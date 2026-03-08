@@ -73,6 +73,12 @@ Stop it with:
 bun run local:down
 ```
 
+For an HTTP-only runtime without the local MCP stdio adapter:
+
+```bash
+bun run start:http
+```
+
 **3. Add the MCP adapter to Claude Desktop**
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -196,6 +202,7 @@ Reference HTTP endpoints:
 - `GET /queries/:id/attachments`
 - `GET /queries/:id/attachments/:index`
 - `GET /queries/:id/attachments/:index/meta`
+- `GET /queries/:id/attachments/:index/preview`
 - `POST /queries/:id/upload`
 - `POST /queries/:id/submit`
 - `POST /queries/:id/cancel`
@@ -205,8 +212,10 @@ For `photo_proof` queries:
 - `GET /queries/:id` returns `result.attachments` as `AttachmentRef[]` with accessible `uri` values
 - `GET /queries/:id/attachments/:index` returns the file itself for local storage, or redirects to the external object URL
 - `GET /queries/:id/attachments/:index/meta` returns stable metadata and view URLs for browser or agent inspection
+- `GET /queries/:id/attachments/:index/preview` returns a resized JPEG preview for browser or agent inspection
 - `GET /uploads/:filename` serves the uploaded image itself
-- `get_query_attachment` returns URL/path metadata by default, and can inline small images through MCP with `include_image: true`
+- `get_query_attachment` returns URL/path metadata only
+- `get_query_attachment_preview` returns a resized preview image through MCP
 
 ## MCP Adapter
 
@@ -218,6 +227,7 @@ Current tools:
 - `request_webpage_field`
 - `get_query_status`
 - `get_query_attachment`
+- `get_query_attachment_preview`
 - `cancel_query`
 - `list_available_queries`
 - `submit_query_result`
@@ -269,7 +279,8 @@ This helps reject obviously bad submissions, but it does not prove ground truth.
 | `REFERENCE_APP_PORT` | `3000` | Port for the reference worker app |
 | `DB_PATH` | `.local/queries.db` | SQLite path for the local query store |
 | `QUERY_SWEEP_INTERVAL_MS` | `30000` | Interval for expiring stale pending queries |
-| `INLINE_ATTACHMENT_LIMIT_BYTES` | `524288` | Max inline image size returned by `get_query_attachment` |
+| `PREVIEW_MAX_DIMENSION` | `768` | Max width/height for resized preview images |
+| `PREVIEW_JPEG_QUALITY` | `75` | JPEG quality used when generating preview images |
 | `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local`, `localstack`, `r2`, or `s3` |
 | `ATTACHMENT_PUBLIC_BASE_URL` | unset | Public base URL for local attachment links |
 | `PUBLIC_BASE_URL` | unset | Alias used when local attachment URLs should resolve through a reverse proxy |
@@ -309,6 +320,94 @@ R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_PUBLIC_BASE_URL=https://assets.example.com
 ```
+
+## Deploying To Fly.io
+
+The current codebase is best deployed as:
+- Fly.io for the public HTTP service and browser worker app
+- Cloudflare R2 for attachment storage
+- local Claude Desktop for the MCP stdio adapter
+
+Files included for this flow:
+- `Dockerfile`
+- `fly.toml`
+
+The deployed app runs the HTTP service only:
+
+```bash
+bun run src/http-server.ts
+```
+
+### 1. Create the Fly app and volume
+
+```bash
+fly launch --no-deploy --copy-config
+fly volumes create data --size 1 --region nrt
+```
+
+If you want a different app name, edit `app` in `fly.toml` before deploy.
+
+### 2. Set R2 secrets
+
+```bash
+fly secrets set \
+  R2_ACCOUNT_ID=... \
+  R2_BUCKET=human-calling \
+  R2_ACCESS_KEY_ID=... \
+  R2_SECRET_ACCESS_KEY=... \
+  R2_PUBLIC_BASE_URL=https://assets.example.com
+```
+
+### 3. Deploy
+
+```bash
+fly deploy
+```
+
+The default Fly config:
+- serves HTTP on port `8080`
+- stores SQLite data under `/data/queries.db`
+- stores local uploads under `/data/uploads` if you ever use `ATTACHMENT_STORAGE=local`
+- assumes `ATTACHMENT_STORAGE=r2`
+
+## CI/CD
+
+GitHub Actions is set up in [.github/workflows/ci-cd.yml](/Users/moti/dev/src/github.com/motxx/human-calling-mcp/.github/workflows/ci-cd.yml).
+
+What it does:
+- on every push and pull request:
+  - `bun install --frozen-lockfile`
+  - `bun run typecheck`
+  - `bun test`
+  - `docker build .`
+- on pushes to the default branch:
+  - deploys to Fly.io with `flyctl deploy --remote-only --config fly.toml`
+- on `workflow_dispatch`:
+  - lets you trigger the same deploy manually from GitHub Actions
+
+Required GitHub secret:
+- `FLY_API_TOKEN`
+
+Create a deploy token with Fly:
+
+```bash
+fly tokens create deploy --app human-calling-mcp
+```
+
+Then add it in GitHub:
+- repository `Settings`
+- `Secrets and variables`
+- `Actions`
+- new repository secret named `FLY_API_TOKEN`
+
+### Why Fly.io instead of Cloudflare Workers
+
+This repository currently depends on:
+- `bun:sqlite`
+- `Bun.serve()`
+- Bun HTML imports for the reference UI
+
+That makes Fly.io a much smaller change than porting the runtime to Workers/D1. Cloudflare still fits very well for storage via R2.
 
 ### LocalStack Example
 

@@ -9,7 +9,9 @@
   },
   "scripts": {
     "start": "bun run src/server.ts",
+    "start:http": "bun run src/http-server.ts",
     "dev": "bun --watch run src/server.ts",
+    "typecheck": "bunx tsc --noEmit",
     "local:up": "bun scripts/local-up.ts",
     "local:down": "bun scripts/local-down.ts"
   },

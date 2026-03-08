@@ -1,6 +1,10 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { DEFAULT_UPLOADS_DIR, getRuntimeConfig } from "./config";
 import type {
+  AttachmentAccess,
+  AttachmentHandle,
   AttachmentRef,
   AttachmentStorageKind,
   QueryResult,
@@ -28,6 +32,73 @@ export interface StoredAttachment {
   storageKind: AttachmentStorageKind;
   path?: string;
   routePath?: string;
+}
+
+export interface AttachmentPreview {
+  data: string;
+  mimeType: string;
+  filename: string;
+  size: number;
+  maxDimension: number;
+}
+
+function resolvePreviewCommand():
+  | { command: string; args: (inputPath: string, outputPath: string, maxDimension: number, jpegQuality: number) => string[] }
+  | null {
+  if (process.platform === "darwin") {
+    return {
+      command: "/usr/bin/sips",
+      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
+        "-Z",
+        String(maxDimension),
+        "-s",
+        "format",
+        "jpeg",
+        "-s",
+        "formatOptions",
+        String(jpegQuality),
+        inputPath,
+        "--out",
+        outputPath,
+      ],
+    };
+  }
+
+  const magick = Bun.which("magick");
+  if (magick) {
+    return {
+      command: magick,
+      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
+        inputPath,
+        "-auto-orient",
+        "-thumbnail",
+        `${maxDimension}x${maxDimension}>`,
+        "-strip",
+        "-quality",
+        String(jpegQuality),
+        outputPath,
+      ],
+    };
+  }
+
+  const convert = Bun.which("convert");
+  if (convert) {
+    return {
+      command: convert,
+      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
+        inputPath,
+        "-auto-orient",
+        "-thumbnail",
+        `${maxDimension}x${maxDimension}>`,
+        "-strip",
+        "-quality",
+        String(jpegQuality),
+        outputPath,
+      ],
+    };
+  }
+
+  return null;
 }
 
 function attachmentRefSource(ref: AttachmentLike): string {
@@ -136,6 +207,38 @@ export function buildQueryAttachmentUrls(queryId: string, attachmentIndex: numbe
   return {
     viewUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}`, `${baseUrl}/`).toString(),
     metaUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}/meta`, `${baseUrl}/`).toString(),
+    previewUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}/preview`, `${baseUrl}/`).toString(),
+  };
+}
+
+export function buildAttachmentAccess(
+  queryId: string,
+  attachmentIndex: number,
+  ref: AttachmentLike,
+  requestUrl?: string,
+): AttachmentAccess {
+  const originalUrl = buildAttachmentAbsoluteUrl(ref, requestUrl);
+  const { viewUrl, metaUrl, previewUrl } = buildQueryAttachmentUrls(queryId, attachmentIndex, requestUrl);
+  const normalized = normalizeAttachmentRef(ref, requestUrl);
+
+  return {
+    original_url: originalUrl,
+    preview_url: previewUrl,
+    view_url: viewUrl,
+    meta_url: metaUrl,
+    local_file_path: normalized.local_file_path,
+  };
+}
+
+export function buildAttachmentHandle(
+  queryId: string,
+  attachmentIndex: number,
+  ref: AttachmentLike,
+  requestUrl?: string,
+): AttachmentHandle {
+  return {
+    attachment: materializeAttachmentRef(ref, requestUrl),
+    access: buildAttachmentAccess(queryId, attachmentIndex, ref, requestUrl),
   };
 }
 
@@ -191,6 +294,16 @@ export function resolveStoredAttachment(ref: AttachmentLike, requestUrl?: string
 }
 
 export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestUrl?: string) {
+  const attachment = await readStoredAttachmentBuffer(ref, requestUrl);
+  if (!attachment) return null;
+
+  return {
+    ...attachment,
+    data: attachment.data.toString("base64"),
+  };
+}
+
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string) {
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 
@@ -199,7 +312,7 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
     if (!response.ok) return null;
     return {
       ...attachment,
-      data: Buffer.from(await response.arrayBuffer()).toString("base64"),
+      data: Buffer.from(await response.arrayBuffer()),
     };
   }
 
@@ -208,8 +321,64 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
 
   return {
     ...attachment,
-    data: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    data: Buffer.from(await file.arrayBuffer()),
   };
+}
+
+export async function renderStoredAttachmentPreview(
+  ref: AttachmentLike,
+  requestUrl?: string,
+  options?: { maxDimension?: number; jpegQuality?: number },
+): Promise<AttachmentPreview | null> {
+  const attachment = await readStoredAttachmentBuffer(ref, requestUrl);
+  if (!attachment) return null;
+
+  if (!attachment.mimeType.startsWith("image/")) {
+    return null;
+  }
+
+  const runtimeConfig = getRuntimeConfig();
+  const maxDimension = options?.maxDimension ?? runtimeConfig.previewMaxDimension;
+  const jpegQuality = options?.jpegQuality ?? runtimeConfig.previewJpegQuality;
+  const previewCommand = resolvePreviewCommand();
+  if (!previewCommand) {
+    return null;
+  }
+  const tempDir = await mkdtemp(join(tmpdir(), "human-calling-preview-"));
+  const inputExt = extname(attachment.filename) || ".bin";
+  const inputPath = join(tempDir, `input${inputExt}`);
+  const outputPath = join(tempDir, "preview.jpg");
+
+  try {
+    await Bun.write(inputPath, attachment.data);
+    const proc = Bun.spawn([
+      previewCommand.command,
+      ...previewCommand.args(inputPath, outputPath, maxDimension, jpegQuality),
+    ], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await proc.exited;
+    if (proc.exitCode !== 0) {
+      return null;
+    }
+
+    const output = Bun.file(outputPath);
+    if (!(await output.exists())) {
+      return null;
+    }
+
+    const data = Buffer.from(await output.arrayBuffer());
+    return {
+      data: data.toString("base64"),
+      mimeType: "image/jpeg",
+      filename: `${attachment.filename.replace(/\.[^.]+$/, "") || "preview"}.preview.jpg`,
+      size: data.length,
+      maxDimension,
+    };
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 export async function statStoredAttachment(ref: AttachmentLike, requestUrl?: string) {

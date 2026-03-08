@@ -3,13 +3,15 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { getAttachmentStore } from "./attachment-store";
 import {
+  buildAttachmentHandle,
   buildAttachmentAbsoluteUrl,
-  buildQueryAttachmentUrls,
   materializeAttachmentRef,
   materializeQueryResult,
+  renderStoredAttachmentPreview,
   statStoredAttachment,
   UPLOADS_DIR,
 } from "./attachments";
+import { getRuntimeConfig } from "./config";
 import {
   cancelQuery,
   getQuery as getQueryById,
@@ -76,20 +78,24 @@ function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
 
 async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, index: number, requestUrl: string) {
   const stat = await statStoredAttachment(attachment, requestUrl);
-  const materialized = materializeAttachmentRef(attachment, requestUrl);
-  const urls = buildQueryAttachmentUrls(query.id, index, requestUrl);
+  const handle = buildAttachmentHandle(query.id, index, attachment, requestUrl);
 
   return {
     query_id: query.id,
     attachment_index: index,
-    attachment: materialized,
-    attachment_view_url: urls.viewUrl,
-    attachment_meta_url: urls.metaUrl,
+    attachment: handle.attachment,
+    access: {
+      ...handle.access,
+      preview_url: handle.access.preview_url ?? undefined,
+      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
+    },
+    attachment_view_url: handle.access.view_url,
+    attachment_meta_url: handle.access.meta_url,
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
     local_file_path: stat?.path ?? null,
-    storage_kind: stat?.storageKind ?? materialized.storage_kind,
-    mime_type: stat?.mimeType ?? materialized.mime_type,
-    size_bytes: stat?.size ?? materialized.size_bytes ?? null,
+    storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
+    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
+    size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
   };
 }
 
@@ -180,6 +186,45 @@ export function buildWorkerApiApp() {
     }
 
     return c.redirect(stat.absoluteUrl, 302);
+  });
+
+  app.get("/queries/:id/attachments/:index/preview", async (c) => {
+    const id = c.req.param("id");
+    const index = Number(c.req.param("index"));
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    if (!Number.isInteger(index) || index < 0) {
+      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
+    }
+
+    const query = getQueryById(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+
+    const attachments = getPhotoProofAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+
+    const attachment = attachments[index];
+    if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+
+    const maxDimensionParam = c.req.query("max_dimension");
+    const maxDimension = maxDimensionParam ? Number(maxDimensionParam) : getRuntimeConfig().previewMaxDimension;
+    if (!Number.isFinite(maxDimension) || maxDimension <= 0) {
+      return c.json({ error: "max_dimension must be a positive number" }, 400);
+    }
+
+    const preview = await renderStoredAttachmentPreview(attachment, c.req.url, {
+      maxDimension: Math.floor(maxDimension),
+    });
+    if (!preview) {
+      return c.json({ error: "Preview could not be generated" }, 422);
+    }
+
+    return new Response(Buffer.from(preview.data, "base64"), {
+      headers: {
+        "content-type": preview.mimeType,
+        "content-length": String(preview.size),
+        "cache-control": "public, max-age=3600",
+      },
+    });
   });
 
   const uploadHandler = async (c: Context) => {

@@ -42,6 +42,19 @@ export interface AttachmentRef {
   route_path?: string;
 }
 
+export interface AttachmentAccess {
+  original_url: string;
+  preview_url?: string;
+  view_url?: string;
+  meta_url?: string;
+  local_file_path?: string;
+}
+
+export interface AttachmentHandle {
+  attachment: AttachmentRef;
+  access: AttachmentAccess;
+}
+
 export interface PhotoProofResult {
   text_answer: string; // must contain nonce
   attachments: AttachmentRef[];

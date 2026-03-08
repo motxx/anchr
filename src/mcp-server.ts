@@ -3,10 +3,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import {
   buildAttachmentAbsoluteUrl,
-  buildQueryAttachmentUrls,
-  materializeAttachmentRef,
+  buildAttachmentHandle,
   materializeQueryResult,
-  readStoredAttachmentAsBase64,
+  renderStoredAttachmentPreview,
   statStoredAttachment,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
@@ -58,10 +57,7 @@ function buildQueryStatusPayload(query: Query) {
 
   if (query.type === "photo_proof") {
     const attachments = query.result?.type === "photo_proof"
-      ? query.result.attachments.map((attachment, index) => ({
-        ...materializeAttachmentRef(attachment, referenceBaseUrl),
-        ...buildQueryAttachmentUrls(query.id, index, referenceBaseUrl),
-      }))
+      ? query.result.attachments.map((attachment, index) => buildAttachmentHandle(query.id, index, attachment, referenceBaseUrl))
       : [];
     const attachmentCount = attachments.length;
     return {
@@ -69,7 +65,7 @@ function buildQueryStatusPayload(query: Query) {
       attachment_count: attachmentCount,
       attachments,
       attachment_access: attachmentCount > 0
-        ? "Use get_query_attachment for URLs/paths by default, or call it with include_image=true to inline small images through MCP."
+        ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
         : null,
     };
   }
@@ -249,13 +245,12 @@ export async function startMcpServer() {
 
   server.tool(
     "get_query_attachment",
-    "Retrieve an attachment for a completed photo proof query as image content.",
+    "Retrieve URL and metadata for an attachment on a completed photo proof query. This tool does not inline image bytes.",
     {
       query_id: z.string().describe("Query ID to inspect"),
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
-      include_image: z.boolean().optional().describe("When true, inline the image bytes in the MCP response. Defaults to false."),
     },
-    async ({ query_id, attachment_index, include_image }) => {
+    async ({ query_id, attachment_index }) => {
       const query = getQuery(query_id);
       if (!query) {
         return { content: [{ type: "text", text: JSON.stringify({ error: "Query not found" }) }] };
@@ -278,14 +273,18 @@ export async function startMcpServer() {
       }
 
       const absoluteUrl = attachmentInfo.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachmentRef);
-      const materialized = materializeAttachmentRef(attachmentRef);
-      const attachmentUrls = buildQueryAttachmentUrls(query.id, index, referenceBaseUrl);
+      const handle = buildAttachmentHandle(query.id, index, attachmentRef, referenceBaseUrl);
       const payload = {
         query_id: query.id,
         attachment_index: index,
-        attachment: materialized,
-        attachment_view_url: attachmentUrls.viewUrl,
-        attachment_meta_url: attachmentUrls.metaUrl,
+        attachment: handle.attachment,
+        access: {
+          ...handle.access,
+          preview_url: handle.access.preview_url ?? undefined,
+          local_file_path: attachmentInfo.path ?? handle.access.local_file_path ?? undefined,
+        },
+        attachment_view_url: handle.access.view_url,
+        attachment_meta_url: handle.access.meta_url,
         filename: attachmentInfo.filename,
         attachment_path: attachmentInfo.routePath ?? null,
         absolute_url: absoluteUrl,
@@ -293,40 +292,8 @@ export async function startMcpServer() {
         storage_kind: attachmentInfo.storageKind,
         mime_type: attachmentInfo.mimeType,
         size_bytes: attachmentInfo.size,
-        include_image: Boolean(include_image),
-        inline_limit_bytes: runtimeConfig.inlineAttachmentLimitBytes,
+        preview_hint: "Use get_query_attachment_preview for a resized inline preview image.",
       };
-
-      if (!include_image) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(payload, null, 2),
-            },
-          ],
-        };
-      }
-
-      if (attachmentInfo.size > runtimeConfig.inlineAttachmentLimitBytes) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                ...payload,
-                error: `Attachment too large to inline over MCP (${attachmentInfo.size} bytes)`,
-                hint: "Use absolute_url or local_file_path instead, or retry with a smaller image.",
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      const attachment = await readStoredAttachmentAsBase64(attachmentRef);
-      if (!attachment) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Attachment file not found" }) }] };
-      }
 
       return {
         content: [
@@ -334,10 +301,86 @@ export async function startMcpServer() {
             type: "text",
             text: JSON.stringify(payload, null, 2),
           },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "get_query_attachment_preview",
+    "Retrieve a resized preview image for a completed photo proof query. This is safer for Claude Desktop than inlining the original image.",
+    {
+      query_id: z.string().describe("Query ID to inspect"),
+      attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
+      max_dimension: z.number().int().min(64).max(2048).optional().describe("Maximum width or height of the preview image. Defaults to PREVIEW_MAX_DIMENSION."),
+    },
+    async ({ query_id, attachment_index, max_dimension }) => {
+      const query = getQuery(query_id);
+      if (!query) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "Query not found" }) }] };
+      }
+
+      const attachments = getPhotoProofAttachmentRefs(query);
+      if (!attachments) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "Query does not have photo proof attachments" }) }] };
+      }
+
+      const index = attachment_index ?? 0;
+      const attachmentRef = attachments[index];
+      if (!attachmentRef) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Attachment index ${index} not found` }) }] };
+      }
+
+      const attachmentInfo = await statStoredAttachment(attachmentRef);
+      if (!attachmentInfo) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: "Attachment file not found" }) }] };
+      }
+
+      const handle = buildAttachmentHandle(query.id, index, attachmentRef, referenceBaseUrl);
+      const preview = await renderStoredAttachmentPreview(attachmentRef, referenceBaseUrl, {
+        maxDimension: max_dimension ?? runtimeConfig.previewMaxDimension,
+      });
+
+      if (!preview) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                query_id: query.id,
+                attachment_index: index,
+                attachment: handle.attachment,
+                access: handle.access,
+                error: "Preview could not be generated",
+                hint: "Use get_query_attachment for original URLs or inspect the image in the browser.",
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              query_id: query.id,
+              attachment_index: index,
+              attachment: handle.attachment,
+              access: {
+                ...handle.access,
+                preview_url: `${handle.access.preview_url}?max_dimension=${preview.maxDimension}`,
+              },
+              original_size_bytes: attachmentInfo.size,
+              preview_size_bytes: preview.size,
+              preview_mime_type: preview.mimeType,
+              max_dimension: preview.maxDimension,
+            }, null, 2),
+          },
           {
             type: "image",
-            data: attachment.data,
-            mimeType: attachment.mimeType,
+            data: preview.data,
+            mimeType: preview.mimeType,
           },
         ],
       };

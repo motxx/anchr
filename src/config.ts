@@ -16,18 +16,20 @@ export interface RuntimeConfig {
   dbPath: string;
   referenceAppPort: number;
   querySweepIntervalMs: number;
-  inlineAttachmentLimitBytes: number;
+  previewMaxDimension: number;
+  previewJpegQuality: number;
 }
 
-export const DEFAULT_RUNTIME_DATA_DIR = join(import.meta.dir, "..", ".local");
-export const DEFAULT_UPLOADS_DIR = join(DEFAULT_RUNTIME_DATA_DIR, "uploads");
-export const DEFAULT_DB_PATH = join(DEFAULT_RUNTIME_DATA_DIR, "queries.db");
+export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
+export const DEFAULT_UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(DEFAULT_RUNTIME_DATA_DIR, "uploads");
+export const DEFAULT_DB_PATH = process.env.DB_PATH ?? join(DEFAULT_RUNTIME_DATA_DIR, "queries.db");
 
 export function getRuntimeConfig(): RuntimeConfig {
   return {
-    dbPath: process.env.DB_PATH ?? DEFAULT_DB_PATH,
-    referenceAppPort: readNumberEnv("REFERENCE_APP_PORT", 3000),
+    dbPath: DEFAULT_DB_PATH,
+    referenceAppPort: readNumberEnv("REFERENCE_APP_PORT", readNumberEnv("PORT", 3000)),
     querySweepIntervalMs: readNumberEnv("QUERY_SWEEP_INTERVAL_MS", 30_000),
-    inlineAttachmentLimitBytes: readNumberEnv("INLINE_ATTACHMENT_LIMIT_BYTES", 512 * 1024),
+    previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),
+    previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
   };
 }

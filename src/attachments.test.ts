@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import {
+  buildAttachmentAccess,
+  buildAttachmentHandle,
   buildAttachmentAbsoluteUrl,
   buildQueryAttachmentUrls,
   materializeQueryResult,
@@ -92,4 +94,33 @@ test("buildQueryAttachmentUrls returns stable query attachment endpoints", () =>
 
   expect(urls.viewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2");
   expect(urls.metaUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/meta");
+  expect(urls.previewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/preview");
+});
+
+test("buildAttachmentAccess keeps delivery URLs separate from attachment identity", () => {
+  const access = buildAttachmentAccess(
+    "query_1",
+    0,
+    "/uploads/example.png",
+    "http://localhost:3000/queries/query_1",
+  );
+
+  expect(access.original_url).toBe("http://localhost:3000/uploads/example.png");
+  expect(access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
+  expect(access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
+  expect(access.meta_url).toBe("http://localhost:3000/queries/query_1/attachments/0/meta");
+});
+
+test("buildAttachmentHandle returns attachment plus derived access info", () => {
+  const handle = buildAttachmentHandle(
+    "query_1",
+    0,
+    "/uploads/example.png",
+    "http://localhost:3000/queries/query_1",
+  );
+
+  expect(handle.attachment.uri).toBe("http://localhost:3000/uploads/example.png");
+  expect(handle.access.original_url).toBe("http://localhost:3000/uploads/example.png");
+  expect(handle.access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
+  expect(handle.access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
 });
