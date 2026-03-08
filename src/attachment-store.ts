@@ -93,6 +93,26 @@ interface S3Config {
 }
 
 function getS3Config(): S3Config {
+  const storage = process.env.ATTACHMENT_STORAGE ?? "local";
+  if (storage === "localstack") {
+    const bucket = process.env.LOCALSTACK_BUCKET ?? "human-calling";
+    const endpoint = trimTrailingSlash(process.env.LOCALSTACK_ENDPOINT ?? "http://localhost:4566");
+    const publicBaseUrl = trimTrailingSlash(
+      process.env.LOCALSTACK_PUBLIC_BASE_URL ?? `${endpoint}/${bucket}`,
+    );
+
+    return {
+      accessKeyId: process.env.LOCALSTACK_ACCESS_KEY_ID ?? "test",
+      secretAccessKey: process.env.LOCALSTACK_SECRET_ACCESS_KEY ?? "test",
+      sessionToken: process.env.LOCALSTACK_SESSION_TOKEN,
+      bucket,
+      endpoint,
+      region: process.env.LOCALSTACK_REGION ?? "us-east-1",
+      prefix: process.env.LOCALSTACK_PREFIX?.replace(/^\/+|\/+$/g, ""),
+      publicBaseUrl,
+    };
+  }
+
   const accessKeyId = process.env.R2_ACCESS_KEY_ID ?? process.env.S3_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY ?? process.env.S3_SECRET_ACCESS_KEY;
   const bucket = process.env.R2_BUCKET ?? process.env.S3_BUCKET;
@@ -215,7 +235,7 @@ class S3AttachmentStore implements AttachmentStore {
 }
 
 export function getAttachmentStore(): AttachmentStore {
-  if (["s3", "r2"].includes(process.env.ATTACHMENT_STORAGE ?? "local")) {
+  if (["s3", "r2", "localstack"].includes(process.env.ATTACHMENT_STORAGE ?? "local")) {
     return new S3AttachmentStore(getS3Config());
   }
   return new LocalAttachmentStore();

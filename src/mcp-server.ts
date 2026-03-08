@@ -1,7 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { buildAttachmentAbsoluteUrl, materializeAttachmentRef, readStoredAttachmentAsBase64, statStoredAttachment } from "./attachments";
+import {
+  buildAttachmentAbsoluteUrl,
+  buildQueryAttachmentUrls,
+  materializeAttachmentRef,
+  materializeQueryResult,
+  readStoredAttachmentAsBase64,
+  statStoredAttachment,
+} from "./attachments";
 import { getRuntimeConfig } from "./config";
 import {
   cancelQuery,
@@ -16,6 +23,7 @@ import {
 import type { AttachmentRef } from "./types";
 
 const runtimeConfig = getRuntimeConfig();
+const referenceBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
 
 function buildCreatedQueryPayload(query: {
   id: string;
@@ -30,28 +38,36 @@ function buildCreatedQueryPayload(query: {
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: new Date(query.expires_at).toISOString(),
-    reference_app_url: `http://localhost:${runtimeConfig.referenceAppPort}/queries/${query.id}`,
-    query_api_url: `http://localhost:${runtimeConfig.referenceAppPort}/queries/${query.id}`,
+    reference_app_url: `${referenceBaseUrl}/queries/${query.id}`,
+    query_api_url: `${referenceBaseUrl}/queries/${query.id}`,
   };
 }
 
 function buildQueryStatusPayload(query: Query) {
+  const result = query.result ? materializeQueryResult(query.result, referenceBaseUrl) : null;
   const payload = {
     query_id: query.id,
     type: query.type,
     status: query.status,
     payment_status: query.payment_status,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-    result: query.result ?? null,
+    result,
     verification: query.verification ?? null,
     submission_meta: query.submission_meta ?? null,
   };
 
   if (query.type === "photo_proof") {
-    const attachmentCount = query.result?.type === "photo_proof" ? query.result.attachments.length : 0;
+    const attachments = query.result?.type === "photo_proof"
+      ? query.result.attachments.map((attachment, index) => ({
+        ...materializeAttachmentRef(attachment, referenceBaseUrl),
+        ...buildQueryAttachmentUrls(query.id, index, referenceBaseUrl),
+      }))
+      : [];
+    const attachmentCount = attachments.length;
     return {
       ...payload,
       attachment_count: attachmentCount,
+      attachments,
       attachment_access: attachmentCount > 0
         ? "Use get_query_attachment for URLs/paths by default, or call it with include_image=true to inline small images through MCP."
         : null,
@@ -263,10 +279,13 @@ export async function startMcpServer() {
 
       const absoluteUrl = attachmentInfo.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachmentRef);
       const materialized = materializeAttachmentRef(attachmentRef);
+      const attachmentUrls = buildQueryAttachmentUrls(query.id, index, referenceBaseUrl);
       const payload = {
         query_id: query.id,
         attachment_index: index,
         attachment: materialized,
+        attachment_view_url: attachmentUrls.viewUrl,
+        attachment_meta_url: attachmentUrls.metaUrl,
         filename: attachmentInfo.filename,
         attachment_path: attachmentInfo.routePath ?? null,
         absolute_url: absoluteUrl,

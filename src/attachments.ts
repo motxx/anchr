@@ -120,6 +120,25 @@ export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: strin
   };
 }
 
+export function materializeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
+  if (result.type !== "photo_proof") {
+    return result;
+  }
+
+  return {
+    ...result,
+    attachments: result.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
+  };
+}
+
+export function buildQueryAttachmentUrls(queryId: string, attachmentIndex: number, requestUrl?: string) {
+  const baseUrl = attachmentPublicBaseUrl(requestUrl);
+  return {
+    viewUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}`, `${baseUrl}/`).toString(),
+    metaUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}/meta`, `${baseUrl}/`).toString(),
+  };
+}
+
 export function normalizeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
   if (result.type !== "photo_proof") {
     return result;

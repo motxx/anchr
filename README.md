@@ -61,6 +61,18 @@ This starts:
 - the reference worker app on `http://localhost:3000`
 - the local SQLite-backed query store
 
+For the browser app plus LocalStack attachment storage as one local environment:
+
+```bash
+bun run local:up
+```
+
+Stop it with:
+
+```bash
+bun run local:down
+```
+
 **3. Add the MCP adapter to Claude Desktop**
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -181,6 +193,9 @@ It shows pending live queries and lets a human submit structured results.
 Reference HTTP endpoints:
 - `GET /queries`
 - `GET /queries/:id`
+- `GET /queries/:id/attachments`
+- `GET /queries/:id/attachments/:index`
+- `GET /queries/:id/attachments/:index/meta`
 - `POST /queries/:id/upload`
 - `POST /queries/:id/submit`
 - `POST /queries/:id/cancel`
@@ -188,6 +203,8 @@ Reference HTTP endpoints:
 For `photo_proof` queries:
 - `POST /queries/:id/upload` returns `attachment`
 - `GET /queries/:id` returns `result.attachments` as `AttachmentRef[]` with accessible `uri` values
+- `GET /queries/:id/attachments/:index` returns the file itself for local storage, or redirects to the external object URL
+- `GET /queries/:id/attachments/:index/meta` returns stable metadata and view URLs for browser or agent inspection
 - `GET /uploads/:filename` serves the uploaded image itself
 - `get_query_attachment` returns URL/path metadata by default, and can inline small images through MCP with `include_image: true`
 
@@ -207,7 +224,12 @@ Current tools:
 
 ## Attachment Storage
 
-The default attachment backend is `.local/uploads` on disk plus the reference app's `/uploads/...` HTTP route.
+The default attachment backend is `.local/uploads` on disk plus a local mock object-access layer exposed by the reference app.
+
+For local development, prefer the query attachment endpoints over wiring up a full S3 clone:
+- `GET /queries/:id/attachments`
+- `GET /queries/:id/attachments/:index`
+- `GET /queries/:id/attachments/:index/meta`
 
 You can also switch to an S3-compatible object store so photo attachments are retrievable via public URLs.
 
@@ -215,10 +237,12 @@ Recommended:
 - Cloudflare R2 with a custom domain
 
 Also supported:
+- LocalStack S3 for local object-storage development
 - Amazon S3 with CloudFront
 - any S3-compatible endpoint that supports server-side PUT uploads
+- Local mock mode via the reference app HTTP endpoints
 
-In S3 mode, uploaded files are written directly to object storage and `result.attachments` stores `AttachmentRef` objects whose `uri` points at the public asset URL.
+In S3 mode, uploaded files are written directly to object storage and `result.attachments` stores `AttachmentRef` objects whose `uri` points at the public asset URL. In local mode, the same queries expose stable attachment view/meta URLs through the reference app.
 
 For Claude Desktop, the MCP server still runs locally over `stdio`. A good deployment split is:
 - local Bun process for the MCP adapter
@@ -246,9 +270,17 @@ This helps reject obviously bad submissions, but it does not prove ground truth.
 | `DB_PATH` | `.local/queries.db` | SQLite path for the local query store |
 | `QUERY_SWEEP_INTERVAL_MS` | `30000` | Interval for expiring stale pending queries |
 | `INLINE_ATTACHMENT_LIMIT_BYTES` | `524288` | Max inline image size returned by `get_query_attachment` |
-| `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local` or `s3` |
+| `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local`, `localstack`, `r2`, or `s3` |
 | `ATTACHMENT_PUBLIC_BASE_URL` | unset | Public base URL for local attachment links |
 | `PUBLIC_BASE_URL` | unset | Alias used when local attachment URLs should resolve through a reverse proxy |
+| `LOCALSTACK_ENDPOINT` | `http://localhost:4566` | LocalStack S3 endpoint |
+| `LOCALSTACK_BUCKET` | `human-calling` | Bucket name used in LocalStack mode |
+| `LOCALSTACK_PUBLIC_BASE_URL` | `http://localhost:4566/<bucket>` | Public read URL base for LocalStack mode |
+| `LOCALSTACK_ACCESS_KEY_ID` | `test` | Access key used in LocalStack mode |
+| `LOCALSTACK_SECRET_ACCESS_KEY` | `test` | Secret key used in LocalStack mode |
+| `LOCALSTACK_SESSION_TOKEN` | unset | Optional session token for LocalStack mode |
+| `LOCALSTACK_REGION` | `us-east-1` | Region used in LocalStack mode |
+| `LOCALSTACK_PREFIX` | unset | Optional key prefix for LocalStack uploads |
 | `R2_ACCOUNT_ID` | unset | Cloudflare account ID; used to derive the R2 endpoint when `R2_ENDPOINT` is not set |
 | `R2_BUCKET` | unset | R2 bucket name |
 | `R2_ACCESS_KEY_ID` | unset | R2 access key |
@@ -277,6 +309,25 @@ R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
 R2_PUBLIC_BASE_URL=https://assets.example.com
 ```
+
+### LocalStack Example
+
+Start LocalStack:
+
+```bash
+docker compose -f docker-compose.localstack.yml up -d
+```
+
+Use it for attachments:
+
+```bash
+ATTACHMENT_STORAGE=localstack
+LOCALSTACK_ENDPOINT=http://localhost:4566
+LOCALSTACK_BUCKET=human-calling
+LOCALSTACK_PUBLIC_BASE_URL=http://localhost:4566/human-calling
+```
+
+In this mode, uploaded photo attachments are written to LocalStack S3 and the returned `AttachmentRef.uri` is directly fetchable over HTTP.
 
 ## Architecture
 

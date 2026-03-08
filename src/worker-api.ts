@@ -2,7 +2,14 @@ import { join } from "node:path";
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { getAttachmentStore } from "./attachment-store";
-import { UPLOADS_DIR, materializeAttachmentRef } from "./attachments";
+import {
+  buildAttachmentAbsoluteUrl,
+  buildQueryAttachmentUrls,
+  materializeAttachmentRef,
+  materializeQueryResult,
+  statStoredAttachment,
+  UPLOADS_DIR,
+} from "./attachments";
 import {
   cancelQuery,
   getQuery as getQueryById,
@@ -11,7 +18,7 @@ import {
   type Query,
   type QueryResult,
 } from "./query-service";
-import type { AttachmentRef, PhotoProofResult } from "./types";
+import type { AttachmentRef } from "./types";
 
 export async function prepareWorkerApiAssets() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
@@ -44,14 +51,7 @@ function querySummary(query: Query) {
 
 function materializeResult(result: QueryResult | undefined, requestUrl: string): QueryResult | undefined {
   if (!result) return undefined;
-  if (result.type !== "photo_proof") return result;
-
-  const photoProof: PhotoProofResult = result;
-  return {
-    ...photoProof,
-    type: result.type,
-    attachments: photoProof.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
-  };
+  return materializeQueryResult(result, requestUrl);
 }
 
 function queryDetail(query: Query, requestUrl: string) {
@@ -63,6 +63,33 @@ function queryDetail(query: Query, requestUrl: string) {
     verification: query.verification,
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
+  };
+}
+
+function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
+  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") {
+    return null;
+  }
+
+  return query.result.attachments;
+}
+
+async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, index: number, requestUrl: string) {
+  const stat = await statStoredAttachment(attachment, requestUrl);
+  const materialized = materializeAttachmentRef(attachment, requestUrl);
+  const urls = buildQueryAttachmentUrls(query.id, index, requestUrl);
+
+  return {
+    query_id: query.id,
+    attachment_index: index,
+    attachment: materialized,
+    attachment_view_url: urls.viewUrl,
+    attachment_meta_url: urls.metaUrl,
+    absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
+    local_file_path: stat?.path ?? null,
+    storage_kind: stat?.storageKind ?? materialized.storage_kind,
+    mime_type: stat?.mimeType ?? materialized.mime_type,
+    size_bytes: stat?.size ?? materialized.size_bytes ?? null,
   };
 }
 
@@ -82,6 +109,78 @@ export function buildWorkerApiApp() {
   app.get("/queries", listQueries);
 
   app.get("/queries/:id", getQuery);
+
+  app.get("/queries/:id/attachments", async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+
+    const query = getQueryById(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+
+    const attachments = getPhotoProofAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+
+    const payloads = await Promise.all(
+      attachments.map((attachment, index) => buildAttachmentPayload(query, attachment, index, c.req.url)),
+    );
+
+    return c.json(payloads);
+  });
+
+  app.get("/queries/:id/attachments/:index/meta", async (c) => {
+    const id = c.req.param("id");
+    const index = Number(c.req.param("index"));
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    if (!Number.isInteger(index) || index < 0) {
+      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
+    }
+
+    const query = getQueryById(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+
+    const attachments = getPhotoProofAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+
+    const attachment = attachments[index];
+    if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+
+    return c.json(await buildAttachmentPayload(query, attachment, index, c.req.url));
+  });
+
+  app.get("/queries/:id/attachments/:index", async (c) => {
+    const id = c.req.param("id");
+    const index = Number(c.req.param("index"));
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    if (!Number.isInteger(index) || index < 0) {
+      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
+    }
+
+    const query = getQueryById(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+
+    const attachments = getPhotoProofAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+
+    const attachment = attachments[index];
+    if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+
+    const stat = await statStoredAttachment(attachment, c.req.url);
+    if (!stat) return c.json({ error: "Attachment file not found" }, 404);
+
+    if (stat.storageKind === "local") {
+      const file = Bun.file(stat.path!);
+      if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
+      return new Response(file, {
+        headers: {
+          "content-type": stat.mimeType,
+          "content-length": String(stat.size),
+          "cache-control": "public, max-age=3600",
+        },
+      });
+    }
+
+    return c.redirect(stat.absoluteUrl, 302);
+  });
 
   const uploadHandler = async (c: Context) => {
     const id = c.req.param("id");

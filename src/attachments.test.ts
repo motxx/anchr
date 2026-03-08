@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { buildAttachmentAbsoluteUrl, normalizeQueryResult, resolveStoredAttachment } from "./attachments";
+import {
+  buildAttachmentAbsoluteUrl,
+  buildQueryAttachmentUrls,
+  materializeQueryResult,
+  normalizeQueryResult,
+  resolveStoredAttachment,
+} from "./attachments";
 
 test("resolveStoredAttachment accepts upload paths", () => {
   const attachment = resolveStoredAttachment("/uploads/example.png");
@@ -58,4 +64,32 @@ test("normalizeQueryResult preserves structured attachment refs", () => {
     local_file_path: expect.any(String),
     route_path: "/uploads/example.png",
   }]);
+});
+
+test("materializeQueryResult expands local attachment refs to absolute URLs", () => {
+  const result = materializeQueryResult({
+    type: "photo_proof",
+    text_answer: "Observed storefront K7P4",
+    attachments: [{
+      id: "example.png",
+      uri: "/uploads/example.png",
+      mime_type: "image/png",
+      storage_kind: "local",
+      route_path: "/uploads/example.png",
+    }],
+    notes: "ok",
+  }, "http://localhost:3000/queries/query_1");
+
+  expect(result.type).toBe("photo_proof");
+  if (result.type !== "photo_proof") {
+    throw new Error("expected photo_proof result");
+  }
+  expect(result.attachments[0]?.uri).toBe("http://localhost:3000/uploads/example.png");
+});
+
+test("buildQueryAttachmentUrls returns stable query attachment endpoints", () => {
+  const urls = buildQueryAttachmentUrls("query_1", 2, "http://localhost:3000/queries/query_1");
+
+  expect(urls.viewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2");
+  expect(urls.metaUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/meta");
 });

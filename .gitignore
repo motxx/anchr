@@ -39,7 +39,7 @@ mcp.json
 # db
 jobs.db*
 queries.db*
-.local/queries.db*
+.local/
 
 # uploads
 uploads/*
