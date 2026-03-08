@@ -28,8 +28,9 @@ function previewSupported() {
   return process.platform === "darwin" || Boolean(Bun.which("magick") || Bun.which("convert"));
 }
 
-async function createMcpClient() {
+async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
   const bootstrap = [
+    bootstrapPreamble,
     `const { startMcpServer } = await import(${JSON.stringify(join(import.meta.dir, "mcp-server.ts"))});`,
     "await startMcpServer();",
     "await new Promise(() => {});",
@@ -41,6 +42,7 @@ async function createMcpClient() {
     env: {
       ...process.env,
       REFERENCE_APP_PORT: process.env.REFERENCE_APP_PORT ?? "3000",
+      ...envOverrides,
     },
   });
 
@@ -120,5 +122,78 @@ test("mcp tools expose query status and attachment metadata", async () => {
   } finally {
     await client.close();
     rmSync(localPath, { force: true });
+  }
+});
+
+test("mcp can use a remote HTTP query backend", async () => {
+  const baseUrl = "http://remote.test";
+  const bootstrapPreamble = [
+    `process.env.HTTP_API_KEY = "remote-test-key";`,
+    `const { buildWorkerApiApp } = await import(${JSON.stringify(join(import.meta.dir, "worker-api.ts"))});`,
+    `const app = buildWorkerApiApp();`,
+    `const originalFetch = globalThis.fetch.bind(globalThis);`,
+    `globalThis.fetch = async (input, init) => {`,
+    `  const url = typeof input === "string" || input instanceof URL ? new URL(input.toString()) : new URL(input.url);`,
+    `  if (url.origin === ${JSON.stringify(baseUrl)}) {`,
+    `    const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");`,
+    `    const headers = new Headers(init?.headers ?? (typeof input === "object" && "headers" in input ? input.headers : undefined));`,
+    `    const body = init?.body ?? (typeof input === "object" && "body" in input ? input.body : undefined);`,
+    `    const request = new Request(url, { method, headers, body, duplex: "half" });`,
+    `    return app.fetch(request);`,
+    `  }`,
+    `  return originalFetch(input, init);`,
+    `};`,
+  ].join(" ");
+  const client = await createMcpClient({
+    REMOTE_QUERY_API_BASE_URL: baseUrl,
+    REMOTE_QUERY_API_KEY: "remote-test-key",
+    REFERENCE_APP_PORT: "3000",
+  }, bootstrapPreamble);
+
+  try {
+    const created = await client.callTool({
+      name: "request_store_status",
+      arguments: {
+        store_name: "Remote MCP Smoke Store",
+        location_hint: "Tokyo",
+        ttl_seconds: 180,
+      },
+    });
+    const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
+    expect(createdJson.query_id).toStartWith("query_");
+    expect(createdJson.reference_app_url).toContain(baseUrl);
+    expect(createdJson.requester_meta?.client_name).toBe("mcp-remote");
+
+    const listed = await client.callTool({
+      name: "list_available_queries",
+      arguments: {},
+    });
+    const listedJson = parseTextPayload(listed as { content: Array<{ type: string; text?: string }> }) as Array<{ query_id: string }>;
+    expect(listedJson.some((query) => query.query_id === createdJson.query_id)).toBe(true);
+
+    const submit = await client.callTool({
+      name: "submit_query_result",
+      arguments: {
+        query_id: createdJson.query_id,
+        result: {
+          type: "store_status",
+          status: "open",
+          notes: `Observed storefront ${createdJson.challenge_nonce}`,
+        },
+      },
+    });
+    const submitJson = parseTextPayload(submit as { content: Array<{ type: string; text?: string }> });
+    expect(submitJson.ok).toBe(true);
+    expect(submitJson.payment_status).toBe("released");
+
+    const status = await client.callTool({
+      name: "get_query_status",
+      arguments: { query_id: createdJson.query_id },
+    });
+    const statusJson = parseTextPayload(status as { content: Array<{ type: string; text?: string }> });
+    expect(statusJson.status).toBe("approved");
+    expect(statusJson.requester_meta?.client_name).toBe("mcp-remote");
+  } finally {
+    await client.close();
   }
 });

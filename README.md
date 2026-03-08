@@ -241,6 +241,7 @@ curl -X POST https://human-calling-mcp.fly.dev/queries \
 ## MCP Adapter
 
 The bundled MCP adapter exposes the engine as tools.
+By default it uses the local query store. If you set `REMOTE_QUERY_API_BASE_URL`, the same local `stdio` MCP server proxies query creation, polling, cancellation, and submission to a remote HTTP deployment.
 
 Current tools:
 - `request_photo_proof`
@@ -280,6 +281,25 @@ For Claude Desktop, the MCP server still runs locally over `stdio`. A good deplo
 - Cloudflare R2 for attachment storage
 - optional custom domain such as `https://assets.example.com`
 
+To make Claude Desktop talk to the deployed Fly app through the local MCP adapter:
+
+```json
+{
+  "mcpServers": {
+    "human-calling": {
+      "command": "bun",
+      "args": ["run", "/path/to/human-calling-mcp/src/index.ts"],
+      "env": {
+        "REMOTE_QUERY_API_BASE_URL": "https://human-calling-mcp.fly.dev",
+        "REMOTE_QUERY_API_KEY": "your-write-key"
+      }
+    }
+  }
+}
+```
+
+That keeps the Claude Desktop transport local, while the query backend itself lives on Fly.io.
+
 ## Verification Model
 
 Verification is intentionally lightweight.
@@ -304,6 +324,8 @@ This helps reject obviously bad submissions, but it does not prove ground truth.
 | `PREVIEW_JPEG_QUALITY` | `75` | JPEG quality used when generating preview images |
 | `HTTP_API_KEY` | unset | Single API key allowed to create/upload/submit/cancel queries over HTTP |
 | `HTTP_API_KEYS` | unset | Comma-separated API keys for the same write endpoints; takes precedence if set |
+| `REMOTE_QUERY_API_BASE_URL` | unset | Optional remote HTTP query service base URL used by the local MCP adapter |
+| `REMOTE_QUERY_API_KEY` | unset | Optional API key used by the local MCP adapter when proxying write calls to the remote HTTP API |
 | `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local`, `localstack`, `r2`, or `s3` |
 | `ATTACHMENT_PUBLIC_BASE_URL` | unset | Public base URL for local attachment links |
 | `PUBLIC_BASE_URL` | unset | Alias used when local attachment URLs should resolve through a reverse proxy |

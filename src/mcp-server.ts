@@ -1,89 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import {
-  buildAttachmentAbsoluteUrl,
-  buildAttachmentHandle,
-  materializeQueryResult,
-  renderStoredAttachmentPreview,
-  statStoredAttachment,
-} from "./attachments";
-import { getRuntimeConfig } from "./config";
-import {
-  cancelQuery,
-  createQuery,
-  getQuery,
-  listOpenQueries,
-  submitQueryResult,
-  type Query,
-  type QueryInput,
-  type QueryResult,
-} from "./query-service";
-import type { AttachmentRef } from "./types";
+import { getMcpQueryBackend } from "./mcp-query-backend";
+import type { QueryInput, QueryResult, RequesterMeta } from "./query-service";
 
-const runtimeConfig = getRuntimeConfig();
-const referenceBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
-
-function buildCreatedQueryPayload(query: {
-  id: string;
-  type: string;
-  status: string;
-  challenge_nonce: string;
-  challenge_rule: string;
-  expires_at: number;
-  requester_meta?: Query["requester_meta"];
-}) {
+function buildRequesterMeta(): RequesterMeta {
   return {
-    query_id: query.id,
-    status: query.status,
-    type: query.type,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
-    expires_at: new Date(query.expires_at).toISOString(),
-    requester_meta: query.requester_meta ?? null,
-    reference_app_url: `${referenceBaseUrl}/queries/${query.id}`,
-    query_api_url: `${referenceBaseUrl}/queries/${query.id}`,
+    requester_type: "agent",
+    client_name: process.env.REMOTE_QUERY_API_BASE_URL ? "mcp-remote" : "mcp",
   };
-}
-
-function buildQueryStatusPayload(query: Query) {
-  const result = query.result ? materializeQueryResult(query.result, referenceBaseUrl) : null;
-  const payload = {
-    query_id: query.id,
-    type: query.type,
-    status: query.status,
-    requester_meta: query.requester_meta ?? null,
-    payment_status: query.payment_status,
-    expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-    result,
-    verification: query.verification ?? null,
-    submission_meta: query.submission_meta ?? null,
-  };
-
-  if (query.type === "photo_proof") {
-    const attachments = query.result?.type === "photo_proof"
-      ? query.result.attachments.map((attachment, index) => buildAttachmentHandle(query.id, index, attachment, referenceBaseUrl))
-      : [];
-    const attachmentCount = attachments.length;
-    return {
-      ...payload,
-      attachment_count: attachmentCount,
-      attachments,
-      attachment_access: attachmentCount > 0
-        ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
-        : null,
-    };
-  }
-
-  return payload;
-}
-
-function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
-  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") {
-    return null;
-  }
-
-  return query.result.attachments;
 }
 
 export async function startMcpServer() {
@@ -91,8 +16,8 @@ export async function startMcpServer() {
     name: "human-calling-mcp",
     version: "0.1.0",
   });
+  const backend = getMcpQueryBackend();
 
-  // Tool: request_photo_proof
   server.tool(
     "request_photo_proof",
     "Ask a human to photograph a specific target. The human must include a one-time nonce in the photo or text answer. Returns a query_id for polling.",
@@ -103,25 +28,13 @@ export async function startMcpServer() {
     },
     async ({ target, location_hint, ttl_seconds }) => {
       const params: QueryInput = { type: "photo_proof", target, location_hint };
-      const query = createQuery(params, {
-        ttlSeconds: ttl_seconds ?? 600,
-        requesterMeta: {
-          requester_type: "agent",
-          client_name: "mcp",
-        },
-      });
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(buildCreatedQueryPayload(query), null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
 
-  // Tool: request_store_status
   server.tool(
     "request_store_status",
     "Ask a human to check if a store is currently open or closed. Returns a live query. The human must include a nonce in their notes.",
@@ -132,25 +45,13 @@ export async function startMcpServer() {
     },
     async ({ store_name, location_hint, ttl_seconds }) => {
       const params: QueryInput = { type: "store_status", store_name, location_hint };
-      const query = createQuery(params, {
-        ttlSeconds: ttl_seconds ?? 600,
-        requesterMeta: {
-          requester_type: "agent",
-          client_name: "mcp",
-        },
-      });
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(buildCreatedQueryPayload(query), null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
 
-  // Tool: request_webpage_field
   server.tool(
     "request_webpage_field",
     "Ask a human to extract a specific field from a webpage and provide nearby proof text. Returns a live query.",
@@ -162,20 +63,9 @@ export async function startMcpServer() {
     },
     async ({ url, field, anchor_word, ttl_seconds }) => {
       const params: QueryInput = { type: "webpage_field", url, field, anchor_word };
-      const query = createQuery(params, {
-        ttlSeconds: ttl_seconds ?? 600,
-        requesterMeta: {
-          requester_type: "agent",
-          client_name: "mcp",
-        },
-      });
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(buildCreatedQueryPayload(query), null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
@@ -187,17 +77,9 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID returned from a request_* tool"),
     },
     async ({ query_id }) => {
-      const query = getQuery(query_id);
-      if (!query) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Query not found" }) }] };
-      }
+      const payload = await backend.getQueryStatus(query_id);
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(buildQueryStatusPayload(query), null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
@@ -209,8 +91,10 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID to cancel"),
     },
     async ({ query_id }) => {
-      const outcome = cancelQuery(query_id);
-      return { content: [{ type: "text", text: JSON.stringify(outcome) }] };
+      const payload = await backend.cancelQuery(query_id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      };
     },
   );
 
@@ -218,23 +102,12 @@ export async function startMcpServer() {
     "list_available_queries",
     "List currently available live queries. Useful for debugging or building a reference worker app.",
     {},
-    async () => ({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            listOpenQueries().map((query) => ({
-              query_id: query.id,
-              type: query.type,
-              challenge_rule: query.challenge_rule,
-              expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-            })),
-            null,
-            2,
-          ),
-        },
-      ],
-    }),
+    async () => {
+      const payload = await backend.listAvailableQueries();
+      return {
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      };
+    },
   );
 
   server.tool(
@@ -245,23 +118,9 @@ export async function startMcpServer() {
       result: z.record(z.string(), z.unknown()).describe("Result object matching the query type"),
     },
     async ({ query_id, result }) => {
-      const outcome = submitQueryResult(query_id, result as unknown as QueryResult, {
-        executor_type: "agent",
-        channel: "mcp",
-      });
+      const payload = await backend.submitQueryResult(query_id, result as unknown as QueryResult);
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              ok: outcome.ok,
-              message: outcome.message,
-              query_id: outcome.query?.id ?? null,
-              verification: outcome.query?.verification,
-              payment_status: outcome.query?.payment_status,
-            }, null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
@@ -274,57 +133,9 @@ export async function startMcpServer() {
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
     },
     async ({ query_id, attachment_index }) => {
-      const query = getQuery(query_id);
-      if (!query) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Query not found" }) }] };
-      }
-
-      const attachments = getPhotoProofAttachmentRefs(query);
-      if (!attachments) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Query does not have photo proof attachments" }) }] };
-      }
-
-      const index = attachment_index ?? 0;
-      const attachmentRef = attachments[index];
-      if (!attachmentRef) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: `Attachment index ${index} not found` }) }] };
-      }
-
-      const attachmentInfo = await statStoredAttachment(attachmentRef);
-      if (!attachmentInfo) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Attachment file not found" }) }] };
-      }
-
-      const absoluteUrl = attachmentInfo.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachmentRef);
-      const handle = buildAttachmentHandle(query.id, index, attachmentRef, referenceBaseUrl);
-      const payload = {
-        query_id: query.id,
-        attachment_index: index,
-        attachment: handle.attachment,
-        access: {
-          ...handle.access,
-          preview_url: handle.access.preview_url ?? undefined,
-          local_file_path: attachmentInfo.path ?? handle.access.local_file_path ?? undefined,
-        },
-        attachment_view_url: handle.access.view_url,
-        attachment_meta_url: handle.access.meta_url,
-        filename: attachmentInfo.filename,
-        attachment_path: attachmentInfo.routePath ?? null,
-        absolute_url: absoluteUrl,
-        local_file_path: attachmentInfo.path ?? null,
-        storage_kind: attachmentInfo.storageKind,
-        mime_type: attachmentInfo.mimeType,
-        size_bytes: attachmentInfo.size,
-        preview_hint: "Use get_query_attachment_preview for a resized inline preview image.",
-      };
-
+      const payload = await backend.getQueryAttachment(query_id, attachment_index ?? 0);
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(payload, null, 2),
-          },
-        ],
+        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
     },
   );
@@ -338,75 +149,23 @@ export async function startMcpServer() {
       max_dimension: z.number().int().min(64).max(2048).optional().describe("Maximum width or height of the preview image. Defaults to PREVIEW_MAX_DIMENSION."),
     },
     async ({ query_id, attachment_index, max_dimension }) => {
-      const query = getQuery(query_id);
-      if (!query) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Query not found" }) }] };
+      const preview = await backend.getQueryAttachmentPreview(query_id, attachment_index ?? 0, max_dimension);
+      const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
+        {
+          type: "text",
+          text: JSON.stringify(preview.payload, null, 2),
+        },
+      ];
+
+      if (preview.image) {
+        content.push({
+          type: "image",
+          data: preview.image.data,
+          mimeType: preview.image.mimeType,
+        });
       }
 
-      const attachments = getPhotoProofAttachmentRefs(query);
-      if (!attachments) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Query does not have photo proof attachments" }) }] };
-      }
-
-      const index = attachment_index ?? 0;
-      const attachmentRef = attachments[index];
-      if (!attachmentRef) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: `Attachment index ${index} not found` }) }] };
-      }
-
-      const attachmentInfo = await statStoredAttachment(attachmentRef);
-      if (!attachmentInfo) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "Attachment file not found" }) }] };
-      }
-
-      const handle = buildAttachmentHandle(query.id, index, attachmentRef, referenceBaseUrl);
-      const preview = await renderStoredAttachmentPreview(attachmentRef, referenceBaseUrl, {
-        maxDimension: max_dimension ?? runtimeConfig.previewMaxDimension,
-      });
-
-      if (!preview) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                query_id: query.id,
-                attachment_index: index,
-                attachment: handle.attachment,
-                access: handle.access,
-                error: "Preview could not be generated",
-                hint: "Use get_query_attachment for original URLs or inspect the image in the browser.",
-              }, null, 2),
-            },
-          ],
-        };
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              query_id: query.id,
-              attachment_index: index,
-              attachment: handle.attachment,
-              access: {
-                ...handle.access,
-                preview_url: `${handle.access.preview_url}?max_dimension=${preview.maxDimension}`,
-              },
-              original_size_bytes: attachmentInfo.size,
-              preview_size_bytes: preview.size,
-              preview_mime_type: preview.mimeType,
-              max_dimension: preview.maxDimension,
-            }, null, 2),
-          },
-          {
-            type: "image",
-            data: preview.data,
-            mimeType: preview.mimeType,
-          },
-        ],
-      };
+      return { content };
     },
   );
 

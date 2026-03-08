@@ -135,6 +135,22 @@ function requireWriteApiKey(c: Context): Response | null {
   );
 }
 
+function getPublicRequestUrl(c: Context): string {
+  const url = new URL(c.req.url);
+  const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || c.req.header("host")?.trim();
+
+  if (forwardedProto) {
+    url.protocol = `${forwardedProto}:`;
+  }
+  if (host) {
+    url.host = host;
+  }
+
+  return url.toString();
+}
+
 function materializeResult(result: QueryResult | undefined, requestUrl: string): QueryResult | undefined {
   if (!result) return undefined;
   return materializeQueryResult(result, requestUrl);
@@ -191,7 +207,8 @@ export function buildWorkerApiApp() {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = getQueryById(id);
-    return query ? c.json(queryDetail(query, c.req.url)) : c.json({ error: "Query not found" }, 404);
+    const requestUrl = getPublicRequestUrl(c);
+    return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
   };
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -258,7 +275,7 @@ export function buildWorkerApiApp() {
       requesterMeta: payload.requester,
     });
 
-    return c.json(buildCreatedQueryPayload(query, c.req.url), 201);
+    return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
   });
 
   app.get("/queries/:id/attachments", async (c) => {
@@ -272,7 +289,7 @@ export function buildWorkerApiApp() {
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
 
     const payloads = await Promise.all(
-      attachments.map((attachment, index) => buildAttachmentPayload(query, attachment, index, c.req.url)),
+      attachments.map((attachment, index) => buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c))),
     );
 
     return c.json(payloads);
@@ -295,7 +312,7 @@ export function buildWorkerApiApp() {
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
 
-    return c.json(await buildAttachmentPayload(query, attachment, index, c.req.url));
+    return c.json(await buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c)));
   });
 
   app.get("/queries/:id/attachments/:index", async (c) => {
@@ -315,7 +332,7 @@ export function buildWorkerApiApp() {
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
 
-    const stat = await statStoredAttachment(attachment, c.req.url);
+    const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
     if (!stat) return c.json({ error: "Attachment file not found" }, 404);
 
     if (stat.storageKind === "local") {
@@ -356,7 +373,7 @@ export function buildWorkerApiApp() {
       return c.json({ error: "max_dimension must be a positive number" }, 400);
     }
 
-    const preview = await renderStoredAttachmentPreview(attachment, c.req.url, {
+    const preview = await renderStoredAttachmentPreview(attachment, getPublicRequestUrl(c), {
       maxDimension: Math.floor(maxDimension),
     });
     if (!preview) {
@@ -400,7 +417,7 @@ export function buildWorkerApiApp() {
       return c.json({ error: `Unsupported file type: ${ext}` }, 400);
     }
 
-    const stored = await getAttachmentStore().put(id, file as File, c.req.url);
+    const stored = await getAttachmentStore().put(id, file as File, getPublicRequestUrl(c));
     return c.json({
       ok: true,
       attachment: materializeAttachmentRef(stored.attachment, c.req.url),
