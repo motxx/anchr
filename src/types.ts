@@ -1,11 +1,14 @@
-export type JobType = "photo_proof" | "store_status" | "webpage_field";
-export type JobStatus =
+export type QueryType = "photo_proof" | "store_status" | "webpage_field";
+export type QueryStatus =
   | "pending"
   | "submitted"
   | "approved"
   | "rejected"
   | "expired";
 export type PaymentStatus = "locked" | "released" | "cancelled";
+export type ExecutorType = "human" | "agent" | "service";
+export type SubmissionChannel = "worker_api" | "mcp";
+export type AttachmentStorageKind = "local" | "external" | "s3";
 
 export interface PhotoProofParams {
   target: string; // e.g. "コンビニ入口の営業時間表示"
@@ -23,14 +26,25 @@ export interface WebpageFieldParams {
   anchor_word: string; // word whose nearby text serves as proof
 }
 
-export type JobParams =
+export type QueryInput =
   | ({ type: "photo_proof" } & PhotoProofParams)
   | ({ type: "store_status" } & StoreStatusParams)
   | ({ type: "webpage_field" } & WebpageFieldParams);
 
+export interface AttachmentRef {
+  id: string;
+  uri: string;
+  mime_type: string;
+  storage_kind: AttachmentStorageKind;
+  filename?: string;
+  size_bytes?: number;
+  local_file_path?: string;
+  route_path?: string;
+}
+
 export interface PhotoProofResult {
   text_answer: string; // must contain nonce
-  attachments?: string[]; // URLs of uploaded photos
+  attachments: AttachmentRef[];
   notes?: string;
 }
 
@@ -42,10 +56,10 @@ export interface StoreStatusResult {
 export interface WebpageFieldResult {
   answer: string; // extracted value
   proof_text: string; // text near anchor_word from page
-  notes?: string;
+  notes: string; // must contain nonce
 }
 
-export type JobResult =
+export type QueryResult =
   | ({ type: "photo_proof" } & PhotoProofResult)
   | ({ type: "store_status" } & StoreStatusResult)
   | ({ type: "webpage_field" } & WebpageFieldResult);
@@ -56,17 +70,23 @@ export interface VerificationDetail {
   failures: string[];
 }
 
-export interface Job {
+export interface SubmissionMeta {
+  executor_type: ExecutorType;
+  channel: SubmissionChannel;
+}
+
+export interface Query {
   id: string;
-  type: JobType;
-  status: JobStatus;
-  params: JobParams;
+  type: QueryType;
+  status: QueryStatus;
+  params: QueryInput;
   challenge_nonce: string;
   challenge_rule: string;
   created_at: number;
   expires_at: number;
   submitted_at?: number;
-  result?: JobResult;
+  result?: QueryResult;
   verification?: VerificationDetail;
+  submission_meta?: SubmissionMeta;
   payment_status: PaymentStatus;
 }

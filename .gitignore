@@ -38,6 +38,7 @@ mcp.json
 
 # db
 jobs.db*
+queries.db*
 
 # uploads
 uploads/*

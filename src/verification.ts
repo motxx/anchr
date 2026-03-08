@@ -1,25 +1,31 @@
 import type {
-  Job,
-  JobResult,
   PhotoProofResult,
+  Query,
+  QueryResult,
   StoreStatusResult,
   VerificationDetail,
   WebpageFieldResult,
 } from "./types";
 
-export function verify(job: Job, result: JobResult): VerificationDetail {
+export function verify(query: Query, result: QueryResult): VerificationDetail {
   const checks: string[] = [];
   const failures: string[] = [];
 
-  switch (job.type) {
+  switch (query.type) {
     case "photo_proof":
-      verifyPhotoProof(result as PhotoProofResult, job.challenge_nonce, checks, failures);
+      verifyPhotoProof(result as PhotoProofResult, query.challenge_nonce, checks, failures);
       break;
     case "store_status":
-      verifyStoreStatus(result as StoreStatusResult, job.challenge_nonce, checks, failures);
+      verifyStoreStatus(result as StoreStatusResult, query.challenge_nonce, checks, failures);
       break;
     case "webpage_field":
-      verifyWebpageField(result as WebpageFieldResult, (job.params as { anchor_word: string }).anchor_word, checks, failures);
+      verifyWebpageField(
+        result as WebpageFieldResult,
+        query.challenge_nonce,
+        (query.params as { anchor_word: string }).anchor_word,
+        checks,
+        failures,
+      );
       break;
   }
 
@@ -46,6 +52,12 @@ function verifyPhotoProof(
     checks.push(`nonce "${nonce}" found in text_answer`);
   } else {
     failures.push(`nonce "${nonce}" not found in text_answer`);
+  }
+
+  if (Array.isArray(result.attachments) && result.attachments.length > 0) {
+    checks.push("photo attachment present");
+  } else {
+    failures.push("at least one photo attachment is required");
   }
 
   if (result.text_answer && result.text_answer.length > 5000) {
@@ -82,6 +94,7 @@ function verifyStoreStatus(
 
 function verifyWebpageField(
   result: WebpageFieldResult,
+  nonce: string,
   anchorWord: string,
   checks: string[],
   failures: string[],
@@ -102,6 +115,18 @@ function verifyWebpageField(
     checks.push(`anchor word "${anchorWord}" found in proof_text`);
   } else {
     failures.push(`anchor word "${anchorWord}" not found in proof_text`);
+  }
+
+  if (!result.notes || result.notes.trim().length === 0) {
+    failures.push("notes is empty");
+  } else {
+    checks.push("notes present");
+  }
+
+  if (result.notes?.includes(nonce)) {
+    checks.push(`nonce "${nonce}" found in notes`);
+  } else {
+    failures.push(`nonce "${nonce}" not found in notes`);
   }
 
   if (result.answer && result.answer.length > 2000) {

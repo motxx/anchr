@@ -1,11 +1,19 @@
 import { Database } from "bun:sqlite";
-import type { Job, JobResult, JobStatus, PaymentStatus, VerificationDetail } from "./types";
+import { normalizeQueryResult } from "./attachments";
+import type {
+  PaymentStatus,
+  Query,
+  QueryResult,
+  QueryStatus,
+  SubmissionMeta,
+  VerificationDetail,
+} from "./types";
 
 let _db: Database | null = null;
 
 export function getDb(): Database {
   if (!_db) {
-    _db = new Database(process.env.DB_PATH ?? "jobs.db");
+    _db = new Database(process.env.DB_PATH ?? "queries.db");
     _db.exec("PRAGMA journal_mode=WAL");
     migrate(_db);
   }
@@ -14,7 +22,7 @@ export function getDb(): Database {
 
 function migrate(db: Database) {
   db.exec(`
-    CREATE TABLE IF NOT EXISTS jobs (
+    CREATE TABLE IF NOT EXISTS queries (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
@@ -26,12 +34,18 @@ function migrate(db: Database) {
       submitted_at INTEGER,
       result TEXT,
       verification TEXT,
+      submission_meta TEXT,
       payment_status TEXT NOT NULL DEFAULT 'locked'
     )
   `);
+
+  const columns = db.prepare("PRAGMA table_info(queries)").all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === "submission_meta")) {
+    db.exec("ALTER TABLE queries ADD COLUMN submission_meta TEXT");
+  }
 }
 
-interface JobRow {
+interface QueryRow {
   id: string;
   type: string;
   status: string;
@@ -43,93 +57,98 @@ interface JobRow {
   submitted_at: number | null;
   result: string | null;
   verification: string | null;
+  submission_meta: string | null;
   payment_status: string;
 }
 
-function rowToJob(row: JobRow): Job {
+function rowToQuery(row: QueryRow): Query {
+  const result = row.result ? normalizeQueryResult(JSON.parse(row.result)) : undefined;
   return {
     id: row.id,
-    type: row.type as Job["type"],
-    status: row.status as JobStatus,
+    type: row.type as Query["type"],
+    status: row.status as QueryStatus,
     params: JSON.parse(row.params),
     challenge_nonce: row.challenge_nonce,
     challenge_rule: row.challenge_rule,
     created_at: row.created_at,
     expires_at: row.expires_at,
     submitted_at: row.submitted_at ?? undefined,
-    result: row.result ? JSON.parse(row.result) : undefined,
+    result,
     verification: row.verification ? JSON.parse(row.verification) : undefined,
+    submission_meta: row.submission_meta ? JSON.parse(row.submission_meta) : undefined,
     payment_status: row.payment_status as PaymentStatus,
   };
 }
 
-export function insertJob(job: Job): void {
+export function insertQueryRecord(query: Query): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO jobs (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, payment_status)
+    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, payment_status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    job.id,
-    job.type,
-    job.status,
-    JSON.stringify(job.params),
-    job.challenge_nonce,
-    job.challenge_rule,
-    job.created_at,
-    job.expires_at,
-    job.payment_status,
+    query.id,
+    query.type,
+    query.status,
+    JSON.stringify(query.params),
+    query.challenge_nonce,
+    query.challenge_rule,
+    query.created_at,
+    query.expires_at,
+    query.payment_status,
   );
 }
 
-export function getJob(id: string): Job | null {
+export function getQueryRecord(id: string): Query | null {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM jobs WHERE id = ?").get(id) as JobRow | null;
-  return row ? rowToJob(row) : null;
+  const row = db.prepare("SELECT * FROM queries WHERE id = ?").get(id) as QueryRow | null;
+  return row ? rowToQuery(row) : null;
 }
 
-export function listJobs(status?: JobStatus): Job[] {
+export function listQueryRecords(status?: QueryStatus): Query[] {
   const db = getDb();
   const rows = status
-    ? (db.prepare("SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC").all(status) as JobRow[])
-    : (db.prepare("SELECT * FROM jobs ORDER BY created_at DESC").all() as JobRow[]);
-  return rows.map(rowToJob);
+    ? (db.prepare("SELECT * FROM queries WHERE status = ? ORDER BY created_at DESC").all(status) as QueryRow[])
+    : (db.prepare("SELECT * FROM queries ORDER BY created_at DESC").all() as QueryRow[]);
+  return rows.map(rowToQuery);
 }
 
-export function updateJobSubmitted(
+export function updateQuerySubmittedRecord(
   id: string,
-  result: JobResult,
+  result: QueryResult,
   verification: VerificationDetail,
-  newStatus: JobStatus,
+  newStatus: QueryStatus,
   paymentStatus: PaymentStatus,
+  submissionMeta: SubmissionMeta,
 ): void {
   const db = getDb();
   db.prepare(`
-    UPDATE jobs SET status = ?, submitted_at = ?, result = ?, verification = ?, payment_status = ?
+    UPDATE queries SET status = ?, submitted_at = ?, result = ?, verification = ?, submission_meta = ?, payment_status = ?
     WHERE id = ?
   `).run(
     newStatus,
     Date.now(),
     JSON.stringify(result),
     JSON.stringify(verification),
+    JSON.stringify(submissionMeta),
     paymentStatus,
     id,
   );
 }
 
-export function updateJobStatus(id: string, status: JobStatus, paymentStatus?: PaymentStatus): void {
+export function updateQueryStatusRecord(id: string, status: QueryStatus, paymentStatus?: PaymentStatus): void {
   const db = getDb();
   if (paymentStatus) {
-    db.prepare("UPDATE jobs SET status = ?, payment_status = ? WHERE id = ?").run(status, paymentStatus, id);
+    db.prepare("UPDATE queries SET status = ?, payment_status = ? WHERE id = ?").run(status, paymentStatus, id);
   } else {
-    db.prepare("UPDATE jobs SET status = ? WHERE id = ?").run(status, id);
+    db.prepare("UPDATE queries SET status = ? WHERE id = ?").run(status, id);
   }
 }
 
-export function expireJobs(): number {
+export function expirePendingQueries(): number {
   const db = getDb();
   const now = Date.now();
   const result = db.prepare(`
-    UPDATE jobs SET status = 'expired', payment_status = 'cancelled'
+    UPDATE queries SET status = 'expired', payment_status = 'cancelled'
     WHERE status = 'pending' AND expires_at < ?
   `).run(now);
   return result.changes;

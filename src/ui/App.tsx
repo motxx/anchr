@@ -26,14 +26,13 @@ import {
 } from "./components/ui/select";
 import { Textarea } from "./components/ui/textarea";
 import { cn } from "./lib/utils";
+import type { AttachmentRef, QueryType } from "../types";
 
 // ---- Types ----
 
-type JobType = "photo_proof" | "store_status" | "webpage_field";
-
-interface Job {
+interface Query {
   id: string;
-  type: JobType;
+  type: QueryType;
   params: Record<string, unknown>;
   challenge_nonce: string;
   challenge_rule: string;
@@ -63,9 +62,9 @@ function timerClasses(expiresAt: number): string {
   return "text-muted-foreground tabular-nums";
 }
 
-// ---- Job type badge config ----
+// ---- Query type badge config ----
 
-const JOB_TYPE_CONFIG: Record<JobType, { label: string; className: string }> =
+const QUERY_TYPE_CONFIG: Record<QueryType, { label: string; className: string }> =
   {
     photo_proof: {
       label: "Photo Proof",
@@ -84,8 +83,8 @@ const JOB_TYPE_CONFIG: Record<JobType, { label: string; className: string }> =
     },
   };
 
-function JobBadge({ type }: { type: JobType }) {
-  const { label, className } = JOB_TYPE_CONFIG[type];
+function QueryBadge({ type }: { type: QueryType }) {
+  const { label, className } = QUERY_TYPE_CONFIG[type];
   return (
     <Badge variant="outline" className={cn("text-[11px] font-semibold", className)}>
       {label}
@@ -111,17 +110,17 @@ function FieldLabel({
 }
 
 function StoreStatusForm({
-  job,
+  query,
   onSubmit,
   isPending,
 }: {
-  job: Job;
+  query: Query;
   onSubmit: (data: Record<string, unknown>) => void;
   isPending: boolean;
 }) {
   const [status, setStatus] = useState("open");
   const notesRef = useRef<HTMLTextAreaElement>(null);
-  const nonce = job.challenge_nonce;
+  const nonce = query.challenge_nonce;
 
   return (
     <div className="space-y-4">
@@ -154,7 +153,7 @@ function StoreStatusForm({
         disabled={isPending}
         onClick={() =>
           onSubmit({
-            type: job.type,
+            type: query.type,
             status,
             notes: notesRef.current?.value ?? "",
           })
@@ -174,18 +173,19 @@ function StoreStatusForm({
 }
 
 function WebpageFieldForm({
-  job,
+  query,
   onSubmit,
   isPending,
 }: {
-  job: Job;
+  query: Query;
   onSubmit: (data: Record<string, unknown>) => void;
   isPending: boolean;
 }) {
   const answerRef = useRef<HTMLInputElement>(null);
   const proofRef = useRef<HTMLTextAreaElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
-  const anchorWord = String(job.params["anchor_word"] ?? "");
+  const anchorWord = String(query.params["anchor_word"] ?? "");
+  const nonce = query.challenge_nonce;
 
   return (
     <div className="space-y-4">
@@ -208,15 +208,22 @@ function WebpageFieldForm({
         />
       </div>
       <div className="space-y-1.5">
-        <FieldLabel>Notes</FieldLabel>
-        <Input ref={notesRef} type="text" placeholder="補足（任意）" />
+        <FieldLabel required>
+          Notes — include nonce{" "}
+          <span className="font-mono font-bold text-amber-400">{nonce}</span>
+        </FieldLabel>
+        <Input
+          ref={notesRef}
+          type="text"
+          placeholder={`補足。必ず「${nonce}」を含めてください。`}
+        />
       </div>
       <Button
         className="w-full"
         disabled={isPending}
         onClick={() =>
           onSubmit({
-            type: job.type,
+            type: query.type,
             answer: answerRef.current?.value ?? "",
             proof_text: proofRef.current?.value ?? "",
             notes: notesRef.current?.value ?? "",
@@ -237,11 +244,11 @@ function WebpageFieldForm({
 }
 
 function PhotoProofForm({
-  job,
+  query,
   onSubmit,
   isPending,
 }: {
-  job: Job;
+  query: Query;
   onSubmit: (data: Record<string, unknown>) => void;
   isPending: boolean;
 }) {
@@ -250,7 +257,7 @@ function PhotoProofForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const nonce = job.challenge_nonce;
+  const nonce = query.challenge_nonce;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -260,23 +267,41 @@ function PhotoProofForm({
   }
 
   async function handleSubmit() {
-    let attachments: string[] = [];
+    let attachments: AttachmentRef[] = [];
     const file = fileRef.current?.files?.[0];
     if (file) {
       setUploading(true);
       try {
         const fd = new FormData();
         fd.append("photo", file);
-        const res = await fetch(`/jobs/${job.id}/upload`, { method: "POST", body: fd });
-        const data = await res.json() as { ok: boolean; url?: string; error?: string };
-        if (!data.ok || !data.url) throw new Error(data.error ?? "Upload failed");
-        attachments = [data.url];
+        const res = await fetch(`/queries/${query.id}/upload`, { method: "POST", body: fd });
+        const data = await res.json() as {
+          ok: boolean;
+          attachment?: AttachmentRef;
+          attachment_ref?: string;
+          url?: string;
+          error?: string;
+        };
+        if (!data.ok) throw new Error(data.error ?? "Upload failed");
+        if (data.attachment) {
+          attachments = [data.attachment];
+        } else {
+          const attachmentRef = data.attachment_ref ?? data.url;
+          if (!attachmentRef) throw new Error(data.error ?? "Upload failed");
+          attachments = [{
+            id: attachmentRef.split("/").filter(Boolean).pop() ?? "attachment",
+            uri: attachmentRef,
+            mime_type: file.type || "application/octet-stream",
+            storage_kind: attachmentRef.startsWith("/uploads/") ? "local" : "external",
+            route_path: attachmentRef.startsWith("/uploads/") ? attachmentRef : undefined,
+          }];
+        }
       } finally {
         setUploading(false);
       }
     }
     onSubmit({
-      type: job.type,
+      type: query.type,
       text_answer: textRef.current?.value ?? "",
       attachments,
       notes: notesRef.current?.value ?? "",
@@ -284,12 +309,13 @@ function PhotoProofForm({
   }
 
   const busy = isPending || uploading;
+  const hasPhoto = Boolean(fileRef.current?.files?.[0] || preview);
 
   return (
     <div className="space-y-4">
       {/* Photo upload area */}
       <div className="space-y-1.5">
-        <FieldLabel>Photo</FieldLabel>
+        <FieldLabel required>Photo</FieldLabel>
         <label
           className={cn(
             "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors",
@@ -312,6 +338,7 @@ function PhotoProofForm({
               </svg>
               <span className="text-sm">Click to select photo</span>
               <span className="text-xs opacity-60">JPG, PNG, GIF, WebP, HEIC</span>
+              <span className="text-xs opacity-60">At least one photo is required</span>
             </div>
           )}
           <input
@@ -349,7 +376,7 @@ function PhotoProofForm({
         <FieldLabel>Notes</FieldLabel>
         <Input ref={notesRef} type="text" placeholder="補足（任意）" />
       </div>
-      <Button className="w-full" disabled={busy} onClick={handleSubmit}>
+      <Button className="w-full" disabled={busy || !hasPhoto} onClick={handleSubmit}>
         {uploading ? (
           <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
         ) : isPending ? (
@@ -362,9 +389,9 @@ function PhotoProofForm({
   );
 }
 
-// ---- JobCard ----
+// ---- QueryCard ----
 
-function JobCard({ job }: { job: Job }) {
+function QueryCard({ query }: { query: Query }) {
   const [open, setOpen] = useState(false);
   const [showParams, setShowParams] = useState(false);
   const [, setTick] = useState(0);
@@ -377,7 +404,7 @@ function JobCard({ job }: { job: Job }) {
 
   const mut = useMutation<SubmitResponse, Error, Record<string, unknown>>({
     mutationFn: async (body) => {
-      const r = await fetch(`/jobs/${job.id}/submit`, {
+      const r = await fetch(`/queries/${query.id}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -399,20 +426,20 @@ function JobCard({ job }: { job: Job }) {
       >
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <JobBadge type={job.type} />
+            <QueryBadge type={query.type} />
             <span className="text-[11px] text-muted-foreground font-mono truncate">
-              {job.id}
+              {query.id}
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span
               className={cn(
                 "text-xs flex items-center gap-1",
-                timerClasses(job.expires_at)
+                timerClasses(query.expires_at)
               )}
             >
               <Clock className="w-3 h-3 shrink-0" />
-              {timeLeft(job.expires_at)}
+              {timeLeft(query.expires_at)}
             </span>
             {open ? (
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -432,10 +459,10 @@ function JobCard({ job }: { job: Job }) {
               Challenge Nonce
             </p>
             <p className="font-mono text-5xl font-black text-amber-400 tracking-[0.4em] leading-none mb-3">
-              {job.challenge_nonce}
+              {query.challenge_nonce}
             </p>
             <p className="text-sm text-foreground/80 leading-relaxed">
-              {job.challenge_rule}
+              {query.challenge_rule}
             </p>
           </div>
 
@@ -450,11 +477,11 @@ function JobCard({ job }: { job: Job }) {
               ) : (
                 <ChevronRight className="w-3 h-3" />
               )}
-              Job parameters
+              Query parameters
             </button>
             {showParams && (
               <pre className="mt-2 text-[11px] text-muted-foreground bg-background border border-border rounded-lg p-3 overflow-x-auto leading-relaxed">
-                {JSON.stringify(job.params, null, 2)}
+                {JSON.stringify(query.params, null, 2)}
               </pre>
             )}
           </div>
@@ -462,23 +489,23 @@ function JobCard({ job }: { job: Job }) {
           {/* Submission form */}
           {!submitted && (
             <div className="pt-1">
-              {job.type === "store_status" && (
+              {query.type === "store_status" && (
                 <StoreStatusForm
-                  job={job}
+                  query={query}
                   onSubmit={mut.mutate}
                   isPending={mut.isPending}
                 />
               )}
-              {job.type === "webpage_field" && (
+              {query.type === "webpage_field" && (
                 <WebpageFieldForm
-                  job={job}
+                  query={query}
                   onSubmit={mut.mutate}
                   isPending={mut.isPending}
                 />
               )}
-              {job.type === "photo_proof" && (
+              {query.type === "photo_proof" && (
                 <PhotoProofForm
-                  job={job}
+                  query={query}
                   onSubmit={mut.mutate}
                   isPending={mut.isPending}
                 />
@@ -524,12 +551,12 @@ function JobCard({ job }: { job: Job }) {
   );
 }
 
-// ---- JobList ----
+// ---- QueryList ----
 
-function JobList() {
-  const { data: jobs = [], isError } = useQuery<Job[]>({
-    queryKey: ["jobs"],
-    queryFn: (): Promise<Job[]> => fetch("/jobs").then((r) => r.json()),
+function QueryList() {
+  const { data: queries = [], isError } = useQuery<Query[]>({
+    queryKey: ["queries"],
+    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -544,17 +571,17 @@ function JobList() {
     );
   }
 
-  if (!jobs.length) {
+  if (!queries.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
           <Clock className="w-5 h-5 text-muted-foreground" />
         </div>
         <p className="text-sm font-medium text-muted-foreground">
-          No pending jobs
+          No pending queries
         </p>
         <p className="text-xs text-muted-foreground/60">
-          AI agents will post tasks here · checking every 3s
+          Live real-world queries will appear here · checking every 3s
         </p>
       </div>
     );
@@ -562,8 +589,8 @@ function JobList() {
 
   return (
     <div className="flex flex-col gap-3">
-      {jobs.map((job) => (
-        <JobCard key={job.id} job={job} />
+      {queries.map((query) => (
+        <QueryCard key={query.id} query={query} />
       ))}
     </div>
   );
@@ -572,9 +599,9 @@ function JobList() {
 // ---- App ----
 
 export default function App() {
-  const { isFetching } = useQuery<Job[]>({
-    queryKey: ["jobs"],
-    queryFn: (): Promise<Job[]> => fetch("/jobs").then((r) => r.json()),
+  const { isFetching } = useQuery<Query[]>({
+    queryKey: ["queries"],
+    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
     staleTime: 2000,
   });
 
@@ -589,7 +616,7 @@ export default function App() {
                 human-calling
               </h1>
               <p className="text-xs text-muted-foreground mt-1">
-                Worker dashboard · MCP human verification
+                Reference worker app · live reality query SDK
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">
@@ -603,7 +630,7 @@ export default function App() {
           </div>
         </header>
 
-        <JobList />
+        <QueryList />
       </div>
     </div>
   );

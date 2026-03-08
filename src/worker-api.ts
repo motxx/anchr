@@ -1,12 +1,21 @@
 import { join } from "node:path";
 import { Hono } from "hono";
-import { cancelJob, fetchAvailableJobs, fetchJob, submitJobResult } from "./jobs";
-import type { Job, JobResult } from "./types";
+import type { Context } from "hono";
+import { getAttachmentStore } from "./attachment-store";
+import { UPLOADS_DIR, materializeAttachmentRef } from "./attachments";
+import {
+  cancelQuery,
+  getQuery as getQueryById,
+  listOpenQueries,
+  submitQueryResult,
+  type Query,
+  type QueryResult,
+} from "./query-service";
+import type { AttachmentRef, PhotoProofResult } from "./types";
 // @ts-ignore — Bun HTML import
 import uiHtml from "./ui/index.html";
 
-const UPLOADS_DIR = join(import.meta.dir, "..", "uploads");
-const PORT = Number(process.env.WORKER_PORT ?? 3000);
+const PORT = Number(process.env.REFERENCE_APP_PORT ?? 3000);
 
 async function buildCss() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
@@ -24,46 +33,66 @@ async function buildCss() {
   }
 }
 
-function jobSummary(job: Job) {
+function querySummary(query: Query) {
   return {
-    id: job.id,
-    type: job.type,
-    status: job.status,
-    params: job.params,
-    challenge_nonce: job.challenge_nonce,
-    challenge_rule: job.challenge_rule,
-    expires_at: job.expires_at,
-    expires_in_seconds: Math.max(0, Math.floor((job.expires_at - Date.now()) / 1000)),
+    id: query.id,
+    type: query.type,
+    status: query.status,
+    params: query.params,
+    challenge_nonce: query.challenge_nonce,
+    challenge_rule: query.challenge_rule,
+    expires_at: query.expires_at,
+    expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
   };
 }
 
-function jobDetail(job: Job) {
+function materializeResult(result: QueryResult | undefined, requestUrl: string): QueryResult | undefined {
+  if (!result) return undefined;
+  if (result.type !== "photo_proof") return result;
+
+  const photoProof: PhotoProofResult = result;
   return {
-    ...jobSummary(job),
-    created_at: job.created_at,
-    submitted_at: job.submitted_at,
-    result: job.result,
-    verification: job.verification,
-    payment_status: job.payment_status,
+    ...photoProof,
+    type: result.type,
+    attachments: photoProof.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
+  };
+}
+
+function queryDetail(query: Query, requestUrl: string) {
+  return {
+    ...querySummary(query),
+    created_at: query.created_at,
+    submitted_at: query.submitted_at,
+    result: materializeResult(query.result, requestUrl),
+    verification: query.verification,
+    submission_meta: query.submission_meta,
+    payment_status: query.payment_status,
   };
 }
 
 function buildApp() {
   const app = new Hono();
+  const listQueries = (c: Context) =>
+    c.json(listOpenQueries().map(querySummary));
+  const getQuery = (c: Context) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const query = getQueryById(id);
+    return query ? c.json(queryDetail(query, c.req.url)) : c.json({ error: "Query not found" }, 404);
+  };
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  app.get("/jobs", (c) => c.json(fetchAvailableJobs().map(jobSummary)));
+  app.get("/queries", listQueries);
 
-  app.get("/jobs/:id", (c) => {
-    const job = fetchJob(c.req.param("id"));
-    return job ? c.json(jobDetail(job)) : c.json({ error: "Not found" }, 404);
-  });
+  app.get("/queries/:id", getQuery);
 
-  app.post("/jobs/:id/upload", async (c) => {
-    const job = fetchJob(c.req.param("id"));
-    if (!job) return c.json({ error: "Not found" }, 404);
-    if (job.status !== "pending") return c.json({ error: "Job not pending" }, 409);
+  const uploadHandler = async (c: Context) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const query = getQueryById(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+    if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
 
     let formData: FormData;
     try {
@@ -83,11 +112,14 @@ function buildApp() {
       return c.json({ error: `Unsupported file type: ${ext}` }, 400);
     }
 
-    const filename = `${c.req.param("id")}_${Date.now()}${ext}`;
-    await Bun.write(join(UPLOADS_DIR, filename), file as File);
+    const stored = await getAttachmentStore().put(id, file as File, c.req.url);
+    return c.json({
+      ok: true,
+      attachment: materializeAttachmentRef(stored.attachment, c.req.url),
+    });
+  };
 
-    return c.json({ ok: true, url: `/uploads/${filename}` });
-  });
+  app.post("/queries/:id/upload", uploadHandler);
 
   app.get("/uploads/:filename", async (c) => {
     const filename = c.req.param("filename");
@@ -99,19 +131,24 @@ function buildApp() {
     return new Response(file);
   });
 
-  app.post("/jobs/:id/submit", async (c) => {
+  const submitHandler = async (c: Context) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: unknown;
     try {
       body = await c.req.json();
     } catch {
       return c.json({ error: "Invalid JSON" }, 400);
     }
-    const outcome = submitJobResult(c.req.param("id"), body as JobResult);
-    const status = !outcome.job
+    const outcome = submitQueryResult(id, body as QueryResult, {
+      executor_type: "human",
+      channel: "worker_api",
+    });
+    const status = !outcome.query
       ? 404
       : !outcome.ok &&
-        outcome.job.status !== "pending" &&
-        outcome.job.status !== "rejected"
+        outcome.query.status !== "pending" &&
+        outcome.query.status !== "rejected"
       ? 409
       : outcome.ok
       ? 200
@@ -120,17 +157,23 @@ function buildApp() {
       {
         ok: outcome.ok,
         message: outcome.message,
-        verification: outcome.job?.verification,
-        payment_status: outcome.job?.payment_status,
+        verification: outcome.query?.verification,
+        payment_status: outcome.query?.payment_status,
       },
       status
     );
-  });
+  };
 
-  app.post("/jobs/:id/cancel", (c) => {
-    const outcome = cancelJob(c.req.param("id"));
+  app.post("/queries/:id/submit", submitHandler);
+
+  const cancelHandler = (c: Context) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const outcome = cancelQuery(id);
     return c.json(outcome, outcome.ok ? 200 : 400);
-  });
+  };
+
+  app.post("/queries/:id/cancel", cancelHandler);
 
   return app;
 }
@@ -150,5 +193,5 @@ export async function startWorkerApi() {
     fetch: app.fetch,
   });
 
-  console.error(`[worker-api] Dashboard → http://localhost:${PORT}`);
+  console.error(`[reference-app] Dashboard → http://localhost:${PORT}`);
 }
