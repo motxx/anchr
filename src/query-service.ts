@@ -116,82 +116,86 @@ function generateQueryId(): string {
   return `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-class DefaultQueryService implements QueryService {
-  constructor(private readonly store: QueryStore) {}
+function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Query {
+  const now = Date.now();
+  const nonce = generateNonce();
+  return {
+    id: generateQueryId(),
+    type: input.type,
+    status: "pending",
+    params: input,
+    challenge_nonce: nonce,
+    challenge_rule: buildChallengeRule(input.type, nonce, input as unknown as Record<string, unknown>),
+    created_at: now,
+    expires_at: now + resolveTtlMs(options),
+    payment_status: "locked",
+  };
+}
 
-  createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
-    const now = Date.now();
-    const nonce = generateNonce();
-    const query: Query = {
-      id: generateQueryId(),
-      type: input.type,
-      status: "pending",
-      params: input,
-      challenge_nonce: nonce,
-      challenge_rule: buildChallengeRule(input.type, nonce, input as unknown as Record<string, unknown>),
-      created_at: now,
-      expires_at: now + resolveTtlMs(options),
-      payment_status: "locked",
-    };
-    this.store.insertQuery(query);
-    return query;
+function submitQueryWithStore(
+  store: QueryStore,
+  id: string,
+  result: QueryResult,
+  submissionMeta: QuerySubmissionMeta,
+): SubmitQueryOutcome {
+  const query = store.getQuery(id);
+  if (!query) return { ok: false, query: null, message: "Query not found" };
+  if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
+  if (query.expires_at < Date.now()) {
+    store.updateQueryStatus(id, "expired", "cancelled");
+    return { ok: false, query, message: "Query has expired" };
   }
 
-  getQuery(id: string): Query | null {
-    return this.store.getQuery(id);
-  }
+  const normalizedResult = normalizeQueryResult(result);
+  const verification = verify(query, normalizedResult);
+  const newStatus: QueryStatus = verification.passed ? "approved" : "rejected";
+  const paymentStatus: PaymentStatus = verification.passed ? "released" : "cancelled";
 
-  listOpenQueries(): Query[] {
-    return this.store.listQueries("pending").filter((query) => query.expires_at > Date.now());
-  }
+  store.updateQuerySubmitted(id, normalizedResult, verification, newStatus, paymentStatus, submissionMeta);
 
-  submitQueryResult(
-    id: string,
-    result: QueryResult,
-    submissionMeta: QuerySubmissionMeta,
-  ): SubmitQueryOutcome {
-    const query = this.store.getQuery(id);
-    if (!query) return { ok: false, query: null, message: "Query not found" };
-    if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
-    if (query.expires_at < Date.now()) {
-      this.store.updateQueryStatus(id, "expired", "cancelled");
-      return { ok: false, query, message: "Query has expired" };
-    }
+  const updated = store.getQuery(id)!;
+  return {
+    ok: verification.passed,
+    query: updated,
+    message: verification.passed
+      ? "Verification passed. Result accepted."
+      : `Verification failed: ${verification.failures.join(", ")}`,
+  };
+}
 
-    const normalizedResult = normalizeQueryResult(result);
-    const verification = verify(query, normalizedResult);
-    const newStatus: QueryStatus = verification.passed ? "approved" : "rejected";
-    const paymentStatus: PaymentStatus = verification.passed ? "released" : "cancelled";
-
-    this.store.updateQuerySubmitted(id, normalizedResult, verification, newStatus, paymentStatus, submissionMeta);
-
-    const updated = this.store.getQuery(id)!;
-    return {
-      ok: verification.passed,
-      query: updated,
-      message: verification.passed
-        ? "Verification passed. Result accepted."
-        : `Verification failed: ${verification.failures.join(", ")}`,
-    };
-  }
-
-  cancelQuery(id: string): CancelQueryOutcome {
-    const query = this.store.getQuery(id);
-    if (!query) return { ok: false, message: "Query not found" };
-    if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
-    this.store.updateQueryStatus(id, "rejected", "cancelled");
-    return { ok: true, message: "Query cancelled" };
-  }
-
-  expireQueries(): number {
-    return this.store.expirePendingQueries();
-  }
+function cancelQueryWithStore(store: QueryStore, id: string): CancelQueryOutcome {
+  const query = store.getQuery(id);
+  if (!query) return { ok: false, message: "Query not found" };
+  if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
+  store.updateQueryStatus(id, "rejected", "cancelled");
+  return { ok: true, message: "Query cancelled" };
 }
 
 let defaultQueryService: QueryService | null = null;
 
 export function createQueryService(store: QueryStore = sqliteQueryStore): QueryService {
-  return new DefaultQueryService(store);
+  return {
+    createQuery(input, options) {
+      const query = createQueryRecord(input, options);
+      store.insertQuery(query);
+      return query;
+    },
+    getQuery(id) {
+      return store.getQuery(id);
+    },
+    listOpenQueries() {
+      return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
+    },
+    submitQueryResult(id, result, submissionMeta) {
+      return submitQueryWithStore(store, id, result, submissionMeta);
+    },
+    cancelQuery(id) {
+      return cancelQueryWithStore(store, id);
+    },
+    expireQueries() {
+      return store.expirePendingQueries();
+    },
+  };
 }
 
 export function getDefaultQueryService(): QueryService {
