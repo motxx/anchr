@@ -6,7 +6,7 @@ import {
   listQueryRecords,
   updateQueryStatusRecord,
   updateQuerySubmittedRecord,
-} from "./db";
+} from "./sqlite-query-store";
 import { normalizeQueryResult } from "./attachments";
 import type {
   ExecutorType,

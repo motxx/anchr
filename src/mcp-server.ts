@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { buildAttachmentAbsoluteUrl, materializeAttachmentRef, readStoredAttachmentAsBase64, statStoredAttachment } from "./attachments";
+import { getRuntimeConfig } from "./config";
 import {
   cancelQuery,
   createQuery,
@@ -14,8 +15,7 @@ import {
 } from "./query-service";
 import type { AttachmentRef } from "./types";
 
-const REFERENCE_APP_PORT = process.env.REFERENCE_APP_PORT ?? 3000;
-const DEFAULT_INLINE_ATTACHMENT_LIMIT_BYTES = 512 * 1024;
+const runtimeConfig = getRuntimeConfig();
 
 function buildCreatedQueryPayload(query: {
   id: string;
@@ -30,8 +30,8 @@ function buildCreatedQueryPayload(query: {
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: new Date(query.expires_at).toISOString(),
-    reference_app_url: `http://localhost:${REFERENCE_APP_PORT}/queries/${query.id}`,
-    query_api_url: `http://localhost:${REFERENCE_APP_PORT}/queries/${query.id}`,
+    reference_app_url: `http://localhost:${runtimeConfig.referenceAppPort}/queries/${query.id}`,
+    query_api_url: `http://localhost:${runtimeConfig.referenceAppPort}/queries/${query.id}`,
   };
 }
 
@@ -275,7 +275,7 @@ export async function startMcpServer() {
         mime_type: attachmentInfo.mimeType,
         size_bytes: attachmentInfo.size,
         include_image: Boolean(include_image),
-        inline_limit_bytes: DEFAULT_INLINE_ATTACHMENT_LIMIT_BYTES,
+        inline_limit_bytes: runtimeConfig.inlineAttachmentLimitBytes,
       };
 
       if (!include_image) {
@@ -289,7 +289,7 @@ export async function startMcpServer() {
         };
       }
 
-      if (attachmentInfo.size > DEFAULT_INLINE_ATTACHMENT_LIMIT_BYTES) {
+      if (attachmentInfo.size > runtimeConfig.inlineAttachmentLimitBytes) {
         return {
           content: [
             {

@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { normalizeQueryResult } from "./attachments";
+import { getRuntimeConfig } from "./config";
 import type {
   PaymentStatus,
   Query,
@@ -13,7 +14,7 @@ let _db: Database | null = null;
 
 export function getDb(): Database {
   if (!_db) {
-    _db = new Database(process.env.DB_PATH ?? "queries.db");
+    _db = new Database(getRuntimeConfig().dbPath);
     _db.exec("PRAGMA journal_mode=WAL");
     migrate(_db);
   }

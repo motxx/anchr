@@ -12,12 +12,8 @@ import {
   type QueryResult,
 } from "./query-service";
 import type { AttachmentRef, PhotoProofResult } from "./types";
-// @ts-ignore — Bun HTML import
-import uiHtml from "./ui/index.html";
 
-const PORT = Number(process.env.REFERENCE_APP_PORT ?? 3000);
-
-async function buildCss() {
+export async function prepareWorkerApiAssets() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
   const cssOut = join(import.meta.dir, "ui/generated.css");
   // stdout/stderr must be "pipe" — never "inherit", which would corrupt MCP stdio
@@ -70,7 +66,7 @@ function queryDetail(query: Query, requestUrl: string) {
   };
 }
 
-function buildApp() {
+export function buildWorkerApiApp() {
   const app = new Hono();
   const listQueries = (c: Context) =>
     c.json(listOpenQueries().map(querySummary));
@@ -176,22 +172,4 @@ function buildApp() {
   app.post("/queries/:id/cancel", cancelHandler);
 
   return app;
-}
-
-export async function startWorkerApi() {
-  await buildCss();
-  const { mkdirSync } = await import("node:fs");
-  mkdirSync(UPLOADS_DIR, { recursive: true });
-
-  const app = buildApp();
-
-  Bun.serve({
-    port: PORT,
-    routes: {
-      "/": uiHtml,
-    },
-    fetch: app.fetch,
-  });
-
-  console.error(`[reference-app] Dashboard → http://localhost:${PORT}`);
 }

@@ -1,4 +1,5 @@
 import { extname, join } from "node:path";
+import { DEFAULT_UPLOADS_DIR, getRuntimeConfig } from "./config";
 import type {
   AttachmentRef,
   AttachmentStorageKind,
@@ -7,9 +8,8 @@ import type {
 
 type AttachmentLike = AttachmentRef | string;
 
-export const UPLOADS_DIR = join(import.meta.dir, "..", "uploads");
+export const UPLOADS_DIR = DEFAULT_UPLOADS_DIR;
 export const UPLOADS_ROUTE_PREFIX = "/uploads/";
-const DEFAULT_REFERENCE_APP_PORT = process.env.REFERENCE_APP_PORT ?? "3000";
 
 const MIME_TYPES: Record<string, string> = {
   ".gif": "image/gif",
@@ -61,7 +61,7 @@ export function attachmentPublicBaseUrl(requestUrl?: string): string {
   const configured = process.env.ATTACHMENT_PUBLIC_BASE_URL ?? process.env.PUBLIC_BASE_URL;
   if (configured) return configured.replace(/\/+$/, "");
   if (requestUrl) return new URL("/", requestUrl).toString().replace(/\/+$/, "");
-  return `http://localhost:${DEFAULT_REFERENCE_APP_PORT}`;
+  return `http://localhost:${getRuntimeConfig().referenceAppPort}`;
 }
 
 export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: string): string {

@@ -27,7 +27,9 @@ export type {
   SubmitQueryOutcome,
 } from "./query-service";
 export { startMcpServer as startMcpAdapter } from "./mcp-server";
-export { startWorkerApi as startReferenceWorkerApi } from "./worker-api";
+export { startReferenceApp } from "./reference-app";
+export { startReferenceRuntime } from "./runtime";
+export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./worker-api";
 export { verify as verifyQueryResult } from "./verification";
 
 if (import.meta.main) {

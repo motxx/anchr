@@ -1,6 +1,7 @@
 import { createHmac, createHash } from "node:crypto";
 import { extname, join } from "node:path";
 import { attachmentPublicBaseUrl } from "./attachments";
+import { DEFAULT_UPLOADS_DIR } from "./config";
 import type { AttachmentRef, AttachmentStorageKind } from "./types";
 
 export interface UploadedAttachment {
@@ -18,7 +19,7 @@ interface AttachmentStore {
   put(queryId: string, file: File, requestUrl: string): Promise<UploadedAttachment>;
 }
 
-const LOCAL_UPLOADS_DIR = join(import.meta.dir, "..", "uploads");
+const LOCAL_UPLOADS_DIR = DEFAULT_UPLOADS_DIR;
 
 function sanitizeExt(fileName: string): string {
   const ext = extname(fileName).toLowerCase();

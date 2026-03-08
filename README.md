@@ -130,7 +130,9 @@ submitQueryResult(query.id, {
 - `queryTemplates.webpageField(...)`
 - `verifyQueryResult(query, result)`
 - `startMcpAdapter()`
-- `startReferenceWorkerApi()`
+- `startReferenceApp()`
+- `buildReferenceWorkerApi()`
+- `prepareWorkerApiAssets()`
 
 ## Query Templates
 
@@ -205,7 +207,7 @@ Current tools:
 
 ## Attachment Storage
 
-The default attachment backend is local disk plus the reference app's `/uploads/...` HTTP route.
+The default attachment backend is `.local/uploads` on disk plus the reference app's `/uploads/...` HTTP route.
 
 You can also switch to an S3-compatible object store so photo attachments are retrievable via public URLs.
 
@@ -241,7 +243,9 @@ This helps reject obviously bad submissions, but it does not prove ground truth.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REFERENCE_APP_PORT` | `3000` | Port for the reference worker app |
-| `DB_PATH` | `queries.db` | SQLite path for the local query store |
+| `DB_PATH` | `.local/queries.db` | SQLite path for the local query store |
+| `QUERY_SWEEP_INTERVAL_MS` | `30000` | Interval for expiring stale pending queries |
+| `INLINE_ATTACHMENT_LIMIT_BYTES` | `524288` | Max inline image size returned by `get_query_attachment` |
 | `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local` or `s3` |
 | `ATTACHMENT_PUBLIC_BASE_URL` | unset | Public base URL for local attachment links |
 | `PUBLIC_BASE_URL` | unset | Alias used when local attachment URLs should resolve through a reverse proxy |
@@ -280,12 +284,15 @@ R2_PUBLIC_BASE_URL=https://assets.example.com
 src/
   index.ts          SDK entrypoint
   server.ts         reference runtime entrypoint
+  runtime.ts        runtime wiring for scheduler + adapters
+  reference-app.ts  reference app startup and Bun.serve
+  config.ts         environment-backed runtime config
   query-service.ts  query-first SDK surface
   mcp-server.ts     MCP adapter
-  worker-api.ts     reference worker app + HTTP API
+  worker-api.ts     reference worker HTTP app builder
   verification.ts   lightweight verification rules
   challenge.ts      nonce generation + challenge text
-  db.ts             SQLite store
+  sqlite-query-store.ts SQLite-backed query store
   types.ts          shared internal types
   ui/               reference app assets
 ```
