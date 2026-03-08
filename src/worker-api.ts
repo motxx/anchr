@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { z } from "zod";
 import { getAttachmentStore } from "./attachment-store";
 import {
   buildAttachmentHandle,
@@ -14,13 +15,46 @@ import {
 import { getRuntimeConfig } from "./config";
 import {
   cancelQuery,
+  createQuery,
   getQuery as getQueryById,
   listOpenQueries,
   submitQueryResult,
   type Query,
+  type QueryInput,
   type QueryResult,
 } from "./query-service";
 import type { AttachmentRef } from "./types";
+
+const requesterMetaSchema = z.object({
+  requester_type: z.enum(["agent", "human", "app"]),
+  requester_id: z.string().min(1).optional(),
+  client_name: z.string().min(1).optional(),
+});
+
+const createQuerySchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("photo_proof"),
+    target: z.string().min(1),
+    location_hint: z.string().min(1).optional(),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("store_status"),
+    store_name: z.string().min(1),
+    location_hint: z.string().min(1).optional(),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+  }),
+  z.object({
+    type: z.literal("webpage_field"),
+    url: z.string().url(),
+    field: z.string().min(1),
+    anchor_word: z.string().min(1),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+  }),
+]);
 
 export async function prepareWorkerApiAssets() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
@@ -44,11 +78,61 @@ function querySummary(query: Query) {
     type: query.type,
     status: query.status,
     params: query.params,
+    requester_meta: query.requester_meta ?? null,
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
   };
+}
+
+function buildCreatedQueryPayload(query: Query, requestUrl: string) {
+  const requestOrigin = new URL(requestUrl).origin;
+  return {
+    query_id: query.id,
+    type: query.type,
+    status: query.status,
+    challenge_nonce: query.challenge_nonce,
+    challenge_rule: query.challenge_rule,
+    expires_at: new Date(query.expires_at).toISOString(),
+    requester_meta: query.requester_meta ?? null,
+    reference_app_url: `${requestOrigin}/queries/${query.id}`,
+    query_api_url: `${requestOrigin}/queries/${query.id}`,
+  };
+}
+
+function getHttpApiKey(c: Context): string | null {
+  const authorization = c.req.header("authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    return token || null;
+  }
+
+  const apiKey = c.req.header("x-api-key")?.trim();
+  return apiKey || null;
+}
+
+function requireWriteApiKey(c: Context): Response | null {
+  const { httpApiKeys } = getRuntimeConfig();
+  if (httpApiKeys.length === 0) {
+    return null;
+  }
+
+  const supplied = getHttpApiKey(c);
+  if (supplied && httpApiKeys.includes(supplied)) {
+    return null;
+  }
+
+  return c.json(
+    {
+      error: "Unauthorized",
+      hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints.",
+    },
+    401,
+    {
+      "www-authenticate": "Bearer",
+    },
+  );
 }
 
 function materializeResult(result: QueryResult | undefined, requestUrl: string): QueryResult | undefined {
@@ -115,6 +199,67 @@ export function buildWorkerApiApp() {
   app.get("/queries", listQueries);
 
   app.get("/queries/:id", getQuery);
+
+  app.post("/queries", async (c) => {
+    const unauthorized = requireWriteApiKey(c);
+    if (unauthorized) return unauthorized;
+
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const parsed = createQuerySchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: "Invalid query payload",
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+        400,
+      );
+    }
+
+    const payload = parsed.data;
+    let input: QueryInput;
+
+    switch (payload.type) {
+      case "photo_proof":
+        input = {
+          type: "photo_proof",
+          target: payload.target,
+          location_hint: payload.location_hint,
+        };
+        break;
+      case "store_status":
+        input = {
+          type: "store_status",
+          store_name: payload.store_name,
+          location_hint: payload.location_hint,
+        };
+        break;
+      case "webpage_field":
+        input = {
+          type: "webpage_field",
+          url: payload.url,
+          field: payload.field,
+          anchor_word: payload.anchor_word,
+        };
+        break;
+    }
+
+    const query = createQuery(input, {
+      ttlSeconds: payload.ttl_seconds,
+      requesterMeta: payload.requester,
+    });
+
+    return c.json(buildCreatedQueryPayload(query, c.req.url), 201);
+  });
 
   app.get("/queries/:id/attachments", async (c) => {
     const id = c.req.param("id");
@@ -228,6 +373,9 @@ export function buildWorkerApiApp() {
   });
 
   const uploadHandler = async (c: Context) => {
+    const unauthorized = requireWriteApiKey(c);
+    if (unauthorized) return unauthorized;
+
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = getQueryById(id);
@@ -272,6 +420,9 @@ export function buildWorkerApiApp() {
   });
 
   const submitHandler = async (c: Context) => {
+    const unauthorized = requireWriteApiKey(c);
+    if (unauthorized) return unauthorized;
+
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: unknown;
@@ -307,6 +458,9 @@ export function buildWorkerApiApp() {
   app.post("/queries/:id/submit", submitHandler);
 
   const cancelHandler = (c: Context) => {
+    const unauthorized = requireWriteApiKey(c);
+    if (unauthorized) return unauthorized;
+
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const outcome = cancelQuery(id);

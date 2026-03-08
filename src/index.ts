@@ -15,6 +15,8 @@ export type {
   CancelQueryOutcome,
   CreateQueryOptions,
   Query,
+  RequesterMeta,
+  RequesterType,
   QueryService,
   QueryStore,
   QueryExecutorType,

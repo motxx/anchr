@@ -30,6 +30,26 @@ import type { AttachmentRef, QueryType } from "../types";
 
 // ---- Types ----
 
+const API_KEY_STORAGE_KEY = "human-calling-api-key";
+
+function readStoredApiKey(): string {
+  if (typeof window === "undefined") return "";
+
+  try {
+    return window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function buildApiHeaders(apiKey: string, initialHeaders?: HeadersInit): Headers {
+  const headers = new Headers(initialHeaders);
+  if (apiKey.trim()) {
+    headers.set("x-api-key", apiKey.trim());
+  }
+  return headers;
+}
+
 interface Query {
   id: string;
   type: QueryType;
@@ -247,10 +267,12 @@ function PhotoProofForm({
   query,
   onSubmit,
   isPending,
+  apiKey,
 }: {
   query: Query;
   onSubmit: (data: Record<string, unknown>) => void;
   isPending: boolean;
+  apiKey: string;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
@@ -274,7 +296,11 @@ function PhotoProofForm({
       try {
         const fd = new FormData();
         fd.append("photo", file);
-        const res = await fetch(`/queries/${query.id}/upload`, { method: "POST", body: fd });
+        const res = await fetch(`/queries/${query.id}/upload`, {
+          method: "POST",
+          headers: buildApiHeaders(apiKey),
+          body: fd,
+        });
         const data = await res.json() as {
           ok: boolean;
           attachment?: AttachmentRef;
@@ -391,7 +417,7 @@ function PhotoProofForm({
 
 // ---- QueryCard ----
 
-function QueryCard({ query }: { query: Query }) {
+function QueryCard({ query, apiKey }: { query: Query; apiKey: string }) {
   const [open, setOpen] = useState(false);
   const [showParams, setShowParams] = useState(false);
   const [, setTick] = useState(0);
@@ -406,7 +432,7 @@ function QueryCard({ query }: { query: Query }) {
     mutationFn: async (body) => {
       const r = await fetch(`/queries/${query.id}/submit`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildApiHeaders(apiKey, { "Content-Type": "application/json" }),
         body: JSON.stringify(body),
       });
       if (!r.ok && r.status >= 500)
@@ -508,6 +534,7 @@ function QueryCard({ query }: { query: Query }) {
                   query={query}
                   onSubmit={mut.mutate}
                   isPending={mut.isPending}
+                  apiKey={apiKey}
                 />
               )}
             </div>
@@ -553,10 +580,12 @@ function QueryCard({ query }: { query: Query }) {
 
 // ---- QueryList ----
 
-function QueryList() {
+function QueryList({ apiKey }: { apiKey: string }) {
   const { data: queries = [], isError } = useQuery<Query[]>({
-    queryKey: ["queries"],
-    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
+    queryKey: ["queries", apiKey],
+    queryFn: (): Promise<Query[]> => fetch("/queries", {
+      headers: buildApiHeaders(apiKey),
+    }).then((r) => r.json()),
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -590,7 +619,7 @@ function QueryList() {
   return (
     <div className="flex flex-col gap-3">
       {queries.map((query) => (
-        <QueryCard key={query.id} query={query} />
+        <QueryCard key={query.id} query={query} apiKey={apiKey} />
       ))}
     </div>
   );
@@ -599,9 +628,25 @@ function QueryList() {
 // ---- App ----
 
 export default function App() {
+  const [apiKey, setApiKey] = useState(() => readStoredApiKey());
+
+  React.useEffect(() => {
+    try {
+      if (apiKey.trim()) {
+        window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
+      } else {
+        window.localStorage.removeItem(API_KEY_STORAGE_KEY);
+      }
+    } catch {
+      // Ignore storage failures in constrained browsers.
+    }
+  }, [apiKey]);
+
   const { isFetching } = useQuery<Query[]>({
-    queryKey: ["queries"],
-    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
+    queryKey: ["queries", apiKey],
+    queryFn: (): Promise<Query[]> => fetch("/queries", {
+      headers: buildApiHeaders(apiKey),
+    }).then((r) => r.json()),
     staleTime: 2000,
   });
 
@@ -620,6 +665,13 @@ export default function App() {
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">
+              <Input
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder="API key (optional)"
+                className="h-8 w-44 text-xs"
+              />
               {isFetching ? (
                 <RefreshCw className="w-3 h-3 text-muted-foreground animate-spin" />
               ) : (
@@ -630,7 +682,7 @@ export default function App() {
           </div>
         </header>
 
-        <QueryList />
+        <QueryList apiKey={apiKey} />
       </div>
     </div>
   );

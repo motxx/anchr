@@ -6,6 +6,7 @@ import type {
   Query,
   QueryResult,
   QueryStatus,
+  RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
 } from "./types";
@@ -32,6 +33,7 @@ function migrate(db: Database) {
       challenge_rule TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
+      requester_meta TEXT,
       submitted_at INTEGER,
       result TEXT,
       verification TEXT,
@@ -44,6 +46,9 @@ function migrate(db: Database) {
   if (!columns.some((column) => column.name === "submission_meta")) {
     db.exec("ALTER TABLE queries ADD COLUMN submission_meta TEXT");
   }
+  if (!columns.some((column) => column.name === "requester_meta")) {
+    db.exec("ALTER TABLE queries ADD COLUMN requester_meta TEXT");
+  }
 }
 
 interface QueryRow {
@@ -55,6 +60,7 @@ interface QueryRow {
   challenge_rule: string;
   created_at: number;
   expires_at: number;
+  requester_meta: string | null;
   submitted_at: number | null;
   result: string | null;
   verification: string | null;
@@ -73,6 +79,7 @@ function rowToQuery(row: QueryRow): Query {
     challenge_rule: row.challenge_rule,
     created_at: row.created_at,
     expires_at: row.expires_at,
+    requester_meta: row.requester_meta ? JSON.parse(row.requester_meta) as RequesterMeta : undefined,
     submitted_at: row.submitted_at ?? undefined,
     result,
     verification: row.verification ? JSON.parse(row.verification) : undefined,
@@ -84,8 +91,8 @@ function rowToQuery(row: QueryRow): Query {
 export function insertQueryRecord(query: Query): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, payment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, requester_meta, payment_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     query.id,
     query.type,
@@ -95,6 +102,7 @@ export function insertQueryRecord(query: Query): void {
     query.challenge_rule,
     query.created_at,
     query.expires_at,
+    query.requester_meta ? JSON.stringify(query.requester_meta) : null,
     query.payment_status,
   );
 }

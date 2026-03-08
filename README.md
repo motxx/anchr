@@ -88,7 +88,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "human-calling": {
       "command": "bun",
-      "args": ["run", "/path/to/human-calling-mcp/src/server.ts"],
+      "args": ["run", "/path/to/human-calling-mcp/src/index.ts"],
       "env": {
         "REFERENCE_APP_PORT": "3000"
       }
@@ -195,8 +195,10 @@ http://localhost:3000
 ```
 
 It shows pending live queries and lets a human submit structured results.
+If `HTTP_API_KEY` or `HTTP_API_KEYS` is set, the reference app can still submit by entering the key in the header input.
 
 Reference HTTP endpoints:
+- `POST /queries`
 - `GET /queries`
 - `GET /queries/:id`
 - `GET /queries/:id/attachments`
@@ -208,6 +210,7 @@ Reference HTTP endpoints:
 - `POST /queries/:id/cancel`
 
 For `photo_proof` queries:
+- `POST /queries` creates new live queries for `store_status`, `photo_proof`, and `webpage_field`
 - `POST /queries/:id/upload` returns `attachment`
 - `GET /queries/:id` returns `result.attachments` as `AttachmentRef[]` with accessible `uri` values
 - `GET /queries/:id/attachments/:index` returns the file itself for local storage, or redirects to the external object URL
@@ -216,6 +219,24 @@ For `photo_proof` queries:
 - `GET /uploads/:filename` serves the uploaded image itself
 - `get_query_attachment` returns URL/path metadata only
 - `get_query_attachment_preview` returns a resized preview image through MCP
+
+Create a query over HTTP:
+
+```bash
+curl -X POST https://human-calling-mcp.fly.dev/queries \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: $HTTP_API_KEY" \
+  -d '{
+    "type": "store_status",
+    "store_name": "Ramen Jiro Shinjuku",
+    "location_hint": "Tokyo",
+    "ttl_seconds": 300,
+    "requester": {
+      "requester_type": "app",
+      "client_name": "mobile-app"
+    }
+  }'
+```
 
 ## MCP Adapter
 
@@ -281,6 +302,8 @@ This helps reject obviously bad submissions, but it does not prove ground truth.
 | `QUERY_SWEEP_INTERVAL_MS` | `30000` | Interval for expiring stale pending queries |
 | `PREVIEW_MAX_DIMENSION` | `768` | Max width/height for resized preview images |
 | `PREVIEW_JPEG_QUALITY` | `75` | JPEG quality used when generating preview images |
+| `HTTP_API_KEY` | unset | Single API key allowed to create/upload/submit/cancel queries over HTTP |
+| `HTTP_API_KEYS` | unset | Comma-separated API keys for the same write endpoints; takes precedence if set |
 | `ATTACHMENT_STORAGE` | `local` | Attachment backend: `local`, `localstack`, `r2`, or `s3` |
 | `ATTACHMENT_PUBLIC_BASE_URL` | unset | Public base URL for local attachment links |
 | `PUBLIC_BASE_URL` | unset | Alias used when local attachment URLs should resolve through a reverse proxy |
@@ -328,6 +351,8 @@ The current codebase is best deployed as:
 - Cloudflare R2 for attachment storage
 - local Claude Desktop for the MCP stdio adapter
 
+For internet-facing deployments, set `HTTP_API_KEY` or `HTTP_API_KEYS` so write endpoints are not anonymous.
+
 Files included for this flow:
 - `Dockerfile`
 - `fly.toml`
@@ -351,6 +376,7 @@ If you want a different app name, edit `app` in `fly.toml` before deploy.
 
 ```bash
 fly secrets set \
+  HTTP_API_KEY=... \
   R2_ACCOUNT_ID=... \
   R2_BUCKET=human-calling \
   R2_ACCESS_KEY_ID=... \

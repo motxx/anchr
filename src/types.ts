@@ -6,6 +6,7 @@ export type QueryStatus =
   | "rejected"
   | "expired";
 export type PaymentStatus = "locked" | "released" | "cancelled";
+export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
 export type AttachmentStorageKind = "local" | "external" | "s3";
@@ -83,6 +84,12 @@ export interface VerificationDetail {
   failures: string[];
 }
 
+export interface RequesterMeta {
+  requester_type: RequesterType;
+  requester_id?: string;
+  client_name?: string;
+}
+
 export interface SubmissionMeta {
   executor_type: ExecutorType;
   channel: SubmissionChannel;
@@ -97,6 +104,7 @@ export interface Query {
   challenge_rule: string;
   created_at: number;
   expires_at: number;
+  requester_meta?: RequesterMeta;
   submitted_at?: number;
   result?: QueryResult;
   verification?: VerificationDetail;

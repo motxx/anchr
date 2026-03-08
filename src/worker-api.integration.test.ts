@@ -13,7 +13,11 @@ test("worker api supports photo proof upload, submission, and attachment metadat
   mkdirSync(UPLOADS_DIR, { recursive: true });
 
   const previousStorage = process.env.ATTACHMENT_STORAGE;
+  const previousHttpApiKey = process.env.HTTP_API_KEY;
+  const previousHttpApiKeys = process.env.HTTP_API_KEYS;
   process.env.ATTACHMENT_STORAGE = "local";
+  delete process.env.HTTP_API_KEY;
+  delete process.env.HTTP_API_KEYS;
 
   const app = buildWorkerApiApp();
   const query = createQuery(queryTemplates.photoProof("Worker API integration test"), { ttlSeconds: 300 });
@@ -99,8 +103,77 @@ test("worker api supports photo proof upload, submission, and attachment metadat
     expect(storedQuery?.status).toBe("approved");
   } finally {
     process.env.ATTACHMENT_STORAGE = previousStorage;
+    process.env.HTTP_API_KEY = previousHttpApiKey;
+    process.env.HTTP_API_KEYS = previousHttpApiKeys;
     if (uploadedLocalPath) {
       rmSync(uploadedLocalPath, { force: true });
     }
+  }
+});
+
+test("worker api creates queries over HTTP and enforces write API keys", async () => {
+  const previousHttpApiKey = process.env.HTTP_API_KEY;
+  const previousHttpApiKeys = process.env.HTTP_API_KEYS;
+  process.env.HTTP_API_KEY = "secret-write-key";
+  delete process.env.HTTP_API_KEYS;
+
+  const app = buildWorkerApiApp();
+
+  try {
+    const unauthorizedResponse = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "store_status",
+        store_name: "Unauthorized Test Store",
+      }),
+    });
+    expect(unauthorizedResponse.status).toBe(401);
+
+    const createResponse = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": "secret-write-key",
+      },
+      body: JSON.stringify({
+        type: "store_status",
+        store_name: "Authorized Test Store",
+        location_hint: "Near Tokyo Station",
+        ttl_seconds: 180,
+        requester: {
+          requester_type: "app",
+          requester_id: "integration-test-client",
+          client_name: "worker-api.integration.test",
+        },
+      }),
+    });
+    expect(createResponse.status).toBe(201);
+
+    const createJson = await createResponse.json() as {
+      query_id: string;
+      type: string;
+      status: string;
+      requester_meta: {
+        requester_type: string;
+        requester_id?: string;
+        client_name?: string;
+      } | null;
+      query_api_url: string;
+    };
+
+    expect(createJson.query_id).toStartWith("query_");
+    expect(createJson.type).toBe("store_status");
+    expect(createJson.status).toBe("pending");
+    expect(createJson.requester_meta?.requester_type).toBe("app");
+    expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
+    expect(createJson.query_api_url).toContain(`/queries/${createJson.query_id}`);
+
+    const storedQuery = getQuery(createJson.query_id);
+    expect(storedQuery?.requester_meta?.requester_type).toBe("app");
+    expect(storedQuery?.requester_meta?.client_name).toBe("worker-api.integration.test");
+  } finally {
+    process.env.HTTP_API_KEY = previousHttpApiKey;
+    process.env.HTTP_API_KEYS = previousHttpApiKeys;
   }
 });

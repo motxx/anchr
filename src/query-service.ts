@@ -16,6 +16,7 @@ import type {
   QueryResult,
   QueryStatus,
   QueryType,
+  RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
 } from "./types";
@@ -29,6 +30,8 @@ export type {
   QueryResult,
   QueryStatus,
   QueryType,
+  RequesterMeta,
+  RequesterType,
 } from "./types";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
@@ -37,6 +40,7 @@ export type QuerySubmissionMeta = SubmissionMeta;
 export interface CreateQueryOptions {
   ttlMs?: number;
   ttlSeconds?: number;
+  requesterMeta?: RequesterMeta;
 }
 
 export interface SubmitQueryOutcome {
@@ -128,6 +132,7 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
     challenge_rule: buildChallengeRule(input.type, nonce, input as unknown as Record<string, unknown>),
     created_at: now,
     expires_at: now + resolveTtlMs(options),
+    requester_meta: options?.requesterMeta,
     payment_status: "locked",
   };
 }

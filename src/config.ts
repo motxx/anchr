@@ -12,12 +12,26 @@ function readNumberEnv(name: string, fallback: number): number {
   return parsed;
 }
 
+function readStringListEnv(...names: string[]): string[] {
+  for (const name of names) {
+    const value = process.env[name];
+    if (!value) continue;
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export interface RuntimeConfig {
   dbPath: string;
   referenceAppPort: number;
   querySweepIntervalMs: number;
   previewMaxDimension: number;
   previewJpegQuality: number;
+  httpApiKeys: string[];
 }
 
 export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
@@ -31,5 +45,6 @@ export function getRuntimeConfig(): RuntimeConfig {
     querySweepIntervalMs: readNumberEnv("QUERY_SWEEP_INTERVAL_MS", 30_000),
     previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
+    httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
   };
 }

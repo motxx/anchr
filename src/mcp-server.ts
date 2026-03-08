@@ -26,17 +26,21 @@ const referenceBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
 
 function buildCreatedQueryPayload(query: {
   id: string;
+  type: string;
   status: string;
   challenge_nonce: string;
   challenge_rule: string;
   expires_at: number;
+  requester_meta?: Query["requester_meta"];
 }) {
   return {
     query_id: query.id,
     status: query.status,
+    type: query.type,
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: new Date(query.expires_at).toISOString(),
+    requester_meta: query.requester_meta ?? null,
     reference_app_url: `${referenceBaseUrl}/queries/${query.id}`,
     query_api_url: `${referenceBaseUrl}/queries/${query.id}`,
   };
@@ -48,6 +52,7 @@ function buildQueryStatusPayload(query: Query) {
     query_id: query.id,
     type: query.type,
     status: query.status,
+    requester_meta: query.requester_meta ?? null,
     payment_status: query.payment_status,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
     result,
@@ -98,7 +103,13 @@ export async function startMcpServer() {
     },
     async ({ target, location_hint, ttl_seconds }) => {
       const params: QueryInput = { type: "photo_proof", target, location_hint };
-      const query = createQuery(params, { ttlSeconds: ttl_seconds ?? 600 });
+      const query = createQuery(params, {
+        ttlSeconds: ttl_seconds ?? 600,
+        requesterMeta: {
+          requester_type: "agent",
+          client_name: "mcp",
+        },
+      });
       return {
         content: [
           {
@@ -121,7 +132,13 @@ export async function startMcpServer() {
     },
     async ({ store_name, location_hint, ttl_seconds }) => {
       const params: QueryInput = { type: "store_status", store_name, location_hint };
-      const query = createQuery(params, { ttlSeconds: ttl_seconds ?? 600 });
+      const query = createQuery(params, {
+        ttlSeconds: ttl_seconds ?? 600,
+        requesterMeta: {
+          requester_type: "agent",
+          client_name: "mcp",
+        },
+      });
       return {
         content: [
           {
@@ -145,7 +162,13 @@ export async function startMcpServer() {
     },
     async ({ url, field, anchor_word, ttl_seconds }) => {
       const params: QueryInput = { type: "webpage_field", url, field, anchor_word };
-      const query = createQuery(params, { ttlSeconds: ttl_seconds ?? 600 });
+      const query = createQuery(params, {
+        ttlSeconds: ttl_seconds ?? 600,
+        requesterMeta: {
+          requester_type: "agent",
+          client_name: "mcp",
+        },
+      });
       return {
         content: [
           {
