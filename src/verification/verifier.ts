@@ -58,8 +58,6 @@ function verifyPhotoProof(
 ): void {
   if (!result.text_answer || result.text_answer.trim().length === 0) {
     failures.push("text_answer is empty");
-  } else {
-    checks.push("text_answer present");
   }
 
   if (result.text_answer?.includes(nonce)) {
@@ -76,8 +74,6 @@ function verifyPhotoProof(
 
   if (result.text_answer && result.text_answer.length > 5000) {
     failures.push("text_answer too long (max 5000 chars)");
-  } else {
-    checks.push("text_answer length ok");
   }
 }
 
@@ -114,13 +110,15 @@ function verifyPhotoIntegrity(
   for (const record of integrityRecords) {
     const { exif, c2pa } = record;
 
-    // C2PA: if present and valid, strong signal of authenticity
-    if (c2pa.available && c2pa.hasManifest) {
-      if (c2pa.signatureValid) {
-        checks.push("C2PA: valid Content Credentials signature");
-      } else {
-        failures.push("C2PA: Content Credentials signature invalid");
-      }
+    // C2PA
+    if (!c2pa.available) {
+      checks.push("C2PA: c2patool not available (skipped)");
+    } else if (!c2pa.hasManifest) {
+      checks.push("C2PA: checked, no Content Credentials found");
+    } else if (c2pa.signatureValid) {
+      checks.push("C2PA: valid Content Credentials signature");
+    } else {
+      failures.push("C2PA: Content Credentials signature invalid");
     }
 
     // EXIF: camera model presence is a soft indicator
@@ -162,14 +160,10 @@ function verifyStoreStatus(
 ): void {
   if (result.status !== "open" && result.status !== "closed") {
     failures.push(`status must be "open" or "closed", got "${result.status}"`);
-  } else {
-    checks.push(`status is valid: "${result.status}"`);
   }
 
   if (!result.notes || result.notes.trim().length === 0) {
     failures.push("notes is empty");
-  } else {
-    checks.push("notes present");
   }
 
   if (result.notes?.includes(nonce)) {
@@ -188,14 +182,10 @@ function verifyWebpageField(
 ): void {
   if (!result.answer || result.answer.trim().length === 0) {
     failures.push("answer is empty");
-  } else {
-    checks.push("answer present");
   }
 
   if (!result.proof_text || result.proof_text.trim().length === 0) {
     failures.push("proof_text is empty");
-  } else {
-    checks.push("proof_text present");
   }
 
   if (result.proof_text?.includes(anchorWord)) {
@@ -206,8 +196,6 @@ function verifyWebpageField(
 
   if (!result.notes || result.notes.trim().length === 0) {
     failures.push("notes is empty");
-  } else {
-    checks.push("notes present");
   }
 
   if (result.notes?.includes(nonce)) {
@@ -218,7 +206,5 @@ function verifyWebpageField(
 
   if (result.answer && result.answer.length > 2000) {
     failures.push("answer too long (max 2000 chars)");
-  } else {
-    checks.push("answer length ok");
   }
 }
