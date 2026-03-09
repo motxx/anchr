@@ -42,6 +42,9 @@ export { buildEscrowP2PKOptions, calculateOracleFee, createEscrowToken, executeE
 export type { EscrowParams, EscrowToken, SwapResult } from "./cashu/escrow";
 export * as nostr from "./nostr/index";
 export * as blossom from "./blossom/client";
+export { workerUpload } from "./blossom/worker-upload";
+export type { WorkerUploadResult } from "./blossom/worker-upload";
+export { fetchBlossomAttachment } from "./blossom/fetch-attachment";
 export * as verification from "./verification/index";
 
 if (import.meta.main) {

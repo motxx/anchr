@@ -9,7 +9,7 @@ export type PaymentStatus = "locked" | "released" | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
-export type AttachmentStorageKind = "local" | "external" | "s3";
+export type AttachmentStorageKind = "local" | "external" | "s3" | "blossom";
 
 export interface PhotoProofParams {
   target: string; // e.g. "コンビニ入口の営業時間表示"
@@ -41,6 +41,14 @@ export interface AttachmentRef {
   size_bytes?: number;
   local_file_path?: string;
   route_path?: string;
+  /** Blossom-specific: SHA-256 hash of encrypted blob. */
+  blossom_hash?: string;
+  /** Blossom-specific: hex-encoded AES-256-GCM decryption key. */
+  blossom_encrypt_key?: string;
+  /** Blossom-specific: hex-encoded AES-256-GCM IV. */
+  blossom_encrypt_iv?: string;
+  /** Blossom-specific: server URLs where the blob is stored. */
+  blossom_servers?: string[];
 }
 
 export interface AttachmentAccess {
