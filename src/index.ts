@@ -38,6 +38,8 @@ export type { Oracle, OracleInfo, OracleAttestation } from "./oracle";
 export { stripExif } from "./exif-strip";
 export { purgeExpiredQueries } from "./data-purge";
 export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./cashu/wallet";
+export { buildEscrowP2PKOptions, calculateOracleFee, createEscrowToken, executeEscrowSwap, inspectEscrowToken } from "./cashu/escrow";
+export type { EscrowParams, EscrowToken, SwapResult } from "./cashu/escrow";
 export * as nostr from "./nostr/index";
 export * as blossom from "./blossom/client";
 export * as verification from "./verification/index";
