@@ -249,9 +249,9 @@ src/
 - [x] EXIF stripping, C2PA validation, AI content check
 - [x] Nostr protocol layer (events, encryption, relay client)
 - [x] Oracle system with mutual selection
-- [ ] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
-- [ ] Worker-to-oracle direct HTTP endpoint (Tor-compatible)
-- [ ] Worker-side storage (EXIF strip + Blossom encrypted upload)
+- [x] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
+- [x] Worker-to-oracle direct HTTP endpoint (Tor-compatible)
+- [x] Worker-side storage (EXIF strip + Blossom encrypted upload)
 - [ ] Remove central server dependency (Nostr-native protocol)
 - [ ] Umbrel app packaging
 
