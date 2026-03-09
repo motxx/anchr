@@ -18,7 +18,7 @@ export function buildChallengeRule(type: string, nonce: string, params: Record<s
       return `「${nonce}」を紙かメモ画面に表示し、店舗（${params.store_name}）の入口と一緒に撮影してください。回答のnotesに必ず「${nonce}」を含めてください。`;
 
     case "webpage_field":
-      return `指定URLのページを開き、${params.field}を抽出してください。また「${params.anchor_word}」という語の近傍テキスト（前後20文字程度）をproof_textとして返してください。`;
+      return `指定URLのページを開き、${params.field}を抽出してください。また「${params.anchor_word}」という語の近傍テキスト（前後20文字程度）をproof_textとして返し、notesには必ず「${nonce}」を含めてください。`;
 
     default:
       return `このジョブには「${nonce}」を回答に含めてください。`;

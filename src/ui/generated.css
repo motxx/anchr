@@ -294,8 +294,8 @@
   .ml-0\.5 {
     margin-left: calc(var(--spacing) * 0.5);
   }
-  .block {
-    display: block;
+  .contents {
+    display: contents;
   }
   .flex {
     display: flex;
@@ -398,6 +398,9 @@
   }
   .w-12 {
     width: calc(var(--spacing) * 12);
+  }
+  .w-44 {
+    width: calc(var(--spacing) * 44);
   }
   .w-fit {
     width: fit-content;
