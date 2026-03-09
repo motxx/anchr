@@ -15,16 +15,18 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
 
   switch (query.type) {
     case "photo_proof":
-      verifyPhotoProof(result as PhotoProofResult, query.challenge_nonce, checks, failures);
+      verifyPhotoProof(result as PhotoProofResult, checks, failures);
       verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures);
       break;
     case "store_status":
-      verifyStoreStatus(result as StoreStatusResult, query.challenge_nonce, checks, failures);
+      verifyStoreStatus(result as StoreStatusResult, checks, failures);
+      if ((result as StoreStatusResult).attachments?.length) {
+        verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures);
+      }
       break;
     case "webpage_field":
       verifyWebpageField(
         result as WebpageFieldResult,
-        query.challenge_nonce,
         (query.params as { anchor_word: string }).anchor_word,
         checks,
         failures,
@@ -32,7 +34,9 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
       break;
   }
 
-  if (query.type === "photo_proof" && failures.length === 0) {
+  const hasAttachments = query.type === "photo_proof"
+    || (query.type === "store_status" && (result as StoreStatusResult).attachments?.length);
+  if (hasAttachments && failures.length === 0) {
     const aiResult = await checkAttachmentContent(query, result);
     if (aiResult) {
       if (aiResult.passed) {
@@ -52,20 +56,9 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
 
 function verifyPhotoProof(
   result: PhotoProofResult,
-  nonce: string,
   checks: string[],
   failures: string[],
 ): void {
-  if (!result.text_answer || result.text_answer.trim().length === 0) {
-    failures.push("text_answer is empty");
-  }
-
-  if (result.text_answer?.includes(nonce)) {
-    checks.push(`nonce "${nonce}" found in text_answer`);
-  } else {
-    failures.push(`nonce "${nonce}" not found in text_answer`);
-  }
-
   if (Array.isArray(result.attachments) && result.attachments.length > 0) {
     checks.push("photo attachment present");
   } else {
@@ -154,7 +147,6 @@ function verifyPhotoIntegrity(
 
 function verifyStoreStatus(
   result: StoreStatusResult,
-  nonce: string,
   checks: string[],
   failures: string[],
 ): void {
@@ -162,20 +154,15 @@ function verifyStoreStatus(
     failures.push(`status must be "open" or "closed", got "${result.status}"`);
   }
 
-  if (!result.notes || result.notes.trim().length === 0) {
-    failures.push("notes is empty");
-  }
-
-  if (result.notes?.includes(nonce)) {
-    checks.push(`nonce "${nonce}" found in notes`);
+  if (Array.isArray(result.attachments) && result.attachments.length > 0) {
+    checks.push("photo attachment present");
   } else {
-    failures.push(`nonce "${nonce}" not found in notes`);
+    checks.push("no photo evidence provided (weak verification)");
   }
 }
 
 function verifyWebpageField(
   result: WebpageFieldResult,
-  nonce: string,
   anchorWord: string,
   checks: string[],
   failures: string[],
@@ -192,16 +179,6 @@ function verifyWebpageField(
     checks.push(`anchor word "${anchorWord}" found in proof_text`);
   } else {
     failures.push(`anchor word "${anchorWord}" not found in proof_text`);
-  }
-
-  if (!result.notes || result.notes.trim().length === 0) {
-    failures.push("notes is empty");
-  }
-
-  if (result.notes?.includes(nonce)) {
-    checks.push(`nonce "${nonce}" found in notes`);
-  } else {
-    failures.push(`nonce "${nonce}" not found in notes`);
   }
 
   if (result.answer && result.answer.length > 2000) {

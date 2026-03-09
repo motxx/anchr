@@ -84,7 +84,7 @@ test("query service approves valid store status submissions", async () => {
   const outcome = await service.submitQueryResult(query.id, {
     type: "store_status",
     status: "open",
-    notes: `Observed storefront ${query.challenge_nonce}`,
+    notes: "Observed storefront, looked open",
   }, {
     executor_type: "human",
     channel: "worker_api",

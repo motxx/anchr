@@ -125,7 +125,51 @@ function StoreStatusForm({
 }) {
   const [status, setStatus] = useState("open");
   const notesRef = useRef<HTMLTextAreaElement>(null);
-  const nonce = query.challenge_nonce;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) { setPreview(null); return; }
+    setPreview(URL.createObjectURL(file));
+  }
+
+  const selectedFile = fileRef.current?.files?.[0];
+  const isVideo = selectedFile?.type.startsWith("video/") ?? false;
+
+  async function handleSubmit() {
+    let attachments: AttachmentRef[] = [];
+    const file = fileRef.current?.files?.[0];
+    if (file) {
+      setUploading(true);
+      try {
+        const fd = new FormData();
+        fd.append("photo", file);
+        const res = await fetch(`/queries/${query.id}/upload`, {
+          method: "POST",
+          body: fd,
+        });
+        const data = await res.json() as {
+          ok: boolean;
+          attachment?: AttachmentRef;
+          error?: string;
+        };
+        if (!data.ok) throw new Error(data.error ?? "Upload failed");
+        if (data.attachment) attachments = [data.attachment];
+      } finally {
+        setUploading(false);
+      }
+    }
+    onSubmit({
+      type: query.type,
+      status,
+      attachments,
+      notes: notesRef.current?.value ?? "",
+    });
+  }
+
+  const busy = isPending || uploading;
 
   return (
     <div className="space-y-4">
@@ -141,34 +185,59 @@ function StoreStatusForm({
           </SelectContent>
         </Select>
       </div>
+      {/* Photo upload */}
       <div className="space-y-1.5">
-        <FieldLabel required>
-          Notes — include nonce{" "}
-          <span className="font-mono font-bold text-amber-400">{nonce}</span>
-        </FieldLabel>
+        <FieldLabel>Photo / Video</FieldLabel>
+        <label
+          className={cn(
+            "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors",
+            preview
+              ? "border-border p-1"
+              : "border-border hover:border-ring/50 bg-muted/20 hover:bg-muted/40 py-8"
+          )}
+        >
+          {preview ? (
+            isVideo ? (
+              <video src={preview} controls muted className="w-full max-h-64 object-contain rounded-md" />
+            ) : (
+              <img src={preview} alt="preview" className="w-full max-h-64 object-contain rounded-md" />
+            )
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              <span className="text-sm">Click to select photo or video</span>
+              <span className="text-xs opacity-60">Photo evidence strengthens verification</span>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*,video/*" className="sr-only" onChange={handleFileChange} />
+        </label>
+        {preview && (
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { setPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <FieldLabel>Notes</FieldLabel>
         <Textarea
           ref={notesRef}
-          rows={3}
-          placeholder={`確認メモ。必ず「${nonce}」を含めてください。`}
+          rows={2}
+          placeholder="補足メモ（任意）"
           className="resize-none"
         />
       </div>
-      <Button
-        className="w-full"
-        disabled={isPending}
-        onClick={() =>
-          onSubmit({
-            type: query.type,
-            status,
-            notes: notesRef.current?.value ?? "",
-          })
-        }
-      >
-        {isPending ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Submitting…
-          </>
+      <Button className="w-full" disabled={busy} onClick={handleSubmit}>
+        {uploading ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+        ) : isPending ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
         ) : (
           "Submit →"
         )}
@@ -188,9 +257,7 @@ function WebpageFieldForm({
 }) {
   const answerRef = useRef<HTMLInputElement>(null);
   const proofRef = useRef<HTMLTextAreaElement>(null);
-  const notesRef = useRef<HTMLInputElement>(null);
   const anchorWord = String(query.params["anchor_word"] ?? "");
-  const nonce = query.challenge_nonce;
 
   return (
     <div className="space-y-4">
@@ -212,17 +279,6 @@ function WebpageFieldForm({
           className="resize-none"
         />
       </div>
-      <div className="space-y-1.5">
-        <FieldLabel required>
-          Notes — include nonce{" "}
-          <span className="font-mono font-bold text-amber-400">{nonce}</span>
-        </FieldLabel>
-        <Input
-          ref={notesRef}
-          type="text"
-          placeholder={`補足。必ず「${nonce}」を含めてください。`}
-        />
-      </div>
       <Button
         className="w-full"
         disabled={isPending}
@@ -231,7 +287,6 @@ function WebpageFieldForm({
             type: query.type,
             answer: answerRef.current?.value ?? "",
             proof_text: proofRef.current?.value ?? "",
-            notes: notesRef.current?.value ?? "",
           })
         }
       >
@@ -262,7 +317,6 @@ function PhotoProofForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const nonce = query.challenge_nonce;
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -380,14 +434,11 @@ function PhotoProofForm({
       </div>
 
       <div className="space-y-1.5">
-        <FieldLabel required>
-          Description — include nonce{" "}
-          <span className="font-mono font-bold text-amber-400">{nonce}</span>
-        </FieldLabel>
+        <FieldLabel>Description</FieldLabel>
         <Textarea
           ref={textRef}
           rows={3}
-          placeholder={`見たものを説明してください。必ず「${nonce}」を含めてください。`}
+          placeholder="見たものを説明してください（任意）"
           className="resize-none"
         />
       </div>

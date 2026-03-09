@@ -57,20 +57,22 @@ export interface AttachmentHandle {
 }
 
 export interface PhotoProofResult {
-  text_answer: string; // must contain nonce
+  text_answer?: string;
   attachments: AttachmentRef[];
   notes?: string;
 }
 
 export interface StoreStatusResult {
   status: "open" | "closed";
-  notes: string; // must contain nonce
+  text_answer?: string; // should contain nonce (handwritten in photo)
+  attachments?: AttachmentRef[]; // photo evidence of store
+  notes?: string;
 }
 
 export interface WebpageFieldResult {
   answer: string; // extracted value
   proof_text: string; // text near anchor_word from page
-  notes: string; // must contain nonce
+  notes?: string;
 }
 
 export type QueryResult =

@@ -178,7 +178,7 @@ test("mcp can use a remote HTTP query backend", async () => {
         result: {
           type: "store_status",
           status: "open",
-          notes: `Observed storefront ${createdJson.challenge_nonce}`,
+          notes: "Observed storefront, looked open",
         },
       },
     });
