@@ -66,11 +66,11 @@ interface AttachmentPreviewPayload {
 }
 
 interface McpQueryBackend {
-  createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta): Promise<CreatedQueryPayload>;
+  createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta, oracleIds?: string[]): Promise<CreatedQueryPayload>;
   getQueryStatus(queryId: string): Promise<QueryStatusPayload | { error: string }>;
   listAvailableQueries(): Promise<Array<{ query_id: string; type: string; challenge_rule: string; expires_in_seconds: number }>>;
   cancelQuery(queryId: string): Promise<unknown>;
-  submitQueryResult(queryId: string, result: QueryResult): Promise<unknown>;
+  submitQueryResult(queryId: string, result: QueryResult, oracleId?: string): Promise<unknown>;
   getQueryAttachment(queryId: string, attachmentIndex: number): Promise<AttachmentPayload | { error: string }>;
   getQueryAttachmentPreview(
     queryId: string,
@@ -184,8 +184,8 @@ function buildRemoteQueryStatusPayload(query: Record<string, unknown>): QuerySta
 
 function createLocalMcpQueryBackend(): McpQueryBackend {
   return {
-    async createQuery(input, ttlSeconds, requesterMeta) {
-      const query = createQuery(input, { ttlSeconds, requesterMeta });
+    async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
+      const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
 
       // Also publish to Nostr relays if configured
       if (isNostrEnabled()) {
@@ -215,17 +215,18 @@ function createLocalMcpQueryBackend(): McpQueryBackend {
     async cancelQuery(queryId) {
       return cancelQuery(queryId);
     },
-    async submitQueryResult(queryId, result) {
+    async submitQueryResult(queryId, result, oracleId) {
       const outcome = await submitQueryResult(queryId, result, {
         executor_type: "agent",
         channel: "mcp",
-      });
+      }, oracleId);
 
       return {
         ok: outcome.ok,
         message: outcome.message,
         query_id: outcome.query?.id ?? null,
         verification: outcome.query?.verification,
+        oracle_id: outcome.query?.assigned_oracle_id ?? null,
         payment_status: outcome.query?.payment_status,
       };
     },
@@ -372,8 +373,8 @@ function createRemoteMcpQueryBackend(remoteBaseUrl: string, remoteApiKey: string
   }
 
   return {
-    async createQuery(input, ttlSeconds, requesterMeta) {
-      const body = { ...input, ttl_seconds: ttlSeconds, requester: requesterMeta };
+    async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
+      const body = { ...input, ttl_seconds: ttlSeconds, requester: requesterMeta, oracle_ids: oracleIds };
       const { response, json } = await requestJson("/queries", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -411,11 +412,11 @@ function createRemoteMcpQueryBackend(remoteBaseUrl: string, remoteApiKey: string
       const { json } = await requestJson(`/queries/${queryId}/cancel`, { method: "POST" });
       return json;
     },
-    async submitQueryResult(queryId, result) {
+    async submitQueryResult(queryId, result, oracleId) {
       const { json } = await requestJson(`/queries/${queryId}/submit`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(result),
+        body: JSON.stringify({ ...result, oracle_id: oracleId }),
       });
       return json;
     },

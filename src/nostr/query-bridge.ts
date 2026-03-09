@@ -35,6 +35,7 @@ import {
 export interface NostrQueryOptions {
   regionCode?: string;
   bounty?: BountyInfo;
+  oracleIds?: string[];
   ttlMs?: number;
   relayUrls?: string[];
 }
@@ -82,6 +83,10 @@ export async function publishQueryToNostr(
       mint: process.env.CASHU_MINT_URL!,
       token: options.bounty.cashu_token ?? "",
     };
+  }
+
+  if (options?.oracleIds?.length) {
+    payload.oracle_ids = options.oracleIds;
   }
 
   const event = buildQueryRequestEvent(

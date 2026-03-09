@@ -113,6 +113,10 @@ export interface Query {
   expires_at: number;
   requester_meta?: RequesterMeta;
   bounty?: BountyInfo;
+  /** Acceptable oracle IDs set by requester. Empty/undefined = any (defaults to built-in). */
+  oracle_ids?: string[];
+  /** Oracle selected by worker at submission time. */
+  assigned_oracle_id?: string;
   submitted_at?: number;
   result?: QueryResult;
   verification?: VerificationDetail;

@@ -32,6 +32,7 @@ function createInMemoryQueryService(): QueryService {
       newStatus: QueryStatus,
       paymentStatus: PaymentStatus,
       submissionMeta: SubmissionMeta,
+      assignedOracleId?: string,
     ) {
       const query = queries.get(id);
       if (!query) return;
@@ -43,6 +44,7 @@ function createInMemoryQueryService(): QueryService {
         verification: structuredClone(verification),
         submission_meta: structuredClone(submissionMeta),
         payment_status: paymentStatus,
+        assigned_oracle_id: assignedOracleId,
       });
     },
     updateQueryStatus(id, status, paymentStatus) {
@@ -135,6 +137,51 @@ test("query service cancels pending queries", () => {
     message: "Query cancelled",
   });
   expect(service.getQuery(query.id)?.status).toBe("rejected");
+});
+
+test("query service stores oracle_ids from options", () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery(
+    { type: "store_status", store_name: "Test" },
+    { oracleIds: ["oracle-a", "oracle-b"] },
+  );
+
+  expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
+});
+
+test("query service records assigned_oracle_id on submission", async () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery({
+    type: "store_status",
+    store_name: "Test Ramen",
+  });
+
+  const outcome = await service.submitQueryResult(
+    query.id,
+    { type: "store_status", status: "open" },
+    { executor_type: "human", channel: "worker_api" },
+  );
+
+  expect(outcome.ok).toBe(true);
+  expect(outcome.query?.assigned_oracle_id).toBe("built-in");
+});
+
+test("query service rejects submission with unacceptable oracle", async () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery(
+    { type: "store_status", store_name: "Test" },
+    { oracleIds: ["oracle-x"] },
+  );
+
+  const outcome = await service.submitQueryResult(
+    query.id,
+    { type: "store_status", status: "open" },
+    { executor_type: "human", channel: "worker_api" },
+    "built-in", // not in oracle_ids
+  );
+
+  expect(outcome.ok).toBe(false);
+  expect(outcome.message).toContain("not available or not accepted");
 });
 
 test("query service materializes local attachment refs before approval", async () => {

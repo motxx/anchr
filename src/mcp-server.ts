@@ -33,10 +33,11 @@ export async function startMcpServer() {
       target: z.string().describe("What should be photographed or reported on, e.g. 'テヘラン市街の現在の様子' or '天安門広場の掲示物'"),
       location_hint: z.string().optional().describe("Region or location hint (e.g. 'IR', 'CN', '渋谷')"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
+      oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
     },
-    async ({ target, location_hint, ttl_seconds }) => {
+    async ({ target, location_hint, ttl_seconds, oracle_ids }) => {
       const params: QueryInput = { type: "photo_proof", target, location_hint };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
@@ -51,10 +52,11 @@ export async function startMcpServer() {
       store_name: z.string().describe("Place or store name, e.g. 'セブンイレブン渋谷店'"),
       location_hint: z.string().optional().describe("Optional location hint"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
+      oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
     },
-    async ({ store_name, location_hint, ttl_seconds }) => {
+    async ({ store_name, location_hint, ttl_seconds, oracle_ids }) => {
       const params: QueryInput = { type: "store_status", store_name, location_hint };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
@@ -70,10 +72,11 @@ export async function startMcpServer() {
       field: z.string().describe("What to extract, e.g. '税込価格' or 'blocked status'"),
       anchor_word: z.string().describe("A word near the target field to serve as proof of reading the page"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
+      oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
     },
-    async ({ url, field, anchor_word, ttl_seconds }) => {
+    async ({ url, field, anchor_word, ttl_seconds, oracle_ids }) => {
       const params: QueryInput = { type: "webpage_field", url, field, anchor_word };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta());
+      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
@@ -126,9 +129,10 @@ export async function startMcpServer() {
     {
       query_id: z.string().describe("Query ID to submit against"),
       result: z.record(z.string(), z.unknown()).describe("Result object matching the query type"),
+      oracle_id: z.string().optional().describe("Oracle ID to use for verification. Omit to use default."),
     },
-    async ({ query_id, result }) => {
-      const payload = await backend.submitQueryResult(query_id, result as unknown as QueryResult);
+    async ({ query_id, result, oracle_id }) => {
+      const payload = await backend.submitQueryResult(query_id, result as unknown as QueryResult, oracle_id);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };

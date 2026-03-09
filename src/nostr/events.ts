@@ -24,6 +24,7 @@ export interface QueryRequestPayload {
     mint: string;
     token: string;
   };
+  oracle_ids?: string[];
   expires_at: number;
 }
 

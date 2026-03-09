@@ -83,7 +83,7 @@ async function extractVideoFrames(
 }
 
 function buildPrompt(query: Query): string {
-  const params = query.params as Record<string, unknown>;
+  const params = query.params as unknown as Record<string, unknown>;
   const target = params.target ?? params.store_name ?? JSON.stringify(params);
   const nonce = query.challenge_nonce;
   return [

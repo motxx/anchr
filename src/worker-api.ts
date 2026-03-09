@@ -16,6 +16,7 @@ import {
 import { getRuntimeConfig } from "./config";
 import { isNostrEnabled } from "./nostr/client";
 import { publishQueryToNostr } from "./nostr/query-bridge";
+import { listOracles } from "./oracle";
 import {
   cancelQuery,
   createQuery,
@@ -40,6 +41,8 @@ const bountySchema = z.object({
   cashu_token: z.string().min(1).optional(),
 });
 
+const oracleIdsSchema = z.array(z.string().min(1)).optional();
+
 const createQuerySchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("photo_proof"),
@@ -48,6 +51,7 @@ const createQuerySchema = z.discriminatedUnion("type", [
     ttl_seconds: z.number().int().min(60).max(86_400).optional(),
     requester: requesterMetaSchema.optional(),
     bounty: bountySchema.optional(),
+    oracle_ids: oracleIdsSchema,
   }),
   z.object({
     type: z.literal("store_status"),
@@ -56,6 +60,7 @@ const createQuerySchema = z.discriminatedUnion("type", [
     ttl_seconds: z.number().int().min(60).max(86_400).optional(),
     requester: requesterMetaSchema.optional(),
     bounty: bountySchema.optional(),
+    oracle_ids: oracleIdsSchema,
   }),
   z.object({
     type: z.literal("webpage_field"),
@@ -65,6 +70,7 @@ const createQuerySchema = z.discriminatedUnion("type", [
     ttl_seconds: z.number().int().min(60).max(86_400).optional(),
     requester: requesterMetaSchema.optional(),
     bounty: bountySchema.optional(),
+    oracle_ids: oracleIdsSchema,
   }),
 ]);
 
@@ -115,6 +121,7 @@ function querySummary(query: Query) {
     bounty: query.bounty ? { amount_sats: query.bounty.amount_sats } : null,
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
+    oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
   };
@@ -140,6 +147,7 @@ function queryDetail(query: Query, requestUrl: string) {
     ...querySummary(query),
     created_at: query.created_at,
     submitted_at: query.submitted_at,
+    assigned_oracle_id: query.assigned_oracle_id ?? null,
     result: query.result ? materializeQueryResult(query.result, requestUrl) : undefined,
     verification: query.verification,
     submission_meta: query.submission_meta,
@@ -196,6 +204,8 @@ export function buildWorkerApiApp() {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
+  app.get("/oracles", (c) => c.json(listOracles()));
+
   app.get("/queries", (c) => c.json(listOpenQueries().map(querySummary)));
 
   app.get("/queries/:id", (c) => {
@@ -237,6 +247,7 @@ export function buildWorkerApiApp() {
         ttlSeconds: payload.ttl_seconds,
         requesterMeta: payload.requester,
         bounty: payload.bounty,
+        oracleIds: payload.oracle_ids,
       });
 
       if (isNostrEnabled()) {
@@ -245,6 +256,7 @@ export function buildWorkerApiApp() {
           ttlMs: (payload.ttl_seconds ?? 600) * 1000,
           regionCode: regionHint,
           bounty: payload.bounty,
+          oracleIds: payload.oracle_ids,
         }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
       }
 
@@ -351,9 +363,10 @@ export function buildWorkerApiApp() {
   app.post("/queries/:id/submit", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    let body: unknown;
-    try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
-    const outcome = await submitQueryResult(id, body as QueryResult, { executor_type: "human", channel: "worker_api" });
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
+    const outcome = await submitQueryResult(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId);
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;
@@ -361,6 +374,7 @@ export function buildWorkerApiApp() {
       ok: outcome.ok,
       message: outcome.message,
       verification: outcome.query?.verification,
+      oracle_id: outcome.query?.assigned_oracle_id ?? null,
       payment_status: outcome.query?.payment_status,
     }, status);
   });

@@ -53,6 +53,12 @@ function migrate(db: Database) {
   if (!columns.some((column) => column.name === "bounty")) {
     db.exec("ALTER TABLE queries ADD COLUMN bounty TEXT");
   }
+  if (!columns.some((column) => column.name === "oracle_ids")) {
+    db.exec("ALTER TABLE queries ADD COLUMN oracle_ids TEXT");
+  }
+  if (!columns.some((column) => column.name === "assigned_oracle_id")) {
+    db.exec("ALTER TABLE queries ADD COLUMN assigned_oracle_id TEXT");
+  }
 }
 
 interface QueryRow {
@@ -66,6 +72,8 @@ interface QueryRow {
   expires_at: number;
   requester_meta: string | null;
   bounty: string | null;
+  oracle_ids: string | null;
+  assigned_oracle_id: string | null;
   submitted_at: number | null;
   result: string | null;
   verification: string | null;
@@ -86,6 +94,8 @@ function rowToQuery(row: QueryRow): Query {
     expires_at: row.expires_at,
     requester_meta: row.requester_meta ? JSON.parse(row.requester_meta) as RequesterMeta : undefined,
     bounty: row.bounty ? JSON.parse(row.bounty) as BountyInfo : undefined,
+    oracle_ids: row.oracle_ids ? JSON.parse(row.oracle_ids) as string[] : undefined,
+    assigned_oracle_id: row.assigned_oracle_id ?? undefined,
     submitted_at: row.submitted_at ?? undefined,
     result,
     verification: row.verification ? JSON.parse(row.verification) : undefined,
@@ -97,8 +107,8 @@ function rowToQuery(row: QueryRow): Query {
 export function insertQueryRecord(query: Query): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, requester_meta, bounty, payment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, requester_meta, bounty, oracle_ids, payment_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     query.id,
     query.type,
@@ -110,6 +120,7 @@ export function insertQueryRecord(query: Query): void {
     query.expires_at,
     query.requester_meta ? JSON.stringify(query.requester_meta) : null,
     query.bounty ? JSON.stringify(query.bounty) : null,
+    query.oracle_ids?.length ? JSON.stringify(query.oracle_ids) : null,
     query.payment_status,
   );
 }
@@ -135,10 +146,11 @@ export function updateQuerySubmittedRecord(
   newStatus: QueryStatus,
   paymentStatus: PaymentStatus,
   submissionMeta: SubmissionMeta,
+  assignedOracleId?: string,
 ): void {
   const db = getDb();
   db.prepare(`
-    UPDATE queries SET status = ?, submitted_at = ?, result = ?, verification = ?, submission_meta = ?, payment_status = ?
+    UPDATE queries SET status = ?, submitted_at = ?, result = ?, verification = ?, submission_meta = ?, payment_status = ?, assigned_oracle_id = ?
     WHERE id = ?
   `).run(
     newStatus,
@@ -147,6 +159,7 @@ export function updateQuerySubmittedRecord(
     JSON.stringify(verification),
     JSON.stringify(submissionMeta),
     paymentStatus,
+    assignedOracleId ?? null,
     id,
   );
 }

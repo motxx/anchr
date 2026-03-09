@@ -1,5 +1,6 @@
 import { normalizeQueryResult } from "./attachments";
 import { buildChallengeRule, generateNonce } from "./challenge";
+import { resolveOracle } from "./oracle";
 import {
   expirePendingQueries,
   getQueryRecord,
@@ -20,7 +21,6 @@ import type {
   SubmissionMeta,
   VerificationDetail,
 } from "./types";
-import { verify } from "./verification/verifier";
 
 export type {
   AttachmentRef,
@@ -42,6 +42,8 @@ export interface CreateQueryOptions {
   ttlSeconds?: number;
   requesterMeta?: RequesterMeta;
   bounty?: BountyInfo;
+  /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
+  oracleIds?: string[];
 }
 
 export interface SubmitQueryOutcome {
@@ -66,6 +68,7 @@ export interface QueryStore {
     newStatus: QueryStatus,
     paymentStatus: PaymentStatus,
     submissionMeta: QuerySubmissionMeta,
+    assignedOracleId?: string,
   ): void;
   updateQueryStatus(id: string, status: QueryStatus, paymentStatus?: PaymentStatus): void;
   expirePendingQueries(): number;
@@ -75,7 +78,7 @@ export interface QueryService {
   createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
   getQuery(id: string): Query | null;
   listOpenQueries(): Query[];
-  submitQueryResult(id: string, result: QueryResult, submissionMeta: QuerySubmissionMeta): Promise<SubmitQueryOutcome>;
+  submitQueryResult(id: string, result: QueryResult, submissionMeta: QuerySubmissionMeta, oracleId?: string): Promise<SubmitQueryOutcome>;
   cancelQuery(id: string): CancelQueryOutcome;
   expireQueries(): number;
 }
@@ -135,6 +138,7 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
     expires_at: now + resolveTtlMs(options),
     requester_meta: options?.requesterMeta,
     bounty: options?.bounty,
+    oracle_ids: options?.oracleIds,
     payment_status: "locked",
   };
 }
@@ -144,6 +148,7 @@ async function submitQueryWithStore(
   id: string,
   result: QueryResult,
   submissionMeta: QuerySubmissionMeta,
+  oracleId?: string,
 ): Promise<SubmitQueryOutcome> {
   const query = store.getQuery(id);
   if (!query) return { ok: false, query: null, message: "Query not found" };
@@ -153,21 +158,33 @@ async function submitQueryWithStore(
     return { ok: false, query, message: "Query has expired" };
   }
 
-  const normalizedResult = normalizeQueryResult(result);
-  const verification = await verify(query, normalizedResult);
+  const oracle = resolveOracle(oracleId, query.oracle_ids);
+  if (!oracle) {
+    return { ok: false, query, message: oracleId
+      ? `Oracle "${oracleId}" is not available or not accepted for this query`
+      : "No oracle available for this query" };
+  }
 
-  if (verification.passed) {
-    store.updateQuerySubmitted(id, normalizedResult, verification, "approved", "released", submissionMeta);
+  const normalizedResult = normalizeQueryResult(result);
+  const attestation = await oracle.verify(query, normalizedResult);
+  const verification: VerificationDetail = {
+    passed: attestation.passed,
+    checks: attestation.checks,
+    failures: attestation.failures,
+  };
+
+  if (attestation.passed) {
+    store.updateQuerySubmitted(id, normalizedResult, verification, "approved", "released", submissionMeta, attestation.oracle_id);
     const updated = store.getQuery(id)!;
     return { ok: true, query: updated, message: "Verification passed. Result accepted." };
   }
 
-  store.updateQuerySubmitted(id, normalizedResult, verification, "rejected", "cancelled", submissionMeta);
+  store.updateQuerySubmitted(id, normalizedResult, verification, "rejected", "cancelled", submissionMeta, attestation.oracle_id);
   const updated = store.getQuery(id)!;
   return {
     ok: false,
     query: updated,
-    message: `Verification failed: ${verification.failures.join(", ")}`,
+    message: `Verification failed: ${attestation.failures.join(", ")}`,
   };
 }
 
@@ -194,8 +211,8 @@ export function createQueryService(store: QueryStore = sqliteQueryStore): QueryS
     listOpenQueries() {
       return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
     },
-    async submitQueryResult(id, result, submissionMeta) {
-      return submitQueryWithStore(store, id, result, submissionMeta);
+    async submitQueryResult(id, result, submissionMeta, oracleId) {
+      return submitQueryWithStore(store, id, result, submissionMeta, oracleId);
     },
     cancelQuery(id) {
       return cancelQueryWithStore(store, id);
@@ -229,8 +246,9 @@ export function submitQueryResult(
   id: string,
   result: QueryResult,
   submissionMeta: QuerySubmissionMeta,
+  oracleId?: string,
 ): Promise<SubmitQueryOutcome> {
-  return getDefaultQueryService().submitQueryResult(id, result, submissionMeta);
+  return getDefaultQueryService().submitQueryResult(id, result, submissionMeta, oracleId);
 }
 
 export function cancelQuery(id: string): CancelQueryOutcome {
