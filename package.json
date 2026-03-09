@@ -27,6 +27,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@cashu/cashu-ts": "^3.5.0",
+    "@hono/zod-validator": "^0.7.6",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@noble/hashes": "^2.0.1",
     "@tanstack/react-query": "^5.90.21",

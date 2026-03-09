@@ -1,8 +1,25 @@
 import { mkdirSync, rmSync } from "node:fs";
-import { expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { UPLOADS_DIR } from "./attachments";
 import { createQuery, getQuery, queryTemplates } from "./query-service";
 import { buildWorkerApiApp } from "./worker-api";
+
+function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
+  return async () => {
+    const saved: Record<string, string | undefined> = {};
+    for (const key of Object.keys(overrides)) {
+      saved[key] = process.env[key];
+      if (overrides[key] === undefined) delete process.env[key];
+      else process.env[key] = overrides[key];
+    }
+    try { await fn(); } finally {
+      for (const key of Object.keys(saved)) {
+        if (saved[key] === undefined) delete process.env[key];
+        else process.env[key] = saved[key];
+      }
+    }
+  };
+}
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -176,4 +193,164 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
     process.env.HTTP_API_KEY = previousHttpApiKey;
     process.env.HTTP_API_KEYS = previousHttpApiKeys;
   }
+});
+
+// --- writeAuth middleware covers all write endpoints ---
+
+describe("writeAuth middleware", () => {
+  const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined, ATTACHMENT_STORAGE: "local" };
+
+  test("rejects unauthenticated upload", withEnv(authEnv, async () => {
+    mkdirSync(UPLOADS_DIR, { recursive: true });
+    const app = buildWorkerApiApp();
+    const query = createQuery(queryTemplates.photoProof("auth test"), { ttlSeconds: 300 });
+    const form = new FormData();
+    form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
+    const res = await app.request(`http://localhost/queries/${query.id}/upload`, { method: "POST", body: form });
+    expect(res.status).toBe(401);
+  }));
+
+  test("rejects unauthenticated submit", withEnv(authEnv, async () => {
+    const app = buildWorkerApiApp();
+    const query = createQuery(queryTemplates.storeStatus("auth test"), { ttlSeconds: 300 });
+    const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "store_status", text_answer: "open", notes: "" }),
+    });
+    expect(res.status).toBe(401);
+  }));
+
+  test("rejects unauthenticated cancel", withEnv(authEnv, async () => {
+    const app = buildWorkerApiApp();
+    const query = createQuery(queryTemplates.storeStatus("auth test"), { ttlSeconds: 300 });
+    const res = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
+    expect(res.status).toBe(401);
+  }));
+
+  test("accepts Authorization: Bearer header", withEnv(authEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer test-key" },
+      body: JSON.stringify({ type: "store_status", store_name: "Bearer Test" }),
+    });
+    expect(res.status).toBe(201);
+  }));
+
+  test("accepts X-API-Key header on cancel", withEnv(authEnv, async () => {
+    const app = buildWorkerApiApp();
+    const query = createQuery(queryTemplates.storeStatus("cancel test"), { ttlSeconds: 300 });
+    const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
+      method: "POST",
+      headers: { "x-api-key": "test-key" },
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { ok: boolean };
+    expect(json.ok).toBe(true);
+  }));
+
+  test("supports multiple API keys via HTTP_API_KEYS", withEnv(
+    { HTTP_API_KEY: undefined as string | undefined, HTTP_API_KEYS: "alpha,bravo,charlie" },
+    async () => {
+      const app = buildWorkerApiApp();
+      const reject = await app.request("http://localhost/queries", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": "wrong" },
+        body: JSON.stringify({ type: "store_status", store_name: "Multi Key" }),
+      });
+      expect(reject.status).toBe(401);
+
+      const accept = await app.request("http://localhost/queries", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer bravo" },
+        body: JSON.stringify({ type: "store_status", store_name: "Multi Key" }),
+      });
+      expect(accept.status).toBe(201);
+    },
+  ));
+});
+
+// --- zValidator: Zod schema validation on POST /queries ---
+
+describe("POST /queries validation", () => {
+  const openEnv = { HTTP_API_KEY: undefined as string | undefined, HTTP_API_KEYS: undefined as string | undefined };
+
+  test("rejects missing type field", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ store_name: "No Type" }),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string; issues?: unknown[] };
+    expect(json.error).toBe("Invalid query payload");
+    expect(json.issues).toBeArray();
+  }));
+
+  test("rejects photo_proof without target", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "photo_proof" }),
+    });
+    expect(res.status).toBe(400);
+  }));
+
+  test("rejects ttl_seconds out of range", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const tooLow = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "store_status", store_name: "X", ttl_seconds: 10 }),
+    });
+    expect(tooLow.status).toBe(400);
+
+    const tooHigh = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "store_status", store_name: "X", ttl_seconds: 100_000 }),
+    });
+    expect(tooHigh.status).toBe(400);
+  }));
+
+  test("rejects webpage_field with invalid url", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "webpage_field", url: "not-a-url", field: "price", anchor_word: "total" }),
+    });
+    expect(res.status).toBe(400);
+  }));
+
+  test("creates webpage_field query successfully", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "webpage_field",
+        url: "https://example.com/menu",
+        field: "price",
+        anchor_word: "latte",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const json = await res.json() as { type: string; query_id: string };
+    expect(json.type).toBe("webpage_field");
+    expect(json.query_id).toStartWith("query_");
+  }));
+
+  test("rejects non-JSON body", withEnv(openEnv, async () => {
+    const app = buildWorkerApiApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "not json",
+    });
+    expect(res.status).toBe(400);
+  }));
 });

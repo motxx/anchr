@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { Hono } from "hono";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { getAttachmentStore } from "./attachment-store";
 import {
@@ -67,31 +68,30 @@ const createQuerySchema = z.discriminatedUnion("type", [
   }),
 ]);
 
-// --- Auth ---
+// --- Auth Middleware ---
 
-function getHttpApiKey(c: Context): string | null {
+function extractApiKey(c: Context): string | null {
   const authorization = c.req.header("authorization");
   if (authorization?.startsWith("Bearer ")) {
     const token = authorization.slice("Bearer ".length).trim();
     return token || null;
   }
-  const apiKey = c.req.header("x-api-key")?.trim();
-  return apiKey || null;
+  return c.req.header("x-api-key")?.trim() || null;
 }
 
-function requireWriteApiKey(c: Context): Response | null {
+const writeAuth: MiddlewareHandler = async (c, next) => {
   const { httpApiKeys } = getRuntimeConfig();
-  if (httpApiKeys.length === 0) return null;
+  if (httpApiKeys.length === 0) return next();
 
-  const supplied = getHttpApiKey(c);
-  if (supplied && httpApiKeys.includes(supplied)) return null;
+  const supplied = extractApiKey(c);
+  if (supplied && httpApiKeys.includes(supplied)) return next();
 
   return c.json(
     { error: "Unauthorized", hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints." },
     401,
     { "www-authenticate": "Bearer" },
   );
-}
+};
 
 // --- Presenters ---
 
@@ -206,52 +206,51 @@ export function buildWorkerApiApp() {
     return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
   });
 
-  app.post("/queries", async (c) => {
-    const unauthorized = requireWriteApiKey(c);
-    if (unauthorized) return unauthorized;
+  app.post(
+    "/queries",
+    writeAuth,
+    zValidator("json", createQuerySchema, (result, c) => {
+      if (!result.success) {
+        return c.json({
+          error: "Invalid query payload",
+          issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+        }, 400);
+      }
+    }),
+    (c) => {
+      const payload = c.req.valid("json");
 
-    let body: unknown;
-    try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      let input: QueryInput;
+      switch (payload.type) {
+        case "photo_proof":
+          input = { type: "photo_proof", target: payload.target, location_hint: payload.location_hint };
+          break;
+        case "store_status":
+          input = { type: "store_status", store_name: payload.store_name, location_hint: payload.location_hint };
+          break;
+        case "webpage_field":
+          input = { type: "webpage_field", url: payload.url, field: payload.field, anchor_word: payload.anchor_word };
+          break;
+      }
 
-    const parsed = createQuerySchema.safeParse(body);
-    if (!parsed.success) {
-      return c.json({
-        error: "Invalid query payload",
-        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
-      }, 400);
-    }
-
-    const payload = parsed.data;
-    let input: QueryInput;
-    switch (payload.type) {
-      case "photo_proof":
-        input = { type: "photo_proof", target: payload.target, location_hint: payload.location_hint };
-        break;
-      case "store_status":
-        input = { type: "store_status", store_name: payload.store_name, location_hint: payload.location_hint };
-        break;
-      case "webpage_field":
-        input = { type: "webpage_field", url: payload.url, field: payload.field, anchor_word: payload.anchor_word };
-        break;
-    }
-
-    const query = createQuery(input, {
-      ttlSeconds: payload.ttl_seconds,
-      requesterMeta: payload.requester,
-      bounty: payload.bounty,
-    });
-
-    if (isNostrEnabled()) {
-      const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-      publishQueryToNostr(input, {
-        ttlMs: (payload.ttl_seconds ?? 600) * 1000,
-        regionCode: regionHint,
+      const query = createQuery(input, {
+        ttlSeconds: payload.ttl_seconds,
+        requesterMeta: payload.requester,
         bounty: payload.bounty,
-      }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
-    }
+      });
 
-    return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
-  });
+      if (isNostrEnabled()) {
+        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
+        publishQueryToNostr(input, {
+          ttlMs: (payload.ttl_seconds ?? 600) * 1000,
+          regionCode: regionHint,
+          bounty: payload.bounty,
+        }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
+      }
+
+      return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
+    },
+  );
 
   app.get("/queries/:id/attachments", async (c) => {
     const id = c.req.param("id");
@@ -324,9 +323,7 @@ export function buildWorkerApiApp() {
     });
   });
 
-  app.post("/queries/:id/upload", async (c) => {
-    const unauthorized = requireWriteApiKey(c);
-    if (unauthorized) return unauthorized;
+  app.post("/queries/:id/upload", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = getQueryById(id);
@@ -351,9 +348,7 @@ export function buildWorkerApiApp() {
     return new Response(file);
   });
 
-  app.post("/queries/:id/submit", async (c) => {
-    const unauthorized = requireWriteApiKey(c);
-    if (unauthorized) return unauthorized;
+  app.post("/queries/:id/submit", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: unknown;
@@ -370,9 +365,7 @@ export function buildWorkerApiApp() {
     }, status);
   });
 
-  app.post("/queries/:id/cancel", (c) => {
-    const unauthorized = requireWriteApiKey(c);
-    if (unauthorized) return unauthorized;
+  app.post("/queries/:id/cancel", writeAuth, (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const outcome = cancelQuery(id);
