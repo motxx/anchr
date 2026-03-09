@@ -69,7 +69,7 @@ test("mcp tools expose query status and attachment metadata", async () => {
     local_file_path: localPath,
     route_path: `/uploads/${filename}`,
   };
-  const outcome = submitQueryResult(query.id, {
+  const outcome = await submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,
     attachments: [attachment],

@@ -74,7 +74,7 @@ export interface QueryService {
   createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
   getQuery(id: string): Query | null;
   listOpenQueries(): Query[];
-  submitQueryResult(id: string, result: QueryResult, submissionMeta: QuerySubmissionMeta): SubmitQueryOutcome;
+  submitQueryResult(id: string, result: QueryResult, submissionMeta: QuerySubmissionMeta): Promise<SubmitQueryOutcome>;
   cancelQuery(id: string): CancelQueryOutcome;
   expireQueries(): number;
 }
@@ -137,12 +137,12 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
   };
 }
 
-function submitQueryWithStore(
+async function submitQueryWithStore(
   store: QueryStore,
   id: string,
   result: QueryResult,
   submissionMeta: QuerySubmissionMeta,
-): SubmitQueryOutcome {
+): Promise<SubmitQueryOutcome> {
   const query = store.getQuery(id);
   if (!query) return { ok: false, query: null, message: "Query not found" };
   if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
@@ -152,7 +152,7 @@ function submitQueryWithStore(
   }
 
   const normalizedResult = normalizeQueryResult(result);
-  const verification = verify(query, normalizedResult);
+  const verification = await verify(query, normalizedResult);
   const newStatus: QueryStatus = verification.passed ? "approved" : "rejected";
   const paymentStatus: PaymentStatus = verification.passed ? "released" : "cancelled";
 
@@ -191,7 +191,7 @@ export function createQueryService(store: QueryStore = sqliteQueryStore): QueryS
     listOpenQueries() {
       return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
     },
-    submitQueryResult(id, result, submissionMeta) {
+    async submitQueryResult(id, result, submissionMeta) {
       return submitQueryWithStore(store, id, result, submissionMeta);
     },
     cancelQuery(id) {
@@ -226,7 +226,7 @@ export function submitQueryResult(
   id: string,
   result: QueryResult,
   submissionMeta: QuerySubmissionMeta,
-): SubmitQueryOutcome {
+): Promise<SubmitQueryOutcome> {
   return getDefaultQueryService().submitQueryResult(id, result, submissionMeta);
 }
 

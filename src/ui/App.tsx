@@ -30,26 +30,6 @@ import type { AttachmentRef, QueryType } from "../types";
 
 // ---- Types ----
 
-const API_KEY_STORAGE_KEY = "human-calling-api-key";
-
-function readStoredApiKey(): string {
-  if (typeof window === "undefined") return "";
-
-  try {
-    return window.localStorage.getItem(API_KEY_STORAGE_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function buildApiHeaders(apiKey: string, initialHeaders?: HeadersInit): Headers {
-  const headers = new Headers(initialHeaders);
-  if (apiKey.trim()) {
-    headers.set("x-api-key", apiKey.trim());
-  }
-  return headers;
-}
-
 interface Query {
   id: string;
   type: QueryType;
@@ -267,12 +247,10 @@ function PhotoProofForm({
   query,
   onSubmit,
   isPending,
-  apiKey,
 }: {
   query: Query;
   onSubmit: (data: Record<string, unknown>) => void;
   isPending: boolean;
-  apiKey: string;
 }) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
@@ -284,9 +262,11 @@ function PhotoProofForm({
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) { setPreview(null); return; }
-    const url = URL.createObjectURL(file);
-    setPreview(url);
+    setPreview(URL.createObjectURL(file));
   }
+
+  const selectedFile = fileRef.current?.files?.[0];
+  const isVideo = selectedFile?.type.startsWith("video/") ?? false;
 
   async function handleSubmit() {
     let attachments: AttachmentRef[] = [];
@@ -298,7 +278,6 @@ function PhotoProofForm({
         fd.append("photo", file);
         const res = await fetch(`/queries/${query.id}/upload`, {
           method: "POST",
-          headers: buildApiHeaders(apiKey),
           body: fd,
         });
         const data = await res.json() as {
@@ -339,9 +318,9 @@ function PhotoProofForm({
 
   return (
     <div className="space-y-4">
-      {/* Photo upload area */}
+      {/* Photo/video upload area */}
       <div className="space-y-1.5">
-        <FieldLabel required>Photo</FieldLabel>
+        <FieldLabel required>Photo / Video</FieldLabel>
         <label
           className={cn(
             "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors",
@@ -351,26 +330,35 @@ function PhotoProofForm({
           )}
         >
           {preview ? (
-            <img
-              src={preview}
-              alt="preview"
-              className="w-full max-h-64 object-contain rounded-md"
-            />
+            isVideo ? (
+              <video
+                src={preview}
+                controls
+                muted
+                className="w-full max-h-64 object-contain rounded-md"
+              />
+            ) : (
+              <img
+                src={preview}
+                alt="preview"
+                className="w-full max-h-64 object-contain rounded-md"
+              />
+            )
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                   d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              <span className="text-sm">Click to select photo</span>
-              <span className="text-xs opacity-60">JPG, PNG, GIF, WebP, HEIC</span>
-              <span className="text-xs opacity-60">At least one photo is required</span>
+              <span className="text-sm">Click to select photo or video</span>
+              <span className="text-xs opacity-60">JPG, PNG, GIF, WebP, HEIC, MP4, MOV, WebM</span>
+              <span className="text-xs opacity-60">At least one file is required</span>
             </div>
           )}
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
+            accept="image/*,video/*"
             className="sr-only"
             onChange={handleFileChange}
           />
@@ -381,7 +369,7 @@ function PhotoProofForm({
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             onClick={() => { setPreview(null); if (fileRef.current) fileRef.current.value = ""; }}
           >
-            Remove photo
+            Remove
           </button>
         )}
       </div>
@@ -417,7 +405,7 @@ function PhotoProofForm({
 
 // ---- QueryCard ----
 
-function QueryCard({ query, apiKey }: { query: Query; apiKey: string }) {
+function QueryCard({ query }: { query: Query }) {
   const [open, setOpen] = useState(false);
   const [showParams, setShowParams] = useState(false);
   const [, setTick] = useState(0);
@@ -432,7 +420,7 @@ function QueryCard({ query, apiKey }: { query: Query; apiKey: string }) {
     mutationFn: async (body) => {
       const r = await fetch(`/queries/${query.id}/submit`, {
         method: "POST",
-        headers: buildApiHeaders(apiKey, { "Content-Type": "application/json" }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       if (!r.ok && r.status >= 500)
@@ -534,7 +522,6 @@ function QueryCard({ query, apiKey }: { query: Query; apiKey: string }) {
                   query={query}
                   onSubmit={mut.mutate}
                   isPending={mut.isPending}
-                  apiKey={apiKey}
                 />
               )}
             </div>
@@ -580,12 +567,10 @@ function QueryCard({ query, apiKey }: { query: Query; apiKey: string }) {
 
 // ---- QueryList ----
 
-function QueryList({ apiKey }: { apiKey: string }) {
+function QueryList() {
   const { data: queries = [], isError } = useQuery<Query[]>({
-    queryKey: ["queries", apiKey],
-    queryFn: (): Promise<Query[]> => fetch("/queries", {
-      headers: buildApiHeaders(apiKey),
-    }).then((r) => r.json()),
+    queryKey: ["queries"],
+    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -619,7 +604,7 @@ function QueryList({ apiKey }: { apiKey: string }) {
   return (
     <div className="flex flex-col gap-3">
       {queries.map((query) => (
-        <QueryCard key={query.id} query={query} apiKey={apiKey} />
+        <QueryCard key={query.id} query={query} />
       ))}
     </div>
   );
@@ -628,25 +613,9 @@ function QueryList({ apiKey }: { apiKey: string }) {
 // ---- App ----
 
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => readStoredApiKey());
-
-  React.useEffect(() => {
-    try {
-      if (apiKey.trim()) {
-        window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim());
-      } else {
-        window.localStorage.removeItem(API_KEY_STORAGE_KEY);
-      }
-    } catch {
-      // Ignore storage failures in constrained browsers.
-    }
-  }, [apiKey]);
-
   const { isFetching } = useQuery<Query[]>({
-    queryKey: ["queries", apiKey],
-    queryFn: (): Promise<Query[]> => fetch("/queries", {
-      headers: buildApiHeaders(apiKey),
-    }).then((r) => r.json()),
+    queryKey: ["queries"],
+    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
     staleTime: 2000,
   });
 
@@ -665,13 +634,6 @@ export default function App() {
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <Input
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder="API key (optional)"
-                className="h-8 w-44 text-xs"
-              />
               {isFetching ? (
                 <RefreshCw className="w-3 h-3 text-muted-foreground animate-spin" />
               ) : (
@@ -682,7 +644,7 @@ export default function App() {
           </div>
         </header>
 
-        <QueryList apiKey={apiKey} />
+        <QueryList />
       </div>
     </div>
   );

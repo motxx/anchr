@@ -201,7 +201,7 @@ function createLocalMcpQueryBackend(): McpQueryBackend {
       return cancelQuery(queryId);
     },
     async submitQueryResult(queryId, result) {
-      const outcome = submitQueryResult(queryId, result, {
+      const outcome = await submitQueryResult(queryId, result, {
         executor_type: "agent",
         channel: "mcp",
       });

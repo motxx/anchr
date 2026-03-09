@@ -17,7 +17,7 @@ function makeQuery(overrides: Partial<Query>): Query {
   };
 }
 
-test("photo_proof requires at least one attachment", () => {
+test("photo_proof requires at least one attachment", async () => {
   const query = makeQuery({});
   const result: QueryResult = {
     type: "photo_proof",
@@ -26,13 +26,13 @@ test("photo_proof requires at least one attachment", () => {
     notes: "",
   };
 
-  const verification = verify(query, result);
+  const verification = await verify(query, result);
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain("at least one photo attachment is required");
 });
 
-test("webpage_field requires nonce in notes", () => {
+test("webpage_field requires nonce in notes", async () => {
   const query = makeQuery({
     type: "webpage_field",
     params: {
@@ -49,13 +49,13 @@ test("webpage_field requires nonce in notes", () => {
     notes: "checked page",
   };
 
-  const verification = verify(query, result);
+  const verification = await verify(query, result);
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain('nonce "K7P4" not found in notes');
 });
 
-test("webpage_field passes when proof text and nonce are present", () => {
+test("webpage_field passes when proof text and nonce are present", async () => {
   const query = makeQuery({
     type: "webpage_field",
     params: {
@@ -72,7 +72,7 @@ test("webpage_field passes when proof text and nonce are present", () => {
     notes: "checked page K7P4",
   };
 
-  const verification = verify(query, result);
+  const verification = await verify(query, result);
 
   expect(verification.passed).toBe(true);
   expect(verification.failures).toHaveLength(0);

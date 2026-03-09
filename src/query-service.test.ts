@@ -73,7 +73,7 @@ function createInMemoryQueryService(): QueryService {
   return createQueryService(store);
 }
 
-test("query service approves valid store status submissions", () => {
+test("query service approves valid store status submissions", async () => {
   const service = createInMemoryQueryService();
   const query = service.createQuery({
     type: "store_status",
@@ -81,7 +81,7 @@ test("query service approves valid store status submissions", () => {
     location_hint: "Tokyo",
   });
 
-  const outcome = service.submitQueryResult(query.id, {
+  const outcome = await service.submitQueryResult(query.id, {
     type: "store_status",
     status: "open",
     notes: `Observed storefront ${query.challenge_nonce}`,
@@ -137,14 +137,14 @@ test("query service cancels pending queries", () => {
   expect(service.getQuery(query.id)?.status).toBe("rejected");
 });
 
-test("query service materializes local attachment refs before approval", () => {
+test("query service materializes local attachment refs before approval", async () => {
   const service = createInMemoryQueryService();
   const query = service.createQuery({
     type: "photo_proof",
     target: "Storefront",
   });
 
-  const outcome = service.submitQueryResult(query.id, {
+  const outcome = await service.submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,
     attachments: [{

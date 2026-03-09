@@ -1,3 +1,4 @@
+import { checkAttachmentContent } from "./ai-content-check";
 import type {
   PhotoProofResult,
   Query,
@@ -7,7 +8,7 @@ import type {
   WebpageFieldResult,
 } from "./types";
 
-export function verify(query: Query, result: QueryResult): VerificationDetail {
+export async function verify(query: Query, result: QueryResult): Promise<VerificationDetail> {
   const checks: string[] = [];
   const failures: string[] = [];
 
@@ -27,6 +28,17 @@ export function verify(query: Query, result: QueryResult): VerificationDetail {
         failures,
       );
       break;
+  }
+
+  if (query.type === "photo_proof" && failures.length === 0) {
+    const aiResult = await checkAttachmentContent(query, result);
+    if (aiResult) {
+      if (aiResult.passed) {
+        checks.push(`AI content check passed: ${aiResult.reason}`);
+      } else {
+        failures.push(`AI content check failed: ${aiResult.reason}`);
+      }
+    }
   }
 
   return {

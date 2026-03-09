@@ -32,6 +32,7 @@ export interface RuntimeConfig {
   previewMaxDimension: number;
   previewJpegQuality: number;
   httpApiKeys: string[];
+  anthropicApiKey?: string;
   remoteQueryApiBaseUrl?: string;
   remoteQueryApiKey?: string;
 }
@@ -48,6 +49,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || undefined,
     remoteQueryApiBaseUrl: process.env.REMOTE_QUERY_API_BASE_URL?.trim() || undefined,
     remoteQueryApiKey: process.env.REMOTE_QUERY_API_KEY?.trim() || undefined,
   };

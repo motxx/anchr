@@ -412,7 +412,7 @@ export function buildWorkerApiApp() {
     }
 
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
-    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"];
+    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
     if (!allowed.includes(ext)) {
       return c.json({ error: `Unsupported file type: ${ext}` }, 400);
     }
@@ -448,7 +448,7 @@ export function buildWorkerApiApp() {
     } catch {
       return c.json({ error: "Invalid JSON" }, 400);
     }
-    const outcome = submitQueryResult(id, body as QueryResult, {
+    const outcome = await submitQueryResult(id, body as QueryResult, {
       executor_type: "human",
       channel: "worker_api",
     });
