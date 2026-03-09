@@ -6,30 +6,23 @@
  * The underlying stores handle pure storage only.
  */
 
-import { isBlossomEnabled, uploadToBlossom } from "../blossom/client";
-import { stripExif } from "../exif-strip";
-import { generateEphemeralIdentity } from "../nostr/identity";
-import type { AttachmentStore, UploadedAttachment } from "../attachment-store";
+import { isBlossomEnabled, uploadToBlossom } from "./blossom/client";
+import { stripExif } from "./exif-strip";
+import { generateEphemeralIdentity } from "./nostr/identity";
+import type { AttachmentStore, UploadedAttachment } from "./attachment-store";
 
-/**
- * Wrap a store to strip EXIF metadata before storage.
- */
-export class ExifStrippingStore implements AttachmentStore {
+class ExifStrippingStore implements AttachmentStore {
   constructor(private readonly inner: AttachmentStore) {}
 
   async put(queryId: string, file: File, requestUrl: string): Promise<UploadedAttachment> {
     const rawBuffer = Buffer.from(await file.arrayBuffer());
     const stripped = await stripExif(rawBuffer, file.name);
-
     const strippedFile = new File([new Uint8Array(stripped)], file.name, { type: file.type });
     return this.inner.put(queryId, strippedFile, requestUrl);
   }
 }
 
-/**
- * Wrap a store to mirror encrypted uploads to Blossom (best-effort).
- */
-export class BlossomMirrorStore implements AttachmentStore {
+class BlossomMirrorStore implements AttachmentStore {
   constructor(private readonly inner: AttachmentStore) {}
 
   async put(queryId: string, file: File, requestUrl: string): Promise<UploadedAttachment> {

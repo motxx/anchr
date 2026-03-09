@@ -2,7 +2,7 @@ import { createHmac, createHash } from "node:crypto";
 import { extname, join } from "node:path";
 import { attachmentPublicBaseUrl } from "./attachments";
 import { DEFAULT_UPLOADS_DIR } from "./config";
-import { withPrivacyPipeline } from "./infra/privacy-pipeline";
+import { withPrivacyPipeline } from "./privacy-pipeline";
 import type { AttachmentRef, AttachmentStorageKind } from "./types";
 
 export interface UploadedAttachment {

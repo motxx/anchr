@@ -1,3 +1,4 @@
+import { normalizeQueryResult } from "./attachments";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import {
   expirePendingQueries,
@@ -7,7 +8,6 @@ import {
   updateQueryStatusRecord,
   updateQuerySubmittedRecord,
 } from "./sqlite-query-store";
-import { runSubmissionPipeline } from "./domain/submission-pipeline";
 import type {
   BountyInfo,
   ExecutorType,
@@ -20,6 +20,7 @@ import type {
   SubmissionMeta,
   VerificationDetail,
 } from "./types";
+import { verify } from "./verification/verifier";
 
 export type {
   AttachmentRef,
@@ -138,6 +139,38 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
   };
 }
 
+async function submitQueryWithStore(
+  store: QueryStore,
+  id: string,
+  result: QueryResult,
+  submissionMeta: QuerySubmissionMeta,
+): Promise<SubmitQueryOutcome> {
+  const query = store.getQuery(id);
+  if (!query) return { ok: false, query: null, message: "Query not found" };
+  if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
+  if (query.expires_at < Date.now()) {
+    store.updateQueryStatus(id, "expired", "cancelled");
+    return { ok: false, query, message: "Query has expired" };
+  }
+
+  const normalizedResult = normalizeQueryResult(result);
+  const verification = await verify(query, normalizedResult);
+
+  if (verification.passed) {
+    store.updateQuerySubmitted(id, normalizedResult, verification, "approved", "released", submissionMeta);
+    const updated = store.getQuery(id)!;
+    return { ok: true, query: updated, message: "Verification passed. Result accepted." };
+  }
+
+  store.updateQuerySubmitted(id, normalizedResult, verification, "rejected", "cancelled", submissionMeta);
+  const updated = store.getQuery(id)!;
+  return {
+    ok: false,
+    query: updated,
+    message: `Verification failed: ${verification.failures.join(", ")}`,
+  };
+}
+
 function cancelQueryWithStore(store: QueryStore, id: string): CancelQueryOutcome {
   const query = store.getQuery(id);
   if (!query) return { ok: false, message: "Query not found" };
@@ -162,7 +195,7 @@ export function createQueryService(store: QueryStore = sqliteQueryStore): QueryS
       return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
     },
     async submitQueryResult(id, result, submissionMeta) {
-      return runSubmissionPipeline(store, id, result, submissionMeta);
+      return submitQueryWithStore(store, id, result, submissionMeta);
     },
     cancelQuery(id) {
       return cancelQueryWithStore(store, id);

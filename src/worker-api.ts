@@ -1,9 +1,13 @@
 import { join } from "node:path";
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { z } from "zod";
 import { getAttachmentStore } from "./attachment-store";
 import {
+  buildAttachmentAbsoluteUrl,
+  buildAttachmentHandle,
   materializeAttachmentRef,
+  materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
   UPLOADS_DIR,
@@ -20,17 +24,157 @@ import {
   type QueryInput,
   type QueryResult,
 } from "./query-service";
+import type { AttachmentRef, Query } from "./types";
 
-import { createQuerySchema } from "./api/schemas";
-import { requireWriteApiKey } from "./api/auth";
-import {
-  buildAttachmentPayload,
-  buildCreatedQueryPayload,
-  getPhotoProofAttachmentRefs,
-  getPublicRequestUrl,
-  queryDetail,
-  querySummary,
-} from "./api/presenters";
+// --- Schemas ---
+
+const requesterMetaSchema = z.object({
+  requester_type: z.enum(["agent", "human", "app"]),
+  requester_id: z.string().min(1).optional(),
+  client_name: z.string().min(1).optional(),
+});
+
+const bountySchema = z.object({
+  amount_sats: z.number().int().min(1),
+  cashu_token: z.string().min(1).optional(),
+});
+
+const createQuerySchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("photo_proof"),
+    target: z.string().min(1),
+    location_hint: z.string().min(1).optional(),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+    bounty: bountySchema.optional(),
+  }),
+  z.object({
+    type: z.literal("store_status"),
+    store_name: z.string().min(1),
+    location_hint: z.string().min(1).optional(),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+    bounty: bountySchema.optional(),
+  }),
+  z.object({
+    type: z.literal("webpage_field"),
+    url: z.string().url(),
+    field: z.string().min(1),
+    anchor_word: z.string().min(1),
+    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+    requester: requesterMetaSchema.optional(),
+    bounty: bountySchema.optional(),
+  }),
+]);
+
+// --- Auth ---
+
+function getHttpApiKey(c: Context): string | null {
+  const authorization = c.req.header("authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    return token || null;
+  }
+  const apiKey = c.req.header("x-api-key")?.trim();
+  return apiKey || null;
+}
+
+function requireWriteApiKey(c: Context): Response | null {
+  const { httpApiKeys } = getRuntimeConfig();
+  if (httpApiKeys.length === 0) return null;
+
+  const supplied = getHttpApiKey(c);
+  if (supplied && httpApiKeys.includes(supplied)) return null;
+
+  return c.json(
+    { error: "Unauthorized", hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints." },
+    401,
+    { "www-authenticate": "Bearer" },
+  );
+}
+
+// --- Presenters ---
+
+function getPublicRequestUrl(c: Context): string {
+  const url = new URL(c.req.url);
+  const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || c.req.header("host")?.trim();
+  if (forwardedProto) url.protocol = `${forwardedProto}:`;
+  if (host) url.host = host;
+  return url.toString();
+}
+
+function querySummary(query: Query) {
+  return {
+    id: query.id,
+    type: query.type,
+    status: query.status,
+    params: query.params,
+    requester_meta: query.requester_meta ?? null,
+    bounty: query.bounty ? { amount_sats: query.bounty.amount_sats } : null,
+    challenge_nonce: query.challenge_nonce,
+    challenge_rule: query.challenge_rule,
+    expires_at: query.expires_at,
+    expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
+  };
+}
+
+function buildCreatedQueryPayload(query: Query, requestUrl: string) {
+  const requestOrigin = new URL(requestUrl).origin;
+  return {
+    query_id: query.id,
+    type: query.type,
+    status: query.status,
+    challenge_nonce: query.challenge_nonce,
+    challenge_rule: query.challenge_rule,
+    expires_at: new Date(query.expires_at).toISOString(),
+    requester_meta: query.requester_meta ?? null,
+    reference_app_url: `${requestOrigin}/queries/${query.id}`,
+    query_api_url: `${requestOrigin}/queries/${query.id}`,
+  };
+}
+
+function queryDetail(query: Query, requestUrl: string) {
+  return {
+    ...querySummary(query),
+    created_at: query.created_at,
+    submitted_at: query.submitted_at,
+    result: query.result ? materializeQueryResult(query.result, requestUrl) : undefined,
+    verification: query.verification,
+    submission_meta: query.submission_meta,
+    payment_status: query.payment_status,
+  };
+}
+
+function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
+  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") return null;
+  return query.result.attachments;
+}
+
+async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, index: number, requestUrl: string) {
+  const stat = await statStoredAttachment(attachment, requestUrl);
+  const handle = buildAttachmentHandle(query.id, index, attachment, requestUrl);
+  return {
+    query_id: query.id,
+    attachment_index: index,
+    attachment: handle.attachment,
+    access: {
+      ...handle.access,
+      preview_url: handle.access.preview_url ?? undefined,
+      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
+    },
+    attachment_view_url: handle.access.view_url,
+    attachment_meta_url: handle.access.meta_url,
+    absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
+    local_file_path: stat?.path ?? null,
+    storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
+    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
+    size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
+  };
+}
+
+// --- CSS Build ---
 
 export async function prepareWorkerApiAssets() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
@@ -45,74 +189,49 @@ export async function prepareWorkerApiAssets() {
   }
 }
 
+// --- Routes ---
+
 export function buildWorkerApiApp() {
   const app = new Hono();
-  const listQueries = (c: Context) =>
-    c.json(listOpenQueries().map(querySummary));
-  const getQuery = (c: Context) => {
+
+  app.get("/health", (c) => c.json({ ok: true }));
+
+  app.get("/queries", (c) => c.json(listOpenQueries().map(querySummary)));
+
+  app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = getQueryById(id);
     const requestUrl = getPublicRequestUrl(c);
     return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
-  };
-
-  app.get("/health", (c) => c.json({ ok: true }));
-
-  app.get("/queries", listQueries);
-
-  app.get("/queries/:id", getQuery);
+  });
 
   app.post("/queries", async (c) => {
     const unauthorized = requireWriteApiKey(c);
     if (unauthorized) return unauthorized;
 
     let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON" }, 400);
-    }
+    try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
 
     const parsed = createQuerySchema.safeParse(body);
     if (!parsed.success) {
-      return c.json(
-        {
-          error: "Invalid query payload",
-          issues: parsed.error.issues.map((issue) => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
-        },
-        400,
-      );
+      return c.json({
+        error: "Invalid query payload",
+        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      }, 400);
     }
 
     const payload = parsed.data;
     let input: QueryInput;
-
     switch (payload.type) {
       case "photo_proof":
-        input = {
-          type: "photo_proof",
-          target: payload.target,
-          location_hint: payload.location_hint,
-        };
+        input = { type: "photo_proof", target: payload.target, location_hint: payload.location_hint };
         break;
       case "store_status":
-        input = {
-          type: "store_status",
-          store_name: payload.store_name,
-          location_hint: payload.location_hint,
-        };
+        input = { type: "store_status", store_name: payload.store_name, location_hint: payload.location_hint };
         break;
       case "webpage_field":
-        input = {
-          type: "webpage_field",
-          url: payload.url,
-          field: payload.field,
-          anchor_word: payload.anchor_word,
-        };
+        input = { type: "webpage_field", url: payload.url, field: payload.field, anchor_word: payload.anchor_word };
         break;
     }
 
@@ -128,9 +247,7 @@ export function buildWorkerApiApp() {
         ttlMs: (payload.ttl_seconds ?? 600) * 1000,
         regionCode: regionHint,
         bounty: payload.bounty,
-      }).catch((err) =>
-        console.error("[worker-api] Nostr publish failed:", err)
-      );
+      }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
     }
 
     return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
@@ -139,17 +256,13 @@ export function buildWorkerApiApp() {
   app.get("/queries/:id/attachments", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-
     const query = getQueryById(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
-
     const payloads = await Promise.all(
-      attachments.map((attachment, index) => buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c))),
+      attachments.map((att, i) => buildAttachmentPayload(query, att, i, getPublicRequestUrl(c))),
     );
-
     return c.json(payloads);
   });
 
@@ -157,19 +270,13 @@ export function buildWorkerApiApp() {
     const id = c.req.param("id");
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    if (!Number.isInteger(index) || index < 0) {
-      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    }
-
+    if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = getQueryById(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
-
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
-
     return c.json(await buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c)));
   });
 
@@ -177,34 +284,22 @@ export function buildWorkerApiApp() {
     const id = c.req.param("id");
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    if (!Number.isInteger(index) || index < 0) {
-      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    }
-
+    if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = getQueryById(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
-
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
-
     const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
     if (!stat) return c.json({ error: "Attachment file not found" }, 404);
-
     if (stat.storageKind === "local") {
       const file = Bun.file(stat.path!);
       if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
       return new Response(file, {
-        headers: {
-          "content-type": stat.mimeType,
-          "content-length": String(stat.size),
-          "cache-control": "public, max-age=3600",
-        },
+        headers: { "content-type": stat.mimeType, "content-length": String(stat.size), "cache-control": "public, max-age=3600" },
       });
     }
-
     return c.redirect(stat.absoluteUrl, 302);
   });
 
@@ -212,137 +307,77 @@ export function buildWorkerApiApp() {
     const id = c.req.param("id");
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    if (!Number.isInteger(index) || index < 0) {
-      return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    }
-
+    if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = getQueryById(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
-
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
-
     const maxDimensionParam = c.req.query("max_dimension");
     const maxDimension = maxDimensionParam ? Number(maxDimensionParam) : getRuntimeConfig().previewMaxDimension;
-    if (!Number.isFinite(maxDimension) || maxDimension <= 0) {
-      return c.json({ error: "max_dimension must be a positive number" }, 400);
-    }
-
-    const preview = await renderStoredAttachmentPreview(attachment, getPublicRequestUrl(c), {
-      maxDimension: Math.floor(maxDimension),
-    });
-    if (!preview) {
-      return c.json({ error: "Preview could not be generated" }, 422);
-    }
-
+    if (!Number.isFinite(maxDimension) || maxDimension <= 0) return c.json({ error: "max_dimension must be a positive number" }, 400);
+    const preview = await renderStoredAttachmentPreview(attachment, getPublicRequestUrl(c), { maxDimension: Math.floor(maxDimension) });
+    if (!preview) return c.json({ error: "Preview could not be generated" }, 422);
     return new Response(Buffer.from(preview.data, "base64"), {
-      headers: {
-        "content-type": preview.mimeType,
-        "content-length": String(preview.size),
-        "cache-control": "public, max-age=3600",
-      },
+      headers: { "content-type": preview.mimeType, "content-length": String(preview.size), "cache-control": "public, max-age=3600" },
     });
   });
 
-  const uploadHandler = async (c: Context) => {
+  app.post("/queries/:id/upload", async (c) => {
     const unauthorized = requireWriteApiKey(c);
     if (unauthorized) return unauthorized;
-
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = getQueryById(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
-
     let formData: FormData;
-    try {
-      formData = await c.req.formData();
-    } catch {
-      return c.json({ error: "Expected multipart/form-data" }, 400);
-    }
-
+    try { formData = await c.req.formData(); } catch { return c.json({ error: "Expected multipart/form-data" }, 400); }
     const file = formData.get("photo");
-    if (!file || typeof file === "string") {
-      return c.json({ error: "Missing photo field" }, 400);
-    }
-
+    if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
     const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
-    if (!allowed.includes(ext)) {
-      return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-    }
-
+    if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
     const stored = await getAttachmentStore().put(id, file as File, getPublicRequestUrl(c));
-    return c.json({
-      ok: true,
-      attachment: materializeAttachmentRef(stored.attachment, c.req.url),
-    });
-  };
-
-  app.post("/queries/:id/upload", uploadHandler);
+    return c.json({ ok: true, attachment: materializeAttachmentRef(stored.attachment, c.req.url) });
+  });
 
   app.get("/uploads/:filename", async (c) => {
     const filename = c.req.param("filename");
-    if (filename.includes("..") || filename.includes("/")) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
+    if (filename.includes("..") || filename.includes("/")) return c.json({ error: "Forbidden" }, 403);
     const file = Bun.file(join(UPLOADS_DIR, filename));
     if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
     return new Response(file);
   });
 
-  const submitHandler = async (c: Context) => {
+  app.post("/queries/:id/submit", async (c) => {
     const unauthorized = requireWriteApiKey(c);
     if (unauthorized) return unauthorized;
-
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: unknown;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON" }, 400);
-    }
-    const outcome = await submitQueryResult(id, body as QueryResult, {
-      executor_type: "human",
-      channel: "worker_api",
-    });
-    const status = !outcome.query
-      ? 404
-      : !outcome.ok &&
-        outcome.query.status !== "pending" &&
-        outcome.query.status !== "rejected"
-      ? 409
-      : outcome.ok
-      ? 200
-      : 422;
-    return c.json(
-      {
-        ok: outcome.ok,
-        message: outcome.message,
-        verification: outcome.query?.verification,
-        payment_status: outcome.query?.payment_status,
-      },
-      status
-    );
-  };
+    try { body = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+    const outcome = await submitQueryResult(id, body as QueryResult, { executor_type: "human", channel: "worker_api" });
+    const status = !outcome.query ? 404
+      : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
+      : outcome.ok ? 200 : 422;
+    return c.json({
+      ok: outcome.ok,
+      message: outcome.message,
+      verification: outcome.query?.verification,
+      payment_status: outcome.query?.payment_status,
+    }, status);
+  });
 
-  app.post("/queries/:id/submit", submitHandler);
-
-  const cancelHandler = (c: Context) => {
+  app.post("/queries/:id/cancel", (c) => {
     const unauthorized = requireWriteApiKey(c);
     if (unauthorized) return unauthorized;
-
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const outcome = cancelQuery(id);
     return c.json(outcome, outcome.ok ? 200 : 400);
-  };
-
-  app.post("/queries/:id/cancel", cancelHandler);
+  });
 
   return app;
 }
