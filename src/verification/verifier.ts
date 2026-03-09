@@ -1,4 +1,5 @@
 import { checkAttachmentContent } from "./ai-content-check";
+import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import type {
   PhotoProofResult,
   Query,
@@ -15,6 +16,7 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
   switch (query.type) {
     case "photo_proof":
       verifyPhotoProof(result as PhotoProofResult, query.challenge_nonce, checks, failures);
+      verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures);
       break;
     case "store_status":
       verifyStoreStatus(result as StoreStatusResult, query.challenge_nonce, checks, failures);
@@ -76,6 +78,79 @@ function verifyPhotoProof(
     failures.push("text_answer too long (max 5000 chars)");
   } else {
     checks.push("text_answer length ok");
+  }
+}
+
+/**
+ * Verify photo integrity using pre-strip EXIF and C2PA metadata.
+ *
+ * These are advisory checks — they add information to the verification
+ * detail but only fail for strong indicators of fabrication.
+ */
+function verifyPhotoIntegrity(
+  queryId: string,
+  result: PhotoProofResult,
+  checks: string[],
+  failures: string[],
+): void {
+  // Try to find integrity data for attachments in this result
+  const integrityRecords = result.attachments
+    .map((att) => getIntegrity(att.id))
+    .filter((m) => m !== null);
+
+  // Also check by queryId for cases where attachment IDs differ
+  if (integrityRecords.length === 0) {
+    const byQuery = getIntegrityForQuery(queryId);
+    if (byQuery.length > 0) {
+      integrityRecords.push(...byQuery);
+    }
+  }
+
+  if (integrityRecords.length === 0) {
+    checks.push("integrity: no pre-upload metadata available (skipped)");
+    return;
+  }
+
+  for (const record of integrityRecords) {
+    const { exif, c2pa } = record;
+
+    // C2PA: if present and valid, strong signal of authenticity
+    if (c2pa.available && c2pa.hasManifest) {
+      if (c2pa.signatureValid) {
+        checks.push("C2PA: valid Content Credentials signature");
+      } else {
+        failures.push("C2PA: Content Credentials signature invalid");
+      }
+    }
+
+    // EXIF: camera model presence is a soft indicator
+    if (exif.hasExif) {
+      if (exif.hasCameraModel) {
+        checks.push(`EXIF: camera identified (${[exif.metadata.make, exif.metadata.model].filter(Boolean).join(" ")})`);
+      } else {
+        checks.push("EXIF: present but no camera model (screenshot or processed image)");
+      }
+
+      if (exif.hasTimestamp) {
+        if (exif.timestampRecent) {
+          checks.push("EXIF: timestamp is recent");
+        } else {
+          checks.push("EXIF: timestamp is not recent (older photo)");
+        }
+      }
+
+      if (exif.hasGps) {
+        checks.push("EXIF: GPS coordinates present");
+        if (exif.gpsNearHint === true) {
+          checks.push("EXIF: GPS matches location hint");
+        } else if (exif.gpsNearHint === false) {
+          failures.push("EXIF: GPS coordinates far from expected location");
+        }
+      }
+    } else {
+      // No EXIF at all — suspicious for a camera photo
+      checks.push("EXIF: no metadata (possible AI-generated image or stripped before upload)");
+    }
   }
 }
 

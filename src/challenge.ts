@@ -12,10 +12,10 @@ export function generateNonce(length = 4): string {
 export function buildChallengeRule(type: string, nonce: string, params: Record<string, unknown>): string {
   switch (type) {
     case "photo_proof":
-      return `「${nonce}」を紙かメモ画面に表示し、対象物（${params.target}）と一緒に撮影してください。撮影できない場合でも、回答のtext_answerに必ず「${nonce}」を含めてください。`;
+      return `「${nonce}」を紙に手書きし、対象物（${params.target}）と一緒に撮影してください。手書きの文字が写真内に写っている必要があります。C2PA対応カメラでの撮影を推奨します。text_answerにも必ず「${nonce}」を含めてください。`;
 
     case "store_status":
-      return `「${nonce}」を紙かメモ画面に表示し、店舗（${params.store_name}）の入口と一緒に撮影してください。回答のnotesに必ず「${nonce}」を含めてください。`;
+      return `「${nonce}」を紙に手書きし、店舗（${params.store_name}）の入口と一緒に撮影してください。手書きの文字が写真内に写っている必要があります。回答のnotesに必ず「${nonce}」を含めてください。`;
 
     case "webpage_field":
       return `指定URLのページを開き、${params.field}を抽出してください。また「${params.anchor_word}」という語の近傍テキスト（前後20文字程度）をproof_textとして返し、notesには必ず「${nonce}」を含めてください。`;
