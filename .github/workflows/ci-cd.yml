@@ -34,7 +34,7 @@ jobs:
         run: bun test
 
       - name: Build deploy image
-        run: docker build -t human-calling-mcp:${{ github.sha }} .
+        run: docker build -t anchr:${{ github.sha }} .
 
   deploy:
     name: Deploy To Fly.io

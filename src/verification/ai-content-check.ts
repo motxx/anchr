@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readStoredAttachmentBuffer } from "./attachments";
-import { getRuntimeConfig } from "./config";
-import type { AttachmentRef, Query, QueryResult } from "./types";
+import { readStoredAttachmentBuffer } from "../attachments";
+import { getRuntimeConfig } from "../config";
+import type { AttachmentRef, Query, QueryResult } from "../types";
 
 export interface ContentCheckResult {
   passed: boolean;
@@ -35,9 +35,12 @@ function isVideoMime(mime: string): boolean {
 }
 
 function getClient(): Anthropic | null {
-  const apiKey = getRuntimeConfig().anthropicApiKey;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
+  const config = getRuntimeConfig();
+  // AI content check must be explicitly opted in (AI_CONTENT_CHECK=true)
+  // to avoid sending user photos to third-party APIs without consent
+  if (!config.aiContentCheckEnabled) return null;
+  if (!config.anthropicApiKey) return null;
+  return new Anthropic({ apiKey: config.anthropicApiKey });
 }
 
 async function extractVideoFrames(
@@ -48,7 +51,7 @@ async function extractVideoFrames(
   const ffmpeg = Bun.which("ffmpeg");
   if (!ffmpeg) return [];
 
-  const tempDir = await mkdtemp(join(tmpdir(), "human-calling-frames-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "anchr-frames-"));
   const inputPath = join(tempDir, `input${inputExt}`);
   const outputPattern = join(tempDir, "frame_%03d.jpg");
 

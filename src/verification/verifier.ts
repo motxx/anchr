@@ -6,7 +6,7 @@ import type {
   StoreStatusResult,
   VerificationDetail,
   WebpageFieldResult,
-} from "./types";
+} from "../types";
 
 export async function verify(query: Query, result: QueryResult): Promise<VerificationDetail> {
   const checks: string[] = [];

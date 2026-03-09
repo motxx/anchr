@@ -1,5 +1,7 @@
 import { buildAttachmentAbsoluteUrl, buildAttachmentHandle, materializeQueryResult, renderStoredAttachmentPreview, statStoredAttachment } from "./attachments";
 import { getRuntimeConfig } from "./config";
+import { publishQueryToNostr } from "./nostr/query-bridge";
+import { isNostrEnabled } from "./nostr/client";
 import { cancelQuery, createQuery, getQuery, listOpenQueries, submitQueryResult, type Query, type QueryInput, type QueryResult } from "./query-service";
 import type { AttachmentRef, AttachmentHandle, RequesterMeta } from "./types";
 
@@ -183,7 +185,20 @@ function buildRemoteQueryStatusPayload(query: Record<string, unknown>): QuerySta
 function createLocalMcpQueryBackend(): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta) {
-      return buildCreatedQueryPayload(createQuery(input, { ttlSeconds, requesterMeta }));
+      const query = createQuery(input, { ttlSeconds, requesterMeta });
+
+      // Also publish to Nostr relays if configured
+      if (isNostrEnabled()) {
+        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
+        publishQueryToNostr(input, {
+          ttlMs: ttlSeconds * 1000,
+          regionCode: regionHint,
+        }).catch((err) =>
+          console.error("[mcp-backend] Nostr publish failed:", err)
+        );
+      }
+
+      return buildCreatedQueryPayload(query);
     },
     async getQueryStatus(queryId) {
       const query = getQuery(queryId);

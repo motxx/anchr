@@ -95,6 +95,11 @@ export interface SubmissionMeta {
   channel: SubmissionChannel;
 }
 
+export interface BountyInfo {
+  amount_sats: number;
+  cashu_token?: string;
+}
+
 export interface Query {
   id: string;
   type: QueryType;
@@ -105,6 +110,7 @@ export interface Query {
   created_at: number;
   expires_at: number;
   requester_meta?: RequesterMeta;
+  bounty?: BountyInfo;
   submitted_at?: number;
   result?: QueryResult;
   verification?: VerificationDetail;

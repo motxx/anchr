@@ -1,67 +1,40 @@
 import { join } from "node:path";
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { z } from "zod";
 import { getAttachmentStore } from "./attachment-store";
 import {
-  buildAttachmentHandle,
-  buildAttachmentAbsoluteUrl,
   materializeAttachmentRef,
-  materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
   UPLOADS_DIR,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
+import { isNostrEnabled } from "./nostr/client";
+import { publishQueryToNostr } from "./nostr/query-bridge";
 import {
   cancelQuery,
   createQuery,
   getQuery as getQueryById,
   listOpenQueries,
   submitQueryResult,
-  type Query,
   type QueryInput,
   type QueryResult,
 } from "./query-service";
-import type { AttachmentRef } from "./types";
 
-const requesterMetaSchema = z.object({
-  requester_type: z.enum(["agent", "human", "app"]),
-  requester_id: z.string().min(1).optional(),
-  client_name: z.string().min(1).optional(),
-});
-
-const createQuerySchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("photo_proof"),
-    target: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-  }),
-  z.object({
-    type: z.literal("store_status"),
-    store_name: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-  }),
-  z.object({
-    type: z.literal("webpage_field"),
-    url: z.string().url(),
-    field: z.string().min(1),
-    anchor_word: z.string().min(1),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-  }),
-]);
+import { createQuerySchema } from "./api/schemas";
+import { requireWriteApiKey } from "./api/auth";
+import {
+  buildAttachmentPayload,
+  buildCreatedQueryPayload,
+  getPhotoProofAttachmentRefs,
+  getPublicRequestUrl,
+  queryDetail,
+  querySummary,
+} from "./api/presenters";
 
 export async function prepareWorkerApiAssets() {
   const cssIn = join(import.meta.dir, "ui/globals.css");
   const cssOut = join(import.meta.dir, "ui/generated.css");
-  // stdout/stderr must be "pipe" — never "inherit", which would corrupt MCP stdio
-  // Use process.execPath (absolute path to bun binary) instead of "bunx"
-  // so this works even when the nix store is not in Claude Desktop's PATH
   const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
@@ -70,133 +43,6 @@ export async function prepareWorkerApiAssets() {
   if (proc.exitCode !== 0) {
     console.error("[css-build] Failed:", await new Response(proc.stderr).text());
   }
-}
-
-function querySummary(query: Query) {
-  return {
-    id: query.id,
-    type: query.type,
-    status: query.status,
-    params: query.params,
-    requester_meta: query.requester_meta ?? null,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
-    expires_at: query.expires_at,
-    expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-  };
-}
-
-function buildCreatedQueryPayload(query: Query, requestUrl: string) {
-  const requestOrigin = new URL(requestUrl).origin;
-  return {
-    query_id: query.id,
-    type: query.type,
-    status: query.status,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
-    expires_at: new Date(query.expires_at).toISOString(),
-    requester_meta: query.requester_meta ?? null,
-    reference_app_url: `${requestOrigin}/queries/${query.id}`,
-    query_api_url: `${requestOrigin}/queries/${query.id}`,
-  };
-}
-
-function getHttpApiKey(c: Context): string | null {
-  const authorization = c.req.header("authorization");
-  if (authorization?.startsWith("Bearer ")) {
-    const token = authorization.slice("Bearer ".length).trim();
-    return token || null;
-  }
-
-  const apiKey = c.req.header("x-api-key")?.trim();
-  return apiKey || null;
-}
-
-function requireWriteApiKey(c: Context): Response | null {
-  const { httpApiKeys } = getRuntimeConfig();
-  if (httpApiKeys.length === 0) {
-    return null;
-  }
-
-  const supplied = getHttpApiKey(c);
-  if (supplied && httpApiKeys.includes(supplied)) {
-    return null;
-  }
-
-  return c.json(
-    {
-      error: "Unauthorized",
-      hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints.",
-    },
-    401,
-    {
-      "www-authenticate": "Bearer",
-    },
-  );
-}
-
-function getPublicRequestUrl(c: Context): string {
-  const url = new URL(c.req.url);
-  const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
-  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || c.req.header("host")?.trim();
-
-  if (forwardedProto) {
-    url.protocol = `${forwardedProto}:`;
-  }
-  if (host) {
-    url.host = host;
-  }
-
-  return url.toString();
-}
-
-function materializeResult(result: QueryResult | undefined, requestUrl: string): QueryResult | undefined {
-  if (!result) return undefined;
-  return materializeQueryResult(result, requestUrl);
-}
-
-function queryDetail(query: Query, requestUrl: string) {
-  return {
-    ...querySummary(query),
-    created_at: query.created_at,
-    submitted_at: query.submitted_at,
-    result: materializeResult(query.result, requestUrl),
-    verification: query.verification,
-    submission_meta: query.submission_meta,
-    payment_status: query.payment_status,
-  };
-}
-
-function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
-  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") {
-    return null;
-  }
-
-  return query.result.attachments;
-}
-
-async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, index: number, requestUrl: string) {
-  const stat = await statStoredAttachment(attachment, requestUrl);
-  const handle = buildAttachmentHandle(query.id, index, attachment, requestUrl);
-
-  return {
-    query_id: query.id,
-    attachment_index: index,
-    attachment: handle.attachment,
-    access: {
-      ...handle.access,
-      preview_url: handle.access.preview_url ?? undefined,
-      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
-    },
-    attachment_view_url: handle.access.view_url,
-    attachment_meta_url: handle.access.meta_url,
-    absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
-    local_file_path: stat?.path ?? null,
-    storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
-    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
-    size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
-  };
 }
 
 export function buildWorkerApiApp() {
@@ -273,7 +119,19 @@ export function buildWorkerApiApp() {
     const query = createQuery(input, {
       ttlSeconds: payload.ttl_seconds,
       requesterMeta: payload.requester,
+      bounty: payload.bounty,
     });
+
+    if (isNostrEnabled()) {
+      const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
+      publishQueryToNostr(input, {
+        ttlMs: (payload.ttl_seconds ?? 600) * 1000,
+        regionCode: regionHint,
+        bounty: payload.bounty,
+      }).catch((err) =>
+        console.error("[worker-api] Nostr publish failed:", err)
+      );
+    }
 
     return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
   });

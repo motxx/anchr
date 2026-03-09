@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { verify } from "./verification";
-import type { Query, QueryResult } from "./types";
+import { verify } from "./verifier";
+import type { Query, QueryResult } from "../types";
 
 function makeQuery(overrides: Partial<Query>): Query {
   return {

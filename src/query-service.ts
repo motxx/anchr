@@ -7,20 +7,19 @@ import {
   updateQueryStatusRecord,
   updateQuerySubmittedRecord,
 } from "./sqlite-query-store";
-import { normalizeQueryResult } from "./attachments";
+import { runSubmissionPipeline } from "./domain/submission-pipeline";
 import type {
+  BountyInfo,
   ExecutorType,
   PaymentStatus,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
-  QueryType,
   RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
 } from "./types";
-import { verify } from "./verification";
 
 export type {
   AttachmentRef,
@@ -41,6 +40,7 @@ export interface CreateQueryOptions {
   ttlMs?: number;
   ttlSeconds?: number;
   requesterMeta?: RequesterMeta;
+  bounty?: BountyInfo;
 }
 
 export interface SubmitQueryOutcome {
@@ -133,38 +133,8 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
     created_at: now,
     expires_at: now + resolveTtlMs(options),
     requester_meta: options?.requesterMeta,
+    bounty: options?.bounty,
     payment_status: "locked",
-  };
-}
-
-async function submitQueryWithStore(
-  store: QueryStore,
-  id: string,
-  result: QueryResult,
-  submissionMeta: QuerySubmissionMeta,
-): Promise<SubmitQueryOutcome> {
-  const query = store.getQuery(id);
-  if (!query) return { ok: false, query: null, message: "Query not found" };
-  if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
-  if (query.expires_at < Date.now()) {
-    store.updateQueryStatus(id, "expired", "cancelled");
-    return { ok: false, query, message: "Query has expired" };
-  }
-
-  const normalizedResult = normalizeQueryResult(result);
-  const verification = await verify(query, normalizedResult);
-  const newStatus: QueryStatus = verification.passed ? "approved" : "rejected";
-  const paymentStatus: PaymentStatus = verification.passed ? "released" : "cancelled";
-
-  store.updateQuerySubmitted(id, normalizedResult, verification, newStatus, paymentStatus, submissionMeta);
-
-  const updated = store.getQuery(id)!;
-  return {
-    ok: verification.passed,
-    query: updated,
-    message: verification.passed
-      ? "Verification passed. Result accepted."
-      : `Verification failed: ${verification.failures.join(", ")}`,
   };
 }
 
@@ -192,7 +162,7 @@ export function createQueryService(store: QueryStore = sqliteQueryStore): QueryS
       return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
     },
     async submitQueryResult(id, result, submissionMeta) {
-      return submitQueryWithStore(store, id, result, submissionMeta);
+      return runSubmissionPipeline(store, id, result, submissionMeta);
     },
     cancelQuery(id) {
       return cancelQueryWithStore(store, id);

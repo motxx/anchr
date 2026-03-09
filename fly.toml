@@ -1,4 +1,4 @@
-app = "human-calling-mcp"
+app = "anchr"
 primary_region = "nrt"
 
 [build]

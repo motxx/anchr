@@ -32,7 +32,13 @@ export { startMcpServer as startMcpAdapter } from "./mcp-server";
 export { startReferenceApp } from "./reference-app";
 export { startReferenceRuntime } from "./runtime";
 export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./worker-api";
-export { verify as verifyQueryResult } from "./verification";
+export { verify as verifyQueryResult } from "./verification/verifier";
+export { stripExif } from "./exif-strip";
+export { purgeExpiredQueries } from "./data-purge";
+export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./cashu/wallet";
+export * as nostr from "./nostr/index";
+export * as blossom from "./blossom/client";
+export * as verification from "./verification/index";
 
 if (import.meta.main) {
   await import("./server");

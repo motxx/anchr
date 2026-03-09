@@ -344,7 +344,7 @@ export async function renderStoredAttachmentPreview(
   if (!previewCommand) {
     return null;
   }
-  const tempDir = await mkdtemp(join(tmpdir(), "human-calling-preview-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "anchr-preview-"));
   const inputExt = extname(attachment.filename) || ".bin";
   const inputPath = join(tempDir, `input${inputExt}`);
   const outputPath = join(tempDir, "preview.jpg");

@@ -2,6 +2,7 @@ import { createHmac, createHash } from "node:crypto";
 import { extname, join } from "node:path";
 import { attachmentPublicBaseUrl } from "./attachments";
 import { DEFAULT_UPLOADS_DIR } from "./config";
+import { withPrivacyPipeline } from "./infra/privacy-pipeline";
 import type { AttachmentRef, AttachmentStorageKind } from "./types";
 
 export interface UploadedAttachment {
@@ -15,7 +16,7 @@ export interface UploadedAttachment {
   storageKind: AttachmentStorageKind;
 }
 
-interface AttachmentStore {
+export interface AttachmentStore {
   put(queryId: string, file: File, requestUrl: string): Promise<UploadedAttachment>;
 }
 
@@ -55,7 +56,9 @@ class LocalAttachmentStore implements AttachmentStore {
     const ext = sanitizeExt(file.name);
     const filename = `${queryId}_${Date.now()}${ext}`;
     const path = join(LOCAL_UPLOADS_DIR, filename);
-    await Bun.write(path, file);
+
+    const body = Buffer.from(await file.arrayBuffer());
+    await Bun.write(path, body);
 
     const attachmentRef = `/uploads/${filename}`;
     const attachment: AttachmentRef = {
@@ -64,7 +67,7 @@ class LocalAttachmentStore implements AttachmentStore {
       mime_type: file.type || "application/octet-stream",
       storage_kind: "local",
       filename,
-      size_bytes: file.size,
+      size_bytes: body.length,
       local_file_path: path,
       route_path: attachmentRef,
     };
@@ -75,7 +78,7 @@ class LocalAttachmentStore implements AttachmentStore {
       filename,
       localFilePath: path,
       mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
+      sizeBytes: body.length,
       storageKind: "local",
     };
   }
@@ -95,7 +98,7 @@ interface S3Config {
 function getS3Config(): S3Config {
   const storage = process.env.ATTACHMENT_STORAGE ?? "local";
   if (storage === "localstack") {
-    const bucket = process.env.LOCALSTACK_BUCKET ?? "human-calling";
+    const bucket = process.env.LOCALSTACK_BUCKET ?? "anchr";
     const endpoint = trimTrailingSlash(process.env.LOCALSTACK_ENDPOINT ?? "http://localhost:4566");
     const publicBaseUrl = trimTrailingSlash(
       process.env.LOCALSTACK_PUBLIC_BASE_URL ?? `${endpoint}/${bucket}`,
@@ -205,7 +208,7 @@ class S3AttachmentStore implements AttachmentStore {
     const response = await fetch(url, {
       method: "PUT",
       headers,
-      body,
+      body: new Uint8Array(body),
     });
 
     if (!response.ok) {
@@ -234,9 +237,17 @@ class S3AttachmentStore implements AttachmentStore {
   }
 }
 
-export function getAttachmentStore(): AttachmentStore {
+function getRawStore(): AttachmentStore {
   if (["s3", "r2", "localstack"].includes(process.env.ATTACHMENT_STORAGE ?? "local")) {
     return new S3AttachmentStore(getS3Config());
   }
   return new LocalAttachmentStore();
+}
+
+/**
+ * Returns a store wrapped with the privacy pipeline:
+ * EXIF stripping → storage → optional Blossom mirror.
+ */
+export function getAttachmentStore(): AttachmentStore {
+  return withPrivacyPipeline(getRawStore());
 }

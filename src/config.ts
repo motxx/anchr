@@ -33,6 +33,7 @@ export interface RuntimeConfig {
   previewJpegQuality: number;
   httpApiKeys: string[];
   anthropicApiKey?: string;
+  aiContentCheckEnabled: boolean;
   remoteQueryApiBaseUrl?: string;
   remoteQueryApiKey?: string;
 }
@@ -50,6 +51,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
     anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || undefined,
+    aiContentCheckEnabled: process.env.AI_CONTENT_CHECK === "true" || process.env.AI_CONTENT_CHECK === "1",
     remoteQueryApiBaseUrl: process.env.REMOTE_QUERY_API_BASE_URL?.trim() || undefined,
     remoteQueryApiKey: process.env.REMOTE_QUERY_API_KEY?.trim() || undefined,
   };

@@ -30,6 +30,10 @@ import type { AttachmentRef, QueryType } from "../types";
 
 // ---- Types ----
 
+interface Bounty {
+  amount_sats: number;
+}
+
 interface Query {
   id: string;
   type: QueryType;
@@ -38,6 +42,7 @@ interface Query {
   challenge_rule: string;
   expires_at: number;
   expires_in_seconds: number;
+  bounty?: Bounty | null;
 }
 
 interface SubmitResponse {
@@ -446,6 +451,11 @@ function QueryCard({ query }: { query: Query }) {
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {query.bounty && query.bounty.amount_sats > 0 && (
+              <span className="text-xs font-semibold text-amber-400">
+                {query.bounty.amount_sats} sats
+              </span>
+            )}
             <span
               className={cn(
                 "text-xs flex items-center gap-1",
@@ -627,10 +637,10 @@ export default function App() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-lg font-bold text-foreground tracking-tight">
-                human-calling
+                Anchr
               </h1>
               <p className="text-xs text-muted-foreground mt-1">
-                Reference worker app · live reality query SDK
+                Ground truth from the street
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">

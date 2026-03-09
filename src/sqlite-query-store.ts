@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { normalizeQueryResult } from "./attachments";
 import { getRuntimeConfig } from "./config";
 import type {
+  BountyInfo,
   PaymentStatus,
   Query,
   QueryResult,
@@ -49,6 +50,9 @@ function migrate(db: Database) {
   if (!columns.some((column) => column.name === "requester_meta")) {
     db.exec("ALTER TABLE queries ADD COLUMN requester_meta TEXT");
   }
+  if (!columns.some((column) => column.name === "bounty")) {
+    db.exec("ALTER TABLE queries ADD COLUMN bounty TEXT");
+  }
 }
 
 interface QueryRow {
@@ -61,6 +65,7 @@ interface QueryRow {
   created_at: number;
   expires_at: number;
   requester_meta: string | null;
+  bounty: string | null;
   submitted_at: number | null;
   result: string | null;
   verification: string | null;
@@ -80,6 +85,7 @@ function rowToQuery(row: QueryRow): Query {
     created_at: row.created_at,
     expires_at: row.expires_at,
     requester_meta: row.requester_meta ? JSON.parse(row.requester_meta) as RequesterMeta : undefined,
+    bounty: row.bounty ? JSON.parse(row.bounty) as BountyInfo : undefined,
     submitted_at: row.submitted_at ?? undefined,
     result,
     verification: row.verification ? JSON.parse(row.verification) : undefined,
@@ -91,8 +97,8 @@ function rowToQuery(row: QueryRow): Query {
 export function insertQueryRecord(query: Query): void {
   const db = getDb();
   db.prepare(`
-    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, requester_meta, payment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO queries (id, type, status, params, challenge_nonce, challenge_rule, created_at, expires_at, requester_meta, bounty, payment_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     query.id,
     query.type,
@@ -103,6 +109,7 @@ export function insertQueryRecord(query: Query): void {
     query.created_at,
     query.expires_at,
     query.requester_meta ? JSON.stringify(query.requester_meta) : null,
+    query.bounty ? JSON.stringify(query.bounty) : null,
     query.payment_status,
   );
 }
