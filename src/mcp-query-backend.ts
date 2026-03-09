@@ -1,105 +1,70 @@
-import { buildAttachmentAbsoluteUrl, buildAttachmentHandle, materializeQueryResult, renderStoredAttachmentPreview, statStoredAttachment } from "./attachments";
+import {
+  buildAttachmentAbsoluteUrl,
+  buildAttachmentHandle,
+  materializeQueryResult,
+  renderStoredAttachmentPreview,
+  statStoredAttachment,
+} from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { publishQueryToNostr } from "./nostr/query-bridge";
 import { isNostrEnabled } from "./nostr/client";
-import { cancelQuery, createQuery, getQuery, listOpenQueries, submitQueryResult, type Query, type QueryInput, type QueryResult } from "./query-service";
-import type { AttachmentRef, AttachmentHandle, RequesterMeta } from "./types";
+import { publishQueryToNostr } from "./nostr/query-bridge";
+import {
+  cancelQuery,
+  createQuery,
+  getQuery,
+  listOpenQueries,
+  submitQueryResult,
+} from "./query-service";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "./types";
 
 const runtimeConfig = getRuntimeConfig();
-const referenceBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
+const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
 
-interface CreatedQueryPayload {
-  query_id: string;
-  type: string;
-  status: string;
-  challenge_nonce: string;
-  challenge_rule: string;
-  expires_at: string;
-  requester_meta: RequesterMeta | null;
-  reference_app_url: string;
-  query_api_url: string;
-}
-
-interface QueryStatusPayload {
-  query_id: string;
-  type: string;
-  status: string;
-  requester_meta: RequesterMeta | null;
-  payment_status: string;
-  expires_in_seconds: number;
-  result: QueryResult | null;
-  verification: Query["verification"] | null;
-  submission_meta: Query["submission_meta"] | null;
-  attachment_count?: number;
-  attachments?: AttachmentHandle[];
-  attachment_access?: string | null;
-}
-
-interface AttachmentPayload {
-  query_id: string;
-  attachment_index: number;
-  attachment: AttachmentHandle["attachment"];
-  access: AttachmentHandle["access"];
-  attachment_view_url?: string;
-  attachment_meta_url?: string;
-  filename?: string | null;
-  attachment_path?: string | null;
-  absolute_url: string;
-  local_file_path?: string | null;
-  storage_kind: string;
-  mime_type: string;
-  size_bytes: number | null;
-  preview_hint?: string;
-}
-
-interface AttachmentPreviewPayload {
-  query_id: string;
-  attachment_index: number;
-  attachment: AttachmentHandle["attachment"];
-  access: AttachmentHandle["access"];
-  original_size_bytes?: number | null;
-  preview_size_bytes?: number | null;
-  preview_mime_type?: string | null;
-  max_dimension?: number | null;
-  error?: string;
-  hint?: string;
-}
+// --- Shared types for MCP tool responses ---
 
 interface McpQueryBackend {
-  createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta, oracleIds?: string[]): Promise<CreatedQueryPayload>;
-  getQueryStatus(queryId: string): Promise<QueryStatusPayload | { error: string }>;
-  listAvailableQueries(): Promise<Array<{ query_id: string; type: string; challenge_rule: string; expires_in_seconds: number }>>;
+  createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta, oracleIds?: string[]): Promise<unknown>;
+  getQueryStatus(queryId: string): Promise<unknown>;
+  listAvailableQueries(): Promise<unknown>;
   cancelQuery(queryId: string): Promise<unknown>;
   submitQueryResult(queryId: string, result: QueryResult, oracleId?: string): Promise<unknown>;
-  getQueryAttachment(queryId: string, attachmentIndex: number): Promise<AttachmentPayload | { error: string }>;
+  getQueryAttachment(queryId: string, attachmentIndex: number): Promise<unknown>;
   getQueryAttachmentPreview(
     queryId: string,
     attachmentIndex: number,
     maxDimension?: number,
-  ): Promise<{ payload: AttachmentPreviewPayload; image?: { data: string; mimeType: string } }>;
+  ): Promise<{ payload: unknown; image?: { data: string; mimeType: string } }>;
 }
 
-function buildCreatedQueryPayload(query: Query): CreatedQueryPayload {
+// --- Shared helpers ---
+
+function getPhotoAttachments(query: Query): AttachmentRef[] | null {
+  if (query.result?.type === "photo_proof") return query.result.attachments;
+  return null;
+}
+
+function buildCreatedPayload(query: Query, baseUrl: string) {
   return {
     query_id: query.id,
-    status: query.status,
     type: query.type,
+    status: query.status,
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: new Date(query.expires_at).toISOString(),
     requester_meta: query.requester_meta ?? null,
-    reference_app_url: `${referenceBaseUrl}/queries/${query.id}`,
-    query_api_url: `${referenceBaseUrl}/queries/${query.id}`,
+    reference_app_url: `${baseUrl}/queries/${query.id}`,
+    query_api_url: `${baseUrl}/queries/${query.id}`,
   };
 }
 
-function buildLocalQueryStatusPayload(query: Query): QueryStatusPayload {
-  const result = query.result ? materializeQueryResult(query.result, referenceBaseUrl) : null;
-  const payload: QueryStatusPayload = {
+function buildStatusPayload(query: Query, baseUrl: string) {
+  const result = query.result ? materializeQueryResult(query.result, baseUrl) : null;
+  const payload: Record<string, unknown> = {
     query_id: query.id,
     type: query.type,
     status: query.status,
     requester_meta: query.requester_meta ?? null,
+    oracle_id: query.assigned_oracle_id ?? null,
     payment_status: query.payment_status,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
     result,
@@ -107,9 +72,9 @@ function buildLocalQueryStatusPayload(query: Query): QueryStatusPayload {
     submission_meta: query.submission_meta ?? null,
   };
 
-  if (query.type === "photo_proof") {
-    const attachments = query.result?.type === "photo_proof"
-      ? query.result.attachments.map((attachment, index) => buildAttachmentHandle(query.id, index, attachment, referenceBaseUrl))
+  if (query.type === "photo_proof" || (query.type === "store_status" && result?.type === "store_status")) {
+    const attachments = result?.type === "photo_proof"
+      ? result.attachments.map((att: AttachmentRef, i: number) => buildAttachmentHandle(query.id, i, att, baseUrl))
       : [];
     payload.attachment_count = attachments.length;
     payload.attachments = attachments;
@@ -121,106 +86,99 @@ function buildLocalQueryStatusPayload(query: Query): QueryStatusPayload {
   return payload;
 }
 
-function getLocalPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
-  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") {
-    return null;
-  }
-
-  return query.result.attachments;
-}
-
-function buildRemoteBaseUrl() {
-  const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
-  const remoteApiKey = process.env.REMOTE_QUERY_API_KEY?.trim() || process.env.HTTP_API_KEY?.trim() || "";
-  return remoteBaseUrl ? { remoteBaseUrl, remoteApiKey } : null;
-}
-
-async function parseJsonResponse(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (!text) return null;
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Expected JSON but received: ${text.slice(0, 200)}`);
-  }
-}
-
-function remoteRequestHeaders(apiKey: string, init?: HeadersInit): Headers {
-  const headers = new Headers(init);
-  if (apiKey) {
-    headers.set("x-api-key", apiKey);
-  }
-  return headers;
-}
-
-function buildRemoteQueryStatusPayload(query: Record<string, unknown>): QueryStatusPayload {
-  const result = (query.result as QueryResult | undefined) ?? null;
-  const basePayload: QueryStatusPayload = {
-    query_id: String(query.id),
-    type: String(query.type),
-    status: String(query.status),
-    requester_meta: (query.requester_meta as RequesterMeta | undefined) ?? null,
-    payment_status: String(query.payment_status ?? ""),
-    expires_in_seconds: Number(query.expires_in_seconds ?? 0),
-    result,
-    verification: (query.verification as Query["verification"] | undefined) ?? null,
-    submission_meta: (query.submission_meta as Query["submission_meta"] | undefined) ?? null,
+async function buildAttachmentPayload(query: Query, ref: AttachmentRef, index: number, baseUrl: string) {
+  const stat = await statStoredAttachment(ref, baseUrl);
+  const handle = buildAttachmentHandle(query.id, index, ref, baseUrl);
+  return {
+    query_id: query.id,
+    attachment_index: index,
+    attachment: handle.attachment,
+    access: {
+      ...handle.access,
+      preview_url: handle.access.preview_url ?? undefined,
+      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
+    },
+    filename: stat?.filename ?? handle.attachment.filename ?? null,
+    absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(ref, baseUrl),
+    local_file_path: stat?.path ?? null,
+    storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
+    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
+    size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
+    preview_hint: "Use get_query_attachment_preview for a resized inline preview image.",
   };
-
-  if (basePayload.type === "photo_proof" && result?.type === "photo_proof") {
-    const attachments = result.attachments.map((attachment, index) =>
-      buildAttachmentHandle(basePayload.query_id, index, attachment, buildRemoteBaseUrl()!.remoteBaseUrl)
-    );
-    basePayload.attachment_count = attachments.length;
-    basePayload.attachments = attachments;
-    basePayload.attachment_access = attachments.length > 0
-      ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
-      : null;
-  }
-
-  return basePayload;
 }
 
-function createLocalMcpQueryBackend(): McpQueryBackend {
+async function buildPreviewPayload(
+  query: Query,
+  ref: AttachmentRef,
+  index: number,
+  baseUrl: string,
+  maxDimension?: number,
+): Promise<{ payload: unknown; image?: { data: string; mimeType: string } }> {
+  const handle = buildAttachmentHandle(query.id, index, ref, baseUrl);
+  const stat = await statStoredAttachment(ref, baseUrl);
+  if (!stat) {
+    return { payload: { query_id: query.id, attachment_index: index, attachment: handle.attachment, access: handle.access, error: "Attachment file not found" } };
+  }
+
+  const preview = await renderStoredAttachmentPreview(ref, baseUrl, {
+    maxDimension: maxDimension ?? runtimeConfig.previewMaxDimension,
+  });
+
+  if (!preview) {
+    return { payload: { query_id: query.id, attachment_index: index, attachment: handle.attachment, access: handle.access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs or inspect the image in the browser." } };
+  }
+
+  return {
+    payload: {
+      query_id: query.id,
+      attachment_index: index,
+      attachment: handle.attachment,
+      access: { ...handle.access, preview_url: `${handle.access.preview_url}?max_dimension=${preview.maxDimension}` },
+      original_size_bytes: stat.size,
+      preview_size_bytes: preview.size,
+      preview_mime_type: preview.mimeType,
+      max_dimension: preview.maxDimension,
+    },
+    image: { data: preview.data, mimeType: preview.mimeType },
+  };
+}
+
+function errorPayload(queryId: string, index: number, message: string) {
+  return { payload: { query_id: queryId, attachment_index: index, attachment: {} as AttachmentHandle["attachment"], access: {} as AttachmentHandle["access"], error: message } };
+}
+
+// --- Local backend ---
+
+function createLocalBackend(): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
       const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
-
-      // Also publish to Nostr relays if configured
       if (isNostrEnabled()) {
         const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-        publishQueryToNostr(input, {
-          ttlMs: ttlSeconds * 1000,
-          regionCode: regionHint,
-        }).catch((err) =>
-          console.error("[mcp-backend] Nostr publish failed:", err)
+        publishQueryToNostr(input, { ttlMs: ttlSeconds * 1000, regionCode: regionHint }).catch((err) =>
+          console.error("[mcp-backend] Nostr publish failed:", err),
         );
       }
-
-      return buildCreatedQueryPayload(query);
+      return buildCreatedPayload(query, localBaseUrl);
     },
     async getQueryStatus(queryId) {
       const query = getQuery(queryId);
-      return query ? buildLocalQueryStatusPayload(query) : { error: "Query not found" };
+      return query ? buildStatusPayload(query, localBaseUrl) : { error: "Query not found" };
     },
     async listAvailableQueries() {
-      return listOpenQueries().map((query) => ({
-        query_id: query.id,
-        type: query.type,
-        challenge_rule: query.challenge_rule,
-        expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
+      return listOpenQueries().map((q) => ({
+        query_id: q.id,
+        type: q.type,
+        challenge_rule: q.challenge_rule,
+        expires_in_seconds: Math.max(0, Math.floor((q.expires_at - Date.now()) / 1000)),
       }));
     },
     async cancelQuery(queryId) {
       return cancelQuery(queryId);
     },
     async submitQueryResult(queryId, result, oracleId) {
-      const outcome = await submitQueryResult(queryId, result, {
-        executor_type: "agent",
-        channel: "mcp",
-      }, oracleId);
-
+      const outcome = await submitQueryResult(queryId, result, { executor_type: "agent", channel: "mcp" }, oracleId);
       return {
         ok: outcome.ok,
         message: outcome.message,
@@ -233,227 +191,113 @@ function createLocalMcpQueryBackend(): McpQueryBackend {
     async getQueryAttachment(queryId, attachmentIndex) {
       const query = getQuery(queryId);
       if (!query) return { error: "Query not found" };
-
-      const attachments = getLocalPhotoProofAttachmentRefs(query);
+      const attachments = getPhotoAttachments(query);
       if (!attachments) return { error: "Query does not have photo proof attachments" };
-
-      const attachmentRef = attachments[attachmentIndex];
-      if (!attachmentRef) return { error: `Attachment index ${attachmentIndex} not found` };
-
-      const attachmentInfo = await statStoredAttachment(attachmentRef);
-      if (!attachmentInfo) return { error: "Attachment file not found" };
-
-      const handle = buildAttachmentHandle(query.id, attachmentIndex, attachmentRef, referenceBaseUrl);
-      return {
-        query_id: query.id,
-        attachment_index: attachmentIndex,
-        attachment: handle.attachment,
-        access: {
-          ...handle.access,
-          preview_url: handle.access.preview_url ?? undefined,
-          local_file_path: attachmentInfo.path ?? handle.access.local_file_path ?? undefined,
-        },
-        attachment_view_url: handle.access.view_url,
-        attachment_meta_url: handle.access.meta_url,
-        filename: attachmentInfo.filename,
-        attachment_path: attachmentInfo.routePath ?? null,
-        absolute_url: attachmentInfo.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachmentRef),
-        local_file_path: attachmentInfo.path ?? null,
-        storage_kind: attachmentInfo.storageKind,
-        mime_type: attachmentInfo.mimeType,
-        size_bytes: attachmentInfo.size,
-        preview_hint: "Use get_query_attachment_preview for a resized inline preview image.",
-      };
+      const ref = attachments[attachmentIndex];
+      if (!ref) return { error: `Attachment index ${attachmentIndex} not found` };
+      return buildAttachmentPayload(query, ref, attachmentIndex, localBaseUrl);
     },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
       const query = getQuery(queryId);
-      if (!query) return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment: {} as AttachmentHandle["attachment"], access: {} as AttachmentHandle["access"], error: "Query not found" } };
-
-      const attachments = getLocalPhotoProofAttachmentRefs(query);
-      if (!attachments) {
-        return {
-          payload: {
-            query_id: query.id,
-            attachment_index: attachmentIndex,
-            attachment: {} as AttachmentHandle["attachment"],
-            access: {} as AttachmentHandle["access"],
-            error: "Query does not have photo proof attachments",
-          },
-        };
-      }
-
-      const attachmentRef = attachments[attachmentIndex];
-      if (!attachmentRef) {
-        return {
-          payload: {
-            query_id: query.id,
-            attachment_index: attachmentIndex,
-            attachment: {} as AttachmentHandle["attachment"],
-            access: {} as AttachmentHandle["access"],
-            error: `Attachment index ${attachmentIndex} not found`,
-          },
-        };
-      }
-
-      const attachmentInfo = await statStoredAttachment(attachmentRef);
-      if (!attachmentInfo) {
-        return {
-          payload: {
-            query_id: query.id,
-            attachment_index: attachmentIndex,
-            attachment: {} as AttachmentHandle["attachment"],
-            access: {} as AttachmentHandle["access"],
-            error: "Attachment file not found",
-          },
-        };
-      }
-
-      const handle = buildAttachmentHandle(query.id, attachmentIndex, attachmentRef, referenceBaseUrl);
-      const preview = await renderStoredAttachmentPreview(attachmentRef, referenceBaseUrl, {
-        maxDimension: maxDimension ?? runtimeConfig.previewMaxDimension,
-      });
-
-      if (!preview) {
-        return {
-          payload: {
-            query_id: query.id,
-            attachment_index: attachmentIndex,
-            attachment: handle.attachment,
-            access: handle.access,
-            error: "Preview could not be generated",
-            hint: "Use get_query_attachment for original URLs or inspect the image in the browser.",
-          },
-        };
-      }
-
-      return {
-        payload: {
-          query_id: query.id,
-          attachment_index: attachmentIndex,
-          attachment: handle.attachment,
-          access: {
-            ...handle.access,
-            preview_url: `${handle.access.preview_url}?max_dimension=${preview.maxDimension}`,
-          },
-          original_size_bytes: attachmentInfo.size,
-          preview_size_bytes: preview.size,
-          preview_mime_type: preview.mimeType,
-          max_dimension: preview.maxDimension,
-        },
-        image: {
-          data: preview.data,
-          mimeType: preview.mimeType,
-        },
-      };
+      if (!query) return errorPayload(queryId, attachmentIndex, "Query not found");
+      const attachments = getPhotoAttachments(query);
+      if (!attachments) return errorPayload(queryId, attachmentIndex, "Query does not have photo proof attachments");
+      const ref = attachments[attachmentIndex];
+      if (!ref) return errorPayload(queryId, attachmentIndex, `Attachment index ${attachmentIndex} not found`);
+      return buildPreviewPayload(query, ref, attachmentIndex, localBaseUrl, maxDimension);
     },
   };
 }
 
-function createRemoteMcpQueryBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
-  async function requestJson(path: string, init?: RequestInit) {
-    const response = await fetch(`${remoteBaseUrl}${path}`, {
-      ...init,
-      headers: remoteRequestHeaders(remoteApiKey, init?.headers),
-    });
-    const json = await parseJsonResponse(response);
+// --- Remote backend ---
+
+function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
+  async function fetchJson(path: string, init?: RequestInit) {
+    const headers = new Headers(init?.headers);
+    if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
+    const response = await fetch(`${remoteBaseUrl}${path}`, { ...init, headers });
+    const text = await response.text();
+    const json = text ? JSON.parse(text) : null;
     return { response, json };
-  }
-
-  async function getQueryAttachment(queryId: string, attachmentIndex: number): Promise<AttachmentPayload | { error: string }> {
-    const { response, json } = await requestJson(`/queries/${queryId}/attachments/${attachmentIndex}/meta`);
-    if (response.status === 404) return { error: "Attachment not found" };
-    if (!response.ok) {
-      throw new Error(`Remote attachment lookup failed: ${response.status} ${JSON.stringify(json)}`);
-    }
-
-    return {
-      ...(json as AttachmentPayload),
-      preview_hint: "Use get_query_attachment_preview for a resized inline preview image.",
-    };
   }
 
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
-      const body = { ...input, ttl_seconds: ttlSeconds, requester: requesterMeta, oracle_ids: oracleIds };
-      const { response, json } = await requestJson("/queries", {
+      const { response, json } = await fetchJson("/queries", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...input, ttl_seconds: ttlSeconds, requester: requesterMeta, oracle_ids: oracleIds }),
       });
-
-      if (!response.ok) {
-        throw new Error(`Remote query creation failed: ${response.status} ${JSON.stringify(json)}`);
-      }
-
-      return json as CreatedQueryPayload;
+      if (!response.ok) throw new Error(`Remote query creation failed: ${response.status} ${JSON.stringify(json)}`);
+      return json;
     },
     async getQueryStatus(queryId) {
-      const { response, json } = await requestJson(`/queries/${queryId}`);
+      const { response, json } = await fetchJson(`/queries/${queryId}`);
       if (response.status === 404) return { error: "Query not found" };
-      if (!response.ok) {
-        throw new Error(`Remote query lookup failed: ${response.status} ${JSON.stringify(json)}`);
+      if (!response.ok) throw new Error(`Remote query lookup failed: ${response.status}`);
+      // Enrich with attachment handles for photo_proof
+      const data = json as Record<string, unknown>;
+      const result = data.result as QueryResult | undefined;
+      if (data.type === "photo_proof" && result?.type === "photo_proof") {
+        const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
+          buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
+        );
+        data.attachment_count = attachments.length;
+        data.attachments = attachments;
+        data.attachment_access = attachments.length > 0
+          ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
+          : null;
       }
-      return buildRemoteQueryStatusPayload(json as Record<string, unknown>);
+      return data;
     },
     async listAvailableQueries() {
-      const { response, json } = await requestJson("/queries");
-      if (!response.ok) {
-        throw new Error(`Remote query listing failed: ${response.status} ${JSON.stringify(json)}`);
-      }
-
-      return (json as Array<Record<string, unknown>>).map((query) => ({
-        query_id: String(query.id),
-        type: String(query.type),
-        challenge_rule: String(query.challenge_rule),
-        expires_in_seconds: Number(query.expires_in_seconds ?? 0),
+      const { response, json } = await fetchJson("/queries");
+      if (!response.ok) throw new Error(`Remote query listing failed: ${response.status}`);
+      return (json as Array<Record<string, unknown>>).map((q) => ({
+        query_id: String(q.id),
+        type: String(q.type),
+        challenge_rule: String(q.challenge_rule),
+        expires_in_seconds: Number(q.expires_in_seconds ?? 0),
       }));
     },
     async cancelQuery(queryId) {
-      const { json } = await requestJson(`/queries/${queryId}/cancel`, { method: "POST" });
+      const { json } = await fetchJson(`/queries/${queryId}/cancel`, { method: "POST" });
       return json;
     },
     async submitQueryResult(queryId, result, oracleId) {
-      const { json } = await requestJson(`/queries/${queryId}/submit`, {
+      const { json } = await fetchJson(`/queries/${queryId}/submit`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ...result, oracle_id: oracleId }),
       });
       return json;
     },
-    getQueryAttachment,
+    async getQueryAttachment(queryId, attachmentIndex) {
+      const { response, json } = await fetchJson(`/queries/${queryId}/attachments/${attachmentIndex}/meta`);
+      if (response.status === 404) return { error: "Attachment not found" };
+      if (!response.ok) throw new Error(`Remote attachment lookup failed: ${response.status}`);
+      return { ...(json as Record<string, unknown>), preview_hint: "Use get_query_attachment_preview for a resized inline preview image." };
+    },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
-      const attachment = await getQueryAttachment(queryId, attachmentIndex);
-      if ("error" in attachment) {
-        return {
-          payload: {
-            query_id: queryId,
-            attachment_index: attachmentIndex,
-            attachment: {} as AttachmentHandle["attachment"],
-            access: {} as AttachmentHandle["access"],
-            error: attachment.error,
-          },
-        };
+      // First get attachment meta
+      const meta = await this.getQueryAttachment(queryId, attachmentIndex);
+      if (meta && typeof meta === "object" && "error" in meta) {
+        return errorPayload(queryId, attachmentIndex, (meta as { error: string }).error);
       }
+      const metaData = meta as Record<string, unknown>;
+      const attachment = (metaData.attachment ?? {}) as AttachmentHandle["attachment"];
+      const access = (metaData.access ?? {}) as AttachmentHandle["access"];
 
-      const previewUrl = new URL(attachment.access.preview_url ?? `${remoteBaseUrl}/queries/${queryId}/attachments/${attachmentIndex}/preview`);
-      if (maxDimension) {
-        previewUrl.searchParams.set("max_dimension", String(maxDimension));
-      }
+      const previewUrl = new URL(
+        (access.preview_url as string) ?? `${remoteBaseUrl}/queries/${queryId}/attachments/${attachmentIndex}/preview`,
+      );
+      if (maxDimension) previewUrl.searchParams.set("max_dimension", String(maxDimension));
 
-      const response = await fetch(previewUrl, {
-        headers: remoteRequestHeaders(remoteApiKey),
-      });
+      const headers = new Headers();
+      if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
+      const response = await fetch(previewUrl, { headers });
       if (!response.ok) {
-        return {
-          payload: {
-            query_id: queryId,
-            attachment_index: attachmentIndex,
-            attachment: attachment.attachment,
-            access: attachment.access,
-            error: "Preview could not be generated",
-            hint: "Use get_query_attachment for original URLs or inspect the image in the browser.",
-          },
-        };
+        return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment, access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs." } };
       }
 
       const bytes = Buffer.from(await response.arrayBuffer());
@@ -462,29 +306,26 @@ function createRemoteMcpQueryBackend(remoteBaseUrl: string, remoteApiKey: string
         payload: {
           query_id: queryId,
           attachment_index: attachmentIndex,
-          attachment: attachment.attachment,
-          access: {
-            ...attachment.access,
-            preview_url: previewUrl.toString(),
-          },
-          original_size_bytes: attachment.size_bytes,
+          attachment,
+          access: { ...access, preview_url: previewUrl.toString() },
+          original_size_bytes: metaData.size_bytes ?? null,
           preview_size_bytes: bytes.length,
           preview_mime_type: mimeType,
           max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
         },
-        image: {
-          data: bytes.toString("base64"),
-          mimeType,
-        },
+        image: { data: bytes.toString("base64"), mimeType },
       };
     },
   };
 }
 
+// --- Factory ---
+
 export function getMcpQueryBackend(): McpQueryBackend {
-  const remoteConfig = buildRemoteBaseUrl();
-  if (remoteConfig) {
-    return createRemoteMcpQueryBackend(remoteConfig.remoteBaseUrl, remoteConfig.remoteApiKey);
+  const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
+  const remoteApiKey = process.env.REMOTE_QUERY_API_KEY?.trim() || process.env.HTTP_API_KEY?.trim() || "";
+  if (remoteBaseUrl) {
+    return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }
-  return createLocalMcpQueryBackend();
+  return createLocalBackend();
 }

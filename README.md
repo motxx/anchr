@@ -246,11 +246,13 @@ src/
 
 ## Roadmap
 
-- [x] Deterministic oracle verification with mutual selection
-- [ ] Cashu P2PK payment escrow
-- [ ] Direct worker-to-oracle HTTP endpoint (Tor-compatible)
-- [ ] Nostr-native serverless protocol
-- [ ] Worker claim step
+- [x] EXIF stripping, C2PA validation, AI content check
+- [x] Nostr protocol layer (events, encryption, relay client)
+- [x] Oracle system with mutual selection
+- [ ] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
+- [ ] Worker-to-oracle direct HTTP endpoint (Tor-compatible)
+- [ ] Worker-side storage (EXIF strip + Blossom encrypted upload)
+- [ ] Remove central server dependency (Nostr-native protocol)
 - [ ] Umbrel app packaging
 
 ## Contributing
