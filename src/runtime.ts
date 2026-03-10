@@ -1,4 +1,5 @@
 import { getRuntimeConfig } from "./config";
+import { purgeExpiredQueries } from "./data-purge";
 import { startMcpServer } from "./mcp-server";
 import { expireQueries } from "./query-service";
 import { startReferenceApp } from "./reference-app";
@@ -9,10 +10,15 @@ export interface ReferenceRuntime {
 
 export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
   const config = getRuntimeConfig();
-  const scheduler = setInterval(() => {
+  const scheduler = setInterval(async () => {
     const expired = expireQueries();
     if (expired > 0) {
       console.error(`[scheduler] Expired ${expired} query(s)`);
+    }
+    // Purge expired data (files + DB records) for privacy
+    const purged = await purgeExpiredQueries();
+    if (purged > 0) {
+      console.error(`[scheduler] Purged ${purged} expired query(s) and their data`);
     }
   }, config.querySweepIntervalMs);
 

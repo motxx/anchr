@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test, beforeEach } from "bun:test";
 import {
   createQueryService,
   type Query,
@@ -8,6 +8,21 @@ import {
   type QueryStore,
 } from "./query-service";
 import type { PaymentStatus, SubmissionMeta, VerificationDetail } from "./types";
+import { storeIntegrity, clearIntegrityStore } from "./verification/integrity-store";
+
+beforeEach(() => {
+  clearIntegrityStore();
+});
+
+function injectValidC2pa(attachmentId: string, queryId: string) {
+  storeIntegrity({
+    attachmentId,
+    queryId,
+    capturedAt: Date.now(),
+    exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+    c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "test.jpg" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+  });
+}
 
 function createInMemoryQueryService(): QueryService {
   const queries = new Map<string, Query>();
@@ -32,6 +47,7 @@ function createInMemoryQueryService(): QueryService {
       newStatus: QueryStatus,
       paymentStatus: PaymentStatus,
       submissionMeta: SubmissionMeta,
+      assignedOracleId?: string,
     ) {
       const query = queries.get(id);
       if (!query) return;
@@ -43,6 +59,7 @@ function createInMemoryQueryService(): QueryService {
         verification: structuredClone(verification),
         submission_meta: structuredClone(submissionMeta),
         payment_status: paymentStatus,
+        assigned_oracle_id: assignedOracleId,
       });
     },
     updateQueryStatus(id, status, paymentStatus) {
@@ -84,7 +101,7 @@ test("query service approves valid store status submissions", async () => {
   const outcome = await service.submitQueryResult(query.id, {
     type: "store_status",
     status: "open",
-    notes: `Observed storefront ${query.challenge_nonce}`,
+    notes: "Observed storefront, looked open",
   }, {
     executor_type: "human",
     channel: "worker_api",
@@ -137,6 +154,51 @@ test("query service cancels pending queries", () => {
   expect(service.getQuery(query.id)?.status).toBe("rejected");
 });
 
+test("query service stores oracle_ids from options", () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery(
+    { type: "store_status", store_name: "Test" },
+    { oracleIds: ["oracle-a", "oracle-b"] },
+  );
+
+  expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
+});
+
+test("query service records assigned_oracle_id on submission", async () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery({
+    type: "store_status",
+    store_name: "Test Ramen",
+  });
+
+  const outcome = await service.submitQueryResult(
+    query.id,
+    { type: "store_status", status: "open" },
+    { executor_type: "human", channel: "worker_api" },
+  );
+
+  expect(outcome.ok).toBe(true);
+  expect(outcome.query?.assigned_oracle_id).toBe("built-in");
+});
+
+test("query service rejects submission with unacceptable oracle", async () => {
+  const service = createInMemoryQueryService();
+  const query = service.createQuery(
+    { type: "store_status", store_name: "Test" },
+    { oracleIds: ["oracle-x"] },
+  );
+
+  const outcome = await service.submitQueryResult(
+    query.id,
+    { type: "store_status", status: "open" },
+    { executor_type: "human", channel: "worker_api" },
+    "built-in", // not in oracle_ids
+  );
+
+  expect(outcome.ok).toBe(false);
+  expect(outcome.message).toContain("not available or not accepted");
+});
+
 test("query service materializes local attachment refs before approval", async () => {
   const service = createInMemoryQueryService();
   const query = service.createQuery({
@@ -144,6 +206,7 @@ test("query service materializes local attachment refs before approval", async (
     target: "Storefront",
   });
 
+  injectValidC2pa("example.png", query.id);
   const outcome = await service.submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,

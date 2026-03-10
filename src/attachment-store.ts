@@ -1,7 +1,8 @@
-import { createHmac, createHash } from "node:crypto";
+import { S3Client } from "bun";
 import { extname, join } from "node:path";
 import { attachmentPublicBaseUrl } from "./attachments";
 import { DEFAULT_UPLOADS_DIR } from "./config";
+import { withPrivacyPipeline } from "./privacy-pipeline";
 import type { AttachmentRef, AttachmentStorageKind } from "./types";
 
 export interface UploadedAttachment {
@@ -15,7 +16,7 @@ export interface UploadedAttachment {
   storageKind: AttachmentStorageKind;
 }
 
-interface AttachmentStore {
+export interface AttachmentStore {
   put(queryId: string, file: File, requestUrl: string): Promise<UploadedAttachment>;
 }
 
@@ -24,22 +25,6 @@ const LOCAL_UPLOADS_DIR = DEFAULT_UPLOADS_DIR;
 function sanitizeExt(fileName: string): string {
   const ext = extname(fileName).toLowerCase();
   return ext || ".bin";
-}
-
-function sha256Hex(data: Buffer | string): string {
-  return createHash("sha256").update(data).digest("hex");
-}
-
-function hmacSha256(key: Buffer | string, data: string): Buffer {
-  return createHmac("sha256", key).update(data).digest();
-}
-
-function isoDate(now: Date): string {
-  return now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-}
-
-function shortDate(now: Date): string {
-  return isoDate(now).slice(0, 8);
 }
 
 function awsUriEncode(path: string): string {
@@ -55,7 +40,9 @@ class LocalAttachmentStore implements AttachmentStore {
     const ext = sanitizeExt(file.name);
     const filename = `${queryId}_${Date.now()}${ext}`;
     const path = join(LOCAL_UPLOADS_DIR, filename);
-    await Bun.write(path, file);
+
+    const body = Buffer.from(await file.arrayBuffer());
+    await Bun.write(path, body);
 
     const attachmentRef = `/uploads/${filename}`;
     const attachment: AttachmentRef = {
@@ -64,7 +51,7 @@ class LocalAttachmentStore implements AttachmentStore {
       mime_type: file.type || "application/octet-stream",
       storage_kind: "local",
       filename,
-      size_bytes: file.size,
+      size_bytes: body.length,
       local_file_path: path,
       route_path: attachmentRef,
     };
@@ -75,7 +62,7 @@ class LocalAttachmentStore implements AttachmentStore {
       filename,
       localFilePath: path,
       mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
+      sizeBytes: body.length,
       storageKind: "local",
     };
   }
@@ -95,7 +82,7 @@ interface S3Config {
 function getS3Config(): S3Config {
   const storage = process.env.ATTACHMENT_STORAGE ?? "local";
   if (storage === "localstack") {
-    const bucket = process.env.LOCALSTACK_BUCKET ?? "human-calling";
+    const bucket = process.env.LOCALSTACK_BUCKET ?? "anchr";
     const endpoint = trimTrailingSlash(process.env.LOCALSTACK_ENDPOINT ?? "http://localhost:4566");
     const publicBaseUrl = trimTrailingSlash(
       process.env.LOCALSTACK_PUBLIC_BASE_URL ?? `${endpoint}/${bucket}`,
@@ -143,74 +130,26 @@ function getS3Config(): S3Config {
 }
 
 class S3AttachmentStore implements AttachmentStore {
-  constructor(private readonly config: S3Config) {}
+  private client: S3Client;
+
+  constructor(private readonly config: S3Config) {
+    this.client = new S3Client({
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey,
+      sessionToken: config.sessionToken,
+      bucket: config.bucket,
+      endpoint: config.endpoint,
+      region: config.region,
+    });
+  }
 
   async put(queryId: string, file: File): Promise<UploadedAttachment> {
     const ext = sanitizeExt(file.name);
     const prefix = this.config.prefix ? `${this.config.prefix}/` : "";
     const key = `${prefix}${queryId}/${Date.now()}${ext}`;
-    const objectPath = `/${this.config.bucket}/${awsUriEncode(key)}`;
-    const url = new URL(objectPath, `${this.config.endpoint}/`);
     const body = Buffer.from(await file.arrayBuffer());
-    const payloadHash = sha256Hex(body);
-    const now = new Date();
-    const amzDate = isoDate(now);
-    const dateStamp = shortDate(now);
 
-    const headers: Record<string, string> = {
-      host: url.host,
-      "content-length": String(body.length),
-      "content-type": file.type || "application/octet-stream",
-      "x-amz-content-sha256": payloadHash,
-      "x-amz-date": amzDate,
-    };
-    if (this.config.sessionToken) {
-      headers["x-amz-security-token"] = this.config.sessionToken;
-    }
-
-    const signedHeaderNames = Object.keys(headers).sort();
-    const canonicalHeaders = signedHeaderNames
-      .map((name) => `${name}:${headers[name]!.trim()}\n`)
-      .join("");
-    const signedHeaders = signedHeaderNames.join(";");
-    const canonicalRequest = [
-      "PUT",
-      url.pathname,
-      "",
-      canonicalHeaders,
-      signedHeaders,
-      payloadHash,
-    ].join("\n");
-
-    const credentialScope = `${dateStamp}/${this.config.region}/s3/aws4_request`;
-    const stringToSign = [
-      "AWS4-HMAC-SHA256",
-      amzDate,
-      credentialScope,
-      sha256Hex(canonicalRequest),
-    ].join("\n");
-
-    const kDate = hmacSha256(`AWS4${this.config.secretAccessKey}`, dateStamp);
-    const kRegion = hmacSha256(kDate, this.config.region);
-    const kService = hmacSha256(kRegion, "s3");
-    const kSigning = hmacSha256(kService, "aws4_request");
-    const signature = createHmac("sha256", kSigning).update(stringToSign).digest("hex");
-
-    headers.authorization = [
-      `AWS4-HMAC-SHA256 Credential=${this.config.accessKeyId}/${credentialScope}`,
-      `SignedHeaders=${signedHeaders}`,
-      `Signature=${signature}`,
-    ].join(", ");
-
-    const response = await fetch(url, {
-      method: "PUT",
-      headers,
-      body,
-    });
-
-    if (!response.ok) {
-      throw new Error(`S3 upload failed with ${response.status}: ${await response.text()}`);
-    }
+    await this.client.write(key, body, { type: file.type || "application/octet-stream" });
 
     const filename = key.split("/").pop() ?? `${queryId}${ext}`;
     const absoluteUrl = `${this.config.publicBaseUrl}/${awsUriEncode(key)}`;
@@ -234,9 +173,17 @@ class S3AttachmentStore implements AttachmentStore {
   }
 }
 
-export function getAttachmentStore(): AttachmentStore {
+function getRawStore(): AttachmentStore {
   if (["s3", "r2", "localstack"].includes(process.env.ATTACHMENT_STORAGE ?? "local")) {
     return new S3AttachmentStore(getS3Config());
   }
   return new LocalAttachmentStore();
+}
+
+/**
+ * Returns a store wrapped with the privacy pipeline:
+ * EXIF stripping → storage → optional Blossom mirror.
+ */
+export function getAttachmentStore(): AttachmentStore {
+  return withPrivacyPipeline(getRawStore());
 }

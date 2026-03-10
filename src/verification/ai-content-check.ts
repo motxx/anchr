@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readStoredAttachmentBuffer } from "./attachments";
-import { getRuntimeConfig } from "./config";
-import type { AttachmentRef, Query, QueryResult } from "./types";
+import { readStoredAttachmentBuffer } from "../attachments";
+import { getRuntimeConfig } from "../config";
+import type { AttachmentRef, Query, QueryResult } from "../types";
 
 export interface ContentCheckResult {
   passed: boolean;
@@ -35,9 +35,12 @@ function isVideoMime(mime: string): boolean {
 }
 
 function getClient(): Anthropic | null {
-  const apiKey = getRuntimeConfig().anthropicApiKey;
-  if (!apiKey) return null;
-  return new Anthropic({ apiKey });
+  const config = getRuntimeConfig();
+  // AI content check must be explicitly opted in (AI_CONTENT_CHECK=true)
+  // to avoid sending user photos to third-party APIs without consent
+  if (!config.aiContentCheckEnabled) return null;
+  if (!config.anthropicApiKey) return null;
+  return new Anthropic({ apiKey: config.anthropicApiKey });
 }
 
 async function extractVideoFrames(
@@ -48,7 +51,7 @@ async function extractVideoFrames(
   const ffmpeg = Bun.which("ffmpeg");
   if (!ffmpeg) return [];
 
-  const tempDir = await mkdtemp(join(tmpdir(), "human-calling-frames-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "anchr-frames-"));
   const inputPath = join(tempDir, `input${inputExt}`);
   const outputPattern = join(tempDir, "frame_%03d.jpg");
 
@@ -80,13 +83,19 @@ async function extractVideoFrames(
 }
 
 function buildPrompt(query: Query): string {
-  const target = (query.params as { target?: string }).target ?? JSON.stringify(query.params);
+  const params = query.params as unknown as Record<string, unknown>;
+  const target = params.target ?? params.store_name ?? JSON.stringify(params);
+  const nonce = query.challenge_nonce;
   return [
     `You are verifying a photo/video submission for the following query:`,
     `"${target}"`,
     ``,
-    `Does the image(s) show content relevant to this query? Answer in the following JSON format only:`,
-    `{"relevant": true or false, "reason": "brief explanation in the language of the query target"}`,
+    `Check TWO things:`,
+    `1. Does the image show content relevant to this query?`,
+    `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
+    ``,
+    `Both must be true to pass. Answer in the following JSON format only:`,
+    `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query target"}`,
   ].join("\n");
 }
 
@@ -125,9 +134,15 @@ export async function checkAttachmentContent(
   const client = getClient();
   if (!client) return null;
 
-  if (result.type !== "photo_proof") return null;
+  const attachments = result.type === "photo_proof"
+    ? result.attachments
+    : result.type === "store_status" && "attachments" in result
+      ? (result as { attachments?: AttachmentRef[] }).attachments
+      : undefined;
 
-  const images = await loadImageContent(result.attachments);
+  if (!attachments?.length) return null;
+
+  const images = await loadImageContent(attachments);
   if (images.length === 0) return null;
 
   const prompt = buildPrompt(query);
@@ -154,10 +169,11 @@ export async function checkAttachmentContent(
       return { passed: true, reason: "AI response could not be parsed; skipping check" };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; reason: string };
+    const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; nonce_visible: boolean; reason: string };
+    const passed = Boolean(parsed.relevant) && Boolean(parsed.nonce_visible);
     return {
-      passed: Boolean(parsed.relevant),
-      reason: parsed.reason || (parsed.relevant ? "Content matches query" : "Content does not match query"),
+      passed,
+      reason: parsed.reason || (passed ? "Content matches query with visible nonce" : "Content or nonce check failed"),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -7,7 +7,9 @@ const runDir = join(rootDir, ".local", "run");
 const pidFile = join(runDir, "reference-app.pid");
 const logFile = join(runDir, "reference-app.log");
 const referencePort = Number(process.env.REFERENCE_APP_PORT ?? "3000");
-const localstackHealthUrl = "http://localhost:4566/_localstack/health";
+const localstackEndpoint = "http://localhost:4566";
+const localstackBucket = "anchr";
+const localstackHealthUrl = `${localstackEndpoint}/_localstack/health`;
 const referenceHealthUrl = `http://localhost:${referencePort}/health`;
 
 const appBootstrap = [
@@ -15,8 +17,8 @@ const appBootstrap = [
   `process.env.REFERENCE_APP_PORT ??= "${referencePort}";`,
   'process.env.ATTACHMENT_STORAGE ??= "localstack";',
   'process.env.LOCALSTACK_ENDPOINT ??= "http://localhost:4566";',
-  'process.env.LOCALSTACK_BUCKET ??= "human-calling";',
-  'process.env.LOCALSTACK_PUBLIC_BASE_URL ??= "http://localhost:4566/human-calling";',
+  'process.env.LOCALSTACK_BUCKET ??= "anchr";',
+  'process.env.LOCALSTACK_PUBLIC_BASE_URL ??= "http://localhost:4566/anchr";',
   'const { startReferenceApp } = await import("./src/reference-app.ts");',
   "await startReferenceApp();",
   "await new Promise(() => {});",
@@ -30,6 +32,22 @@ function ensureLocalstack() {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+}
+
+function ensureS3Bucket() {
+  spawnSync("aws", [
+    "--endpoint-url", localstackEndpoint,
+    "s3", "mb", `s3://${localstackBucket}`,
+  ], {
+    cwd: rootDir,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      AWS_ACCESS_KEY_ID: "test",
+      AWS_SECRET_ACCESS_KEY: "test",
+      AWS_DEFAULT_REGION: "us-east-1",
+    },
+  });
 }
 
 function readExistingPid(): number | null {
@@ -69,6 +87,7 @@ mkdirSync(runDir, { recursive: true });
 
 ensureLocalstack();
 await waitFor(localstackHealthUrl, "localstack", 15_000);
+ensureS3Bucket();
 
 const existingPid = readExistingPid();
 if (existingPid && isRunning(existingPid)) {
