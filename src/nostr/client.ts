@@ -1,5 +1,5 @@
 /**
- * Nostr relay client for Ground Truth Protocol (NIP-90 DVM).
+ * Nostr relay client for Anchr (NIP-90 DVM).
  *
  * Handles connection to multiple relays, event publishing,
  * and subscription management. Event kinds follow the NIP-90
@@ -9,8 +9,8 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { GT_QUERY_REQUEST, GT_QUERY_RESPONSE, GT_QUERY_SETTLEMENT } from "./events";
-import { GT_ORACLE_ATTESTATION } from "./oracle-attestation";
+import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_SETTLEMENT } from "./events";
+import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation";
 
 export interface NostrClientConfig {
   relayUrls: string[];
@@ -69,7 +69,7 @@ export async function publishEvent(
 }
 
 /**
- * Subscribe to Ground Truth query request events (DVM kind 5300).
+ * Subscribe to Anchr query request events (DVM kind 5300).
  */
 export function subscribeToQueries(
   onEvent: (event: Event) => void,
@@ -83,8 +83,8 @@ export function subscribeToQueries(
   const pool = getPool();
 
   const filter: Filter = {
-    kinds: [GT_QUERY_REQUEST],
-    "#t": ["ground-truth"],
+    kinds: [ANCHR_QUERY_REQUEST],
+    "#t": ["anchr"],
     since: Math.floor(Date.now() / 1000) - 3600, // last hour
   };
 
@@ -110,7 +110,7 @@ export function subscribeToResponses(
   const pool = getPool();
 
   return pool.subscribeMany(urls, {
-    kinds: [GT_QUERY_RESPONSE],
+    kinds: [ANCHR_QUERY_RESPONSE],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -130,7 +130,7 @@ export function subscribeToSettlements(
   const pool = getPool();
 
   return pool.subscribeMany(urls, {
-    kinds: [GT_QUERY_SETTLEMENT],
+    kinds: [ANCHR_QUERY_SETTLEMENT],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -150,7 +150,7 @@ export function subscribeToAttestations(
   const pool = getPool();
 
   return pool.subscribeMany(urls, {
-    kinds: [GT_ORACLE_ATTESTATION],
+    kinds: [ANCHR_ORACLE_ATTESTATION],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -172,8 +172,8 @@ export async function fetchRecentQueries(
   const pool = getPool();
 
   const filter: Filter = {
-    kinds: [GT_QUERY_REQUEST],
-    "#t": ["ground-truth"],
+    kinds: [ANCHR_QUERY_REQUEST],
+    "#t": ["anchr"],
     since: Math.floor(Date.now() / 1000) - 3600,
     limit: options?.limit ?? 50,
   };

@@ -70,7 +70,7 @@ export async function publishQueryToNostr(
 
   const identity = generateEphemeralIdentity();
   const nonce = generateNonce();
-  const queryId = `gt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const queryId = `anchr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   const payload: QueryRequestPayload = {
     type: input.type,

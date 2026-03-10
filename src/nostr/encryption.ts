@@ -1,5 +1,5 @@
 /**
- * Encryption utilities for Ground Truth Protocol over Nostr.
+ * Encryption utilities for Anchr over Nostr.
  *
  * Two modes:
  * 1. Region-key encryption: Derive a shared key from region code.
@@ -13,7 +13,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { nip44 } from "nostr-tools";
 
-const PROTOCOL_VERSION = "ground-truth:v1";
+const PROTOCOL_VERSION = "anchr:v1";
 
 /**
  * Derive a region key from a region code (e.g., "IR", "CN", "JP").

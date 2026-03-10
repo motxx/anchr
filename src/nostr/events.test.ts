@@ -7,9 +7,9 @@ import {
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   parseQuerySettlementPayload,
-  GT_QUERY_REQUEST,
-  GT_QUERY_RESPONSE,
-  GT_QUERY_SETTLEMENT,
+  ANCHR_QUERY_REQUEST,
+  ANCHR_QUERY_RESPONSE,
+  ANCHR_QUERY_SETTLEMENT,
   type QueryRequestPayload,
 } from "./events";
 
@@ -25,7 +25,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
 
     const event = buildQueryRequestEvent(identity, "query_123", payload, "IR");
 
-    expect(event.kind).toBe(GT_QUERY_REQUEST);
+    expect(event.kind).toBe(ANCHR_QUERY_REQUEST);
     expect(event.kind).toBe(5300); // DVM Job Request
     expect(event.pubkey).toBe(identity.publicKey);
 
@@ -34,7 +34,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(dTag?.[1]).toBe("query_123");
 
     const tTags = event.tags.filter((t) => t[0] === "t");
-    expect(tTags.some((t) => t[1] === "ground-truth")).toBe(true);
+    expect(tTags.some((t) => t[1] === "anchr")).toBe(true);
     expect(tTags.some((t) => t[1] === "photo_proof")).toBe(true);
 
     const regionTag = event.tags.find((t) => t[0] === "region");
@@ -101,7 +101,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       },
     );
 
-    expect(response.kind).toBe(GT_QUERY_RESPONSE);
+    expect(response.kind).toBe(ANCHR_QUERY_RESPONSE);
     expect(response.pubkey).toBe(worker.publicKey);
 
     // Requester can decrypt
@@ -131,7 +131,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       },
     );
 
-    expect(settlement.kind).toBe(GT_QUERY_SETTLEMENT);
+    expect(settlement.kind).toBe(ANCHR_QUERY_SETTLEMENT);
 
     // Check tags
     const eTags = settlement.tags.filter((t) => t[0] === "e");

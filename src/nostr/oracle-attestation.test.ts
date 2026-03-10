@@ -4,7 +4,7 @@ import {
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,
-  GT_ORACLE_ATTESTATION,
+  ANCHR_ORACLE_ATTESTATION,
 } from "./oracle-attestation";
 import type { OracleAttestation } from "../oracle/types";
 
@@ -27,7 +27,7 @@ test("buildOracleAttestationEvent creates valid event", () => {
     attestation,
   );
 
-  expect(event.kind).toBe(GT_ORACLE_ATTESTATION);
+  expect(event.kind).toBe(ANCHR_ORACLE_ATTESTATION);
   expect(event.pubkey).toBe(oracleIdentity.publicKey);
 
   // Tags

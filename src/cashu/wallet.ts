@@ -1,5 +1,5 @@
 /**
- * Cashu ecash wallet for Ground Truth Protocol.
+ * Cashu ecash wallet for Anchr.
  *
  * Provides anonymous payment capabilities:
  * - Mint tokens from a Cashu mint (backed by Lightning sats)

@@ -1,5 +1,5 @@
 /**
- * Oracle attestation events for Ground Truth Protocol.
+ * Oracle attestation events for Anchr.
  *
  * Kind 30103 - OracleAttestation: published by oracle after verification.
  * Publicly verifiable — anyone can check the oracle's signature and
@@ -10,7 +10,7 @@ import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-too
 import type { NostrIdentity } from "./identity";
 import type { OracleAttestation } from "../oracle/types";
 
-export const GT_ORACLE_ATTESTATION = 30103;
+export const ANCHR_ORACLE_ATTESTATION = 30103;
 
 export interface OracleAttestationPayload {
   oracle_id: string;
@@ -42,13 +42,13 @@ export function buildOracleAttestationEvent(
   };
 
   const template: EventTemplate = {
-    kind: GT_ORACLE_ATTESTATION,
+    kind: ANCHR_ORACLE_ATTESTATION,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["e", queryEventId],
       ["e", responseEventId],
       ["d", attestation.query_id],
-      ["t", "ground-truth"],
+      ["t", "anchr"],
       ["t", "attestation"],
       ["result", attestation.passed ? "pass" : "fail"],
     ],

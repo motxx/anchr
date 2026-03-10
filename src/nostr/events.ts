@@ -1,13 +1,13 @@
 /**
- * Ground Truth Protocol Nostr event builders and parsers.
+ * Anchr Nostr event builders and parsers.
  *
  * Uses NIP-90 Data Vending Machine (DVM) event kinds so that any
  * DVM-aware client can discover and interact with Anchr queries.
  *
  * Event kind mapping (GT constant → DVM kind):
- *   GT_QUERY_REQUEST   = 5300  (DVM Job Request)
- *   GT_QUERY_RESPONSE  = 6300  (DVM Job Result)
- *   GT_QUERY_SETTLEMENT = 7000 (DVM Job Feedback)
+ *   ANCHR_QUERY_REQUEST   = 5300  (DVM Job Request)
+ *   ANCHR_QUERY_RESPONSE  = 6300  (DVM Job Result)
+ *   ANCHR_QUERY_SETTLEMENT = 7000 (DVM Job Feedback)
  *
  * OracleAttestation (30103) remains a custom parametric-replaceable kind.
  */
@@ -16,11 +16,10 @@ import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-too
 import type { NostrIdentity } from "./identity";
 import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
 
-// NIP-90 DVM event kinds for Ground Truth Protocol.
-// Constant names kept as GT_* for backward compat; values are DVM kinds.
-export const GT_QUERY_REQUEST = 5300;   // was 30100 → DVM Job Request
-export const GT_QUERY_RESPONSE = 6300;  // was 30101 → DVM Job Result
-export const GT_QUERY_SETTLEMENT = 7000; // was 30102 → DVM Job Feedback
+// NIP-90 DVM event kinds for Anchr.
+export const ANCHR_QUERY_REQUEST = 5300;   // DVM Job Request
+export const ANCHR_QUERY_RESPONSE = 6300;  // DVM Job Result
+export const ANCHR_QUERY_SETTLEMENT = 7000; // DVM Job Feedback
 
 export interface QueryRequestPayload {
   type: string;
@@ -65,7 +64,7 @@ export interface QuerySettlementPayload {
  *   ["output", "application/json"] - expected result MIME type
  *   ["encrypted"]                 - signals that the result should be NIP-44 encrypted
  *   ["d", <queryId>]              - deduplication / replaceable-event tag
- *   ["t", "ground-truth"]         - protocol marker
+ *   ["t", "anchr"]                - protocol marker
  *   ["t", <query_type>]           - query type tag
  *   ["expiration", <unix>]        - NIP-40 expiration
  *   ["region", <code>]            - optional region filter
@@ -87,7 +86,7 @@ export function buildQueryRequestEvent(
     ["output", "application/json"],
     ["encrypted"],
     ["d", queryId],
-    ["t", "ground-truth"],
+    ["t", "anchr"],
     ["t", payload.type],
     ["expiration", String(Math.floor(payload.expires_at / 1000))],
   ];
@@ -102,7 +101,7 @@ export function buildQueryRequestEvent(
   }
 
   const template: EventTemplate = {
-    kind: GT_QUERY_REQUEST,
+    kind: ANCHR_QUERY_REQUEST,
     created_at: Math.floor(Date.now() / 1000),
     tags,
     content: JSON.stringify(payload),
@@ -136,7 +135,7 @@ export function buildQueryResponseEvent(
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
-    kind: GT_QUERY_RESPONSE,
+    kind: ANCHR_QUERY_RESPONSE,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["e", queryEventId],
@@ -163,7 +162,7 @@ export function buildQuerySettlementEvent(
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
-    kind: GT_QUERY_SETTLEMENT,
+    kind: ANCHR_QUERY_SETTLEMENT,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["e", queryEventId],

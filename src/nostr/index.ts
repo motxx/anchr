@@ -15,9 +15,9 @@ export {
   regionKeyHex,
 } from "./encryption";
 export {
-  GT_QUERY_REQUEST,
-  GT_QUERY_RESPONSE,
-  GT_QUERY_SETTLEMENT,
+  ANCHR_QUERY_REQUEST,
+  ANCHR_QUERY_RESPONSE,
+  ANCHR_QUERY_SETTLEMENT,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
@@ -40,7 +40,7 @@ export {
   closePool,
 } from "./client";
 export {
-  GT_ORACLE_ATTESTATION,
+  ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,

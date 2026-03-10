@@ -167,7 +167,7 @@ export async function createNostrQuery(
 ): Promise<Query | null> {
   const identity = generateEphemeralIdentity();
   const nonce = generateNonce();
-  const queryId = `gt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const queryId = `anchr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const ttlMs = options?.ttlMs ?? 600_000;
   const expiresAt = Date.now() + ttlMs;
 
