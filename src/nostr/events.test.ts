@@ -13,8 +13,8 @@ import {
   type QueryRequestPayload,
 } from "./events";
 
-describe("Nostr events", () => {
-  test("builds and parses QueryRequest event", () => {
+describe("Nostr events (NIP-90 DVM)", () => {
+  test("builds and parses QueryRequest event with DVM tags", () => {
     const identity = generateEphemeralIdentity();
     const payload: QueryRequestPayload = {
       type: "photo_proof",
@@ -26,9 +26,10 @@ describe("Nostr events", () => {
     const event = buildQueryRequestEvent(identity, "query_123", payload, "IR");
 
     expect(event.kind).toBe(GT_QUERY_REQUEST);
+    expect(event.kind).toBe(5300); // DVM Job Request
     expect(event.pubkey).toBe(identity.publicKey);
 
-    // Check tags
+    // Check legacy tags
     const dTag = event.tags.find((t) => t[0] === "d");
     expect(dTag?.[1]).toBe("query_123");
 
@@ -39,6 +40,24 @@ describe("Nostr events", () => {
     const regionTag = event.tags.find((t) => t[0] === "region");
     expect(regionTag?.[1]).toBe("IR");
 
+    // Check NIP-90 DVM tags
+    const iTag = event.tags.find((t) => t[0] === "i");
+    expect(iTag?.[1]).toBe("テヘラン市街の様子");
+    expect(iTag?.[2]).toBe("text");
+
+    const nonceTag = event.tags.find((t) => t[0] === "param" && t[1] === "nonce");
+    expect(nonceTag?.[2]).toBe("K7P4");
+
+    const outputTag = event.tags.find((t) => t[0] === "output");
+    expect(outputTag?.[1]).toBe("application/json");
+
+    const encryptedTag = event.tags.find((t) => t[0] === "encrypted");
+    expect(encryptedTag).toBeTruthy();
+
+    // No bid tag when no bounty
+    const bidTag = event.tags.find((t) => t[0] === "bid");
+    expect(bidTag).toBeUndefined();
+
     // Parse content
     const parsed = parseQueryRequestPayload(event.content);
     expect(parsed.type).toBe("photo_proof");
@@ -46,7 +65,23 @@ describe("Nostr events", () => {
     expect(parsed.params.target).toBe("テヘラン市街の様子");
   });
 
-  test("builds and decrypts QueryResponse event", () => {
+  test("QueryRequest includes bid tag when bounty is present", () => {
+    const identity = generateEphemeralIdentity();
+    const payload: QueryRequestPayload = {
+      type: "photo_proof",
+      params: { target: "storefront" },
+      nonce: "B1C2",
+      bounty: { mint: "https://mint.example", token: "cashuAbc..." },
+      expires_at: Date.now() + 600_000,
+    };
+
+    const event = buildQueryRequestEvent(identity, "query_bid", payload);
+
+    const bidTag = event.tags.find((t) => t[0] === "bid");
+    expect(bidTag?.[1]).toBe("cashuAbc...");
+  });
+
+  test("builds and decrypts QueryResponse event (DVM kind 6300)", () => {
     const requester = generateEphemeralIdentity();
     const worker = generateEphemeralIdentity();
 
@@ -81,7 +116,7 @@ describe("Nostr events", () => {
     expect(parsed.attachments?.[0]?.blossom_hash).toBe("sha256:deadbeef");
   });
 
-  test("builds and decrypts QuerySettlement event", () => {
+  test("builds and decrypts QuerySettlement event (DVM kind 7000)", () => {
     const requester = generateEphemeralIdentity();
     const worker = generateEphemeralIdentity();
 

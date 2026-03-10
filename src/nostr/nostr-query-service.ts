@@ -303,9 +303,9 @@ export async function listNostrQueries(options?: {
  * This is the key function that replaces the central server's role:
  * 1. Resolve oracle (respects mutual selection)
  * 2. Run deterministic verification
- * 3. Publish OracleAttestation (30103) to relays
+ * 3. Publish OracleAttestation (kind 30103) to relays
  * 4. Execute Cashu P2PK escrow swap (if bounty exists)
- * 5. Publish Settlement (7000) to relay (with Cashu token if passed)
+ * 5. Publish DVM Job Feedback / Settlement (kind 7000) to relay (with Cashu token if passed)
  */
 export async function verifyAndSettle(
   queryId: string,

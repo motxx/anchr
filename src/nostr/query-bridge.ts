@@ -1,8 +1,9 @@
 /**
  * Query Bridge: connects the existing QueryService with the Nostr protocol layer.
  *
- * Requester side: Creates queries via Nostr events, monitors for responses
- * Worker side: Listens for query events, submits responses via Nostr
+ * Requester side: Creates queries via NIP-90 DVM Job Request (kind 5300),
+ *   monitors for DVM Job Result responses (kind 6300).
+ * Worker side: Listens for DVM job requests, submits responses via Nostr.
  *
  * This bridge allows the existing HTTP API and MCP tools to work alongside
  * the Nostr protocol. When NOSTR_RELAYS is configured, queries are also

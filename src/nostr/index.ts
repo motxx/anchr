@@ -1,8 +1,9 @@
 /**
- * Anchr Nostr protocol layer.
+ * Anchr Nostr protocol layer (NIP-90 DVM compatible).
  *
  * Provides decentralized query distribution and encrypted
- * communication over the Nostr relay network.
+ * communication over the Nostr relay network using NIP-90
+ * Data Vending Machine event kinds (5300/6300/7000).
  */
 
 export { generateEphemeralIdentity, restoreIdentity, type NostrIdentity } from "./identity";
