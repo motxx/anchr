@@ -5,6 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { UPLOADS_DIR } from "./attachments";
 import { createQuery, queryTemplates, submitQueryResult } from "./query-service";
+import { storeIntegrity } from "./verification/integrity-store";
 import type { AttachmentRef } from "./types";
 
 const PNG_BYTES = Buffer.from(
@@ -69,6 +70,14 @@ test("mcp tools expose query status and attachment metadata", async () => {
     local_file_path: localPath,
     route_path: `/uploads/${filename}`,
   };
+  storeIntegrity({
+    attachmentId: filename,
+    queryId: query.id,
+    capturedAt: Date.now(),
+    exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+    c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: filename }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+  });
+
   const outcome = await submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,

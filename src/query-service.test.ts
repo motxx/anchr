@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test, beforeEach } from "bun:test";
 import {
   createQueryService,
   type Query,
@@ -8,6 +8,21 @@ import {
   type QueryStore,
 } from "./query-service";
 import type { PaymentStatus, SubmissionMeta, VerificationDetail } from "./types";
+import { storeIntegrity, clearIntegrityStore } from "./verification/integrity-store";
+
+beforeEach(() => {
+  clearIntegrityStore();
+});
+
+function injectValidC2pa(attachmentId: string, queryId: string) {
+  storeIntegrity({
+    attachmentId,
+    queryId,
+    capturedAt: Date.now(),
+    exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+    c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "test.jpg" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+  });
+}
 
 function createInMemoryQueryService(): QueryService {
   const queries = new Map<string, Query>();
@@ -191,6 +206,7 @@ test("query service materializes local attachment refs before approval", async (
     target: "Storefront",
   });
 
+  injectValidC2pa("example.png", query.id);
   const outcome = await service.submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,

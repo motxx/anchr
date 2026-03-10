@@ -2,6 +2,7 @@ import { mkdirSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import { UPLOADS_DIR } from "./attachments";
 import { createQuery, getQuery, queryTemplates } from "./query-service";
+import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 
 function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
@@ -63,6 +64,15 @@ test("worker api supports photo proof upload, submission, and attachment metadat
     uploadedLocalPath = uploadJson.attachment.local_file_path;
     expect(uploadJson.attachment.storage_kind).toBe("local");
     expect(uploadJson.attachment.uri).toContain("/uploads/");
+
+    // Override integrity record with valid C2PA for test (real uploads would have C2PA-signed photos)
+    storeIntegrity({
+      attachmentId: uploadJson.attachment.id,
+      queryId: query.id,
+      capturedAt: Date.now(),
+      exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+      c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+    });
 
     const submitResponse = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",

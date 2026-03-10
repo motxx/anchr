@@ -11,8 +11,8 @@ const JPEG_APP1 = 0xffe1;
 const JPEG_SOS = 0xffda;
 
 /**
- * Strip EXIF from JPEG by removing APP1 (Exif) segments.
- * Preserves image quality — no re-encoding.
+ * Strip EXIF from JPEG by removing APP1 (Exif/XMP) segments.
+ * Preserves C2PA/JUMBF (APP11) and image quality — no re-encoding.
  */
 function stripJpegExif(data: Buffer): Buffer {
   if (data.length < 2) return data;
@@ -80,28 +80,47 @@ function stripJpegExif(data: Buffer): Buffer {
 }
 
 /**
- * Strip EXIF using external tools (for non-JPEG formats like PNG, HEIC, WebP).
- * Falls back to returning original data if no tool available.
+ * Strip EXIF using exiftool (preserves C2PA/JUMBF), falling back to
+ * ImageMagick/sips (which destroy C2PA). Returns original data if no tool.
  */
 async function stripExifWithTool(data: Buffer, ext: string): Promise<Buffer> {
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");
 
-  // Try magick (ImageMagick) first, then sips on macOS
-  const magick = Bun.which("magick");
-  const sips = process.platform === "darwin" ? "/usr/bin/sips" : null;
-
-  if (!magick && !sips) {
-    return data;
-  }
-
-  const tempDir = await mkdtemp(join(tmpdir(), "gt-exif-strip-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "anchr-exif-strip-"));
   const inputPath = join(tempDir, `input${ext}`);
   const outputPath = join(tempDir, `output${ext}`);
 
   try {
     await Bun.write(inputPath, data);
+
+    // Prefer exiftool: strips EXIF/XMP/IPTC but preserves JUMBF (C2PA)
+    const exiftool = Bun.which("exiftool");
+    if (exiftool) {
+      const { copyFile } = await import("node:fs/promises");
+      await copyFile(inputPath, outputPath);
+      const proc = Bun.spawn([exiftool, "-all=", "--jumbf:all", "-overwrite_original", outputPath], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      await proc.exited;
+      if (proc.exitCode === 0) {
+        const outputFile = Bun.file(outputPath);
+        if (await outputFile.exists()) {
+          return Buffer.from(await outputFile.arrayBuffer());
+        }
+      }
+      // Fall through to other tools if exiftool fails
+    }
+
+    // Fallback: magick/sips (WARNING: destroys C2PA)
+    const magick = Bun.which("magick");
+    const sips = process.platform === "darwin" ? "/usr/bin/sips" : null;
+
+    if (!magick && !sips) {
+      return data;
+    }
 
     let proc: ReturnType<typeof Bun.spawn>;
     if (magick) {
@@ -110,7 +129,6 @@ async function stripExifWithTool(data: Buffer, ext: string): Promise<Buffer> {
         stderr: "pipe",
       });
     } else {
-      // sips can only strip in-place for some formats
       const { copyFile } = await import("node:fs/promises");
       await copyFile(inputPath, outputPath);
       proc = Bun.spawn([sips!, "-d", "allExif", outputPath], {

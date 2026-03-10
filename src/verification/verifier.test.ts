@@ -1,6 +1,39 @@
-import { expect, test } from "bun:test";
+import { expect, test, beforeEach } from "bun:test";
 import { verify } from "./verifier";
+import { storeIntegrity, clearIntegrityStore } from "./integrity-store";
 import type { Query, QueryResult } from "../types";
+
+beforeEach(() => {
+  clearIntegrityStore();
+});
+
+/** Inject a valid C2PA integrity record for a given attachment + query. */
+function injectC2paIntegrity(attachmentId: string, queryId: string) {
+  storeIntegrity({
+    attachmentId,
+    queryId,
+    capturedAt: Date.now(),
+    exif: {
+      hasExif: false,
+      hasCameraModel: false,
+      hasGps: false,
+      hasTimestamp: false,
+      timestampRecent: false,
+      gpsNearHint: null,
+      metadata: {},
+      checks: [],
+      failures: [],
+    },
+    c2pa: {
+      available: true,
+      hasManifest: true,
+      signatureValid: true,
+      manifest: { title: "test.jpg", claimGenerator: "test" },
+      checks: ["C2PA manifest found", "C2PA signature valid"],
+      failures: [],
+    },
+  });
+}
 
 function makeQuery(overrides: Partial<Query>): Query {
   return {
@@ -76,7 +109,7 @@ test("webpage_field passes when proof text contains anchor word", async () => {
   expect(verification.failures).toHaveLength(0);
 });
 
-test("store_status with photo evidence passes", async () => {
+test("store_status with photo evidence passes (C2PA valid)", async () => {
   const query = makeQuery({
     type: "store_status",
     params: { type: "store_status", store_name: "Test Ramen" },
@@ -92,10 +125,42 @@ test("store_status with photo evidence passes", async () => {
     }],
   };
 
+  injectC2paIntegrity("photo1", query.id);
   const verification = await verify(query, result);
 
   expect(verification.passed).toBe(true);
   expect(verification.checks).toContain("photo attachment present");
+  expect(verification.checks).toContain("C2PA: valid Content Credentials signature");
+});
+
+test("store_status with photo but no C2PA fails", async () => {
+  const query = makeQuery({
+    type: "store_status",
+    params: { type: "store_status", store_name: "Test Ramen" },
+  });
+  const result: QueryResult = {
+    type: "store_status",
+    status: "open",
+    attachments: [{
+      id: "photo_no_c2pa",
+      uri: "/uploads/photo_no_c2pa.jpg",
+      mime_type: "image/jpeg",
+      storage_kind: "local",
+    }],
+  };
+
+  // Inject integrity record with NO C2PA manifest
+  storeIntegrity({
+    attachmentId: "photo_no_c2pa",
+    queryId: query.id,
+    capturedAt: Date.now(),
+    exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+    c2pa: { available: true, hasManifest: false, signatureValid: false, manifest: null, checks: [], failures: [] },
+  });
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain("C2PA: no Content Credentials found — use a C2PA-enabled camera");
 });
 
 test("store_status without photo evidence passes with weak verification", async () => {

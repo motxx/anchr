@@ -1,6 +1,9 @@
 import { checkAttachmentContent } from "./ai-content-check";
+import { validateC2pa } from "./c2pa-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
+import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import type {
+  AttachmentRef,
   PhotoProofResult,
   Query,
   QueryResult,
@@ -16,12 +19,12 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
   switch (query.type) {
     case "photo_proof":
       verifyPhotoProof(result as PhotoProofResult, checks, failures);
-      verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures);
+      await verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures);
       break;
     case "store_status":
       verifyStoreStatus(result as StoreStatusResult, checks, failures);
       if ((result as StoreStatusResult).attachments?.length) {
-        verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures);
+        await verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures);
       }
       break;
     case "webpage_field":
@@ -73,15 +76,15 @@ function verifyPhotoProof(
 /**
  * Verify photo integrity using pre-strip EXIF and C2PA metadata.
  *
- * These are advisory checks — they add information to the verification
- * detail but only fail for strong indicators of fabrication.
+ * C2PA is mandatory — photos without valid Content Credentials are rejected.
+ * EXIF checks are advisory (GPS, camera model add trust signals but don't fail).
  */
-function verifyPhotoIntegrity(
+async function verifyPhotoIntegrity(
   queryId: string,
   result: PhotoProofResult,
   checks: string[],
   failures: string[],
-): void {
+): Promise<void> {
   // Try to find integrity data for attachments in this result
   const integrityRecords = result.attachments
     .map((att) => getIntegrity(att.id))
@@ -95,19 +98,21 @@ function verifyPhotoIntegrity(
     }
   }
 
+  // No pre-upload integrity data — try direct C2PA validation on attachments
+  // This handles the decentralized path (Blossom download → C2PA check)
   if (integrityRecords.length === 0) {
-    checks.push("integrity: no pre-upload metadata available (skipped)");
+    await verifyC2paFromAttachments(result.attachments, checks, failures);
     return;
   }
 
   for (const record of integrityRecords) {
     const { exif, c2pa } = record;
 
-    // C2PA
+    // C2PA (mandatory)
     if (!c2pa.available) {
-      checks.push("C2PA: c2patool not available (skipped)");
+      failures.push("C2PA: c2patool not available — cannot verify Content Credentials");
     } else if (!c2pa.hasManifest) {
-      checks.push("C2PA: checked, no Content Credentials found");
+      failures.push("C2PA: no Content Credentials found — use a C2PA-enabled camera");
     } else if (c2pa.signatureValid) {
       checks.push("C2PA: valid Content Credentials signature");
     } else {
@@ -139,9 +144,67 @@ function verifyPhotoIntegrity(
         }
       }
     } else {
-      // No EXIF at all — suspicious for a camera photo
-      checks.push("EXIF: no metadata (possible AI-generated image or stripped before upload)");
+      // No EXIF at all — expected when worker stripped before upload
+      checks.push("EXIF: no metadata (stripped by worker for privacy)");
     }
+  }
+}
+
+/**
+ * Fetch Blossom attachments and run C2PA validation directly.
+ * Used in the decentralized path where no pre-upload integrity data exists.
+ */
+async function verifyC2paFromAttachments(
+  attachments: AttachmentRef[],
+  checks: string[],
+  failures: string[],
+): Promise<void> {
+  if (attachments.length === 0) return;
+
+  let validated = false;
+  for (const att of attachments) {
+    if (!att.mime_type?.startsWith("image/")) continue;
+
+    // Try to fetch from Blossom (decentralized path)
+    let data: Uint8Array | null = null;
+    if (att.storage_kind === "blossom") {
+      data = await fetchBlossomAttachment(att);
+    }
+
+    // Try to fetch from URL (local/external path)
+    if (!data && att.uri) {
+      try {
+        const response = await fetch(att.uri);
+        if (response.ok) {
+          data = new Uint8Array(await response.arrayBuffer());
+        }
+      } catch {
+        // fetch failed, continue
+      }
+    }
+
+    if (!data) {
+      failures.push("C2PA: could not retrieve attachment for verification");
+      continue;
+    }
+
+    const filename = att.filename ?? att.id ?? "photo.jpg";
+    const c2pa = await validateC2pa(Buffer.from(data), filename);
+
+    if (!c2pa.available) {
+      failures.push("C2PA: c2patool not available — cannot verify Content Credentials");
+    } else if (!c2pa.hasManifest) {
+      failures.push("C2PA: no Content Credentials found — use a C2PA-enabled camera");
+    } else if (c2pa.signatureValid) {
+      checks.push("C2PA: valid Content Credentials signature");
+    } else {
+      failures.push("C2PA: Content Credentials signature invalid");
+    }
+    validated = true;
+  }
+
+  if (!validated && attachments.some((a) => a.mime_type?.startsWith("image/"))) {
+    failures.push("C2PA: no image attachments could be verified");
   }
 }
 
