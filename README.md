@@ -1,8 +1,8 @@
 # Anchr
 
-匿名の現実世界検証プロトコル。[Nostr](https://nostr.com/) リレー上で動作し、[Cashu](https://cashu.space/) ecash で報酬を支払う。
+Anonymous real-world verification protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
 
-リクエスターがクエリ（写真証明・店舗状態・Webページフィールド）を投稿し、匿名のワーカーが実地で確認して結果を返す。決定論的オラクルが検証し、合格すればワーカーにecashが渡る。
+Requesters post queries (photo proof, store status, webpage field). Anonymous workers fulfill them on the ground. Deterministic oracles verify results; workers receive ecash on pass.
 
 ## How It Works
 
