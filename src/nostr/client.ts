@@ -9,6 +9,7 @@ import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
 import { GT_QUERY_REQUEST, GT_QUERY_RESPONSE, GT_QUERY_SETTLEMENT } from "./events";
+import { GT_ORACLE_ATTESTATION } from "./oracle-attestation";
 
 export interface NostrClientConfig {
   relayUrls: string[];
@@ -129,6 +130,26 @@ export function subscribeToSettlements(
 
   return pool.subscribeMany(urls, {
     kinds: [GT_QUERY_SETTLEMENT],
+    "#e": [queryEventId],
+  }, {
+    onevent: onEvent,
+  });
+}
+
+/**
+ * Subscribe to oracle attestations for a specific query.
+ */
+export function subscribeToAttestations(
+  queryEventId: string,
+  onEvent: (event: Event) => void,
+  relayUrls?: string[],
+): SubCloser {
+  const config = getNostrConfig();
+  const urls = relayUrls ?? config?.relayUrls ?? [];
+  const pool = getPool();
+
+  return pool.subscribeMany(urls, {
+    kinds: [GT_ORACLE_ATTESTATION],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,

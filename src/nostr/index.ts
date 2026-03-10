@@ -32,11 +32,19 @@ export {
   subscribeToQueries,
   subscribeToResponses,
   subscribeToSettlements,
+  subscribeToAttestations,
   fetchRecentQueries,
   isNostrEnabled,
   getNostrConfig,
   closePool,
 } from "./client";
+export {
+  GT_ORACLE_ATTESTATION,
+  buildOracleAttestationEvent,
+  parseOracleAttestationPayload,
+  toOracleAttestation,
+  type OracleAttestationPayload,
+} from "./oracle-attestation";
 export {
   publishQueryToNostr,
   listenForQueries,
@@ -44,3 +52,12 @@ export {
   type NostrQueryOptions,
   type NostrWorkerHandle,
 } from "./query-bridge";
+export {
+  createNostrQuery,
+  getNostrQuery,
+  listNostrQueries,
+  cancelNostrQuery,
+  verifyAndSettle,
+  expireNostrQueries,
+  activeQueryCount,
+} from "./nostr-query-service";

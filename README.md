@@ -200,6 +200,11 @@ Requester                     Worker                      Oracle
 | `ANTHROPIC_API_KEY` | — | Required when AI check is enabled |
 | `ATTACHMENT_STORAGE` | `local` | `local`, `s3`, `r2`, or `localstack` |
 | `REMOTE_QUERY_API_BASE_URL` | — | Remote backend for MCP proxy mode |
+| `NOSTR_RELAYS` | — | Comma-separated Nostr relay URLs |
+| `NOSTR_NATIVE` | `false` | Use Nostr as sole data layer (no SQLite) |
+| `BLOSSOM_SERVERS` | — | Comma-separated Blossom server URLs |
+| `ORACLE_PORT` | `4000` | Standalone oracle server port |
+| `ORACLE_API_KEY` | — | Oracle server authentication |
 
 <details>
 <summary>S3 / R2 / LocalStack variables</summary>
@@ -234,11 +239,11 @@ src/
   index.ts              SDK entrypoint
   query-service.ts      query lifecycle
   types.ts              shared types
-  oracle/               oracle interface, built-in oracle, registry
+  oracle/               oracle interface, built-in oracle, HTTP oracle, standalone server
   verification/         deterministic checks (EXIF, C2PA, AI content)
-  nostr/                Nostr protocol layer (NIP-44, events, relay)
-  cashu/                Cashu ecash payments
-  blossom/              content-addressed blob storage
+  nostr/                Nostr protocol layer (NIP-44, events, relay, Nostr-native query service)
+  cashu/                Cashu ecash payments and P2PK escrow
+  blossom/              content-addressed blob storage (encrypted, worker-side upload)
   worker-api.ts         HTTP API (Hono)
   mcp-server.ts         MCP stdio adapter
   ui/                   reference worker app (React)
@@ -252,7 +257,7 @@ src/
 - [x] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
 - [x] Worker-to-oracle direct HTTP endpoint (Tor-compatible)
 - [x] Worker-side storage (EXIF strip + Blossom encrypted upload)
-- [ ] Remove central server dependency (Nostr-native protocol)
+- [x] Nostr-native protocol (no central server dependency)
 - [ ] Umbrel app packaging
 
 ## Contributing
