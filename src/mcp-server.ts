@@ -24,7 +24,7 @@ export async function startMcpServer() {
     "request_photo_proof",
     "Request an anonymous human to photograph a real-world target and report what they see. " +
     "The reporter must include a one-time nonce to prove freshness. " +
-    "Use this to verify ground truth that cannot be determined from the internet alone. " +
+    "Use this to verify real-world facts that cannot be determined from the internet alone. " +
     "Photos are EXIF-stripped for reporter privacy. " +
     (isNostrEnabled() ? "Query is broadcast via Nostr relays. " : "") +
     (isCashuEnabled() ? "Bounty paid via Cashu ecash (anonymous). " : "") +
@@ -85,7 +85,7 @@ export async function startMcpServer() {
 
   server.tool(
     "get_query_status",
-    "Poll the status of a ground truth query. Returns status and verified result if available.",
+    "Poll the status of an Anchr query. Returns status and verified result if available.",
     {
       query_id: z.string().describe("Query ID returned from a request_* tool"),
     },
@@ -99,7 +99,7 @@ export async function startMcpServer() {
 
   server.tool(
     "cancel_query",
-    "Cancel a pending ground truth query.",
+    "Cancel a pending Anchr query.",
     {
       query_id: z.string().describe("Query ID to cancel"),
     },
@@ -113,7 +113,7 @@ export async function startMcpServer() {
 
   server.tool(
     "list_available_queries",
-    "List currently available ground truth queries waiting for a reporter.",
+    "List currently available Anchr queries waiting for a reporter.",
     {},
     async () => {
       const payload = await backend.listAvailableQueries();
@@ -125,7 +125,7 @@ export async function startMcpServer() {
 
   server.tool(
     "submit_query_result",
-    "Submit a result for a pending ground truth query. Normally reporters use the worker app, but this tool allows direct submission for testing.",
+    "Submit a result for a pending Anchr query. Normally reporters use the worker app, but this tool allows direct submission for testing.",
     {
       query_id: z.string().describe("Query ID to submit against"),
       result: z.record(z.string(), z.unknown()).describe("Result object matching the query type"),

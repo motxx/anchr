@@ -1,16 +1,62 @@
 # Anchr
 
-> Anonymous, censorship-resistant ground truth verification.
+> Anonymous, censorship-resistant real-world verification.
 
-Anchr is a protocol that connects requesters (AI agents, apps, humans) with anonymous reporters who provide real-world evidence — photos, observations, field data. Results are verified by deterministic oracles and paid via [Cashu](https://cashu.space/) ecash.
+Anchr connects requesters (AI agents, apps, humans) with anonymous reporters who provide first-hand evidence — photos, observations, field data. Results are verified by deterministic oracles and paid via [Cashu](https://cashu.space/) ecash over [Nostr](https://nostr.com/).
 
 **No KYC. No identity. Just facts and payment.**
 
+## How It Works
+
+```
+Requester                 Nostr Relay              Worker                    Oracle
+    |                         |                       |                        |
+    | 1. DVM Job Request      |                       |                        |
+    |    (kind 5300, tagged    |                       |                        |
+    |     "anchr" + Cashu      |                       |                        |
+    |     P2PK escrow token)   |                       |                        |
+    |------------------------>|                       |                        |
+    |                         |  2. pick up query     |                        |
+    |                         |---------------------->|                        |
+    |                         |                       |                        |
+    |                         |                       | 3. do the work:        |
+    |                         |                       |    photograph, observe  |
+    |                         |                       |    EXIF strip → encrypt |
+    |                         |                       |    → upload to Blossom  |
+    |                         |                       |                        |
+    |                         |  4. DVM Job Result    |                        |
+    |                         |     (kind 6300,       |                        |
+    |                         |      NIP-44 encrypted)|                        |
+    |                         |<----------------------|                        |
+    |                         |                       |                        |
+    | 5. receive response     |                       |                        |
+    |<------------------------|                       |                        |
+    |                         |                       |                        |
+    |                         |  6. OracleAttestation |                        |
+    |                         |     (kind 30103,      |                        |
+    |                         |      plaintext)       |                        |
+    |                         |<-----------------------------------------------|
+    |                         |                       |                        |
+    | 7. DVM Job Feedback     |                       |                        |
+    |    (kind 7000, Cashu    |                       |                        |
+    |     token inside)       |                       |                        |
+    |------------------------>|                       |                        |
+    |                         |  8. worker redeems    |                        |
+    |                         |     Cashu token       |                        |
+    |                         |---------------------->|                        |
+```
+
+**Oracle selection is mutual**: the requester specifies acceptable oracles; the worker picks one. This prevents collusion from either side. Verification is deterministic — anyone can reproduce the checks and prove if an oracle lied.
+
+**Payment is anonymous**: Cashu ecash tokens are locked with P2PK (NUT-11) 2-of-2 multisig (Oracle + Worker). On verification pass, the oracle co-signs a swap — worker gets the bounty minus fee. On failure, the token times out and the requester reclaims it. No Lightning invoices, no identity.
+
 ## Features
 
+- **NIP-90 DVM compatible** — standard Nostr Data Vending Machine event kinds (5300/6300/7000)
 - **Three query types** — photo proof, store status, webpage field extraction
 - **Oracle-verified** — deterministic checks (C2PA, EXIF, GPS, attachments) with mutual oracle selection
-- **Privacy-first** — EXIF stripping, Cashu ecash payments, Nostr relay encryption, ephemeral identities
+- **Privacy-first** — EXIF stripping, Cashu ecash, NIP-44 encryption, ephemeral identities
+- **Blossom storage** — content-addressed, AES-256-GCM encrypted blob storage
 - **MCP integration** — use as tools in Claude Desktop or any MCP-compatible client
 - **HTTP API** — create queries, upload attachments, submit results, poll status
 - **Reference worker app** — browser UI for reporters to pick up and fulfill queries
@@ -108,6 +154,21 @@ Available tools:
 
 To proxy through a remote deployment, set `REMOTE_QUERY_API_BASE_URL` and `REMOTE_QUERY_API_KEY` in the MCP env.
 
+### Nostr-Native Mode
+
+When `NOSTR_RELAYS` and `NOSTR_NATIVE=true` are set, Anchr operates without a central server:
+
+- Queries are published as DVM Job Requests (kind 5300) tagged `["t", "anchr"]`
+- Workers subscribe to relays, pick up jobs, and respond with DVM Job Results (kind 6300)
+- Oracle attestations are published as kind 30103 (plaintext, publicly verifiable)
+- Settlement happens via DVM Job Feedback (kind 7000) with Cashu tokens
+- All messages between requester and worker are NIP-44 encrypted
+- Each query uses an ephemeral keypair — no identity persistence
+
+```bash
+NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol NOSTR_NATIVE=true bun run start
+```
+
 ### HTTP API
 
 Write endpoints require `Authorization: Bearer <key>` or `X-API-Key` header when `HTTP_API_KEY` is set.
@@ -153,33 +214,6 @@ curl http://localhost:3000/oracles
 
 </details>
 
-## How It Works
-
-```
-Requester                     Worker                      Oracle
-    |                            |                           |
-    |  1. create query           |                           |
-    |  (type, params, bounty,    |                           |
-    |   acceptable oracle_ids)   |                           |
-    |                            |                           |
-    |         2. pick up query, do the work                  |
-    |                            |                           |
-    |                            |  3. submit evidence       |
-    |                            |     + select oracle_id    |
-    |                            |------------------------>  |
-    |                            |                           |
-    |                            |  4. deterministic verify  |
-    |                            |     (C2PA, EXIF, GPS...)  |
-    |                            |                           |
-    |                            |  5. attestation           |
-    |                            |  <-----------------------  |
-    |                            |                           |
-    |  6. result + attestation   |                           |
-    |  <-------------------------|                           |
-```
-
-**Oracle selection is mutual**: the requester specifies which oracles they accept; the worker picks one. This prevents collusion from either side. Verification is deterministic — anyone can reproduce the checks and prove if an oracle lied.
-
 ## Query Types
 
 | Type | Input | Output | Checks |
@@ -202,6 +236,7 @@ Requester                     Worker                      Oracle
 | `REMOTE_QUERY_API_BASE_URL` | — | Remote backend for MCP proxy mode |
 | `NOSTR_RELAYS` | — | Comma-separated Nostr relay URLs |
 | `NOSTR_NATIVE` | `false` | Use Nostr as sole data layer (no SQLite) |
+| `CASHU_MINT_URL` | — | Cashu mint URL for ecash payments |
 | `BLOSSOM_SERVERS` | — | Comma-separated Blossom server URLs |
 | `ORACLE_PORT` | `4000` | Standalone oracle server port |
 | `ORACLE_API_KEY` | — | Oracle server authentication |
@@ -216,6 +251,78 @@ Requester                     Worker                      Oracle
 | `LOCALSTACK_ENDPOINT`, `LOCALSTACK_BUCKET`, `LOCALSTACK_PUBLIC_BASE_URL` | LocalStack for local dev |
 
 </details>
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Nostr Relay Network                    │
+│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐ │
+│  │kind 5300 │  │kind 6300 │  │kind 30103 │  │kind 7000  │ │
+│  │Job Req   │  │Job Result│  │Attestation│  │Feedback   │ │
+│  └──────────┘  └──────────┘  └───────────┘  └───────────┘ │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+   ┌────▼────┐   ┌─────▼─────┐  ┌────▼────┐
+   │Requester│   │  Worker   │  │ Oracle  │
+   │         │   │           │  │         │
+   │ MCP /   │   │ Worker UI │  │Built-in │
+   │ HTTP /  │   │ or SDK    │  │or HTTP  │
+   │ SDK     │   │           │  │(Tor OK) │
+   └────┬────┘   └─────┬─────┘  └─────────┘
+        │              │
+        │         ┌────▼────┐
+        │         │ Blossom │  content-addressed
+        │         │ Storage │  AES-256-GCM encrypted
+        │         └─────────┘
+        │
+   ┌────▼──────────┐
+   │ Cashu Mint    │  anonymous ecash
+   │ (Lightning)   │  P2PK escrow (NUT-11)
+   └───────────────┘
+```
+
+Three backend modes:
+
+1. **Local** (default) — SQLite + optional Nostr broadcast
+2. **Remote** — HTTP proxy via `REMOTE_QUERY_API_BASE_URL`
+3. **Nostr-native** — `NOSTR_RELAYS` + `NOSTR_NATIVE=true`, no central server
+
+## Project Structure
+
+```
+src/
+  index.ts              SDK entrypoint
+  query-service.ts      query lifecycle (SQLite-backed)
+  types.ts              shared types
+  nostr/
+    events.ts           DVM event builders (kind 5300/6300/7000)
+    oracle-attestation.ts  kind 30103 attestation events
+    encryption.ts       NIP-44 + region-key encryption
+    identity.ts         ephemeral Nostr keypairs
+    client.ts           relay pool (publish, subscribe, fetch)
+    query-bridge.ts     connects QueryService ↔ Nostr relays
+    nostr-query-service.ts  full Nostr-native lifecycle
+  oracle/
+    built-in.ts         deterministic verification logic
+    oracle-server.ts    standalone HTTP oracle (Tor-compatible)
+    http-oracle.ts      HTTP oracle client
+    registry.ts         oracle discovery + mutual selection
+  cashu/
+    wallet.ts           Cashu mint/redeem/verify
+    escrow.ts           P2PK 2-of-2 multisig + timelock refund
+  blossom/
+    client.ts           Blossom download + decrypt
+    worker-upload.ts    EXIF strip → encrypt → upload
+    fetch-attachment.ts attachment fetcher for oracle verification
+  verification/         EXIF, C2PA, AI content checks
+  worker-api.ts         HTTP API (Hono)
+  mcp-server.ts         MCP stdio adapter
+  mcp-query-backend.ts  backend mode selector (local/remote/nostr)
+  ui/                   reference worker app (React)
+```
 
 ## Deployment
 
@@ -232,32 +339,16 @@ fly deploy
 
 GitHub Actions runs typecheck, tests, and Docker build on every push. Merges to main auto-deploy to Fly.io. Requires `FLY_API_TOKEN` secret.
 
-## Project Structure
-
-```
-src/
-  index.ts              SDK entrypoint
-  query-service.ts      query lifecycle
-  types.ts              shared types
-  oracle/               oracle interface, built-in oracle, HTTP oracle, standalone server
-  verification/         deterministic checks (EXIF, C2PA, AI content)
-  nostr/                Nostr protocol layer (NIP-44, events, relay, Nostr-native query service)
-  cashu/                Cashu ecash payments and P2PK escrow
-  blossom/              content-addressed blob storage (encrypted, worker-side upload)
-  worker-api.ts         HTTP API (Hono)
-  mcp-server.ts         MCP stdio adapter
-  ui/                   reference worker app (React)
-```
-
 ## Roadmap
 
 - [x] EXIF stripping, C2PA validation, AI content check
-- [x] Nostr protocol layer (events, encryption, relay client)
+- [x] Nostr protocol layer (NIP-44 encryption, relay client)
+- [x] NIP-90 DVM event kinds (5300/6300/7000)
 - [x] Oracle system with mutual selection
+- [x] Standalone oracle HTTP server (Tor-compatible)
 - [x] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
-- [x] Worker-to-oracle direct HTTP endpoint (Tor-compatible)
-- [x] Worker-side storage (EXIF strip + Blossom encrypted upload)
-- [x] Nostr-native protocol (no central server dependency)
+- [x] Worker-side Blossom storage (EXIF strip + AES-256-GCM + upload)
+- [x] Nostr-native mode (no central server dependency)
 - [ ] Umbrel app packaging
 
 ## Contributing
