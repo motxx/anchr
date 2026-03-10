@@ -6,6 +6,14 @@ Anchr connects requesters (AI agents, apps, humans) with anonymous reporters who
 
 **No KYC. No identity. Just facts and payment.**
 
+## Why
+
+Governments lie. Corporations lie. Media lies. But the storefront is either open or closed. The sign either says that price or it doesn't. The protest either happened or it didn't.
+
+Anchr is a tool for citizens to verify reality with first-hand evidence. Casual users earn ecash for checking shop hours (ポイ活); at-risk users use the same protocol to document what power wants hidden. The cover traffic is indistinguishable from the signal.
+
+*事実を知る自由は人権.*
+
 ## How It Works
 
 ```
@@ -50,6 +58,40 @@ Requester                 Nostr Relay              Worker                    Ora
 
 **Payment is anonymous**: Cashu ecash tokens are locked with P2PK (NUT-11) 2-of-2 multisig (Oracle + Worker). On verification pass, the oracle co-signs a swap — worker gets the bounty minus fee. On failure, the token times out and the requester reclaims it. No Lightning invoices, no identity.
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Nostr Relay Network                    │
+│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐ │
+│  │kind 5300 │  │kind 6300 │  │kind 30103 │  │kind 7000  │ │
+│  │Job Req   │  │Job Result│  │Attestation│  │Feedback   │ │
+│  └──────────┘  └──────────┘  └───────────┘  └───────────┘ │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+   ┌────▼────┐   ┌─────▼─────┐  ┌────▼────┐
+   │Requester│   │  Worker   │  │ Oracle  │
+   │         │   │           │  │         │
+   │ MCP /   │   │ Worker UI │  │Built-in │
+   │ HTTP /  │   │ or SDK    │  │or HTTP  │
+   │ SDK     │   │           │  │(Tor OK) │
+   └────┬────┘   └─────┬─────┘  └─────────┘
+        │              │
+        │         ┌────▼────┐
+        │         │ Blossom │  content-addressed
+        │         │ Storage │  AES-256-GCM encrypted
+        │         └─────────┘
+        │
+   ┌────▼──────────┐
+   │ Cashu Mint    │  anonymous ecash
+   │ (Lightning)   │  P2PK escrow (NUT-11)
+   └───────────────┘
+```
+
+Queries are stored in an in-memory Map and fire-and-forget published to Nostr relays when `NOSTR_RELAYS` is set. The relay network is the durable persistence layer; the in-memory store is a fast-access cache. For MCP proxy mode, set `REMOTE_QUERY_API_BASE_URL` to forward all operations to a remote Anchr instance over HTTP.
+
 ## Features
 
 - **NIP-90 DVM compatible** — standard Nostr Data Vending Machine event kinds (5300/6300/7000)
@@ -66,6 +108,7 @@ Requester                 Nostr Relay              Worker                    Ora
 ### Prerequisites
 
 - [Bun](https://bun.sh/) v1.3+
+- [Docker](https://www.docker.com/) (for local Nostr relay)
 
 ### Install
 
@@ -75,14 +118,25 @@ cd anchr
 bun install
 ```
 
+### Quick Demo
+
+Start a local Nostr relay and run the full query lifecycle:
+
+```bash
+bun run demo
+```
+
+This starts `docker compose` (Nostr relay on `localhost:7777`), creates queries, submits results, and verifies events on the relay.
+
 ### Run
 
 ```bash
 # Full service (MCP + HTTP + worker UI)
 bun run start
 
-# HTTP only
-bun run start:http
+# With local Nostr relay
+docker compose up -d
+NOSTR_RELAYS=ws://localhost:7777 bun run start
 
 # Development with watch
 bun run dev
@@ -93,7 +147,14 @@ The worker app is available at `http://localhost:3000`.
 ### Test
 
 ```bash
-bun test
+# Unit + integration tests
+bun run test
+
+# E2E tests (starts docker compose, tests against local relay)
+bun run test:e2e
+
+# All tests
+bun run test:all
 ```
 
 ## Usage
@@ -154,9 +215,9 @@ Available tools:
 
 To proxy through a remote deployment, set `REMOTE_QUERY_API_BASE_URL` and `REMOTE_QUERY_API_KEY` in the MCP env.
 
-### Nostr-Native Mode
+### Nostr Relay
 
-When `NOSTR_RELAYS` and `NOSTR_NATIVE=true` are set, Anchr operates without a central server:
+When `NOSTR_RELAYS` is set, queries are automatically published to Nostr relays as NIP-90 DVM events:
 
 - Queries are published as DVM Job Requests (kind 5300) tagged `["t", "anchr"]`
 - Workers subscribe to relays, pick up jobs, and respond with DVM Job Results (kind 6300)
@@ -166,8 +227,15 @@ When `NOSTR_RELAYS` and `NOSTR_NATIVE=true` are set, Anchr operates without a ce
 - Each query uses an ephemeral keypair — no identity persistence
 
 ```bash
-NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol NOSTR_NATIVE=true bun run start
+# Local development
+docker compose up -d
+NOSTR_RELAYS=ws://localhost:7777 bun run start
+
+# Production
+NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol bun run start
 ```
+
+The only difference between local and production is the relay URL. No code changes, no mode switches.
 
 ### HTTP API
 
@@ -227,102 +295,18 @@ curl http://localhost:3000/oracles
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REFERENCE_APP_PORT` | `3000` | HTTP server port |
-| `DB_PATH` | `.local/queries.db` | SQLite database path |
-| `HTTP_API_KEY` | — | API key for write endpoints |
-| `HTTP_API_KEYS` | — | Comma-separated API keys |
+| `NOSTR_RELAYS` | -- | Comma-separated Nostr relay WebSocket URLs |
+| `HTTP_API_KEY` | -- | API key for write endpoints |
+| `HTTP_API_KEYS` | -- | Comma-separated API keys |
 | `AI_CONTENT_CHECK` | `false` | Enable AI content check (`true`/`1`) |
-| `ANTHROPIC_API_KEY` | — | Required when AI check is enabled |
-| `ATTACHMENT_STORAGE` | `local` | `local`, `s3`, `r2`, or `localstack` |
-| `REMOTE_QUERY_API_BASE_URL` | — | Remote backend for MCP proxy mode |
-| `NOSTR_RELAYS` | — | Comma-separated Nostr relay URLs |
-| `NOSTR_NATIVE` | `false` | Use Nostr as sole data layer (no SQLite) |
-| `CASHU_MINT_URL` | — | Cashu mint URL for ecash payments |
-| `BLOSSOM_SERVERS` | — | Comma-separated Blossom server URLs |
+| `ANTHROPIC_API_KEY` | -- | Required when AI check is enabled |
+| `REMOTE_QUERY_API_BASE_URL` | -- | Remote backend for MCP proxy mode |
+| `REMOTE_QUERY_API_KEY` | -- | API key for remote backend |
+| `CASHU_MINT_URL` | -- | Cashu mint URL for ecash payments |
+| `BLOSSOM_SERVERS` | -- | Comma-separated Blossom server URLs |
 | `ORACLE_PORT` | `4000` | Standalone oracle server port |
-| `ORACLE_API_KEY` | — | Oracle server authentication |
-
-<details>
-<summary>S3 / R2 / LocalStack variables</summary>
-
-| Variable | Description |
-|----------|-------------|
-| `S3_ENDPOINT`, `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL` | Generic S3-compatible storage |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_PUBLIC_BASE_URL` | Cloudflare R2 |
-| `LOCALSTACK_ENDPOINT`, `LOCALSTACK_BUCKET`, `LOCALSTACK_PUBLIC_BASE_URL` | LocalStack for local dev |
-
-</details>
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Nostr Relay Network                    │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌───────────┐ │
-│  │kind 5300 │  │kind 6300 │  │kind 30103 │  │kind 7000  │ │
-│  │Job Req   │  │Job Result│  │Attestation│  │Feedback   │ │
-│  └──────────┘  └──────────┘  └───────────┘  └───────────┘ │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-        ┌──────────────┼──────────────┐
-        │              │              │
-   ┌────▼────┐   ┌─────▼─────┐  ┌────▼────┐
-   │Requester│   │  Worker   │  │ Oracle  │
-   │         │   │           │  │         │
-   │ MCP /   │   │ Worker UI │  │Built-in │
-   │ HTTP /  │   │ or SDK    │  │or HTTP  │
-   │ SDK     │   │           │  │(Tor OK) │
-   └────┬────┘   └─────┬─────┘  └─────────┘
-        │              │
-        │         ┌────▼────┐
-        │         │ Blossom │  content-addressed
-        │         │ Storage │  AES-256-GCM encrypted
-        │         └─────────┘
-        │
-   ┌────▼──────────┐
-   │ Cashu Mint    │  anonymous ecash
-   │ (Lightning)   │  P2PK escrow (NUT-11)
-   └───────────────┘
-```
-
-Three backend modes:
-
-1. **Local** (default) — SQLite + optional Nostr broadcast
-2. **Remote** — HTTP proxy via `REMOTE_QUERY_API_BASE_URL`
-3. **Nostr-native** — `NOSTR_RELAYS` + `NOSTR_NATIVE=true`, no central server
-
-## Project Structure
-
-```
-src/
-  index.ts              SDK entrypoint
-  query-service.ts      query lifecycle (SQLite-backed)
-  types.ts              shared types
-  nostr/
-    events.ts           DVM event builders (kind 5300/6300/7000)
-    oracle-attestation.ts  kind 30103 attestation events
-    encryption.ts       NIP-44 + region-key encryption
-    identity.ts         ephemeral Nostr keypairs
-    client.ts           relay pool (publish, subscribe, fetch)
-    query-bridge.ts     connects QueryService ↔ Nostr relays
-    nostr-query-service.ts  full Nostr-native lifecycle
-  oracle/
-    built-in.ts         deterministic verification logic
-    oracle-server.ts    standalone HTTP oracle (Tor-compatible)
-    http-oracle.ts      HTTP oracle client
-    registry.ts         oracle discovery + mutual selection
-  cashu/
-    wallet.ts           Cashu mint/redeem/verify
-    escrow.ts           P2PK 2-of-2 multisig + timelock refund
-  blossom/
-    client.ts           Blossom download + decrypt
-    worker-upload.ts    EXIF strip → encrypt → upload
-    fetch-attachment.ts attachment fetcher for oracle verification
-  verification/         EXIF, C2PA, AI content checks
-  worker-api.ts         HTTP API (Hono)
-  mcp-server.ts         MCP stdio adapter
-  mcp-query-backend.ts  backend mode selector (local/remote/nostr)
-  ui/                   reference worker app (React)
-```
+| `ORACLE_API_KEY` | -- | Oracle server authentication |
+| `ORACLE_FEE_PPM` | -- | Oracle fee in parts-per-million |
 
 ## Deployment
 
@@ -331,7 +315,7 @@ src/
 ```bash
 fly launch --no-deploy --copy-config
 fly volumes create data --size 1 --region nrt
-fly secrets set HTTP_API_KEY=... ATTACHMENT_STORAGE=r2 R2_ACCOUNT_ID=... R2_BUCKET=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_PUBLIC_BASE_URL=...
+fly secrets set HTTP_API_KEY=... NOSTR_RELAYS=wss://relay.damus.io,wss://nos.lol
 fly deploy
 ```
 
@@ -348,7 +332,8 @@ GitHub Actions runs typecheck, tests, and Docker build on every push. Merges to 
 - [x] Standalone oracle HTTP server (Tor-compatible)
 - [x] Cashu P2PK escrow (NUT-11 2-of-2 multisig + timelock refund)
 - [x] Worker-side Blossom storage (EXIF strip + AES-256-GCM + upload)
-- [x] Nostr-native mode (no central server dependency)
+- [x] In-memory store + Nostr relay sync (no central DB dependency)
+- [x] docker-compose local dev with E2E tests
 - [ ] Umbrel app packaging
 
 ## Contributing
@@ -357,7 +342,7 @@ Contributions are welcome. Please open an issue first to discuss what you'd like
 
 ```bash
 bun install
-bun test
+bun run test
 bun run typecheck
 ```
 

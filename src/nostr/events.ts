@@ -40,6 +40,7 @@ export interface QueryResponsePayload {
     blossom_hash: string;
     blossom_urls: string[];
     decrypt_key: string;
+    decrypt_iv: string;
     mime: string;
   }>;
   notes?: string;

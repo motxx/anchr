@@ -9,11 +9,12 @@
   },
   "scripts": {
     "start": "bun run src/server.ts",
-    "start:http": "bun run src/http-server.ts",
     "dev": "bun --watch run src/server.ts",
     "typecheck": "bunx tsc --noEmit",
-    "local:up": "bun scripts/local-up.ts",
-    "local:down": "bun scripts/local-down.ts"
+    "test": "bun test src/",
+    "test:e2e": "docker compose up -d && NOSTR_RELAYS=ws://localhost:7777 bun test e2e/",
+    "test:all": "docker compose up -d && NOSTR_RELAYS=ws://localhost:7777 bun test src/ e2e/",
+    "demo": "docker compose up -d && NOSTR_RELAYS=ws://localhost:7777 bun run scripts/demo.ts"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.1",

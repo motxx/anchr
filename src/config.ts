@@ -26,7 +26,6 @@ function readStringListEnv(...names: string[]): string[] {
 }
 
 export interface RuntimeConfig {
-  dbPath: string;
   referenceAppPort: number;
   querySweepIntervalMs: number;
   previewMaxDimension: number;
@@ -40,11 +39,8 @@ export interface RuntimeConfig {
 
 export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
 export const DEFAULT_UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(DEFAULT_RUNTIME_DATA_DIR, "uploads");
-export const DEFAULT_DB_PATH = process.env.DB_PATH ?? join(DEFAULT_RUNTIME_DATA_DIR, "queries.db");
-
 export function getRuntimeConfig(): RuntimeConfig {
   return {
-    dbPath: DEFAULT_DB_PATH,
     referenceAppPort: readNumberEnv("REFERENCE_APP_PORT", readNumberEnv("PORT", 3000)),
     querySweepIntervalMs: readNumberEnv("QUERY_SWEEP_INTERVAL_MS", 30_000),
     previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),

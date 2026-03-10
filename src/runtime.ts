@@ -15,7 +15,6 @@ export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
     if (expired > 0) {
       console.error(`[scheduler] Expired ${expired} query(s)`);
     }
-    // Purge expired data (files + DB records) for privacy
     const purged = await purgeExpiredQueries();
     if (purged > 0) {
       console.error(`[scheduler] Purged ${purged} expired query(s) and their data`);

@@ -46,19 +46,3 @@ export {
   toOracleAttestation,
   type OracleAttestationPayload,
 } from "./oracle-attestation";
-export {
-  publishQueryToNostr,
-  listenForQueries,
-  type NostrQueryHandle,
-  type NostrQueryOptions,
-  type NostrWorkerHandle,
-} from "./query-bridge";
-export {
-  createNostrQuery,
-  getNostrQuery,
-  listNostrQueries,
-  cancelNostrQuery,
-  verifyAndSettle,
-  expireNostrQueries,
-  activeQueryCount,
-} from "./nostr-query-service";

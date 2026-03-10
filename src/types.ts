@@ -9,7 +9,7 @@ export type PaymentStatus = "locked" | "released" | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
-export type AttachmentStorageKind = "local" | "external" | "s3" | "blossom";
+export type AttachmentStorageKind = "local" | "external" | "blossom";
 
 export interface PhotoProofParams {
   target: string; // e.g. "コンビニ入口の営業時間表示"

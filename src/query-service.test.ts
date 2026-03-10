@@ -1,16 +1,16 @@
 import { expect, test, beforeEach } from "bun:test";
 import {
-  createQueryService,
-  type Query,
-  type QueryResult,
-  type QueryService,
-  type QueryStatus,
-  type QueryStore,
+  clearQueryStore,
+  createQuery,
+  getQuery,
+  listOpenQueries,
+  cancelQuery,
+  submitQueryResult,
 } from "./query-service";
-import type { PaymentStatus, SubmissionMeta, VerificationDetail } from "./types";
 import { storeIntegrity, clearIntegrityStore } from "./verification/integrity-store";
 
 beforeEach(() => {
+  clearQueryStore();
   clearIntegrityStore();
 });
 
@@ -24,81 +24,14 @@ function injectValidC2pa(attachmentId: string, queryId: string) {
   });
 }
 
-function createInMemoryQueryService(): QueryService {
-  const queries = new Map<string, Query>();
-
-  const store: QueryStore = {
-    insertQuery(query) {
-      queries.set(query.id, structuredClone(query));
-    },
-    getQuery(id) {
-      const query = queries.get(id);
-      return query ? structuredClone(query) : null;
-    },
-    listQueries(status?: QueryStatus) {
-      return [...queries.values()]
-        .filter((query) => (status ? query.status === status : true))
-        .map((query) => structuredClone(query));
-    },
-    updateQuerySubmitted(
-      id: string,
-      result: QueryResult,
-      verification: VerificationDetail,
-      newStatus: QueryStatus,
-      paymentStatus: PaymentStatus,
-      submissionMeta: SubmissionMeta,
-      assignedOracleId?: string,
-    ) {
-      const query = queries.get(id);
-      if (!query) return;
-      queries.set(id, {
-        ...query,
-        status: newStatus,
-        submitted_at: Date.now(),
-        result: structuredClone(result),
-        verification: structuredClone(verification),
-        submission_meta: structuredClone(submissionMeta),
-        payment_status: paymentStatus,
-        assigned_oracle_id: assignedOracleId,
-      });
-    },
-    updateQueryStatus(id, status, paymentStatus) {
-      const query = queries.get(id);
-      if (!query) return;
-      queries.set(id, {
-        ...query,
-        status,
-        payment_status: paymentStatus ?? query.payment_status,
-      });
-    },
-    expirePendingQueries() {
-      let expired = 0;
-      for (const [id, query] of queries.entries()) {
-        if (query.status === "pending" && query.expires_at < Date.now()) {
-          queries.set(id, {
-            ...query,
-            status: "expired",
-            payment_status: "cancelled",
-          });
-          expired += 1;
-        }
-      }
-      return expired;
-    },
-  };
-
-  return createQueryService(store);
-}
-
 test("query service approves valid store status submissions", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
+  const query = createQuery({
     type: "store_status",
     store_name: "Test Ramen",
     location_hint: "Tokyo",
   });
 
-  const outcome = await service.submitQueryResult(query.id, {
+  const outcome = await submitQueryResult(query.id, {
     type: "store_status",
     status: "open",
     notes: "Observed storefront, looked open",
@@ -116,47 +49,44 @@ test("query service approves valid store status submissions", async () => {
 });
 
 test("query service excludes expired pending queries from open list", () => {
-  const service = createInMemoryQueryService();
-  const expired = service.createQuery({
+  const expired = createQuery({
     type: "photo_proof",
     target: "Storefront",
   }, {
     ttlMs: -1,
   });
-  const active = service.createQuery({
+  const active = createQuery({
     type: "photo_proof",
     target: "Signboard",
   }, {
     ttlMs: 60_000,
   });
 
-  const openIds = service.listOpenQueries().map((query) => query.id);
+  const openIds = listOpenQueries().map((query) => query.id);
 
   expect(openIds).toContain(active.id);
   expect(openIds).not.toContain(expired.id);
 });
 
 test("query service cancels pending queries", () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
+  const query = createQuery({
     type: "webpage_field",
     url: "https://example.com",
     field: "price",
     anchor_word: "税込",
   });
 
-  const outcome = service.cancelQuery(query.id);
+  const outcome = cancelQuery(query.id);
 
   expect(outcome).toEqual({
     ok: true,
     message: "Query cancelled",
   });
-  expect(service.getQuery(query.id)?.status).toBe("rejected");
+  expect(getQuery(query.id)?.status).toBe("rejected");
 });
 
 test("query service stores oracle_ids from options", () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery(
+  const query = createQuery(
     { type: "store_status", store_name: "Test" },
     { oracleIds: ["oracle-a", "oracle-b"] },
   );
@@ -165,13 +95,12 @@ test("query service stores oracle_ids from options", () => {
 });
 
 test("query service records assigned_oracle_id on submission", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
+  const query = createQuery({
     type: "store_status",
     store_name: "Test Ramen",
   });
 
-  const outcome = await service.submitQueryResult(
+  const outcome = await submitQueryResult(
     query.id,
     { type: "store_status", status: "open" },
     { executor_type: "human", channel: "worker_api" },
@@ -182,13 +111,12 @@ test("query service records assigned_oracle_id on submission", async () => {
 });
 
 test("query service rejects submission with unacceptable oracle", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery(
+  const query = createQuery(
     { type: "store_status", store_name: "Test" },
     { oracleIds: ["oracle-x"] },
   );
 
-  const outcome = await service.submitQueryResult(
+  const outcome = await submitQueryResult(
     query.id,
     { type: "store_status", status: "open" },
     { executor_type: "human", channel: "worker_api" },
@@ -200,14 +128,13 @@ test("query service rejects submission with unacceptable oracle", async () => {
 });
 
 test("query service materializes local attachment refs before approval", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
+  const query = createQuery({
     type: "photo_proof",
     target: "Storefront",
   });
 
   injectValidC2pa("example.png", query.id);
-  const outcome = await service.submitQueryResult(query.id, {
+  const outcome = await submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,
     attachments: [{

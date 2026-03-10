@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { getAttachmentStore } from "./attachment-store";
+import { uploadAttachment } from "./attachment-store";
 import {
   buildAttachmentAbsoluteUrl,
   buildAttachmentHandle,
@@ -14,8 +14,6 @@ import {
   UPLOADS_DIR,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { isNostrEnabled } from "./nostr/client";
-import { publishQueryToNostr } from "./nostr/query-bridge";
 import { listOracles } from "./oracle";
 import {
   cancelQuery,
@@ -250,16 +248,6 @@ export function buildWorkerApiApp() {
         oracleIds: payload.oracle_ids,
       });
 
-      if (isNostrEnabled()) {
-        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-        publishQueryToNostr(input, {
-          ttlMs: (payload.ttl_seconds ?? 600) * 1000,
-          regionCode: regionHint,
-          bounty: payload.bounty,
-          oracleIds: payload.oracle_ids,
-        }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
-      }
-
       return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
     },
   );
@@ -348,8 +336,8 @@ export function buildWorkerApiApp() {
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
     const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
     if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-    const stored = await getAttachmentStore().put(id, file as File, getPublicRequestUrl(c));
-    return c.json({ ok: true, attachment: materializeAttachmentRef(stored.attachment, c.req.url) });
+    const attachment = await uploadAttachment(id, file as File);
+    return c.json({ ok: true, attachment: materializeAttachmentRef(attachment, c.req.url) });
   });
 
   app.get("/uploads/:filename", async (c) => {

@@ -96,6 +96,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
           blossom_hash: "sha256:deadbeef",
           blossom_urls: ["https://blossom.example/deadbeef"],
           decrypt_key: "0123456789abcdef",
+          decrypt_iv: "aabbccdd00112233",
           mime: "image/jpeg",
         }],
       },

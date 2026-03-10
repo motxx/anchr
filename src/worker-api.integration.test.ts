@@ -30,10 +30,8 @@ const PNG_BYTES = Buffer.from(
 test("worker api supports photo proof upload, submission, and attachment metadata", async () => {
   mkdirSync(UPLOADS_DIR, { recursive: true });
 
-  const previousStorage = process.env.ATTACHMENT_STORAGE;
   const previousHttpApiKey = process.env.HTTP_API_KEY;
   const previousHttpApiKeys = process.env.HTTP_API_KEYS;
-  process.env.ATTACHMENT_STORAGE = "local";
   delete process.env.HTTP_API_KEY;
   delete process.env.HTTP_API_KEYS;
 
@@ -129,7 +127,6 @@ test("worker api supports photo proof upload, submission, and attachment metadat
     const storedQuery = getQuery(query.id);
     expect(storedQuery?.status).toBe("approved");
   } finally {
-    process.env.ATTACHMENT_STORAGE = previousStorage;
     process.env.HTTP_API_KEY = previousHttpApiKey;
     process.env.HTTP_API_KEYS = previousHttpApiKeys;
     if (uploadedLocalPath) {
@@ -208,7 +205,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
 // --- writeAuth middleware covers all write endpoints ---
 
 describe("writeAuth middleware", () => {
-  const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined, ATTACHMENT_STORAGE: "local" };
+  const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined };
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
     mkdirSync(UPLOADS_DIR, { recursive: true });

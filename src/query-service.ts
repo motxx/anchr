@@ -1,14 +1,6 @@
 import { normalizeQueryResult } from "./attachments";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
-import {
-  expirePendingQueries,
-  getQueryRecord,
-  insertQueryRecord,
-  listQueryRecords,
-  updateQueryStatusRecord,
-  updateQuerySubmittedRecord,
-} from "./sqlite-query-store";
 import type {
   BountyInfo,
   ExecutorType,
@@ -57,31 +49,47 @@ export interface CancelQueryOutcome {
   message: string;
 }
 
-export interface QueryStore {
-  insertQuery(query: Query): void;
-  getQuery(id: string): Query | null;
-  listQueries(status?: QueryStatus): Query[];
-  updateQuerySubmitted(
-    id: string,
-    result: QueryResult,
-    verification: QueryVerification,
-    newStatus: QueryStatus,
-    paymentStatus: PaymentStatus,
-    submissionMeta: QuerySubmissionMeta,
-    assignedOracleId?: string,
-  ): void;
-  updateQueryStatus(id: string, status: QueryStatus, paymentStatus?: PaymentStatus): void;
-  expirePendingQueries(): number;
+// --- In-memory query store ---
+
+const queries = new Map<string, Query>();
+
+/** Clear all queries (for testing). */
+export function clearQueryStore(): void {
+  queries.clear();
 }
 
-export interface QueryService {
-  createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
-  getQuery(id: string): Query | null;
-  listOpenQueries(): Query[];
-  submitQueryResult(id: string, result: QueryResult, submissionMeta: QuerySubmissionMeta, oracleId?: string): Promise<SubmitQueryOutcome>;
-  cancelQuery(id: string): CancelQueryOutcome;
-  expireQueries(): number;
+// --- Relay sync (fire-and-forget) ---
+
+function publishQueryToRelay(query: Query): void {
+  // Lazy-import to avoid circular deps and keep sync API
+  import("./nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
+    if (!isNostrEnabled()) return;
+    const { buildQueryRequestEvent } = await import("./nostr/events");
+    const { generateEphemeralIdentity } = await import("./nostr/identity");
+
+    const identity = generateEphemeralIdentity();
+    const params = query.params as unknown as Record<string, unknown>;
+    const event = buildQueryRequestEvent(identity, query.id, {
+      type: query.type,
+      params,
+      nonce: query.challenge_nonce,
+      expires_at: query.expires_at,
+      oracle_ids: query.oracle_ids,
+      bounty: query.bounty?.cashu_token
+        ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.cashu_token }
+        : undefined,
+    }, params.location_hint as string | undefined);
+
+    const result = await publishEvent(event);
+    if (result.successes.length > 0) {
+      console.error(`[relay] Query ${query.id} published to ${result.successes.length} relay(s)`);
+    }
+  }).catch((err) => {
+    console.error("[relay] Failed to publish query:", err);
+  });
 }
+
+// --- Query templates ---
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
@@ -104,14 +112,7 @@ export const queryTemplates = {
   }),
 } as const;
 
-const sqliteQueryStore: QueryStore = {
-  insertQuery: insertQueryRecord,
-  getQuery: getQueryRecord,
-  listQueries: listQueryRecords,
-  updateQuerySubmitted: updateQuerySubmittedRecord,
-  updateQueryStatus: updateQueryStatusRecord,
-  expirePendingQueries,
-};
+// --- Core logic ---
 
 function resolveTtlMs(options?: CreateQueryOptions): number {
   if (!options) return DEFAULT_TTL_MS;
@@ -124,10 +125,10 @@ function generateQueryId(): string {
   return `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Query {
+export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
   const now = Date.now();
   const nonce = generateNonce();
-  return {
+  const query: Query = {
     id: generateQueryId(),
     type: input.type,
     status: "pending",
@@ -141,20 +142,33 @@ function createQueryRecord(input: QueryInput, options?: CreateQueryOptions): Que
     oracle_ids: options?.oracleIds,
     payment_status: "locked",
   };
+
+  queries.set(query.id, query);
+  publishQueryToRelay(query);
+  return query;
 }
 
-async function submitQueryWithStore(
-  store: QueryStore,
+export function getQuery(id: string): Query | null {
+  return queries.get(id) ?? null;
+}
+
+export function listOpenQueries(): Query[] {
+  const now = Date.now();
+  return Array.from(queries.values())
+    .filter((q) => q.status === "pending" && q.expires_at > now);
+}
+
+export async function submitQueryResult(
   id: string,
   result: QueryResult,
-  submissionMeta: QuerySubmissionMeta,
+  submissionMeta: SubmissionMeta,
   oracleId?: string,
 ): Promise<SubmitQueryOutcome> {
-  const query = store.getQuery(id);
+  const query = queries.get(id);
   if (!query) return { ok: false, query: null, message: "Query not found" };
   if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
   if (query.expires_at < Date.now()) {
-    store.updateQueryStatus(id, "expired", "cancelled");
+    queries.set(id, { ...query, status: "expired", payment_status: "cancelled" });
     return { ok: false, query, message: "Query has expired" };
   }
 
@@ -173,88 +187,57 @@ async function submitQueryWithStore(
     failures: attestation.failures,
   };
 
-  if (attestation.passed) {
-    store.updateQuerySubmitted(id, normalizedResult, verification, "approved", "released", submissionMeta, attestation.oracle_id);
-    const updated = store.getQuery(id)!;
-    return { ok: true, query: updated, message: "Verification passed. Result accepted." };
-  }
+  const newStatus: QueryStatus = attestation.passed ? "approved" : "rejected";
+  const paymentStatus: PaymentStatus = attestation.passed ? "released" : "cancelled";
+  const updated: Query = {
+    ...query,
+    status: newStatus,
+    submitted_at: Date.now(),
+    result: normalizedResult,
+    verification,
+    submission_meta: submissionMeta,
+    payment_status: paymentStatus,
+    assigned_oracle_id: attestation.oracle_id,
+  };
+  queries.set(id, updated);
 
-  store.updateQuerySubmitted(id, normalizedResult, verification, "rejected", "cancelled", submissionMeta, attestation.oracle_id);
-  const updated = store.getQuery(id)!;
   return {
-    ok: false,
+    ok: attestation.passed,
     query: updated,
-    message: `Verification failed: ${attestation.failures.join(", ")}`,
+    message: attestation.passed
+      ? "Verification passed. Result accepted."
+      : `Verification failed: ${attestation.failures.join(", ")}`,
   };
-}
-
-function cancelQueryWithStore(store: QueryStore, id: string): CancelQueryOutcome {
-  const query = store.getQuery(id);
-  if (!query) return { ok: false, message: "Query not found" };
-  if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
-  store.updateQueryStatus(id, "rejected", "cancelled");
-  return { ok: true, message: "Query cancelled" };
-}
-
-let defaultQueryService: QueryService | null = null;
-
-export function createQueryService(store: QueryStore = sqliteQueryStore): QueryService {
-  return {
-    createQuery(input, options) {
-      const query = createQueryRecord(input, options);
-      store.insertQuery(query);
-      return query;
-    },
-    getQuery(id) {
-      return store.getQuery(id);
-    },
-    listOpenQueries() {
-      return store.listQueries("pending").filter((query) => query.expires_at > Date.now());
-    },
-    async submitQueryResult(id, result, submissionMeta, oracleId) {
-      return submitQueryWithStore(store, id, result, submissionMeta, oracleId);
-    },
-    cancelQuery(id) {
-      return cancelQueryWithStore(store, id);
-    },
-    expireQueries() {
-      return store.expirePendingQueries();
-    },
-  };
-}
-
-export function getDefaultQueryService(): QueryService {
-  if (!defaultQueryService) {
-    defaultQueryService = createQueryService();
-  }
-  return defaultQueryService;
-}
-
-export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
-  return getDefaultQueryService().createQuery(input, options);
-}
-
-export function getQuery(id: string): Query | null {
-  return getDefaultQueryService().getQuery(id);
-}
-
-export function listOpenQueries(): Query[] {
-  return getDefaultQueryService().listOpenQueries();
-}
-
-export function submitQueryResult(
-  id: string,
-  result: QueryResult,
-  submissionMeta: QuerySubmissionMeta,
-  oracleId?: string,
-): Promise<SubmitQueryOutcome> {
-  return getDefaultQueryService().submitQueryResult(id, result, submissionMeta, oracleId);
 }
 
 export function cancelQuery(id: string): CancelQueryOutcome {
-  return getDefaultQueryService().cancelQuery(id);
+  const query = queries.get(id);
+  if (!query) return { ok: false, message: "Query not found" };
+  if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
+  queries.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
+  return { ok: true, message: "Query cancelled" };
 }
 
 export function expireQueries(): number {
-  return getDefaultQueryService().expireQueries();
+  const now = Date.now();
+  let count = 0;
+  for (const [id, query] of queries) {
+    if (query.status === "pending" && query.expires_at < now) {
+      queries.set(id, { ...query, status: "expired", payment_status: "cancelled" });
+      count++;
+    }
+  }
+  return count;
+}
+
+/** List expired queries and remove them from the store. Returns removed query IDs. */
+export function purgeExpiredFromStore(): Query[] {
+  const expired: Query[] = [];
+  for (const [id, query] of queries) {
+    if (query.status === "expired") {
+      expired.push(query);
+      queries.delete(id);
+    }
+  }
+  return expired;
 }

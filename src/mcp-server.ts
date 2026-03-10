@@ -4,7 +4,8 @@ import { z } from "zod";
 import { getMcpQueryBackend } from "./mcp-query-backend";
 import { isNostrEnabled } from "./nostr/client";
 import { isCashuEnabled } from "./cashu/wallet";
-import type { QueryInput, QueryResult, RequesterMeta } from "./query-service";
+import type { QueryInput, QueryResult } from "./query-service";
+import type { RequesterMeta } from "./types";
 
 function buildRequesterMeta(): RequesterMeta {
   return {

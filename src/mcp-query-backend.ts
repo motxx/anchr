@@ -6,15 +6,6 @@ import {
   statStoredAttachment,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { isNostrEnabled } from "./nostr/client";
-import {
-  createNostrQuery,
-  getNostrQuery,
-  listNostrQueries,
-  cancelNostrQuery,
-  verifyAndSettle,
-} from "./nostr/nostr-query-service";
-import { publishQueryToNostr } from "./nostr/query-bridge";
 import {
   cancelQuery,
   createQuery,
@@ -155,18 +146,12 @@ function errorPayload(queryId: string, index: number, message: string) {
   return { payload: { query_id: queryId, attachment_index: index, attachment: {} as AttachmentHandle["attachment"], access: {} as AttachmentHandle["access"], error: message } };
 }
 
-// --- Local backend ---
+// --- Default backend (in-memory + relay sync) ---
 
-function createLocalBackend(): McpQueryBackend {
+function createDefaultBackend(): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
       const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
-      if (isNostrEnabled()) {
-        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-        publishQueryToNostr(input, { ttlMs: ttlSeconds * 1000, regionCode: regionHint }).catch((err) =>
-          console.error("[mcp-backend] Nostr publish failed:", err),
-        );
-      }
       return buildCreatedPayload(query, localBaseUrl);
     },
     async getQueryStatus(queryId) {
@@ -216,7 +201,7 @@ function createLocalBackend(): McpQueryBackend {
   };
 }
 
-// --- Remote backend ---
+// --- Remote backend (MCP proxy to external server) ---
 
 function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
   async function fetchJson(path: string, init?: RequestInit) {
@@ -242,7 +227,6 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       const { response, json } = await fetchJson(`/queries/${queryId}`);
       if (response.status === 404) return { error: "Query not found" };
       if (!response.ok) throw new Error(`Remote query lookup failed: ${response.status}`);
-      // Enrich with attachment handles for photo_proof
       const data = json as Record<string, unknown>;
       const result = data.result as QueryResult | undefined;
       if (data.type === "photo_proof" && result?.type === "photo_proof") {
@@ -286,7 +270,6 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       return { ...(json as Record<string, unknown>), preview_hint: "Use get_query_attachment_preview for a resized inline preview image." };
     },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
-      // First get attachment meta
       const meta = await this.getQueryAttachment(queryId, attachmentIndex);
       if (meta && typeof meta === "object" && "error" in meta) {
         return errorPayload(queryId, attachmentIndex, (meta as { error: string }).error);
@@ -326,104 +309,12 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
   };
 }
 
-// --- Nostr backend ---
-
-function createNostrBackend(): McpQueryBackend {
-  return {
-    async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
-      const query = await createNostrQuery(input, {
-        ttlMs: ttlSeconds * 1000,
-        requesterMeta,
-        oracleIds,
-        regionCode: (input as unknown as Record<string, unknown>).location_hint as string | undefined,
-      });
-      if (!query) return { error: "Failed to publish query to Nostr relays" };
-      return {
-        query_id: query.id,
-        type: query.type,
-        status: query.status,
-        challenge_nonce: query.challenge_nonce,
-        expires_at: new Date(query.expires_at).toISOString(),
-        requester_meta: query.requester_meta ?? null,
-        transport: "nostr",
-      };
-    },
-    async getQueryStatus(queryId) {
-      const query = getNostrQuery(queryId);
-      if (!query) return { error: "Query not found" };
-      return {
-        query_id: query.id,
-        type: query.type,
-        status: query.status,
-        oracle_id: query.assigned_oracle_id ?? null,
-        payment_status: query.payment_status,
-        expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-        result: query.result ?? null,
-        verification: query.verification ?? null,
-        transport: "nostr",
-      };
-    },
-    async listAvailableQueries() {
-      const queries = await listNostrQueries();
-      return queries.map((q) => ({
-        query_id: q.id,
-        type: q.type,
-        challenge_rule: q.challenge_rule,
-        expires_in_seconds: Math.max(0, Math.floor((q.expires_at - Date.now()) / 1000)),
-        transport: "nostr",
-      }));
-    },
-    async cancelQuery(queryId) {
-      return cancelNostrQuery(queryId);
-    },
-    async submitQueryResult(queryId, _result, oracleId) {
-      // In Nostr mode, "submit" means verifying the already-received response
-      // and publishing attestation + settlement events
-      const outcome = await verifyAndSettle(queryId, oracleId);
-      return {
-        ok: outcome.ok,
-        message: outcome.message,
-        query_id: queryId,
-        verification: outcome.attestation ? {
-          passed: outcome.attestation.passed,
-          checks: outcome.attestation.checks,
-          failures: outcome.attestation.failures,
-        } : null,
-        oracle_id: outcome.attestation?.oracle_id ?? null,
-        transport: "nostr",
-      };
-    },
-    async getQueryAttachment(queryId, attachmentIndex) {
-      const query = getNostrQuery(queryId);
-      if (!query) return { error: "Query not found" };
-      const attachments = getPhotoAttachments(query);
-      if (!attachments) return { error: "Query does not have attachments" };
-      const ref = attachments[attachmentIndex];
-      if (!ref) return { error: `Attachment index ${attachmentIndex} not found` };
-      return {
-        query_id: queryId,
-        attachment_index: attachmentIndex,
-        storage_kind: ref.storage_kind,
-        blossom_hash: ref.blossom_hash ?? null,
-        blossom_servers: ref.blossom_servers ?? null,
-        mime_type: ref.mime_type,
-        transport: "nostr",
-      };
-    },
-    async getQueryAttachmentPreview(queryId, attachmentIndex) {
-      return errorPayload(queryId, attachmentIndex,
-        "Preview not available in Nostr mode. Use Blossom hash to download directly.");
-    },
-  };
-}
-
 // --- Factory ---
 
 /**
- * Backend selection priority:
- * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP backend
- * 2. NOSTR_RELAYS + NOSTR_NATIVE=true → Nostr-native backend (no central server)
- * 3. Default → Local SQLite backend (+ optional Nostr broadcast)
+ * Backend selection:
+ * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP proxy
+ * 2. Default → In-memory store + Nostr relay sync
  */
 export function getMcpQueryBackend(): McpQueryBackend {
   const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
@@ -431,8 +322,5 @@ export function getMcpQueryBackend(): McpQueryBackend {
   if (remoteBaseUrl) {
     return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }
-  if (isNostrEnabled() && process.env.NOSTR_NATIVE === "true") {
-    return createNostrBackend();
-  }
-  return createLocalBackend();
+  return createDefaultBackend();
 }
