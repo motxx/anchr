@@ -1,8 +1,8 @@
 # Anchr
 
-> Ground truth from the street.
+匿名の現実世界検証プロトコル。[Nostr](https://nostr.com/) リレー上で動作し、[Cashu](https://cashu.space/) ecash で報酬を支払う。
 
-Anchr is an anonymous real-world verification protocol over [Nostr](https://nostr.com/). Requesters post queries (photo proof, store status, webpage field); anonymous workers fulfill them for [Cashu](https://cashu.space/) ecash. Deterministic oracles verify results without knowing who submitted them.
+リクエスターがクエリ（写真証明・店舗状態・Webページフィールド）を投稿し、匿名のワーカーが実地で確認して結果を返す。決定論的オラクルが検証し、合格すればワーカーにecashが渡る。
 
 ## How It Works
 
