@@ -1,18 +1,8 @@
 # Anchr
 
-> Anonymous, censorship-resistant real-world verification.
+> Ground truth from the street.
 
-Anchr connects requesters (AI agents, apps, humans) with anonymous reporters who provide first-hand evidence — photos, observations, field data. Results are verified by deterministic oracles and paid via [Cashu](https://cashu.space/) ecash over [Nostr](https://nostr.com/).
-
-**No KYC. No identity. Just facts and payment.**
-
-## Why
-
-Governments lie. Corporations lie. Media lies. But the storefront is either open or closed. The sign either says that price or it doesn't. The protest either happened or it didn't.
-
-Anchr is a tool for citizens to verify reality with first-hand evidence. Casual users earn ecash for checking shop hours (ポイ活); at-risk users use the same protocol to document what power wants hidden. The cover traffic is indistinguishable from the signal.
-
-*事実を知る自由は人権.*
+Anchr is an anonymous real-world verification protocol over [Nostr](https://nostr.com/). Requesters post queries (photo proof, store status, webpage field); anonymous workers fulfill them for [Cashu](https://cashu.space/) ecash. Deterministic oracles verify results without knowing who submitted them.
 
 ## How It Works
 
