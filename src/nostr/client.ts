@@ -1,8 +1,9 @@
 /**
- * Nostr relay client for Ground Truth Protocol.
+ * Nostr relay client for Ground Truth Protocol (NIP-90 DVM).
  *
  * Handles connection to multiple relays, event publishing,
- * and subscription management.
+ * and subscription management. Event kinds follow the NIP-90
+ * Data Vending Machine spec (5300/6300/7000).
  */
 
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
@@ -68,7 +69,7 @@ export async function publishEvent(
 }
 
 /**
- * Subscribe to Ground Truth query request events.
+ * Subscribe to Ground Truth query request events (DVM kind 5300).
  */
 export function subscribeToQueries(
   onEvent: (event: Event) => void,
@@ -97,7 +98,7 @@ export function subscribeToQueries(
 }
 
 /**
- * Subscribe to responses for a specific query.
+ * Subscribe to responses for a specific query (DVM kind 6300).
  */
 export function subscribeToResponses(
   queryEventId: string,
@@ -117,7 +118,7 @@ export function subscribeToResponses(
 }
 
 /**
- * Subscribe to settlements for a specific query.
+ * Subscribe to settlements for a specific query (DVM kind 7000).
  */
 export function subscribeToSettlements(
   queryEventId: string,

@@ -1,21 +1,25 @@
 /**
- * Nostr-native query service.
+ * Nostr-native query service (NIP-90 DVM compatible).
  *
  * Replaces SQLite as source of truth. Queries live on Nostr relays;
  * local state is an ephemeral in-memory cache for active sessions.
  *
+ * Event kinds follow the NIP-90 Data Vending Machine spec:
+ *
  * Flow:
- *   1. Requester publishes QueryRequest (30100) → relay
+ *   1. Requester publishes DVM Job Request (kind 5300) → relay
  *   2. Worker subscribes, sees query, does work
- *   3. Worker publishes QueryResponse (30101, NIP-44 encrypted) → relay
+ *   3. Worker publishes DVM Job Result (kind 6300, NIP-44 encrypted) → relay
  *   4. Requester receives response, runs oracle verification
- *   5. Oracle publishes OracleAttestation (30103, plaintext) → relay
- *   6. Requester publishes QuerySettlement (30102, NIP-44 encrypted + Cashu) → relay
+ *   5. Oracle publishes OracleAttestation (kind 30103, plaintext) → relay
+ *   6. Requester publishes DVM Job Feedback (kind 7000, NIP-44 encrypted + Cashu) → relay
  *   7. Worker receives settlement, redeems Cashu token
  */
 
 import type { Event } from "nostr-tools/core";
 import type { SubCloser } from "nostr-tools/pool";
+import { executeEscrowSwap, calculateOracleFee } from "../cashu/escrow";
+import { isCashuEnabled, verifyToken } from "../cashu/wallet";
 import { generateNonce, buildChallengeRule } from "../challenge";
 import { resolveOracle } from "../oracle/registry";
 import type { OracleAttestation } from "../oracle/types";
@@ -300,12 +304,13 @@ export async function listNostrQueries(options?: {
  * 1. Resolve oracle (respects mutual selection)
  * 2. Run deterministic verification
  * 3. Publish OracleAttestation (30103) to relays
- * 4. Publish Settlement (30102) to relay (with Cashu token if passed)
+ * 4. Execute Cashu P2PK escrow swap (if bounty exists)
+ * 5. Publish Settlement (7000) to relay (with Cashu token if passed)
  */
 export async function verifyAndSettle(
   queryId: string,
   oracleId?: string,
-  options?: { relayUrls?: string[]; cashuToken?: string },
+  options?: { relayUrls?: string[] },
 ): Promise<{ ok: boolean; attestation: OracleAttestation | null; message: string }> {
   const aq = activeQueries.get(queryId);
   if (!aq) return { ok: false, attestation: null, message: "Query not found in active cache" };
@@ -346,9 +351,48 @@ export async function verifyAndSettle(
   );
   await publishEvent(attestationEvent, options?.relayUrls);
 
-  // Publish Settlement (30102) to relay
+  // Execute Cashu P2PK escrow swap if bounty exists and verification passed
+  let workerCashuToken: string | undefined;
+  if (attestation.passed && aq.bounty?.cashu_token && isCashuEnabled()) {
+    const tokenInfo = verifyToken(aq.bounty.cashu_token);
+    if (tokenInfo.valid) {
+      const feeSats = calculateOracleFee(tokenInfo.amountSats, oracle.info.fee_ppm);
+      // In a full implementation, the escrow token's proofs would be
+      // co-signed by oracle + worker, then swapped atomically.
+      // For now, the worker receives the full bounty token and the
+      // oracle fee is handled separately (fee_ppm=0 for built-in).
+      if (feeSats === 0) {
+        workerCashuToken = aq.bounty.cashu_token;
+      } else {
+        // Attempt atomic swap: worker gets (bounty - fee), oracle gets fee
+        const { getDecodedToken } = await import("@cashu/cashu-ts");
+        try {
+          const decoded = getDecodedToken(aq.bounty.cashu_token);
+          const swapResult = await executeEscrowSwap(
+            decoded.proofs,
+            aq.workerPubKey,
+            oracleIdentity.publicKey,
+            feeSats,
+          );
+          if (swapResult) {
+            workerCashuToken = swapResult.workerToken;
+            console.error(`[nostr-qs] Escrow swap: worker=${swapResult.workerAmountSats}sat, oracle=${swapResult.oracleFeeSats}sat`);
+          } else {
+            // Swap failed, fall back to giving full token to worker
+            workerCashuToken = aq.bounty.cashu_token;
+            console.error("[nostr-qs] Escrow swap failed, worker receives full bounty");
+          }
+        } catch (err) {
+          workerCashuToken = aq.bounty.cashu_token;
+          console.error("[nostr-qs] Escrow swap error, worker receives full bounty:", err);
+        }
+      }
+    }
+  }
+
+  // Publish Settlement (7000) to relay
   const settlement: QuerySettlementPayload = attestation.passed
-    ? { status: "accepted", cashu_token: options?.cashuToken }
+    ? { status: "accepted", cashu_token: workerCashuToken }
     : { status: "rejected", reason: attestation.failures.join(", ") };
 
   const settlementEvent = buildQuerySettlementEvent(

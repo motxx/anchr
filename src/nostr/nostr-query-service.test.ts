@@ -34,7 +34,7 @@ test("full protocol lifecycle: request → response → attestation → settleme
   const requestEvent = buildQueryRequestEvent(requester, "gt_test_001", requestPayload, "JP");
 
   // Verify request event structure
-  expect(requestEvent.kind).toBe(30100);
+  expect(requestEvent.kind).toBe(5300); // NIP-90 DVM Job Request
   expect(requestEvent.pubkey).toBe(requester.publicKey);
   const dTag = requestEvent.tags.find((t) => t[0] === "d");
   expect(dTag?.[1]).toBe("gt_test_001");
@@ -61,7 +61,7 @@ test("full protocol lifecycle: request → response → attestation → settleme
   };
 
   const responseEvent = buildQueryResponseEvent(worker, requestEvent.id, requester.publicKey, responsePayload);
-  expect(responseEvent.kind).toBe(30101);
+  expect(responseEvent.kind).toBe(6300); // NIP-90 DVM Job Result
 
   // Requester decrypts response
   const decryptedResponse = parseQueryResponsePayload(

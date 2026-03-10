@@ -1,20 +1,26 @@
 /**
  * Ground Truth Protocol Nostr event builders and parsers.
  *
- * Event kinds:
- *   30100 - QueryRequest (parametric replaceable)
- *   30101 - QueryResponse
- *   30102 - QuerySettlement
+ * Uses NIP-90 Data Vending Machine (DVM) event kinds so that any
+ * DVM-aware client can discover and interact with Anchr queries.
+ *
+ * Event kind mapping (GT constant → DVM kind):
+ *   GT_QUERY_REQUEST   = 5300  (DVM Job Request)
+ *   GT_QUERY_RESPONSE  = 6300  (DVM Job Result)
+ *   GT_QUERY_SETTLEMENT = 7000 (DVM Job Feedback)
+ *
+ * OracleAttestation (30103) remains a custom parametric-replaceable kind.
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { NostrIdentity } from "./identity";
 import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
 
-// Custom NIP event kinds for Ground Truth Protocol
-export const GT_QUERY_REQUEST = 30100;
-export const GT_QUERY_RESPONSE = 30101;
-export const GT_QUERY_SETTLEMENT = 30102;
+// NIP-90 DVM event kinds for Ground Truth Protocol.
+// Constant names kept as GT_* for backward compat; values are DVM kinds.
+export const GT_QUERY_REQUEST = 5300;   // was 30100 → DVM Job Request
+export const GT_QUERY_RESPONSE = 6300;  // was 30101 → DVM Job Result
+export const GT_QUERY_SETTLEMENT = 7000; // was 30102 → DVM Job Feedback
 
 export interface QueryRequestPayload {
   type: string;
@@ -50,7 +56,20 @@ export interface QuerySettlementPayload {
 }
 
 /**
- * Build a QueryRequest event.
+ * Build a QueryRequest event (NIP-90 DVM Job Request, kind 5300).
+ *
+ * Tag layout follows NIP-90 conventions:
+ *   ["i", <input_text>, "text"]   - human-readable query subject
+ *   ["param", "nonce", <nonce>]   - challenge nonce for proof-of-work
+ *   ["bid", <amount_msats>]       - optional bounty hint
+ *   ["output", "application/json"] - expected result MIME type
+ *   ["encrypted"]                 - signals that the result should be NIP-44 encrypted
+ *   ["d", <queryId>]              - deduplication / replaceable-event tag
+ *   ["t", "ground-truth"]         - protocol marker
+ *   ["t", <query_type>]           - query type tag
+ *   ["expiration", <unix>]        - NIP-40 expiration
+ *   ["region", <code>]            - optional region filter
+ *
  * Content is JSON (optionally encrypted by caller before passing).
  */
 export function buildQueryRequestEvent(
@@ -59,12 +78,24 @@ export function buildQueryRequestEvent(
   payload: QueryRequestPayload,
   regionCode?: string,
 ): VerifiedEvent {
+  // Derive a human-readable input string from params for the DVM "i" tag
+  const inputText = deriveInputText(payload);
+
   const tags: string[][] = [
+    ["i", inputText, "text"],
+    ["param", "nonce", payload.nonce],
+    ["output", "application/json"],
+    ["encrypted"],
     ["d", queryId],
     ["t", "ground-truth"],
     ["t", payload.type],
     ["expiration", String(Math.floor(payload.expires_at / 1000))],
   ];
+
+  // Add bid tag if bounty is present (value in msats-equivalent, token string)
+  if (payload.bounty?.token) {
+    tags.push(["bid", payload.bounty.token]);
+  }
 
   if (regionCode) {
     tags.push(["region", regionCode.toUpperCase()]);
@@ -81,7 +112,19 @@ export function buildQueryRequestEvent(
 }
 
 /**
- * Build a QueryResponse event (NIP-44 encrypted to requester).
+ * Derive a short human-readable string from query params for the DVM "i" tag.
+ */
+function deriveInputText(payload: QueryRequestPayload): string {
+  const p = payload.params as Record<string, unknown>;
+  if (p.target) return String(p.target);
+  if (p.store_name) return String(p.store_name);
+  if (p.url) return String(p.url);
+  return payload.type;
+}
+
+/**
+ * Build a QueryResponse event (NIP-90 DVM Job Result, kind 6300).
+ * Content is NIP-44 encrypted to the requester.
  */
 export function buildQueryResponseEvent(
   identity: NostrIdentity,
@@ -106,7 +149,8 @@ export function buildQueryResponseEvent(
 }
 
 /**
- * Build a QuerySettlement event (NIP-44 encrypted to worker).
+ * Build a QuerySettlement event (NIP-90 DVM Job Feedback, kind 7000).
+ * Content is NIP-44 encrypted to the worker. Carries Cashu token on acceptance.
  */
 export function buildQuerySettlementEvent(
   identity: NostrIdentity,
