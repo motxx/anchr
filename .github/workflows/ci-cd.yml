@@ -36,8 +36,8 @@ jobs:
       - name: Build deploy image
         run: docker build -t anchr:${{ github.sha }} .
 
-  deploy:
-    name: Deploy To Fly.io
+  deploy-infra:
+    name: Deploy ${{ matrix.app }}
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -47,6 +47,40 @@ jobs:
         (github.event_name == 'push' &&
          github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
       }}
+    concurrency:
+      group: fly-${{ matrix.app }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: relay
+            config: fly.relay.toml
+          - app: blossom
+            config: fly.blossom.toml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy ${{ matrix.app }}
+        run: flyctl deploy --remote-only --config ${{ matrix.config }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-app:
+    name: Deploy Anchr App
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     concurrency:
       group: fly-production
       cancel-in-progress: true

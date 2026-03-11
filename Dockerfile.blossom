@@ -1,0 +1,5 @@
+FROM ghcr.io/hzrd149/blossom-server:master
+
+COPY blossom-config.yml /app/config.yml
+
+EXPOSE 3000
