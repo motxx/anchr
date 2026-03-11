@@ -38,7 +38,6 @@ export interface RuntimeConfig {
 }
 
 export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
-export const DEFAULT_UPLOADS_DIR = process.env.UPLOADS_DIR ?? join(DEFAULT_RUNTIME_DATA_DIR, "uploads");
 export function getRuntimeConfig(): RuntimeConfig {
   return {
     referenceAppPort: readNumberEnv("REFERENCE_APP_PORT", readNumberEnv("PORT", 3000)),

@@ -9,18 +9,6 @@ import {
   resolveStoredAttachment,
 } from "./attachments";
 
-test("resolveStoredAttachment accepts upload paths", () => {
-  const attachment = resolveStoredAttachment("/uploads/example.png");
-
-  expect(attachment).not.toBeNull();
-  expect(attachment?.filename).toBe("example.png");
-  expect(attachment?.mimeType).toBe("image/png");
-});
-
-test("resolveStoredAttachment rejects non-upload paths", () => {
-  expect(resolveStoredAttachment("/uploads/../../etc/passwd")).toBeNull();
-});
-
 test("resolveStoredAttachment accepts absolute URLs", () => {
   const attachment = resolveStoredAttachment("https://cdn.example.com/query/image.png");
 
@@ -29,25 +17,27 @@ test("resolveStoredAttachment accepts absolute URLs", () => {
   expect(attachment?.absoluteUrl).toBe("https://cdn.example.com/query/image.png");
 });
 
-test("buildAttachmentAbsoluteUrl keeps external URLs and expands local paths", () => {
+test("resolveStoredAttachment returns null for relative paths", () => {
+  expect(resolveStoredAttachment("/some/path")).toBeNull();
+});
+
+test("buildAttachmentAbsoluteUrl keeps external URLs", () => {
   expect(buildAttachmentAbsoluteUrl("https://cdn.example.com/query/image.png")).toBe(
     "https://cdn.example.com/query/image.png",
   );
-  expect(buildAttachmentAbsoluteUrl("/uploads/image.png", "http://localhost:3000/queries/1")).toBe(
-    "http://localhost:3000/uploads/image.png",
-  );
 });
 
-test("normalizeQueryResult preserves structured attachment refs", () => {
+test("normalizeQueryResult preserves blossom attachment refs", () => {
   const result = normalizeQueryResult({
     type: "photo_proof",
     text_answer: "Observed storefront K7P4",
     attachments: [{
-      id: "example.png",
-      uri: "/uploads/example.png",
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
       mime_type: "image/png",
-      storage_kind: "local",
-      route_path: "/uploads/example.png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
+      blossom_servers: ["https://blossom.example.com"],
     }],
     notes: "ok",
   });
@@ -56,28 +46,20 @@ test("normalizeQueryResult preserves structured attachment refs", () => {
   if (result.type !== "photo_proof") {
     throw new Error("expected photo_proof result");
   }
-  expect(result.attachments).toEqual([{
-    id: "example.png",
-    uri: "/uploads/example.png",
-    mime_type: "image/png",
-    storage_kind: "local",
-    filename: "example.png",
-    size_bytes: undefined,
-    local_file_path: expect.any(String),
-    route_path: "/uploads/example.png",
-  }]);
+  expect(result.attachments[0]?.storage_kind).toBe("blossom");
+  expect(result.attachments[0]?.blossom_hash).toBe("abc123");
 });
 
-test("materializeQueryResult expands local attachment refs to absolute URLs", () => {
+test("materializeQueryResult expands blossom attachment refs", () => {
   const result = materializeQueryResult({
     type: "photo_proof",
     text_answer: "Observed storefront K7P4",
     attachments: [{
-      id: "example.png",
-      uri: "/uploads/example.png",
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
       mime_type: "image/png",
-      storage_kind: "local",
-      route_path: "/uploads/example.png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
     }],
     notes: "ok",
   }, "http://localhost:3000/queries/query_1");
@@ -86,7 +68,7 @@ test("materializeQueryResult expands local attachment refs to absolute URLs", ()
   if (result.type !== "photo_proof") {
     throw new Error("expected photo_proof result");
   }
-  expect(result.attachments[0]?.uri).toBe("http://localhost:3000/uploads/example.png");
+  expect(result.attachments[0]?.uri).toBe("https://blossom.example.com/abc123");
 });
 
 test("buildQueryAttachmentUrls returns stable query attachment endpoints", () => {
@@ -97,15 +79,21 @@ test("buildQueryAttachmentUrls returns stable query attachment endpoints", () =>
   expect(urls.previewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/preview");
 });
 
-test("buildAttachmentAccess keeps delivery URLs separate from attachment identity", () => {
+test("buildAttachmentAccess builds delivery URLs for blossom attachment", () => {
   const access = buildAttachmentAccess(
     "query_1",
     0,
-    "/uploads/example.png",
+    {
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
+      mime_type: "image/png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
+    },
     "http://localhost:3000/queries/query_1",
   );
 
-  expect(access.original_url).toBe("http://localhost:3000/uploads/example.png");
+  expect(access.original_url).toBe("https://blossom.example.com/abc123");
   expect(access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
   expect(access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
   expect(access.meta_url).toBe("http://localhost:3000/queries/query_1/attachments/0/meta");
@@ -115,12 +103,18 @@ test("buildAttachmentHandle returns attachment plus derived access info", () => 
   const handle = buildAttachmentHandle(
     "query_1",
     0,
-    "/uploads/example.png",
+    {
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
+      mime_type: "image/png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
+    },
     "http://localhost:3000/queries/query_1",
   );
 
-  expect(handle.attachment.uri).toBe("http://localhost:3000/uploads/example.png");
-  expect(handle.access.original_url).toBe("http://localhost:3000/uploads/example.png");
+  expect(handle.attachment.uri).toBe("https://blossom.example.com/abc123");
+  expect(handle.access.original_url).toBe("https://blossom.example.com/abc123");
   expect(handle.access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
   expect(handle.access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
 });

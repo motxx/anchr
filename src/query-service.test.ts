@@ -127,22 +127,23 @@ test("query service rejects submission with unacceptable oracle", async () => {
   expect(outcome.message).toContain("not available or not accepted");
 });
 
-test("query service materializes local attachment refs before approval", async () => {
+test("query service normalizes blossom attachment refs before approval", async () => {
   const query = createQuery({
     type: "photo_proof",
     target: "Storefront",
   });
 
-  injectValidC2pa("example.png", query.id);
+  injectValidC2pa("abc123", query.id);
   const outcome = await submitQueryResult(query.id, {
     type: "photo_proof",
     text_answer: `Observed storefront ${query.challenge_nonce}`,
     attachments: [{
-      id: "example.png",
-      uri: "/uploads/example.png",
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
       mime_type: "image/png",
-      storage_kind: "local",
-      route_path: "/uploads/example.png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
+      blossom_servers: ["https://blossom.example.com"],
     }],
     notes: "ok",
   }, {
@@ -155,14 +156,6 @@ test("query service materializes local attachment refs before approval", async (
   if (outcome.query?.result?.type !== "photo_proof") {
     throw new Error("expected photo_proof result");
   }
-  expect(outcome.query.result.attachments[0]).toEqual({
-    id: "example.png",
-    uri: "/uploads/example.png",
-    mime_type: "image/png",
-    storage_kind: "local",
-    filename: "example.png",
-    size_bytes: undefined,
-    local_file_path: expect.any(String),
-    route_path: "/uploads/example.png",
-  });
+  expect(outcome.query.result.attachments[0]?.storage_kind).toBe("blossom");
+  expect(outcome.query.result.attachments[0]?.blossom_hash).toBe("abc123");
 });

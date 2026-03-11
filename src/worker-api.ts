@@ -11,7 +11,6 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-  UPLOADS_DIR,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
 import { listOracles } from "./oracle";
@@ -176,12 +175,10 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
     access: {
       ...handle.access,
       preview_url: handle.access.preview_url ?? undefined,
-      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
     },
     attachment_view_url: handle.access.view_url,
     attachment_meta_url: handle.access.meta_url,
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
-    local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
     // Blossom stores encrypted blobs; prefer the original mime_type from AttachmentRef (E2E: no keys exposed)
     mime_type: handle.attachment.storage_kind === "blossom" ? handle.attachment.mime_type : (stat?.mimeType ?? handle.attachment.mime_type),
@@ -308,22 +305,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
 
-    // E2E: Blossom attachments are encrypted. Redirect to the encrypted blob URL.
+    // All attachments are stored on Blossom (encrypted). Redirect to the blob URL.
     // Clients must decrypt using keys obtained via NIP-44 encrypted Nostr events.
-    if (attachment.storage_kind === "blossom" && attachment.blossom_hash) {
-      return c.redirect(attachment.uri, 302);
-    }
-
-    const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
-    if (!stat) return c.json({ error: "Attachment file not found" }, 404);
-    if (stat.storageKind === "local") {
-      const file = Bun.file(stat.path!);
-      if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
-      return new Response(file, {
-        headers: { "content-type": stat.mimeType, "content-length": String(stat.size), "cache-control": "public, max-age=3600" },
-      });
-    }
-    return c.redirect(stat.absoluteUrl, 302);
+    return c.redirect(attachment.uri, 302);
   });
 
   app.get("/queries/:id/attachments/:index/preview", async (c) => {
@@ -365,16 +349,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       ok: true,
       attachment: materializeAttachmentRef(result.attachment, c.req.url),
       // E2E: encryption keys returned once, never persisted on server
-      ...(result.encryption ? { encryption: result.encryption } : {}),
+      encryption: result.encryption,
     });
-  });
-
-  app.get("/uploads/:filename", async (c) => {
-    const filename = c.req.param("filename");
-    if (filename.includes("..") || filename.includes("/")) return c.json({ error: "Forbidden" }, 403);
-    const file = Bun.file(join(UPLOADS_DIR, filename));
-    if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
-    return new Response(file);
   });
 
   app.post("/queries/:id/submit", writeAuth, async (c) => {

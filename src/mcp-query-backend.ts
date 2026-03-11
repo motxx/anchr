@@ -94,11 +94,9 @@ async function buildAttachmentPayload(query: Query, ref: AttachmentRef, index: n
     access: {
       ...handle.access,
       preview_url: handle.access.preview_url ?? undefined,
-      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
     },
     filename: stat?.filename ?? handle.attachment.filename ?? null,
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(ref, baseUrl),
-    local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
     mime_type: stat?.mimeType ?? handle.attachment.mime_type,
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,

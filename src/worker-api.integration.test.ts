@@ -1,6 +1,4 @@
-import { mkdirSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
-import { UPLOADS_DIR } from "./attachments";
 import { isBlossomEnabled } from "./blossom/client";
 import { createQuery, getQuery, queryTemplates } from "./query-service";
 import { storeIntegrity } from "./verification/integrity-store";
@@ -28,138 +26,113 @@ const PNG_BYTES = Buffer.from(
   "base64",
 );
 
-test("worker api supports photo proof upload, submission, and attachment metadata", async () => {
-  mkdirSync(UPLOADS_DIR, { recursive: true });
+// Photo upload/submit integration tests require Blossom to be configured
+const describeWithBlossom = isBlossomEnabled() ? describe : describe.skip;
 
-  const previousHttpApiKey = process.env.HTTP_API_KEY;
-  const previousHttpApiKeys = process.env.HTTP_API_KEYS;
-  delete process.env.HTTP_API_KEY;
-  delete process.env.HTTP_API_KEYS;
+describeWithBlossom("worker api photo proof (Blossom)", () => {
+  test("supports photo proof upload, submission, and attachment metadata", async () => {
+    const previousHttpApiKey = process.env.HTTP_API_KEY;
+    const previousHttpApiKeys = process.env.HTTP_API_KEYS;
+    delete process.env.HTTP_API_KEY;
+    delete process.env.HTTP_API_KEYS;
 
-  const app = buildWorkerApiApp();
-  const query = createQuery(queryTemplates.photoProof("Worker API integration test"), { ttlSeconds: 300 });
+    const app = buildWorkerApiApp();
+    const query = createQuery(queryTemplates.photoProof("Worker API integration test"), { ttlSeconds: 300 });
 
-  let uploadedLocalPath: string | undefined;
+    try {
+      const form = new FormData();
+      form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
 
-  try {
-    const form = new FormData();
-    form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
+      const uploadResponse = await app.request(`http://localhost/queries/${query.id}/upload`, {
+        method: "POST",
+        body: form,
+      });
+      expect(uploadResponse.status).toBe(200);
 
-    const uploadResponse = await app.request(`http://localhost/queries/${query.id}/upload`, {
-      method: "POST",
-      body: form,
-    });
-    expect(uploadResponse.status).toBe(200);
-
-    const uploadJson = await uploadResponse.json() as {
-      attachment: {
-        id: string;
-        uri: string;
-        mime_type: string;
-        storage_kind: string;
-        local_file_path?: string;
+      const uploadJson = await uploadResponse.json() as {
+        attachment: {
+          id: string;
+          uri: string;
+          mime_type: string;
+          storage_kind: string;
+        };
+        encryption: { encrypt_key: string; encrypt_iv: string };
       };
-      encryption?: { encrypt_key: string; encrypt_iv: string };
-    };
-    uploadedLocalPath = uploadJson.attachment.local_file_path;
-    const expectedStorageKind = isBlossomEnabled() ? "blossom" : "local";
-    expect(uploadJson.attachment.storage_kind).toBe(expectedStorageKind);
-    if (expectedStorageKind === "local") {
-      expect(uploadJson.attachment.uri).toContain("/uploads/");
-    }
-    // E2E: Blossom uploads return ephemeral encryption keys
-    if (expectedStorageKind === "blossom") {
+      expect(uploadJson.attachment.storage_kind).toBe("blossom");
       expect(uploadJson.encryption).toBeDefined();
-      expect(uploadJson.encryption!.encrypt_key).toBeString();
-      expect(uploadJson.encryption!.encrypt_iv).toBeString();
-    }
+      expect(uploadJson.encryption.encrypt_key).toBeString();
+      expect(uploadJson.encryption.encrypt_iv).toBeString();
 
-    // Override integrity record with valid C2PA for test (real uploads would have C2PA-signed photos)
-    storeIntegrity({
-      attachmentId: uploadJson.attachment.id,
-      queryId: query.id,
-      capturedAt: Date.now(),
-      exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
-      c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
-    });
+      // Override integrity record with valid C2PA for test
+      storeIntegrity({
+        attachmentId: uploadJson.attachment.id,
+        queryId: query.id,
+        capturedAt: Date.now(),
+        exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+        c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+      });
 
-    // E2E: pass encryption keys for one-time oracle verification
-    const encryptionKeys = uploadJson.encryption
-      ? { [uploadJson.attachment.id]: uploadJson.encryption }
-      : undefined;
+      const encryptionKeys = { [uploadJson.attachment.id]: uploadJson.encryption };
 
-    const submitResponse = await app.request(`http://localhost/queries/${query.id}/submit`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        type: "photo_proof",
-        text_answer: `Observed storefront ${query.challenge_nonce}`,
-        attachments: [uploadJson.attachment],
-        notes: "worker api integration",
-        encryption_keys: encryptionKeys,
-      }),
-    });
-    expect(submitResponse.status).toBe(200);
+      const submitResponse = await app.request(`http://localhost/queries/${query.id}/submit`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "photo_proof",
+          text_answer: `Observed storefront ${query.challenge_nonce}`,
+          attachments: [uploadJson.attachment],
+          notes: "worker api integration",
+          encryption_keys: encryptionKeys,
+        }),
+      });
+      expect(submitResponse.status).toBe(200);
 
-    const submitJson = await submitResponse.json() as {
-      ok: boolean;
-      payment_status: string;
-      verification?: { passed: boolean };
-    };
-    expect(submitJson.ok).toBe(true);
-    expect(submitJson.payment_status).toBe("released");
-    expect(submitJson.verification?.passed).toBe(true);
+      const submitJson = await submitResponse.json() as {
+        ok: boolean;
+        payment_status: string;
+        verification?: { passed: boolean };
+      };
+      expect(submitJson.ok).toBe(true);
+      expect(submitJson.payment_status).toBe("released");
+      expect(submitJson.verification?.passed).toBe(true);
 
-    const detailResponse = await app.request(`http://localhost/queries/${query.id}`);
-    expect(detailResponse.status).toBe(200);
-    const detailJson = await detailResponse.json() as {
-      status: string;
-      result?: { type: string; attachments: Array<{ uri: string }> };
-    };
-    expect(detailJson.status).toBe("approved");
-    expect(detailJson.result?.type).toBe("photo_proof");
-    expect(detailJson.result?.attachments).toHaveLength(1);
-    if (!isBlossomEnabled()) {
-      expect(detailJson.result?.attachments[0]?.uri).toContain("/uploads/");
-    }
+      const detailResponse = await app.request(`http://localhost/queries/${query.id}`);
+      expect(detailResponse.status).toBe(200);
+      const detailJson = await detailResponse.json() as {
+        status: string;
+        result?: { type: string; attachments: Array<{ uri: string }> };
+      };
+      expect(detailJson.status).toBe("approved");
+      expect(detailJson.result?.type).toBe("photo_proof");
+      expect(detailJson.result?.attachments).toHaveLength(1);
 
-    const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
-    expect(metaResponse.status).toBe(200);
-    const metaJson = await metaResponse.json() as {
-      query_id: string;
-      attachment: { storage_kind: string };
-      access: { original_url: string; preview_url: string; view_url: string; meta_url: string };
-      mime_type: string;
-    };
-    expect(metaJson.query_id).toBe(query.id);
-    expect(metaJson.attachment.storage_kind).toBe(expectedStorageKind);
-    if (!isBlossomEnabled()) {
-      expect(metaJson.access.original_url).toContain("/uploads/");
-    }
-    expect(metaJson.access.preview_url).toContain(`/queries/${query.id}/attachments/0/preview`);
-    expect(metaJson.access.view_url).toContain(`/queries/${query.id}/attachments/0`);
-    expect(metaJson.access.meta_url).toContain(`/queries/${query.id}/attachments/0/meta`);
-    expect(metaJson.mime_type).toBe("image/png");
+      const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
+      expect(metaResponse.status).toBe(200);
+      const metaJson = await metaResponse.json() as {
+        query_id: string;
+        attachment: { storage_kind: string };
+        access: { original_url: string; preview_url: string; view_url: string; meta_url: string };
+        mime_type: string;
+      };
+      expect(metaJson.query_id).toBe(query.id);
+      expect(metaJson.attachment.storage_kind).toBe("blossom");
+      expect(metaJson.access.preview_url).toContain(`/queries/${query.id}/attachments/0/preview`);
+      expect(metaJson.access.view_url).toContain(`/queries/${query.id}/attachments/0`);
+      expect(metaJson.access.meta_url).toContain(`/queries/${query.id}/attachments/0/meta`);
+      expect(metaJson.mime_type).toBe("image/png");
 
-    const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
-    if (isBlossomEnabled()) {
-      // E2E: Blossom attachments redirect to the encrypted blob URL
+      // Blossom attachments redirect to encrypted blob URL
+      const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
       expect(viewResponse.status).toBe(302);
       expect(viewResponse.headers.get("location")).toBeTruthy();
-    } else {
-      expect(viewResponse.status).toBe(200);
-      expect(viewResponse.headers.get("content-type")).toBe("image/png");
-    }
 
-    const storedQuery = getQuery(query.id);
-    expect(storedQuery?.status).toBe("approved");
-  } finally {
-    process.env.HTTP_API_KEY = previousHttpApiKey;
-    process.env.HTTP_API_KEYS = previousHttpApiKeys;
-    if (uploadedLocalPath) {
-      rmSync(uploadedLocalPath, { force: true });
+      const storedQuery = getQuery(query.id);
+      expect(storedQuery?.status).toBe("approved");
+    } finally {
+      process.env.HTTP_API_KEY = previousHttpApiKey;
+      process.env.HTTP_API_KEYS = previousHttpApiKeys;
     }
-  }
+  });
 });
 
 test("worker api creates queries over HTTP and enforces write API keys", async () => {
@@ -235,7 +208,6 @@ describe("writeAuth middleware", () => {
   const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined };
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
-    mkdirSync(UPLOADS_DIR, { recursive: true });
     const app = buildWorkerApiApp();
     const query = createQuery(queryTemplates.photoProof("auth test"), { ttlSeconds: 300 });
     const form = new FormData();

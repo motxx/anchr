@@ -119,9 +119,10 @@ test("store_status with photo evidence passes (C2PA valid)", async () => {
     status: "open",
     attachments: [{
       id: "photo1",
-      uri: "/uploads/photo1.jpg",
+      uri: "https://blossom.example.com/photo1",
       mime_type: "image/jpeg",
-      storage_kind: "local",
+      storage_kind: "blossom",
+      blossom_hash: "photo1",
     }],
   };
 
@@ -143,9 +144,10 @@ test("store_status with photo but no C2PA fails", async () => {
     status: "open",
     attachments: [{
       id: "photo_no_c2pa",
-      uri: "/uploads/photo_no_c2pa.jpg",
+      uri: "https://blossom.example.com/photo_no_c2pa",
       mime_type: "image/jpeg",
-      storage_kind: "local",
+      storage_kind: "blossom",
+      blossom_hash: "photo_no_c2pa",
     }],
   };
 

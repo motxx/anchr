@@ -366,8 +366,7 @@ function PhotoProofForm({
             id: attachmentRef.split("/").filter(Boolean).pop() ?? "attachment",
             uri: attachmentRef,
             mime_type: file.type || "application/octet-stream",
-            storage_kind: attachmentRef.startsWith("/uploads/") ? "local" : "external",
-            route_path: attachmentRef.startsWith("/uploads/") ? attachmentRef : undefined,
+            storage_kind: "external",
           }];
         }
       } finally {
