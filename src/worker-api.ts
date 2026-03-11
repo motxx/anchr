@@ -24,7 +24,7 @@ import {
   type QueryInput,
   type QueryResult,
 } from "./query-service";
-import type { AttachmentRef, Query } from "./types";
+import type { AttachmentRef, BlossomKeyMap, Query } from "./types";
 
 // --- Schemas ---
 
@@ -175,7 +175,7 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
     local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
-    // Blossom stores encrypted blobs; prefer the original mime_type from AttachmentRef
+    // Blossom stores encrypted blobs; prefer the original mime_type from AttachmentRef (E2E: no keys exposed)
     mime_type: handle.attachment.storage_kind === "blossom" ? handle.attachment.mime_type : (stat?.mimeType ?? handle.attachment.mime_type),
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
   };
@@ -292,14 +292,10 @@ export function buildWorkerApiApp() {
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
 
-    // Blossom: download + decrypt server-side and return plaintext image
+    // E2E: Blossom attachments are encrypted. Redirect to the encrypted blob URL.
+    // Clients must decrypt using keys obtained via NIP-44 encrypted Nostr events.
     if (attachment.storage_kind === "blossom" && attachment.blossom_hash) {
-      const { fetchBlossomAttachment } = await import("./blossom/fetch-attachment");
-      const data = await fetchBlossomAttachment(attachment);
-      if (!data) return c.json({ error: "Blossom attachment not available" }, 404);
-      return new Response(data, {
-        headers: { "content-type": attachment.mime_type, "content-length": String(data.length), "cache-control": "public, max-age=3600" },
-      });
+      return c.redirect(attachment.uri, 302);
     }
 
     const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
@@ -348,8 +344,13 @@ export function buildWorkerApiApp() {
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
     const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
     if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-    const attachment = await uploadAttachment(id, file as File);
-    return c.json({ ok: true, attachment: materializeAttachmentRef(attachment, c.req.url) });
+    const result = await uploadAttachment(id, file as File);
+    return c.json({
+      ok: true,
+      attachment: materializeAttachmentRef(result.attachment, c.req.url),
+      // E2E: encryption keys returned once, never persisted on server
+      ...(result.encryption ? { encryption: result.encryption } : {}),
+    });
   });
 
   app.get("/uploads/:filename", async (c) => {
@@ -366,7 +367,9 @@ export function buildWorkerApiApp() {
     let body: Record<string, unknown>;
     try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
     const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
-    const outcome = await submitQueryResult(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId);
+    // E2E: accept ephemeral encryption keys for one-time oracle verification
+    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
+    const outcome = await submitQueryResult(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;

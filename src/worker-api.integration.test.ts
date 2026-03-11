@@ -59,12 +59,19 @@ test("worker api supports photo proof upload, submission, and attachment metadat
         storage_kind: string;
         local_file_path?: string;
       };
+      encryption?: { encrypt_key: string; encrypt_iv: string };
     };
     uploadedLocalPath = uploadJson.attachment.local_file_path;
     const expectedStorageKind = isBlossomEnabled() ? "blossom" : "local";
     expect(uploadJson.attachment.storage_kind).toBe(expectedStorageKind);
     if (expectedStorageKind === "local") {
       expect(uploadJson.attachment.uri).toContain("/uploads/");
+    }
+    // E2E: Blossom uploads return ephemeral encryption keys
+    if (expectedStorageKind === "blossom") {
+      expect(uploadJson.encryption).toBeDefined();
+      expect(uploadJson.encryption!.encrypt_key).toBeString();
+      expect(uploadJson.encryption!.encrypt_iv).toBeString();
     }
 
     // Override integrity record with valid C2PA for test (real uploads would have C2PA-signed photos)
@@ -76,6 +83,11 @@ test("worker api supports photo proof upload, submission, and attachment metadat
       c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
     });
 
+    // E2E: pass encryption keys for one-time oracle verification
+    const encryptionKeys = uploadJson.encryption
+      ? { [uploadJson.attachment.id]: uploadJson.encryption }
+      : undefined;
+
     const submitResponse = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -84,6 +96,7 @@ test("worker api supports photo proof upload, submission, and attachment metadat
         text_answer: `Observed storefront ${query.challenge_nonce}`,
         attachments: [uploadJson.attachment],
         notes: "worker api integration",
+        encryption_keys: encryptionKeys,
       }),
     });
     expect(submitResponse.status).toBe(200);
@@ -129,8 +142,14 @@ test("worker api supports photo proof upload, submission, and attachment metadat
     expect(metaJson.mime_type).toBe("image/png");
 
     const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
-    expect(viewResponse.status).toBe(200);
-    expect(viewResponse.headers.get("content-type")).toBe("image/png");
+    if (isBlossomEnabled()) {
+      // E2E: Blossom attachments redirect to the encrypted blob URL
+      expect(viewResponse.status).toBe(302);
+      expect(viewResponse.headers.get("location")).toBeTruthy();
+    } else {
+      expect(viewResponse.status).toBe(200);
+      expect(viewResponse.headers.get("content-type")).toBe("image/png");
+    }
 
     const storedQuery = getQuery(query.id);
     expect(storedQuery?.status).toBe("approved");

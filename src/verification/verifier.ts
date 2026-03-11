@@ -4,6 +4,7 @@ import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import type {
   AttachmentRef,
+  BlossomKeyMap,
   PhotoProofResult,
   Query,
   QueryResult,
@@ -12,19 +13,19 @@ import type {
   WebpageFieldResult,
 } from "../types";
 
-export async function verify(query: Query, result: QueryResult): Promise<VerificationDetail> {
+export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
   const checks: string[] = [];
   const failures: string[] = [];
 
   switch (query.type) {
     case "photo_proof":
       verifyPhotoProof(result as PhotoProofResult, checks, failures);
-      await verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures);
+      await verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures, blossomKeys);
       break;
     case "store_status":
       verifyStoreStatus(result as StoreStatusResult, checks, failures);
       if ((result as StoreStatusResult).attachments?.length) {
-        await verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures);
+        await verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures, blossomKeys);
       }
       break;
     case "webpage_field":
@@ -40,7 +41,7 @@ export async function verify(query: Query, result: QueryResult): Promise<Verific
   const hasAttachments = query.type === "photo_proof"
     || (query.type === "store_status" && (result as StoreStatusResult).attachments?.length);
   if (hasAttachments && failures.length === 0) {
-    const aiResult = await checkAttachmentContent(query, result);
+    const aiResult = await checkAttachmentContent(query, result, blossomKeys);
     if (aiResult) {
       if (aiResult.passed) {
         checks.push(`AI content check passed: ${aiResult.reason}`);
@@ -84,6 +85,7 @@ async function verifyPhotoIntegrity(
   result: PhotoProofResult,
   checks: string[],
   failures: string[],
+  blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   // Try to find integrity data for attachments in this result
   const integrityRecords = result.attachments
@@ -101,7 +103,7 @@ async function verifyPhotoIntegrity(
   // No pre-upload integrity data — try direct C2PA validation on attachments
   // This handles the decentralized path (Blossom download → C2PA check)
   if (integrityRecords.length === 0) {
-    await verifyC2paFromAttachments(result.attachments, checks, failures);
+    await verifyC2paFromAttachments(result.attachments, checks, failures, blossomKeys);
     return;
   }
 
@@ -158,6 +160,7 @@ async function verifyC2paFromAttachments(
   attachments: AttachmentRef[],
   checks: string[],
   failures: string[],
+  blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   if (attachments.length === 0) return;
 
@@ -165,10 +168,11 @@ async function verifyC2paFromAttachments(
   for (const att of attachments) {
     if (!att.mime_type?.startsWith("image/")) continue;
 
-    // Try to fetch from Blossom (decentralized path)
+    // Try to fetch from Blossom (decentralized path) using ephemeral keys
     let data: Uint8Array | null = null;
     if (att.storage_kind === "blossom") {
-      data = await fetchBlossomAttachment(att);
+      const keyMaterial = blossomKeys?.[att.id];
+      data = await fetchBlossomAttachment(att, keyMaterial);
     }
 
     // Try to fetch from URL (local/external path)

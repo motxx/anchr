@@ -26,12 +26,21 @@ import {
 } from "./components/ui/select";
 import { Textarea } from "./components/ui/textarea";
 import { cn } from "./lib/utils";
-import type { AttachmentRef, QueryType } from "../types";
+import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, QueryType } from "../types";
 
 // ---- Types ----
 
 interface Bounty {
   amount_sats: number;
+}
+
+interface UploadResponse {
+  ok: boolean;
+  attachment?: AttachmentRef;
+  encryption?: BlossomKeyMaterial;
+  attachment_ref?: string;
+  url?: string;
+  error?: string;
 }
 
 interface Query {
@@ -140,6 +149,7 @@ function StoreStatusForm({
 
   async function handleSubmit() {
     let attachments: AttachmentRef[] = [];
+    let encryptionKeys: BlossomKeyMap = {};
     const file = fileRef.current?.files?.[0];
     if (file) {
       setUploading(true);
@@ -150,13 +160,14 @@ function StoreStatusForm({
           method: "POST",
           body: fd,
         });
-        const data = await res.json() as {
-          ok: boolean;
-          attachment?: AttachmentRef;
-          error?: string;
-        };
+        const data = await res.json() as UploadResponse;
         if (!data.ok) throw new Error(data.error ?? "Upload failed");
-        if (data.attachment) attachments = [data.attachment];
+        if (data.attachment) {
+          attachments = [data.attachment];
+          if (data.encryption && data.attachment.id) {
+            encryptionKeys[data.attachment.id] = data.encryption;
+          }
+        }
       } finally {
         setUploading(false);
       }
@@ -166,6 +177,7 @@ function StoreStatusForm({
       status,
       attachments,
       notes: notesRef.current?.value ?? "",
+      ...(Object.keys(encryptionKeys).length > 0 ? { encryption_keys: encryptionKeys } : {}),
     });
   }
 
@@ -329,6 +341,7 @@ function PhotoProofForm({
 
   async function handleSubmit() {
     let attachments: AttachmentRef[] = [];
+    let encryptionKeys: BlossomKeyMap = {};
     const file = fileRef.current?.files?.[0];
     if (file) {
       setUploading(true);
@@ -339,16 +352,13 @@ function PhotoProofForm({
           method: "POST",
           body: fd,
         });
-        const data = await res.json() as {
-          ok: boolean;
-          attachment?: AttachmentRef;
-          attachment_ref?: string;
-          url?: string;
-          error?: string;
-        };
+        const data = await res.json() as UploadResponse;
         if (!data.ok) throw new Error(data.error ?? "Upload failed");
         if (data.attachment) {
           attachments = [data.attachment];
+          if (data.encryption && data.attachment.id) {
+            encryptionKeys[data.attachment.id] = data.encryption;
+          }
         } else {
           const attachmentRef = data.attachment_ref ?? data.url;
           if (!attachmentRef) throw new Error(data.error ?? "Upload failed");
@@ -369,6 +379,7 @@ function PhotoProofForm({
       text_answer: textRef.current?.value ?? "",
       attachments,
       notes: notesRef.current?.value ?? "",
+      ...(Object.keys(encryptionKeys).length > 0 ? { encryption_keys: encryptionKeys } : {}),
     });
   }
 

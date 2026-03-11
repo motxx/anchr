@@ -6,7 +6,13 @@ import { stripExif } from "./exif-strip";
 import { validateC2pa } from "./verification/c2pa-validation";
 import { validateExif } from "./verification/exif-validation";
 import { storeIntegrity } from "./verification/integrity-store";
-import type { AttachmentRef } from "./types";
+import type { AttachmentRef, BlossomKeyMaterial } from "./types";
+
+export interface UploadResult {
+  attachment: AttachmentRef;
+  /** Ephemeral key material for Blossom E2E encryption. Only returned once; never persisted. */
+  encryption?: BlossomKeyMaterial;
+}
 
 function sanitizeExt(fileName: string): string {
   const ext = extname(fileName).toLowerCase();
@@ -17,8 +23,11 @@ function sanitizeExt(fileName: string): string {
  * Upload an attachment: validate integrity → strip EXIF → store.
  * When BLOSSOM_SERVERS is configured, encrypts and uploads to Blossom.
  * Otherwise falls back to local disk storage.
+ *
+ * For Blossom uploads, the encryption key is returned separately and
+ * never stored on the server (E2E encryption).
  */
-export async function uploadAttachment(queryId: string, file: File): Promise<AttachmentRef> {
+export async function uploadAttachment(queryId: string, file: File): Promise<UploadResult> {
   const rawBuffer = Buffer.from(await file.arrayBuffer());
 
   // 1. Validate integrity on raw data (before any modification)
@@ -35,15 +44,32 @@ export async function uploadAttachment(queryId: string, file: File): Promise<Att
       file.type || "application/octet-stream",
     );
     if (result) {
+      // Store AttachmentRef WITHOUT encryption keys
+      const attachment: AttachmentRef = {
+        id: result.attachment.id,
+        uri: result.attachment.uri,
+        mime_type: result.attachment.mime_type,
+        storage_kind: "blossom",
+        filename: result.attachment.filename,
+        size_bytes: result.attachment.size_bytes,
+        blossom_hash: result.blossom.hash,
+        blossom_servers: result.blossom.urls.map((u) => u.replace(`/${result.blossom.hash}`, "")),
+      };
       storeIntegrity({
-        attachmentId: result.attachment.id,
+        attachmentId: attachment.id,
         queryId,
         capturedAt: Date.now(),
         exif: exifResult,
         c2pa: c2paResult,
       });
       logIntegrity(queryId, exifResult, c2paResult);
-      return result.attachment;
+      return {
+        attachment,
+        encryption: {
+          encrypt_key: result.blossom.encryptKey,
+          encrypt_iv: result.blossom.encryptIv,
+        },
+      };
     }
     console.error(`[blossom] Upload failed for ${queryId}, falling back to local storage`);
   }
@@ -76,7 +102,7 @@ export async function uploadAttachment(queryId: string, file: File): Promise<Att
   });
   logIntegrity(queryId, exifResult, c2paResult);
 
-  return attachment;
+  return { attachment };
 }
 
 function logIntegrity(

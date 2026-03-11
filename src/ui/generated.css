@@ -252,6 +252,9 @@
   .start {
     inset-inline-start: var(--spacing);
   }
+  .end {
+    inset-inline-end: var(--spacing);
+  }
   .right-2 {
     right: calc(var(--spacing) * 2);
   }

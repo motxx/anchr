@@ -2,6 +2,7 @@ import { normalizeQueryResult } from "./attachments";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
 import type {
+  BlossomKeyMap,
   BountyInfo,
   ExecutorType,
   PaymentStatus,
@@ -163,6 +164,7 @@ export async function submitQueryResult(
   result: QueryResult,
   submissionMeta: SubmissionMeta,
   oracleId?: string,
+  blossomKeys?: BlossomKeyMap,
 ): Promise<SubmitQueryOutcome> {
   const query = queries.get(id);
   if (!query) return { ok: false, query: null, message: "Query not found" };
@@ -180,7 +182,7 @@ export async function submitQueryResult(
   }
 
   const normalizedResult = normalizeQueryResult(result);
-  const attestation = await oracle.verify(query, normalizedResult);
+  const attestation = await oracle.verify(query, normalizedResult, blossomKeys);
   const verification: VerificationDetail = {
     passed: attestation.passed,
     checks: attestation.checks,

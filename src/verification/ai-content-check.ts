@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readStoredAttachmentBuffer } from "../attachments";
 import { getRuntimeConfig } from "../config";
-import type { AttachmentRef, Query, QueryResult } from "../types";
+import type { AttachmentRef, BlossomKeyMap, Query, QueryResult } from "../types";
 
 export interface ContentCheckResult {
   passed: boolean;
@@ -101,19 +101,21 @@ function buildPrompt(query: Query): string {
 
 async function loadImageContent(
   attachments: AttachmentRef[],
+  blossomKeys?: BlossomKeyMap,
 ): Promise<{ data: string; mimeType: ImageMediaType }[]> {
   const images: { data: string; mimeType: ImageMediaType }[] = [];
 
   for (const ref of attachments) {
     const mime = ref.mime_type?.toLowerCase() ?? "";
+    const keyMaterial = blossomKeys?.[ref.id];
 
     if (isImageMime(mime)) {
-      const buf = await readStoredAttachmentBuffer(ref);
+      const buf = await readStoredAttachmentBuffer(ref, undefined, keyMaterial);
       if (buf) {
         images.push({ data: buf.data.toString("base64"), mimeType: mime });
       }
     } else if (isVideoMime(mime)) {
-      const buf = await readStoredAttachmentBuffer(ref);
+      const buf = await readStoredAttachmentBuffer(ref, undefined, keyMaterial);
       if (buf) {
         const ext = ref.filename?.match(/\.[^.]+$/)?.[0] ?? ".mp4";
         const frames = await extractVideoFrames(buf.data, ext);
@@ -130,6 +132,7 @@ async function loadImageContent(
 export async function checkAttachmentContent(
   query: Query,
   result: QueryResult,
+  blossomKeys?: BlossomKeyMap,
 ): Promise<ContentCheckResult | null> {
   const client = getClient();
   if (!client) return null;
@@ -142,7 +145,7 @@ export async function checkAttachmentContent(
 
   if (!attachments?.length) return null;
 
-  const images = await loadImageContent(attachments);
+  const images = await loadImageContent(attachments, blossomKeys);
   if (images.length === 0) return null;
 
   const prompt = buildPrompt(query);

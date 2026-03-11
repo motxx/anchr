@@ -43,13 +43,18 @@ export interface AttachmentRef {
   route_path?: string;
   /** Blossom-specific: SHA-256 hash of encrypted blob. */
   blossom_hash?: string;
-  /** Blossom-specific: hex-encoded AES-256-GCM decryption key. */
-  blossom_encrypt_key?: string;
-  /** Blossom-specific: hex-encoded AES-256-GCM IV. */
-  blossom_encrypt_iv?: string;
   /** Blossom-specific: server URLs where the blob is stored. */
   blossom_servers?: string[];
 }
+
+/** Ephemeral key material for Blossom E2E encryption. Never persisted on the server. */
+export interface BlossomKeyMaterial {
+  encrypt_key: string; // hex-encoded AES-256-GCM key
+  encrypt_iv: string;  // hex-encoded AES-256-GCM IV
+}
+
+/** Map of attachment ID → key material, used for one-time oracle verification. */
+export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
 export interface AttachmentAccess {
   original_url: string;

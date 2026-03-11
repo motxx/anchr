@@ -148,8 +148,6 @@ export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string)
   const resolved = resolveStoredAttachment(ref, requestUrl);
   const blossomFields = typeof ref !== "string" ? {
     blossom_hash: ref.blossom_hash,
-    blossom_encrypt_key: ref.blossom_encrypt_key,
-    blossom_encrypt_iv: ref.blossom_encrypt_iv,
     blossom_servers: ref.blossom_servers,
   } : {};
 
@@ -312,11 +310,12 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("./types").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
-  if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && ref.blossom_encrypt_key && ref.blossom_encrypt_iv) {
+  // Requires ephemeral key material — keys are never stored in AttachmentRef (E2E).
+  if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
     const { downloadFromBlossom } = await import("./blossom/client");
-    const data = await downloadFromBlossom(ref.blossom_hash, ref.blossom_encrypt_key, ref.blossom_encrypt_iv, ref.blossom_servers);
+    const data = await downloadFromBlossom(ref.blossom_hash, blossomKeyMaterial.encrypt_key, blossomKeyMaterial.encrypt_iv, ref.blossom_servers);
     if (!data) return null;
     return {
       filename: ref.filename ?? ref.blossom_hash,
