@@ -1,5 +1,7 @@
 import { extname, join } from "node:path";
 import { DEFAULT_UPLOADS_DIR } from "./config";
+import { isBlossomEnabled } from "./blossom/client";
+import { workerUpload } from "./blossom/worker-upload";
 import { stripExif } from "./exif-strip";
 import { validateC2pa } from "./verification/c2pa-validation";
 import { validateExif } from "./verification/exif-validation";
@@ -12,8 +14,9 @@ function sanitizeExt(fileName: string): string {
 }
 
 /**
- * Upload an attachment: validate integrity → strip EXIF → save to disk.
- * Returns the stored AttachmentRef.
+ * Upload an attachment: validate integrity → strip EXIF → store.
+ * When BLOSSOM_SERVERS is configured, encrypts and uploads to Blossom.
+ * Otherwise falls back to local disk storage.
  */
 export async function uploadAttachment(queryId: string, file: File): Promise<AttachmentRef> {
   const rawBuffer = Buffer.from(await file.arrayBuffer());
@@ -24,10 +27,29 @@ export async function uploadAttachment(queryId: string, file: File): Promise<Att
     validateC2pa(rawBuffer, file.name),
   ]);
 
-  // 2. Strip EXIF (preserves C2PA/JUMBF)
-  const stripped = await stripExif(rawBuffer, file.name);
+  // 2. Upload to Blossom if configured (handles EXIF strip + encrypt internally)
+  if (isBlossomEnabled()) {
+    const result = await workerUpload(
+      new Uint8Array(rawBuffer),
+      file.name,
+      file.type || "application/octet-stream",
+    );
+    if (result) {
+      storeIntegrity({
+        attachmentId: result.attachment.id,
+        queryId,
+        capturedAt: Date.now(),
+        exif: exifResult,
+        c2pa: c2paResult,
+      });
+      logIntegrity(queryId, exifResult, c2paResult);
+      return result.attachment;
+    }
+    console.error(`[blossom] Upload failed for ${queryId}, falling back to local storage`);
+  }
 
-  // 3. Save to disk
+  // 3. Fallback: strip EXIF → save to local disk
+  const stripped = await stripExif(rawBuffer, file.name);
   const ext = sanitizeExt(file.name);
   const filename = `${queryId}_${Date.now()}${ext}`;
   const path = join(DEFAULT_UPLOADS_DIR, filename);
@@ -45,7 +67,6 @@ export async function uploadAttachment(queryId: string, file: File): Promise<Att
     route_path: routePath,
   };
 
-  // 4. Store integrity metadata for verification
   storeIntegrity({
     attachmentId: attachment.id,
     queryId,
@@ -53,15 +74,22 @@ export async function uploadAttachment(queryId: string, file: File): Promise<Att
     exif: exifResult,
     c2pa: c2paResult,
   });
-
-  const integrityChecks = [...exifResult.checks, ...c2paResult.checks];
-  const integrityFailures = [...exifResult.failures, ...c2paResult.failures];
-  if (integrityChecks.length > 0) {
-    console.error(`[integrity] ${queryId}: ${integrityChecks.join("; ")}`);
-  }
-  if (integrityFailures.length > 0) {
-    console.error(`[integrity] ${queryId} warnings: ${integrityFailures.join("; ")}`);
-  }
+  logIntegrity(queryId, exifResult, c2paResult);
 
   return attachment;
+}
+
+function logIntegrity(
+  queryId: string,
+  exifResult: { checks: string[]; failures: string[] },
+  c2paResult: { checks: string[]; failures: string[] },
+) {
+  const checks = [...exifResult.checks, ...c2paResult.checks];
+  const failures = [...exifResult.failures, ...c2paResult.failures];
+  if (checks.length > 0) {
+    console.error(`[integrity] ${queryId}: ${checks.join("; ")}`);
+  }
+  if (failures.length > 0) {
+    console.error(`[integrity] ${queryId} warnings: ${failures.join("; ")}`);
+  }
 }

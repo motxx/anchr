@@ -1,10 +1,21 @@
 services:
   relay:
     image: scsibug/nostr-rs-relay:latest
+    platform: linux/amd64
     ports:
       - "7777:8080"
     volumes:
       - relay-data:/usr/src/app/db
 
+  blossom:
+    image: ghcr.io/hzrd149/blossom-server:master
+    platform: linux/amd64
+    ports:
+      - "3333:3000"
+    volumes:
+      - blossom-data:/app/data
+      - ./blossom-config.yml:/app/config.yml
+
 volumes:
   relay-data:
+  blossom-data:

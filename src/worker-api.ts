@@ -175,7 +175,8 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
     local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
-    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
+    // Blossom stores encrypted blobs; prefer the original mime_type from AttachmentRef
+    mime_type: handle.attachment.storage_kind === "blossom" ? handle.attachment.mime_type : (stat?.mimeType ?? handle.attachment.mime_type),
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
   };
 }
@@ -290,6 +291,17 @@ export function buildWorkerApiApp() {
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
+
+    // Blossom: download + decrypt server-side and return plaintext image
+    if (attachment.storage_kind === "blossom" && attachment.blossom_hash) {
+      const { fetchBlossomAttachment } = await import("./blossom/fetch-attachment");
+      const data = await fetchBlossomAttachment(attachment);
+      if (!data) return c.json({ error: "Blossom attachment not available" }, 404);
+      return new Response(data, {
+        headers: { "content-type": attachment.mime_type, "content-length": String(data.length), "cache-control": "public, max-age=3600" },
+      });
+    }
+
     const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
     if (!stat) return c.json({ error: "Attachment file not found" }, 404);
     if (stat.storageKind === "local") {

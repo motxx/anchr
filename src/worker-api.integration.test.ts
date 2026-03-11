@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import { UPLOADS_DIR } from "./attachments";
+import { isBlossomEnabled } from "./blossom/client";
 import { createQuery, getQuery, queryTemplates } from "./query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
@@ -60,8 +61,11 @@ test("worker api supports photo proof upload, submission, and attachment metadat
       };
     };
     uploadedLocalPath = uploadJson.attachment.local_file_path;
-    expect(uploadJson.attachment.storage_kind).toBe("local");
-    expect(uploadJson.attachment.uri).toContain("/uploads/");
+    const expectedStorageKind = isBlossomEnabled() ? "blossom" : "local";
+    expect(uploadJson.attachment.storage_kind).toBe(expectedStorageKind);
+    if (expectedStorageKind === "local") {
+      expect(uploadJson.attachment.uri).toContain("/uploads/");
+    }
 
     // Override integrity record with valid C2PA for test (real uploads would have C2PA-signed photos)
     storeIntegrity({
@@ -102,7 +106,9 @@ test("worker api supports photo proof upload, submission, and attachment metadat
     expect(detailJson.status).toBe("approved");
     expect(detailJson.result?.type).toBe("photo_proof");
     expect(detailJson.result?.attachments).toHaveLength(1);
-    expect(detailJson.result?.attachments[0]?.uri).toContain("/uploads/");
+    if (!isBlossomEnabled()) {
+      expect(detailJson.result?.attachments[0]?.uri).toContain("/uploads/");
+    }
 
     const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
     expect(metaResponse.status).toBe(200);
@@ -113,8 +119,10 @@ test("worker api supports photo proof upload, submission, and attachment metadat
       mime_type: string;
     };
     expect(metaJson.query_id).toBe(query.id);
-    expect(metaJson.attachment.storage_kind).toBe("local");
-    expect(metaJson.access.original_url).toContain("/uploads/");
+    expect(metaJson.attachment.storage_kind).toBe(expectedStorageKind);
+    if (!isBlossomEnabled()) {
+      expect(metaJson.access.original_url).toContain("/uploads/");
+    }
     expect(metaJson.access.preview_url).toContain(`/queries/${query.id}/attachments/0/preview`);
     expect(metaJson.access.view_url).toContain(`/queries/${query.id}/attachments/0`);
     expect(metaJson.access.meta_url).toContain(`/queries/${query.id}/attachments/0/meta`);

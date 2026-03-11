@@ -146,6 +146,13 @@ export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: str
 
 export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
   const resolved = resolveStoredAttachment(ref, requestUrl);
+  const blossomFields = typeof ref !== "string" ? {
+    blossom_hash: ref.blossom_hash,
+    blossom_encrypt_key: ref.blossom_encrypt_key,
+    blossom_encrypt_iv: ref.blossom_encrypt_iv,
+    blossom_servers: ref.blossom_servers,
+  } : {};
+
   if (resolved) {
     const baseRef = typeof ref === "string" ? null : ref;
     return {
@@ -159,6 +166,7 @@ export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string)
       size_bytes: baseRef?.size_bytes,
       local_file_path: baseRef?.local_file_path ?? resolved.path,
       route_path: baseRef?.route_path ?? resolved.routePath,
+      ...blossomFields,
     };
   }
 
@@ -172,6 +180,7 @@ export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string)
       size_bytes: ref.size_bytes,
       local_file_path: ref.local_file_path,
       route_path: ref.route_path,
+      ...blossomFields,
     };
   }
 
