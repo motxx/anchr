@@ -15,16 +15,24 @@ import {
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
 import { listOracles } from "./oracle";
+import type { OracleRegistry } from "./oracle/registry";
 import {
   cancelQuery,
   createQuery,
+  createQueryService,
   getQuery as getQueryById,
   listOpenQueries,
   submitQueryResult,
   type QueryInput,
   type QueryResult,
+  type QueryService,
 } from "./query-service";
 import type { AttachmentRef, BlossomKeyMap, Query } from "./types";
+
+export interface WorkerApiDeps {
+  queryService?: QueryService;
+  oracleRegistry?: OracleRegistry;
+}
 
 // --- Schemas ---
 
@@ -198,19 +206,27 @@ export async function prepareWorkerApiAssets() {
 
 // --- Routes ---
 
-export function buildWorkerApiApp() {
+export function buildWorkerApiApp(deps?: WorkerApiDeps) {
+  const qs = deps?.queryService;
+  const doCreateQuery = qs ? qs.createQuery.bind(qs) : createQuery;
+  const doGetQuery = qs ? qs.getQuery.bind(qs) : getQueryById;
+  const doListOpen = qs ? qs.listOpenQueries.bind(qs) : listOpenQueries;
+  const doSubmit = qs ? qs.submitQueryResult.bind(qs) : submitQueryResult;
+  const doCancel = qs ? qs.cancelQuery.bind(qs) : cancelQuery;
+  const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
+
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  app.get("/oracles", (c) => c.json(listOracles()));
+  app.get("/oracles", (c) => c.json(doListOracles()));
 
-  app.get("/queries", (c) => c.json(listOpenQueries().map(querySummary)));
+  app.get("/queries", (c) => c.json(doListOpen().map(querySummary)));
 
   app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     const requestUrl = getPublicRequestUrl(c);
     return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
   });
@@ -242,7 +258,7 @@ export function buildWorkerApiApp() {
           break;
       }
 
-      const query = createQuery(input, {
+      const query = doCreateQuery(input, {
         ttlSeconds: payload.ttl_seconds,
         requesterMeta: payload.requester,
         bounty: payload.bounty,
@@ -256,7 +272,7 @@ export function buildWorkerApiApp() {
   app.get("/queries/:id/attachments", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
@@ -271,7 +287,7 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
@@ -285,7 +301,7 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
@@ -315,7 +331,7 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     const attachments = getPhotoProofAttachmentRefs(query);
     if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
@@ -334,7 +350,7 @@ export function buildWorkerApiApp() {
   app.post("/queries/:id/upload", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
     let formData: FormData;
@@ -369,7 +385,7 @@ export function buildWorkerApiApp() {
     const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
     // E2E: accept ephemeral encryption keys for one-time oracle verification
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
-    const outcome = await submitQueryResult(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
+    const outcome = await doSubmit(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;
@@ -385,7 +401,7 @@ export function buildWorkerApiApp() {
   app.post("/queries/:id/cancel", writeAuth, (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const outcome = cancelQuery(id);
+    const outcome = doCancel(id);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 

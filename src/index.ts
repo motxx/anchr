@@ -2,6 +2,8 @@ export {
   cancelQuery,
   clearQueryStore,
   createQuery,
+  createQueryService,
+  createQueryStore,
   expireQueries,
   getQuery,
   listOpenQueries,
@@ -14,6 +16,10 @@ export type {
   CancelQueryOutcome,
   CreateQueryOptions,
   Query,
+  QueryHooks,
+  QueryService,
+  QueryServiceDeps,
+  QueryStore,
   RequesterMeta,
   RequesterType,
   QueryExecutorType,
@@ -30,8 +36,8 @@ export { startReferenceApp } from "./reference-app";
 export { startReferenceRuntime } from "./runtime";
 export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./worker-api";
 export { verify as verifyQueryResult } from "./verification/verifier";
-export { listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./oracle";
-export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./oracle";
+export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./oracle";
+export type { Oracle, OracleInfo, OracleAttestation, OracleRegistry, HttpOracleConfig } from "./oracle";
 export { stripExif } from "./exif-strip";
 export { purgeExpiredQueries } from "./data-purge";
 export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./cashu/wallet";

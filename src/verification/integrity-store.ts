@@ -17,34 +17,64 @@ export interface IntegrityMetadata {
   c2pa: C2paValidationResult;
 }
 
-const store = new Map<string, IntegrityMetadata>();
+export interface IntegrityStore {
+  store(metadata: IntegrityMetadata): void;
+  get(attachmentId: string): IntegrityMetadata | null;
+  getForQuery(queryId: string): IntegrityMetadata[];
+  purgeStale(maxAgeMs?: number): number;
+  clear(): void;
+}
+
+export function createIntegrityStore(): IntegrityStore {
+  const map = new Map<string, IntegrityMetadata>();
+
+  return {
+    store(metadata) {
+      map.set(metadata.attachmentId, metadata);
+    },
+    get(attachmentId) {
+      return map.get(attachmentId) ?? null;
+    },
+    getForQuery(queryId) {
+      return [...map.values()].filter((m) => m.queryId === queryId);
+    },
+    purgeStale(maxAgeMs = 7_200_000) {
+      const cutoff = Date.now() - maxAgeMs;
+      let count = 0;
+      for (const [key, value] of map) {
+        if (value.capturedAt < cutoff) {
+          map.delete(key);
+          count++;
+        }
+      }
+      return count;
+    },
+    clear() {
+      map.clear();
+    },
+  };
+}
+
+// --- Default singleton (backward compat) ---
+
+const defaultStore = createIntegrityStore();
 
 export function storeIntegrity(metadata: IntegrityMetadata): void {
-  store.set(metadata.attachmentId, metadata);
+  defaultStore.store(metadata);
 }
 
 export function getIntegrity(attachmentId: string): IntegrityMetadata | null {
-  return store.get(attachmentId) ?? null;
+  return defaultStore.get(attachmentId);
 }
 
 export function getIntegrityForQuery(queryId: string): IntegrityMetadata[] {
-  return [...store.values()].filter((m) => m.queryId === queryId);
+  return defaultStore.getForQuery(queryId);
 }
 
-/** Remove integrity data older than maxAgeMs (default: 2 hours). */
 export function purgeStaleIntegrity(maxAgeMs = 7_200_000): number {
-  const cutoff = Date.now() - maxAgeMs;
-  let count = 0;
-  for (const [key, value] of store) {
-    if (value.capturedAt < cutoff) {
-      store.delete(key);
-      count++;
-    }
-  }
-  return count;
+  return defaultStore.purgeStale(maxAgeMs);
 }
 
-/** Clear all entries (for testing). */
 export function clearIntegrityStore(): void {
-  store.clear();
+  defaultStore.clear();
 }
