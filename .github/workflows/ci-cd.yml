@@ -30,8 +30,18 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Start infrastructure (relay + Blossom)
+        run: docker compose up -d && sleep 3
+
       - name: Run tests
-        run: bun test
+        run: bun test src/ e2e/
+        env:
+          NOSTR_RELAYS: ws://localhost:7777
+          BLOSSOM_SERVERS: http://localhost:3333
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
 
       - name: Build deploy image
         run: docker build -t anchr:${{ github.sha }} .

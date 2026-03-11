@@ -11,9 +11,9 @@
     "start": "bun run src/server.ts",
     "dev": "bun --watch run src/server.ts",
     "typecheck": "bunx tsc --noEmit",
-    "test": "bun test src/",
-    "test:e2e": "docker compose up -d && sleep 2 && bun test e2e/",
-    "test:all": "docker compose up -d && sleep 2 && bun test src/ e2e/",
+    "test:unit": "bun test src/**/*.unit.test.ts",
+    "test": "docker compose up -d && sleep 3 && BLOSSOM_SERVERS=http://localhost:3333 NOSTR_RELAYS=ws://localhost:7777 bun test src/ e2e/",
+    "test:e2e": "docker compose up -d && sleep 3 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 bun test e2e/",
     "demo": "docker compose up -d && sleep 2 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 bun run scripts/demo.ts",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down"

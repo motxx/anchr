@@ -26,11 +26,16 @@ const PNG_BYTES = Buffer.from(
   "base64",
 );
 
-// Photo upload/submit integration tests require Blossom to be configured
-const describeWithBlossom = isBlossomEnabled() ? describe : describe.skip;
+function requireBlossom() {
+  if (!isBlossomEnabled()) {
+    throw new Error("BLOSSOM_SERVERS must be set. Run: docker compose up -d && export BLOSSOM_SERVERS=http://localhost:3333");
+  }
+}
 
-describeWithBlossom("worker api photo proof (Blossom)", () => {
+describe("worker api photo proof (Blossom)", () => {
   test("supports photo proof upload, submission, and attachment metadata", async () => {
+    requireBlossom();
+
     const previousHttpApiKey = process.env.HTTP_API_KEY;
     const previousHttpApiKeys = process.env.HTTP_API_KEYS;
     delete process.env.HTTP_API_KEY;
