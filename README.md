@@ -2,7 +2,7 @@
 
 Anonymous real-world information protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
 
-Requesters describe what they need observed or verified in the real world. Anonymous workers fulfill queries on the ground with C2PA-verified media. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
+Requesters post queries (photo proof, store status). Anonymous workers fulfill them on the ground. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
 
 ## Design Principles
 
@@ -18,7 +18,7 @@ Requesters describe what they need observed or verified in the real world. Anony
 ```mermaid
 sequenceDiagram
     participant R as Requester
-    participant O as Oracle (C2PA only)
+    participant O as Oracle
     participant N as Nostr Relay
     participant W as Worker
     participant B as Blossom
@@ -202,21 +202,20 @@ Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set
 ### SDK
 
 ```ts
-import { createQuery } from "anchr";
+import { createQuery, queryTemplates } from "anchr";
 
-// Requester: create a query
-const query = createQuery(
-  { description: "渋谷スクランブル交差点の現在の様子", location_hint: "Shibuya" },
+// Requester: create a query (fetches HTLC hash from Oracle internally)
+const query = await createQuery(
+  queryTemplates.photoProof("Shibuya crossing, Tokyo"),
   {
     ttlSeconds: 3600,
-    oracleIds: ["oracle-1"],                   // trusted Oracle IDs
-    bounty: { amount_sats: 100 },              // Cashu HTLC bounty
+    oraclePubkey: "npub1...",   // trusted Oracle pubkey
+    cashuMintUrl: "https://mint.example.com",
   },
 );
 
-// query.id              — query ID
-// query.challenge_nonce  — nonce for freshness proof
-// query.challenge_rule   — instructions for worker
+// query.htlcToken  — locked Cashu HTLC token
+// query.nostrEventId — kind 5300 Job Request ID
 ```
 
 ## Configuration
@@ -277,7 +276,7 @@ fly volumes create data --size 1 --region nrt
 fly secrets set HTTP_API_KEY=...
 ```
 
-Set `FLY_API_TOKEN` as a GitHub Actions secret. Pushes to main auto-deploy all three apps.
+Set `FLY_API_TOKEN` as a GitHub Actions secret. Pushes to main auto-deploy all four apps.
 
 ## Roadmap
 
