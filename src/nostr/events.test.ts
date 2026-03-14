@@ -4,13 +4,20 @@ import {
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
+  buildQuoteFeedbackEvent,
+  buildSelectionFeedbackEvent,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   parseQuerySettlementPayload,
+  parseOracleResponsePayload,
+  parseFeedbackPayload,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
+  ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_SETTLEMENT,
   type QueryRequestPayload,
+  type QuoteFeedbackPayload,
+  type SelectionFeedbackPayload,
 } from "./events";
 
 describe("Nostr events (NIP-90 DVM)", () => {
@@ -144,6 +151,150 @@ describe("Nostr events (NIP-90 DVM)", () => {
     );
     expect(parsed.status).toBe("accepted");
     expect(parsed.cashu_token).toBe("cashuAbc123...");
+  });
+
+  test("QueryResponse includes oracle_payload when oraclePubKey provided", () => {
+    const requester = generateEphemeralIdentity();
+    const worker = generateEphemeralIdentity();
+    const oracle = generateEphemeralIdentity();
+
+    const response = buildQueryResponseEvent(
+      worker,
+      "event_oracle",
+      requester.publicKey,
+      {
+        nonce_echo: "N1",
+        attachments: [{
+          blossom_hash: "sha256:aabbccdd",
+          blossom_urls: ["https://blossom.example/aabbccdd"],
+          decrypt_key_requester: "key_for_requester",
+          decrypt_key_oracle: "key_for_oracle",
+          decrypt_iv: "iv123",
+          mime: "image/jpeg",
+        }],
+        notes: "oracle test",
+      },
+      oracle.publicKey,
+    );
+
+    // Tags should include oracle pubkey, blob hash, blossom URL, and oracle_payload
+    const oracleP = response.tags.find((t) => t[0] === "p" && t[3] === "oracle");
+    expect(oracleP?.[1]).toBe(oracle.publicKey);
+
+    const xTag = response.tags.find((t) => t[0] === "x");
+    expect(xTag?.[1]).toBe("sha256:aabbccdd");
+
+    const blossomTag = response.tags.find((t) => t[0] === "blossom");
+    expect(blossomTag?.[1]).toBe("https://blossom.example/aabbccdd");
+
+    const oraclePayloadTag = response.tags.find((t) => t[0] === "oracle_payload");
+    expect(oraclePayloadTag).toBeTruthy();
+
+    // Oracle can decrypt oracle_payload
+    const oraclePayload = parseOracleResponsePayload(response, oracle.secretKey);
+    expect(oraclePayload).not.toBeNull();
+    expect(oraclePayload!.nonce_echo).toBe("N1");
+    expect(oraclePayload!.attachments).toHaveLength(1);
+    expect(oraclePayload!.attachments[0]!.decrypt_key_oracle).toBe("key_for_oracle");
+    expect(oraclePayload!.attachments[0]!.decrypt_iv).toBe("iv123");
+    expect(oraclePayload!.notes).toBe("oracle test");
+
+    // Requester can still decrypt main content
+    const requesterPayload = parseQueryResponsePayload(
+      response.content,
+      requester.secretKey,
+      worker.publicKey,
+    );
+    expect(requesterPayload.nonce_echo).toBe("N1");
+    expect(requesterPayload.attachments?.[0]?.decrypt_key_requester).toBe("key_for_requester");
+  });
+
+  test("oracle_payload not present when oraclePubKey omitted", () => {
+    const requester = generateEphemeralIdentity();
+    const worker = generateEphemeralIdentity();
+
+    const response = buildQueryResponseEvent(
+      worker,
+      "event_no_oracle",
+      requester.publicKey,
+      { nonce_echo: "N2" },
+    );
+
+    const oraclePayloadTag = response.tags.find((t) => t[0] === "oracle_payload");
+    expect(oraclePayloadTag).toBeUndefined();
+    expect(parseOracleResponsePayload(response, worker.secretKey)).toBeNull();
+  });
+
+  test("eavesdropper cannot decrypt oracle_payload", () => {
+    const requester = generateEphemeralIdentity();
+    const worker = generateEphemeralIdentity();
+    const oracle = generateEphemeralIdentity();
+    const eavesdropper = generateEphemeralIdentity();
+
+    const response = buildQueryResponseEvent(
+      worker,
+      "event_eav",
+      requester.publicKey,
+      {
+        nonce_echo: "N3",
+        attachments: [{
+          blossom_hash: "sha256:1234",
+          blossom_urls: ["https://blossom.example/1234"],
+          decrypt_key_oracle: "secret_key",
+          decrypt_iv: "iv456",
+          mime: "image/png",
+        }],
+      },
+      oracle.publicKey,
+    );
+
+    expect(() => parseOracleResponsePayload(response, eavesdropper.secretKey)).toThrow();
+  });
+
+  test("builds and decrypts QuoteFeedback event (kind 7000)", () => {
+    const worker = generateEphemeralIdentity();
+    const requester = generateEphemeralIdentity();
+
+    const payload: QuoteFeedbackPayload = {
+      status: "payment-required",
+      worker_pubkey: worker.publicKey,
+      amount_sats: 100,
+    };
+
+    const event = buildQuoteFeedbackEvent(worker, "event_q1", requester.publicKey, payload);
+
+    expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
+    const statusTag = event.tags.find((t) => t[0] === "status");
+    expect(statusTag?.[1]).toBe("payment-required");
+
+    // Requester can decrypt
+    const parsed = parseFeedbackPayload(event.content, requester.secretKey, worker.publicKey);
+    expect(parsed.status).toBe("payment-required");
+    expect((parsed as QuoteFeedbackPayload).worker_pubkey).toBe(worker.publicKey);
+    expect((parsed as QuoteFeedbackPayload).amount_sats).toBe(100);
+  });
+
+  test("builds and decrypts SelectionFeedback event (kind 7000)", () => {
+    const requester = generateEphemeralIdentity();
+    const worker = generateEphemeralIdentity();
+
+    const payload: SelectionFeedbackPayload = {
+      status: "processing",
+      selected_worker_pubkey: worker.publicKey,
+      htlc_token: "cashuToken123",
+    };
+
+    const event = buildSelectionFeedbackEvent(requester, "event_s1", worker.publicKey, payload);
+
+    expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
+    const statusTag = event.tags.find((t) => t[0] === "status");
+    expect(statusTag?.[1]).toBe("processing");
+
+    // Worker can decrypt
+    const parsed = parseFeedbackPayload(event.content, worker.secretKey, requester.publicKey);
+    expect(parsed.status).toBe("processing");
+    expect((parsed as SelectionFeedbackPayload).selected_worker_pubkey).toBe(worker.publicKey);
+    expect((parsed as SelectionFeedbackPayload).htlc_token).toBe("cashuToken123");
   });
 
   test("third party cannot decrypt response", () => {
