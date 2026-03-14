@@ -16,6 +16,7 @@
     "test:e2e": "docker compose up -d && sleep 3 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun test e2e/",
     "demo": "docker compose up -d && sleep 2 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun run scripts/demo.ts",
     "demo:htlc": "docker compose up -d && sleep 3 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun run scripts/demo-htlc.ts",
+    "demo:htlc:web": "docker compose up -d && sleep 3 && bunx @tailwindcss/cli -i src/ui/demo/globals.css -o src/ui/demo/generated.css && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun --hot run scripts/demo-htlc-server.ts",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down"
   },
