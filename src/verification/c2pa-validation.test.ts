@@ -9,8 +9,9 @@ async function createTestJpeg(): Promise<Buffer> {
   const tmpDir = await mkdtemp(join(tmpdir(), "anchr-jpeg-"));
   const outPath = join(tmpDir, "test.jpg");
   try {
-    // Try sharp (runtime import to avoid TS type error)
-    const sharpMod = await import("sharp").catch(() => null);
+    // Try sharp (use variable to prevent TS module resolution)
+    const sharpName = "sharp";
+    const sharpMod = await import(sharpName).catch(() => null);
     if (sharpMod) {
       const buf = await sharpMod.default({
         create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 0, b: 0 } },
