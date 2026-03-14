@@ -1,33 +1,91 @@
 # Anchr
 
-Anonymous real-world verification protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
+Anonymous real-world information protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
 
-Requesters post queries (photo proof, store status, webpage field). Anonymous workers fulfill them on the ground. Deterministic oracles verify results; workers receive ecash on pass.
+Requesters post queries (photo proof, store status). Anonymous workers fulfill them on the ground. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
+
+## Design Principles
+
+- **Pull-based**: Requesters specify what they want. Workers respond.
+- **Anonymous**: No accounts, no identities. Nostr keypairs only.
+- **Trustless payment**: Cashu HTLC escrow — funds release automatically on C2PA verification, refund on timeout.
+- **Minimal oracle**: Oracle generates HTLC preimage at query creation, verifies C2PA authenticity, and delivers preimage to Worker on pass. No content judgment.
+
+> Future: Oracle can be replaced entirely by Cairo Spending Conditions (ZK-based) once the ecosystem matures.
 
 ## How It Works
 
 ```mermaid
 sequenceDiagram
     participant R as Requester
+    participant O as Oracle (C2PA only)
     participant N as Nostr Relay
     participant W as Worker
     participant B as Blossom
-    participant O as Oracle
+    participant M as Cashu Mint
 
-    R->>N: DVM Job Request (kind 5300)<br/>Cashu P2PK escrow token
-    N->>W: pick up query
-    W->>W: photograph / observe<br/>EXIF strip → encrypt
+    R->>O: request hash for new query
+    O->>O: generate preimage, store secretly
+    O->>R: return hash(preimage) only
+
+    R->>M: lock Cashu token<br/>HTLC: hash(preimage) + timelock + refund pubkey<br/>(Worker pubkey TBD)
+    R->>N: DVM Job Request (kind 5300)<br/>Requester pubkey + Oracle pubkey included
+
+    W->>N: subscribe and pick up query
+    W->>W: verify Oracle pubkey in Job Request<br/>against trusted Oracle whitelist → drop out if unknown
+    W->>N: quote (kind 7000 status=payment-required)<br/>Worker pubkey included
+    O->>N: listen for kind 7000 quotes → record Worker pubkey
+
+    R->>N: listen and receive quotes (possibly multiple Workers)
+    R->>R: select one Worker based on quote
+    R->>M: swap HTLC to add selected Worker pubkey<br/>condition: hash(preimage) AND Worker signature
+    R->>N: announce selection (kind 7000 status=processing)<br/>selected Worker pubkey included
+    O->>M: check HTLC condition → record selected Worker pubkey
+
+    loop all Workers watching Nostr
+        W->>N: watch for kind 7000 status=processing
+        alt own pubkey listed in announcement
+            W->>M: verify own pubkey is in HTLC condition
+            alt HTLC confirmed
+                M->>W: own pubkey confirmed → proceed
+            else HTLC mismatch
+                M->>W: pubkey not in HTLC → drop out (Requester lied)
+            end
+        else another pubkey listed
+            N->>W: another pubkey listed → drop out
+        end
+    end
+
+    W->>W: photograph on-site<br/>C2PA signed + EXIF strip
+    W->>W: generate symmetric key K<br/>encrypt blob with K (AES-256-GCM)<br/>encrypt K with Requester pubkey → K_R<br/>encrypt K with Oracle pubkey → K_O
     W->>B: upload encrypted blob
-    W->>N: DVM Job Result (kind 6300, NIP-44 encrypted)
-    N->>R: receive response
-    O->>N: OracleAttestation (kind 30103)
-    R->>N: DVM Job Feedback (kind 7000)<br/>Cashu token inside
-    N->>W: worker redeems Cashu token
+    W->>N: DVM Job Result (kind 6300)<br/>Blossom URL + blob hash + K_R + K_O
+
+    R->>N: listen and receive result (Blossom URL + K_R)
+    R->>B: download encrypted blob
+    R->>R: decrypt K_R with Requester privkey → K<br/>decrypt blob with K + verify C2PA + view result
+
+    O->>N: listen and receive result (Blossom URL + K_O)
+    O->>O: verify kind 6300 pubkey = selected Worker pubkey (from HTLC)<br/>verify kind 6300 references correct Job Request ID<br/>reject if mismatch → ignore event
+    O->>B: download encrypted blob
+    O->>O: verify blob hash matches Nostr event<br/>decrypt K_O with Oracle privkey → K<br/>decrypt blob with K + verify C2PA signature
+    alt C2PA valid
+        O->>N: send preimage via NIP-44 DM (kind 4) signed by Oracle privkey
+        W->>N: receive DM
+        W->>W: verify sender pubkey = Oracle pubkey in Job Request
+        W->>M: redeem token with preimage + Worker signature
+    else C2PA invalid
+        O->>N: send rejection via NIP-44 DM (kind 4) signed by Oracle privkey
+        W->>N: receive rejection
+        W->>W: verify sender pubkey = Oracle pubkey in Job Request → stop waiting
+        Note over M,R: timelock expires → Cashu refunds Requester automatically
+    end
 ```
 
-**Oracle selection is mutual**: the requester specifies acceptable oracles; the worker picks one. Verification is deterministic — anyone can reproduce the checks.
+**Oracle cannot steal funds**: the HTLC requires both `hash(preimage)` AND the Worker's signature (NUT-14 `pubkeys` tag). Oracle alone cannot redeem — it knows the preimage but not the Worker's private key.
 
-**Payment is anonymous**: Cashu ecash tokens are locked with P2PK (NUT-11) 2-of-2 multisig (Oracle + Worker). On pass, the oracle co-signs a swap. On failure, the token times out and the requester reclaims it.
+**Payment is trustless**: Cashu HTLC (NUT-14) locks funds to `hash(preimage) AND Worker pubkey`. The hash is obtained from Oracle before the query is posted. Once a Worker picks up the query and registers their pubkey, the Requester swaps the HTLC to include the Worker signature requirement. Oracle delivers the preimage to Worker via NIP-44 DM (kind 4) on C2PA pass. Timeout refunds the requester automatically via the `refund` tag (NUT-11).
+
 
 ## Architecture
 
@@ -36,24 +94,45 @@ graph TB
     subgraph Nostr["Nostr Relay Network"]
         K5300["kind 5300<br/>Job Request"]
         K6300["kind 6300<br/>Job Result"]
-        K30103["kind 30103<br/>Attestation"]
         K7000["kind 7000<br/>Feedback"]
     end
 
-    Requester["Requester<br/>(MCP / HTTP / SDK)"]
+    Requester["Requester<br/>(HTTP / SDK)"]
     Worker["Worker<br/>(Worker UI / SDK)"]
-    Oracle["Oracle<br/>(Built-in / HTTP)"]
+    Oracle["Oracle<br/>(preimage + C2PA + delivery)"]
     Blossom["Blossom<br/>AES-256-GCM encrypted"]
-    Cashu["Cashu Mint<br/>P2PK escrow (NUT-11)"]
+    Cashu["Cashu Mint<br/>HTLC escrow (NUT-14)"]
 
     Requester --> Nostr
     Worker --> Nostr
     Oracle --> Nostr
     Worker --> Blossom
+    Oracle --> Blossom
     Requester --> Cashu
+    Worker --> Cashu
+    Oracle --> Cashu
 ```
 
-Queries are stored in an in-memory Map and published to Nostr relays when `NOSTR_RELAYS` is set. The relay network is the durable persistence layer. For MCP proxy mode, set `REMOTE_QUERY_API_BASE_URL` to forward operations to a remote Anchr instance.
+## Payment Flow
+
+| Step | Actor | Action |
+|------|-------|--------|
+| 1 | Requester | Ask Oracle for hash (Oracle generates preimage secretly, returns hash only) |
+| 2 | Requester | Lock Cashu token: HTLC `hash(preimage)` + timelock + refund pubkey (Worker TBD) |
+| 3 | Requester | Post DVM Job Request (kind 5300) with Oracle pubkey |
+| 4 | Worker | Pick up query, verify Oracle pubkey against whitelist |
+| 5 | Worker | Send quote (kind 7000 status=payment-required) with Worker pubkey |
+| 6 | Requester | Select Worker, swap HTLC to add Worker pubkey |
+| 7 | Requester | Announce selection (kind 7000 status=processing) |
+| 8 | Oracle | Confirm selected Worker pubkey via HTLC |
+| 9 | Worker | Confirm own pubkey in HTLC, photograph, encrypt with KEM+DEM, upload to Blossom |
+| 10 | Worker | Post DVM Job Result (kind 6300) with Blossom URL + blob hash + K_R + K_O |
+| 11 | Oracle | Verify Worker identity, download blob, verify blob hash, verify C2PA |
+| 12 | Oracle | Send preimage via NIP-44 DM (kind 4) signed by Oracle privkey |
+| 13 | Worker | Verify Oracle pubkey in DM, redeem HTLC with preimage + Worker signature |
+| 14 (fallback) | Requester | Reclaim token automatically after timelock if no valid submission |
+
+**Why Oracle cannot steal**: Oracle knows the preimage but not the Worker's private key. Both are required to redeem — neither party can act alone.
 
 ## Getting Started
 
@@ -74,7 +153,7 @@ bun run demo    # starts local relay + Blossom, runs full lifecycle
 ### Run
 
 ```bash
-bun run start           # MCP + HTTP + worker UI
+bun run start           # HTTP + worker UI
 bun run dev             # with file watching
 
 # with local infrastructure
@@ -92,31 +171,6 @@ bun run test:all        # all
 
 ## Usage
 
-### MCP Tools (Claude Desktop)
-
-```json
-{
-  "mcpServers": {
-    "anchr": {
-      "command": "bun",
-      "args": ["run", "/path/to/anchr/src/index.ts"]
-    }
-  }
-}
-```
-
-| Tool | Description |
-|------|-------------|
-| `request_photo_proof` | Request photo evidence of a real-world target |
-| `request_store_status` | Check if a place is open or closed |
-| `request_webpage_field` | Extract a specific field from a webpage |
-| `get_query_status` | Poll query status and results |
-| `submit_query_result` | Submit a result for a pending query |
-| `cancel_query` | Cancel a pending query |
-| `list_available_queries` | List queries waiting for reporters |
-| `get_query_attachment` | Get attachment URL/metadata |
-| `get_query_attachment_preview` | Get a resized preview image |
-
 ### HTTP API
 
 Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set.
@@ -127,7 +181,6 @@ Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/oracles` | List available oracles |
 | `GET` | `/queries` | List open queries |
 | `GET` | `/queries/:id` | Query detail |
 | `POST` | `/queries` | Create query |
@@ -143,17 +196,20 @@ Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set
 ### SDK
 
 ```ts
-import { createQuery, submitQueryResult, queryTemplates } from "anchr";
+import { createQuery, queryTemplates } from "anchr";
 
-const query = createQuery(
-  queryTemplates.storeStatus("Ramen Jiro Shinjuku", "Tokyo"),
-  { ttlSeconds: 300, oracleIds: ["built-in"] },
+// Requester: create a query (fetches HTLC hash from Oracle internally)
+const query = await createQuery(
+  queryTemplates.photoProof("Shibuya crossing, Tokyo"),
+  {
+    ttlSeconds: 3600,
+    oraclePubkey: "npub1...",   // trusted Oracle pubkey
+    cashuMintUrl: "https://mint.example.com",
+  },
 );
 
-await submitQueryResult(query.id, {
-  type: "store_status",
-  status: "open",
-}, { executor_type: "human", channel: "worker_api" }, "built-in");
+// query.htlcToken  — locked Cashu HTLC token
+// query.nostrEventId — kind 5300 Job Request ID
 ```
 
 ## Configuration
@@ -164,18 +220,14 @@ await submitQueryResult(query.id, {
 | `NOSTR_RELAYS` | -- | Comma-separated relay WebSocket URLs |
 | `BLOSSOM_SERVERS` | -- | Comma-separated Blossom server URLs |
 | `HTTP_API_KEY` | -- | API key for write endpoints |
-| `AI_CONTENT_CHECK` | `false` | Enable AI content check |
-| `ANTHROPIC_API_KEY` | -- | Required when AI check is enabled |
-| `REMOTE_QUERY_API_BASE_URL` | -- | Remote backend for MCP proxy mode |
-| `REMOTE_QUERY_API_KEY` | -- | API key for remote backend |
 | `CASHU_MINT_URL` | -- | Cashu mint URL for ecash payments |
-| `ORACLE_PORT` | `4000` | Standalone oracle server port |
+| `ORACLE_PORT` | `4000` | Oracle server port |
 | `ORACLE_API_KEY` | -- | Oracle server authentication |
-| `ORACLE_FEE_PPM` | -- | Oracle fee in parts-per-million |
+| `TRUSTED_ORACLE_PUBKEYS` | -- | Comma-separated pubkeys of trusted Oracles (Worker whitelist) |
 
 ## Deployment
 
-Three Fly.io apps are deployed via CI/CD:
+Four Fly.io apps are deployed via CI/CD:
 
 ```mermaid
 graph LR
@@ -183,10 +235,13 @@ graph LR
         Relay["anchr-relay<br/>nostr-rs-relay<br/>wss://anchr-relay.fly.dev"]
         Blossom["anchr-blossom<br/>blossom-server<br/>https://anchr-blossom.fly.dev"]
         App["anchr<br/>Bun app<br/>https://anchr.fly.dev"]
+        Oracle["anchr-oracle<br/>Bun app<br/>https://anchr-oracle.fly.dev"]
     end
 
     App -->|NOSTR_RELAYS| Relay
     App -->|BLOSSOM_SERVERS| Blossom
+    Oracle -->|NOSTR_RELAYS| Relay
+    Oracle -->|BLOSSOM_SERVERS| Blossom
 ```
 
 ```mermaid
@@ -196,7 +251,9 @@ graph TD
     Infra --> R["anchr-relay"]
     Infra --> B["anchr-blossom"]
     R --> Deploy["Deploy anchr"]
+    R --> DeployOracle["Deploy anchr-oracle"]
     B --> Deploy
+    B --> DeployOracle
 ```
 
 ### Initial Setup
@@ -214,6 +271,14 @@ fly secrets set HTTP_API_KEY=...
 ```
 
 Set `FLY_API_TOKEN` as a GitHub Actions secret. Pushes to main auto-deploy all three apps.
+
+## Roadmap
+
+- [ ] Oracle fee: two-HTLC design for trustless Worker+Oracle fee distribution (currently Oracle runs free)
+- [ ] Oracle discovery: NIP-89 (kind 31990) registration for decentralized Oracle registry — replaces hardcoded whitelist, enables multiple competing Oracles and graceful failover
+- [ ] Oracle → Cairo Spending Conditions (trustless C2PA verification via ZK)
+- [ ] Worker reputation layer
+- [ ] AI-assisted query decomposition (for non-Diaspora requesters)
 
 ## License
 
