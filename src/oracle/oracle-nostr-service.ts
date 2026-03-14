@@ -18,9 +18,10 @@ import { restoreIdentity } from "../nostr/identity";
 import {
   ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_RESPONSE,
-  parseQueryResponsePayload,
+  parseOracleResponsePayload,
   parseFeedbackPayload,
   type QuoteFeedbackPayload,
+  type OracleResponsePayload,
 } from "../nostr/events";
 import { buildPreimageDM, buildRejectionDM } from "../nostr/dm";
 import {
@@ -103,27 +104,36 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     }
 
     try {
-      const responsePayload = parseQueryResponsePayload(
-        event.content,
-        config.identity.secretKey,
-        event.pubkey,
-      );
+      // Parse Oracle-specific payload from tags (NIP-44 encrypted to Oracle)
+      const oraclePayload = parseOracleResponsePayload(event, config.identity.secretKey);
+      if (!oraclePayload) {
+        console.error(`[oracle-nostr] No oracle_payload tag in result for ${queryId}`);
+        return;
+      }
 
       // Build a minimal Query and QueryResult for verification
       const query: Query = {
         id: queryId,
         status: "processing",
         description: "",
-        challenge_nonce: responsePayload.nonce_echo,
+        challenge_nonce: oraclePayload.nonce_echo,
         challenge_rule: "",
         created_at: 0,
         expires_at: Date.now() + 600_000,
         payment_status: "htlc_swapped",
       };
 
+      // Map Oracle payload attachments to QueryResult attachments
       const result: QueryResult = {
-        attachments: [],
-        notes: responsePayload.notes,
+        attachments: (oraclePayload.attachments ?? []).map((a) => ({
+          id: a.blossom_hash,
+          uri: a.blossom_urls[0] ?? "",
+          mime_type: a.mime,
+          storage_kind: "blossom" as const,
+          blossom_hash: a.blossom_hash,
+          blossom_servers: a.blossom_urls,
+        })),
+        notes: oraclePayload.notes,
       };
 
       const passed = await verifyAndDeliverInternal(

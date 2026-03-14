@@ -28,7 +28,7 @@ sequenceDiagram
     O->>O: generate preimage, store secretly
     O->>R: return hash(preimage) only
 
-    R->>M: lock Cashu token<br/>HTLC: hash(preimage) + timelock + refund pubkey<br/>(Worker pubkey TBD)
+    Note over R: hold Cashu proofs locally<br/>(plain bearer tokens, no conditions yet)
     R->>N: DVM Job Request (kind 5300)<br/>Requester pubkey + Oracle pubkey included
 
     W->>N: subscribe and pick up query
@@ -84,7 +84,7 @@ sequenceDiagram
 
 **Oracle cannot steal funds**: the HTLC requires both `hash(preimage)` AND the Worker's signature (NUT-14 `pubkeys` tag). Oracle alone cannot redeem — it knows the preimage but not the Worker's private key.
 
-**Payment is trustless**: Cashu HTLC (NUT-14) locks funds to `hash(preimage) AND Worker pubkey`. The hash is obtained from Oracle before the query is posted. Once a Worker picks up the query and registers their pubkey, the Requester swaps the HTLC to include the Worker signature requirement. Oracle delivers the preimage to Worker via NIP-44 DM (kind 4) on C2PA pass. Timeout refunds the requester automatically via the `refund` tag (NUT-11).
+**Payment is trustless**: The Requester holds plain Cashu proofs locally until a Worker is selected. On selection, plain proofs are swapped for a Cashu HTLC token (NUT-14) locked to `hash(preimage) AND Worker pubkey`. Plain proofs are used in Phase 1 because the Requester does not know the preimage — the Mint requires it to spend hashlock-ed proofs. Oracle delivers the preimage to Worker via NIP-44 DM (kind 4) on C2PA pass. Timeout refunds the requester automatically via the `refund` tag (NUT-11).
 
 
 ## Architecture
@@ -124,7 +124,7 @@ graph TB
 | Step | Actor | Action |
 |------|-------|--------|
 | 1 | Requester | Ask Oracle for hash (Oracle generates preimage secretly, returns hash only) |
-| 2 | Requester | Lock Cashu token: HTLC `hash(preimage)` + timelock + refund pubkey (Worker TBD) |
+| 2 | Requester | Hold plain Cashu proofs locally (bearer tokens, no HTLC conditions yet) |
 | 3 | Requester | Post DVM Job Request (kind 5300) with Oracle pubkey |
 | 4 | Worker | Pick up query, verify Oracle pubkey against whitelist |
 | 5 | Worker | Send quote (kind 7000 status=payment-required) with Worker pubkey |
@@ -187,15 +187,21 @@ Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check |
+| `GET` | `/oracles` | List registered oracles |
 | `GET` | `/queries` | List open queries |
 | `GET` | `/queries/:id` | Query detail |
 | `POST` | `/queries` | Create query |
 | `POST` | `/queries/:id/upload` | Upload attachment |
 | `POST` | `/queries/:id/submit` | Submit result |
 | `POST` | `/queries/:id/cancel` | Cancel query |
+| `GET` | `/queries/:id/attachments` | List attachments |
 | `GET` | `/queries/:id/attachments/:index` | Serve attachment |
 | `GET` | `/queries/:id/attachments/:index/meta` | Attachment metadata |
 | `GET` | `/queries/:id/attachments/:index/preview` | Resized preview |
+| `GET` | `/queries/:id/quotes` | List worker quotes (HTLC) |
+| `POST` | `/queries/:id/quotes` | Submit worker quote (HTLC) |
+| `POST` | `/queries/:id/select` | Select worker (HTLC) |
+| `POST` | `/queries/:id/result` | Submit worker result (HTLC) |
 
 </details>
 

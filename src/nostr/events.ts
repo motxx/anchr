@@ -163,26 +163,92 @@ export function buildQueryRequestEvent(
  * Build a QueryResponse event (NIP-90 DVM Job Result, kind 6300).
  * Content is NIP-44 encrypted to the requester.
  */
+/**
+ * Oracle-accessible payload embedded in kind 6300 tags.
+ * Encrypted to Oracle via NIP-44 so only Oracle can read it.
+ */
+export interface OracleResponsePayload {
+  nonce_echo: string;
+  attachments: Array<{
+    blossom_hash: string;
+    blossom_urls: string[];
+    decrypt_key_oracle: string;
+    decrypt_iv: string;
+    mime: string;
+  }>;
+  notes?: string;
+}
+
 export function buildQueryResponseEvent(
   identity: NostrIdentity,
   queryEventId: string,
   requesterPubKey: string,
   payload: QueryResponsePayload,
+  oraclePubKey?: string,
 ): VerifiedEvent {
   const conversationKey = deriveConversationKey(identity.secretKey, requesterPubKey);
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
+  const tags: string[][] = [
+    ["e", queryEventId],
+    ["p", requesterPubKey],
+  ];
+
+  // Add Oracle-accessible data when Oracle pubkey is provided
+  if (oraclePubKey && payload.attachments?.length) {
+    tags.push(["p", oraclePubKey, "", "oracle"]);
+
+    // Blossom URLs and blob hash are not secret (blob is AES-256-GCM encrypted)
+    for (const att of payload.attachments) {
+      tags.push(["x", att.blossom_hash]);
+      for (const url of att.blossom_urls) {
+        tags.push(["blossom", url]);
+      }
+    }
+
+    // Oracle payload: NIP-44 encrypted to Oracle
+    const oraclePayload: OracleResponsePayload = {
+      nonce_echo: payload.nonce_echo,
+      attachments: payload.attachments
+        .filter((a) => a.decrypt_key_oracle)
+        .map((a) => ({
+          blossom_hash: a.blossom_hash,
+          blossom_urls: a.blossom_urls,
+          decrypt_key_oracle: a.decrypt_key_oracle!,
+          decrypt_iv: a.decrypt_iv,
+          mime: a.mime,
+        })),
+      notes: payload.notes,
+    };
+
+    const oracleConvKey = deriveConversationKey(identity.secretKey, oraclePubKey);
+    const oracleEncrypted = encryptNip44(JSON.stringify(oraclePayload), oracleConvKey);
+    tags.push(["oracle_payload", oracleEncrypted]);
+  }
+
   const template: EventTemplate = {
     kind: ANCHR_QUERY_RESPONSE,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["e", queryEventId],
-      ["p", requesterPubKey],
-    ],
+    tags,
     content: encrypted,
   };
 
   return finalizeEvent(template, identity.secretKey);
+}
+
+/**
+ * Parse the Oracle-specific payload from a kind 6300 event's tags.
+ */
+export function parseOracleResponsePayload(
+  event: { tags: string[][]; pubkey: string },
+  oracleSecretKey: Uint8Array,
+): OracleResponsePayload | null {
+  const oracleTag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
+  if (!oracleTag) return null;
+
+  const conversationKey = deriveConversationKey(oracleSecretKey, event.pubkey);
+  const decrypted = decryptNip44(oracleTag[1]!, conversationKey);
+  return JSON.parse(decrypted) as OracleResponsePayload;
 }
 
 /**

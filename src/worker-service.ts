@@ -234,6 +234,7 @@ export async function publishResult(
     query.eventId,
     query.requesterPubkey ?? query.pubkey,
     payload,
+    query.oraclePubkey,
   );
 
   await publishEvent(event, relayUrls);

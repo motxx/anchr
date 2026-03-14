@@ -278,11 +278,18 @@ export async function swapHtlcBindWorker(
   const config = getCashuConfig();
   if (!wallet || !config) return null;
 
-  const amountSats = initialProofs.reduce((sum, p) => sum + p.amount, 0);
   const p2pkOptions = buildHtlcFinalOptions(params);
 
   try {
     await wallet.loadMint();
+    const totalSats = initialProofs.reduce((sum, p) => sum + p.amount, 0);
+    const fee = wallet.getFeesForProofs(initialProofs);
+    const amountSats = totalSats - fee;
+    if (amountSats <= 0) {
+      console.error("[cashu-htlc] Fee exceeds total amount");
+      return null;
+    }
+
     const { send } = await wallet.ops
       .send(amountSats, initialProofs)
       .asP2PK(p2pkOptions)
@@ -301,25 +308,44 @@ export async function swapHtlcBindWorker(
  *
  * The Worker receives the preimage from the Oracle via NIP-44 DM after
  * C2PA verification passes. Combined with the Worker's signature, this
- * satisfies the HTLC spending conditions.
+ * satisfies the HTLC spending conditions (NUT-14).
+ *
+ * Steps:
+ *   1. Set preimage as HTLC witness on each proof
+ *   2. Sign proofs with Worker's private key (P2PK witness)
+ *   3. Swap signed proofs for fresh, unlocked proofs on the mint
  */
 export async function redeemHtlcToken(
   htlcProofs: Proof[],
-  workerPubkey: string,
+  preimage: string,
+  workerPrivateKey: string,
 ): Promise<{ token: string; proofs: Proof[]; amountSats: number } | null> {
   const wallet = getCashuWallet();
   const config = getCashuConfig();
   if (!wallet || !config) return null;
 
-  const amountSats = htlcProofs.reduce((sum, p) => sum + p.amount, 0);
-
   try {
     await wallet.loadMint();
-    // Swap to simple P2PK(Worker) token — the Worker already has the signed proofs
-    const workerP2PK = new P2PKBuilder().addLockPubkey(workerPubkey).toOptions();
+
+    // Set HTLC preimage witness on each proof so the mint can verify the hashlock.
+    // The Worker's private key is passed via .privkey() so that completeSwap()
+    // calls signP2PKProofs() with the correct OutputData (required for SIG_ALL).
+    const proofsWithPreimage = htlcProofs.map((p) => ({
+      ...p,
+      witness: JSON.stringify({ preimage, signatures: [] }),
+    }));
+
+    const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
+    const fee = wallet.getFeesForProofs(proofsWithPreimage);
+    const amountSats = totalSats - fee;
+    if (amountSats <= 0) {
+      console.error("[cashu-htlc] Fee exceeds total amount");
+      return null;
+    }
+
     const { send } = await wallet.ops
-      .send(amountSats, htlcProofs)
-      .asP2PK(workerP2PK)
+      .send(amountSats, proofsWithPreimage)
+      .privkey(workerPrivateKey)
       .run();
 
     const token = getEncodedToken({ mint: config.mintUrl, proofs: send });

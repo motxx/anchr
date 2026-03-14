@@ -35,6 +35,8 @@ export interface RuntimeConfig {
   aiContentCheckEnabled: boolean;
   remoteQueryApiBaseUrl?: string;
   remoteQueryApiKey?: string;
+  /** Trusted Oracle pubkeys for Worker whitelist (from TRUSTED_ORACLE_PUBKEYS env). */
+  trustedOraclePubkeys: string[];
 }
 
 export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
@@ -49,5 +51,6 @@ export function getRuntimeConfig(): RuntimeConfig {
     aiContentCheckEnabled: process.env.AI_CONTENT_CHECK === "true" || process.env.AI_CONTENT_CHECK === "1",
     remoteQueryApiBaseUrl: process.env.REMOTE_QUERY_API_BASE_URL?.trim() || undefined,
     remoteQueryApiKey: process.env.REMOTE_QUERY_API_KEY?.trim() || undefined,
+    trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
   };
 }

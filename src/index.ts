@@ -1,3 +1,4 @@
+export { queryTemplates } from "./query-templates";
 export {
   cancelQuery,
   clearQueryStore,
