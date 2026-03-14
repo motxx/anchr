@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends imagemagick ca-certificates curl \
-  && curl -sSL https://github.com/contentauth/c2patool/releases/download/v0.9.12/c2patool-v0.9.12-x86_64-unknown-linux-gnu.tar.gz \
+  && curl -sSL https://github.com/contentauth/c2pa-rs/releases/download/c2patool-v0.26.37/c2patool-v0.26.37-x86_64-unknown-linux-gnu.tar.gz \
      | tar -xz --strip-components=1 -C /usr/local/bin c2patool \
   && rm -rf /var/lib/apt/lists/*
 
