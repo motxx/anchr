@@ -1,4 +1,4 @@
-app = "anchr"
+app = "anchr-app"
 primary_region = "nrt"
 
 [build]
