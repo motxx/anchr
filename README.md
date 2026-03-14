@@ -2,7 +2,7 @@
 
 Anonymous real-world information protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
 
-Requesters post queries (photo proof, store status). Anonymous workers fulfill them on the ground. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
+Requesters describe what they need observed or verified in the real world. Anonymous workers fulfill queries on the ground with C2PA-verified media. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
 
 ## Design Principles
 
@@ -202,20 +202,21 @@ Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set
 ### SDK
 
 ```ts
-import { createQuery, queryTemplates } from "anchr";
+import { createQuery } from "anchr";
 
-// Requester: create a query (fetches HTLC hash from Oracle internally)
-const query = await createQuery(
-  queryTemplates.photoProof("Shibuya crossing, Tokyo"),
+// Requester: create a query
+const query = createQuery(
+  { description: "渋谷スクランブル交差点の現在の様子", location_hint: "Shibuya" },
   {
     ttlSeconds: 3600,
-    oraclePubkey: "npub1...",   // trusted Oracle pubkey
-    cashuMintUrl: "https://mint.example.com",
+    oracleIds: ["oracle-1"],                   // trusted Oracle IDs
+    bounty: { amount_sats: 100 },              // Cashu HTLC bounty
   },
 );
 
-// query.htlcToken  — locked Cashu HTLC token
-// query.nostrEventId — kind 5300 Job Request ID
+// query.id              — query ID
+// query.challenge_nonce  — nonce for freshness proof
+// query.challenge_rule   — instructions for worker
 ```
 
 ## Configuration
