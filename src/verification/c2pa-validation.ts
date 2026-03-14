@@ -117,9 +117,21 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
       };
     }
 
-    const validationStatus = active.validation_status as Array<{ code: string }> | undefined;
-    const hasErrors = validationStatus?.some((v) => v.code.startsWith("assertion") || v.code.startsWith("signing")) ?? false;
-    const signatureValid = !hasErrors;
+    // validation_status is at the report root, not inside the manifest.
+    // validation_results.activeManifest has structured success/failure arrays.
+    const validationResults = report.validation_results as {
+      activeManifest?: { success?: Array<{ code: string }>; failure?: Array<{ code: string; explanation?: string }> };
+    } | undefined;
+    const successCodes = validationResults?.activeManifest?.success ?? [];
+    const failureCodes = validationResults?.activeManifest?.failure ?? [];
+
+    // Signature is valid if claimSignature.validated is in success list.
+    // signingCredential.untrusted is expected for dev/self-signed certs and not a signature failure.
+    const claimSignatureOk = successCodes.some((v) => v.code === "claimSignature.validated");
+    const hasRealFailures = failureCodes.some((v) =>
+      v.code.startsWith("claimSignature.") || v.code.startsWith("assertion.dataHash."),
+    );
+    const signatureValid = claimSignatureOk && !hasRealFailures;
 
     checks.push("C2PA manifest found");
     if (manifest.claimGenerator) checks.push(`claim generator: ${manifest.claimGenerator}`);
