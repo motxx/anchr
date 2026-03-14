@@ -1,10 +1,21 @@
 export type QueryStatus =
   | "pending"
+  | "awaiting_quotes"
+  | "worker_selected"
+  | "processing"
+  | "verifying"
   | "submitted"
   | "approved"
   | "rejected"
   | "expired";
-export type PaymentStatus = "locked" | "released" | "cancelled";
+export type PaymentStatus =
+  | "none"
+  | "htlc_pending"
+  | "htlc_locked"
+  | "htlc_swapped"
+  | "locked"
+  | "released"
+  | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
@@ -76,6 +87,34 @@ export interface BountyInfo {
   cashu_token?: string;
 }
 
+/** HTLC escrow information for trustless payment. */
+export interface HtlcInfo {
+  /** SHA-256 hash of the preimage — known to all parties. */
+  hash: string;
+  /** Oracle's Nostr pubkey (hex). */
+  oracle_pubkey: string;
+  /** Requester's Nostr pubkey (hex) — used for HTLC refund. */
+  requester_pubkey: string;
+  /** Worker's Nostr pubkey (hex) — set after worker selection. */
+  worker_pubkey?: string;
+  /** HTLC locktime as unix timestamp (seconds). */
+  locktime: number;
+  /** Encoded Cashu HTLC token (held by Requester until swap). */
+  escrow_token?: string;
+}
+
+/** A quote from a Worker offering to fulfill a query. */
+export interface QuoteInfo {
+  /** Worker's Nostr pubkey (hex). */
+  worker_pubkey: string;
+  /** Requested amount in sats (optional; may match bounty). */
+  amount_sats?: number;
+  /** Nostr event ID of the kind 7000 quote event. */
+  quote_event_id: string;
+  /** Timestamp when the quote was received. */
+  received_at: number;
+}
+
 export interface Query {
   id: string;
   status: QueryStatus;
@@ -96,4 +135,10 @@ export interface Query {
   verification?: VerificationDetail;
   submission_meta?: SubmissionMeta;
   payment_status: PaymentStatus;
+  /** HTLC escrow details (present when Cashu payment is used). */
+  htlc?: HtlcInfo;
+  /** Worker quotes received for this query. */
+  quotes?: QuoteInfo[];
+  /** Nostr event ID of the kind 5300 Job Request. */
+  nostr_event_id?: string;
 }

@@ -16,6 +16,17 @@ services:
       - blossom-data:/app/data
       - ./blossom-config.yml:/app/config.yml
 
+  cashu-mint:
+    image: cashubtc/nutshell:latest
+    ports:
+      - "3338:3338"
+    environment:
+      MINT_BACKEND_BOLT11_SAT: FakeWallet
+      MINT_LISTEN_HOST: 0.0.0.0
+      MINT_LISTEN_PORT: "3338"
+      MINT_PRIVATE_KEY: "testtesttesttesttesttesttesttest"
+    command: ["poetry", "run", "mint"]
+
 volumes:
   relay-data:
   blossom-data:

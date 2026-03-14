@@ -330,6 +330,157 @@ describe("createQueryService", () => {
   });
 });
 
+describe("HTLC lifecycle", () => {
+  function makeIsolatedService() {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const oracle: Oracle = {
+      info: { id: "test-oracle", name: "Mock test-oracle", fee_ppm: 0 },
+      async verify(query: Query): Promise<OracleAttestation> {
+        return { oracle_id: "test-oracle", query_id: query.id, passed: true, checks: ["ok"], failures: [], attested_at: Date.now() };
+      },
+    };
+    registry.register(oracle);
+    return {
+      service: createQueryService({ store, oracleRegistry: registry }),
+      store,
+    };
+  }
+
+  const htlcInfo = {
+    hash: "abcd1234",
+    oracle_pubkey: "oracle_pub",
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  test("createQuery with htlc option sets awaiting_quotes status", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    expect(query.status).toBe("awaiting_quotes");
+    expect(query.payment_status).toBe("htlc_locked");
+    expect(query.htlc?.hash).toBe("abcd1234");
+    expect(query.quotes).toEqual([]);
+  });
+
+  test("recordQuote adds quote to awaiting_quotes query", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const outcome = service.recordQuote(query.id, {
+      worker_pubkey: "worker_pub_1",
+      amount_sats: 100,
+      quote_event_id: "evt_1",
+      received_at: Date.now(),
+    });
+    expect(outcome.ok).toBe(true);
+    expect(service.getQuery(query.id)?.quotes).toHaveLength(1);
+  });
+
+  test("recordQuote fails on non-HTLC query", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "Simple query" });
+    const outcome = service.recordQuote(query.id, {
+      worker_pubkey: "worker_pub_1",
+      amount_sats: 100,
+      quote_event_id: "evt_1",
+      received_at: Date.now(),
+    });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Not an HTLC query");
+  });
+
+  test("selectWorker transitions awaiting_quotes → processing", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.recordQuote(query.id, { worker_pubkey: "worker_pub_1", quote_event_id: "evt_1", received_at: Date.now() });
+    const outcome = service.selectWorker(query.id, "worker_pub_1", "htlc_token_123");
+    expect(outcome.ok).toBe(true);
+    const updated = service.getQuery(query.id)!;
+    expect(updated.status).toBe("processing");
+    expect(updated.htlc?.worker_pubkey).toBe("worker_pub_1");
+    expect(updated.payment_status).toBe("htlc_swapped");
+  });
+
+  test("selectWorker fails on wrong state", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.selectWorker(query.id, "worker_pub_1");
+    const outcome = service.selectWorker(query.id, "worker_pub_2");
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("not awaiting_quotes");
+  });
+
+  test("recordResult transitions processing → verifying", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.selectWorker(query.id, "worker_pub_1");
+    const outcome = service.recordResult(query.id, { attachments: [], notes: "done" }, "worker_pub_1");
+    expect(outcome.ok).toBe(true);
+    expect(service.getQuery(query.id)?.status).toBe("verifying");
+  });
+
+  test("recordResult fails for wrong worker", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.selectWorker(query.id, "worker_pub_1");
+    const outcome = service.recordResult(query.id, { attachments: [] }, "wrong_worker");
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("does not match");
+  });
+
+  test("completeVerification transitions verifying → approved", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.selectWorker(query.id, "worker_pub_1");
+    service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
+    const outcome = service.completeVerification(query.id, true, "test-oracle");
+    expect(outcome.ok).toBe(true);
+    const updated = service.getQuery(query.id)!;
+    expect(updated.status).toBe("approved");
+    expect(updated.payment_status).toBe("released");
+    expect(updated.assigned_oracle_id).toBe("test-oracle");
+  });
+
+  test("completeVerification transitions verifying → rejected", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    service.selectWorker(query.id, "worker_pub_1");
+    service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
+    const outcome = service.completeVerification(query.id, false);
+    expect(outcome.ok).toBe(true);
+    expect(service.getQuery(query.id)?.status).toBe("rejected");
+    expect(service.getQuery(query.id)?.payment_status).toBe("cancelled");
+  });
+
+  test("listOpenQueries includes HTLC queries in active states", () => {
+    const { service } = makeIsolatedService();
+    service.createQuery({ description: "Simple" }, { ttlMs: 60_000 });
+    service.createQuery({ description: "HTLC" }, { htlc: htlcInfo, ttlMs: 60_000 });
+    const open = service.listOpenQueries();
+    expect(open).toHaveLength(2);
+  });
+
+  test("full HTLC lifecycle: create → quote → select → result → verify", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery({ description: "Full HTLC" }, { htlc: htlcInfo });
+    expect(query.status).toBe("awaiting_quotes");
+
+    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, { worker_pubkey: "w2", amount_sats: 50, quote_event_id: "e2", received_at: Date.now() });
+    expect(service.getQuery(query.id)?.quotes).toHaveLength(2);
+
+    service.selectWorker(query.id, "w1", "final_htlc_token");
+    expect(service.getQuery(query.id)?.status).toBe("processing");
+
+    service.recordResult(query.id, { attachments: [], notes: "photo taken" }, "w1");
+    expect(service.getQuery(query.id)?.status).toBe("verifying");
+
+    service.completeVerification(query.id, true, "test-oracle");
+    expect(service.getQuery(query.id)?.status).toBe("approved");
+    expect(service.getQuery(query.id)?.payment_status).toBe("released");
+  });
+});
+
 describe("createIntegrityStore isolation", () => {
   test("instances do not share state", () => {
     const store1 = createIntegrityStore();

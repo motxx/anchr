@@ -18,7 +18,7 @@ import type { OracleRegistry } from "./oracle/registry";
 import {
   cancelQuery,
   createQuery,
-  createQueryService,
+  defaultService as defaultQueryService,
   getQuery as getQueryById,
   listOpenQueries,
   submitQueryResult,
@@ -26,7 +26,7 @@ import {
   type QueryResult,
   type QueryService,
 } from "./query-service";
-import type { AttachmentRef, BlossomKeyMap, Query } from "./types";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, Query, QuoteInfo } from "./types";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
@@ -48,6 +48,14 @@ const bountySchema = z.object({
 
 const oracleIdsSchema = z.array(z.string().min(1)).optional();
 
+const htlcSchema = z.object({
+  hash: z.string().min(1),
+  oracle_pubkey: z.string().min(1),
+  requester_pubkey: z.string().min(1),
+  locktime: z.number().int().min(0),
+  escrow_token: z.string().min(1).optional(),
+}).optional();
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
@@ -55,6 +63,7 @@ const createQuerySchema = z.object({
   requester: requesterMetaSchema.optional(),
   bounty: bountySchema.optional(),
   oracle_ids: oracleIdsSchema,
+  htlc: htlcSchema,
 });
 
 // --- Auth Middleware ---
@@ -107,6 +116,13 @@ function querySummary(query: Query) {
     oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
+    htlc: query.htlc ? {
+      hash: query.htlc.hash,
+      oracle_pubkey: query.htlc.oracle_pubkey,
+      worker_pubkey: query.htlc.worker_pubkey ?? null,
+      locktime: query.htlc.locktime,
+    } : null,
+    quotes_count: query.quotes?.length ?? 0,
   };
 }
 
@@ -122,6 +138,8 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
     requester_meta: query.requester_meta ?? null,
     reference_app_url: `${requestOrigin}/queries/${query.id}`,
     query_api_url: `${requestOrigin}/queries/${query.id}`,
+    payment_status: query.payment_status,
+    htlc: query.htlc ? { hash: query.htlc.hash, oracle_pubkey: query.htlc.oracle_pubkey } : null,
   };
 }
 
@@ -182,12 +200,12 @@ export async function prepareWorkerApiAssets() {
 // --- Routes ---
 
 export function buildWorkerApiApp(deps?: WorkerApiDeps) {
-  const qs = deps?.queryService;
-  const doCreateQuery = qs ? qs.createQuery.bind(qs) : createQuery;
-  const doGetQuery = qs ? qs.getQuery.bind(qs) : getQueryById;
-  const doListOpen = qs ? qs.listOpenQueries.bind(qs) : listOpenQueries;
-  const doSubmit = qs ? qs.submitQueryResult.bind(qs) : submitQueryResult;
-  const doCancel = qs ? qs.cancelQuery.bind(qs) : cancelQuery;
+  const svc = deps?.queryService ?? defaultQueryService;
+  const doCreateQuery = svc.createQuery.bind(svc);
+  const doGetQuery = svc.getQuery.bind(svc);
+  const doListOpen = svc.listOpenQueries.bind(svc);
+  const doSubmit = svc.submitQueryResult.bind(svc);
+  const doCancel = svc.cancelQuery.bind(svc);
   const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
 
   const app = new Hono();
@@ -230,6 +248,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         requesterMeta: payload.requester,
         bounty: payload.bounty,
         oracleIds: payload.oracle_ids,
+        htlc: payload.htlc as HtlcInfo | undefined,
       });
 
       return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
@@ -348,6 +367,68 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const outcome = doCancel(id);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  // --- HTLC lifecycle endpoints ---
+
+  app.get("/queries/:id/quotes", (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const query = doGetQuery(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+    return c.json(query.quotes ?? []);
+  });
+
+  app.post("/queries/:id/quotes", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+
+    const quote: QuoteInfo = {
+      worker_pubkey: workerPubkey,
+      amount_sats: typeof body.amount_sats === "number" ? body.amount_sats : undefined,
+      quote_event_id: typeof body.quote_event_id === "string" ? body.quote_event_id : "",
+      received_at: Date.now(),
+    };
+
+    const outcome = svc.recordQuote(id, quote);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  app.post("/queries/:id/select", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+    const htlcToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
+
+    const outcome = svc.selectWorker(id, workerPubkey, htlcToken);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  app.post("/queries/:id/result", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+
+    const result: QueryResult = {
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      notes: typeof body.notes === "string" ? body.notes : undefined,
+    };
+
+    const outcome = svc.recordResult(id, result, workerPubkey);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 

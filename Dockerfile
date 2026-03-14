@@ -19,4 +19,4 @@ ENV RUNTIME_DATA_DIR=/data
 
 EXPOSE 8080
 
-CMD ["bun", "run", "src/http-server.ts"]
+CMD ["bun", "run", "src/server.ts"]

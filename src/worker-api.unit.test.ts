@@ -159,3 +159,140 @@ describe("buildWorkerApiApp with injected deps", () => {
     expect(res2.status).toBe(404);
   }));
 });
+
+describe("HTLC endpoints", () => {
+  const htlcInfo = {
+    hash: "abcd1234",
+    oracle_pubkey: "oracle_pub",
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  test("POST /queries creates HTLC query when htlc provided", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "HTLC query",
+        htlc: htlcInfo,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const json = await res.json() as { query_id: string; status: string; payment_status: string; htlc: { hash: string } | null };
+    expect(json.status).toBe("awaiting_quotes");
+    expect(json.payment_status).toBe("htlc_locked");
+    expect(json.htlc?.hash).toBe("abcd1234");
+    expect(queryService.getQuery(json.query_id)?.htlc).toBeDefined();
+  }));
+
+  test("GET /queries/:id/quotes returns quotes", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    queryService.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+
+    const res = await app.request(`http://localhost/queries/${query.id}/quotes`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as Array<{ worker_pubkey: string }>;
+    expect(json).toHaveLength(1);
+    expect(json[0]!.worker_pubkey).toBe("w1");
+  }));
+
+  test("POST /queries/:id/quotes records a quote", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+
+    const res = await app.request(`http://localhost/queries/${query.id}/quotes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", amount_sats: 100, quote_event_id: "evt_1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(queryService.getQuery(query.id)?.quotes).toHaveLength(1);
+  }));
+
+  test("POST /queries/:id/select selects worker", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+
+    const res = await app.request(`http://localhost/queries/${query.id}/select`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", htlc_token: "token123" }),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(queryService.getQuery(query.id)?.status).toBe("processing");
+  }));
+
+  test("POST /queries/:id/result records result", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    queryService.selectWorker(query.id, "w1");
+
+    const res = await app.request(`http://localhost/queries/${query.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "done" }),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(queryService.getQuery(query.id)?.status).toBe("verifying");
+  }));
+
+  test("GET /queries/:id includes HTLC info", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+
+    const res = await app.request(`http://localhost/queries/${query.id}`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { status: string; payment_status: string };
+    expect(json.status).toBe("awaiting_quotes");
+    expect(json.payment_status).toBe("htlc_locked");
+  }));
+
+  test("HTLC full lifecycle via HTTP", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+
+    // Create HTLC query
+    const createRes = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ description: "Full HTLC lifecycle", htlc: htlcInfo }),
+    });
+    expect(createRes.status).toBe(201);
+    const { query_id } = await createRes.json() as { query_id: string };
+
+    // Submit quote
+    const quoteRes = await app.request(`http://localhost/queries/${query_id}/quotes`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", amount_sats: 100, quote_event_id: "e1" }),
+    });
+    expect((await quoteRes.json() as { ok: boolean }).ok).toBe(true);
+
+    // Select worker
+    const selectRes = await app.request(`http://localhost/queries/${query_id}/select`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", htlc_token: "final_token" }),
+    });
+    expect((await selectRes.json() as { ok: boolean }).ok).toBe(true);
+
+    // Submit result
+    const resultRes = await app.request(`http://localhost/queries/${query_id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "photo" }),
+    });
+    expect((await resultRes.json() as { ok: boolean }).ok).toBe(true);
+
+    // Complete verification (done server-side, tested via service)
+    queryService.completeVerification(query_id, true);
+    expect(queryService.getQuery(query_id)?.status).toBe("approved");
+  }));
+});

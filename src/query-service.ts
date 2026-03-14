@@ -6,11 +6,13 @@ import type {
   BlossomKeyMap,
   BountyInfo,
   ExecutorType,
+  HtlcInfo,
   PaymentStatus,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
+  QuoteInfo,
   RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
@@ -37,6 +39,10 @@ export interface CreateQueryOptions {
   bounty?: BountyInfo;
   /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
   oracleIds?: string[];
+  /** HTLC escrow info — when present, creates an HTLC-mode query. */
+  htlc?: HtlcInfo;
+  /** Nostr event ID of the kind 5300 Job Request. */
+  nostrEventId?: string;
 }
 
 export interface SubmitQueryOutcome {
@@ -83,6 +89,11 @@ export interface QueryServiceDeps {
   hooks?: QueryHooks;
 }
 
+export interface HtlcOutcome {
+  ok: boolean;
+  message: string;
+}
+
 export interface QueryService {
   createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
   getQuery(id: string): Query | null;
@@ -98,6 +109,17 @@ export interface QueryService {
   expireQueries(): number;
   purgeExpiredFromStore(): Query[];
   clearQueryStore(): void;
+
+  // --- HTLC lifecycle ---
+
+  /** Record a Worker quote for an HTLC query. */
+  recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
+  /** Select a Worker and transition to worker_selected/processing. */
+  selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): HtlcOutcome;
+  /** Record a Worker's result submission (transition to verifying). */
+  recordResult(queryId: string, result: QueryResult, workerPubkey: string): HtlcOutcome;
+  /** Complete Oracle verification (transition to approved/rejected). */
+  completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
 }
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
@@ -124,13 +146,26 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       : resolveOracle(oracleId, acceptableIds);
   }
 
+  /** Valid state transitions for HTLC queries. */
+  const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
+    awaiting_quotes: ["worker_selected"],
+    worker_selected: ["processing"],
+    processing: ["verifying"],
+    verifying: ["approved", "rejected"],
+  };
+
+  function isHtlcQuery(query: Query): boolean {
+    return query.htlc !== undefined;
+  }
+
   return {
     createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
       const now = Date.now();
       const nonce = generateNonce();
+      const isHtlc = options?.htlc !== undefined;
       const query: Query = {
         id: generateQueryId(),
-        status: "pending",
+        status: isHtlc ? "awaiting_quotes" : "pending",
         description: input.description,
         location_hint: input.location_hint,
         challenge_nonce: nonce,
@@ -140,7 +175,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         requester_meta: options?.requesterMeta,
         bounty: options?.bounty,
         oracle_ids: options?.oracleIds,
-        payment_status: "locked",
+        payment_status: isHtlc ? "htlc_locked" : "locked",
+        htlc: options?.htlc,
+        quotes: isHtlc ? [] : undefined,
+        nostr_event_id: options?.nostrEventId,
       };
 
       store.set(query.id, query);
@@ -154,7 +192,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
     listOpenQueries(): Query[] {
       const now = Date.now();
-      return store.values().filter((q) => q.status === "pending" && q.expires_at > now);
+      const openStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+      return store.values().filter((q) => openStatuses.includes(q.status) && q.expires_at > now);
     },
 
     async submitQueryResult(
@@ -244,6 +283,77 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     clearQueryStore(): void {
       store.clear();
     },
+
+    // --- HTLC lifecycle ---
+
+    recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome {
+      const query = store.get(queryId);
+      if (!query) return { ok: false, message: "Query not found" };
+      if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+      if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
+
+      const quotes = [...(query.quotes ?? []), quote];
+      store.set(queryId, { ...query, quotes });
+      return { ok: true, message: "Quote recorded" };
+    },
+
+    selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): HtlcOutcome {
+      const query = store.get(queryId);
+      if (!query) return { ok: false, message: "Query not found" };
+      if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+      if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
+
+      const htlc: HtlcInfo = {
+        ...query.htlc!,
+        worker_pubkey: workerPubkey,
+        escrow_token: htlcToken ?? query.htlc!.escrow_token,
+      };
+
+      store.set(queryId, {
+        ...query,
+        status: "processing",
+        htlc,
+        payment_status: htlcToken ? "htlc_swapped" : query.payment_status,
+      });
+      return { ok: true, message: "Worker selected" };
+    },
+
+    recordResult(queryId: string, result: QueryResult, workerPubkey: string): HtlcOutcome {
+      const query = store.get(queryId);
+      if (!query) return { ok: false, message: "Query not found" };
+      if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+      if (query.status !== "processing") return { ok: false, message: `Query is ${query.status}, not processing` };
+      if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+        return { ok: false, message: "Worker pubkey does not match selected worker" };
+      }
+
+      const normalizedResult = normalizeQueryResult(result);
+      store.set(queryId, {
+        ...query,
+        status: "verifying",
+        result: normalizedResult,
+        submitted_at: Date.now(),
+        submission_meta: { executor_type: "human", channel: "worker_api" },
+      });
+      return { ok: true, message: "Result recorded, verification in progress" };
+    },
+
+    completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome {
+      const query = store.get(queryId);
+      if (!query) return { ok: false, message: "Query not found" };
+      if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+      if (query.status !== "verifying") return { ok: false, message: `Query is ${query.status}, not verifying` };
+
+      const newStatus: QueryStatus = passed ? "approved" : "rejected";
+      const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
+      store.set(queryId, {
+        ...query,
+        status: newStatus,
+        payment_status: paymentStatus,
+        assigned_oracle_id: oracleId,
+      });
+      return { ok: true, message: passed ? "Verification passed" : "Verification failed" };
+    },
   };
 }
 
@@ -277,7 +387,7 @@ function publishQueryToRelay(query: Query): void {
 
 // --- Default singleton service (backward compat) ---
 
-const defaultService = createQueryService({
+export const defaultService = createQueryService({
   hooks: { onCreated: publishQueryToRelay },
 });
 

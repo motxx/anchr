@@ -11,29 +11,47 @@
  */
 
 import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../types";
 import type { OracleAttestation } from "./types";
+import { createPreimageStore, type PreimageStore } from "./preimage-store";
 
 const ORACLE_ID = process.env.ORACLE_ID ?? "remote-oracle";
 const ORACLE_API_KEY = process.env.ORACLE_API_KEY?.trim();
 const ORACLE_PORT = Number(process.env.ORACLE_PORT) || 4000;
 
-export function buildOracleApp(oracleId: string = ORACLE_ID, apiKey?: string): Hono {
+export interface OracleAppOptions {
+  oracleId?: string;
+  apiKey?: string;
+  preimageStore?: PreimageStore;
+}
+
+export function buildOracleApp(
+  oracleIdOrOptions?: string | OracleAppOptions,
+  apiKey?: string,
+): Hono {
+  const opts: OracleAppOptions = typeof oracleIdOrOptions === "string"
+    ? { oracleId: oracleIdOrOptions, apiKey }
+    : oracleIdOrOptions ?? {};
+
+  const oracleId = opts.oracleId ?? ORACLE_ID;
+  const resolvedApiKey = opts.apiKey ?? apiKey;
+  const preimageStore = opts.preimageStore ?? createPreimageStore();
+
   const app = new Hono();
 
-  // Auth middleware (optional)
-  if (apiKey) {
-    app.use("/verify", async (c, next) => {
-      const auth = c.req.header("authorization");
-      const key = c.req.header("x-api-key");
-      const token = auth?.startsWith("Bearer ") ? auth.slice(7) : key;
-      if (token !== apiKey) {
-        return c.json({ error: "Unauthorized" }, 401);
-      }
-      await next();
-    });
-  }
+  // Auth middleware for protected endpoints
+  const authMiddleware: MiddlewareHandler = async (c, next) => {
+    if (!resolvedApiKey) return next();
+    const auth = c.req.header("authorization");
+    const key = c.req.header("x-api-key");
+    const token = auth?.startsWith("Bearer ") ? auth.slice(7) : key;
+    if (token !== resolvedApiKey) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+    await next();
+  };
 
   app.get("/health", (c) => c.json({ ok: true, oracle_id: oracleId }));
 
@@ -45,7 +63,44 @@ export function buildOracleApp(oracleId: string = ORACLE_ID, apiKey?: string): H
     }),
   );
 
-  app.post("/verify", async (c) => {
+  /**
+   * POST /hash — Generate HTLC preimage for a new query.
+   *
+   * Step 1 of the HTLC flow: Oracle generates preimage secretly,
+   * returns hash(preimage) to the Requester.
+   */
+  app.post("/hash", authMiddleware, async (c) => {
+    const body = await c.req.json<{ query_id: string }>().catch(() => null);
+    if (!body?.query_id) {
+      return c.json({ error: "Missing query_id" }, 400);
+    }
+
+    const existing = preimageStore.getHash(body.query_id);
+    if (existing) {
+      return c.json({ query_id: body.query_id, hash: existing });
+    }
+
+    const entry = preimageStore.create(body.query_id);
+    return c.json({
+      query_id: body.query_id,
+      hash: entry.hash,
+    }, 201);
+  });
+
+  /**
+   * GET /hash/:queryId — Retrieve hash for a known query.
+   */
+  app.get("/hash/:queryId", authMiddleware, (c) => {
+    const queryId = c.req.param("queryId");
+    const hash = preimageStore.getHash(queryId);
+    if (!hash) return c.json({ error: "No hash found for this query" }, 404);
+    return c.json({ query_id: queryId, hash });
+  });
+
+  /**
+   * POST /verify — Run C2PA verification and return attestation.
+   */
+  app.post("/verify", authMiddleware, async (c) => {
     const body = await c.req.json<{ query: Query; result: QueryResult }>();
     if (!body.query || !body.result) {
       return c.json({ error: "Missing query or result in request body" }, 400);
@@ -62,6 +117,26 @@ export function buildOracleApp(oracleId: string = ORACLE_ID, apiKey?: string): H
     };
 
     return c.json(attestation);
+  });
+
+  /**
+   * POST /preimage — Retrieve preimage after successful verification.
+   *
+   * The Oracle delivers the preimage only after C2PA verification passes.
+   * In the Nostr-native flow, this is done via NIP-44 DM instead.
+   */
+  app.post("/preimage", authMiddleware, async (c) => {
+    const body = await c.req.json<{ query_id: string }>().catch(() => null);
+    if (!body?.query_id) {
+      return c.json({ error: "Missing query_id" }, 400);
+    }
+
+    const preimage = preimageStore.getPreimage(body.query_id);
+    if (!preimage) {
+      return c.json({ error: "No preimage found for this query" }, 404);
+    }
+
+    return c.json({ query_id: body.query_id, preimage });
   });
 
   return app;
