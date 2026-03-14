@@ -16,14 +16,6 @@ function parseTextPayload(result: { content: Array<{ type: string; text?: string
   return JSON.parse(text);
 }
 
-function getContentTypes(result: unknown) {
-  return (result as { content: Array<{ type: string }> }).content.map((item) => item.type);
-}
-
-function previewSupported() {
-  return process.platform === "darwin" || Boolean(Bun.which("magick") || Bun.which("convert"));
-}
-
 async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
   const bootstrap = [
     bootstrapPreamble,
@@ -53,14 +45,14 @@ test("mcp tools expose query status and attachment metadata", async () => {
   // Bootstrap: create query + submit result inside the MCP subprocess so
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
-    `const { createQuery, submitQueryResult, queryTemplates } = await import(${JSON.stringify(join(import.meta.dir, "query-service.ts"))});`,
+    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(import.meta.dir, "query-service.ts"))});`,
     `const { storeIntegrity } = await import(${JSON.stringify(join(import.meta.dir, "verification/integrity-store.ts"))});`,
-    `const query = createQuery(queryTemplates.photoProof("MCP integration test"), { ttlSeconds: 300 });`,
+    `const query = createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,
     `const attachment = { id: ${JSON.stringify(attachmentId)}, uri: "https://blossom.example.com/${attachmentId}", mime_type: "image/png", storage_kind: "blossom", filename: "${attachmentId}.png", size_bytes: ${PNG_BYTES.length}, blossom_hash: ${JSON.stringify(attachmentId)}, blossom_servers: ["https://blossom.example.com"] };`,
     `storeIntegrity({ attachmentId: ${JSON.stringify(attachmentId)}, queryId: query.id, capturedAt: Date.now(), exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] }, c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "${attachmentId}.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] } });`,
-    `await submitQueryResult(query.id, { type: "photo_proof", text_answer: "Observed storefront " + query.challenge_nonce, attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "worker_api" });`,
+    `await submitQueryResult(query.id, { attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "worker_api" });`,
   ].join(" ");
 
   const client = await createMcpClient({}, setupPreamble);
@@ -70,10 +62,10 @@ test("mcp tools expose query status and attachment metadata", async () => {
     expect(tools.tools.some((tool) => tool.name === "get_query_attachment")).toBe(true);
     expect(tools.tools.some((tool) => tool.name === "get_query_attachment_preview")).toBe(true);
 
-    // Create a store_status query via MCP tool to verify creation works
+    // Create a query via MCP tool to verify creation works
     const created = await client.callTool({
-      name: "request_store_status",
-      arguments: { store_name: "MCP Test Store", ttl_seconds: 120 },
+      name: "create_query",
+      arguments: { description: "MCP Test Store の営業状況", ttl_seconds: 120 },
     });
     const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
     expect(createdJson.query_id).toStartWith("query_");
@@ -83,7 +75,7 @@ test("mcp tools expose query status and attachment metadata", async () => {
       name: "submit_query_result",
       arguments: {
         query_id: createdJson.query_id,
-        result: { type: "store_status", status: "open", notes: "MCP test" },
+        result: { attachments: [], notes: "MCP test" },
       },
     });
     const submitJson = parseTextPayload(submitResult as { content: Array<{ type: string; text?: string }> });
@@ -97,22 +89,22 @@ test("mcp tools expose query status and attachment metadata", async () => {
     const statusJson = parseTextPayload(status as { content: Array<{ type: string; text?: string }> });
     expect(statusJson.status).toBe("approved");
 
-    // Create a photo_proof query via MCP
-    const photoQuery = await client.callTool({
-      name: "request_photo_proof",
-      arguments: { target: "Attachment test", ttl_seconds: 120 },
+    // Create another query via MCP
+    const anotherQuery = await client.callTool({
+      name: "create_query",
+      arguments: { description: "Attachment test", ttl_seconds: 120 },
     });
-    const photoJson = parseTextPayload(photoQuery as { content: Array<{ type: string; text?: string }> });
-    const photoQueryId = photoJson.query_id;
+    const anotherJson = parseTextPayload(anotherQuery as { content: Array<{ type: string; text?: string }> });
+    const anotherQueryId = anotherJson.query_id;
 
     // Verify we can get attachment tools listed
     const attResult = await client.callTool({
       name: "get_query_attachment",
-      arguments: { query_id: photoQueryId },
+      arguments: { query_id: anotherQueryId },
     });
     const attJson = parseTextPayload(attResult as { content: Array<{ type: string; text?: string }> });
     // Query is pending, no attachments yet
-    expect(attJson.error).toContain("does not have photo proof attachments");
+    expect(attJson.error).toContain("does not have attachments");
   } finally {
     await client.close();
   }
@@ -145,9 +137,9 @@ test("mcp can use a remote HTTP query backend", async () => {
 
   try {
     const created = await client.callTool({
-      name: "request_store_status",
+      name: "create_query",
       arguments: {
-        store_name: "Remote MCP Smoke Store",
+        description: "Remote MCP Smoke Store の営業状況",
         location_hint: "Tokyo",
         ttl_seconds: 180,
       },
@@ -169,8 +161,7 @@ test("mcp can use a remote HTTP query backend", async () => {
       arguments: {
         query_id: createdJson.query_id,
         result: {
-          type: "store_status",
-          status: "open",
+          attachments: [],
           notes: "Observed storefront, looked open",
         },
       },

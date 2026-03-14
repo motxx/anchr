@@ -30,16 +30,15 @@ test("built-in oracle has correct info", () => {
 test("built-in oracle verify returns attestation", async () => {
   const query: Query = {
     id: "q1",
-    type: "store_status",
     status: "pending",
-    params: { type: "store_status", store_name: "Test" },
+    description: "Test query",
     challenge_nonce: "ABC",
     challenge_rule: "test",
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "locked",
   };
-  const result: QueryResult = { type: "store_status", status: "open" };
+  const result: QueryResult = { attachments: [], notes: "open" };
 
   const attestation = await builtInOracle.verify(query, result);
 

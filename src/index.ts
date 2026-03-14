@@ -7,7 +7,6 @@ export {
   expireQueries,
   getQuery,
   listOpenQueries,
-  queryTemplates,
   submitQueryResult,
 } from "./query-service";
 export type {
@@ -27,7 +26,6 @@ export type {
   QueryResult,
   QueryStatus,
   QuerySubmissionMeta,
-  QueryType,
   QueryVerification,
   SubmitQueryOutcome,
 } from "./query-service";

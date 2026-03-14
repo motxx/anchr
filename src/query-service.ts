@@ -23,7 +23,6 @@ export type {
   QueryInput,
   QueryResult,
   QueryStatus,
-  QueryType,
   RequesterMeta,
   RequesterType,
 } from "./types";
@@ -103,25 +102,6 @@ export interface QueryService {
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
-export const queryTemplates = {
-  photoProof: (target: string, locationHint?: string): QueryInput => ({
-    type: "photo_proof",
-    target,
-    location_hint: locationHint,
-  }),
-  storeStatus: (storeName: string, locationHint?: string): QueryInput => ({
-    type: "store_status",
-    store_name: storeName,
-    location_hint: locationHint,
-  }),
-  webpageField: (url: string, field: string, anchorWord: string): QueryInput => ({
-    type: "webpage_field",
-    url,
-    field,
-    anchor_word: anchorWord,
-  }),
-} as const;
-
 function resolveTtlMs(options?: CreateQueryOptions): number {
   if (!options) return DEFAULT_TTL_MS;
   if (typeof options.ttlMs === "number") return options.ttlMs;
@@ -150,11 +130,11 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const nonce = generateNonce();
       const query: Query = {
         id: generateQueryId(),
-        type: input.type,
         status: "pending",
-        params: input,
+        description: input.description,
+        location_hint: input.location_hint,
         challenge_nonce: nonce,
-        challenge_rule: buildChallengeRule(input.type, nonce, input as unknown as Record<string, unknown>),
+        challenge_rule: buildChallengeRule(nonce, input.description),
         created_at: now,
         expires_at: now + resolveTtlMs(options),
         requester_meta: options?.requesterMeta,
@@ -276,17 +256,15 @@ function publishQueryToRelay(query: Query): void {
     const { generateEphemeralIdentity } = await import("./nostr/identity");
 
     const identity = generateEphemeralIdentity();
-    const params = query.params as unknown as Record<string, unknown>;
     const event = buildQueryRequestEvent(identity, query.id, {
-      type: query.type,
-      params,
+      description: query.description,
       nonce: query.challenge_nonce,
       expires_at: query.expires_at,
       oracle_ids: query.oracle_ids,
       bounty: query.bounty?.cashu_token
         ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.cashu_token }
         : undefined,
-    }, params.location_hint as string | undefined);
+    }, query.location_hint);
 
     const result = await publishEvent(event);
     if (result.successes.length > 0) {

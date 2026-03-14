@@ -93,7 +93,7 @@ describe("createQueryService", () => {
 
   test("createQuery returns a pending query with nonce", () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     expect(query.status).toBe("pending");
     expect(query.challenge_nonce).toBeTruthy();
     expect(query.id).toStartWith("query_");
@@ -102,7 +102,7 @@ describe("createQueryService", () => {
   test("createQuery respects ttlMs option", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { ttlMs: 5000 },
     );
     expect(query.expires_at - query.created_at).toBe(5000);
@@ -111,7 +111,7 @@ describe("createQueryService", () => {
   test("createQuery respects ttlSeconds option", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { ttlSeconds: 120 },
     );
     expect(query.expires_at - query.created_at).toBe(120_000);
@@ -120,7 +120,7 @@ describe("createQueryService", () => {
   test("createQuery stores requester_meta", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { requesterMeta: { requester_type: "app", requester_id: "test-app" } },
     );
     expect(query.requester_meta?.requester_type).toBe("app");
@@ -130,7 +130,7 @@ describe("createQueryService", () => {
   test("createQuery stores oracle_ids", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { oracleIds: ["oracle-a", "oracle-b"] },
     );
     expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
@@ -139,7 +139,7 @@ describe("createQueryService", () => {
   test("createQuery stores bounty info", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { bounty: { amount_sats: 100 } },
     );
     expect(query.bounty?.amount_sats).toBe(100);
@@ -150,13 +150,13 @@ describe("createQueryService", () => {
     const { service } = makeIsolatedService({
       hooks: { onCreated: (q) => created.push(q) },
     });
-    service.createQuery({ type: "store_status", store_name: "Test" });
+    service.createQuery({ description: "Test query" });
     expect(created).toHaveLength(1);
   });
 
   test("getQuery retrieves created query", () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     expect(service.getQuery(query.id)).toEqual(query);
   });
 
@@ -167,19 +167,19 @@ describe("createQueryService", () => {
 
   test("listOpenQueries returns only pending non-expired queries", () => {
     const { service } = makeIsolatedService();
-    service.createQuery({ type: "store_status", store_name: "Active" }, { ttlMs: 60_000 });
-    service.createQuery({ type: "store_status", store_name: "Expired" }, { ttlMs: -1 });
+    service.createQuery({ description: "Active" }, { ttlMs: 60_000 });
+    service.createQuery({ description: "Expired" }, { ttlMs: -1 });
     const open = service.listOpenQueries();
     expect(open).toHaveLength(1);
-    expect(open[0]!.params).toEqual({ type: "store_status", store_name: "Active" });
+    expect(open[0]!.description).toBe("Active");
   });
 
   test("submitQueryResult approves valid submission", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     const outcome = await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "test-oracle",
     );
@@ -193,10 +193,10 @@ describe("createQueryService", () => {
     const { service } = makeIsolatedService({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     const outcome = await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "strict-oracle",
     );
@@ -209,7 +209,7 @@ describe("createQueryService", () => {
     const { service } = makeIsolatedService();
     const outcome = await service.submitQueryResult(
       "nonexistent",
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
     );
     expect(outcome.ok).toBe(false);
@@ -220,12 +220,12 @@ describe("createQueryService", () => {
   test("submitQueryResult fails for expired query", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { ttlMs: -1 },
     );
     const outcome = await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
     );
     expect(outcome.ok).toBe(false);
@@ -234,16 +234,16 @@ describe("createQueryService", () => {
 
   test("submitQueryResult fails for already-submitted query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "test-oracle",
     );
     const outcome = await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "test-oracle",
     );
@@ -254,12 +254,12 @@ describe("createQueryService", () => {
   test("submitQueryResult rejects unacceptable oracle", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { type: "store_status", store_name: "Test" },
+      { description: "Test query" },
       { oracleIds: ["specific-oracle"] },
     );
     const outcome = await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "test-oracle",
     );
@@ -269,7 +269,7 @@ describe("createQueryService", () => {
 
   test("cancelQuery cancels a pending query", () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     const outcome = service.cancelQuery(query.id);
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("rejected");
@@ -284,10 +284,10 @@ describe("createQueryService", () => {
 
   test("cancelQuery fails for already-approved query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ type: "store_status", store_name: "Test" });
+    const query = service.createQuery({ description: "Test query" });
     await service.submitQueryResult(
       query.id,
-      { type: "store_status", status: "open" },
+      { attachments: [], notes: "open" },
       { executor_type: "human", channel: "worker_api" },
       "test-oracle",
     );
@@ -298,15 +298,15 @@ describe("createQueryService", () => {
 
   test("expireQueries marks expired pending queries", () => {
     const { service } = makeIsolatedService();
-    service.createQuery({ type: "store_status", store_name: "Expired" }, { ttlMs: -1 });
-    service.createQuery({ type: "store_status", store_name: "Active" }, { ttlMs: 60_000 });
+    service.createQuery({ description: "Expired" }, { ttlMs: -1 });
+    service.createQuery({ description: "Active" }, { ttlMs: 60_000 });
     const count = service.expireQueries();
     expect(count).toBe(1);
   });
 
   test("purgeExpiredFromStore removes expired queries", () => {
     const { service, store } = makeIsolatedService();
-    service.createQuery({ type: "store_status", store_name: "Expired" }, { ttlMs: -1 });
+    service.createQuery({ description: "Expired" }, { ttlMs: -1 });
     service.expireQueries();
     const purged = service.purgeExpiredFromStore();
     expect(purged).toHaveLength(1);
@@ -315,8 +315,8 @@ describe("createQueryService", () => {
 
   test("clearQueryStore empties the store", () => {
     const { service, store } = makeIsolatedService();
-    service.createQuery({ type: "store_status", store_name: "A" });
-    service.createQuery({ type: "store_status", store_name: "B" });
+    service.createQuery({ description: "A" });
+    service.createQuery({ description: "B" });
     service.clearQueryStore();
     expect(store.values()).toHaveLength(0);
   });
@@ -324,7 +324,7 @@ describe("createQueryService", () => {
   test("isolated services do not share state", () => {
     const { service: s1 } = makeIsolatedService();
     const { service: s2 } = makeIsolatedService();
-    const q = s1.createQuery({ type: "store_status", store_name: "Test" });
+    const q = s1.createQuery({ description: "Test" });
     expect(s1.getQuery(q.id)).not.toBeNull();
     expect(s2.getQuery(q.id)).toBeNull();
   });

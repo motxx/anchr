@@ -24,16 +24,14 @@ function injectValidC2pa(attachmentId: string, queryId: string) {
   });
 }
 
-test("query service approves valid store status submissions", async () => {
+test("query service approves valid submissions", async () => {
   const query = createQuery({
-    type: "store_status",
-    store_name: "Test Ramen",
+    description: "Check if Test Ramen is open",
     location_hint: "Tokyo",
   });
 
   const outcome = await submitQueryResult(query.id, {
-    type: "store_status",
-    status: "open",
+    attachments: [],
     notes: "Observed storefront, looked open",
   }, {
     executor_type: "human",
@@ -50,14 +48,12 @@ test("query service approves valid store status submissions", async () => {
 
 test("query service excludes expired pending queries from open list", () => {
   const expired = createQuery({
-    type: "photo_proof",
-    target: "Storefront",
+    description: "Expired query",
   }, {
     ttlMs: -1,
   });
   const active = createQuery({
-    type: "photo_proof",
-    target: "Signboard",
+    description: "Active query",
   }, {
     ttlMs: 60_000,
   });
@@ -70,10 +66,7 @@ test("query service excludes expired pending queries from open list", () => {
 
 test("query service cancels pending queries", () => {
   const query = createQuery({
-    type: "webpage_field",
-    url: "https://example.com",
-    field: "price",
-    anchor_word: "税込",
+    description: "Query to cancel",
   });
 
   const outcome = cancelQuery(query.id);
@@ -87,7 +80,7 @@ test("query service cancels pending queries", () => {
 
 test("query service stores oracle_ids from options", () => {
   const query = createQuery(
-    { type: "store_status", store_name: "Test" },
+    { description: "Test query" },
     { oracleIds: ["oracle-a", "oracle-b"] },
   );
 
@@ -96,13 +89,12 @@ test("query service stores oracle_ids from options", () => {
 
 test("query service records assigned_oracle_id on submission", async () => {
   const query = createQuery({
-    type: "store_status",
-    store_name: "Test Ramen",
+    description: "Test Ramen status",
   });
 
   const outcome = await submitQueryResult(
     query.id,
-    { type: "store_status", status: "open" },
+    { attachments: [], notes: "open" },
     { executor_type: "human", channel: "worker_api" },
   );
 
@@ -112,13 +104,13 @@ test("query service records assigned_oracle_id on submission", async () => {
 
 test("query service rejects submission with unacceptable oracle", async () => {
   const query = createQuery(
-    { type: "store_status", store_name: "Test" },
+    { description: "Test query" },
     { oracleIds: ["oracle-x"] },
   );
 
   const outcome = await submitQueryResult(
     query.id,
-    { type: "store_status", status: "open" },
+    { attachments: [], notes: "open" },
     { executor_type: "human", channel: "worker_api" },
     "built-in", // not in oracle_ids
   );
@@ -129,14 +121,11 @@ test("query service rejects submission with unacceptable oracle", async () => {
 
 test("query service normalizes blossom attachment refs before approval", async () => {
   const query = createQuery({
-    type: "photo_proof",
-    target: "Storefront",
+    description: "Storefront observation",
   });
 
   injectValidC2pa("abc123", query.id);
   const outcome = await submitQueryResult(query.id, {
-    type: "photo_proof",
-    text_answer: `Observed storefront ${query.challenge_nonce}`,
     attachments: [{
       id: "abc123",
       uri: "https://blossom.example.com/abc123",
@@ -152,10 +141,6 @@ test("query service normalizes blossom attachment refs before approval", async (
   });
 
   expect(outcome.ok).toBe(true);
-  expect(outcome.query?.result?.type).toBe("photo_proof");
-  if (outcome.query?.result?.type !== "photo_proof") {
-    throw new Error("expected photo_proof result");
-  }
-  expect(outcome.query.result.attachments[0]?.storage_kind).toBe("blossom");
-  expect(outcome.query.result.attachments[0]?.blossom_hash).toBe("abc123");
+  expect(outcome.query?.result?.attachments[0]?.storage_kind).toBe("blossom");
+  expect(outcome.query?.result?.attachments[0]?.blossom_hash).toBe("abc123");
 });

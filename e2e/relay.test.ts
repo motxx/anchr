@@ -90,8 +90,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "store_status",
-        store_name: "E2E Ramen Shop",
+        description: "E2E Ramen Shop の営業状況",
         location_hint: "Shibuya",
         ttl_seconds: 120,
       }),
@@ -100,13 +99,13 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
 
     const createJson = await createRes.json() as {
       query_id: string;
-      type: string;
+      description: string;
       status: string;
       challenge_nonce: string;
       reference_app_url: string;
     };
     expect(createJson.query_id).toStartWith("query_");
-    expect(createJson.type).toBe("store_status");
+    expect(createJson.description).toBe("E2E Ramen Shop の営業状況");
     expect(createJson.status).toBe("pending");
 
     // Wait for fire-and-forget relay publish to complete
@@ -122,7 +121,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     const matchingEvent = events.find((e) => {
       try {
         const payload = JSON.parse(e.content);
-        return payload.params?.store_name === "E2E Ramen Shop";
+        return payload.description === "E2E Ramen Shop の営業状況";
       } catch { return false; }
     });
 
@@ -132,8 +131,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     // Verify event tags
     const tags = matchingEvent!.tags;
     expect(tags.some((t) => t[0] === "t" && t[1] === "anchr")).toBe(true);
-    expect(tags.some((t) => t[0] === "t" && t[1] === "store_status")).toBe(true);
-    expect(tags.some((t) => t[0] === "i" && t[1] === "E2E Ramen Shop")).toBe(true);
+    expect(tags.some((t) => t[0] === "i" && t[1] === "E2E Ramen Shop の営業状況")).toBe(true);
   });
 
   test("full lifecycle: create → list → submit → verify status", async () => {
@@ -146,8 +144,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "store_status",
-        store_name: "E2E Lifecycle Store",
+        description: "E2E Lifecycle Store の営業状況",
         location_hint: "Akihabara",
         ttl_seconds: 300,
       }),
@@ -176,8 +173,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "store_status",
-        status: "open",
+        attachments: [],
         notes: `E2E test observation ${challenge_nonce}`,
       }),
     });
@@ -207,7 +203,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "store_status", store_name: "E2E Cancel Store", ttl_seconds: 120 }),
+      body: JSON.stringify({ description: "E2E Cancel Store", ttl_seconds: 120 }),
     });
     const { query_id } = await createRes.json() as { query_id: string };
 
@@ -231,13 +227,13 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     const since = Math.floor(Date.now() / 1000) - 5;
 
     // Create 3 queries in parallel
-    const names = ["E2E Alpha", "E2E Bravo", "E2E Charlie"];
+    const descriptions = ["E2E Alpha の確認", "E2E Bravo の確認", "E2E Charlie の確認"];
     await Promise.all(
-      names.map((name) =>
+      descriptions.map((desc) =>
         app.request("http://localhost/queries", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ type: "store_status", store_name: name, ttl_seconds: 120 }),
+          body: JSON.stringify({ description: desc, ttl_seconds: 120 }),
         }),
       ),
     );
@@ -254,14 +250,14 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     const e2eEvents = events.filter((e) => {
       try {
         const p = JSON.parse(e.content);
-        return typeof p.params?.store_name === "string" && p.params.store_name.startsWith("E2E ");
+        return typeof p.description === "string" && p.description.startsWith("E2E ");
       } catch { return false; }
     });
 
     // At least our 3 should be there
-    const foundNames = e2eEvents.map((e) => JSON.parse(e.content).params.store_name);
-    for (const name of names) {
-      expect(foundNames).toContain(name);
+    const foundDescriptions = e2eEvents.map((e) => JSON.parse(e.content).description);
+    for (const desc of descriptions) {
+      expect(foundDescriptions).toContain(desc);
     }
   });
 });

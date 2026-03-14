@@ -17,67 +17,26 @@ function buildRequesterMeta(): RequesterMeta {
 export async function startMcpServer() {
   const server = new McpServer({
     name: "anchr",
-    version: "0.2.0",
+    version: "0.3.0",
   });
   const backend = getMcpQueryBackend();
 
   server.tool(
-    "request_photo_proof",
-    "Request an anonymous human to photograph a real-world target and report what they see. " +
-    "The reporter must include a one-time nonce to prove freshness. " +
-    "Use this to verify real-world facts that cannot be determined from the internet alone. " +
-    "Photos are EXIF-stripped for reporter privacy. " +
+    "create_query",
+    "Request an anonymous human to observe, photograph, or verify something in the real world. " +
+    "Describe what you need — the worker will submit C2PA-verified media as evidence. " +
     (isNostrEnabled() ? "Query is broadcast via Nostr relays. " : "") +
     (isCashuEnabled() ? "Bounty paid via Cashu ecash (anonymous). " : "") +
     "Returns a query_id for polling.",
     {
-      target: z.string().describe("What should be photographed or reported on, e.g. 'テヘラン市街の現在の様子' or '天安門広場の掲示物'"),
+      description: z.string().describe("What should be observed, photographed, or verified, e.g. 'テヘラン市街の現在の様子' or 'セブンイレブン渋谷店の営業状況'"),
       location_hint: z.string().optional().describe("Region or location hint (e.g. 'IR', 'CN', '渋谷')"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
       oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
     },
-    async ({ target, location_hint, ttl_seconds, oracle_ids }) => {
-      const params: QueryInput = { type: "photo_proof", target, location_hint };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
-    },
-  );
-
-  server.tool(
-    "request_store_status",
-    "Request an anonymous human to verify if a place is currently open or closed. " +
-    "The reporter must include a nonce in their notes to prove freshness.",
-    {
-      store_name: z.string().describe("Place or store name, e.g. 'セブンイレブン渋谷店'"),
-      location_hint: z.string().optional().describe("Optional location hint"),
-      ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
-      oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
-    },
-    async ({ store_name, location_hint, ttl_seconds, oracle_ids }) => {
-      const params: QueryInput = { type: "store_status", store_name, location_hint };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
-    },
-  );
-
-  server.tool(
-    "request_webpage_field",
-    "Request a human to extract a specific field from a webpage and provide nearby proof text. " +
-    "Useful for verifying censorship — is this page accessible from a given region?",
-    {
-      url: z.string().url().describe("URL of the webpage"),
-      field: z.string().describe("What to extract, e.g. '税込価格' or 'blocked status'"),
-      anchor_word: z.string().describe("A word near the target field to serve as proof of reading the page"),
-      ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
-      oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
-    },
-    async ({ url, field, anchor_word, ttl_seconds, oracle_ids }) => {
-      const params: QueryInput = { type: "webpage_field", url, field, anchor_word };
-      const payload = await backend.createQuery(params, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
+    async ({ description, location_hint, ttl_seconds, oracle_ids }) => {
+      const input: QueryInput = { description, location_hint };
+      const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
       };
@@ -88,7 +47,7 @@ export async function startMcpServer() {
     "get_query_status",
     "Poll the status of an Anchr query. Returns status and verified result if available.",
     {
-      query_id: z.string().describe("Query ID returned from a request_* tool"),
+      query_id: z.string().describe("Query ID returned from create_query"),
     },
     async ({ query_id }) => {
       const payload = await backend.getQueryStatus(query_id);
@@ -129,7 +88,7 @@ export async function startMcpServer() {
     "Submit a result for a pending Anchr query. Normally reporters use the worker app, but this tool allows direct submission for testing.",
     {
       query_id: z.string().describe("Query ID to submit against"),
-      result: z.record(z.string(), z.unknown()).describe("Result object matching the query type"),
+      result: z.record(z.string(), z.unknown()).describe("Result object with attachments and optional notes"),
       oracle_id: z.string().optional().describe("Oracle ID to use for verification. Omit to use default."),
     },
     async ({ query_id, result, oracle_id }) => {
@@ -142,7 +101,7 @@ export async function startMcpServer() {
 
   server.tool(
     "get_query_attachment",
-    "Retrieve URL and metadata for an attachment on a completed photo proof query. EXIF data has been stripped for privacy.",
+    "Retrieve URL and metadata for an attachment on a completed query. EXIF data has been stripped for privacy.",
     {
       query_id: z.string().describe("Query ID to inspect"),
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
@@ -157,7 +116,7 @@ export async function startMcpServer() {
 
   server.tool(
     "get_query_attachment_preview",
-    "Retrieve a resized preview image for a completed photo proof query.",
+    "Retrieve a resized preview image for a completed query.",
     {
       query_id: z.string().describe("Query ID to inspect"),
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),

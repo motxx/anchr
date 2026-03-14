@@ -5,42 +5,33 @@ import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import type {
   AttachmentRef,
   BlossomKeyMap,
-  PhotoProofResult,
   Query,
   QueryResult,
-  StoreStatusResult,
   VerificationDetail,
-  WebpageFieldResult,
 } from "../types";
 
+/**
+ * Verify a query result cryptographically.
+ *
+ * Oracle checks:
+ * 1. Attachments present → C2PA / EXIF integrity
+ * 2. AI content check (opt-in, if attachments pass crypto checks)
+ * 3. No attachments → weak verification (pass with advisory)
+ */
 export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
   const checks: string[] = [];
   const failures: string[] = [];
 
-  switch (query.type) {
-    case "photo_proof":
-      verifyPhotoProof(result as PhotoProofResult, checks, failures);
-      await verifyPhotoIntegrity(query.id, result as PhotoProofResult, checks, failures, blossomKeys);
-      break;
-    case "store_status":
-      verifyStoreStatus(result as StoreStatusResult, checks, failures);
-      if ((result as StoreStatusResult).attachments?.length) {
-        await verifyPhotoIntegrity(query.id, result as unknown as PhotoProofResult, checks, failures, blossomKeys);
-      }
-      break;
-    case "webpage_field":
-      verifyWebpageField(
-        result as WebpageFieldResult,
-        (query.params as { anchor_word: string }).anchor_word,
-        checks,
-        failures,
-      );
-      break;
+  const attachments = result.attachments ?? [];
+
+  if (attachments.length > 0) {
+    checks.push("attachment present");
+    await verifyPhotoIntegrity(query.id, attachments, checks, failures, blossomKeys);
+  } else {
+    checks.push("no media evidence provided (weak verification)");
   }
 
-  const hasAttachments = query.type === "photo_proof"
-    || (query.type === "store_status" && (result as StoreStatusResult).attachments?.length);
-  if (hasAttachments && failures.length === 0) {
+  if (attachments.length > 0 && failures.length === 0) {
     const aiResult = await checkAttachmentContent(query, result, blossomKeys);
     if (aiResult) {
       if (aiResult.passed) {
@@ -58,22 +49,6 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
   };
 }
 
-function verifyPhotoProof(
-  result: PhotoProofResult,
-  checks: string[],
-  failures: string[],
-): void {
-  if (Array.isArray(result.attachments) && result.attachments.length > 0) {
-    checks.push("photo attachment present");
-  } else {
-    failures.push("at least one photo attachment is required");
-  }
-
-  if (result.text_answer && result.text_answer.length > 5000) {
-    failures.push("text_answer too long (max 5000 chars)");
-  }
-}
-
 /**
  * Verify photo integrity using pre-strip EXIF and C2PA metadata.
  *
@@ -82,13 +57,13 @@ function verifyPhotoProof(
  */
 async function verifyPhotoIntegrity(
   queryId: string,
-  result: PhotoProofResult,
+  attachments: AttachmentRef[],
   checks: string[],
   failures: string[],
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   // Try to find integrity data for attachments in this result
-  const integrityRecords = result.attachments
+  const integrityRecords = attachments
     .map((att) => getIntegrity(att.id))
     .filter((m) => m !== null);
 
@@ -103,7 +78,7 @@ async function verifyPhotoIntegrity(
   // No pre-upload integrity data — try direct C2PA validation on attachments
   // This handles the decentralized path (Blossom download → C2PA check)
   if (integrityRecords.length === 0) {
-    await verifyC2paFromAttachments(result.attachments, checks, failures, blossomKeys);
+    await verifyC2paFromAttachments(attachments, checks, failures, blossomKeys);
     return;
   }
 
@@ -175,7 +150,7 @@ async function verifyC2paFromAttachments(
       data = await fetchBlossomAttachment(att, keyMaterial);
     }
 
-    // Try to fetch from URL (local/external path)
+    // Try to fetch from URL (external path)
     if (!data && att.uri) {
       try {
         const response = await fetch(att.uri);
@@ -209,46 +184,5 @@ async function verifyC2paFromAttachments(
 
   if (!validated && attachments.some((a) => a.mime_type?.startsWith("image/"))) {
     failures.push("C2PA: no image attachments could be verified");
-  }
-}
-
-function verifyStoreStatus(
-  result: StoreStatusResult,
-  checks: string[],
-  failures: string[],
-): void {
-  if (result.status !== "open" && result.status !== "closed") {
-    failures.push(`status must be "open" or "closed", got "${result.status}"`);
-  }
-
-  if (Array.isArray(result.attachments) && result.attachments.length > 0) {
-    checks.push("photo attachment present");
-  } else {
-    checks.push("no photo evidence provided (weak verification)");
-  }
-}
-
-function verifyWebpageField(
-  result: WebpageFieldResult,
-  anchorWord: string,
-  checks: string[],
-  failures: string[],
-): void {
-  if (!result.answer || result.answer.trim().length === 0) {
-    failures.push("answer is empty");
-  }
-
-  if (!result.proof_text || result.proof_text.trim().length === 0) {
-    failures.push("proof_text is empty");
-  }
-
-  if (result.proof_text?.includes(anchorWord)) {
-    checks.push(`anchor word "${anchorWord}" found in proof_text`);
-  } else {
-    failures.push(`anchor word "${anchorWord}" not found in proof_text`);
-  }
-
-  if (result.answer && result.answer.length > 2000) {
-    failures.push("answer too long (max 2000 chars)");
   }
 }

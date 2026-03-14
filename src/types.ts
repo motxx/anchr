@@ -1,4 +1,3 @@
-export type QueryType = "photo_proof" | "store_status" | "webpage_field";
 export type QueryStatus =
   | "pending"
   | "submitted"
@@ -11,26 +10,10 @@ export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
 export type AttachmentStorageKind = "blossom" | "external";
 
-export interface PhotoProofParams {
-  target: string; // e.g. "コンビニ入口の営業時間表示"
+export interface QueryInput {
+  description: string;
   location_hint?: string;
 }
-
-export interface StoreStatusParams {
-  store_name: string;
-  location_hint?: string;
-}
-
-export interface WebpageFieldParams {
-  url: string;
-  field: string; // e.g. "税込価格"
-  anchor_word: string; // word whose nearby text serves as proof
-}
-
-export type QueryInput =
-  | ({ type: "photo_proof" } & PhotoProofParams)
-  | ({ type: "store_status" } & StoreStatusParams)
-  | ({ type: "webpage_field" } & WebpageFieldParams);
 
 export interface AttachmentRef {
   id: string;
@@ -66,29 +49,10 @@ export interface AttachmentHandle {
   access: AttachmentAccess;
 }
 
-export interface PhotoProofResult {
-  text_answer?: string;
+export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
 }
-
-export interface StoreStatusResult {
-  status: "open" | "closed";
-  text_answer?: string; // should contain nonce (handwritten in photo)
-  attachments?: AttachmentRef[]; // photo evidence of store
-  notes?: string;
-}
-
-export interface WebpageFieldResult {
-  answer: string; // extracted value
-  proof_text: string; // text near anchor_word from page
-  notes?: string;
-}
-
-export type QueryResult =
-  | ({ type: "photo_proof" } & PhotoProofResult)
-  | ({ type: "store_status" } & StoreStatusResult)
-  | ({ type: "webpage_field" } & WebpageFieldResult);
 
 export interface VerificationDetail {
   passed: boolean;
@@ -114,9 +78,9 @@ export interface BountyInfo {
 
 export interface Query {
   id: string;
-  type: QueryType;
   status: QueryStatus;
-  params: QueryInput;
+  description: string;
+  location_hint?: string;
   challenge_nonce: string;
   challenge_rule: string;
   created_at: number;

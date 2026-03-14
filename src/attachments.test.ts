@@ -29,8 +29,6 @@ test("buildAttachmentAbsoluteUrl keeps external URLs", () => {
 
 test("normalizeQueryResult preserves blossom attachment refs", () => {
   const result = normalizeQueryResult({
-    type: "photo_proof",
-    text_answer: "Observed storefront K7P4",
     attachments: [{
       id: "abc123",
       uri: "https://blossom.example.com/abc123",
@@ -42,18 +40,12 @@ test("normalizeQueryResult preserves blossom attachment refs", () => {
     notes: "ok",
   });
 
-  expect(result.type).toBe("photo_proof");
-  if (result.type !== "photo_proof") {
-    throw new Error("expected photo_proof result");
-  }
   expect(result.attachments[0]?.storage_kind).toBe("blossom");
   expect(result.attachments[0]?.blossom_hash).toBe("abc123");
 });
 
 test("materializeQueryResult expands blossom attachment refs", () => {
   const result = materializeQueryResult({
-    type: "photo_proof",
-    text_answer: "Observed storefront K7P4",
     attachments: [{
       id: "abc123",
       uri: "https://blossom.example.com/abc123",
@@ -64,10 +56,6 @@ test("materializeQueryResult expands blossom attachment refs", () => {
     notes: "ok",
   }, "http://localhost:3000/queries/query_1");
 
-  expect(result.type).toBe("photo_proof");
-  if (result.type !== "photo_proof") {
-    throw new Error("expected photo_proof result");
-  }
   expect(result.attachments[0]?.uri).toBe("https://blossom.example.com/abc123");
 });
 

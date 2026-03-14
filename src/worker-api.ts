@@ -48,36 +48,14 @@ const bountySchema = z.object({
 
 const oracleIdsSchema = z.array(z.string().min(1)).optional();
 
-const createQuerySchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("photo_proof"),
-    target: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-  z.object({
-    type: z.literal("store_status"),
-    store_name: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-  z.object({
-    type: z.literal("webpage_field"),
-    url: z.string().url(),
-    field: z.string().min(1),
-    anchor_word: z.string().min(1),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-]);
+const createQuerySchema = z.object({
+  description: z.string().min(1),
+  location_hint: z.string().min(1).optional(),
+  ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+  requester: requesterMetaSchema.optional(),
+  bounty: bountySchema.optional(),
+  oracle_ids: oracleIdsSchema,
+});
 
 // --- Auth Middleware ---
 
@@ -119,9 +97,9 @@ function getPublicRequestUrl(c: Context): string {
 function querySummary(query: Query) {
   return {
     id: query.id,
-    type: query.type,
     status: query.status,
-    params: query.params,
+    description: query.description,
+    location_hint: query.location_hint ?? null,
     requester_meta: query.requester_meta ?? null,
     bounty: query.bounty ? { amount_sats: query.bounty.amount_sats } : null,
     challenge_nonce: query.challenge_nonce,
@@ -136,8 +114,8 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
   const requestOrigin = new URL(requestUrl).origin;
   return {
     query_id: query.id,
-    type: query.type,
     status: query.status,
+    description: query.description,
     challenge_nonce: query.challenge_nonce,
     challenge_rule: query.challenge_rule,
     expires_at: new Date(query.expires_at).toISOString(),
@@ -160,8 +138,8 @@ function queryDetail(query: Query, requestUrl: string) {
   };
 }
 
-function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
-  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") return null;
+function getAttachmentRefs(query: Query): AttachmentRef[] | null {
+  if (!query.result?.attachments?.length) return null;
   return query.result.attachments;
 }
 
@@ -242,18 +220,10 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     (c) => {
       const payload = c.req.valid("json");
 
-      let input: QueryInput;
-      switch (payload.type) {
-        case "photo_proof":
-          input = { type: "photo_proof", target: payload.target, location_hint: payload.location_hint };
-          break;
-        case "store_status":
-          input = { type: "store_status", store_name: payload.store_name, location_hint: payload.location_hint };
-          break;
-        case "webpage_field":
-          input = { type: "webpage_field", url: payload.url, field: payload.field, anchor_word: payload.anchor_word };
-          break;
-      }
+      const input: QueryInput = {
+        description: payload.description,
+        location_hint: payload.location_hint,
+      };
 
       const query = doCreateQuery(input, {
         ttlSeconds: payload.ttl_seconds,
@@ -271,8 +241,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const payloads = await Promise.all(
       attachments.map((att, i) => buildAttachmentPayload(query, att, i, getPublicRequestUrl(c))),
     );
@@ -286,8 +256,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
     return c.json(await buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c)));
@@ -300,8 +270,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
 
@@ -317,8 +287,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
     const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
     const maxDimensionParam = c.req.query("max_dimension");

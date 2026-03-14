@@ -22,8 +22,7 @@ export const ANCHR_QUERY_RESPONSE = 6300;  // DVM Job Result
 export const ANCHR_QUERY_SETTLEMENT = 7000; // DVM Job Feedback
 
 export interface QueryRequestPayload {
-  type: string;
-  params: Record<string, unknown>;
+  description: string;
   nonce: string;
   bounty?: {
     mint: string;
@@ -34,7 +33,6 @@ export interface QueryRequestPayload {
 }
 
 export interface QueryResponsePayload {
-  text_answer?: string;
   nonce_echo: string;
   attachments?: Array<{
     blossom_hash: string;
@@ -44,9 +42,6 @@ export interface QueryResponsePayload {
     mime: string;
   }>;
   notes?: string;
-  status?: string;
-  answer?: string;
-  proof_text?: string;
 }
 
 export interface QuerySettlementPayload {
@@ -78,17 +73,13 @@ export function buildQueryRequestEvent(
   payload: QueryRequestPayload,
   regionCode?: string,
 ): VerifiedEvent {
-  // Derive a human-readable input string from params for the DVM "i" tag
-  const inputText = deriveInputText(payload);
-
   const tags: string[][] = [
-    ["i", inputText, "text"],
+    ["i", payload.description, "text"],
     ["param", "nonce", payload.nonce],
     ["output", "application/json"],
     ["encrypted"],
     ["d", queryId],
     ["t", "anchr"],
-    ["t", payload.type],
     ["expiration", String(Math.floor(payload.expires_at / 1000))],
   ];
 
@@ -109,17 +100,6 @@ export function buildQueryRequestEvent(
   };
 
   return finalizeEvent(template, identity.secretKey);
-}
-
-/**
- * Derive a short human-readable string from query params for the DVM "i" tag.
- */
-function deriveInputText(payload: QueryRequestPayload): string {
-  const p = payload.params as Record<string, unknown>;
-  if (p.target) return String(p.target);
-  if (p.store_name) return String(p.store_name);
-  if (p.url) return String(p.url);
-  return payload.type;
 }
 
 /**

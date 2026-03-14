@@ -20,12 +20,12 @@ describe("data purge", () => {
   test("purges expired queries from memory store", async () => {
     // Create an expired query
     createQuery(
-      { type: "photo_proof", target: "test" },
+      { description: "expired test query" },
       { ttlMs: -1 },
     );
     // Create an active query
     const active = createQuery(
-      { type: "store_status", store_name: "test" },
+      { description: "active test query" },
       { ttlMs: 60_000 },
     );
 

@@ -23,7 +23,7 @@ const BOLD = "\x1b[1m";
 const CYAN = "\x1b[36m";
 const RESET = "\x1b[0m";
 
-const TOTAL_STEPS = 7;
+const TOTAL_STEPS = 6;
 let passed = 0;
 let failed = 0;
 
@@ -111,74 +111,50 @@ async function runDemo() {
   }
   ok(`Relay reachable at ${RELAY_URL}`);
 
-  // Step 2: Create store_status query
-  step(2, "Creating store_status query...");
-  const storeRes = await app.request("http://localhost/queries", {
+  // Step 2: Create query
+  step(2, "Creating query...");
+  const createRes = await app.request("http://localhost/queries", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      type: "store_status",
-      store_name: "渋谷ラーメン太郎",
+      description: "渋谷ラーメン太郎の営業状況",
       location_hint: "Shibuya",
       ttl_seconds: 300,
     }),
   });
-  const storeJson = await storeRes.json() as {
-    query_id: string; type: string; status: string;
+  const createJson = await createRes.json() as {
+    query_id: string; description: string; status: string;
     challenge_nonce: string; reference_app_url: string;
   };
-  if (storeRes.status === 201) {
-    ok(`Query created: ${storeJson.query_id}`);
-    info(`Type: ${storeJson.type} | Nonce: ${storeJson.challenge_nonce}`);
-    info(`URL: ${storeJson.reference_app_url}`);
+  if (createRes.status === 201) {
+    ok(`Query created: ${createJson.query_id}`);
+    info(`Description: ${createJson.description} | Nonce: ${createJson.challenge_nonce}`);
+    info(`URL: ${createJson.reference_app_url}`);
   } else {
-    err(`Failed to create store_status query (${storeRes.status})`);
+    err(`Failed to create query (${createRes.status})`);
   }
 
-  // Step 3: Create photo_proof query
-  step(3, "Creating photo_proof query...");
-  const photoRes = await app.request("http://localhost/queries", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      type: "photo_proof",
-      target: "秋葉原駅前の看板",
-      location_hint: "Akihabara",
-      ttl_seconds: 300,
-    }),
-  });
-  const photoJson = await photoRes.json() as {
-    query_id: string; type: string; challenge_nonce: string;
-  };
-  if (photoRes.status === 201) {
-    ok(`Query created: ${photoJson.query_id}`);
-    info(`Type: ${photoJson.type} | Nonce: ${photoJson.challenge_nonce}`);
-  } else {
-    err(`Failed to create photo_proof query (${photoRes.status})`);
-  }
-
-  // Step 4: List open queries
-  step(4, "Listing open queries...");
+  // Step 3: List open queries
+  step(3, "Listing open queries...");
   const listRes = await app.request("http://localhost/queries");
-  const listed = await listRes.json() as Array<{ id: string; type: string }>;
-  if (listed.length >= 2) {
+  const listed = await listRes.json() as Array<{ id: string; description: string }>;
+  if (listed.length >= 1) {
     ok(`Found ${listed.length} open queries`);
     for (const q of listed) {
-      info(`- ${q.id} (${q.type})`);
+      info(`- ${q.id} (${q.description})`);
     }
   } else {
-    err(`Expected at least 2 open queries, found ${listed.length}`);
+    err(`Expected at least 1 open query, found ${listed.length}`);
   }
 
-  // Step 5: Submit result for store_status
-  step(5, "Submitting result for store_status query...");
-  const submitRes = await app.request(`http://localhost/queries/${storeJson.query_id}/submit`, {
+  // Step 4: Submit result
+  step(4, "Submitting result...");
+  const submitRes = await app.request(`http://localhost/queries/${createJson.query_id}/submit`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      type: "store_status",
-      status: "open",
-      notes: `Observed storefront open ${storeJson.challenge_nonce}`,
+      attachments: [],
+      notes: `Observed storefront open ${createJson.challenge_nonce}`,
     }),
   });
   const submitJson = await submitRes.json() as {
@@ -193,22 +169,21 @@ async function runDemo() {
     err(`Verification failed: ${JSON.stringify(submitJson.verification?.failures)}`);
   }
 
-  // Step 6: Verify query status
-  step(6, "Checking query status...");
-  const statusRes = await app.request(`http://localhost/queries/${storeJson.query_id}`);
+  // Step 5: Verify query status
+  step(5, "Checking query status...");
+  const statusRes = await app.request(`http://localhost/queries/${createJson.query_id}`);
   const statusJson = await statusRes.json() as {
     id: string; status: string; payment_status: string;
-    result?: { type: string };
   };
   if (statusJson.status === "approved") {
     ok(`Query ${statusJson.id} → ${statusJson.status}`);
-    info(`Payment: ${statusJson.payment_status} | Result type: ${statusJson.result?.type}`);
+    info(`Payment: ${statusJson.payment_status}`);
   } else {
     err(`Expected approved, got ${statusJson.status}`);
   }
 
-  // Step 7: Verify Nostr relay events
-  step(7, "Reading events from Nostr relay...");
+  // Step 6: Verify Nostr relay events
+  step(6, "Reading events from Nostr relay...");
   await Bun.sleep(1500);
   const events = await readRelayEvents({
     kinds: [ANCHR_QUERY_REQUEST],
@@ -219,21 +194,19 @@ async function runDemo() {
   const demoEvents = events.filter((e) => {
     try {
       const p = JSON.parse(e.content);
-      const name = p.params?.store_name ?? p.params?.target ?? "";
-      return name === "渋谷ラーメン太郎" || name === "秋葉原駅前の看板";
+      return p.description === "渋谷ラーメン太郎の営業状況";
     } catch { return false; }
   });
 
-  if (demoEvents.length >= 2) {
+  if (demoEvents.length >= 1) {
     ok(`Found ${demoEvents.length} Anchr events on relay (kind ${ANCHR_QUERY_REQUEST})`);
     for (const e of demoEvents) {
       const p = JSON.parse(e.content);
-      const name = p.params?.store_name ?? p.params?.target ?? "?";
       const dTag = e.tags.find((t) => t[0] === "d")?.[1] ?? "?";
-      info(`- "${name}" [d=${dTag}] pubkey=${e.pubkey.slice(0, 12)}...`);
+      info(`- "${p.description}" [d=${dTag}] pubkey=${e.pubkey.slice(0, 12)}...`);
     }
   } else {
-    err(`Expected 2 events on relay, found ${demoEvents.length}`);
+    err(`Expected at least 1 event on relay, found ${demoEvents.length}`);
   }
 
   // Cleanup

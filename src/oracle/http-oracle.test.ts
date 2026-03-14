@@ -13,11 +13,10 @@ afterAll(() => server.stop());
 
 const baseUrl = `http://localhost:${TEST_PORT}`;
 
-const makeQuery = (id: string, type: "store_status" = "store_status"): Query => ({
+const makeQuery = (id: string): Query => ({
   id,
-  type,
   status: "pending",
-  params: { type: "store_status", store_name: "Test Store" },
+  description: "Test Store status check",
   challenge_nonce: "nonce",
   challenge_rule: "rule",
   created_at: Date.now(),
@@ -44,14 +43,14 @@ test("oracle server rejects unauthenticated verify", async () => {
   const res = await fetch(`${baseUrl}/verify`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: makeQuery("q1"), result: { type: "store_status", status: "open" } }),
+    body: JSON.stringify({ query: makeQuery("q1"), result: { attachments: [], notes: "open" } }),
   });
   expect(res.status).toBe(401);
 });
 
 test("oracle server verify with valid auth", async () => {
   const query = makeQuery("q2");
-  const result: QueryResult = { type: "store_status", status: "open" };
+  const result: QueryResult = { attachments: [], notes: "open" };
 
   const res = await fetch(`${baseUrl}/verify`, {
     method: "POST",
@@ -70,25 +69,6 @@ test("oracle server verify with valid auth", async () => {
   expect(attestation.checks.length).toBeGreaterThan(0);
 });
 
-test("oracle server verify rejects bad store status", async () => {
-  const query = makeQuery("q3");
-  const result = { type: "store_status", status: "maybe" } as unknown as QueryResult;
-
-  const res = await fetch(`${baseUrl}/verify`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "authorization": `Bearer ${TEST_API_KEY}`,
-    },
-    body: JSON.stringify({ query, result }),
-  });
-
-  expect(res.status).toBe(200);
-  const attestation = await res.json();
-  expect(attestation.passed).toBe(false);
-  expect(attestation.failures.length).toBeGreaterThan(0);
-});
-
 // --- HTTP oracle client tests ---
 
 test("createHttpOracle delegates to remote server", async () => {
@@ -104,7 +84,7 @@ test("createHttpOracle delegates to remote server", async () => {
   expect(oracle.info.endpoint).toBe(baseUrl);
 
   const query = makeQuery("q4");
-  const result: QueryResult = { type: "store_status", status: "closed" };
+  const result: QueryResult = { attachments: [], notes: "closed" };
   const attestation = await oracle.verify(query, result);
 
   expect(attestation.oracle_id).toBe(TEST_ORACLE_ID);
@@ -122,7 +102,7 @@ test("createHttpOracle fails without auth", async () => {
   });
 
   const query = makeQuery("q5");
-  const result: QueryResult = { type: "store_status", status: "open" };
+  const result: QueryResult = { attachments: [], notes: "open" };
 
   await expect(oracle.verify(query, result)).rejects.toThrow(/401/);
 });

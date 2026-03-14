@@ -179,10 +179,7 @@ export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: strin
 }
 
 export function materializeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
-  if (result.type !== "photo_proof") {
-    return result;
-  }
-
+  if (!result.attachments?.length) return result;
   return {
     ...result,
     attachments: result.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
@@ -228,10 +225,7 @@ export function buildAttachmentHandle(
 }
 
 export function normalizeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
-  if (result.type !== "photo_proof") {
-    return result;
-  }
-
+  if (!result.attachments?.length) return result;
   return {
     ...result,
     attachments: result.attachments.map((attachment) => normalizeAttachmentRef(attachment, requestUrl)),

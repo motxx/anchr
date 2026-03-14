@@ -38,9 +38,8 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
 function makeQuery(overrides: Partial<Query>): Query {
   return {
     id: "query_test",
-    type: "photo_proof",
     status: "pending",
-    params: { type: "photo_proof", target: "storefront" },
+    description: "Test query",
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
     created_at: Date.now(),
@@ -50,73 +49,23 @@ function makeQuery(overrides: Partial<Query>): Query {
   };
 }
 
-test("photo_proof requires at least one attachment", async () => {
+test("requires at least one attachment for strong verification", async () => {
   const query = makeQuery({});
   const result: QueryResult = {
-    type: "photo_proof",
-    text_answer: "Saw the storefront K7P4",
     attachments: [],
     notes: "",
   };
 
   const verification = await verify(query, result);
 
-  expect(verification.passed).toBe(false);
-  expect(verification.failures).toContain("at least one photo attachment is required");
-});
-
-test("webpage_field requires anchor_word in proof_text", async () => {
-  const query = makeQuery({
-    type: "webpage_field",
-    params: {
-      type: "webpage_field",
-      url: "https://example.com",
-      field: "price",
-      anchor_word: "税込",
-    },
-  });
-  const result: QueryResult = {
-    type: "webpage_field",
-    answer: "¥980",
-    proof_text: "some text without the anchor word",
-  };
-
-  const verification = await verify(query, result);
-
-  expect(verification.passed).toBe(false);
-  expect(verification.failures).toContain('anchor word "税込" not found in proof_text');
-});
-
-test("webpage_field passes when proof text contains anchor word", async () => {
-  const query = makeQuery({
-    type: "webpage_field",
-    params: {
-      type: "webpage_field",
-      url: "https://example.com",
-      field: "price",
-      anchor_word: "税込",
-    },
-  });
-  const result: QueryResult = {
-    type: "webpage_field",
-    answer: "¥980",
-    proof_text: "通常価格 税込 ¥980",
-  };
-
-  const verification = await verify(query, result);
-
+  // Empty attachments → weak verification pass (advisory only)
   expect(verification.passed).toBe(true);
-  expect(verification.failures).toHaveLength(0);
+  expect(verification.checks).toContain("no media evidence provided (weak verification)");
 });
 
-test("store_status with photo evidence passes (C2PA valid)", async () => {
-  const query = makeQuery({
-    type: "store_status",
-    params: { type: "store_status", store_name: "Test Ramen" },
-  });
+test("attachment with valid C2PA passes", async () => {
+  const query = makeQuery({});
   const result: QueryResult = {
-    type: "store_status",
-    status: "open",
     attachments: [{
       id: "photo1",
       uri: "https://blossom.example.com/photo1",
@@ -130,18 +79,13 @@ test("store_status with photo evidence passes (C2PA valid)", async () => {
   const verification = await verify(query, result);
 
   expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain("photo attachment present");
+  expect(verification.checks).toContain("attachment present");
   expect(verification.checks).toContain("C2PA: valid Content Credentials signature");
 });
 
-test("store_status with photo but no C2PA fails", async () => {
-  const query = makeQuery({
-    type: "store_status",
-    params: { type: "store_status", store_name: "Test Ramen" },
-  });
+test("attachment without C2PA fails", async () => {
+  const query = makeQuery({});
   const result: QueryResult = {
-    type: "store_status",
-    status: "open",
     attachments: [{
       id: "photo_no_c2pa",
       uri: "https://blossom.example.com/photo_no_c2pa",
@@ -165,19 +109,15 @@ test("store_status with photo but no C2PA fails", async () => {
   expect(verification.failures).toContain("C2PA: no Content Credentials found — use a C2PA-enabled camera");
 });
 
-test("store_status without photo evidence passes with weak verification", async () => {
-  const query = makeQuery({
-    type: "store_status",
-    params: { type: "store_status", store_name: "Test Ramen" },
-  });
+test("no attachments passes with weak verification", async () => {
+  const query = makeQuery({});
   const result: QueryResult = {
-    type: "store_status",
-    status: "open",
-    notes: "Store looked open",
+    attachments: [],
+    notes: "Observed the target",
   };
 
   const verification = await verify(query, result);
 
   expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain("no photo evidence provided (weak verification)");
+  expect(verification.checks).toContain("no media evidence provided (weak verification)");
 });

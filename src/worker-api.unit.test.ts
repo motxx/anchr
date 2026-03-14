@@ -79,25 +79,25 @@ describe("buildWorkerApiApp with injected deps", () => {
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "store_status", store_name: "Test Store" }),
+      body: JSON.stringify({ description: "Test Store status check" }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; type: string; status: string };
+    const json = await res.json() as { query_id: string; description: string; status: string };
     expect(json.query_id).toStartWith("query_");
-    expect(json.type).toBe("store_status");
+    expect(json.description).toBe("Test Store status check");
     expect(json.status).toBe("pending");
     expect(queryService.getQuery(json.query_id)).not.toBeNull();
   }));
 
   test("GET /queries/:id returns query detail", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ type: "store_status", store_name: "Test" });
+    const query = queryService.createQuery({ description: "Test query" });
     const res = await app.request(`http://localhost/queries/${query.id}`);
     expect(res.status).toBe(200);
-    const json = await res.json() as { id: string; status: string; type: string };
+    const json = await res.json() as { id: string; status: string; description: string };
     expect(json.id).toBe(query.id);
     expect(json.status).toBe("pending");
-    expect(json.type).toBe("store_status");
+    expect(json.description).toBe("Test query");
   }));
 
   test("GET /queries/:id returns 404 for unknown query", async () => {
@@ -108,13 +108,13 @@ describe("buildWorkerApiApp with injected deps", () => {
 
   test("POST /queries/:id/submit verifies with injected oracle", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ type: "store_status", store_name: "Test" });
+    const query = queryService.createQuery({ description: "Test query" });
     const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "store_status",
-        status: "open",
+        attachments: [],
+        notes: "open",
         oracle_id: "test-oracle",
       }),
     });
@@ -127,7 +127,7 @@ describe("buildWorkerApiApp with injected deps", () => {
 
   test("POST /queries/:id/cancel cancels via injected service", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ type: "store_status", store_name: "Test" });
+    const query = queryService.createQuery({ description: "Test query" });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
       method: "POST",
     });
@@ -139,8 +139,8 @@ describe("buildWorkerApiApp with injected deps", () => {
 
   test("GET /queries lists only open queries from injected service", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    queryService.createQuery({ type: "store_status", store_name: "Active" }, { ttlMs: 60_000 });
-    queryService.createQuery({ type: "store_status", store_name: "Expired" }, { ttlMs: -1 });
+    queryService.createQuery({ description: "Active" }, { ttlMs: 60_000 });
+    queryService.createQuery({ description: "Expired" }, { ttlMs: -1 });
     const res = await app.request("http://localhost/queries");
     expect(res.status).toBe(200);
     const json = await res.json() as Array<{ id: string }>;
@@ -150,7 +150,7 @@ describe("buildWorkerApiApp with injected deps", () => {
   test("isolated app instances do not share state", withOpenAuth(async () => {
     const { app: app1, queryService: qs1 } = makeTestApp();
     const { app: app2 } = makeTestApp();
-    const query = qs1.createQuery({ type: "store_status", store_name: "Only in app1" });
+    const query = qs1.createQuery({ description: "Only in app1" });
 
     const res1 = await app1.request(`http://localhost/queries/${query.id}`);
     expect(res1.status).toBe(200);

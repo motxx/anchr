@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { isBlossomEnabled } from "./blossom/client";
-import { createQuery, getQuery, queryTemplates } from "./query-service";
+import { createQuery, getQuery } from "./query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 
@@ -33,7 +33,7 @@ function requireBlossom() {
 }
 
 describe("worker api photo proof (Blossom)", () => {
-  test("supports photo proof upload, submission, and attachment metadata", async () => {
+  test("supports photo upload, submission, and attachment metadata", async () => {
     requireBlossom();
 
     const previousHttpApiKey = process.env.HTTP_API_KEY;
@@ -42,7 +42,7 @@ describe("worker api photo proof (Blossom)", () => {
     delete process.env.HTTP_API_KEYS;
 
     const app = buildWorkerApiApp();
-    const query = createQuery(queryTemplates.photoProof("Worker API integration test"), { ttlSeconds: 300 });
+    const query = createQuery({ description: "Worker API integration test" }, { ttlSeconds: 300 });
 
     try {
       const form = new FormData();
@@ -83,8 +83,6 @@ describe("worker api photo proof (Blossom)", () => {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          type: "photo_proof",
-          text_answer: `Observed storefront ${query.challenge_nonce}`,
           attachments: [uploadJson.attachment],
           notes: "worker api integration",
           encryption_keys: encryptionKeys,
@@ -105,10 +103,9 @@ describe("worker api photo proof (Blossom)", () => {
       expect(detailResponse.status).toBe(200);
       const detailJson = await detailResponse.json() as {
         status: string;
-        result?: { type: string; attachments: Array<{ uri: string }> };
+        result?: { attachments: Array<{ uri: string }> };
       };
       expect(detailJson.status).toBe("approved");
-      expect(detailJson.result?.type).toBe("photo_proof");
       expect(detailJson.result?.attachments).toHaveLength(1);
 
       const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
@@ -153,8 +150,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "store_status",
-        store_name: "Unauthorized Test Store",
+        description: "Unauthorized Test Store",
       }),
     });
     expect(unauthorizedResponse.status).toBe(401);
@@ -166,8 +162,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
         "x-api-key": "secret-write-key",
       },
       body: JSON.stringify({
-        type: "store_status",
-        store_name: "Authorized Test Store",
+        description: "Check if Authorized Test Store is open",
         location_hint: "Near Tokyo Station",
         ttl_seconds: 180,
         requester: {
@@ -181,7 +176,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
 
     const createJson = await createResponse.json() as {
       query_id: string;
-      type: string;
+      description: string;
       status: string;
       requester_meta: {
         requester_type: string;
@@ -192,7 +187,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
     };
 
     expect(createJson.query_id).toStartWith("query_");
-    expect(createJson.type).toBe("store_status");
+    expect(createJson.description).toBe("Check if Authorized Test Store is open");
     expect(createJson.status).toBe("pending");
     expect(createJson.requester_meta?.requester_type).toBe("app");
     expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
@@ -214,7 +209,7 @@ describe("writeAuth middleware", () => {
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp();
-    const query = createQuery(queryTemplates.photoProof("auth test"), { ttlSeconds: 300 });
+    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const form = new FormData();
     form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
     const res = await app.request(`http://localhost/queries/${query.id}/upload`, { method: "POST", body: form });
@@ -223,18 +218,18 @@ describe("writeAuth middleware", () => {
 
   test("rejects unauthenticated submit", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp();
-    const query = createQuery(queryTemplates.storeStatus("auth test"), { ttlSeconds: 300 });
+    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "store_status", text_answer: "open", notes: "" }),
+      body: JSON.stringify({ attachments: [], notes: "" }),
     });
     expect(res.status).toBe(401);
   }));
 
   test("rejects unauthenticated cancel", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp();
-    const query = createQuery(queryTemplates.storeStatus("auth test"), { ttlSeconds: 300 });
+    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
     expect(res.status).toBe(401);
   }));
@@ -244,14 +239,14 @@ describe("writeAuth middleware", () => {
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-key" },
-      body: JSON.stringify({ type: "store_status", store_name: "Bearer Test" }),
+      body: JSON.stringify({ description: "Bearer Test" }),
     });
     expect(res.status).toBe(201);
   }));
 
   test("accepts X-API-Key header on cancel", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp();
-    const query = createQuery(queryTemplates.storeStatus("cancel test"), { ttlSeconds: 300 });
+    const query = createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
       method: "POST",
       headers: { "x-api-key": "test-key" },
@@ -268,14 +263,14 @@ describe("writeAuth middleware", () => {
       const reject = await app.request("http://localhost/queries", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": "wrong" },
-        body: JSON.stringify({ type: "store_status", store_name: "Multi Key" }),
+        body: JSON.stringify({ description: "Multi Key" }),
       });
       expect(reject.status).toBe(401);
 
       const accept = await app.request("http://localhost/queries", {
         method: "POST",
         headers: { "content-type": "application/json", authorization: "Bearer bravo" },
-        body: JSON.stringify({ type: "store_status", store_name: "Multi Key" }),
+        body: JSON.stringify({ description: "Multi Key" }),
       });
       expect(accept.status).toBe(201);
     },
@@ -287,12 +282,12 @@ describe("writeAuth middleware", () => {
 describe("POST /queries validation", () => {
   const openEnv = { HTTP_API_KEY: undefined as string | undefined, HTTP_API_KEYS: undefined as string | undefined };
 
-  test("rejects missing type field", withEnv(openEnv, async () => {
+  test("rejects missing description field", withEnv(openEnv, async () => {
     const app = buildWorkerApiApp();
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ store_name: "No Type" }),
+      body: JSON.stringify({ location_hint: "Tokyo" }),
     });
     expect(res.status).toBe(400);
     const json = await res.json() as { error: string; issues?: unknown[] };
@@ -300,58 +295,36 @@ describe("POST /queries validation", () => {
     expect(json.issues).toBeArray();
   }));
 
-  test("rejects photo_proof without target", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
-    const res = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "photo_proof" }),
-    });
-    expect(res.status).toBe(400);
-  }));
-
   test("rejects ttl_seconds out of range", withEnv(openEnv, async () => {
     const app = buildWorkerApiApp();
     const tooLow = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "store_status", store_name: "X", ttl_seconds: 10 }),
+      body: JSON.stringify({ description: "Test", ttl_seconds: 10 }),
     });
     expect(tooLow.status).toBe(400);
 
     const tooHigh = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "store_status", store_name: "X", ttl_seconds: 100_000 }),
+      body: JSON.stringify({ description: "Test", ttl_seconds: 100_000 }),
     });
     expect(tooHigh.status).toBe(400);
   }));
 
-  test("rejects webpage_field with invalid url", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
-    const res = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "webpage_field", url: "not-a-url", field: "price", anchor_word: "total" }),
-    });
-    expect(res.status).toBe(400);
-  }));
-
-  test("creates webpage_field query successfully", withEnv(openEnv, async () => {
+  test("creates query successfully", withEnv(openEnv, async () => {
     const app = buildWorkerApiApp();
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        type: "webpage_field",
-        url: "https://example.com/menu",
-        field: "price",
-        anchor_word: "latte",
+        description: "Check if Shibuya ramen shop is open",
+        location_hint: "Shibuya",
       }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { type: string; query_id: string };
-    expect(json.type).toBe("webpage_field");
+    const json = await res.json() as { description: string; query_id: string };
+    expect(json.description).toBe("Check if Shibuya ramen shop is open");
     expect(json.query_id).toStartWith("query_");
   }));
 

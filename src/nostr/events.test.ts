@@ -17,8 +17,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
   test("builds and parses QueryRequest event with DVM tags", () => {
     const identity = generateEphemeralIdentity();
     const payload: QueryRequestPayload = {
-      type: "photo_proof",
-      params: { target: "テヘラン市街の様子" },
+      description: "テヘラン市街の様子",
       nonce: "K7P4",
       expires_at: Date.now() + 600_000,
     };
@@ -29,13 +28,12 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(event.kind).toBe(5300); // DVM Job Request
     expect(event.pubkey).toBe(identity.publicKey);
 
-    // Check legacy tags
+    // Check tags
     const dTag = event.tags.find((t) => t[0] === "d");
     expect(dTag?.[1]).toBe("query_123");
 
     const tTags = event.tags.filter((t) => t[0] === "t");
     expect(tTags.some((t) => t[1] === "anchr")).toBe(true);
-    expect(tTags.some((t) => t[1] === "photo_proof")).toBe(true);
 
     const regionTag = event.tags.find((t) => t[0] === "region");
     expect(regionTag?.[1]).toBe("IR");
@@ -60,16 +58,14 @@ describe("Nostr events (NIP-90 DVM)", () => {
 
     // Parse content
     const parsed = parseQueryRequestPayload(event.content);
-    expect(parsed.type).toBe("photo_proof");
+    expect(parsed.description).toBe("テヘラン市街の様子");
     expect(parsed.nonce).toBe("K7P4");
-    expect(parsed.params.target).toBe("テヘラン市街の様子");
   });
 
   test("QueryRequest includes bid tag when bounty is present", () => {
     const identity = generateEphemeralIdentity();
     const payload: QueryRequestPayload = {
-      type: "photo_proof",
-      params: { target: "storefront" },
+      description: "storefront observation",
       nonce: "B1C2",
       bounty: { mint: "https://mint.example", token: "cashuAbc..." },
       expires_at: Date.now() + 600_000,
@@ -90,7 +86,6 @@ describe("Nostr events (NIP-90 DVM)", () => {
       "event_abc",
       requester.publicKey,
       {
-        text_answer: "街は平穏です。K7P4",
         nonce_echo: "K7P4",
         attachments: [{
           blossom_hash: "sha256:deadbeef",
@@ -99,6 +94,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
           decrypt_iv: "aabbccdd00112233",
           mime: "image/jpeg",
         }],
+        notes: "街は平穏です",
       },
     );
 
@@ -111,8 +107,8 @@ describe("Nostr events (NIP-90 DVM)", () => {
       requester.secretKey,
       worker.publicKey,
     );
-    expect(parsed.text_answer).toBe("街は平穏です。K7P4");
     expect(parsed.nonce_echo).toBe("K7P4");
+    expect(parsed.notes).toBe("街は平穏です");
     expect(parsed.attachments?.length).toBe(1);
     expect(parsed.attachments?.[0]?.blossom_hash).toBe("sha256:deadbeef");
   });
@@ -159,7 +155,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       worker,
       "event_abc",
       requester.publicKey,
-      { text_answer: "secret", nonce_echo: "TEST" },
+      { nonce_echo: "TEST", notes: "secret" },
     );
 
     // Eavesdropper cannot decrypt

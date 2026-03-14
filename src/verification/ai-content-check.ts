@@ -83,19 +83,17 @@ async function extractVideoFrames(
 }
 
 function buildPrompt(query: Query): string {
-  const params = query.params as unknown as Record<string, unknown>;
-  const target = params.target ?? params.store_name ?? JSON.stringify(params);
   const nonce = query.challenge_nonce;
   return [
     `You are verifying a photo/video submission for the following query:`,
-    `"${target}"`,
+    `"${query.description}"`,
     ``,
     `Check TWO things:`,
     `1. Does the image show content relevant to this query?`,
     `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
     ``,
     `Both must be true to pass. Answer in the following JSON format only:`,
-    `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query target"}`,
+    `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
   ].join("\n");
 }
 
@@ -137,12 +135,7 @@ export async function checkAttachmentContent(
   const client = getClient();
   if (!client) return null;
 
-  const attachments = result.type === "photo_proof"
-    ? result.attachments
-    : result.type === "store_status" && "attachments" in result
-      ? (result as { attachments?: AttachmentRef[] }).attachments
-      : undefined;
-
+  const attachments = result.attachments;
   if (!attachments?.length) return null;
 
   const images = await loadImageContent(attachments, blossomKeys);
