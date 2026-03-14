@@ -117,7 +117,7 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
       };
     }
 
-    // validation_status is at the report root, not inside the manifest.
+    // c2patool puts validation results at report.validation_results (not inside the manifest).
     // validation_results.activeManifest has structured success/failure arrays.
     const validationResults = report.validation_results as {
       activeManifest?: { success?: Array<{ code: string }>; failure?: Array<{ code: string; explanation?: string }> };
