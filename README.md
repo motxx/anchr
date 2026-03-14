@@ -91,26 +91,32 @@ sequenceDiagram
 
 ```mermaid
 graph TB
-    subgraph Nostr["Nostr Relay Network"]
-        K5300["kind 5300<br/>Job Request"]
-        K6300["kind 6300<br/>Job Result"]
-        K7000["kind 7000<br/>Feedback"]
+    subgraph Actors["Actors"]
+        direction LR
+        Requester["Requester<br/>(HTTP / SDK)"]
+        Worker["Worker<br/>(Worker UI / SDK)"]
+        Oracle["Oracle<br/>(preimage + C2PA + delivery)"]
     end
 
-    Requester["Requester<br/>(HTTP / SDK)"]
-    Worker["Worker<br/>(Worker UI / SDK)"]
-    Oracle["Oracle<br/>(preimage + C2PA + delivery)"]
-    Blossom["Blossom<br/>AES-256-GCM encrypted"]
-    Cashu["Cashu Mint<br/>HTLC escrow (NUT-14)"]
+    subgraph Bus["Nostr Relay Network — Message Bus"]
+        direction LR
+        K5300["kind 5300<br/>Job Request"]
+        K7000["kind 7000<br/>Feedback"]
+        K6300["kind 6300<br/>Job Result"]
+    end
 
-    Requester --> Nostr
-    Worker --> Nostr
-    Oracle --> Nostr
-    Worker --> Blossom
-    Oracle --> Blossom
-    Requester --> Cashu
-    Worker --> Cashu
-    Oracle --> Cashu
+    subgraph Infra["Infrastructure"]
+        direction LR
+        Cashu["Cashu Mint<br/>HTLC escrow (NUT-14)"]
+        Blossom["Blossom<br/>AES-256-GCM blob store"]
+    end
+
+    Actors --> Bus
+    Requester -->|"lock / swap HTLC"| Cashu
+    Worker -->|"verify / redeem HTLC"| Cashu
+    Oracle -->|"check HTLC condition"| Cashu
+    Worker -->|"upload encrypted blob"| Blossom
+    Oracle -->|"download blob for C2PA"| Blossom
 ```
 
 ## Payment Flow
