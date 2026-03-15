@@ -19,6 +19,7 @@ const makeQuery = (id: string): Query => ({
   description: "Test Store status check",
   challenge_nonce: "nonce",
   challenge_rule: "rule",
+  verification_requirements: ["nonce", "gps", "ai_check"],
   created_at: Date.now(),
   expires_at: Date.now() + 60_000,
   payment_status: "locked",

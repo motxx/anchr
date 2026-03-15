@@ -46,8 +46,9 @@ function buildCreatedPayload(query: Query, baseUrl: string) {
     query_id: query.id,
     status: query.status,
     description: query.description,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     expires_at: new Date(query.expires_at).toISOString(),
     requester_meta: query.requester_meta ?? null,
     reference_app_url: `${baseUrl}/queries/${query.id}`,
@@ -156,7 +157,8 @@ function createDefaultBackend(): McpQueryBackend {
       return listOpenQueries().map((q) => ({
         query_id: q.id,
         description: q.description,
-        challenge_rule: q.challenge_rule,
+        challenge_rule: q.challenge_rule ?? null,
+        verification_requirements: q.verification_requirements,
         expires_in_seconds: Math.max(0, Math.floor((q.expires_at - Date.now()) / 1000)),
       }));
     },
@@ -241,7 +243,8 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       return (json as Array<Record<string, unknown>>).map((q) => ({
         query_id: String(q.id),
         description: String(q.description),
-        challenge_rule: String(q.challenge_rule),
+        challenge_rule: q.challenge_rule ? String(q.challenge_rule) : null,
+        verification_requirements: q.verification_requirements ?? [],
         expires_in_seconds: Number(q.expires_in_seconds ?? 0),
       }));
     },

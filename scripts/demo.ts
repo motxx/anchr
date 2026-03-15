@@ -124,11 +124,11 @@ async function runDemo() {
   });
   const createJson = await createRes.json() as {
     query_id: string; description: string; status: string;
-    challenge_nonce: string; reference_app_url: string;
+    challenge_nonce: string | null; reference_app_url: string;
   };
   if (createRes.status === 201) {
     ok(`Query created: ${createJson.query_id}`);
-    info(`Description: ${createJson.description} | Nonce: ${createJson.challenge_nonce}`);
+    info(`Description: ${createJson.description}${createJson.challenge_nonce ? ` | Nonce: ${createJson.challenge_nonce}` : ""}`);
     info(`URL: ${createJson.reference_app_url}`);
   } else {
     err(`Failed to create query (${createRes.status})`);
@@ -154,7 +154,7 @@ async function runDemo() {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       attachments: [],
-      notes: `Observed storefront open ${createJson.challenge_nonce}`,
+      notes: `Observed storefront open${createJson.challenge_nonce ? ` ${createJson.challenge_nonce}` : ""}`,
     }),
   });
   const submitJson = await submitRes.json() as {

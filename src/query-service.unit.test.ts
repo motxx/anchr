@@ -91,12 +91,23 @@ describe("createQueryService", () => {
     };
   }
 
-  test("createQuery returns a pending query with nonce", () => {
+  test("createQuery returns a pending query (no nonce by default)", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "Test query" });
     expect(query.status).toBe("pending");
-    expect(query.challenge_nonce).toBeTruthy();
+    expect(query.challenge_nonce).toBeUndefined();
+    expect(query.verification_requirements).toEqual(["gps", "ai_check"]);
     expect(query.id).toStartWith("query_");
+  });
+
+  test("createQuery generates nonce when nonce factor is requested", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery(
+      { description: "Test query", verification_requirements: ["nonce", "gps"] },
+    );
+    expect(query.challenge_nonce).toBeTruthy();
+    expect(query.challenge_nonce!.length).toBe(4);
+    expect(query.verification_requirements).toEqual(["nonce", "gps"]);
   });
 
   test("createQuery respects ttlMs option", () => {

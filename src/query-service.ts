@@ -16,7 +16,9 @@ import type {
   RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
+  VerificationFactor,
 } from "./types";
+import { DEFAULT_VERIFICATION_FACTORS } from "./types";
 
 export type {
   AttachmentRef,
@@ -25,6 +27,7 @@ export type {
   QueryInput,
   QueryResult,
   QueryStatus,
+  VerificationFactor,
   RequesterMeta,
   RequesterType,
 } from "./types";
@@ -162,7 +165,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   return {
     createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
       const now = Date.now();
-      const nonce = generateNonce();
+      const requirements = input.verification_requirements
+        ?? DEFAULT_VERIFICATION_FACTORS;
+      const needsNonce = requirements.includes("nonce");
+      const nonce = needsNonce ? generateNonce() : undefined;
       const isHtlc = options?.htlc !== undefined;
       const query: Query = {
         id: generateQueryId(),
@@ -170,7 +176,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         description: input.description,
         location_hint: input.location_hint,
         challenge_nonce: nonce,
-        challenge_rule: buildChallengeRule(nonce, input.description),
+        challenge_rule: nonce ? buildChallengeRule(nonce, input.description) : undefined,
+        verification_requirements: requirements,
         created_at: now,
         expires_at: now + resolveTtlMs(options),
         requester_meta: options?.requesterMeta,
@@ -379,6 +386,7 @@ function publishQueryToRelay(query: Query): void {
       nonce: query.challenge_nonce,
       expires_at: query.expires_at,
       oracle_ids: query.oracle_ids,
+      verification_requirements: query.verification_requirements,
       bounty: query.bounty?.cashu_token
         ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.cashu_token }
         : undefined,

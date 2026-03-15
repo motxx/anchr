@@ -26,10 +26,20 @@ export interface GpsCoord {
   lon: number;
 }
 
+/**
+ * Verification factors that a Requester can request.
+ * When omitted, defaults to ["gps", "ai_check"].
+ */
+export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check"] as const;
+export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
+
+export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
+
 export interface QueryInput {
   description: string;
   location_hint?: string;
   expected_gps?: GpsCoord;
+  verification_requirements?: readonly VerificationFactor[];
 }
 
 export interface AttachmentRef {
@@ -126,8 +136,10 @@ export interface Query {
   status: QueryStatus;
   description: string;
   location_hint?: string;
-  challenge_nonce: string;
-  challenge_rule: string;
+  challenge_nonce?: string;
+  challenge_rule?: string;
+  /** Verification factors requested by the Requester. */
+  verification_requirements: readonly VerificationFactor[];
   created_at: number;
   expires_at: number;
   requester_meta?: RequesterMeta;

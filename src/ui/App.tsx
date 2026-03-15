@@ -36,8 +36,8 @@ interface UploadResponse {
 interface Query {
   id: string;
   description: string;
-  challenge_nonce: string;
-  challenge_rule: string;
+  challenge_nonce: string | null;
+  challenge_rule: string | null;
   expires_at: number;
   expires_in_seconds: number;
   bounty?: Bounty | null;
@@ -280,18 +280,20 @@ function QueryCard({ query }: { query: Query }) {
       {/* Body */}
       {open && (
         <CardContent className="px-4 pb-5 pt-4 border-t border-border space-y-5">
-          {/* Nonce box */}
-          <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg px-4 py-4">
-            <p className="text-[10px] uppercase tracking-widest text-amber-700 font-semibold mb-2">
-              Challenge Nonce
-            </p>
-            <p className="font-mono text-5xl font-black text-amber-400 tracking-[0.4em] leading-none mb-3">
-              {query.challenge_nonce}
-            </p>
-            <p className="text-sm text-foreground/80 leading-relaxed">
-              {query.challenge_rule}
-            </p>
-          </div>
+          {/* Nonce box (only when nonce verification is required) */}
+          {query.challenge_nonce && (
+            <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg px-4 py-4">
+              <p className="text-[10px] uppercase tracking-widest text-amber-700 font-semibold mb-2">
+                Challenge Nonce
+              </p>
+              <p className="font-mono text-5xl font-black text-amber-400 tracking-[0.4em] leading-none mb-3">
+                {query.challenge_nonce}
+              </p>
+              <p className="text-sm text-foreground/80 leading-relaxed">
+                {query.challenge_rule}
+              </p>
+            </div>
+          )}
 
           {/* Submission form */}
           {!submitted && (

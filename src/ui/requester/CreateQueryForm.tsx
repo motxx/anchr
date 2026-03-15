@@ -10,7 +10,7 @@ interface CreateResponse {
   query_id: string;
   status: string;
   description: string;
-  challenge_nonce: string;
+  challenge_nonce: string | null;
 }
 
 export function CreateQueryForm() {

@@ -152,17 +152,19 @@ export default function QueryDetailScreen() {
           className="flex-1"
           facing="back"
         >
-          {/* Nonce overlay */}
-          <View className="absolute top-16 left-0 right-0 items-center">
-            <View className="bg-black/60 rounded-xl px-5 py-3">
-              <Text className="text-amber-400 text-xs text-center mb-1">
-                Write this on paper:
-              </Text>
-              <Text className="text-amber-300 text-3xl font-black font-mono tracking-[0.3em] text-center">
-                {query.challenge_nonce}
-              </Text>
+          {/* Nonce overlay (only when nonce required) */}
+          {query.challenge_nonce && (
+            <View className="absolute top-16 left-0 right-0 items-center">
+              <View className="bg-black/60 rounded-xl px-5 py-3">
+                <Text className="text-amber-400 text-xs text-center mb-1">
+                  Write this on paper:
+                </Text>
+                <Text className="text-amber-300 text-3xl font-black font-mono tracking-[0.3em] text-center">
+                  {query.challenge_nonce}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Bottom controls */}
           <View className="absolute bottom-12 left-0 right-0 flex-row items-center justify-center gap-8">
@@ -222,8 +224,10 @@ export default function QueryDetailScreen() {
         )}
       </View>
 
-      {/* Challenge Nonce */}
-      <ChallengeNonceDisplay nonce={query.challenge_nonce} rule={query.challenge_rule} />
+      {/* Challenge Nonce (only when nonce verification is required) */}
+      {query.challenge_nonce && query.challenge_rule && (
+        <ChallengeNonceDisplay nonce={query.challenge_nonce} rule={query.challenge_rule} />
+      )}
 
       {/* Action area */}
       {!submitted && !expired && (

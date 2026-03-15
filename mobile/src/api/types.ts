@@ -60,6 +60,8 @@ export interface VerificationDetail {
   failures: string[];
 }
 
+export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check";
+
 /** Shape returned by GET /queries (querySummary presenter) */
 export interface QuerySummary {
   id: string;
@@ -67,8 +69,9 @@ export interface QuerySummary {
   description: string;
   location_hint: string | null;
   bounty: BountyInfo | null;
-  challenge_nonce: string;
-  challenge_rule: string;
+  challenge_nonce: string | null;
+  challenge_rule: string | null;
+  verification_requirements: VerificationFactor[];
   oracle_ids: string[] | null;
   expires_at: number;
   expires_in_seconds: number;

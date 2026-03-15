@@ -84,16 +84,27 @@ async function extractVideoFrames(
 
 function buildPrompt(query: Query): string {
   const nonce = query.challenge_nonce;
+  if (nonce) {
+    return [
+      `You are verifying a photo/video submission for the following query:`,
+      `"${query.description}"`,
+      ``,
+      `Check TWO things:`,
+      `1. Does the image show content relevant to this query?`,
+      `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
+      ``,
+      `Both must be true to pass. Answer in the following JSON format only:`,
+      `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
+    ].join("\n");
+  }
   return [
     `You are verifying a photo/video submission for the following query:`,
     `"${query.description}"`,
     ``,
-    `Check TWO things:`,
-    `1. Does the image show content relevant to this query?`,
-    `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
+    `Check whether the image shows content relevant to this query.`,
     ``,
-    `Both must be true to pass. Answer in the following JSON format only:`,
-    `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
+    `Answer in the following JSON format only:`,
+    `{"relevant": true or false, "reason": "brief explanation in the language of the query description"}`,
   ].join("\n");
 }
 
@@ -165,11 +176,12 @@ export async function checkAttachmentContent(
       return { passed: true, reason: "AI response could not be parsed; skipping check" };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; nonce_visible: boolean; reason: string };
-    const passed = Boolean(parsed.relevant) && Boolean(parsed.nonce_visible);
+    const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; nonce_visible?: boolean; reason: string };
+    const nonceRequired = query.verification_requirements.includes("nonce");
+    const passed = Boolean(parsed.relevant) && (!nonceRequired || Boolean(parsed.nonce_visible));
     return {
       passed,
-      reason: parsed.reason || (passed ? "Content matches query with visible nonce" : "Content or nonce check failed"),
+      reason: parsed.reason || (passed ? "Content matches query" : "Content check failed"),
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

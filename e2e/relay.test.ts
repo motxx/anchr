@@ -101,7 +101,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       query_id: string;
       description: string;
       status: string;
-      challenge_nonce: string;
+      challenge_nonce: string | null;
       reference_app_url: string;
     };
     expect(createJson.query_id).toStartWith("query_");
@@ -152,7 +152,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     expect(createRes.status).toBe(201);
     const { query_id, challenge_nonce } = await createRes.json() as {
       query_id: string;
-      challenge_nonce: string;
+      challenge_nonce: string | null;
     };
 
     // 2. List queries – should include our query
@@ -164,7 +164,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     // 3. Get query detail
     const detailRes = await app.request(`http://localhost/queries/${query_id}`);
     expect(detailRes.status).toBe(200);
-    const detail = await detailRes.json() as { id: string; status: string; challenge_nonce: string };
+    const detail = await detailRes.json() as { id: string; status: string; challenge_nonce: string | null };
     expect(detail.status).toBe("pending");
     expect(detail.challenge_nonce).toBe(challenge_nonce);
 
@@ -174,7 +174,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         attachments: [],
-        notes: `E2E test observation ${challenge_nonce}`,
+        notes: `E2E test observation${challenge_nonce ? ` ${challenge_nonce}` : ""}`,
       }),
     });
     expect(submitRes.status).toBe(200);

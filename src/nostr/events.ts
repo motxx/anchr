@@ -16,6 +16,7 @@
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import type { VerificationFactor } from "../types";
 import type { NostrIdentity } from "./identity";
 import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
 
@@ -30,7 +31,7 @@ export const ANCHR_QUERY_SETTLEMENT = ANCHR_QUERY_FEEDBACK;
 
 export interface QueryRequestPayload {
   description: string;
-  nonce: string;
+  nonce?: string;
   /** Oracle's Nostr pubkey (hex) — Workers verify against whitelist. */
   oracle_pubkey?: string;
   /** Requester's Nostr pubkey (hex) — Workers encrypt K_R to this. */
@@ -40,6 +41,8 @@ export interface QueryRequestPayload {
     token: string;
   };
   oracle_ids?: string[];
+  /** Verification factors requested by the Requester. */
+  verification_requirements?: VerificationFactor[];
   expires_at: number;
 }
 
@@ -129,13 +132,20 @@ export function buildQueryRequestEvent(
 ): VerifiedEvent {
   const tags: string[][] = [
     ["i", payload.description, "text"],
-    ["param", "nonce", payload.nonce],
     ["output", "application/json"],
     ["encrypted"],
     ["d", queryId],
     ["t", "anchr"],
     ["expiration", String(Math.floor(payload.expires_at / 1000))],
   ];
+
+  if (payload.nonce) {
+    tags.push(["param", "nonce", payload.nonce]);
+  }
+
+  if (payload.verification_requirements?.length) {
+    tags.push(["param", "verification", payload.verification_requirements.join(",")]);
+  }
 
   if (payload.bounty?.token) {
     tags.push(["bid", payload.bounty.token]);

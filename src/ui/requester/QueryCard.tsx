@@ -35,8 +35,8 @@ interface QuerySummary {
   description: string;
   location_hint: string | null;
   bounty: Bounty | null;
-  challenge_nonce: string;
-  challenge_rule: string;
+  challenge_nonce: string | null;
+  challenge_rule: string | null;
   expires_at: number;
   expires_in_seconds: number;
   htlc: HtlcSummary | null;
@@ -262,18 +262,20 @@ export function QueryCard({ query }: { query: QuerySummary }) {
             )}
           </div>
 
-          {/* Challenge */}
-          <div className="rounded-lg border bg-muted/30 px-3 py-3">
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-              Challenge Nonce
-            </p>
-            <p className="font-mono text-3xl font-black tracking-[0.3em] leading-none mb-2">
-              {query.challenge_nonce}
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {query.challenge_rule}
-            </p>
-          </div>
+          {/* Challenge (only when nonce is present) */}
+          {query.challenge_nonce && (
+            <div className="rounded-lg border bg-muted/30 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
+                Challenge Nonce
+              </p>
+              <p className="font-mono text-3xl font-black tracking-[0.3em] leading-none mb-2">
+                {query.challenge_nonce}
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {query.challenge_rule}
+              </p>
+            </div>
+          )}
 
           {/* HTLC info */}
           {query.htlc && (

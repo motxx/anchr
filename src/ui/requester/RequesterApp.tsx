@@ -10,8 +10,8 @@ interface QuerySummary {
   description: string;
   location_hint: string | null;
   bounty: { amount_sats: number } | null;
-  challenge_nonce: string;
-  challenge_rule: string;
+  challenge_nonce: string | null;
+  challenge_rule: string | null;
   expires_at: number;
   expires_in_seconds: number;
   htlc: {

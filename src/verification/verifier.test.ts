@@ -42,6 +42,7 @@ function makeQuery(overrides: Partial<Query>): Query {
     description: "Test query",
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
+    verification_requirements: ["nonce", "gps", "ai_check"],
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "locked",

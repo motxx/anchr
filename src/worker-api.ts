@@ -26,6 +26,7 @@ import {
   type QueryResult,
   type QueryService,
 } from "./query-service";
+import { VERIFICATION_FACTORS } from "./types";
 import type { AttachmentRef, BlossomKeyMap, HtlcInfo, Query, QuoteInfo } from "./types";
 
 export interface WorkerApiDeps {
@@ -61,6 +62,10 @@ const gpsSchema = z.object({
   lon: z.number().min(-180).max(180),
 }).optional();
 
+const verificationRequirementsSchema = z.array(
+  z.enum(VERIFICATION_FACTORS),
+).optional();
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
@@ -70,6 +75,7 @@ const createQuerySchema = z.object({
   bounty: bountySchema.optional(),
   oracle_ids: oracleIdsSchema,
   htlc: htlcSchema,
+  verification_requirements: verificationRequirementsSchema,
 });
 
 // --- Auth Middleware ---
@@ -117,8 +123,9 @@ function querySummary(query: Query) {
     location_hint: query.location_hint ?? null,
     requester_meta: query.requester_meta ?? null,
     bounty: query.bounty ? { amount_sats: query.bounty.amount_sats } : null,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
@@ -139,8 +146,9 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
     query_id: query.id,
     status: query.status,
     description: query.description,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     expires_at: new Date(query.expires_at).toISOString(),
     requester_meta: query.requester_meta ?? null,
     reference_app_url: `${requestOrigin}/queries/${query.id}`,
@@ -257,6 +265,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         description: payload.description,
         location_hint: payload.location_hint,
         expected_gps: payload.expected_gps,
+        verification_requirements: payload.verification_requirements,
       };
 
       const query = doCreateQuery(input, {
