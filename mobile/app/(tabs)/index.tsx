@@ -10,15 +10,21 @@ import * as Location from "expo-location";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueries } from "../../src/hooks/useQueries";
 import { QueryCard } from "../../src/components/QueryCard";
+import {
+  useNearbyNotifications,
+  requestNotificationPermissions,
+} from "../../src/hooks/useNearbyNotifications";
 import { haversineKm } from "../../src/utils/distance";
 import type { GpsCoord, QuerySummary } from "../../src/api/types";
 
 export default function QueriesScreen() {
   const { data: queries, isLoading, isError, refetch, isFetching } = useQueries();
   const [userLocation, setUserLocation] = useState<GpsCoord | null>(null);
+  const [isManualRefresh, setIsManualRefresh] = useState(false);
 
   useEffect(() => {
     (async () => {
+      await requestNotificationPermissions();
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
       const loc = await Location.getCurrentPositionAsync({
@@ -28,8 +34,13 @@ export default function QueriesScreen() {
     })();
   }, []);
 
-  const onRefresh = useCallback(() => {
-    refetch();
+  // Fire local notification when a query appears within 10km
+  useNearbyNotifications(queries, userLocation);
+
+  const onRefresh = useCallback(async () => {
+    setIsManualRefresh(true);
+    await refetch();
+    setIsManualRefresh(false);
   }, [refetch]);
 
   // Sort queries: nearest first if location available
@@ -103,7 +114,7 @@ export default function QueriesScreen() {
         )}
         contentContainerStyle={{ padding: 16, gap: 12 }}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} />
+          <RefreshControl refreshing={isManualRefresh} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View className="items-center justify-center py-20">

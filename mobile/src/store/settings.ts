@@ -12,7 +12,7 @@ interface SettingsState {
 const STORAGE_KEY_SERVER_URL = "anchr_server_url";
 const STORAGE_KEY_API_KEY = "anchr_api_key";
 
-const DEFAULT_SERVER_URL = "https://anchr-app.fly.dev";
+const DEFAULT_SERVER_URL = __DEV__ ? "http://localhost:3000" : "https://anchr-app.fly.dev";
 
 export const useSettingsStore = create<SettingsState>((set) => ({
   serverUrl: DEFAULT_SERVER_URL,
@@ -30,13 +30,22 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
 
   load: async () => {
-    const [url, key] = await Promise.all([
-      AsyncStorage.getItem(STORAGE_KEY_SERVER_URL),
-      AsyncStorage.getItem(STORAGE_KEY_API_KEY),
-    ]);
-    set({
-      serverUrl: url || DEFAULT_SERVER_URL,
-      apiKey: key || "",
-    });
+    try {
+      const [url, key] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY_SERVER_URL),
+        AsyncStorage.getItem(STORAGE_KEY_API_KEY),
+      ]);
+      // In dev mode, always prefer localhost unless user explicitly saved localhost
+      const resolvedUrl = __DEV__
+        ? (url?.includes("localhost") ? url : DEFAULT_SERVER_URL)
+        : (url || DEFAULT_SERVER_URL);
+      console.log(`[anchr-settings] load: stored="${url}", using="${resolvedUrl}"`);
+      set({
+        serverUrl: resolvedUrl,
+        apiKey: key || "",
+      });
+    } catch (e) {
+      console.error(`[anchr-settings] load error:`, e);
+    }
   },
 }));

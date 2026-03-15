@@ -24,19 +24,33 @@ function getHeaders(): Record<string, string> {
 }
 
 export async function fetchQueries(): Promise<QuerySummary[]> {
-  const res = await fetch(`${getBaseUrl()}/queries`, {
-    headers: getHeaders(),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch queries: ${res.status}`);
-  return res.json();
+  const url = `${getBaseUrl()}/queries`;
+  console.log(`[anchr-api] fetchQueries → ${url}`);
+  try {
+    const res = await fetch(url, {
+      headers: getHeaders(),
+    });
+    console.log(`[anchr-api] fetchQueries ← ${res.status}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    console.log(`[anchr-api] fetchQueries got ${data.length} queries`);
+    return data;
+  } catch (e) {
+    console.error(`[anchr-api] fetchQueries error:`, e);
+    return [];
+  }
 }
 
-export async function fetchQueryDetail(id: string): Promise<QueryDetail> {
-  const res = await fetch(`${getBaseUrl()}/queries/${id}`, {
-    headers: getHeaders(),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch query: ${res.status}`);
-  return res.json();
+export async function fetchQueryDetail(id: string): Promise<QueryDetail | null> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/queries/${id}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function uploadPhoto(

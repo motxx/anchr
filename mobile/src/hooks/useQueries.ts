@@ -6,7 +6,7 @@ export function useQueries() {
   return useQuery<QuerySummary[]>({
     queryKey: ["queries"],
     queryFn: fetchQueries,
-    refetchInterval: 5000,
+    refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
 }

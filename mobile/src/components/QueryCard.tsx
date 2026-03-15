@@ -33,7 +33,7 @@ export function QueryCard({ query, userLocation }: Props) {
 
   return (
     <Pressable
-      onPress={() => router.push(`/query/${query.id}`)}
+      onPress={() => router.push(`/${query.id}`)}
       className="bg-white rounded-xl border border-gray-200 overflow-hidden active:scale-[0.98]"
       style={{ elevation: 1 }}
     >

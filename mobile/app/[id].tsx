@@ -14,18 +14,18 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as DocumentPicker from "expo-document-picker";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { Ionicons } from "@expo/vector-icons";
-import { useQueryDetail } from "../../src/hooks/useQueries";
-import { ChallengeNonceDisplay } from "../../src/components/ChallengeNonceDisplay";
-import { StatusBadge } from "../../src/components/StatusBadge";
-import { uploadPhoto, submitResult } from "../../src/api/client";
-import { timeLeft, isExpired } from "../../src/utils/time";
+import { useQueryDetail } from "../src/hooks/useQueries";
+import { ChallengeNonceDisplay } from "../src/components/ChallengeNonceDisplay";
+import { StatusBadge } from "../src/components/StatusBadge";
+import { uploadPhoto, submitResult } from "../src/api/client";
+import { timeLeft, isExpired } from "../src/utils/time";
 import type {
   AttachmentRef,
   BlossomKeyMap,
   BlossomKeyMaterial,
   SubmitResponse,
   UploadResponse,
-} from "../../src/api/types";
+} from "../src/api/types";
 
 export default function QueryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

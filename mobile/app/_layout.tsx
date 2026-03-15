@@ -30,14 +30,13 @@ export default function RootLayout() {
       >
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
-          name="query/[id]"
+          name="[id]"
           options={{
             headerShown: true,
             headerTitle: "Query",
             headerBackTitle: "Back",
             headerTintColor: "#1c1917",
             headerStyle: { backgroundColor: "#f5f5f4" },
-            presentation: "card",
           }}
         />
       </Stack>
