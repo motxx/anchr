@@ -98,6 +98,7 @@ export interface QueryService {
   createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
   getQuery(id: string): Query | null;
   listOpenQueries(): Query[];
+  listAllQueries(): Query[];
   submitQueryResult(
     id: string,
     result: QueryResult,
@@ -117,7 +118,7 @@ export interface QueryService {
   /** Select a Worker and transition to worker_selected/processing. */
   selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): HtlcOutcome;
   /** Record a Worker's result submission (transition to verifying). */
-  recordResult(queryId: string, result: QueryResult, workerPubkey: string): HtlcOutcome;
+  recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
   /** Complete Oracle verification (transition to approved/rejected). */
   completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
 }
@@ -179,6 +180,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         htlc: options?.htlc,
         quotes: isHtlc ? [] : undefined,
         nostr_event_id: options?.nostrEventId,
+        expected_gps: input.expected_gps,
       };
 
       store.set(query.id, query);
@@ -194,6 +196,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const now = Date.now();
       const openStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
       return store.values().filter((q) => openStatuses.includes(q.status) && q.expires_at > now);
+    },
+
+    listAllQueries(): Query[] {
+      return store.values().sort((a, b) => b.created_at - a.created_at);
     },
 
     async submitQueryResult(
@@ -237,6 +243,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         submission_meta: submissionMeta,
         payment_status: paymentStatus,
         assigned_oracle_id: attestation.oracle_id,
+        blossom_keys: blossomKeys,
       };
       store.set(id, updated);
 
@@ -318,7 +325,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       return { ok: true, message: "Worker selected" };
     },
 
-    recordResult(queryId: string, result: QueryResult, workerPubkey: string): HtlcOutcome {
+    recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome {
       const query = store.get(queryId);
       if (!query) return { ok: false, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
@@ -334,6 +341,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         result: normalizedResult,
         submitted_at: Date.now(),
         submission_meta: { executor_type: "human", channel: "worker_api" },
+        blossom_keys: blossomKeys,
       });
       return { ok: true, message: "Result recorded, verification in progress" };
     },
@@ -401,6 +409,10 @@ export function getQuery(id: string): Query | null {
 
 export function listOpenQueries(): Query[] {
   return defaultService.listOpenQueries();
+}
+
+export function listAllQueries(): Query[] {
+  return defaultService.listAllQueries();
 }
 
 export async function submitQueryResult(

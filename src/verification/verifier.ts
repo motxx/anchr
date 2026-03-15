@@ -96,6 +96,13 @@ async function verifyPhotoIntegrity(
       failures.push("C2PA: Content Credentials signature invalid");
     }
 
+    // ProofMode bundle checks
+    if (record.proofmode) {
+      const pm = record.proofmode;
+      for (const c of pm.checks) checks.push(c);
+      for (const f of pm.failures) failures.push(f);
+    }
+
     // EXIF: camera model presence is a soft indicator
     if (exif.hasExif) {
       if (exif.hasCameraModel) {

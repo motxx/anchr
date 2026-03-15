@@ -8,6 +8,24 @@
 
 import type { C2paValidationResult } from "./c2pa-validation";
 import type { ExifValidationResult } from "./exif-validation";
+import type { ProofModeMetadata } from "./proofmode-validation";
+
+export interface ProofModeIntegrity {
+  /** Parsed proof.json metadata. */
+  proof: ProofModeMetadata | null;
+  /** SHA256 hash in proof.json matches actual photo hash. */
+  hashValid: boolean;
+  /** PGP signature verification result (null = gpg not available). */
+  pgpValid: boolean | null;
+  /** OpenTimestamps proof present. */
+  hasOts: boolean;
+  /** Apple DeviceCheck attestation present. */
+  hasDeviceCheck: boolean;
+  /** Advisory checks. */
+  checks: string[];
+  /** Failures. */
+  failures: string[];
+}
 
 export interface IntegrityMetadata {
   attachmentId: string;
@@ -15,6 +33,7 @@ export interface IntegrityMetadata {
   capturedAt: number;
   exif: ExifValidationResult;
   c2pa: C2paValidationResult;
+  proofmode?: ProofModeIntegrity;
 }
 
 export interface IntegrityStore {

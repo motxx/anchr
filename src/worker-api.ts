@@ -56,9 +56,15 @@ const htlcSchema = z.object({
   escrow_token: z.string().min(1).optional(),
 }).optional();
 
+const gpsSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+}).optional();
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
+  expected_gps: gpsSchema,
   ttl_seconds: z.number().int().min(60).max(86_400).optional(),
   requester: requesterMetaSchema.optional(),
   bounty: bountySchema.optional(),
@@ -123,6 +129,7 @@ function querySummary(query: Query) {
       locktime: query.htlc.locktime,
     } : null,
     quotes_count: query.quotes?.length ?? 0,
+    expected_gps: query.expected_gps ?? null,
   };
 }
 
@@ -153,6 +160,7 @@ function queryDetail(query: Query, requestUrl: string) {
     verification: query.verification,
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
+    blossom_keys: query.blossom_keys ?? null,
   };
 }
 
@@ -184,17 +192,22 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
 
 // --- CSS Build ---
 
-export async function prepareWorkerApiAssets() {
-  const cssIn = join(import.meta.dir, "ui/globals.css");
-  const cssOut = join(import.meta.dir, "ui/generated.css");
+async function buildCss(cssIn: string, cssOut: string, label: string) {
   const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
   });
   await proc.exited;
   if (proc.exitCode !== 0) {
-    console.error("[css-build] Failed:", await new Response(proc.stderr).text());
+    console.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
   }
+}
+
+export async function prepareWorkerApiAssets() {
+  await Promise.all([
+    buildCss(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
+    buildCss(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+  ]);
 }
 
 // --- Routes ---
@@ -215,6 +228,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   app.get("/oracles", (c) => c.json(doListOracles()));
 
   app.get("/queries", (c) => c.json(doListOpen().map(querySummary)));
+
+  app.get("/queries/all", (c) => c.json(svc.listAllQueries().map(querySummary)));
 
   app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
@@ -241,6 +256,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       const input: QueryInput = {
         description: payload.description,
         location_hint: payload.location_hint,
+        expected_gps: payload.expected_gps,
       };
 
       const query = doCreateQuery(input, {
@@ -331,9 +347,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const file = formData.get("photo");
     if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
-    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
+    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
     if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-    const result = await uploadAttachment(id, file as File);
+    const result = await uploadAttachment(id, file as File, { expectedGps: query.expected_gps });
     return c.json({
       ok: true,
       attachment: materializeAttachmentRef(result.attachment, c.req.url),
@@ -427,8 +443,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
     };
+    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
 
-    const outcome = svc.recordResult(id, result, workerPubkey);
+    const outcome = svc.recordResult(id, result, workerPubkey, blossomKeys);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 

@@ -21,9 +21,15 @@ export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
 export type AttachmentStorageKind = "blossom" | "external";
 
+export interface GpsCoord {
+  lat: number;
+  lon: number;
+}
+
 export interface QueryInput {
   description: string;
   location_hint?: string;
+  expected_gps?: GpsCoord;
 }
 
 export interface AttachmentRef {
@@ -141,4 +147,8 @@ export interface Query {
   quotes?: QuoteInfo[];
   /** Nostr event ID of the kind 5300 Job Request. */
   nostr_event_id?: string;
+  /** Ephemeral Blossom encryption keys — stored for requester download via HTTP API. */
+  blossom_keys?: BlossomKeyMap;
+  /** Expected GPS coordinates for proximity check. */
+  expected_gps?: GpsCoord;
 }
