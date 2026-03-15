@@ -44,3 +44,6 @@ queries.db*
 # uploads
 uploads/*
 .local/uploads/*
+
+# ui
+generated.css
