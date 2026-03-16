@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Anchr Worker",
+    "slug": "anchr-worker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "anchr",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#f5f5f4"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anchr.worker",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos for verification queries",
+        "NSLocationWhenInUseUsageDescription": "Find queries near your location",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Get notified when queries appear near you",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f5f5f4"
+      },
+      "package": "com.anchr.worker",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Get notified when queries appear near you",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10b981"
+        }
+      ]
+    ]
+  }
+}

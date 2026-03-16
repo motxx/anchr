@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { Context, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { getAttachmentStore } from "./attachment-store";
+import { uploadAttachment } from "./attachment-store";
 import {
   buildAttachmentAbsoluteUrl,
   buildAttachmentHandle,
@@ -11,22 +11,28 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-  UPLOADS_DIR,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { isNostrEnabled } from "./nostr/client";
-import { publishQueryToNostr } from "./nostr/query-bridge";
 import { listOracles } from "./oracle";
+import type { OracleRegistry } from "./oracle/registry";
 import {
   cancelQuery,
   createQuery,
+  defaultService as defaultQueryService,
   getQuery as getQueryById,
   listOpenQueries,
   submitQueryResult,
   type QueryInput,
   type QueryResult,
+  type QueryService,
 } from "./query-service";
-import type { AttachmentRef, Query } from "./types";
+import { VERIFICATION_FACTORS } from "./types";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, Query, QuoteInfo } from "./types";
+
+export interface WorkerApiDeps {
+  queryService?: QueryService;
+  oracleRegistry?: OracleRegistry;
+}
 
 // --- Schemas ---
 
@@ -43,36 +49,34 @@ const bountySchema = z.object({
 
 const oracleIdsSchema = z.array(z.string().min(1)).optional();
 
-const createQuerySchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("photo_proof"),
-    target: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-  z.object({
-    type: z.literal("store_status"),
-    store_name: z.string().min(1),
-    location_hint: z.string().min(1).optional(),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-  z.object({
-    type: z.literal("webpage_field"),
-    url: z.string().url(),
-    field: z.string().min(1),
-    anchor_word: z.string().min(1),
-    ttl_seconds: z.number().int().min(60).max(86_400).optional(),
-    requester: requesterMetaSchema.optional(),
-    bounty: bountySchema.optional(),
-    oracle_ids: oracleIdsSchema,
-  }),
-]);
+const htlcSchema = z.object({
+  hash: z.string().min(1),
+  oracle_pubkey: z.string().min(1),
+  requester_pubkey: z.string().min(1),
+  locktime: z.number().int().min(0),
+  escrow_token: z.string().min(1).optional(),
+}).optional();
+
+const gpsSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+}).optional();
+
+const verificationRequirementsSchema = z.array(
+  z.enum(VERIFICATION_FACTORS),
+).optional();
+
+const createQuerySchema = z.object({
+  description: z.string().min(1),
+  location_hint: z.string().min(1).optional(),
+  expected_gps: gpsSchema,
+  ttl_seconds: z.number().int().min(60).max(86_400).optional(),
+  requester: requesterMetaSchema.optional(),
+  bounty: bountySchema.optional(),
+  oracle_ids: oracleIdsSchema,
+  htlc: htlcSchema,
+  verification_requirements: verificationRequirementsSchema,
+});
 
 // --- Auth Middleware ---
 
@@ -114,16 +118,25 @@ function getPublicRequestUrl(c: Context): string {
 function querySummary(query: Query) {
   return {
     id: query.id,
-    type: query.type,
     status: query.status,
-    params: query.params,
+    description: query.description,
+    location_hint: query.location_hint ?? null,
     requester_meta: query.requester_meta ?? null,
     bounty: query.bounty ? { amount_sats: query.bounty.amount_sats } : null,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
+    htlc: query.htlc ? {
+      hash: query.htlc.hash,
+      oracle_pubkey: query.htlc.oracle_pubkey,
+      worker_pubkey: query.htlc.worker_pubkey ?? null,
+      locktime: query.htlc.locktime,
+    } : null,
+    quotes_count: query.quotes?.length ?? 0,
+    expected_gps: query.expected_gps ?? null,
   };
 }
 
@@ -131,14 +144,17 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
   const requestOrigin = new URL(requestUrl).origin;
   return {
     query_id: query.id,
-    type: query.type,
     status: query.status,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    description: query.description,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     expires_at: new Date(query.expires_at).toISOString(),
     requester_meta: query.requester_meta ?? null,
     reference_app_url: `${requestOrigin}/queries/${query.id}`,
     query_api_url: `${requestOrigin}/queries/${query.id}`,
+    payment_status: query.payment_status,
+    htlc: query.htlc ? { hash: query.htlc.hash, oracle_pubkey: query.htlc.oracle_pubkey } : null,
   };
 }
 
@@ -152,11 +168,12 @@ function queryDetail(query: Query, requestUrl: string) {
     verification: query.verification,
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
+    blossom_keys: query.blossom_keys ?? null,
   };
 }
 
-function getPhotoProofAttachmentRefs(query: Query): AttachmentRef[] | null {
-  if (query.type !== "photo_proof" || query.result?.type !== "photo_proof") return null;
+function getAttachmentRefs(query: Query): AttachmentRef[] | null {
+  if (!query.result?.attachments?.length) return null;
   return query.result.attachments;
 }
 
@@ -170,48 +187,62 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
     access: {
       ...handle.access,
       preview_url: handle.access.preview_url ?? undefined,
-      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
     },
     attachment_view_url: handle.access.view_url,
     attachment_meta_url: handle.access.meta_url,
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
-    local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
-    mime_type: stat?.mimeType ?? handle.attachment.mime_type,
+    // Blossom stores encrypted blobs; prefer the original mime_type from AttachmentRef (E2E: no keys exposed)
+    mime_type: handle.attachment.storage_kind === "blossom" ? handle.attachment.mime_type : (stat?.mimeType ?? handle.attachment.mime_type),
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
   };
 }
 
 // --- CSS Build ---
 
-export async function prepareWorkerApiAssets() {
-  const cssIn = join(import.meta.dir, "ui/globals.css");
-  const cssOut = join(import.meta.dir, "ui/generated.css");
+async function buildCss(cssIn: string, cssOut: string, label: string) {
   const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
   });
   await proc.exited;
   if (proc.exitCode !== 0) {
-    console.error("[css-build] Failed:", await new Response(proc.stderr).text());
+    console.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
   }
+}
+
+export async function prepareWorkerApiAssets() {
+  await Promise.all([
+    buildCss(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
+    buildCss(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+  ]);
 }
 
 // --- Routes ---
 
-export function buildWorkerApiApp() {
+export function buildWorkerApiApp(deps?: WorkerApiDeps) {
+  const svc = deps?.queryService ?? defaultQueryService;
+  const doCreateQuery = svc.createQuery.bind(svc);
+  const doGetQuery = svc.getQuery.bind(svc);
+  const doListOpen = svc.listOpenQueries.bind(svc);
+  const doSubmit = svc.submitQueryResult.bind(svc);
+  const doCancel = svc.cancelQuery.bind(svc);
+  const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
+
   const app = new Hono();
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  app.get("/oracles", (c) => c.json(listOracles()));
+  app.get("/oracles", (c) => c.json(doListOracles()));
 
-  app.get("/queries", (c) => c.json(listOpenQueries().map(querySummary)));
+  app.get("/queries", (c) => c.json(doListOpen().map(querySummary)));
+
+  app.get("/queries/all", (c) => c.json(svc.listAllQueries().map(querySummary)));
 
   app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     const requestUrl = getPublicRequestUrl(c);
     return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
   });
@@ -230,35 +261,20 @@ export function buildWorkerApiApp() {
     (c) => {
       const payload = c.req.valid("json");
 
-      let input: QueryInput;
-      switch (payload.type) {
-        case "photo_proof":
-          input = { type: "photo_proof", target: payload.target, location_hint: payload.location_hint };
-          break;
-        case "store_status":
-          input = { type: "store_status", store_name: payload.store_name, location_hint: payload.location_hint };
-          break;
-        case "webpage_field":
-          input = { type: "webpage_field", url: payload.url, field: payload.field, anchor_word: payload.anchor_word };
-          break;
-      }
+      const input: QueryInput = {
+        description: payload.description,
+        location_hint: payload.location_hint,
+        expected_gps: payload.expected_gps,
+        verification_requirements: payload.verification_requirements,
+      };
 
-      const query = createQuery(input, {
+      const query = doCreateQuery(input, {
         ttlSeconds: payload.ttl_seconds,
         requesterMeta: payload.requester,
         bounty: payload.bounty,
         oracleIds: payload.oracle_ids,
+        htlc: payload.htlc as HtlcInfo | undefined,
       });
-
-      if (isNostrEnabled()) {
-        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-        publishQueryToNostr(input, {
-          ttlMs: (payload.ttl_seconds ?? 600) * 1000,
-          regionCode: regionHint,
-          bounty: payload.bounty,
-          oracleIds: payload.oracle_ids,
-        }).catch((err) => console.error("[worker-api] Nostr publish failed:", err));
-      }
 
       return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
     },
@@ -267,10 +283,10 @@ export function buildWorkerApiApp() {
   app.get("/queries/:id/attachments", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const payloads = await Promise.all(
       attachments.map((att, i) => buildAttachmentPayload(query, att, i, getPublicRequestUrl(c))),
     );
@@ -282,10 +298,10 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
     return c.json(await buildAttachmentPayload(query, attachment, index, getPublicRequestUrl(c)));
@@ -296,22 +312,16 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
-    const stat = await statStoredAttachment(attachment, getPublicRequestUrl(c));
-    if (!stat) return c.json({ error: "Attachment file not found" }, 404);
-    if (stat.storageKind === "local") {
-      const file = Bun.file(stat.path!);
-      if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
-      return new Response(file, {
-        headers: { "content-type": stat.mimeType, "content-length": String(stat.size), "cache-control": "public, max-age=3600" },
-      });
-    }
-    return c.redirect(stat.absoluteUrl, 302);
+
+    // All attachments are stored on Blossom (encrypted). Redirect to the blob URL.
+    // Clients must decrypt using keys obtained via NIP-44 encrypted Nostr events.
+    return c.redirect(attachment.uri, 302);
   });
 
   app.get("/queries/:id/attachments/:index/preview", async (c) => {
@@ -319,10 +329,10 @@ export function buildWorkerApiApp() {
     const index = Number(c.req.param("index"));
     if (!id) return c.json({ error: "Query id is required" }, 400);
     if (!Number.isInteger(index) || index < 0) return c.json({ error: "Attachment index must be a non-negative integer" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
-    const attachments = getPhotoProofAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have photo proof attachments" }, 404);
+    const attachments = getAttachmentRefs(query);
+    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
     const attachment = attachments[index];
     if (!attachment) return c.json({ error: "Attachment not found" }, 404);
     const maxDimensionParam = c.req.query("max_dimension");
@@ -338,7 +348,7 @@ export function buildWorkerApiApp() {
   app.post("/queries/:id/upload", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const query = getQueryById(id);
+    const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
     let formData: FormData;
@@ -346,18 +356,15 @@ export function buildWorkerApiApp() {
     const file = formData.get("photo");
     if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
-    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm"];
+    const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
     if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-    const stored = await getAttachmentStore().put(id, file as File, getPublicRequestUrl(c));
-    return c.json({ ok: true, attachment: materializeAttachmentRef(stored.attachment, c.req.url) });
-  });
-
-  app.get("/uploads/:filename", async (c) => {
-    const filename = c.req.param("filename");
-    if (filename.includes("..") || filename.includes("/")) return c.json({ error: "Forbidden" }, 403);
-    const file = Bun.file(join(UPLOADS_DIR, filename));
-    if (!(await file.exists())) return c.json({ error: "Not found" }, 404);
-    return new Response(file);
+    const result = await uploadAttachment(id, file as File, { expectedGps: query.expected_gps });
+    return c.json({
+      ok: true,
+      attachment: materializeAttachmentRef(result.attachment, c.req.url),
+      // E2E: encryption keys returned once, never persisted on server
+      encryption: result.encryption,
+    });
   });
 
   app.post("/queries/:id/submit", writeAuth, async (c) => {
@@ -366,23 +373,94 @@ export function buildWorkerApiApp() {
     let body: Record<string, unknown>;
     try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
     const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
-    const outcome = await submitQueryResult(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId);
+    // E2E: accept ephemeral encryption keys for one-time oracle verification
+    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
+    const outcome = await doSubmit(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;
+    // Release bounty token to Worker on approval
+    const cashuToken = outcome.ok && outcome.query?.bounty?.cashu_token
+      ? outcome.query.bounty.cashu_token
+      : undefined;
     return c.json({
       ok: outcome.ok,
       message: outcome.message,
       verification: outcome.query?.verification,
       oracle_id: outcome.query?.assigned_oracle_id ?? null,
       payment_status: outcome.query?.payment_status,
+      bounty_amount_sats: outcome.query?.bounty?.amount_sats ?? null,
+      cashu_token: cashuToken ?? null,
     }, status);
   });
 
   app.post("/queries/:id/cancel", writeAuth, (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    const outcome = cancelQuery(id);
+    const outcome = doCancel(id);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  // --- HTLC lifecycle endpoints ---
+
+  app.get("/queries/:id/quotes", (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const query = doGetQuery(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+    return c.json(query.quotes ?? []);
+  });
+
+  app.post("/queries/:id/quotes", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+
+    const quote: QuoteInfo = {
+      worker_pubkey: workerPubkey,
+      amount_sats: typeof body.amount_sats === "number" ? body.amount_sats : undefined,
+      quote_event_id: typeof body.quote_event_id === "string" ? body.quote_event_id : "",
+      received_at: Date.now(),
+    };
+
+    const outcome = svc.recordQuote(id, quote);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  app.post("/queries/:id/select", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+    const htlcToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
+
+    const outcome = svc.selectWorker(id, workerPubkey, htlcToken);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  app.post("/queries/:id/result", writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    let body: Record<string, unknown>;
+    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+
+    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
+    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+
+    const result: QueryResult = {
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      notes: typeof body.notes === "string" ? body.notes : undefined,
+    };
+    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
+
+    const outcome = svc.recordResult(id, result, workerPubkey, blossomKeys);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 

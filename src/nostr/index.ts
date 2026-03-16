@@ -17,22 +17,41 @@ export {
 export {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
+  ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_SETTLEMENT,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
+  buildQuoteFeedbackEvent,
+  buildSelectionFeedbackEvent,
   buildQuerySettlementEvent,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
+  parseFeedbackPayload,
   parseQuerySettlementPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
+  type QuoteFeedbackPayload,
+  type SelectionFeedbackPayload,
+  type CompletionFeedbackPayload,
   type QuerySettlementPayload,
+  type FeedbackPayload,
+  type PreimageDMPayload,
+  type RejectionDMPayload,
+  type OracleDMPayload,
 } from "./events";
+export {
+  DM_KIND,
+  buildPreimageDM,
+  buildRejectionDM,
+  parseOracleDM,
+} from "./dm";
 export {
   publishEvent,
   subscribeToQueries,
   subscribeToResponses,
   subscribeToSettlements,
+  subscribeToFeedback,
+  subscribeToDMs,
   subscribeToAttestations,
   fetchRecentQueries,
   isNostrEnabled,
@@ -46,19 +65,3 @@ export {
   toOracleAttestation,
   type OracleAttestationPayload,
 } from "./oracle-attestation";
-export {
-  publishQueryToNostr,
-  listenForQueries,
-  type NostrQueryHandle,
-  type NostrQueryOptions,
-  type NostrWorkerHandle,
-} from "./query-bridge";
-export {
-  createNostrQuery,
-  getNostrQuery,
-  listNostrQueries,
-  cancelNostrQuery,
-  verifyAndSettle,
-  expireNostrQueries,
-  activeQueryCount,
-} from "./nostr-query-service";

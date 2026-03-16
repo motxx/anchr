@@ -1,13 +1,12 @@
-import { mkdirSync } from "node:fs";
 import { getRuntimeConfig } from "./config";
-import { UPLOADS_DIR } from "./attachments";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 // @ts-ignore — Bun HTML import
 import uiHtml from "./ui/index.html";
+// @ts-ignore — Bun HTML import
+import requesterHtml from "./ui/requester/index.html";
 
 export async function startReferenceApp() {
   await prepareWorkerApiAssets();
-  mkdirSync(UPLOADS_DIR, { recursive: true });
 
   const app = buildWorkerApiApp();
   const port = getRuntimeConfig().referenceAppPort;
@@ -16,9 +15,11 @@ export async function startReferenceApp() {
     port,
     routes: {
       "/": uiHtml,
+      "/requester": requesterHtml,
     },
     fetch: app.fetch,
   });
 
-  console.error(`[reference-app] Dashboard → http://localhost:${port}`);
+  console.error(`[reference-app] Worker    → http://localhost:${port}`);
+  console.error(`[reference-app] Requester → http://localhost:${port}/requester`);
 }

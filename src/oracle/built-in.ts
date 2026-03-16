@@ -1,5 +1,5 @@
 import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../types";
+import type { BlossomKeyMap, Query, QueryResult } from "../types";
 import type { Oracle, OracleAttestation, OracleInfo } from "./types";
 
 export const BUILT_IN_ORACLE_ID = "built-in";
@@ -12,8 +12,8 @@ const info: OracleInfo = {
 
 export const builtInOracle: Oracle = {
   info,
-  async verify(query: Query, result: QueryResult): Promise<OracleAttestation> {
-    const detail = await verify(query, result);
+  async verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<OracleAttestation> {
+    const detail = await verify(query, result, blossomKeys);
     return {
       oracle_id: BUILT_IN_ORACLE_ID,
       query_id: query.id,

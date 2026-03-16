@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { DEFAULT_UPLOADS_DIR, getRuntimeConfig } from "./config";
+import { getRuntimeConfig } from "./config";
 import type {
   AttachmentAccess,
   AttachmentHandle,
@@ -11,9 +11,6 @@ import type {
 } from "./types";
 
 type AttachmentLike = AttachmentRef | string;
-
-export const UPLOADS_DIR = DEFAULT_UPLOADS_DIR;
-export const UPLOADS_ROUTE_PREFIX = "/uploads/";
 
 const MIME_TYPES: Record<string, string> = {
   ".gif": "image/gif",
@@ -30,8 +27,6 @@ export interface StoredAttachment {
   mimeType: string;
   absoluteUrl: string;
   storageKind: AttachmentStorageKind;
-  path?: string;
-  routePath?: string;
 }
 
 export interface AttachmentPreview {
@@ -103,16 +98,7 @@ function resolvePreviewCommand():
 
 function attachmentRefSource(ref: AttachmentLike): string {
   if (typeof ref === "string") return ref;
-  if (ref.storage_kind === "local" && ref.route_path) return ref.route_path;
   return ref.uri;
-}
-
-function attachmentPathname(ref: AttachmentLike): string | null {
-  try {
-    return new URL(attachmentRefSource(ref)).pathname;
-  } catch {
-    return attachmentRefSource(ref);
-  }
 }
 
 function inferAttachmentId(value: string): string {
@@ -146,19 +132,21 @@ export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: str
 
 export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
   const resolved = resolveStoredAttachment(ref, requestUrl);
+  const blossomFields = typeof ref !== "string" ? {
+    blossom_hash: ref.blossom_hash,
+    blossom_servers: ref.blossom_servers,
+  } : {};
+
   if (resolved) {
     const baseRef = typeof ref === "string" ? null : ref;
     return {
       id: baseRef?.id ?? resolved.filename ?? inferAttachmentId(attachmentRefSource(ref)),
-      uri: baseRef?.storage_kind === "local" && baseRef.route_path
-        ? baseRef.route_path
-        : resolved.routePath ?? resolved.absoluteUrl,
+      uri: resolved.absoluteUrl,
       mime_type: baseRef?.mime_type ?? resolved.mimeType,
       storage_kind: baseRef?.storage_kind ?? resolved.storageKind,
       filename: baseRef?.filename ?? resolved.filename,
       size_bytes: baseRef?.size_bytes,
-      local_file_path: baseRef?.local_file_path ?? resolved.path,
-      route_path: baseRef?.route_path ?? resolved.routePath,
+      ...blossomFields,
     };
   }
 
@@ -170,8 +158,7 @@ export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string)
       storage_kind: ref.storage_kind || "external",
       filename: ref.filename,
       size_bytes: ref.size_bytes,
-      local_file_path: ref.local_file_path,
-      route_path: ref.route_path,
+      ...blossomFields,
     };
   }
 
@@ -192,10 +179,7 @@ export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: strin
 }
 
 export function materializeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
-  if (result.type !== "photo_proof") {
-    return result;
-  }
-
+  if (!result.attachments?.length) return result;
   return {
     ...result,
     attachments: result.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
@@ -219,14 +203,12 @@ export function buildAttachmentAccess(
 ): AttachmentAccess {
   const originalUrl = buildAttachmentAbsoluteUrl(ref, requestUrl);
   const { viewUrl, metaUrl, previewUrl } = buildQueryAttachmentUrls(queryId, attachmentIndex, requestUrl);
-  const normalized = normalizeAttachmentRef(ref, requestUrl);
 
   return {
     original_url: originalUrl,
     preview_url: previewUrl,
     view_url: viewUrl,
     meta_url: metaUrl,
-    local_file_path: normalized.local_file_path,
   };
 }
 
@@ -243,17 +225,14 @@ export function buildAttachmentHandle(
 }
 
 export function normalizeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
-  if (result.type !== "photo_proof") {
-    return result;
-  }
-
+  if (!result.attachments?.length) return result;
   return {
     ...result,
     attachments: result.attachments.map((attachment) => normalizeAttachmentRef(attachment, requestUrl)),
   };
 }
 
-export function resolveStoredAttachment(ref: AttachmentLike, requestUrl?: string): StoredAttachment | null {
+export function resolveStoredAttachment(ref: AttachmentLike, _requestUrl?: string): StoredAttachment | null {
   const source = attachmentRefSource(ref);
   try {
     const url = new URL(source);
@@ -263,34 +242,10 @@ export function resolveStoredAttachment(ref: AttachmentLike, requestUrl?: string
       mimeType: typeof ref === "string" ? inferMimeTypeFromFilename(filename) : ref.mime_type || inferMimeTypeFromFilename(filename),
       absoluteUrl: url.toString(),
       storageKind: typeof ref === "string" ? "external" : ref.storage_kind,
-      path: typeof ref === "string" ? undefined : ref.local_file_path,
-      routePath: typeof ref === "string" ? undefined : ref.route_path,
     };
   } catch {
-    // fall through to local path resolution
-  }
-
-  const pathname = attachmentPathname(ref);
-  if (!pathname || !pathname.startsWith(UPLOADS_ROUTE_PREFIX)) {
     return null;
   }
-
-  const filename = pathname.slice(UPLOADS_ROUTE_PREFIX.length);
-  if (!filename || filename.includes("/") || filename.includes("..")) {
-    return null;
-  }
-
-  return {
-    filename,
-    mimeType: typeof ref === "string" ? inferMimeTypeFromFilename(filename) : ref.mime_type || inferMimeTypeFromFilename(filename),
-    absoluteUrl: buildAttachmentAbsoluteUrl(
-      typeof ref === "string" ? `${UPLOADS_ROUTE_PREFIX}${filename}` : ref.route_path ?? ref.uri,
-      requestUrl,
-    ),
-    storageKind: typeof ref === "string" ? "local" : ref.storage_kind,
-    path: typeof ref === "string" ? join(UPLOADS_DIR, filename) : ref.local_file_path ?? join(UPLOADS_DIR, filename),
-    routePath: typeof ref === "string" ? `${UPLOADS_ROUTE_PREFIX}${filename}` : ref.route_path ?? `${UPLOADS_ROUTE_PREFIX}${filename}`,
-  };
 }
 
 export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestUrl?: string) {
@@ -303,11 +258,12 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("./types").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
-  if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && ref.blossom_encrypt_key && ref.blossom_encrypt_iv) {
+  // Requires ephemeral key material — keys are never stored in AttachmentRef (E2E).
+  if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
     const { downloadFromBlossom } = await import("./blossom/client");
-    const data = await downloadFromBlossom(ref.blossom_hash, ref.blossom_encrypt_key, ref.blossom_encrypt_iv, ref.blossom_servers);
+    const data = await downloadFromBlossom(ref.blossom_hash, blossomKeyMaterial.encrypt_key, blossomKeyMaterial.encrypt_iv, ref.blossom_servers);
     if (!data) return null;
     return {
       filename: ref.filename ?? ref.blossom_hash,
@@ -321,21 +277,11 @@ export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 
-  if (attachment.storageKind !== "local") {
-    const response = await fetch(attachment.absoluteUrl);
-    if (!response.ok) return null;
-    return {
-      ...attachment,
-      data: Buffer.from(await response.arrayBuffer()),
-    };
-  }
-
-  const file = Bun.file(attachment.path!);
-  if (!(await file.exists())) return null;
-
+  const response = await fetch(attachment.absoluteUrl);
+  if (!response.ok) return null;
   return {
     ...attachment,
-    data: Buffer.from(await file.arrayBuffer()),
+    data: Buffer.from(await response.arrayBuffer()),
   };
 }
 
@@ -399,29 +345,19 @@ export async function statStoredAttachment(ref: AttachmentLike, requestUrl?: str
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 
-  if (attachment.storageKind !== "local") {
-    try {
-      const response = await fetch(attachment.absoluteUrl, { method: "HEAD" });
-      if (!response.ok) return null;
-      const sizeHeader = response.headers.get("content-length");
-      return {
-        ...attachment,
-        size: sizeHeader ? Number(sizeHeader) : 0,
-        mimeType: response.headers.get("content-type") ?? attachment.mimeType,
-      };
-    } catch {
-      return {
-        ...attachment,
-        size: 0,
-      };
-    }
+  try {
+    const response = await fetch(attachment.absoluteUrl, { method: "HEAD" });
+    if (!response.ok) return null;
+    const sizeHeader = response.headers.get("content-length");
+    return {
+      ...attachment,
+      size: sizeHeader ? Number(sizeHeader) : 0,
+      mimeType: response.headers.get("content-type") ?? attachment.mimeType,
+    };
+  } catch {
+    return {
+      ...attachment,
+      size: 0,
+    };
   }
-
-  const file = Bun.file(attachment.path!);
-  if (!(await file.exists())) return null;
-
-  return {
-    ...attachment,
-    size: file.size,
-  };
 }

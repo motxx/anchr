@@ -1,16 +1,16 @@
 import { expect, test, beforeEach } from "bun:test";
 import {
-  createQueryService,
-  type Query,
-  type QueryResult,
-  type QueryService,
-  type QueryStatus,
-  type QueryStore,
+  clearQueryStore,
+  createQuery,
+  getQuery,
+  listOpenQueries,
+  cancelQuery,
+  submitQueryResult,
 } from "./query-service";
-import type { PaymentStatus, SubmissionMeta, VerificationDetail } from "./types";
 import { storeIntegrity, clearIntegrityStore } from "./verification/integrity-store";
 
 beforeEach(() => {
+  clearQueryStore();
   clearIntegrityStore();
 });
 
@@ -24,83 +24,14 @@ function injectValidC2pa(attachmentId: string, queryId: string) {
   });
 }
 
-function createInMemoryQueryService(): QueryService {
-  const queries = new Map<string, Query>();
-
-  const store: QueryStore = {
-    insertQuery(query) {
-      queries.set(query.id, structuredClone(query));
-    },
-    getQuery(id) {
-      const query = queries.get(id);
-      return query ? structuredClone(query) : null;
-    },
-    listQueries(status?: QueryStatus) {
-      return [...queries.values()]
-        .filter((query) => (status ? query.status === status : true))
-        .map((query) => structuredClone(query));
-    },
-    updateQuerySubmitted(
-      id: string,
-      result: QueryResult,
-      verification: VerificationDetail,
-      newStatus: QueryStatus,
-      paymentStatus: PaymentStatus,
-      submissionMeta: SubmissionMeta,
-      assignedOracleId?: string,
-    ) {
-      const query = queries.get(id);
-      if (!query) return;
-      queries.set(id, {
-        ...query,
-        status: newStatus,
-        submitted_at: Date.now(),
-        result: structuredClone(result),
-        verification: structuredClone(verification),
-        submission_meta: structuredClone(submissionMeta),
-        payment_status: paymentStatus,
-        assigned_oracle_id: assignedOracleId,
-      });
-    },
-    updateQueryStatus(id, status, paymentStatus) {
-      const query = queries.get(id);
-      if (!query) return;
-      queries.set(id, {
-        ...query,
-        status,
-        payment_status: paymentStatus ?? query.payment_status,
-      });
-    },
-    expirePendingQueries() {
-      let expired = 0;
-      for (const [id, query] of queries.entries()) {
-        if (query.status === "pending" && query.expires_at < Date.now()) {
-          queries.set(id, {
-            ...query,
-            status: "expired",
-            payment_status: "cancelled",
-          });
-          expired += 1;
-        }
-      }
-      return expired;
-    },
-  };
-
-  return createQueryService(store);
-}
-
-test("query service approves valid store status submissions", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
-    type: "store_status",
-    store_name: "Test Ramen",
+test("query service approves valid submissions", async () => {
+  const query = createQuery({
+    description: "Check if Test Ramen is open",
     location_hint: "Tokyo",
   });
 
-  const outcome = await service.submitQueryResult(query.id, {
-    type: "store_status",
-    status: "open",
+  const outcome = await submitQueryResult(query.id, {
+    attachments: [],
     notes: "Observed storefront, looked open",
   }, {
     executor_type: "human",
@@ -116,48 +47,40 @@ test("query service approves valid store status submissions", async () => {
 });
 
 test("query service excludes expired pending queries from open list", () => {
-  const service = createInMemoryQueryService();
-  const expired = service.createQuery({
-    type: "photo_proof",
-    target: "Storefront",
+  const expired = createQuery({
+    description: "Expired query",
   }, {
     ttlMs: -1,
   });
-  const active = service.createQuery({
-    type: "photo_proof",
-    target: "Signboard",
+  const active = createQuery({
+    description: "Active query",
   }, {
     ttlMs: 60_000,
   });
 
-  const openIds = service.listOpenQueries().map((query) => query.id);
+  const openIds = listOpenQueries().map((query) => query.id);
 
   expect(openIds).toContain(active.id);
   expect(openIds).not.toContain(expired.id);
 });
 
 test("query service cancels pending queries", () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
-    type: "webpage_field",
-    url: "https://example.com",
-    field: "price",
-    anchor_word: "税込",
+  const query = createQuery({
+    description: "Query to cancel",
   });
 
-  const outcome = service.cancelQuery(query.id);
+  const outcome = cancelQuery(query.id);
 
   expect(outcome).toEqual({
     ok: true,
     message: "Query cancelled",
   });
-  expect(service.getQuery(query.id)?.status).toBe("rejected");
+  expect(getQuery(query.id)?.status).toBe("rejected");
 });
 
 test("query service stores oracle_ids from options", () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery(
-    { type: "store_status", store_name: "Test" },
+  const query = createQuery(
+    { description: "Test query" },
     { oracleIds: ["oracle-a", "oracle-b"] },
   );
 
@@ -165,15 +88,13 @@ test("query service stores oracle_ids from options", () => {
 });
 
 test("query service records assigned_oracle_id on submission", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
-    type: "store_status",
-    store_name: "Test Ramen",
+  const query = createQuery({
+    description: "Test Ramen status",
   });
 
-  const outcome = await service.submitQueryResult(
+  const outcome = await submitQueryResult(
     query.id,
-    { type: "store_status", status: "open" },
+    { attachments: [], notes: "open" },
     { executor_type: "human", channel: "worker_api" },
   );
 
@@ -182,15 +103,14 @@ test("query service records assigned_oracle_id on submission", async () => {
 });
 
 test("query service rejects submission with unacceptable oracle", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery(
-    { type: "store_status", store_name: "Test" },
+  const query = createQuery(
+    { description: "Test query" },
     { oracleIds: ["oracle-x"] },
   );
 
-  const outcome = await service.submitQueryResult(
+  const outcome = await submitQueryResult(
     query.id,
-    { type: "store_status", status: "open" },
+    { attachments: [], notes: "open" },
     { executor_type: "human", channel: "worker_api" },
     "built-in", // not in oracle_ids
   );
@@ -199,23 +119,20 @@ test("query service rejects submission with unacceptable oracle", async () => {
   expect(outcome.message).toContain("not available or not accepted");
 });
 
-test("query service materializes local attachment refs before approval", async () => {
-  const service = createInMemoryQueryService();
-  const query = service.createQuery({
-    type: "photo_proof",
-    target: "Storefront",
+test("query service normalizes blossom attachment refs before approval", async () => {
+  const query = createQuery({
+    description: "Storefront observation",
   });
 
-  injectValidC2pa("example.png", query.id);
-  const outcome = await service.submitQueryResult(query.id, {
-    type: "photo_proof",
-    text_answer: `Observed storefront ${query.challenge_nonce}`,
+  injectValidC2pa("abc123", query.id);
+  const outcome = await submitQueryResult(query.id, {
     attachments: [{
-      id: "example.png",
-      uri: "/uploads/example.png",
+      id: "abc123",
+      uri: "https://blossom.example.com/abc123",
       mime_type: "image/png",
-      storage_kind: "local",
-      route_path: "/uploads/example.png",
+      storage_kind: "blossom",
+      blossom_hash: "abc123",
+      blossom_servers: ["https://blossom.example.com"],
     }],
     notes: "ok",
   }, {
@@ -224,18 +141,6 @@ test("query service materializes local attachment refs before approval", async (
   });
 
   expect(outcome.ok).toBe(true);
-  expect(outcome.query?.result?.type).toBe("photo_proof");
-  if (outcome.query?.result?.type !== "photo_proof") {
-    throw new Error("expected photo_proof result");
-  }
-  expect(outcome.query.result.attachments[0]).toEqual({
-    id: "example.png",
-    uri: "/uploads/example.png",
-    mime_type: "image/png",
-    storage_kind: "local",
-    filename: "example.png",
-    size_bytes: undefined,
-    local_file_path: expect.any(String),
-    route_path: "/uploads/example.png",
-  });
+  expect(outcome.query?.result?.attachments[0]?.storage_kind).toBe("blossom");
+  expect(outcome.query?.result?.attachments[0]?.blossom_hash).toBe("abc123");
 });

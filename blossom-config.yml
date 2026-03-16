@@ -1,0 +1,17 @@
+databasePath: data/sqlite.db
+
+storage:
+  backend: local
+  local:
+    dir: ./data/blobs
+  rules:
+    - type: "*"
+      expiration: 1 month
+
+upload:
+  enabled: true
+  requireAuth: false
+
+list:
+  requireAuth: false
+  allowListOthers: true

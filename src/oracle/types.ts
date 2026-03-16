@@ -1,4 +1,4 @@
-import type { Query, QueryResult, VerificationDetail } from "../types";
+import type { BlossomKeyMap, Query, QueryResult, VerificationDetail } from "../types";
 
 /** Metadata about an oracle service. */
 export interface OracleInfo {
@@ -23,7 +23,7 @@ export interface OracleAttestation {
 /** Oracle interface — any implementation (built-in, external HTTP, etc.) must satisfy this. */
 export interface Oracle {
   info: OracleInfo;
-  verify(query: Query, result: QueryResult): Promise<OracleAttestation>;
+  verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<OracleAttestation>;
 }
 
 /** Extends VerificationDetail with oracle provenance. */

@@ -1,36 +1,46 @@
-export type QueryType = "photo_proof" | "store_status" | "webpage_field";
 export type QueryStatus =
   | "pending"
+  | "awaiting_quotes"
+  | "worker_selected"
+  | "processing"
+  | "verifying"
   | "submitted"
   | "approved"
   | "rejected"
   | "expired";
-export type PaymentStatus = "locked" | "released" | "cancelled";
+export type PaymentStatus =
+  | "none"
+  | "htlc_pending"
+  | "htlc_locked"
+  | "htlc_swapped"
+  | "locked"
+  | "released"
+  | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
-export type AttachmentStorageKind = "local" | "external" | "s3" | "blossom";
+export type AttachmentStorageKind = "blossom" | "external";
 
-export interface PhotoProofParams {
-  target: string; // e.g. "コンビニ入口の営業時間表示"
+export interface GpsCoord {
+  lat: number;
+  lon: number;
+}
+
+/**
+ * Verification factors that a Requester can request.
+ * When omitted, defaults to ["gps", "ai_check"].
+ */
+export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check"] as const;
+export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
+
+export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
+
+export interface QueryInput {
+  description: string;
   location_hint?: string;
+  expected_gps?: GpsCoord;
+  verification_requirements?: readonly VerificationFactor[];
 }
-
-export interface StoreStatusParams {
-  store_name: string;
-  location_hint?: string;
-}
-
-export interface WebpageFieldParams {
-  url: string;
-  field: string; // e.g. "税込価格"
-  anchor_word: string; // word whose nearby text serves as proof
-}
-
-export type QueryInput =
-  | ({ type: "photo_proof" } & PhotoProofParams)
-  | ({ type: "store_status" } & StoreStatusParams)
-  | ({ type: "webpage_field" } & WebpageFieldParams);
 
 export interface AttachmentRef {
   id: string;
@@ -39,24 +49,26 @@ export interface AttachmentRef {
   storage_kind: AttachmentStorageKind;
   filename?: string;
   size_bytes?: number;
-  local_file_path?: string;
-  route_path?: string;
   /** Blossom-specific: SHA-256 hash of encrypted blob. */
   blossom_hash?: string;
-  /** Blossom-specific: hex-encoded AES-256-GCM decryption key. */
-  blossom_encrypt_key?: string;
-  /** Blossom-specific: hex-encoded AES-256-GCM IV. */
-  blossom_encrypt_iv?: string;
   /** Blossom-specific: server URLs where the blob is stored. */
   blossom_servers?: string[];
 }
+
+/** Ephemeral key material for Blossom E2E encryption. Never persisted on the server. */
+export interface BlossomKeyMaterial {
+  encrypt_key: string; // hex-encoded AES-256-GCM key
+  encrypt_iv: string;  // hex-encoded AES-256-GCM IV
+}
+
+/** Map of attachment ID → key material, used for one-time oracle verification. */
+export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
 export interface AttachmentAccess {
   original_url: string;
   preview_url?: string;
   view_url?: string;
   meta_url?: string;
-  local_file_path?: string;
 }
 
 export interface AttachmentHandle {
@@ -64,29 +76,10 @@ export interface AttachmentHandle {
   access: AttachmentAccess;
 }
 
-export interface PhotoProofResult {
-  text_answer?: string;
+export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
 }
-
-export interface StoreStatusResult {
-  status: "open" | "closed";
-  text_answer?: string; // should contain nonce (handwritten in photo)
-  attachments?: AttachmentRef[]; // photo evidence of store
-  notes?: string;
-}
-
-export interface WebpageFieldResult {
-  answer: string; // extracted value
-  proof_text: string; // text near anchor_word from page
-  notes?: string;
-}
-
-export type QueryResult =
-  | ({ type: "photo_proof" } & PhotoProofResult)
-  | ({ type: "store_status" } & StoreStatusResult)
-  | ({ type: "webpage_field" } & WebpageFieldResult);
 
 export interface VerificationDetail {
   passed: boolean;
@@ -110,13 +103,43 @@ export interface BountyInfo {
   cashu_token?: string;
 }
 
+/** HTLC escrow information for trustless payment. */
+export interface HtlcInfo {
+  /** SHA-256 hash of the preimage — known to all parties. */
+  hash: string;
+  /** Oracle's Nostr pubkey (hex). */
+  oracle_pubkey: string;
+  /** Requester's Nostr pubkey (hex) — used for HTLC refund. */
+  requester_pubkey: string;
+  /** Worker's Nostr pubkey (hex) — set after worker selection. */
+  worker_pubkey?: string;
+  /** HTLC locktime as unix timestamp (seconds). */
+  locktime: number;
+  /** Encoded Cashu HTLC token (held by Requester until swap). */
+  escrow_token?: string;
+}
+
+/** A quote from a Worker offering to fulfill a query. */
+export interface QuoteInfo {
+  /** Worker's Nostr pubkey (hex). */
+  worker_pubkey: string;
+  /** Requested amount in sats (optional; may match bounty). */
+  amount_sats?: number;
+  /** Nostr event ID of the kind 7000 quote event. */
+  quote_event_id: string;
+  /** Timestamp when the quote was received. */
+  received_at: number;
+}
+
 export interface Query {
   id: string;
-  type: QueryType;
   status: QueryStatus;
-  params: QueryInput;
-  challenge_nonce: string;
-  challenge_rule: string;
+  description: string;
+  location_hint?: string;
+  challenge_nonce?: string;
+  challenge_rule?: string;
+  /** Verification factors requested by the Requester. */
+  verification_requirements: readonly VerificationFactor[];
   created_at: number;
   expires_at: number;
   requester_meta?: RequesterMeta;
@@ -130,4 +153,14 @@ export interface Query {
   verification?: VerificationDetail;
   submission_meta?: SubmissionMeta;
   payment_status: PaymentStatus;
+  /** HTLC escrow details (present when Cashu payment is used). */
+  htlc?: HtlcInfo;
+  /** Worker quotes received for this query. */
+  quotes?: QuoteInfo[];
+  /** Nostr event ID of the kind 5300 Job Request. */
+  nostr_event_id?: string;
+  /** Ephemeral Blossom encryption keys — stored for requester download via HTTP API. */
+  blossom_keys?: BlossomKeyMap;
+  /** Expected GPS coordinates for proximity check. */
+  expected_gps?: GpsCoord;
 }

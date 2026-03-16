@@ -3,7 +3,7 @@
  * as an Oracle interface so it can be used seamlessly in the registry.
  */
 
-import type { Query, QueryResult } from "../types";
+import type { BlossomKeyMap, Query, QueryResult } from "../types";
 import type { Oracle, OracleAttestation, OracleInfo } from "./types";
 
 export interface HttpOracleConfig {
@@ -35,7 +35,7 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
 
   return {
     info,
-    async verify(query: Query, result: QueryResult): Promise<OracleAttestation> {
+    async verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<OracleAttestation> {
       const url = `${config.endpoint.replace(/\/+$/, "")}/verify`;
       const headers: Record<string, string> = {
         "content-type": "application/json",
@@ -51,7 +51,7 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
         const response = await fetch(url, {
           method: "POST",
           headers,
-          body: JSON.stringify({ query, result }),
+          body: JSON.stringify({ query, result, blossom_keys: blossomKeys }),
           signal: controller.signal,
         });
 

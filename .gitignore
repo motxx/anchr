@@ -44,3 +44,12 @@ queries.db*
 # uploads
 uploads/*
 .local/uploads/*
+
+# ui
+generated.css
+
+# mobile (expo)
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/node_modules/

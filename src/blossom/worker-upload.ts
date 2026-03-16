@@ -58,7 +58,7 @@ export async function workerUpload(
   const result = await uploadToBlossom(processed, identity, serverUrls);
   if (!result) return null;
 
-  // 3. Build attachment ref
+  // 3. Build attachment ref (E2E: no encryption keys stored here)
   const attachment: AttachmentRef = {
     id: result.hash,
     uri: result.urls[0]!,
@@ -67,8 +67,6 @@ export async function workerUpload(
     filename,
     size_bytes: processed.length,
     blossom_hash: result.hash,
-    blossom_encrypt_key: result.encryptKey,
-    blossom_encrypt_iv: result.encryptIv,
     blossom_servers: serverUrls,
   };
 

@@ -6,15 +6,6 @@ import {
   statStoredAttachment,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { isNostrEnabled } from "./nostr/client";
-import {
-  createNostrQuery,
-  getNostrQuery,
-  listNostrQueries,
-  cancelNostrQuery,
-  verifyAndSettle,
-} from "./nostr/nostr-query-service";
-import { publishQueryToNostr } from "./nostr/query-bridge";
 import {
   cancelQuery,
   createQuery,
@@ -45,18 +36,19 @@ interface McpQueryBackend {
 
 // --- Shared helpers ---
 
-function getPhotoAttachments(query: Query): AttachmentRef[] | null {
-  if (query.result?.type === "photo_proof") return query.result.attachments;
-  return null;
+function getAttachments(query: Query): AttachmentRef[] | null {
+  if (!query.result?.attachments?.length) return null;
+  return query.result.attachments;
 }
 
 function buildCreatedPayload(query: Query, baseUrl: string) {
   return {
     query_id: query.id,
-    type: query.type,
     status: query.status,
-    challenge_nonce: query.challenge_nonce,
-    challenge_rule: query.challenge_rule,
+    description: query.description,
+    challenge_nonce: query.challenge_nonce ?? null,
+    challenge_rule: query.challenge_rule ?? null,
+    verification_requirements: query.verification_requirements,
     expires_at: new Date(query.expires_at).toISOString(),
     requester_meta: query.requester_meta ?? null,
     reference_app_url: `${baseUrl}/queries/${query.id}`,
@@ -66,10 +58,14 @@ function buildCreatedPayload(query: Query, baseUrl: string) {
 
 function buildStatusPayload(query: Query, baseUrl: string) {
   const result = query.result ? materializeQueryResult(query.result, baseUrl) : null;
-  const payload: Record<string, unknown> = {
+  const attachments = result?.attachments?.map((att: AttachmentRef, i: number) =>
+    buildAttachmentHandle(query.id, i, att, baseUrl),
+  ) ?? [];
+
+  return {
     query_id: query.id,
-    type: query.type,
     status: query.status,
+    description: query.description,
     requester_meta: query.requester_meta ?? null,
     oracle_id: query.assigned_oracle_id ?? null,
     payment_status: query.payment_status,
@@ -77,20 +73,12 @@ function buildStatusPayload(query: Query, baseUrl: string) {
     result,
     verification: query.verification ?? null,
     submission_meta: query.submission_meta ?? null,
-  };
-
-  if (query.type === "photo_proof" || (query.type === "store_status" && result?.type === "store_status")) {
-    const attachments = result?.type === "photo_proof"
-      ? result.attachments.map((att: AttachmentRef, i: number) => buildAttachmentHandle(query.id, i, att, baseUrl))
-      : [];
-    payload.attachment_count = attachments.length;
-    payload.attachments = attachments;
-    payload.attachment_access = attachments.length > 0
+    attachment_count: attachments.length,
+    attachments,
+    attachment_access: attachments.length > 0
       ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
-      : null;
-  }
-
-  return payload;
+      : null,
+  };
 }
 
 async function buildAttachmentPayload(query: Query, ref: AttachmentRef, index: number, baseUrl: string) {
@@ -103,11 +91,9 @@ async function buildAttachmentPayload(query: Query, ref: AttachmentRef, index: n
     access: {
       ...handle.access,
       preview_url: handle.access.preview_url ?? undefined,
-      local_file_path: stat?.path ?? handle.access.local_file_path ?? undefined,
     },
     filename: stat?.filename ?? handle.attachment.filename ?? null,
     absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(ref, baseUrl),
-    local_file_path: stat?.path ?? null,
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
     mime_type: stat?.mimeType ?? handle.attachment.mime_type,
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
@@ -155,18 +141,12 @@ function errorPayload(queryId: string, index: number, message: string) {
   return { payload: { query_id: queryId, attachment_index: index, attachment: {} as AttachmentHandle["attachment"], access: {} as AttachmentHandle["access"], error: message } };
 }
 
-// --- Local backend ---
+// --- Default backend (in-memory + relay sync) ---
 
-function createLocalBackend(): McpQueryBackend {
+function createDefaultBackend(): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
       const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
-      if (isNostrEnabled()) {
-        const regionHint = (input as unknown as Record<string, unknown>).location_hint as string | undefined;
-        publishQueryToNostr(input, { ttlMs: ttlSeconds * 1000, regionCode: regionHint }).catch((err) =>
-          console.error("[mcp-backend] Nostr publish failed:", err),
-        );
-      }
       return buildCreatedPayload(query, localBaseUrl);
     },
     async getQueryStatus(queryId) {
@@ -176,8 +156,9 @@ function createLocalBackend(): McpQueryBackend {
     async listAvailableQueries() {
       return listOpenQueries().map((q) => ({
         query_id: q.id,
-        type: q.type,
-        challenge_rule: q.challenge_rule,
+        description: q.description,
+        challenge_rule: q.challenge_rule ?? null,
+        verification_requirements: q.verification_requirements,
         expires_in_seconds: Math.max(0, Math.floor((q.expires_at - Date.now()) / 1000)),
       }));
     },
@@ -198,8 +179,8 @@ function createLocalBackend(): McpQueryBackend {
     async getQueryAttachment(queryId, attachmentIndex) {
       const query = getQuery(queryId);
       if (!query) return { error: "Query not found" };
-      const attachments = getPhotoAttachments(query);
-      if (!attachments) return { error: "Query does not have photo proof attachments" };
+      const attachments = getAttachments(query);
+      if (!attachments) return { error: "Query does not have attachments" };
       const ref = attachments[attachmentIndex];
       if (!ref) return { error: `Attachment index ${attachmentIndex} not found` };
       return buildAttachmentPayload(query, ref, attachmentIndex, localBaseUrl);
@@ -207,8 +188,8 @@ function createLocalBackend(): McpQueryBackend {
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
       const query = getQuery(queryId);
       if (!query) return errorPayload(queryId, attachmentIndex, "Query not found");
-      const attachments = getPhotoAttachments(query);
-      if (!attachments) return errorPayload(queryId, attachmentIndex, "Query does not have photo proof attachments");
+      const attachments = getAttachments(query);
+      if (!attachments) return errorPayload(queryId, attachmentIndex, "Query does not have attachments");
       const ref = attachments[attachmentIndex];
       if (!ref) return errorPayload(queryId, attachmentIndex, `Attachment index ${attachmentIndex} not found`);
       return buildPreviewPayload(query, ref, attachmentIndex, localBaseUrl, maxDimension);
@@ -216,7 +197,7 @@ function createLocalBackend(): McpQueryBackend {
   };
 }
 
-// --- Remote backend ---
+// --- Remote backend (MCP proxy to external server) ---
 
 function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
   async function fetchJson(path: string, init?: RequestInit) {
@@ -242,10 +223,9 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       const { response, json } = await fetchJson(`/queries/${queryId}`);
       if (response.status === 404) return { error: "Query not found" };
       if (!response.ok) throw new Error(`Remote query lookup failed: ${response.status}`);
-      // Enrich with attachment handles for photo_proof
       const data = json as Record<string, unknown>;
       const result = data.result as QueryResult | undefined;
-      if (data.type === "photo_proof" && result?.type === "photo_proof") {
+      if (result?.attachments?.length) {
         const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
           buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
         );
@@ -262,8 +242,9 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       if (!response.ok) throw new Error(`Remote query listing failed: ${response.status}`);
       return (json as Array<Record<string, unknown>>).map((q) => ({
         query_id: String(q.id),
-        type: String(q.type),
-        challenge_rule: String(q.challenge_rule),
+        description: String(q.description),
+        challenge_rule: q.challenge_rule ? String(q.challenge_rule) : null,
+        verification_requirements: q.verification_requirements ?? [],
         expires_in_seconds: Number(q.expires_in_seconds ?? 0),
       }));
     },
@@ -286,7 +267,6 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       return { ...(json as Record<string, unknown>), preview_hint: "Use get_query_attachment_preview for a resized inline preview image." };
     },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
-      // First get attachment meta
       const meta = await this.getQueryAttachment(queryId, attachmentIndex);
       if (meta && typeof meta === "object" && "error" in meta) {
         return errorPayload(queryId, attachmentIndex, (meta as { error: string }).error);
@@ -326,104 +306,12 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
   };
 }
 
-// --- Nostr backend ---
-
-function createNostrBackend(): McpQueryBackend {
-  return {
-    async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
-      const query = await createNostrQuery(input, {
-        ttlMs: ttlSeconds * 1000,
-        requesterMeta,
-        oracleIds,
-        regionCode: (input as unknown as Record<string, unknown>).location_hint as string | undefined,
-      });
-      if (!query) return { error: "Failed to publish query to Nostr relays" };
-      return {
-        query_id: query.id,
-        type: query.type,
-        status: query.status,
-        challenge_nonce: query.challenge_nonce,
-        expires_at: new Date(query.expires_at).toISOString(),
-        requester_meta: query.requester_meta ?? null,
-        transport: "nostr",
-      };
-    },
-    async getQueryStatus(queryId) {
-      const query = getNostrQuery(queryId);
-      if (!query) return { error: "Query not found" };
-      return {
-        query_id: query.id,
-        type: query.type,
-        status: query.status,
-        oracle_id: query.assigned_oracle_id ?? null,
-        payment_status: query.payment_status,
-        expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-        result: query.result ?? null,
-        verification: query.verification ?? null,
-        transport: "nostr",
-      };
-    },
-    async listAvailableQueries() {
-      const queries = await listNostrQueries();
-      return queries.map((q) => ({
-        query_id: q.id,
-        type: q.type,
-        challenge_rule: q.challenge_rule,
-        expires_in_seconds: Math.max(0, Math.floor((q.expires_at - Date.now()) / 1000)),
-        transport: "nostr",
-      }));
-    },
-    async cancelQuery(queryId) {
-      return cancelNostrQuery(queryId);
-    },
-    async submitQueryResult(queryId, _result, oracleId) {
-      // In Nostr mode, "submit" means verifying the already-received response
-      // and publishing attestation + settlement events
-      const outcome = await verifyAndSettle(queryId, oracleId);
-      return {
-        ok: outcome.ok,
-        message: outcome.message,
-        query_id: queryId,
-        verification: outcome.attestation ? {
-          passed: outcome.attestation.passed,
-          checks: outcome.attestation.checks,
-          failures: outcome.attestation.failures,
-        } : null,
-        oracle_id: outcome.attestation?.oracle_id ?? null,
-        transport: "nostr",
-      };
-    },
-    async getQueryAttachment(queryId, attachmentIndex) {
-      const query = getNostrQuery(queryId);
-      if (!query) return { error: "Query not found" };
-      const attachments = getPhotoAttachments(query);
-      if (!attachments) return { error: "Query does not have attachments" };
-      const ref = attachments[attachmentIndex];
-      if (!ref) return { error: `Attachment index ${attachmentIndex} not found` };
-      return {
-        query_id: queryId,
-        attachment_index: attachmentIndex,
-        storage_kind: ref.storage_kind,
-        blossom_hash: ref.blossom_hash ?? null,
-        blossom_servers: ref.blossom_servers ?? null,
-        mime_type: ref.mime_type,
-        transport: "nostr",
-      };
-    },
-    async getQueryAttachmentPreview(queryId, attachmentIndex) {
-      return errorPayload(queryId, attachmentIndex,
-        "Preview not available in Nostr mode. Use Blossom hash to download directly.");
-    },
-  };
-}
-
 // --- Factory ---
 
 /**
- * Backend selection priority:
- * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP backend
- * 2. NOSTR_RELAYS + NOSTR_NATIVE=true → Nostr-native backend (no central server)
- * 3. Default → Local SQLite backend (+ optional Nostr broadcast)
+ * Backend selection:
+ * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP proxy
+ * 2. Default → In-memory store + Nostr relay sync
  */
 export function getMcpQueryBackend(): McpQueryBackend {
   const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
@@ -431,8 +319,5 @@ export function getMcpQueryBackend(): McpQueryBackend {
   if (remoteBaseUrl) {
     return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }
-  if (isNostrEnabled() && process.env.NOSTR_NATIVE === "true") {
-    return createNostrBackend();
-  }
-  return createLocalBackend();
+  return createDefaultBackend();
 }

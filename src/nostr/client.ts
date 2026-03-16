@@ -9,7 +9,8 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_SETTLEMENT } from "./events";
+import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "./events";
+import { DM_KIND } from "./dm";
 import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation";
 
 export interface NostrClientConfig {
@@ -130,8 +131,50 @@ export function subscribeToSettlements(
   const pool = getPool();
 
   return pool.subscribeMany(urls, {
-    kinds: [ANCHR_QUERY_SETTLEMENT],
+    kinds: [ANCHR_QUERY_FEEDBACK],
     "#e": [queryEventId],
+  }, {
+    onevent: onEvent,
+  });
+}
+
+/**
+ * Subscribe to all feedback for a query (kind 7000): quotes, selection, completion.
+ */
+export function subscribeToFeedback(
+  queryEventId: string,
+  onEvent: (event: Event) => void,
+  relayUrls?: string[],
+): SubCloser {
+  const config = getNostrConfig();
+  const urls = relayUrls ?? config?.relayUrls ?? [];
+  const pool = getPool();
+
+  return pool.subscribeMany(urls, {
+    kinds: [ANCHR_QUERY_FEEDBACK],
+    "#e": [queryEventId],
+  }, {
+    onevent: onEvent,
+  });
+}
+
+/**
+ * Subscribe to NIP-44 DMs addressed to a specific pubkey (kind 4).
+ * Used by Workers to receive preimage from Oracle.
+ */
+export function subscribeToDMs(
+  recipientPubkey: string,
+  onEvent: (event: Event) => void,
+  relayUrls?: string[],
+): SubCloser {
+  const config = getNostrConfig();
+  const urls = relayUrls ?? config?.relayUrls ?? [];
+  const pool = getPool();
+
+  return pool.subscribeMany(urls, {
+    kinds: [DM_KIND],
+    "#p": [recipientPubkey],
+    since: Math.floor(Date.now() / 1000) - 3600,
   }, {
     onevent: onEvent,
   });
