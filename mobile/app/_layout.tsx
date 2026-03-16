@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useSettingsStore } from "../src/store/settings";
+import { useWalletStore } from "../src/store/wallet";
 import "../global.css";
 
 const queryClient = new QueryClient({
@@ -17,6 +18,7 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   useEffect(() => {
     useSettingsStore.getState().load();
+    useWalletStore.getState().load();
   }, []);
 
   return (

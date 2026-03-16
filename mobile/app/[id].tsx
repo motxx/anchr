@@ -18,6 +18,7 @@ import { useQueryDetail } from "../src/hooks/useQueries";
 import { ChallengeNonceDisplay } from "../src/components/ChallengeNonceDisplay";
 import { StatusBadge } from "../src/components/StatusBadge";
 import { uploadPhoto, submitResult } from "../src/api/client";
+import { useWalletStore } from "../src/store/wallet";
 import { timeLeft, isExpired } from "../src/utils/time";
 import type {
   AttachmentRef,
@@ -40,6 +41,8 @@ export default function QueryDetailScreen() {
   const [capturedMimeType, setCapturedMimeType] = useState("image/jpeg");
   const [notes, setNotes] = useState("");
   const [uploading, setUploading] = useState(false);
+
+  const addEarning = useWalletStore((s) => s.addEarning);
 
   // Submission mutation
   const submitMutation = useMutation<SubmitResponse, Error, void>({
@@ -67,7 +70,19 @@ export default function QueryDetailScreen() {
         }
 
         // 3. Submit result
-        return await submitResult(query.id, attachments, notes, encryptionKeys);
+        const res = await submitResult(query.id, attachments, notes, encryptionKeys);
+
+        // 4. Store earned Cashu token in wallet
+        if (res.ok && res.cashu_token && res.bounty_amount_sats) {
+          addEarning({
+            queryId: query.id,
+            description: query.description,
+            amountSats: res.bounty_amount_sats,
+            cashuToken: res.cashu_token,
+          });
+        }
+
+        return res;
       } finally {
         setUploading(false);
       }
@@ -314,6 +329,14 @@ export default function QueryDetailScreen() {
             >
               {submitMutation.data.message}
             </Text>
+            {submitMutation.data.ok && submitMutation.data.bounty_amount_sats ? (
+              <View className="flex-row items-center gap-1 mt-1.5">
+                <Ionicons name="flash" size={12} color="#f59e0b" />
+                <Text className="text-sm font-bold text-amber-600">
+                  +{submitMutation.data.bounty_amount_sats} sats earned
+                </Text>
+              </View>
+            ) : null}
             {(submitMutation.data.verification?.failures?.length ?? 0) > 0 && (
               <Text className="text-xs text-red-500 mt-1">
                 {submitMutation.data.verification!.failures.join(", ")}

@@ -379,12 +379,18 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;
+    // Release bounty token to Worker on approval
+    const cashuToken = outcome.ok && outcome.query?.bounty?.cashu_token
+      ? outcome.query.bounty.cashu_token
+      : undefined;
     return c.json({
       ok: outcome.ok,
       message: outcome.message,
       verification: outcome.query?.verification,
       oracle_id: outcome.query?.assigned_oracle_id ?? null,
       payment_status: outcome.query?.payment_status,
+      bounty_amount_sats: outcome.query?.bounty?.amount_sats ?? null,
+      cashu_token: cashuToken ?? null,
     }, status);
   });
 

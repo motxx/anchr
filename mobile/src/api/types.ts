@@ -107,4 +107,6 @@ export interface SubmitResponse {
   verification?: VerificationDetail;
   oracle_id?: string | null;
   payment_status?: PaymentStatus;
+  bounty_amount_sats?: number | null;
+  cashu_token?: string | null;
 }
