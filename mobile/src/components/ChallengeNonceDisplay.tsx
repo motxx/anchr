@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { DSText, DSCard } from "./ds";
 
 interface Props {
   nonce: string;
@@ -8,16 +9,16 @@ interface Props {
 
 export function ChallengeNonceDisplay({ nonce, rule }: Props) {
   return (
-    <View className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-5">
-      <Text className="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-semibold mb-3">
+    <DSCard className="bg-amber-50 border-amber-300 px-5 py-5">
+      <DSText variant="label" weight="semibold" color="text-amber-700" className="mb-3">
         Challenge Nonce
-      </Text>
-      <Text className="font-mono text-5xl font-black text-amber-600 tracking-[0.4em] leading-none mb-4">
+      </DSText>
+      <DSText variant="mono" weight="black" color="text-amber-600" className="text-5xl tracking-[0.4em] leading-none mb-4">
         {nonce}
-      </Text>
-      <Text className="text-sm text-gray-700 leading-relaxed">
+      </DSText>
+      <DSText variant="body" color="text-gray-700" className="leading-relaxed">
         {rule}
-      </Text>
-    </View>
+      </DSText>
+    </DSCard>
   );
 }
