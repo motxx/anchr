@@ -8,14 +8,12 @@ import {
   Pressable,
   SectionList,
 } from "react-native";
-import * as Location from "expo-location";
+import { locationProvider } from "../../src/platform/location";
+import { notificationProvider } from "../../src/platform/notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueries } from "../../src/hooks/useQueries";
 import { QueryCard } from "../../src/components/QueryCard";
-import {
-  useNearbyNotifications,
-  requestNotificationPermissions,
-} from "../../src/hooks/useNearbyNotifications";
+import { useNearbyNotifications } from "../../src/hooks/useNearbyNotifications";
 import { haversineKm } from "../../src/utils/distance";
 import type { GpsCoord, QuerySummary } from "../../src/api/types";
 import { useWalletStore, type WalletTransaction } from "../../src/store/wallet";
@@ -63,13 +61,15 @@ export default function QueriesScreen() {
 
   useEffect(() => {
     (async () => {
-      await requestNotificationPermissions();
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setUserLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+      await notificationProvider.requestPermission().catch(() => {});
+      const granted = await locationProvider.requestPermission().catch(() => false);
+      if (!granted) return;
+      try {
+        const coord = await locationProvider.getCurrentPosition();
+        setUserLocation(coord);
+      } catch {
+        // Location unavailable (e.g., denied, headless browser) — continue without
+      }
     })();
   }, []);
 

@@ -21,6 +21,10 @@
         "UIBackgroundModes": ["location", "fetch"]
       }
     },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/icon.png"
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#f5f5f4"

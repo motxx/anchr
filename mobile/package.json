@@ -7,7 +7,9 @@
     "start": "npx expo start",
     "ios": "npx expo start --ios",
     "android": "npx expo start --android",
-    "prebuild": "npx expo prebuild"
+    "web": "npx expo start --web",
+    "prebuild": "npx expo prebuild",
+    "test": "bun test src/"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",

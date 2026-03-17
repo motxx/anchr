@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ActivityIndicator } from "react-native";
-import * as Location from "expo-location";
+import { locationProvider } from "../../src/platform/location";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueries } from "../../src/hooks/useQueries";
 import type { GpsCoord } from "../../src/api/types";
@@ -11,12 +11,14 @@ export default function MapScreen() {
 
   useEffect(() => {
     (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setUserLocation({ lat: loc.coords.latitude, lon: loc.coords.longitude });
+      const granted = await locationProvider.requestPermission().catch(() => false);
+      if (!granted) return;
+      try {
+        const coord = await locationProvider.getCurrentPosition();
+        setUserLocation(coord);
+      } catch {
+        // Location unavailable — continue without
+      }
     })();
   }, []);
 

@@ -7,13 +7,13 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as DocumentPicker from "expo-document-picker";
-import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import { Ionicons } from "@expo/vector-icons";
+import { cameraProvider, fileToPhoto } from "../src/platform/camera";
+import { filePickerProvider } from "../src/platform/file-picker";
 import { useQueryDetail } from "../src/hooks/useQueries";
 import { ChallengeNonceDisplay } from "../src/components/ChallengeNonceDisplay";
 import { StatusBadge } from "../src/components/StatusBadge";
@@ -33,8 +33,8 @@ export default function QueryDetailScreen() {
   const { data: query, isLoading, isError } = useQueryDetail(id);
 
   const [cameraActive, setCameraActive] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<any>(null);
+  const webFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
   const [capturedFilename, setCapturedFilename] = useState("photo.jpg");
@@ -122,33 +122,49 @@ export default function QueryDetailScreen() {
       setCapturedFilename("photo.jpg");
       setCapturedMimeType("image/jpeg");
       setCameraActive(false);
-      deactivateKeepAwake();
+      if (Platform.OS !== "web") {
+        const { deactivateKeepAwake } = await import("expo-keep-awake");
+        deactivateKeepAwake();
+      }
     }
   }, []);
 
   const handleOpenCamera = useCallback(async () => {
-    if (!permission?.granted) {
-      const { granted } = await requestPermission();
-      if (!granted) {
-        Alert.alert("Camera Permission", "Camera access is required to take photos.");
-        return;
+    if (Platform.OS === "web") {
+      // On web, use file input with capture attribute
+      if (webFileInputRef.current) {
+        webFileInputRef.current.click();
       }
+      return;
     }
+    // Native: use expo-camera
+    const granted = await cameraProvider.requestPermission();
+    if (!granted) {
+      Alert.alert("Camera Permission", "Camera access is required to take photos.");
+      return;
+    }
+    const { activateKeepAwakeAsync } = await import("expo-keep-awake");
     await activateKeepAwakeAsync();
     setCameraActive(true);
-  }, [permission, requestPermission]);
+  }, []);
+
+  const handleWebFileChange = useCallback((e: Event) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const photo = fileToPhoto(file);
+    setCapturedUri(photo.uri);
+    setCapturedFilename(photo.filename);
+    setCapturedMimeType(photo.mimeType);
+    input.value = ""; // Reset so same file can be re-selected
+  }, []);
 
   const handlePickDocument = useCallback(async () => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["image/*", "application/zip"],
-      copyToCacheDirectory: true,
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
-      const asset = result.assets[0];
-      setCapturedUri(asset.uri);
-      setCapturedFilename(asset.name);
-      setCapturedMimeType(asset.mimeType ?? "image/jpeg");
+    const file = await filePickerProvider.pickFile();
+    if (file) {
+      setCapturedUri(file.uri);
+      setCapturedFilename(file.name);
+      setCapturedMimeType(file.mimeType);
     }
   }, []);
 
@@ -180,11 +196,12 @@ export default function QueryDetailScreen() {
   const expired = isExpired(query.expires_at);
   const submitted = submitMutation.isSuccess && submitMutation.data.ok;
 
-  // Camera fullscreen view
-  if (cameraActive) {
+  // Camera fullscreen view (native only — web uses file input)
+  if (cameraActive && Platform.OS !== "web") {
+    const NativeCameraView = require("expo-camera").CameraView;
     return (
       <View className="flex-1 bg-black">
-        <CameraView
+        <NativeCameraView
           ref={cameraRef}
           className="flex-1"
           facing="back"
@@ -206,8 +223,9 @@ export default function QueryDetailScreen() {
           {/* Bottom controls */}
           <View className="absolute bottom-12 left-0 right-0 flex-row items-center justify-center gap-8">
             <Pressable
-              onPress={() => {
+              onPress={async () => {
                 setCameraActive(false);
+                const { deactivateKeepAwake } = await import("expo-keep-awake");
                 deactivateKeepAwake();
               }}
               className="w-14 h-14 rounded-full bg-white/20 items-center justify-center"
@@ -222,7 +240,7 @@ export default function QueryDetailScreen() {
             </Pressable>
             <View className="w-14 h-14" />
           </View>
-        </CameraView>
+        </NativeCameraView>
       </View>
     );
   }
@@ -403,6 +421,22 @@ export default function QueryDetailScreen() {
             </View>
           ))}
         </View>
+      )}
+
+      {/* Hidden file input for web camera capture */}
+      {Platform.OS === "web" && (
+        <input
+          ref={(el: any) => {
+            if (el && webFileInputRef.current !== el) {
+              webFileInputRef.current = el;
+              el.addEventListener("change", handleWebFileChange);
+            }
+          }}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+        />
       )}
     </ScrollView>
   );

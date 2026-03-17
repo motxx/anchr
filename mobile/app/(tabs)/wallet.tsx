@@ -6,7 +6,7 @@ import {
   Pressable,
   Alert,
 } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import { clipboardProvider } from "../../src/platform/clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import { useWalletStore, type WalletTransaction } from "../../src/store/wallet";
 
@@ -21,7 +21,7 @@ function formatTime(ts: number): string {
 
 function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const handleCopyToken = useCallback(async () => {
-    await Clipboard.setStringAsync(tx.cashuToken);
+    await clipboardProvider.copyText(tx.cashuToken);
     Alert.alert("Copied", "Cashu token copied to clipboard. Paste into any Cashu wallet to redeem.");
   }, [tx.cashuToken]);
 

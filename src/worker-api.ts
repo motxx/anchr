@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -233,6 +234,8 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
 
   const app = new Hono();
+
+  app.use("*", cors());
 
   app.get("/health", (c) => c.json({ ok: true }));
 
