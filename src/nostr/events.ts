@@ -42,7 +42,7 @@ export interface QueryRequestPayload {
   };
   oracle_ids?: string[];
   /** Verification factors requested by the Requester. */
-  verification_requirements?: VerificationFactor[];
+  verification_requirements?: readonly VerificationFactor[];
   expires_at: number;
 }
 

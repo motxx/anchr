@@ -30,11 +30,14 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Start infrastructure (relay + Blossom)
-        run: docker compose up -d && sleep 3
+      - name: Unit & integration tests (no Docker)
+        run: bun test src/ mobile/src/
 
-      - name: Run tests
-        run: bun test src/ e2e/
+      - name: Start infrastructure (relay + Blossom)
+        run: docker compose up -d relay blossom && sleep 3
+
+      - name: E2E tests (relay + Blossom)
+        run: bun test e2e/relay.test.ts
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333

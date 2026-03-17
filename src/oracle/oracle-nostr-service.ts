@@ -118,6 +118,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
         description: "",
         challenge_nonce: oraclePayload.nonce_echo,
         challenge_rule: "",
+        verification_requirements: ["gps", "ai_check"],
         created_at: 0,
         expires_at: Date.now() + 600_000,
         payment_status: "htlc_swapped",
