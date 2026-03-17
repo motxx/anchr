@@ -290,11 +290,25 @@ export default function QueryDetailScreen() {
           {/* Photo preview or action buttons */}
           {capturedUri ? (
             <View className="gap-3">
-              <Image
-                source={{ uri: capturedUri }}
-                className="w-full h-48 rounded-xl"
-                resizeMode="cover"
-              />
+              {capturedMimeType.startsWith("image/") ? (
+                <Image
+                  source={{ uri: capturedUri }}
+                  className="w-full h-48 rounded-xl"
+                  resizeMode="cover"
+                />
+              ) : (
+                <View className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center gap-2">
+                  <Ionicons
+                    name={capturedMimeType === "application/zip" ? "archive-outline" : "document-outline"}
+                    size={32}
+                    color="#6b7280"
+                  />
+                  <Text className="text-sm font-medium text-gray-700">{capturedFilename}</Text>
+                  <Text className="text-xs text-gray-400">
+                    {capturedMimeType === "application/zip" ? "ProofMode bundle" : capturedMimeType}
+                  </Text>
+                </View>
+              )}
               <Pressable
                 onPress={() => setCapturedUri(null)}
                 className="self-start"
