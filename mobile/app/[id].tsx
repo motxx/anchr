@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,26 @@ export default function QueryDetailScreen() {
   const [uploading, setUploading] = useState(false);
 
   const addEarning = useWalletStore((s) => s.addEarning);
+  const transactions = useWalletStore((s) => s.transactions);
+
+  // Auto-record earning when query becomes approved (e.g. submitted via API)
+  useEffect(() => {
+    if (
+      query?.status === "approved" &&
+      query.bounty &&
+      query.payment_status === "released" &&
+      !transactions.some((tx) => tx.queryId === query.id)
+    ) {
+      addEarning({
+        queryId: query.id,
+        description: query.description,
+        amountSats: query.bounty.amount_sats,
+        cashuToken: "",
+        locationHint: query.location_hint ?? undefined,
+        status: "approved",
+      });
+    }
+  }, [query?.status, query?.id]);
 
   // Submission mutation
   const submitMutation = useMutation<SubmitResponse, Error, void>({
@@ -79,6 +99,8 @@ export default function QueryDetailScreen() {
             description: query.description,
             amountSats: res.bounty_amount_sats,
             cashuToken: res.cashu_token,
+            locationHint: query.location_hint ?? undefined,
+            status: "approved",
           });
         }
 

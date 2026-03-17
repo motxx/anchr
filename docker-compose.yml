@@ -16,17 +16,99 @@ services:
       - blossom-data:/app/data
       - ./blossom-config.yml:/app/config.yml
 
+  # --- Lightning regtest stack ---
+
+  bitcoind:
+    image: boltz/bitcoin-core:27.1
+    command: >-
+      -regtest -fallbackfee=0.00000253
+      -zmqpubrawtx=tcp://0.0.0.0:29000
+      -zmqpubrawblock=tcp://0.0.0.0:29001
+      -zmqpubhashblock=tcp://0.0.0.0:29002
+      -txindex -rpcallowip=0.0.0.0/0 -rpcbind=0.0.0.0
+      -rpcuser=cashu -rpcpassword=cashu
+    expose:
+      - "18443"
+      - "29000"
+      - "29001"
+      - "29002"
+    volumes:
+      - bitcoin-data:/root/.bitcoin
+
+  # LND node for the Cashu mint
+  lnd-mint:
+    image: boltz/lnd:0.18.1-beta
+    depends_on:
+      - bitcoind
+    restart: on-failure
+    entrypoint: >-
+      sh -c 'sleep 15; lnd
+      --listen=lnd-mint:9735
+      --rpclisten=lnd-mint:10009
+      --restlisten=lnd-mint:8081
+      --bitcoin.active --bitcoin.regtest
+      --bitcoin.node=bitcoind
+      --bitcoind.rpchost=bitcoind
+      --bitcoind.zmqpubrawtx=tcp://bitcoind:29000
+      --bitcoind.zmqpubrawblock=tcp://bitcoind:29001
+      --bitcoind.rpcuser=cashu --bitcoind.rpcpass=cashu
+      --noseedbackup --protocol.wumbo-channels
+      --tlsextradomain=lnd-mint'
+    expose:
+      - "8081"
+      - "9735"
+      - "10009"
+    volumes:
+      - lnd-mint-data:/root/.lnd
+
+  # LND node for the user (Requester pays invoices from here)
+  lnd-user:
+    image: boltz/lnd:0.18.1-beta
+    depends_on:
+      - bitcoind
+    restart: on-failure
+    entrypoint: >-
+      sh -c 'sleep 15; lnd
+      --listen=lnd-user:9735
+      --rpclisten=lnd-user:10009
+      --restlisten=lnd-user:8081
+      --bitcoin.active --bitcoin.regtest
+      --bitcoin.node=bitcoind
+      --bitcoind.rpchost=bitcoind
+      --bitcoind.zmqpubrawtx=tcp://bitcoind:29000
+      --bitcoind.zmqpubrawblock=tcp://bitcoind:29001
+      --bitcoind.rpcuser=cashu --bitcoind.rpcpass=cashu
+      --noseedbackup --protocol.wumbo-channels
+      --tlsextradomain=lnd-user'
+    ports:
+      - "8081:8081"
+      - "10009:10009"
+    volumes:
+      - lnd-user-data:/root/.lnd
+
   cashu-mint:
     image: cashubtc/nutshell:latest
+    depends_on:
+      - lnd-mint
+    restart: on-failure
     ports:
       - "3338:3338"
     environment:
-      MINT_BACKEND_BOLT11_SAT: FakeWallet
-      MINT_LISTEN_HOST: 0.0.0.0
+      MINT_BACKEND_BOLT11_SAT: LndRestWallet
+      MINT_LISTEN_HOST: "0.0.0.0"
       MINT_LISTEN_PORT: "3338"
       MINT_PRIVATE_KEY: "testtesttesttesttesttesttesttest"
+      MINT_LND_REST_ENDPOINT: https://lnd-mint:8081/
+      MINT_LND_REST_CERT: /lnd/tls.cert
+      MINT_LND_REST_MACAROON: /lnd/data/chain/bitcoin/regtest/admin.macaroon
+      MINT_LND_REST_CERT_VERIFY: "FALSE"
+    volumes:
+      - lnd-mint-data:/lnd:ro
     command: ["poetry", "run", "mint"]
 
 volumes:
   relay-data:
   blossom-data:
+  bitcoin-data:
+  lnd-mint-data:
+  lnd-user-data:

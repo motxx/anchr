@@ -8,6 +8,8 @@ export interface WalletTransaction {
   amountSats: number;
   cashuToken: string;
   timestamp: number;
+  locationHint?: string;
+  status?: "approved" | "rejected";
 }
 
 interface WalletState {

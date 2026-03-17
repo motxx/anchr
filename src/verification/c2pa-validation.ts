@@ -28,6 +28,8 @@ export interface C2paValidationResult {
   hasManifest: boolean;
   signatureValid: boolean;
   manifest: C2paManifest | null;
+  /** GPS coordinates extracted from C2PA EXIF assertion (cryptographically signed). */
+  gps?: { lat: number; lon: number };
   checks: string[];
   failures: string[];
 }
@@ -109,6 +111,12 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
       claimGenerator: active.claim_generator as string | undefined,
     };
 
+    // Extract assertions (including EXIF GPS)
+    const rawAssertions = active.assertions as Array<{ label: string; data?: Record<string, unknown> }> | undefined;
+    if (rawAssertions) {
+      manifest.assertions = rawAssertions;
+    }
+
     const sigInfo = active.signature_info as Record<string, unknown> | undefined;
     if (sigInfo) {
       manifest.signatureInfo = {
@@ -144,8 +152,89 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
       failures.push("C2PA signature validation failed");
     }
 
-    return { available: true, hasManifest: true, signatureValid, manifest, checks, failures };
+    // Extract GPS from C2PA EXIF assertion (cryptographically signed coordinates)
+    const gps = extractC2paGps(rawAssertions);
+    if (gps) {
+      checks.push(`C2PA EXIF GPS: ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`);
+    }
+
+    return { available: true, hasManifest: true, signatureValid, manifest, gps: gps ?? undefined, checks, failures };
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Extract GPS coordinates from C2PA EXIF assertion.
+ *
+ * c2patool outputs assertions like:
+ * { label: "stds.exif", data: { "EXIF:GPSLatitude": "35.6762", "EXIF:GPSLongitude": "139.6503", ... } }
+ * or with the @exif prefix:
+ * { label: "stds.exif", data: { "@exif:GPSLatitude": "35,40.572N", ... } }
+ */
+function extractC2paGps(assertions?: Array<{ label: string; data?: Record<string, unknown> }>): { lat: number; lon: number } | null {
+  if (!assertions) return null;
+
+  for (const assertion of assertions) {
+    if (!assertion.label.includes("exif") || !assertion.data) continue;
+
+    const data = assertion.data;
+
+    // Try multiple key formats c2patool may use
+    const latRaw = data["EXIF:GPSLatitude"] ?? data["exif:GPSLatitude"] ?? data["@exif:GPSLatitude"];
+    const lonRaw = data["EXIF:GPSLongitude"] ?? data["exif:GPSLongitude"] ?? data["@exif:GPSLongitude"];
+    const latRef = data["EXIF:GPSLatitudeRef"] ?? data["exif:GPSLatitudeRef"] ?? data["@exif:GPSLatitudeRef"];
+    const lonRef = data["EXIF:GPSLongitudeRef"] ?? data["exif:GPSLongitudeRef"] ?? data["@exif:GPSLongitudeRef"];
+
+    if (latRaw == null || lonRaw == null) continue;
+
+    let lat = parseGpsValue(latRaw);
+    let lon = parseGpsValue(lonRaw);
+    if (lat == null || lon == null) continue;
+
+    // Apply reference direction
+    if (typeof latRef === "string" && latRef.toUpperCase().startsWith("S")) lat = -lat;
+    if (typeof lonRef === "string" && lonRef.toUpperCase().startsWith("W")) lon = -lon;
+
+    // Some formats embed direction in the value string itself
+    if (typeof latRaw === "string" && /S$/i.test(latRaw)) lat = -Math.abs(lat);
+    if (typeof lonRaw === "string" && /W$/i.test(lonRaw)) lon = -Math.abs(lon);
+
+    if (lat !== 0 || lon !== 0) return { lat, lon };
+  }
+
+  return null;
+}
+
+/**
+ * Parse GPS coordinate value from various c2patool output formats:
+ * - "35.6762" (decimal degrees)
+ * - "35,40.572N" (degrees,decimal-minutes with direction suffix)
+ * - "35,40,34.3" (degrees,minutes,seconds)
+ */
+function parseGpsValue(raw: unknown): number | null {
+  if (typeof raw === "number") return raw;
+  if (typeof raw !== "string") return null;
+
+  // Strip direction suffix for parsing
+  const cleaned = raw.replace(/[NSEW]$/i, "").trim();
+
+  // Decimal degrees
+  const decimal = parseFloat(cleaned);
+  if (!cleaned.includes(",") && Number.isFinite(decimal)) return decimal;
+
+  // Degrees,minutes or degrees,minutes,seconds
+  const parts = cleaned.split(",").map((s) => parseFloat(s.trim()));
+  if (parts.some((p) => !Number.isFinite(p))) return null;
+
+  if (parts.length === 2) {
+    // degrees, decimal-minutes
+    return parts[0]! + parts[1]! / 60;
+  }
+  if (parts.length === 3) {
+    // degrees, minutes, seconds
+    return parts[0]! + parts[1]! / 60 + parts[2]! / 3600;
+  }
+
+  return null;
 }

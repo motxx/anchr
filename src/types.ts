@@ -39,6 +39,8 @@ export interface QueryInput {
   description: string;
   location_hint?: string;
   expected_gps?: GpsCoord;
+  /** Max allowed distance from expected_gps in km (default: 50). */
+  max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
 }
 
@@ -79,6 +81,8 @@ export interface AttachmentHandle {
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
+  /** GPS coordinates reported by the worker's device at submission time. */
+  gps?: GpsCoord;
 }
 
 export interface VerificationDetail {
@@ -163,4 +167,6 @@ export interface Query {
   blossom_keys?: BlossomKeyMap;
   /** Expected GPS coordinates for proximity check. */
   expected_gps?: GpsCoord;
+  /** Max allowed distance from expected_gps in km (default: 50). */
+  max_gps_distance_km?: number;
 }

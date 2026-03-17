@@ -257,7 +257,7 @@ function parseExifDateTime(dt: string): Date | null {
 /**
  * Haversine distance in km between two GPS coordinates.
  */
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);

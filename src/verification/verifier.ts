@@ -1,14 +1,19 @@
 import { checkAttachmentContent } from "./ai-content-check";
 import { validateC2pa } from "./c2pa-validation";
+import { haversineKm } from "./exif-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import type {
   AttachmentRef,
   BlossomKeyMap,
+  GpsCoord,
   Query,
   QueryResult,
   VerificationDetail,
 } from "../types";
+
+/** Default maximum distance (km) between reported GPS and expected GPS. */
+const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
 
 /**
  * Verify a query result cryptographically.
@@ -16,19 +21,44 @@ import type {
  * Oracle checks:
  * 1. Attachments present → C2PA / EXIF integrity
  * 2. AI content check (opt-in, if attachments pass crypto checks)
- * 3. No attachments → weak verification (pass with advisory)
+ * 3. No attachments → reject if bounty/GPS/nonce required, otherwise weak pass
+ * 4. Body GPS vs expected GPS proximity check
  */
 export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
   const checks: string[] = [];
   const failures: string[] = [];
+  const maxGpsDist = query.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
 
   const attachments = result.attachments ?? [];
 
+  // --- Fix 1: Reject empty submissions when evidence is required ---
+  if (attachments.length === 0) {
+    const requiresEvidence =
+      query.verification_requirements.includes("nonce") ||
+      query.verification_requirements.includes("gps");
+
+    if (requiresEvidence) {
+      failures.push("no media evidence provided — photos are required when GPS or nonce verification is enabled");
+    } else {
+      checks.push("no media evidence provided (weak verification)");
+    }
+  }
+
+  // --- Fix 2: Validate body GPS against expected GPS ---
+  if (result.gps && query.expected_gps) {
+    const dist = haversineKm(result.gps.lat, result.gps.lon, query.expected_gps.lat, query.expected_gps.lon);
+    if (dist <= maxGpsDist) {
+      checks.push(`body GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+    } else {
+      failures.push(`body GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+    }
+  } else if (!result.gps && query.expected_gps && query.verification_requirements.includes("gps")) {
+    failures.push("GPS coordinates missing from submission body — required by verification policy");
+  }
+
   if (attachments.length > 0) {
     checks.push("attachment present");
-    await verifyPhotoIntegrity(query.id, attachments, checks, failures, blossomKeys);
-  } else {
-    checks.push("no media evidence provided (weak verification)");
+    await verifyPhotoIntegrity(query.id, attachments, checks, failures, query.expected_gps, maxGpsDist, blossomKeys);
   }
 
   if (attachments.length > 0 && failures.length === 0) {
@@ -54,12 +84,15 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
  *
  * C2PA is mandatory — photos without valid Content Credentials are rejected.
  * EXIF checks are advisory (GPS, camera model add trust signals but don't fail).
+ * C2PA GPS and ProofMode GPS are compared against expected_gps.
  */
 async function verifyPhotoIntegrity(
   queryId: string,
   attachments: AttachmentRef[],
   checks: string[],
   failures: string[],
+  expectedGps: GpsCoord | undefined,
+  maxGpsDist: number,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   // Try to find integrity data for attachments in this result
@@ -78,7 +111,7 @@ async function verifyPhotoIntegrity(
   // No pre-upload integrity data — try direct C2PA validation on attachments
   // This handles the decentralized path (Blossom download → C2PA check)
   if (integrityRecords.length === 0) {
-    await verifyC2paFromAttachments(attachments, checks, failures, blossomKeys);
+    await verifyC2paFromAttachments(attachments, checks, failures, expectedGps, maxGpsDist, blossomKeys);
     return;
   }
 
@@ -96,11 +129,32 @@ async function verifyPhotoIntegrity(
       failures.push("C2PA: Content Credentials signature invalid");
     }
 
-    // ProofMode bundle checks
+    // --- Fix 3: Compare C2PA GPS with expected GPS ---
+    if (c2pa.gps && expectedGps) {
+      const dist = haversineKm(c2pa.gps.lat, c2pa.gps.lon, expectedGps.lat, expectedGps.lon);
+      if (dist <= maxGpsDist) {
+        checks.push(`C2PA GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+      } else {
+        failures.push(`C2PA GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+      }
+    } else if (c2pa.gps) {
+      checks.push(`C2PA GPS: ${c2pa.gps.lat.toFixed(4)}, ${c2pa.gps.lon.toFixed(4)}`);
+    }
+
+    // --- Fix 4: Compare ProofMode GPS with expected GPS ---
     if (record.proofmode) {
       const pm = record.proofmode;
       for (const c of pm.checks) checks.push(c);
       for (const f of pm.failures) failures.push(f);
+
+      if (pm.proof && expectedGps && (pm.proof.locationLatitude !== 0 || pm.proof.locationLongitude !== 0)) {
+        const dist = haversineKm(pm.proof.locationLatitude, pm.proof.locationLongitude, expectedGps.lat, expectedGps.lon);
+        if (dist <= maxGpsDist) {
+          checks.push(`ProofMode GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+        } else {
+          failures.push(`ProofMode GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+        }
+      }
     }
 
     // EXIF: camera model presence is a soft indicator
@@ -142,6 +196,8 @@ async function verifyC2paFromAttachments(
   attachments: AttachmentRef[],
   checks: string[],
   failures: string[],
+  expectedGps: GpsCoord | undefined,
+  maxGpsDist: number,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   if (attachments.length === 0) return;
@@ -186,6 +242,17 @@ async function verifyC2paFromAttachments(
     } else {
       failures.push("C2PA: Content Credentials signature invalid");
     }
+
+    // --- Fix 3: Compare C2PA GPS in decentralized path ---
+    if (c2pa.gps && expectedGps) {
+      const dist = haversineKm(c2pa.gps.lat, c2pa.gps.lon, expectedGps.lat, expectedGps.lon);
+      if (dist <= maxGpsDist) {
+        checks.push(`C2PA GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+      } else {
+        failures.push(`C2PA GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+      }
+    }
+
     validated = true;
   }
 

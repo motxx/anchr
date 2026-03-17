@@ -147,6 +147,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
         description: "E2E Lifecycle Store の営業状況",
         location_hint: "Akihabara",
         ttl_seconds: 300,
+        verification_requirements: [],
       }),
     });
     expect(createRes.status).toBe(201);

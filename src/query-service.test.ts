@@ -28,6 +28,7 @@ test("query service approves valid submissions", async () => {
   const query = createQuery({
     description: "Check if Test Ramen is open",
     location_hint: "Tokyo",
+    verification_requirements: [],
   });
 
   const outcome = await submitQueryResult(query.id, {
@@ -90,6 +91,7 @@ test("query service stores oracle_ids from options", () => {
 test("query service records assigned_oracle_id on submission", async () => {
   const query = createQuery({
     description: "Test Ramen status",
+    verification_requirements: [],
   });
 
   const outcome = await submitQueryResult(
