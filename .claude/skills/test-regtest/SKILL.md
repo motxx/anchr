@@ -316,6 +316,19 @@ xcrun simctl location booted clear
 
 ---
 
+## Gotchas
+
+These are non-obvious facts discovered through actual testing. The agent WILL get these wrong without being told.
+
+- **Settings load race condition**: Zustand store loads AsyncStorage async. If React Query fires `fetchQueries` before `load()` completes, it uses the default URL (localhost). The fix is `_layout.tsx` awaiting `load()` before rendering children.
+- **Dev-mode URL override**: `settings.ts` had logic to force `localhost` in `__DEV__` mode. This silently overrides any saved server URL (e.g., fly.io). Removed — always use the stored value.
+- **Simulator text input unreliable**: Triple-tap to select-all often fails. Long-press triggers Save button. To change Settings fields reliably, write directly to AsyncStorage's `manifest.json` at `~/Library/Developer/CoreSimulator/Devices/{UDID}/data/Containers/Data/Application/{APP}/Library/Application Support/com.anchr.worker/RCTAsyncLocalStorage_V1/manifest.json`, then restart the app.
+- **CORS required for web**: The Expo web app runs on a different port (8082) than the server (3000). Without `cors()` middleware on Hono, all fetches fail silently — the app shows "No pending queries" with no visible error.
+- **HEIC images don't render in `<Image>`**: Browsers (except Safari) and react-native-web can't render HEIC. The `ImagePreviewOrFallback` component falls back to a file icon for non-previewable formats.
+- **tsconfig picks up mobile/**: Without `"exclude": ["mobile"]` in the root tsconfig, `tsc --noEmit` fails because mobile's deps (expo, react-native) aren't in the root node_modules. CI will fail on typecheck.
+- **Docker context bloat**: Without `.dockerignore` entries for `mobile/`, `e2e/`, `scripts/`, the build context is ~275MB instead of ~800KB. First deploy will timeout.
+- **testnut.cashu.space is FakeWallet**: All Lightning invoices auto-paid, tokens are worthless test ecash. Not real Bitcoin testnet sats.
+
 ## Troubleshooting
 
 | Symptom | Fix |
