@@ -28,6 +28,39 @@ import type {
   UploadResponse,
 } from "../src/api/types";
 
+/** Formats that browsers/RN can render natively as <Image>. */
+const PREVIEWABLE_TYPES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp",
+]);
+
+function FilePreviewCard({ filename, mimeType }: { filename: string; mimeType: string }) {
+  const isZip = mimeType === "application/zip";
+  return (
+    <View className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center gap-2">
+      <Ionicons name={isZip ? "archive-outline" : "document-outline"} size={32} color="#6b7280" />
+      <Text className="text-sm font-medium text-gray-700">{filename}</Text>
+      <Text className="text-xs text-gray-400">{isZip ? "ProofMode bundle" : mimeType}</Text>
+    </View>
+  );
+}
+
+function ImagePreviewOrFallback({ uri, filename, mimeType }: { uri: string; filename: string; mimeType: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !PREVIEWABLE_TYPES.has(mimeType)) {
+    return <FilePreviewCard filename={filename} mimeType={mimeType} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      className="w-full h-48 rounded-xl"
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function QueryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: query, isLoading, isError } = useQueryDetail(id);
@@ -291,23 +324,13 @@ export default function QueryDetailScreen() {
           {capturedUri ? (
             <View className="gap-3">
               {capturedMimeType.startsWith("image/") ? (
-                <Image
-                  source={{ uri: capturedUri }}
-                  className="w-full h-48 rounded-xl"
-                  resizeMode="cover"
+                <ImagePreviewOrFallback
+                  uri={capturedUri}
+                  filename={capturedFilename}
+                  mimeType={capturedMimeType}
                 />
               ) : (
-                <View className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center gap-2">
-                  <Ionicons
-                    name={capturedMimeType === "application/zip" ? "archive-outline" : "document-outline"}
-                    size={32}
-                    color="#6b7280"
-                  />
-                  <Text className="text-sm font-medium text-gray-700">{capturedFilename}</Text>
-                  <Text className="text-xs text-gray-400">
-                    {capturedMimeType === "application/zip" ? "ProofMode bundle" : capturedMimeType}
-                  </Text>
-                </View>
+                <FilePreviewCard filename={capturedFilename} mimeType={capturedMimeType} />
               )}
               <Pressable
                 onPress={() => setCapturedUri(null)}
