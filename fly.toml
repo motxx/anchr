@@ -12,6 +12,7 @@ primary_region = "nrt"
   RUNTIME_DATA_DIR = "/data"
   NOSTR_RELAYS = "wss://anchr-relay.fly.dev"
   BLOSSOM_SERVERS = "https://anchr-blossom.fly.dev"
+  CASHU_MINT_URL = "https://testnut.cashu.space"
 
 [[mounts]]
   source = "data"
