@@ -11,6 +11,11 @@ Run the full Anchr end-to-end test on a local regtest Lightning network with Cas
 
 ## Quick start
 
+All commands assume `PROJECT_ROOT` is the repo root. Set it first:
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+```
+
 **Automated tests (Phase 1-3, 5 — no mobile UI):**
 ```bash
 # 1. Start infra + init Lightning
@@ -42,7 +47,7 @@ Start Docker services and initialize the regtest Lightning network.
 
 ```bash
 # 1a. Start all Docker services
-cd /Users/moti/dev/src/github.com/motxx/anchr
+cd "$PROJECT_ROOT"
 docker compose up -d
 
 # 1b. Wait for LND nodes to be ready (~25s)
@@ -75,7 +80,7 @@ If any service fails, check `docker compose logs <service>` for errors.
 Start the Anchr server with local infrastructure endpoints.
 
 ```bash
-cd /Users/moti/dev/src/github.com/motxx/anchr
+cd "$PROJECT_ROOT"
 
 # Kill any existing server process first
 pkill -f "bun.*src/server.ts" 2>/dev/null || true
@@ -100,7 +105,7 @@ Mint Cashu tokens via regtest Lightning and create test queries with bounty.
 ### Basic usage
 
 ```bash
-cd /Users/moti/dev/src/github.com/motxx/anchr
+cd "$PROJECT_ROOT"
 
 # Photo-required query (default — GPS verification enabled)
 CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts
@@ -166,7 +171,7 @@ Launch the iOS simulator and test the Worker mobile app.
 
 **First time or after clean:**
 ```bash
-cd /Users/moti/dev/src/github.com/motxx/anchr/mobile
+cd mobile
 bun install
 npx expo prebuild --platform ios --clean
 npx expo run:ios --device "iPhone 17 Pro"
@@ -174,7 +179,7 @@ npx expo run:ios --device "iPhone 17 Pro"
 
 **Subsequent runs (app already built):**
 ```bash
-cd /Users/moti/dev/src/github.com/motxx/anchr/mobile
+cd mobile
 bun run ios
 ```
 
@@ -302,7 +307,7 @@ import json,sys; print(f'{len(json.load(sys.stdin))} queries')
 ## Phase 6: Teardown (`teardown`)
 
 ```bash
-cd /Users/moti/dev/src/github.com/motxx/anchr
+cd "$PROJECT_ROOT"
 
 # Stop the Anchr server
 pkill -f "bun.*src/server.ts" || true
