@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ActivityIndicator, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useSettingsStore } from "../src/store/settings";
 import { useWalletStore } from "../src/store/wallet";
@@ -16,10 +17,22 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    useSettingsStore.getState().load();
-    useWalletStore.getState().load();
+    Promise.all([
+      useSettingsStore.getState().load(),
+      useWalletStore.getState().load(),
+    ]).then(() => setReady(true));
   }, []);
+
+  if (!ready) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f4" }}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
