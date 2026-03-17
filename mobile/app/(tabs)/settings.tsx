@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
 } from "react-native";
+import { useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSettingsStore } from "../../src/store/settings";
 import { healthCheck } from "../../src/api/client";
@@ -15,28 +16,15 @@ export default function SettingsScreen() {
   const { serverUrl, apiKey, setServerUrl, setApiKey } = useSettingsStore();
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [keyInput, setKeyInput] = useState(apiKey);
-  const [checking, setChecking] = useState(false);
-  const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    setUrlInput(serverUrl);
-    setKeyInput(apiKey);
-  }, [serverUrl, apiKey]);
+  const testConnection = useMutation({
+    mutationFn: () => healthCheck(urlInput),
+  });
 
   const handleSave = () => {
     setServerUrl(urlInput);
     setApiKey(keyInput);
     Alert.alert("Saved", "Settings updated.");
-  };
-
-  const handleTestConnection = async () => {
-    setChecking(true);
-    setConnectionOk(null);
-    // Temporarily set the URL to test
-    setServerUrl(urlInput);
-    const ok = await healthCheck();
-    setConnectionOk(ok);
-    setChecking(false);
   };
 
   return (
@@ -77,29 +65,29 @@ export default function SettingsScreen() {
 
         <View className="flex-row gap-3">
           <Pressable
-            onPress={handleTestConnection}
-            disabled={checking}
+            onPress={() => testConnection.mutate()}
+            disabled={testConnection.isPending}
             className="flex-1 bg-gray-100 rounded-lg py-2.5 items-center flex-row justify-center gap-2"
           >
             <Ionicons
               name={
-                connectionOk === true
+                testConnection.isSuccess && testConnection.data
                   ? "checkmark-circle"
-                  : connectionOk === false
+                  : testConnection.isSuccess && !testConnection.data
                     ? "close-circle"
                     : "pulse-outline"
               }
               size={16}
               color={
-                connectionOk === true
+                testConnection.isSuccess && testConnection.data
                   ? "#10b981"
-                  : connectionOk === false
+                  : testConnection.isSuccess && !testConnection.data
                     ? "#ef4444"
                     : "#6b7280"
               }
             />
             <Text className="text-sm font-medium text-gray-700">
-              {checking ? "Testing..." : "Test"}
+              {testConnection.isPending ? "Testing..." : "Test"}
             </Text>
           </Pressable>
           <Pressable

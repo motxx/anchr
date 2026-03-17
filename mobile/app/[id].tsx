@@ -73,18 +73,15 @@ export default function QueryDetailScreen() {
   const [capturedFilename, setCapturedFilename] = useState("photo.jpg");
   const [capturedMimeType, setCapturedMimeType] = useState("image/jpeg");
   const [notes, setNotes] = useState("");
-  const [uploading, setUploading] = useState(false);
 
   const addEarning = useWalletStore((s) => s.addEarning);
-  const transactions = useWalletStore((s) => s.transactions);
 
   // Auto-record earning when query becomes approved (e.g. submitted via API)
   useEffect(() => {
     if (
       query?.status === "approved" &&
       query.bounty &&
-      query.payment_status === "released" &&
-      !transactions.some((tx) => tx.queryId === query.id)
+      query.payment_status === "released"
     ) {
       addEarning({
         queryId: query.id,
@@ -102,45 +99,40 @@ export default function QueryDetailScreen() {
     mutationFn: async () => {
       if (!capturedUri || !query) throw new Error("No photo to submit");
 
-      setUploading(true);
-      try {
-        // 1. Upload photo
-        const uploadRes: UploadResponse = await uploadPhoto(
-          query.id,
-          capturedUri,
-          capturedFilename,
-          capturedMimeType,
-        );
-        if (!uploadRes.ok || !uploadRes.attachment) {
-          throw new Error(uploadRes.error ?? "Upload failed");
-        }
-
-        // 2. Build encryption keys map
-        const attachments: AttachmentRef[] = [uploadRes.attachment];
-        const encryptionKeys: BlossomKeyMap = {};
-        if (uploadRes.encryption && uploadRes.attachment.id) {
-          encryptionKeys[uploadRes.attachment.id] = uploadRes.encryption;
-        }
-
-        // 3. Submit result
-        const res = await submitResult(query.id, attachments, notes, encryptionKeys);
-
-        // 4. Store earned Cashu token in wallet
-        if (res.ok && res.cashu_token && res.bounty_amount_sats) {
-          addEarning({
-            queryId: query.id,
-            description: query.description,
-            amountSats: res.bounty_amount_sats,
-            cashuToken: res.cashu_token,
-            locationHint: query.location_hint ?? undefined,
-            status: "approved",
-          });
-        }
-
-        return res;
-      } finally {
-        setUploading(false);
+      // 1. Upload photo
+      const uploadRes: UploadResponse = await uploadPhoto(
+        query.id,
+        capturedUri,
+        capturedFilename,
+        capturedMimeType,
+      );
+      if (!uploadRes.ok || !uploadRes.attachment) {
+        throw new Error(uploadRes.error ?? "Upload failed");
       }
+
+      // 2. Build encryption keys map
+      const attachments: AttachmentRef[] = [uploadRes.attachment];
+      const encryptionKeys: BlossomKeyMap = {};
+      if (uploadRes.encryption && uploadRes.attachment.id) {
+        encryptionKeys[uploadRes.attachment.id] = uploadRes.encryption;
+      }
+
+      // 3. Submit result
+      const res = await submitResult(query.id, attachments, notes, encryptionKeys);
+
+      // 4. Store earned Cashu token in wallet
+      if (res.ok && res.cashu_token && res.bounty_amount_sats) {
+        addEarning({
+          queryId: query.id,
+          description: query.description,
+          amountSats: res.bounty_amount_sats,
+          cashuToken: res.cashu_token,
+          locationHint: query.location_hint ?? undefined,
+          status: "approved",
+        });
+      }
+
+      return res;
     },
   });
 
@@ -362,18 +354,18 @@ export default function QueryDetailScreen() {
           {capturedUri && (
             <Pressable
               onPress={handleSubmit}
-              disabled={uploading || submitMutation.isPending}
+              disabled={submitMutation.isPending}
               className={`rounded-xl py-4 items-center ${
-                uploading || submitMutation.isPending
+                submitMutation.isPending
                   ? "bg-emerald-300"
                   : "bg-emerald-500 active:bg-emerald-600"
               }`}
             >
-              {uploading || submitMutation.isPending ? (
+              {submitMutation.isPending ? (
                 <View className="flex-row items-center gap-2">
                   <ActivityIndicator size="small" color="white" />
                   <Text className="text-white font-semibold">
-                    {uploading ? "Uploading..." : "Submitting..."}
+                    {"Submitting..."}
                   </Text>
                 </View>
               ) : (
@@ -463,16 +455,12 @@ export default function QueryDetailScreen() {
       {/* Hidden file input for web camera capture */}
       {Platform.OS === "web" && (
         <input
-          ref={(el: any) => {
-            if (el && webFileInputRef.current !== el) {
-              webFileInputRef.current = el;
-              el.addEventListener("change", handleWebFileChange);
-            }
-          }}
+          ref={(el: any) => { webFileInputRef.current = el; }}
           type="file"
           accept="image/*"
           capture="environment"
           style={{ display: "none" }}
+          onChange={handleWebFileChange as any}
         />
       )}
     </ScrollView>

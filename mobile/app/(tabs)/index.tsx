@@ -1,33 +1,26 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  Pressable,
-  SectionList,
 } from "react-native";
-import { locationProvider } from "../../src/platform/location";
-import { notificationProvider } from "../../src/platform/notifications";
 import { Ionicons } from "@expo/vector-icons";
+import { notificationProvider } from "../../src/platform/notifications";
 import { useQueries } from "../../src/hooks/useQueries";
+import { useUserLocation } from "../../src/hooks/useUserLocation";
 import { QueryCard } from "../../src/components/QueryCard";
 import { useNearbyNotifications } from "../../src/hooks/useNearbyNotifications";
 import { haversineKm } from "../../src/utils/distance";
-import type { GpsCoord, QuerySummary } from "../../src/api/types";
+import { formatShortTime } from "../../src/utils/time";
+import type { QuerySummary } from "../../src/api/types";
 import { useWalletStore, type WalletTransaction } from "../../src/store/wallet";
 
-function formatHistoryTime(ts: number): string {
-  const d = new Date(ts);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${month}/${day} ${hours}:${minutes}`;
-}
+// Request notification permission once at module level
+notificationProvider.requestPermission().catch(() => {});
 
-function HistoryRow({ tx }: { tx: WalletTransaction }) {
+const HistoryRow = React.memo(function HistoryRow({ tx }: { tx: WalletTransaction }) {
   return (
     <View className="bg-white rounded-xl px-4 py-3 flex-row items-center">
       <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
@@ -42,7 +35,7 @@ function HistoryRow({ tx }: { tx: WalletTransaction }) {
             <Text className="text-xs text-gray-400">{tx.locationHint}</Text>
           ) : null}
           <Text className="text-xs text-gray-300">
-            {formatHistoryTime(tx.timestamp)}
+            {formatShortTime(tx.timestamp)}
           </Text>
         </View>
       </View>
@@ -51,35 +44,18 @@ function HistoryRow({ tx }: { tx: WalletTransaction }) {
       </Text>
     </View>
   );
-}
+});
 
 export default function QueriesScreen() {
   const { data: queries, isLoading, isError, refetch, isFetching } = useQueries();
-  const [userLocation, setUserLocation] = useState<GpsCoord | null>(null);
-  const [isManualRefresh, setIsManualRefresh] = useState(false);
+  const userLocation = useUserLocation();
   const transactions = useWalletStore((s) => s.transactions);
-
-  useEffect(() => {
-    (async () => {
-      await notificationProvider.requestPermission().catch(() => {});
-      const granted = await locationProvider.requestPermission().catch(() => false);
-      if (!granted) return;
-      try {
-        const coord = await locationProvider.getCurrentPosition();
-        setUserLocation(coord);
-      } catch {
-        // Location unavailable (e.g., denied, headless browser) — continue without
-      }
-    })();
-  }, []);
 
   // Fire local notification when a query appears within 10km
   useNearbyNotifications(queries, userLocation);
 
   const onRefresh = useCallback(async () => {
-    setIsManualRefresh(true);
     await refetch();
-    setIsManualRefresh(false);
   }, [refetch]);
 
   // Sort queries: nearest first if location available
@@ -153,7 +129,7 @@ export default function QueriesScreen() {
         )}
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 24 }}
         refreshControl={
-          <RefreshControl refreshing={isManualRefresh} onRefresh={onRefresh} />
+          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View className="items-center justify-center py-20">

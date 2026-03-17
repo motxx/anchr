@@ -16,3 +16,20 @@ export function isUrgent(expiresAt: number): boolean {
 export function isCritical(expiresAt: number): boolean {
   return Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)) < 10;
 }
+
+/** Format timestamp as "M/D HH:MM". */
+export function formatShortTime(ts: number): string {
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hours}:${minutes}`;
+}
+
+const TERMINAL_STATUSES = new Set(["approved", "rejected", "expired"]);
+
+/** Whether a query status is terminal (no further updates expected). */
+export function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
+}

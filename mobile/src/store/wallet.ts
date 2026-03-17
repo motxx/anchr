@@ -13,8 +13,9 @@ export interface WalletTransaction {
 }
 
 interface WalletState {
-  balance: number;
   transactions: WalletTransaction[];
+  /** Derived from transactions — do not set directly. */
+  readonly balance: number;
   addEarning: (tx: Omit<WalletTransaction, "id" | "timestamp">) => void;
   load: () => Promise<void>;
 }
@@ -30,6 +31,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   transactions: [],
 
   addEarning: (tx) => {
+    // Idempotent by queryId — prevent duplicate earnings
+    if (get().transactions.some((t) => t.queryId === tx.queryId)) return;
+
     const entry: WalletTransaction = {
       ...tx,
       id: `tx_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,

@@ -8,18 +8,10 @@ import {
 } from "react-native";
 import { clipboardProvider } from "../../src/platform/clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { formatShortTime } from "../../src/utils/time";
 import { useWalletStore, type WalletTransaction } from "../../src/store/wallet";
 
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${month}/${day} ${hours}:${minutes}`;
-}
-
-function TransactionRow({ tx }: { tx: WalletTransaction }) {
+const TransactionRow = React.memo(function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const handleCopyToken = useCallback(async () => {
     await clipboardProvider.copyText(tx.cashuToken);
     Alert.alert("Copied", "Cashu token copied to clipboard. Paste into any Cashu wallet to redeem.");
@@ -38,7 +30,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
           {tx.description}
         </Text>
         <Text className="text-xs text-gray-400 mt-0.5">
-          {formatTime(tx.timestamp)}
+          {formatShortTime(tx.timestamp)}
         </Text>
       </View>
       <View className="items-end">
@@ -52,7 +44,7 @@ function TransactionRow({ tx }: { tx: WalletTransaction }) {
       </View>
     </Pressable>
   );
-}
+});
 
 export default function WalletScreen() {
   const { balance, transactions } = useWalletStore();

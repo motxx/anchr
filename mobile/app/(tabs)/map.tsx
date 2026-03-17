@@ -1,26 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, ActivityIndicator } from "react-native";
-import { locationProvider } from "../../src/platform/location";
+import React from "react";
+import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQueries } from "../../src/hooks/useQueries";
-import type { GpsCoord } from "../../src/api/types";
+import { useUserLocation } from "../../src/hooks/useUserLocation";
 
 export default function MapScreen() {
   const { data: queries } = useQueries();
-  const [userLocation, setUserLocation] = useState<GpsCoord | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const granted = await locationProvider.requestPermission().catch(() => false);
-      if (!granted) return;
-      try {
-        const coord = await locationProvider.getCurrentPosition();
-        setUserLocation(coord);
-      } catch {
-        // Location unavailable — continue without
-      }
-    })();
-  }, []);
+  const userLocation = useUserLocation();
 
   const queriesWithGps = queries?.filter((q) => q.expected_gps) ?? [];
 
