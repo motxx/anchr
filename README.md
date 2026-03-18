@@ -4,6 +4,10 @@ Anonymous real-world information protocol on [Nostr](https://nostr.com/), paid w
 
 Requesters post queries (photo proof, store status). Anonymous workers fulfill them on the ground. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Anchr Worker app demo" width="280" />
+</p>
+
 ## Design Principles
 
 - **Pull-based**: Requesters specify what they want. Workers respond.
