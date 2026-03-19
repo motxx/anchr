@@ -3,29 +3,31 @@ import { View, Text } from "react-native";
 
 type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "muted";
 
-const VARIANT_CLASSES: Record<BadgeVariant, { bg: string; text: string }> = {
-  default: { bg: "bg-blue-50", text: "text-blue-700" },
-  success: { bg: "bg-emerald-50", text: "text-emerald-700" },
-  warning: { bg: "bg-amber-50", text: "text-amber-700" },
-  error: { bg: "bg-red-50", text: "text-red-700" },
-  info: { bg: "bg-cyan-50", text: "text-cyan-700" },
-  muted: { bg: "bg-gray-100", text: "text-gray-500" },
+const VARIANT_CLASSES: Record<BadgeVariant, { dot: string; text: string }> = {
+  default: { dot: "bg-status-pending", text: "text-status-pending" },
+  success: { dot: "bg-status-approved", text: "text-status-approved" },
+  warning: { dot: "bg-warning", text: "text-warning" },
+  error: { dot: "bg-status-rejected", text: "text-status-rejected" },
+  info: { dot: "bg-info", text: "text-info" },
+  muted: { dot: "bg-status-expired", text: "text-muted-foreground" },
 };
 
 export interface DSBadgeProps {
   label: string;
   variant?: BadgeVariant;
-  /** Override bg class directly (e.g., "bg-purple-50"). */
-  bg?: string;
-  /** Override text color class directly (e.g., "text-purple-700"). */
+  /** Override dot color class. */
+  dotColor?: string;
+  /** Override text color class. */
   textColor?: string;
 }
 
-export function DSBadge({ label, variant = "default", bg, textColor }: DSBadgeProps) {
+/** Linear-style status badge: colored dot + label. */
+export function DSBadge({ label, variant = "default", dotColor, textColor }: DSBadgeProps) {
   const v = VARIANT_CLASSES[variant];
   return (
-    <View className={`${bg ?? v.bg} rounded-full px-2.5 py-0.5`}>
-      <Text className={`${textColor ?? v.text} text-xs font-semibold`}>{label}</Text>
+    <View className="flex-row items-center gap-1.5">
+      <View className={`w-2 h-2 rounded-full ${dotColor ?? v.dot}`} />
+      <Text className={`text-xs font-medium ${textColor ?? v.text}`}>{label}</Text>
     </View>
   );
 }

@@ -22,24 +22,24 @@ notificationProvider.requestPermission().catch(() => {});
 
 const HistoryRow = React.memo(function HistoryRow({ tx }: { tx: WalletTransaction }) {
   return (
-    <View className="bg-white rounded-xl px-4 py-3 flex-row items-center">
-      <View className="w-8 h-8 rounded-full bg-emerald-50 items-center justify-center mr-3">
+    <View className="bg-surface rounded-xl px-4 py-3 flex-row items-center">
+      <View className="w-8 h-8 rounded-full bg-emerald-950 items-center justify-center mr-3">
         <Ionicons name="checkmark" size={16} color="#10b981" />
       </View>
       <View className="flex-1 mr-3">
-        <Text className="text-sm text-gray-900" numberOfLines={1}>
+        <Text className="text-sm text-foreground" numberOfLines={1}>
           {tx.description}
         </Text>
         <View className="flex-row items-center gap-2 mt-0.5">
           {tx.locationHint ? (
-            <Text className="text-xs text-gray-400">{tx.locationHint}</Text>
+            <Text className="text-xs text-muted-foreground">{tx.locationHint}</Text>
           ) : null}
-          <Text className="text-xs text-gray-300">
+          <Text className="text-xs text-subtle">
             {formatShortTime(tx.timestamp)}
           </Text>
         </View>
       </View>
-      <Text className="text-sm font-semibold text-emerald-600">
+      <Text className="text-sm font-semibold text-primary">
         +{tx.amountSats} sats
       </Text>
     </View>
@@ -76,7 +76,7 @@ export default function QueriesScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-stone-50">
+      <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#10b981" />
       </View>
     );
@@ -84,12 +84,12 @@ export default function QueriesScreen() {
 
   if (isError) {
     return (
-      <View className="flex-1 items-center justify-center bg-stone-50 px-6">
-        <Ionicons name="cloud-offline-outline" size={48} color="#9ca3af" />
-        <Text className="text-base font-medium text-gray-500 mt-3">
+      <View className="flex-1 items-center justify-center bg-background px-6">
+        <Ionicons name="cloud-offline-outline" size={48} color="#52525b" />
+        <Text className="text-base font-medium text-muted-foreground mt-3">
           Could not reach server
         </Text>
-        <Text className="text-sm text-gray-400 mt-1">
+        <Text className="text-sm text-muted-foreground mt-1">
           Check your server URL in Settings
         </Text>
       </View>
@@ -97,25 +97,25 @@ export default function QueriesScreen() {
   }
 
   return (
-    <View className="flex-1 bg-stone-50">
+    <View className="flex-1 bg-background">
       {/* Header */}
-      <View className="px-4 pt-14 pb-3 bg-stone-50">
+      <View className="px-4 pt-14 pb-3 bg-background">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-xl font-bold text-gray-900 tracking-tight">
+            <Text className="text-xl font-bold text-foreground tracking-tight">
               Anchr
             </Text>
-            <Text className="text-xs text-gray-400 mt-0.5">
+            <Text className="text-xs text-muted-foreground mt-0.5">
               Ground truth from the street
             </Text>
           </View>
           <View className="flex-row items-center gap-1.5">
             {isFetching ? (
-              <ActivityIndicator size="small" color="#9ca3af" />
+              <ActivityIndicator size="small" color="#52525b" />
             ) : (
               <View className="w-2 h-2 rounded-full bg-emerald-400" />
             )}
-            <Text className="text-xs text-gray-400">live</Text>
+            <Text className="text-xs text-muted-foreground">live</Text>
           </View>
         </View>
       </View>
@@ -133,13 +133,13 @@ export default function QueriesScreen() {
         }
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
-            <View className="w-14 h-14 rounded-full bg-gray-100 items-center justify-center mb-3">
-              <Ionicons name="time-outline" size={24} color="#9ca3af" />
+            <View className="w-14 h-14 rounded-full bg-surface-raised items-center justify-center mb-3">
+              <Ionicons name="time-outline" size={24} color="#52525b" />
             </View>
-            <Text className="text-sm font-medium text-gray-500">
+            <Text className="text-sm font-medium text-muted-foreground">
               No pending queries
             </Text>
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               Pull to refresh
             </Text>
           </View>
@@ -147,7 +147,7 @@ export default function QueriesScreen() {
         ListFooterComponent={
           transactions.length > 0 ? (
             <View className="mt-4">
-              <Text className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
                 Completed
               </Text>
               <View style={{ gap: 8 }}>

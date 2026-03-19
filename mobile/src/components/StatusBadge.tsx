@@ -4,8 +4,8 @@ import type { QueryStatus } from "../api/types";
 
 const STATUS_CONFIG: Record<QueryStatus, DSBadgeProps> = {
   pending: { label: "Pending", variant: "default" },
-  awaiting_quotes: { label: "Awaiting Quotes", bg: "bg-purple-50", textColor: "text-purple-700" },
-  worker_selected: { label: "Worker Selected", bg: "bg-indigo-50", textColor: "text-indigo-700" },
+  awaiting_quotes: { label: "Awaiting Quotes", dotColor: "bg-violet-500", textColor: "text-violet-400" },
+  worker_selected: { label: "Worker Selected", dotColor: "bg-indigo-500", textColor: "text-indigo-400" },
   processing: { label: "Processing", variant: "warning" },
   verifying: { label: "Verifying", variant: "info" },
   submitted: { label: "Submitted", variant: "default" },

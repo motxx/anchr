@@ -9,11 +9,11 @@ export function DSInput({ label, className = "", ...props }: DSInputProps) {
   return (
     <View>
       {label && (
-        <Text className="text-sm font-medium text-foreground mb-1">{label}</Text>
+        <Text className="text-sm font-medium text-muted-foreground mb-1.5">{label}</Text>
       )}
       <TextInput
-        className={`bg-muted/40 border border-border rounded-lg px-3 py-2.5 text-sm text-foreground ${className}`}
-        placeholderTextColor="#a8a29e"
+        className={`bg-surface border border-border rounded-lg px-3 py-2.5 text-sm text-foreground ${className}`}
+        placeholderTextColor="#52525b"
         {...props}
       />
     </View>

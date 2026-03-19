@@ -28,7 +28,7 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f5f5f4" }}>
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#09090b" }}>
         <ActivityIndicator size="large" color="#10b981" />
       </View>
     );
@@ -36,11 +36,11 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: "#f5f5f4" },
+          contentStyle: { backgroundColor: "#09090b" },
         }}
       >
         <Stack.Screen name="(tabs)" />
@@ -50,8 +50,8 @@ export default function RootLayout() {
             headerShown: true,
             headerTitle: "Query",
             headerBackTitle: "Back",
-            headerTintColor: "#1c1917",
-            headerStyle: { backgroundColor: "#f5f5f4" },
+            headerTintColor: "#fafafa",
+            headerStyle: { backgroundColor: "#09090b" },
           }}
         />
       </Stack>

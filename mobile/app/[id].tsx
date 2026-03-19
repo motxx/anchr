@@ -36,10 +36,10 @@ const PREVIEWABLE_TYPES = new Set([
 function FilePreviewCard({ filename, mimeType }: { filename: string; mimeType: string }) {
   const isZip = mimeType === "application/zip";
   return (
-    <View className="w-full h-32 rounded-xl bg-gray-100 border border-gray-200 items-center justify-center gap-2">
+    <View className="w-full h-32 rounded-xl bg-surface-raised border border-border items-center justify-center gap-2">
       <Ionicons name={isZip ? "archive-outline" : "document-outline"} size={32} color="#6b7280" />
-      <Text className="text-sm font-medium text-gray-700">{filename}</Text>
-      <Text className="text-xs text-gray-400">{isZip ? "ProofMode bundle" : mimeType}</Text>
+      <Text className="text-sm font-medium text-muted-foreground">{filename}</Text>
+      <Text className="text-xs text-muted-foreground">{isZip ? "ProofMode bundle" : mimeType}</Text>
     </View>
   );
 }
@@ -203,7 +203,7 @@ export default function QueryDetailScreen() {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-stone-50">
+      <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator size="large" color="#10b981" />
       </View>
     );
@@ -211,9 +211,9 @@ export default function QueryDetailScreen() {
 
   if (isError || !query) {
     return (
-      <View className="flex-1 items-center justify-center bg-stone-50">
+      <View className="flex-1 items-center justify-center bg-background">
         <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
-        <Text className="text-base text-gray-500 mt-3">Query not found</Text>
+        <Text className="text-base text-muted-foreground mt-3">Query not found</Text>
       </View>
     );
   }
@@ -271,18 +271,18 @@ export default function QueryDetailScreen() {
   }
 
   return (
-    <ScrollView className="flex-1 bg-stone-50" contentContainerStyle={{ padding: 16 }}>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16 }}>
       {/* Status + Timer */}
       <View className="flex-row items-center justify-between mb-4">
         <StatusBadge status={query.status} />
         <View className="flex-row items-center gap-1">
-          <Ionicons name="time-outline" size={14} color="#9ca3af" />
-          <Text className="text-sm text-gray-400">{timeLeft(query.expires_at)}</Text>
+          <Ionicons name="time-outline" size={14} color="#52525b" />
+          <Text className="text-sm text-muted-foreground">{timeLeft(query.expires_at)}</Text>
         </View>
       </View>
 
       {/* Description */}
-      <Text className="text-lg font-semibold text-gray-900 mb-2">
+      <Text className="text-lg font-semibold text-foreground mb-2">
         {query.description}
       </Text>
 
@@ -291,7 +291,7 @@ export default function QueryDetailScreen() {
         {query.location_hint && (
           <View className="flex-row items-center gap-1">
             <Ionicons name="location-outline" size={14} color="#6b7280" />
-            <Text className="text-sm text-gray-500">{query.location_hint}</Text>
+            <Text className="text-sm text-muted-foreground">{query.location_hint}</Text>
           </View>
         )}
         {query.bounty && query.bounty.amount_sats > 0 && (
@@ -328,24 +328,24 @@ export default function QueryDetailScreen() {
                 onPress={() => setCapturedUri(null)}
                 className="self-start"
               >
-                <Text className="text-sm text-gray-400">Remove</Text>
+                <Text className="text-sm text-muted-foreground">Remove</Text>
               </Pressable>
             </View>
           ) : (
             <View className="flex-row gap-3">
               <Pressable
                 onPress={handleOpenCamera}
-                className="flex-1 bg-emerald-500 rounded-xl py-3.5 items-center flex-row justify-center gap-2"
+                className="flex-1 bg-primary rounded-xl py-3.5 items-center flex-row justify-center gap-2"
               >
                 <Ionicons name="camera" size={20} color="white" />
                 <Text className="text-white font-semibold">Camera</Text>
               </Pressable>
               <Pressable
                 onPress={handlePickDocument}
-                className="flex-1 bg-white border border-gray-200 rounded-xl py-3.5 items-center flex-row justify-center gap-2"
+                className="flex-1 bg-surface border border-border rounded-xl py-3.5 items-center flex-row justify-center gap-2"
               >
                 <Ionicons name="document-outline" size={20} color="#6b7280" />
-                <Text className="text-gray-700 font-semibold">Import</Text>
+                <Text className="text-muted-foreground font-semibold">Import</Text>
               </Pressable>
             </View>
           )}
@@ -358,7 +358,7 @@ export default function QueryDetailScreen() {
               className={`rounded-xl py-4 items-center ${
                 submitMutation.isPending
                   ? "bg-emerald-300"
-                  : "bg-emerald-500 active:bg-emerald-600"
+                  : "bg-primary active:bg-primary-hover"
               }`}
             >
               {submitMutation.isPending ? (
@@ -381,8 +381,8 @@ export default function QueryDetailScreen() {
         <View
           className={`mt-5 p-4 rounded-xl flex-row items-start gap-3 ${
             submitMutation.data.ok
-              ? "bg-emerald-50 border border-emerald-200"
-              : "bg-red-50 border border-red-200"
+              ? "bg-emerald-950/30 border border-emerald-800"
+              : "bg-red-950/30 border border-red-800"
           }`}
         >
           <Ionicons
@@ -393,7 +393,7 @@ export default function QueryDetailScreen() {
           <View className="flex-1">
             <Text
               className={`text-sm font-medium ${
-                submitMutation.data.ok ? "text-emerald-700" : "text-red-700"
+                submitMutation.data.ok ? "text-emerald-400" : "text-red-400"
               }`}
             >
               {submitMutation.data.message}
@@ -401,13 +401,13 @@ export default function QueryDetailScreen() {
             {submitMutation.data.ok && submitMutation.data.bounty_amount_sats ? (
               <View className="flex-row items-center gap-1 mt-1.5">
                 <Ionicons name="flash" size={12} color="#f59e0b" />
-                <Text className="text-sm font-bold text-amber-600">
+                <Text className="text-sm font-bold text-amber-400">
                   +{submitMutation.data.bounty_amount_sats} sats earned
                 </Text>
               </View>
             ) : null}
             {(submitMutation.data.verification?.failures?.length ?? 0) > 0 && (
-              <Text className="text-xs text-red-500 mt-1">
+              <Text className="text-xs text-red-400 mt-1">
                 {submitMutation.data.verification!.failures.join(", ")}
               </Text>
             )}
@@ -416,9 +416,9 @@ export default function QueryDetailScreen() {
       )}
 
       {submitMutation.isError && (
-        <View className="mt-5 p-4 rounded-xl bg-red-50 border border-red-200 flex-row items-center gap-3">
+        <View className="mt-5 p-4 rounded-xl bg-red-950/30 border border-red-800 flex-row items-center gap-3">
           <Ionicons name="alert-circle" size={20} color="#ef4444" />
-          <Text className="text-sm text-red-700 flex-1">
+          <Text className="text-sm text-red-400 flex-1">
             {submitMutation.error.message || "Network error"}
           </Text>
         </View>
@@ -426,27 +426,27 @@ export default function QueryDetailScreen() {
 
       {/* Expired notice */}
       {expired && !submitted && (
-        <View className="mt-5 p-4 rounded-xl bg-gray-100 items-center">
-          <Text className="text-sm text-gray-500">This query has expired</Text>
+        <View className="mt-5 p-4 rounded-xl bg-surface-raised items-center">
+          <Text className="text-sm text-muted-foreground">This query has expired</Text>
         </View>
       )}
 
       {/* Verification detail (if available) */}
       {query.verification && (
-        <View className="mt-5 p-4 rounded-xl bg-white border border-gray-200">
-          <Text className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+        <View className="mt-5 p-4 rounded-xl bg-surface border border-border">
+          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
             Verification
           </Text>
           {query.verification.checks.map((check, i) => (
             <View key={i} className="flex-row items-start gap-2 mb-1">
               <Ionicons name="checkmark-circle" size={14} color="#10b981" />
-              <Text className="text-xs text-gray-600 flex-1">{check}</Text>
+              <Text className="text-xs text-muted-foreground flex-1">{check}</Text>
             </View>
           ))}
           {query.verification.failures.map((fail, i) => (
             <View key={i} className="flex-row items-start gap-2 mb-1">
               <Ionicons name="close-circle" size={14} color="#ef4444" />
-              <Text className="text-xs text-red-600 flex-1">{fail}</Text>
+              <Text className="text-xs text-red-400 flex-1">{fail}</Text>
             </View>
           ))}
         </View>

@@ -9,7 +9,7 @@ export interface DSCardProps extends ViewProps {
 export function DSCard({ children, padded = true, className = "", ...props }: DSCardProps) {
   return (
     <View
-      className={`bg-card rounded-xl border border-border ${padded ? "px-4 py-3.5" : ""} ${className}`}
+      className={`bg-surface rounded-xl border border-border ${padded ? "px-4 py-3.5" : ""} ${className}`}
       {...props}
     >
       {children}
@@ -25,10 +25,9 @@ export interface DSPressableCardProps extends Omit<PressableProps, "children"> {
 export function DSPressableCard({ children, padded = true, className = "", ...props }: DSPressableCardProps) {
   return (
     <Pressable
-      className={`bg-card rounded-xl border border-border overflow-hidden active:scale-[0.98] ${
+      className={`bg-surface rounded-xl border border-border overflow-hidden active:bg-surface-raised ${
         padded ? "px-4 py-3.5" : ""
       } ${className}`}
-      style={{ elevation: 1 }}
       {...props}
     >
       {children}

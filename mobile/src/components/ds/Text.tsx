@@ -9,7 +9,7 @@ const VARIANT_CLASSES: Record<Variant, string> = {
   subheading: "text-lg",
   body: "text-sm",
   caption: "text-xs",
-  label: "text-xs uppercase tracking-widest",
+  label: "text-[10px] uppercase tracking-[0.15em]",
   mono: "font-mono text-sm",
 };
 

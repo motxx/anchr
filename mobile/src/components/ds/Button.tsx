@@ -1,30 +1,30 @@
 import React from "react";
-import { Pressable, Text, ActivityIndicator, View, type PressableProps } from "react-native";
+import { Pressable, Text, ActivityIndicator, type PressableProps } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
-const VARIANT_CLASSES: Record<Variant, { container: string; text: string; activeContainer: string }> = {
+const VARIANT_CLASSES: Record<Variant, { container: string; text: string; active: string }> = {
   primary: {
     container: "bg-primary",
     text: "text-primary-foreground font-semibold",
-    activeContainer: "active:opacity-90",
+    active: "active:bg-primary-hover",
   },
   secondary: {
-    container: "bg-white border border-border",
+    container: "bg-surface-raised border border-border",
     text: "text-foreground font-semibold",
-    activeContainer: "active:bg-muted",
+    active: "active:bg-muted",
   },
   ghost: {
     container: "bg-transparent",
     text: "text-muted-foreground font-medium",
-    activeContainer: "active:bg-muted/50",
+    active: "active:bg-surface-raised",
   },
   destructive: {
     container: "bg-destructive",
     text: "text-white font-semibold",
-    activeContainer: "active:opacity-90",
+    active: "active:opacity-90",
   },
 };
 
@@ -61,15 +61,15 @@ export function DSButton({
   return (
     <Pressable
       disabled={isDisabled}
-      className={`${v.container} ${s.container} ${v.activeContainer} flex-row items-center justify-center gap-2 ${
-        isDisabled ? "opacity-50" : ""
+      className={`${v.container} ${s.container} ${v.active} flex-row items-center justify-center gap-2 ${
+        isDisabled ? "opacity-40" : ""
       } ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === "primary" ? "#fff" : "#6b7280"} />
+        <ActivityIndicator size="small" color={variant === "primary" ? "#fff" : "#a1a1aa"} />
       ) : icon ? (
-        <Ionicons name={icon} size={s.icon} color={variant === "primary" ? "#fff" : "#6b7280"} />
+        <Ionicons name={icon} size={s.icon} color={variant === "primary" ? "#fff" : "#a1a1aa"} />
       ) : null}
       <Text className={`${v.text} ${s.text}`}>{label}</Text>
     </Pressable>
