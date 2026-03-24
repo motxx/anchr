@@ -125,7 +125,8 @@ describe("TLSNotary Browser Extension E2E", () => {
             if (p.url().includes("confirmPopup") && !popupApproved) {
               await sleep(300);
               await p.evaluate(() => {
-                for (const b of document.querySelectorAll("button"))
+                const buttons = Array.from(document.querySelectorAll("button"));
+                for (const b of buttons)
                   if (b.textContent?.toLowerCase().includes("allow")) {
                     (b as HTMLButtonElement).click();
                     return;
@@ -140,7 +141,8 @@ describe("TLSNotary Browser Extension E2E", () => {
 
     // Click Run Code
     await page.evaluate(() => {
-      for (const b of document.querySelectorAll("button"))
+      const buttons = Array.from(document.querySelectorAll("button"));
+      for (const b of buttons)
         if (b.textContent?.includes("Run")) {
           (b as HTMLButtonElement).click();
           break;

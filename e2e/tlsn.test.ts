@@ -24,8 +24,8 @@ const VERIFIER_BIN = join(import.meta.dir, "../crates/tlsn-verifier/target/relea
 async function isVerifierReachable(): Promise<boolean> {
   try {
     const conn = await Bun.connect({
-      hostname: VERIFIER_HOST.split(":")[0],
-      port: parseInt(VERIFIER_HOST.split(":")[1] ?? "7047"),
+      hostname: VERIFIER_HOST.split(":")[0]!,
+      port: parseInt(VERIFIER_HOST.split(":")[1] ?? "7047", 10),
       socket: {
         data() {},
         open(socket) { socket.end(); },

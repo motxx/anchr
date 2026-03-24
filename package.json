@@ -20,7 +20,12 @@
     "demo:htlc": "docker compose up -d && sleep 3 && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun run scripts/demo-htlc.ts",
     "demo:htlc:web": "docker compose up -d && sleep 3 && bunx @tailwindcss/cli -i src/ui/demo/globals.css -o src/ui/demo/generated.css && NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun --hot run scripts/demo-htlc-server.ts",
     "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "build:sdk": "cd packages/sdk && bun run build",
+    "deploy": "./scripts/deploy.sh all",
+    "deploy:app": "./scripts/deploy.sh app",
+    "deploy:verifier": "./scripts/deploy.sh verifier",
+    "deploy:worker": "./scripts/deploy.sh worker"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.1",

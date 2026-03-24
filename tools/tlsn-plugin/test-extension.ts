@@ -109,7 +109,7 @@ async function main() {
           if (!confirmed) {
             // Click the last button (usually the confirm)
             if (popupBtns.length > 0) {
-              await popupBtns[popupBtns.length - 1].click();
+              await popupBtns[popupBtns.length - 1]!.click();
               console.log("[test] Clicked last button as fallback");
               confirmed = true;
             }

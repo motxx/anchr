@@ -289,6 +289,51 @@ docker compose down tlsn-verifier 2>/dev/null || true
 
 ---
 
+## Phase 8: Deploy to fly.io (`deploy`)
+
+### Prerequisites
+- `fly` CLI installed and authenticated
+- fly.io apps created: `anchr-app`, `anchr-tlsn-verifier`, `anchr-tlsn-worker`
+
+### Deploy all services
+```bash
+./scripts/deploy.sh all
+```
+
+### Deploy individually
+```bash
+./scripts/deploy.sh verifier   # TLSNotary Verifier Server
+./scripts/deploy.sh app        # Anchr App (Oracle + API)
+./scripts/deploy.sh worker     # Auto-Worker daemon
+```
+
+### Verify production
+```bash
+curl -s https://anchr-app.fly.dev/health | jq .
+curl -s https://anchr-tlsn-verifier.fly.dev/health
+```
+
+### Production E2E test
+```bash
+# Create query on production
+QID=$(curl -s -X POST https://anchr-app.fly.dev/queries \
+  -H "Content-Type: application/json" \
+  -d '{"description":"BTC price","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd","conditions":[{"type":"jsonpath","expression":"bitcoin.usd"}]},"bounty":{"amount_sats":21},"ttl_seconds":600}' | jq -r '.query_id')
+echo "Created: $QID"
+
+# Check query status (Auto-Worker should fulfill it)
+curl -s "https://anchr-app.fly.dev/queries/$QID" | jq '{status, verification_requirements}'
+```
+
+### Production URLs
+| Service | URL |
+|---------|-----|
+| Anchr App | https://anchr-app.fly.dev |
+| Verifier Server | https://anchr-tlsn-verifier.fly.dev |
+| Requester UI | https://anchr-app.fly.dev/requester |
+
+---
+
 ## Automated Tests
 
 ```bash

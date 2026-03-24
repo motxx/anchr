@@ -126,7 +126,7 @@ export class AnchrWorker {
   /** Run once: poll, fulfill one query, return */
   async runOnce(): Promise<FulfilledEvent | null> {
     const queries = await this.fetchEligibleQueries();
-    if (queries.length === 0) return null;
+    if (queries.length === 0 || !queries[0]) return null;
     return this.fulfillQuery(queries[0]);
   }
 
@@ -164,7 +164,7 @@ export class AnchrWorker {
 
     return queries.filter((q) => {
       // Only TLSNotary queries
-      if (!q.verification_requirements?.includes("tlsn")) return false;
+      if (!Array.isArray(q.verification_requirements) || !q.verification_requirements.includes("tlsn")) return false;
       if (!q.tlsn_requirements?.target_url) return false;
 
       // Bounty filter

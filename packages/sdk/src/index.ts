@@ -207,7 +207,10 @@ export class Anchr {
         return {
           verified: true,
           checks: status.verification?.checks ?? [],
-          attachments: status.result?.attachments ?? [],
+          attachments: (status.result?.attachments ?? []).map((a: { uri: string; mime_type?: string; mimeType?: string }) => ({
+            uri: a.uri,
+            mimeType: a.mimeType ?? a.mime_type ?? "application/octet-stream",
+          })),
           notes: status.result?.notes,
           gps: status.result?.gps,
           queryId,

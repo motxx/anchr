@@ -9,7 +9,7 @@ AI agents and humans buy verified API responses, price feeds, and real-world pho
 ```typescript
 import { Anchr } from "anchr-sdk";
 
-const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
+const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
 
 const result = await anchr.query({
   description: "BTC price from CoinGecko",
