@@ -364,13 +364,21 @@ async fn handle_proxy_ws_raw(
     let mut tcp_read = tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_read);
     let mut tcp_write = tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(tcp_write);
 
+    let host_log1 = host.clone();
+    let host_log2 = host.clone();
     let ws_to_tcp = tokio::spawn(async move {
-        let _ = futures::io::copy(&mut ws_read, &mut tcp_write).await;
+        match futures::io::copy(&mut ws_read, &mut tcp_write).await {
+            Ok(n) => eprintln!("[proxy] WS→TCP {} bytes for {}", n, host_log1),
+            Err(e) => eprintln!("[proxy] WS→TCP error for {}: {}", host_log1, e),
+        }
         let _ = futures::AsyncWriteExt::close(&mut tcp_write).await;
     });
 
     let tcp_to_ws = tokio::spawn(async move {
-        let _ = futures::io::copy(&mut tcp_read, &mut ws_write).await;
+        match futures::io::copy(&mut tcp_read, &mut ws_write).await {
+            Ok(n) => eprintln!("[proxy] TCP→WS {} bytes for {}", n, host_log2),
+            Err(e) => eprintln!("[proxy] TCP→WS error for {}: {}", host_log2, e),
+        }
         let _ = futures::AsyncWriteExt::close(&mut ws_write).await;
     });
 
