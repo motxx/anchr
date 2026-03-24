@@ -14,7 +14,7 @@ spansy = { git = "https://github.com/tlsnotary/tlsn-utils", rev = "6f1a934", fea
 
 k256 = { version = "0.13", features = ["ecdsa"] }
 bincode = "1.3"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-std", "fs"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-std", "io-util", "fs"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 hyper = { version = "1", features = ["client", "http1"] }
 hyper-util = { version = "0.1", features = ["full"] }

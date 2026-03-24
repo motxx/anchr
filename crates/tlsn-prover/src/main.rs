@@ -46,12 +46,16 @@ const MAX_RECV_DATA: usize = 1 << 14; // 16384
 #[derive(Parser)]
 #[command(name = "tlsn-prove", about = "Generate a TLSNotary presentation for a URL")]
 struct Cli {
-    /// Target URL to fetch (e.g. https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd)
+    /// Target URL to fetch
     url: String,
 
     /// Output file path (default: presentation.tlsn)
     #[arg(short, long, default_value = "presentation.tlsn")]
     output: PathBuf,
+
+    /// Verifier server address (e.g. localhost:7047). If omitted, runs verifier in-process.
+    #[arg(short, long)]
+    verifier: Option<String>,
 }
 
 #[tokio::main]
@@ -73,27 +77,15 @@ async fn main() -> Result<()> {
 
     eprintln!("[tlsn-prove] Target: {}:{}{}", host, port, path);
 
-    // In-memory channel between prover and verifier
-    let (verifier_socket, prover_socket) = tokio::io::duplex(1 << 23);
-    let (request_tx, request_rx) = oneshot::channel::<AttestationRequest>();
-    let (attestation_tx, attestation_rx) = oneshot::channel::<Attestation>();
-
-    let host_clone = host.clone();
-    tokio::spawn(async move {
-        if let Err(e) = run_verifier(verifier_socket, request_rx, attestation_tx, &host_clone).await {
-            eprintln!("[tlsn-prove] Verifier error: {e:#}");
-        }
-    });
-
-    let (attestation, secrets) = run_prover(
-        prover_socket,
-        request_tx,
-        attestation_rx,
-        &host,
-        port,
-        &path,
-    )
-    .await?;
+    let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
+        // Remote verifier mode: connect to external Verifier Server
+        eprintln!("[tlsn-prove] Using remote verifier: {}", verifier_addr);
+        run_with_remote_verifier(verifier_addr, &host, port, &path).await?
+    } else {
+        // Local mode: run both prover and verifier in-process
+        eprintln!("[tlsn-prove] Using in-process verifier");
+        run_with_local_verifier(&host, port, &path).await?
+    };
 
     // Build presentation with full disclosure
     let presentation = build_presentation(attestation, secrets)?;
@@ -112,6 +104,195 @@ async fn main() -> Result<()> {
     std::io::stdout().write_all(b"\n")?;
 
     Ok(())
+}
+
+async fn run_with_local_verifier(
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<(Attestation, Secrets)> {
+    let (verifier_socket, prover_socket) = tokio::io::duplex(1 << 23);
+    let (request_tx, request_rx) = oneshot::channel::<AttestationRequest>();
+    let (attestation_tx, attestation_rx) = oneshot::channel::<Attestation>();
+
+    let host_clone = host.to_string();
+    tokio::spawn(async move {
+        if let Err(e) = run_verifier(verifier_socket, request_rx, attestation_tx, &host_clone).await {
+            eprintln!("[tlsn-prove] Verifier error: {e:#}");
+        }
+    });
+
+    run_prover(prover_socket, request_tx, attestation_rx, host, port, path).await
+}
+
+async fn run_with_remote_verifier(
+    verifier_addr: &str,
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<(Attestation, Secrets)> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // Generate random session ID
+    let session_id: [u8; 16] = rand::random();
+    let sid_hex = hex::encode(&session_id[..8]);
+    eprintln!("[tlsn-prove] Session ID: {}", sid_hex);
+
+    // Connection 1: MPC Session
+    let mut mpc_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
+    mpc_tcp.write_all(&[b'M']).await?;
+    mpc_tcp.write_all(&session_id).await?;
+    mpc_tcp.flush().await?;
+
+    eprintln!("[tlsn-prove] MPC connection established");
+
+    // Run prover (MPC session) — no oneshot channels, we handle attestation over TCP
+    let prover_output = run_prover_mpc(mpc_tcp, host, port, path).await?;
+
+    eprintln!("[tlsn-prove] MPC complete, requesting attestation...");
+
+    // Connection 2: Attestation exchange
+    let mut att_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
+    att_tcp.write_all(&[b'A']).await?;
+    att_tcp.write_all(&session_id).await?;
+
+    // Send AttestationRequest
+    let req_bytes = bincode::serialize(&prover_output.request)?;
+    att_tcp.write_all(&(req_bytes.len() as u32).to_be_bytes()).await?;
+    att_tcp.write_all(&req_bytes).await?;
+    att_tcp.flush().await?;
+
+    // Receive Attestation
+    let mut len_buf = [0u8; 4];
+    att_tcp.read_exact(&mut len_buf).await?;
+    let att_len = u32::from_be_bytes(len_buf) as usize;
+    let mut att_buf = vec![0u8; att_len];
+    att_tcp.read_exact(&mut att_buf).await?;
+    let attestation: Attestation = bincode::deserialize(&att_buf)?;
+
+    // Validate
+    let provider = CryptoProvider::default();
+    prover_output.request.validate(&attestation, &provider)?;
+
+    eprintln!("[tlsn-prove] Attestation received and validated");
+
+    Ok((attestation, prover_output.secrets))
+}
+
+/// Output of the prover MPC phase (before attestation exchange).
+struct ProverMpcOutput {
+    request: AttestationRequest,
+    secrets: Secrets,
+    request_config: RequestConfig,
+}
+
+async fn run_prover_mpc(
+    tcp: tokio::net::TcpStream,
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<ProverMpcOutput> {
+    let session = Session::new(tcp.compat());
+    let (driver, mut handle) = session.split();
+    let driver_task = tokio::spawn(driver);
+
+    let prover = handle
+        .new_prover(ProverConfig::builder().build()?)?
+        .commit(
+            TlsCommitConfig::builder()
+                .protocol(
+                    MpcTlsConfig::builder()
+                        .max_sent_data(MAX_SENT_DATA)
+                        .max_recv_data(MAX_RECV_DATA)
+                        .build()?,
+                )
+                .build()?,
+        )
+        .await?;
+
+    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
+
+    let (tls_connection, prover_fut) = prover
+        .connect(
+            TlsClientConfig::builder()
+                .server_name(ServerName::Dns(host.try_into()?))
+                .root_store(tlsn::webpki::RootCertStore::mozilla())
+                .build()?,
+            target_tcp.compat(),
+        )
+        .await?;
+    let tls_connection = TokioIo::new(tls_connection.compat());
+    let prover_task = tokio::spawn(prover_fut);
+
+    let (mut request_sender, connection) =
+        hyper::client::conn::http1::handshake(tls_connection).await?;
+    tokio::spawn(connection);
+
+    let request = Request::builder()
+        .uri(path)
+        .header("Host", host)
+        .header("Accept", "application/json")
+        .header("Accept-Encoding", "identity")
+        .header("Connection", "close")
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
+        .body(Empty::<Bytes>::new())?;
+
+    eprintln!("[tlsn-prove] Sending HTTP request...");
+    let response = request_sender.send_request(request).await?;
+    eprintln!("[tlsn-prove] Response status: {}", response.status());
+
+    let mut prover = prover_task.await??;
+
+    // Configure commits
+    let transcript = prover.transcript();
+    let sent_len = transcript.sent().len();
+    let recv_len = transcript.received().len();
+
+    let mut builder = TranscriptCommitConfig::builder(transcript);
+    builder.commit_sent(&(0..sent_len))?;
+    builder.commit_recv(&(0..recv_len))?;
+    let transcript_commit = builder.build()?;
+
+    let mut req_builder = RequestConfig::builder();
+    req_builder.transcript_commit(transcript_commit);
+    let request_config = req_builder.build()?;
+
+    // Prove phase
+    let mut prove_builder = ProveConfig::builder(prover.transcript());
+    if let Some(tc) = request_config.transcript_commit() {
+        prove_builder.transcript_commit(tc.clone());
+    }
+    let disclosure_config = prove_builder.build()?;
+
+    let ProverOutput {
+        transcript_commitments,
+        transcript_secrets,
+        ..
+    } = prover.prove(&disclosure_config).await?;
+
+    let transcript = prover.transcript().clone();
+    let tls_transcript = prover.tls_transcript().clone();
+    prover.close().await?;
+
+    // Build attestation request
+    let mut att_builder = AttestationRequest::builder(&request_config);
+    att_builder
+        .server_name(ServerName::Dns(host.try_into()?))
+        .handshake_data(HandshakeData {
+            certs: tls_transcript.server_cert_chain().expect("cert chain").to_vec(),
+            sig: tls_transcript.server_signature().expect("signature").clone(),
+            binding: tls_transcript.certificate_binding().clone(),
+        })
+        .transcript(transcript)
+        .transcript_commitments(transcript_secrets, transcript_commitments);
+
+    let (request, secrets) = att_builder.build(&CryptoProvider::default())?;
+
+    handle.close();
+    driver_task.await??;
+
+    Ok(ProverMpcOutput { request, secrets, request_config })
 }
 
 fn base64_encode(data: &[u8]) -> String {
