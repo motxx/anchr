@@ -60,6 +60,8 @@ interface Query {
   expires_at: number;
   expires_in_seconds: number;
   bounty?: Bounty | null;
+  tlsn_verifier_url?: string | null;
+  tlsn_proxy_url?: string | null;
 }
 
 interface SubmitResponse {
@@ -114,19 +116,21 @@ function generatePluginCode(query: Query, apiOrigin: string): string {
   if (!req) return "";
   const url = req.target_url;
   let hostname: string;
-  let pathname: string;
   try {
-    const u = new URL(url);
-    hostname = u.hostname;
-    pathname = u.pathname + u.search;
+    hostname = new URL(url).hostname;
   } catch {
     hostname = url;
-    pathname = "/";
   }
+
+  // Use query-provided URLs, or sensible defaults
+  const verifierUrl = query.tlsn_verifier_url || "ws://localhost:7048";
+  const proxyUrl = query.tlsn_proxy_url || `ws://localhost:7048/proxy?token=${hostname}`;
 
   return `// Anchr plugin — auto-proves and submits
 const QUERY_ID = '${query.id}';
 const API = '${apiOrigin}';
+const VERIFIER_URL = '${verifierUrl}';
+const PROXY_URL = '${proxyUrl}';
 
 export default {
   config: {
@@ -136,6 +140,7 @@ export default {
       method: 'GET',
       host: '${hostname}',
       pathname: '/**',
+      verifierUrl: VERIFIER_URL,
     }],
   },
   main: async () => {
@@ -151,6 +156,8 @@ export default {
         },
       },
       {
+        verifierUrl: VERIFIER_URL,
+        proxyUrl: PROXY_URL,
         maxRecvData: 16384,
         maxSentData: 4096,
         handlers: [
