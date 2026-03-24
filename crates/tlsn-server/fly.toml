@@ -6,20 +6,14 @@ primary_region = "nrt"
 
 [env]
 
+# WS port exposed via fly.io HTTP (TLS terminated by fly.io)
 [http_service]
   internal_port = 7047
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = "off"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
-
-# TCP service for CLI prover
-[[services]]
-  internal_port = 7046
-  protocol = "tcp"
-  [[services.ports]]
-    port = 7046
 
 [[vm]]
   cpu_kind = "shared"
