@@ -51,15 +51,16 @@ export interface TlsnRequirement {
 }
 
 export interface TlsnAttestation {
-  /** Base64-encoded TLSNotary attestation document. */
-  attestation_doc: string;
+  /** Base64-encoded TLSNotary presentation file (.presentation.tlsn). */
+  presentation: string;
+}
+
+/** Cryptographically verified data extracted from a TLSNotary presentation by the oracle. */
+export interface TlsnVerifiedData {
   server_name: string;
-  request_url: string;
   revealed_body: string;
-  revealed_headers?: Record<string, string>;
-  /** Notary public key (hex). */
-  notary_pubkey: string;
-  /** Session timestamp (unix ms). */
+  revealed_headers?: string;
+  /** Session timestamp (unix seconds, from the cryptographic proof). */
   session_timestamp: number;
 }
 
@@ -120,6 +121,8 @@ export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
+  /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
+  tlsn_verified?: TlsnVerifiedData;
 }
 
 export interface RequesterMeta {

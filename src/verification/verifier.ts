@@ -4,13 +4,13 @@ import { haversineKm } from "./exif-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import { validateTlsn } from "./tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
-import { getRuntimeConfig } from "../config";
 import type {
   AttachmentRef,
   BlossomKeyMap,
   GpsCoord,
   Query,
   QueryResult,
+  TlsnVerifiedData,
   VerificationDetail,
 } from "../types";
 
@@ -29,6 +29,7 @@ const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
 export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
   const checks: string[] = [];
   const failures: string[] = [];
+  let tlsnVerifiedData: TlsnVerifiedData | undefined;
   const maxGpsDist = query.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
 
   const attachments = result.attachments ?? [];
@@ -70,10 +71,13 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
       const tlsnResult = await validateTlsn(
         result.tlsn_attestation,
         query.tlsn_requirements,
-        getRuntimeConfig().trustedNotaryPubkeys,
       );
       checks.push(...tlsnResult.checks);
       failures.push(...tlsnResult.failures);
+      // Attach verified data for downstream display
+      if (tlsnResult.verifiedData) {
+        tlsnVerifiedData = tlsnResult.verifiedData;
+      }
     }
   }
 
@@ -97,6 +101,7 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
     passed: failures.length === 0,
     checks,
     failures,
+    tlsn_verified: tlsnVerifiedData,
   };
 }
 

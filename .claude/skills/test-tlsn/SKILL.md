@@ -19,9 +19,9 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 ```bash
 cd "$PROJECT_ROOT"
 bun run src/index.ts &
-sleep 3
+until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
 bun test src/verification/tlsn-validation.test.ts
-# Then run Phase 3 commands below
+# Then run Phase 2 commands below
 ```
 
 **Full runbook (includes mobile app on iOS simulator):**
@@ -46,7 +46,6 @@ Start the Anchr server.
 cd "$PROJECT_ROOT"
 pkill -f "bun.*src/index.ts" 2>/dev/null || true
 bun run src/index.ts &
-sleep 3
 ```
 
 **Verification:**
@@ -189,7 +188,6 @@ Test the Worker mobile app on iOS Simulator.
 cd "$PROJECT_ROOT/mobile"
 bun install
 bunx expo start --port 8082 &
-sleep 10
 ```
 
 ### 3b. Open app in Expo Go

@@ -25,8 +25,8 @@ import type {
   BlossomKeyMap,
   BlossomKeyMaterial,
   SubmitResponse,
-  TlsnAttestation,
   TlsnRequirement,
+  TlsnVerifiedData,
   UploadResponse,
 } from "../src/api/types";
 
@@ -64,48 +64,42 @@ function ImagePreviewOrFallback({ uri, filename, mimeType }: { uri: string; file
 }
 
 function TlsnProofSection({
-  attestation,
+  verified,
   requirement,
 }: {
-  attestation: TlsnAttestation;
+  verified: TlsnVerifiedData;
   requirement?: TlsnRequirement | null;
 }) {
-  const [showRawBody, setShowRawBody] = useState(false);
-  const [showFullLog, setShowFullLog] = useState(false);
+  const [showBody, setShowBody] = useState(false);
 
-  // Try to pretty-print revealed_body as JSON
   let bodyDisplay: string;
   let isJson = false;
   try {
-    const parsed = JSON.parse(attestation.revealed_body);
-    bodyDisplay = JSON.stringify(parsed, null, 2);
+    bodyDisplay = JSON.stringify(JSON.parse(verified.revealed_body), null, 2);
     isJson = true;
   } catch {
-    bodyDisplay = attestation.revealed_body;
+    bodyDisplay = verified.revealed_body;
   }
 
-  const timestamp = new Date(attestation.session_timestamp).toLocaleString();
+  const timestamp = new Date(verified.session_timestamp * 1000).toLocaleString();
 
   return (
     <View className="mt-5 p-4 rounded-xl bg-surface border border-border">
       <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-        TLSNotary Proof
+        TLSNotary Proof (cryptographically verified)
       </Text>
 
-      {/* Server & URL */}
+      {/* Server */}
       <View className="mb-3 gap-1.5">
         <View className="flex-row items-center gap-2">
           <Ionicons name="lock-closed" size={14} color="#10b981" />
           <Text className="text-sm font-medium text-foreground">
-            {attestation.server_name}
+            {verified.server_name}
           </Text>
         </View>
-        <Text className="text-xs text-muted-foreground ml-5" numberOfLines={2}>
-          {attestation.request_url}
-        </Text>
       </View>
 
-      {/* Conditions (if requirement provided) */}
+      {/* Conditions */}
       {requirement?.conditions && requirement.conditions.length > 0 && (
         <View className="mb-3 gap-1">
           <Text className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
@@ -122,13 +116,13 @@ function TlsnProofSection({
         </View>
       )}
 
-      {/* Revealed Body (collapsible) */}
+      {/* Server Response (collapsible) */}
       <Pressable
-        onPress={() => setShowRawBody((v) => !v)}
+        onPress={() => setShowBody((v) => !v)}
         className="mb-2 flex-row items-center gap-1.5"
       >
         <Ionicons
-          name={showRawBody ? "chevron-down" : "chevron-forward"}
+          name={showBody ? "chevron-down" : "chevron-forward"}
           size={14}
           color="#6b7280"
         />
@@ -141,52 +135,20 @@ function TlsnProofSection({
           </View>
         )}
       </Pressable>
-      {showRawBody && (
+      {showBody && (
         <View className="bg-black/40 rounded-lg p-3 mb-3">
           <ScrollView horizontal={!isJson} nestedScrollEnabled>
-            <Text
-              className="text-xs text-emerald-300 font-mono"
-              selectable
-            >
+            <Text className="text-xs text-emerald-300 font-mono" selectable>
               {bodyDisplay}
             </Text>
           </ScrollView>
         </View>
       )}
 
-      {/* Metadata row */}
-      <View className="flex-row flex-wrap gap-x-4 gap-y-1 mb-2">
-        <Text className="text-[10px] text-muted-foreground">
-          {timestamp}
-        </Text>
-        <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
-          Notary: {attestation.notary_pubkey.slice(0, 12)}...
-        </Text>
-      </View>
-
-      {/* Full debug log (collapsible) */}
-      <Pressable
-        onPress={() => setShowFullLog((v) => !v)}
-        className="flex-row items-center gap-1.5 mt-1"
-      >
-        <Ionicons
-          name={showFullLog ? "chevron-down" : "chevron-forward"}
-          size={14}
-          color="#6b7280"
-        />
-        <Text className="text-[10px] text-muted-foreground">
-          Raw attestation data
-        </Text>
-      </Pressable>
-      {showFullLog && (
-        <View className="bg-black/40 rounded-lg p-3 mt-1.5">
-          <ScrollView horizontal nestedScrollEnabled>
-            <Text className="text-[10px] text-gray-400 font-mono" selectable>
-              {JSON.stringify(attestation, null, 2)}
-            </Text>
-          </ScrollView>
-        </View>
-      )}
+      {/* Timestamp */}
+      <Text className="text-[10px] text-muted-foreground">
+        {timestamp}
+      </Text>
     </View>
   );
 }
@@ -350,6 +312,9 @@ export default function QueryDetailScreen() {
 
   const expired = isExpired(query.expires_at);
   const submitted = submitMutation.isSuccess && submitMutation.data.ok;
+  const isTlsnOnly = query.verification_requirements.includes("tlsn") &&
+    !query.verification_requirements.includes("nonce") &&
+    !query.verification_requirements.includes("gps");
 
   // Camera fullscreen view (native only — web uses file input)
   if (cameraActive && Platform.OS !== "web") {
@@ -439,8 +404,32 @@ export default function QueryDetailScreen() {
         <ChallengeNonceDisplay nonce={query.challenge_nonce} rule={query.challenge_rule} />
       )}
 
-      {/* Action area */}
-      {!submitted && !expired && (
+      {/* TLSNotary requirement info (for tlsn-only queries) */}
+      {!submitted && !expired && isTlsnOnly && (
+        <View className="mt-6 p-4 rounded-xl bg-surface border border-border gap-3">
+          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            TLSNotary Verification Required
+          </Text>
+          <Text className="text-sm text-muted-foreground">
+            Use the TLSNotary browser extension to prove the server response.
+          </Text>
+          {query.tlsn_requirements && (
+            <View className="gap-1.5">
+              <Text className="text-xs text-foreground font-medium">
+                {query.tlsn_requirements.target_url}
+              </Text>
+              {query.tlsn_requirements.conditions?.map((cond, i) => (
+                <Text key={i} className="text-xs text-muted-foreground">
+                  {cond.description ?? `${cond.type}: ${cond.expression}`}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Action area (photo queries only) */}
+      {!submitted && !expired && !isTlsnOnly && (
         <View className="mt-6 gap-3">
           {/* Photo preview or action buttons */}
           {capturedUri ? (
@@ -582,10 +571,10 @@ export default function QueryDetailScreen() {
         </View>
       )}
 
-      {/* TLSNotary Proof detail */}
-      {query.result?.tlsn_attestation && (
+      {/* TLSNotary Proof detail (from cryptographically verified data) */}
+      {(query.verification?.tlsn_verified || query.result?.tlsn_verified) && (
         <TlsnProofSection
-          attestation={query.result.tlsn_attestation}
+          verified={(query.verification?.tlsn_verified || query.result?.tlsn_verified)!}
           requirement={query.tlsn_requirements}
         />
       )}

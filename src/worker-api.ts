@@ -29,6 +29,7 @@ import {
 } from "./query-service";
 import { VERIFICATION_FACTORS } from "./types";
 import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo, TlsnAttestation } from "./types";
+import { getRuntimeConfig as getConfig } from "./config";
 import { haversineKm } from "./verification/exif-validation";
 
 export interface WorkerApiDeps {
@@ -179,6 +180,8 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
 }
 
 function queryDetail(query: Query, requestUrl: string) {
+  const config = getConfig();
+  const hasTlsn = query.verification_requirements.includes("tlsn");
   return {
     ...querySummary(query),
     created_at: query.created_at,
@@ -189,6 +192,10 @@ function queryDetail(query: Query, requestUrl: string) {
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
     blossom_keys: query.blossom_keys ?? null,
+    ...(hasTlsn && {
+      tlsn_verifier_url: config.tlsnVerifierUrl ?? null,
+      tlsn_proxy_url: config.tlsnProxyUrl ?? null,
+    }),
   };
 }
 
@@ -432,7 +439,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
       gps: bodyGps && typeof bodyGps.lat === "number" && typeof bodyGps.lon === "number" ? bodyGps : undefined,
-      tlsn_attestation: body.tlsn_attestation as TlsnAttestation | undefined,
+      tlsn_attestation: typeof body.tlsn_presentation === "string"
+        ? { presentation: body.tlsn_presentation as string }
+        : (body.tlsn_attestation as TlsnAttestation | undefined),
     };
     const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404

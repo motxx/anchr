@@ -77,12 +77,14 @@ export interface TlsnRequirement {
 }
 
 export interface TlsnAttestation {
-  attestation_doc: string;
+  /** Base64-encoded TLSNotary presentation file. */
+  presentation: string;
+}
+
+export interface TlsnVerifiedData {
   server_name: string;
-  request_url: string;
   revealed_body: string;
-  revealed_headers?: Record<string, string>;
-  notary_pubkey: string;
+  revealed_headers?: string;
   session_timestamp: number;
 }
 
@@ -114,10 +116,13 @@ export interface QueryDetail extends QuerySummary {
     attachments: AttachmentRef[];
     notes?: string;
     tlsn_attestation?: TlsnAttestation;
+    tlsn_verified?: TlsnVerifiedData;
   };
   verification?: VerificationDetail;
   payment_status: PaymentStatus;
   blossom_keys: BlossomKeyMap | null;
+  tlsn_verifier_url?: string | null;
+  tlsn_proxy_url?: string | null;
 }
 
 export interface UploadResponse {

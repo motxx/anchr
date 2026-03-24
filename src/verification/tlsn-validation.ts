@@ -1,49 +1,54 @@
 /**
- * TLSNotary attestation validation.
+ * TLSNotary presentation verification.
  *
- * In production, delegates cryptographic verification to a `tlsn-verifier` sidecar binary.
- * When the binary is not available, performs structural validation (notary trust, freshness,
- * domain matching, condition evaluation) — crypto verification is deferred.
+ * Delegates cryptographic verification to the `tlsn-verifier` sidecar binary.
+ * All verified data (server_name, revealed_body, timestamp) comes from the
+ * cryptographic proof — never from worker self-reports.
+ *
+ * When the binary is not available, verification FAILS (no fake structural fallback).
  */
 
 import { mkdtemp, rm } from "node:fs/promises";
+import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement } from "../types";
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../types";
 
 export interface TlsnValidationResult {
   available: boolean;
   signatureValid: boolean;
-  notaryTrusted: boolean;
   serverIdentityValid: boolean;
   conditionResults: Array<{ condition: TlsnCondition; passed: boolean; actual_value?: string }>;
   attestationFresh: boolean;
+  /** Verified data extracted from the presentation (null if verification failed). */
+  verifiedData?: TlsnVerifiedData;
   checks: string[];
   failures: string[];
 }
 
 let tlsnVerifierPath: string | null | undefined;
 
+/** Allow tests to override the verifier path. */
+export function _setVerifierPathForTest(path: string | null): void {
+  tlsnVerifierPath = path;
+}
+
 function findTlsnVerifier(): string | null {
   if (tlsnVerifierPath !== undefined) return tlsnVerifierPath;
 
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
-    join(import.meta.dir, "../../.local/bin/tlsn-verifier"),
     join(import.meta.dir, "../../crates/tlsn-verifier/target/release/tlsn-verifier"),
     join(import.meta.dir, "../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
   ];
   for (const p of localPaths) {
-    if (Bun.which(p) || (typeof Bun.file === "function" && Bun.file(p).size > 0)) {
-      try {
-        const stat = require("node:fs").statSync(p);
-        if (stat.isFile()) {
-          tlsnVerifierPath = p;
-          console.error(`[tlsn] Found tlsn-verifier at ${p}`);
-          return tlsnVerifierPath;
-        }
-      } catch { /* not found */ }
-    }
+    try {
+      if (statSync(p).isFile()) {
+        tlsnVerifierPath = p;
+        console.error(`[tlsn] Found tlsn-verifier at ${p}`);
+        return tlsnVerifierPath;
+      }
+    } catch { /* not found */ }
   }
 
   // Fall back to PATH
@@ -61,9 +66,6 @@ export function isTlsnVerifierAvailable(): boolean {
 /** Default max attestation age: 5 minutes. */
 const DEFAULT_MAX_AGE_SECONDS = 300;
 
-/**
- * Extract the hostname from a URL string.
- */
 function extractHostname(url: string): string | null {
   try {
     return new URL(url).hostname;
@@ -90,18 +92,14 @@ export function evaluateCondition(
       return { passed: match !== null, actual_value: match?.[0] };
     }
     case "jsonpath": {
-      // Simple dot-notation path evaluation (no external deps)
       try {
         const obj = JSON.parse(body);
         const value = resolveDotPath(obj, condition.expression);
-        if (value === undefined) {
-          return { passed: false };
-        }
+        if (value === undefined) return { passed: false };
         const actual = String(value);
         if (condition.expected !== undefined) {
           return { passed: actual === condition.expected, actual_value: actual };
         }
-        // No expected value — just check existence
         return { passed: true, actual_value: actual };
       } catch {
         return { passed: false, actual_value: "invalid JSON" };
@@ -112,10 +110,6 @@ export function evaluateCondition(
   }
 }
 
-/**
- * Resolve a dot-notation path against an object.
- * E.g. "bitcoin.usd" on { bitcoin: { usd: 42000 } } → 42000
- */
 function resolveDotPath(obj: unknown, path: string): unknown {
   const parts = path.split(".");
   let current: unknown = obj;
@@ -129,7 +123,6 @@ function resolveDotPath(obj: unknown, path: string): unknown {
 export async function validateTlsn(
   attestation: TlsnAttestation,
   requirement: TlsnRequirement,
-  trustedNotaryPubkeys: string[],
 ): Promise<TlsnValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
@@ -137,67 +130,67 @@ export async function validateTlsn(
 
   const verifierPath = findTlsnVerifier();
 
-  let signatureValid = false;
-  let notaryTrusted = false;
-  let serverIdentityValid = false;
-
-  // --- Cryptographic verification via sidecar binary ---
-  // When the binary is available, it provides cryptographically verified server_name
-  // and revealed_body that override the self-reported values from the attestation.
-  let verifiedBody = attestation.revealed_body;
-  let verifiedServerName = attestation.server_name;
-
-  if (verifierPath) {
-    const cryptoResult = await runVerifierBinary(verifierPath, attestation);
-    signatureValid = cryptoResult.signatureValid;
-    if (signatureValid) {
-      checks.push("TLSNotary: presentation signature valid (cryptographically verified)");
-      // Use cryptographically verified values instead of self-reported ones
-      if (cryptoResult.verifiedServerName) {
-        verifiedServerName = cryptoResult.verifiedServerName;
-      }
-      if (cryptoResult.verifiedBody) {
-        verifiedBody = cryptoResult.verifiedBody;
-      }
-    } else {
-      failures.push(`TLSNotary: presentation signature invalid — ${cryptoResult.error ?? "verification failed"}`);
-    }
-  } else {
-    checks.push("TLSNotary: tlsn-verifier not available — crypto verification deferred");
+  // --- Binary required ---
+  if (!verifierPath) {
+    failures.push("TLSNotary: tlsn-verifier binary not available — cannot verify presentation");
+    return {
+      available: false,
+      signatureValid: false,
+      serverIdentityValid: false,
+      conditionResults: [],
+      attestationFresh: false,
+      checks,
+      failures,
+    };
   }
 
-  // --- Notary trust check ---
-  if (trustedNotaryPubkeys.length === 0) {
-    checks.push("TLSNotary: no trusted notary pubkeys configured — trust check skipped");
-    notaryTrusted = true;
-  } else if (trustedNotaryPubkeys.includes(attestation.notary_pubkey)) {
-    checks.push("TLSNotary: notary pubkey is trusted");
-    notaryTrusted = true;
-  } else {
-    failures.push("TLSNotary: notary pubkey not in trusted set");
+  // --- Cryptographic verification ---
+  const cryptoResult = await runVerifierBinary(verifierPath, attestation);
+  if (!cryptoResult.signatureValid) {
+    failures.push(`TLSNotary: presentation signature invalid — ${cryptoResult.error ?? "verification failed"}`);
+    return {
+      available: true,
+      signatureValid: false,
+      serverIdentityValid: false,
+      conditionResults: [],
+      attestationFresh: false,
+      checks,
+      failures,
+    };
   }
+
+  checks.push("TLSNotary: presentation signature valid (cryptographically verified)");
+
+  const verifiedServerName = cryptoResult.verifiedServerName;
+  const verifiedBody = cryptoResult.verifiedBody ?? "";
+  const verifiedTime = cryptoResult.verifiedTime; // unix seconds
 
   // --- Server identity / domain matching ---
-  // Use cryptographically verified server name when available
+  let serverIdentityValid = false;
   const expectedHostname = extractHostname(requirement.target_url);
   if (expectedHostname && verifiedServerName === expectedHostname) {
     checks.push(`TLSNotary: server name matches target (${expectedHostname})`);
     serverIdentityValid = true;
   } else if (expectedHostname) {
-    failures.push(`TLSNotary: server name "${verifiedServerName}" does not match target "${expectedHostname}"`);
+    failures.push(`TLSNotary: server name "${verifiedServerName ?? "unknown"}" does not match target "${expectedHostname}"`);
   }
 
-  // --- Freshness check ---
-  const ageMs = Date.now() - attestation.session_timestamp;
-  const attestationFresh = ageMs >= 0 && ageMs < maxAgeSeconds * 1000;
-  if (attestationFresh) {
-    checks.push(`TLSNotary: attestation fresh (${Math.round(ageMs / 1000)}s old, max ${maxAgeSeconds}s)`);
+  // --- Freshness check (using verified timestamp from the proof) ---
+  let attestationFresh = false;
+  if (verifiedTime != null) {
+    const ageMs = Date.now() - verifiedTime * 1000;
+    attestationFresh = ageMs >= 0 && ageMs < maxAgeSeconds * 1000;
+    if (attestationFresh) {
+      checks.push(`TLSNotary: attestation fresh (${Math.round(ageMs / 1000)}s old, max ${maxAgeSeconds}s)`);
+    } else {
+      failures.push(`TLSNotary: attestation too old (${Math.round(ageMs / 1000)}s, max ${maxAgeSeconds}s)`);
+    }
   } else {
-    failures.push(`TLSNotary: attestation too old (${Math.round(ageMs / 1000)}s, max ${maxAgeSeconds}s)`);
+    checks.push("TLSNotary: no timestamp in proof — freshness check skipped");
+    attestationFresh = true; // no timestamp to check
   }
 
-  // --- Condition evaluation ---
-  // Use cryptographically verified body when available
+  // --- Condition evaluation (using cryptographically verified body) ---
   const conditionResults: TlsnValidationResult["conditionResults"] = [];
   if (requirement.conditions) {
     for (const condition of requirement.conditions) {
@@ -213,12 +206,17 @@ export async function validateTlsn(
   }
 
   return {
-    available: verifierPath !== null,
-    signatureValid,
-    notaryTrusted,
+    available: true,
+    signatureValid: true,
     serverIdentityValid,
     conditionResults,
     attestationFresh,
+    verifiedData: {
+      server_name: verifiedServerName ?? "",
+      revealed_body: verifiedBody,
+      revealed_headers: cryptoResult.verifiedHeaders,
+      session_timestamp: verifiedTime ?? 0,
+    },
     checks,
     failures,
   };
@@ -228,11 +226,9 @@ export async function validateTlsn(
 
 interface VerifierBinaryResult {
   signatureValid: boolean;
-  /** Server name extracted from the cryptographic proof (if available). */
   verifiedServerName?: string;
-  /** HTTP response body extracted from the revealed transcript. */
   verifiedBody?: string;
-  /** Session timestamp from the proof (unix seconds). */
+  verifiedHeaders?: string;
   verifiedTime?: number;
   error?: string;
 }
@@ -245,8 +241,7 @@ async function runVerifierBinary(
   const presentationPath = join(tempDir, "presentation.tlsn");
 
   try {
-    // Write base64-decoded presentation to temp file
-    const presentationData = Buffer.from(attestation.attestation_doc, "base64");
+    const presentationData = Buffer.from(attestation.presentation, "base64");
     await Bun.write(presentationPath, presentationData);
 
     const proc = Bun.spawn([verifierPath, "verify", presentationPath], {
@@ -266,6 +261,7 @@ async function runVerifierBinary(
         valid?: boolean;
         server_name?: string;
         revealed_body?: string;
+        revealed_headers?: string;
         time?: number;
         error?: string;
       };
@@ -273,6 +269,7 @@ async function runVerifierBinary(
         signatureValid: result.valid === true,
         verifiedServerName: result.server_name ?? undefined,
         verifiedBody: result.revealed_body ?? undefined,
+        verifiedHeaders: result.revealed_headers ?? undefined,
         verifiedTime: result.time ?? undefined,
         error: result.error ?? undefined,
       };

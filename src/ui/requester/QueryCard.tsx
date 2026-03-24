@@ -4,7 +4,6 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Code2,
   Globe,
   ImageIcon,
   Loader2,
@@ -66,13 +65,10 @@ interface TlsnRequirement {
   conditions?: TlsnCondition[];
 }
 
-interface TlsnAttestation {
-  attestation_doc: string;
+interface TlsnVerifiedData {
   server_name: string;
-  request_url: string;
   revealed_body: string;
-  revealed_headers?: Record<string, string>;
-  notary_pubkey: string;
+  revealed_headers?: string;
   session_timestamp: number;
 }
 
@@ -83,12 +79,12 @@ interface QueryDetail extends QuerySummary {
   result?: {
     attachments: AttachmentInfo[];
     notes?: string;
-    tlsn_attestation?: TlsnAttestation;
   };
   verification?: {
     passed: boolean;
     checks: string[];
     failures: string[];
+    tlsn_verified?: TlsnVerifiedData;
   };
   blossom_keys?: Record<string, BlossomKeyMaterial> | null;
   tlsn_requirements?: TlsnRequirement | null;
@@ -236,39 +232,35 @@ function StatusIcon({ status }: { status: string }) {
 // --- TLSNotary Proof Panel ---
 
 function TlsnProofPanel({
-  attestation,
+  verified,
   requirement,
 }: {
-  attestation: TlsnAttestation;
+  verified: TlsnVerifiedData;
   requirement?: TlsnRequirement | null;
 }) {
   const [showBody, setShowBody] = useState(false);
-  const [showRaw, setShowRaw] = useState(false);
 
   let bodyDisplay: string;
   let isJson = false;
   try {
-    bodyDisplay = JSON.stringify(JSON.parse(attestation.revealed_body), null, 2);
+    bodyDisplay = JSON.stringify(JSON.parse(verified.revealed_body), null, 2);
     isJson = true;
   } catch {
-    bodyDisplay = attestation.revealed_body;
+    bodyDisplay = verified.revealed_body;
   }
 
-  const ts = new Date(attestation.session_timestamp).toLocaleString();
+  const ts = new Date(verified.session_timestamp * 1000).toLocaleString();
 
   return (
     <div className="rounded-lg border bg-card px-3 py-3 space-y-3">
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
-        <Lock className="w-3 h-3" /> TLSNotary Proof
+        <Lock className="w-3 h-3" /> TLSNotary Proof (cryptographically verified)
       </p>
 
-      {/* Server & URL */}
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <Globe className="w-3.5 h-3.5 text-emerald-500" />
-          <span className="text-sm font-medium text-foreground">{attestation.server_name}</span>
-        </div>
-        <p className="text-xs text-muted-foreground truncate ml-5">{attestation.request_url}</p>
+      {/* Server */}
+      <div className="flex items-center gap-1.5">
+        <Globe className="w-3.5 h-3.5 text-emerald-500" />
+        <span className="text-sm font-medium text-foreground">{verified.server_name}</span>
       </div>
 
       {/* Conditions */}
@@ -304,27 +296,8 @@ function TlsnProofPanel({
         </pre>
       )}
 
-      {/* Metadata */}
-      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-muted-foreground">
-        <span>{ts}</span>
-        <span className="truncate max-w-48">Notary: {attestation.notary_pubkey}</span>
-      </div>
-
-      {/* Raw attestation data (collapsible) */}
-      <button
-        type="button"
-        className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-        onClick={() => setShowRaw((v) => !v)}
-      >
-        {showRaw ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <Code2 className="w-3 h-3" />
-        <span>Raw attestation data</span>
-      </button>
-      {showRaw && (
-        <pre className="bg-black/60 rounded-md p-3 text-[10px] text-gray-400 font-mono overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">
-          {JSON.stringify(attestation, null, 2)}
-        </pre>
-      )}
+      {/* Timestamp */}
+      <span className="text-[10px] text-muted-foreground">{ts}</span>
     </div>
   );
 }
@@ -456,10 +429,10 @@ export function QueryCard({ query }: { query: QuerySummary }) {
             </div>
           )}
 
-          {/* TLSNotary Proof */}
-          {detail?.result?.tlsn_attestation && (
+          {/* TLSNotary Proof (from cryptographically verified data) */}
+          {detail?.verification?.tlsn_verified && (
             <TlsnProofPanel
-              attestation={detail.result.tlsn_attestation}
+              verified={detail.verification.tlsn_verified}
               requirement={detail.tlsn_requirements}
             />
           )}
