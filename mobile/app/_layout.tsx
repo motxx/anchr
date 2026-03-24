@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { useSettingsStore } from "../src/store/settings";
 import { useWalletStore } from "../src/store/wallet";
 import "../global.css";
@@ -35,6 +36,7 @@ export default function RootLayout() {
   }
 
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <StatusBar style="light" />
       <Stack
@@ -56,5 +58,6 @@ export default function RootLayout() {
         />
       </Stack>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
