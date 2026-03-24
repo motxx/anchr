@@ -13,6 +13,8 @@ primary_region = "nrt"
   NOSTR_RELAYS = "wss://anchr-relay.fly.dev"
   BLOSSOM_SERVERS = "https://anchr-blossom.fly.dev"
   CASHU_MINT_URL = "https://testnut.cashu.space"
+  TLSN_VERIFIER_URL = "https://anchr-tlsn-verifier.fly.dev"
+  TLSN_PROXY_URL = "wss://anchr-tlsn-verifier.fly.dev/proxy"
 
 [[mounts]]
   source = "data"
