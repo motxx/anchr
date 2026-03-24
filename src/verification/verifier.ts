@@ -2,7 +2,9 @@ import { checkAttachmentContent } from "./ai-content-check";
 import { validateC2pa } from "./c2pa-validation";
 import { haversineKm } from "./exif-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
+import { validateTlsn } from "./tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
+import { getRuntimeConfig } from "../config";
 import type {
   AttachmentRef,
   BlossomKeyMap,
@@ -32,14 +34,16 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
   const attachments = result.attachments ?? [];
 
   // --- Fix 1: Reject empty submissions when evidence is required ---
+  // TLSNotary queries don't require photo attachments
+  const hasTlsn = query.verification_requirements.includes("tlsn");
   if (attachments.length === 0) {
     const requiresEvidence =
       query.verification_requirements.includes("nonce") ||
       query.verification_requirements.includes("gps");
 
-    if (requiresEvidence) {
+    if (requiresEvidence && !hasTlsn) {
       failures.push("no media evidence provided — photos are required when GPS or nonce verification is enabled");
-    } else {
+    } else if (!hasTlsn) {
       checks.push("no media evidence provided (weak verification)");
     }
   }
@@ -54,6 +58,23 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
     }
   } else if (!result.gps && query.expected_gps && query.verification_requirements.includes("gps")) {
     failures.push("GPS coordinates missing from submission body — required by verification policy");
+  }
+
+  // --- TLSNotary verification ---
+  if (hasTlsn) {
+    if (!result.tlsn_attestation) {
+      failures.push("TLSNotary: no attestation provided");
+    } else if (!query.tlsn_requirements) {
+      failures.push("TLSNotary: query missing tlsn_requirements");
+    } else {
+      const tlsnResult = await validateTlsn(
+        result.tlsn_attestation,
+        query.tlsn_requirements,
+        getRuntimeConfig().trustedNotaryPubkeys,
+      );
+      checks.push(...tlsnResult.checks);
+      failures.push(...tlsnResult.failures);
+    }
   }
 
   if (attachments.length > 0) {

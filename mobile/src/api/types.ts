@@ -60,7 +60,31 @@ export interface VerificationDetail {
   failures: string[];
 }
 
-export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check";
+export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check" | "tlsn";
+
+export interface TlsnCondition {
+  type: "contains" | "regex" | "jsonpath";
+  expression: string;
+  expected?: string;
+  description?: string;
+}
+
+export interface TlsnRequirement {
+  target_url: string;
+  method?: "GET" | "POST";
+  conditions?: TlsnCondition[];
+  max_attestation_age_seconds?: number;
+}
+
+export interface TlsnAttestation {
+  attestation_doc: string;
+  server_name: string;
+  request_url: string;
+  revealed_body: string;
+  revealed_headers?: Record<string, string>;
+  notary_pubkey: string;
+  session_timestamp: number;
+}
 
 /** Shape returned by GET /queries (querySummary presenter) */
 export interface QuerySummary {
@@ -78,6 +102,7 @@ export interface QuerySummary {
   htlc: HtlcSummary | null;
   quotes_count: number;
   expected_gps: GpsCoord | null;
+  tlsn_requirements: TlsnRequirement | null;
 }
 
 /** Shape returned by GET /queries/:id (queryDetail presenter) */
@@ -88,6 +113,7 @@ export interface QueryDetail extends QuerySummary {
   result?: {
     attachments: AttachmentRef[];
     notes?: string;
+    tlsn_attestation?: TlsnAttestation;
   };
   verification?: VerificationDetail;
   payment_status: PaymentStatus;

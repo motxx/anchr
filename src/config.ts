@@ -37,6 +37,10 @@ export interface RuntimeConfig {
   remoteQueryApiKey?: string;
   /** Trusted Oracle pubkeys for Worker whitelist (from TRUSTED_ORACLE_PUBKEYS env). */
   trustedOraclePubkeys: string[];
+  /** Trusted TLSNotary notary public keys (hex). */
+  trustedNotaryPubkeys: string[];
+  /** Default TLSNotary notary URL. */
+  defaultNotaryUrl?: string;
 }
 
 export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
@@ -52,5 +56,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     remoteQueryApiBaseUrl: process.env.REMOTE_QUERY_API_BASE_URL?.trim() || undefined,
     remoteQueryApiKey: process.env.REMOTE_QUERY_API_KEY?.trim() || undefined,
     trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
+    trustedNotaryPubkeys: readStringListEnv("TRUSTED_NOTARY_PUBKEYS"),
+    defaultNotaryUrl: process.env.DEFAULT_NOTARY_URL?.trim() || undefined,
   };
 }

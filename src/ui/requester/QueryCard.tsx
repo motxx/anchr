@@ -4,8 +4,11 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Code2,
+  Globe,
   ImageIcon,
   Loader2,
+  Lock,
   XCircle,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -50,6 +53,29 @@ interface AttachmentInfo {
   storage_kind?: string;
 }
 
+interface TlsnCondition {
+  type: string;
+  expression: string;
+  expected?: string;
+  description?: string;
+}
+
+interface TlsnRequirement {
+  target_url: string;
+  method?: string;
+  conditions?: TlsnCondition[];
+}
+
+interface TlsnAttestation {
+  attestation_doc: string;
+  server_name: string;
+  request_url: string;
+  revealed_body: string;
+  revealed_headers?: Record<string, string>;
+  notary_pubkey: string;
+  session_timestamp: number;
+}
+
 interface QueryDetail extends QuerySummary {
   created_at: number;
   submitted_at?: number;
@@ -57,6 +83,7 @@ interface QueryDetail extends QuerySummary {
   result?: {
     attachments: AttachmentInfo[];
     notes?: string;
+    tlsn_attestation?: TlsnAttestation;
   };
   verification?: {
     passed: boolean;
@@ -64,6 +91,7 @@ interface QueryDetail extends QuerySummary {
     failures: string[];
   };
   blossom_keys?: Record<string, BlossomKeyMaterial> | null;
+  tlsn_requirements?: TlsnRequirement | null;
 }
 
 // --- AES-256-GCM decryption (Web Crypto API) ---
@@ -205,6 +233,102 @@ function StatusIcon({ status }: { status: string }) {
   }
 }
 
+// --- TLSNotary Proof Panel ---
+
+function TlsnProofPanel({
+  attestation,
+  requirement,
+}: {
+  attestation: TlsnAttestation;
+  requirement?: TlsnRequirement | null;
+}) {
+  const [showBody, setShowBody] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
+
+  let bodyDisplay: string;
+  let isJson = false;
+  try {
+    bodyDisplay = JSON.stringify(JSON.parse(attestation.revealed_body), null, 2);
+    isJson = true;
+  } catch {
+    bodyDisplay = attestation.revealed_body;
+  }
+
+  const ts = new Date(attestation.session_timestamp).toLocaleString();
+
+  return (
+    <div className="rounded-lg border bg-card px-3 py-3 space-y-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
+        <Lock className="w-3 h-3" /> TLSNotary Proof
+      </p>
+
+      {/* Server & URL */}
+      <div className="space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <Globe className="w-3.5 h-3.5 text-emerald-500" />
+          <span className="text-sm font-medium text-foreground">{attestation.server_name}</span>
+        </div>
+        <p className="text-xs text-muted-foreground truncate ml-5">{attestation.request_url}</p>
+      </div>
+
+      {/* Conditions */}
+      {requirement?.conditions && requirement.conditions.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Conditions</p>
+          {requirement.conditions.map((cond, i) => (
+            <div key={i} className="flex items-start gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
+              <span className="text-xs text-muted-foreground">
+                {cond.description ?? `${cond.type}: ${cond.expression}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Server Response (collapsible) */}
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => setShowBody((v) => !v)}
+      >
+        {showBody ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        <span className="font-medium">Server Response</span>
+        {isJson && (
+          <span className="bg-blue-500/20 text-blue-400 text-[9px] font-medium rounded px-1.5 py-0.5">JSON</span>
+        )}
+      </button>
+      {showBody && (
+        <pre className="bg-black/60 rounded-md p-3 text-xs text-emerald-300 font-mono overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">
+          {bodyDisplay}
+        </pre>
+      )}
+
+      {/* Metadata */}
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[10px] text-muted-foreground">
+        <span>{ts}</span>
+        <span className="truncate max-w-48">Notary: {attestation.notary_pubkey}</span>
+      </div>
+
+      {/* Raw attestation data (collapsible) */}
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+        onClick={() => setShowRaw((v) => !v)}
+      >
+        {showRaw ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <Code2 className="w-3 h-3" />
+        <span>Raw attestation data</span>
+      </button>
+      {showRaw && (
+        <pre className="bg-black/60 rounded-md p-3 text-[10px] text-gray-400 font-mono overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">
+          {JSON.stringify(attestation, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 // --- QueryCard ---
 
 export function QueryCard({ query }: { query: QuerySummary }) {
@@ -330,6 +454,14 @@ export function QueryCard({ query }: { query: QuerySummary }) {
                 </ul>
               )}
             </div>
+          )}
+
+          {/* TLSNotary Proof */}
+          {detail?.result?.tlsn_attestation && (
+            <TlsnProofPanel
+              attestation={detail.result.tlsn_attestation}
+              requirement={detail.tlsn_requirements}
+            />
           )}
 
           {/* Decrypted attachments */}

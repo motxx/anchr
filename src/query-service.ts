@@ -189,6 +189,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         nostr_event_id: options?.nostrEventId,
         expected_gps: input.expected_gps,
         max_gps_distance_km: input.max_gps_distance_km,
+        tlsn_requirements: input.tlsn_requirements,
       };
 
       store.set(query.id, query);

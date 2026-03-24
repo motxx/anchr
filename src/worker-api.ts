@@ -28,7 +28,7 @@ import {
   type QueryService,
 } from "./query-service";
 import { VERIFICATION_FACTORS } from "./types";
-import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo } from "./types";
+import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo, TlsnAttestation } from "./types";
 import { haversineKm } from "./verification/exif-validation";
 
 export interface WorkerApiDeps {
@@ -68,6 +68,20 @@ const verificationRequirementsSchema = z.array(
   z.enum(VERIFICATION_FACTORS),
 ).optional();
 
+const tlsnConditionSchema = z.object({
+  type: z.enum(["contains", "regex", "jsonpath"]),
+  expression: z.string().min(1),
+  expected: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const tlsnRequirementSchema = z.object({
+  target_url: z.string().url(),
+  method: z.enum(["GET", "POST"]).optional(),
+  conditions: z.array(tlsnConditionSchema).optional(),
+  max_attestation_age_seconds: z.number().int().min(60).max(86400).optional(),
+});
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
@@ -79,6 +93,7 @@ const createQuerySchema = z.object({
   oracle_ids: oracleIdsSchema,
   htlc: htlcSchema,
   verification_requirements: verificationRequirementsSchema,
+  tlsn_requirements: tlsnRequirementSchema.optional(),
 });
 
 // --- Auth Middleware ---
@@ -141,6 +156,7 @@ function querySummary(query: Query) {
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
     max_gps_distance_km: query.max_gps_distance_km ?? null,
+    tlsn_requirements: query.tlsn_requirements ?? null,
   };
 }
 
@@ -300,6 +316,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         expected_gps: payload.expected_gps,
         max_gps_distance_km: payload.max_gps_distance_km,
         verification_requirements: payload.verification_requirements,
+        tlsn_requirements: payload.tlsn_requirements,
       };
 
       const query = doCreateQuery(input, {
@@ -415,6 +432,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
       gps: bodyGps && typeof bodyGps.lat === "number" && typeof bodyGps.lon === "number" ? bodyGps : undefined,
+      tlsn_attestation: body.tlsn_attestation as TlsnAttestation | undefined,
     };
     const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404
