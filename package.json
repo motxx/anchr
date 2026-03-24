@@ -26,7 +26,8 @@
     "@tailwindcss/cli": "^4.2.1",
     "@types/bun": "latest",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "puppeteer": "^24.40.0"
   },
   "peerDependencies": {
     "typescript": "^5"
