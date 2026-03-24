@@ -424,5 +424,8 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Re-export worker
+export { AnchrWorker, type AnchrWorkerConfig, type FulfilledEvent } from "./worker";
+
 // Default export
 export default Anchr;
