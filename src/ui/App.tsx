@@ -7,6 +7,8 @@ import {
   Clock,
   Globe,
   Camera,
+  ExternalLink,
+  FileUp,
   Loader2,
   Lock,
   RefreshCw,
@@ -105,19 +107,45 @@ function QueryTypeBadge({ query }: { query: Query }) {
   );
 }
 
-// ---- TLSNotary info panel ----
+// ---- TLSNotary Worker panel ----
 
-function TlsnInfoPanel({ query }: { query: Query }) {
+function TlsnWorkerPanel({
+  query,
+  onSubmit,
+  isPending,
+}: {
+  query: Query;
+  onSubmit: (data: Record<string, unknown>) => void;
+  isPending: boolean;
+}) {
   const req = query.tlsn_requirements;
-  const isPending = query.status === "pending";
-  const isProcessing = query.status === "processing" || query.status === "verifying";
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmitPresentation() {
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+
+    setSubmitting(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      onSubmit({ tlsn_presentation: base64 });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const busy = isPending || submitting;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Target info */}
       <div className="flex items-center gap-2">
         <Globe className="w-4 h-4 text-blue-400" />
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Web Proof — Auto-Worker
+          TLSNotary Web Proof
         </span>
       </div>
 
@@ -135,22 +163,68 @@ function TlsnInfoPanel({ query }: { query: Query }) {
         </div>
       )}
 
-      {isPending && (
-        <div className="flex items-center gap-2">
-          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
-          <span className="text-sm text-blue-400">Waiting for Auto-Worker to pick up...</span>
-        </div>
-      )}
-      {isProcessing && (
-        <div className="flex items-center gap-2">
-          <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-          <span className="text-sm text-amber-400">Running MPC-TLS proof...</span>
-        </div>
-      )}
+      {/* How to generate proof */}
+      <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-2.5 space-y-2">
+        <p className="text-xs font-medium text-blue-400 flex items-center gap-1.5">
+          <ExternalLink className="w-3 h-3" />
+          How to generate the proof
+        </p>
+        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
+          <li>Open the TLSNotary browser extension</li>
+          <li>Configure the target URL and verifier server</li>
+          <li>Run the plugin — MPC-TLS generates a cryptographic presentation</li>
+          <li>Upload the <code className="text-blue-400">.presentation.tlsn</code> file below</li>
+        </ol>
+      </div>
 
-      <p className="text-[11px] text-muted-foreground">
-        TLSNotary queries are automatically fulfilled by the Auto-Worker daemon via MPC-TLS.
-      </p>
+      {/* Upload presentation file */}
+      <div className="space-y-1.5">
+        <FieldLabel required>Presentation file (.presentation.tlsn)</FieldLabel>
+        <label
+          className={cn(
+            "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors py-6",
+            fileName
+              ? "border-blue-800 bg-blue-950/20"
+              : "border-border hover:border-blue-800/50 bg-muted/20 hover:bg-muted/40"
+          )}
+        >
+          {fileName ? (
+            <div className="flex items-center gap-2 text-blue-400">
+              <FileUp className="w-5 h-5" />
+              <span className="text-sm font-medium">{fileName}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <FileUp className="w-6 h-6" />
+              <span className="text-sm">Click to select presentation file</span>
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".tlsn,.bin,application/octet-stream"
+            className="sr-only"
+            onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          />
+        </label>
+        {fileName && (
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => { setFileName(null); if (fileRef.current) fileRef.current.value = ""; }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+
+      <Button className="w-full" disabled={busy || !fileName} onClick={handleSubmitPresentation}>
+        {busy ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+        ) : (
+          "Submit Presentation →"
+        )}
+      </Button>
     </div>
   );
 }
@@ -363,10 +437,10 @@ function QueryCard({ query }: { query: Query }) {
             </div>
           )}
 
-          {/* TLSNotary info or photo submit form */}
-          {tlsn ? (
-            <TlsnInfoPanel query={query} />
-          ) : !submitted ? (
+          {/* TLSNotary worker panel or photo submit form */}
+          {tlsn && !submitted ? (
+            <TlsnWorkerPanel query={query} onSubmit={mut.mutate} isPending={mut.isPending} />
+          ) : !tlsn && !submitted ? (
             <div className="pt-1">
               <SubmitForm query={query} onSubmit={mut.mutate} isPending={mut.isPending} />
             </div>
