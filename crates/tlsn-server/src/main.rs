@@ -355,31 +355,51 @@ async fn handle_proxy_ws_raw(
         }
     };
 
-    // Use WsStream for the proxy too (converts WS messages to byte stream)
-    let ws_stream = ws_stream_tungstenite::WsStream::new(ws);
+    // Message-based relay (same approach as official tlsn-extension verifier)
+    // WS Binary messages <-> raw TCP bytes
+    let (mut ws_sink, mut ws_stream) = ws.split();
+    let (mut tcp_read, mut tcp_write) = tokio::io::split(tcp);
 
-    // Bidirectional relay: WsStream <-> TCP
-    let (mut ws_read, mut ws_write) = futures::AsyncReadExt::split(ws_stream);
-    let (tcp_read, tcp_write) = tcp.into_split();
-    let mut tcp_read = tokio_util::compat::TokioAsyncReadCompatExt::compat(tcp_read);
-    let mut tcp_write = tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(tcp_write);
-
-    let host_log1 = host.clone();
-    let host_log2 = host.clone();
+    let host1 = host.clone();
     let ws_to_tcp = tokio::spawn(async move {
-        match futures::io::copy(&mut ws_read, &mut tcp_write).await {
-            Ok(n) => eprintln!("[proxy] WS→TCP {} bytes for {}", n, host_log1),
-            Err(e) => eprintln!("[proxy] WS→TCP error for {}: {}", host_log1, e),
+        let mut total = 0u64;
+        while let Some(Ok(msg)) = ws_stream.next().await {
+            match msg {
+                async_tungstenite::tungstenite::Message::Binary(data) => {
+                    total += data.len() as u64;
+                    if tcp_write.write_all(&data).await.is_err() { break; }
+                }
+                async_tungstenite::tungstenite::Message::Close(_) => break,
+                _ => {}
+            }
         }
-        let _ = futures::AsyncWriteExt::close(&mut tcp_write).await;
+        eprintln!("[proxy] WS→TCP {} bytes for {}", total, host1);
+        let _ = tcp_write.shutdown().await;
     });
 
+    let host2 = host.clone();
     let tcp_to_ws = tokio::spawn(async move {
-        match futures::io::copy(&mut tcp_read, &mut ws_write).await {
-            Ok(n) => eprintln!("[proxy] TCP→WS {} bytes for {}", n, host_log2),
-            Err(e) => eprintln!("[proxy] TCP→WS error for {}: {}", host_log2, e),
+        let mut buf = vec![0u8; 8192];
+        let mut total = 0u64;
+        loop {
+            match tcp_read.read(&mut buf).await {
+                Ok(0) => {
+                    let _ = ws_sink.send(async_tungstenite::tungstenite::Message::Close(None)).await;
+                    break;
+                }
+                Ok(n) => {
+                    total += n as u64;
+                    if ws_sink.send(async_tungstenite::tungstenite::Message::Binary(buf[..n].to_vec())).await.is_err() {
+                        break;
+                    }
+                }
+                Err(_) => {
+                    let _ = ws_sink.send(async_tungstenite::tungstenite::Message::Close(None)).await;
+                    break;
+                }
+            }
         }
-        let _ = futures::AsyncWriteExt::close(&mut ws_write).await;
+        eprintln!("[proxy] TCP→WS {} bytes for {}", total, host2);
     });
 
     let _ = tokio::join!(ws_to_tcp, tcp_to_ws);
