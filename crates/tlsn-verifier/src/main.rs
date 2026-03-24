@@ -78,8 +78,12 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
     };
 
     // Extract HTTP response body from revealed_recv (after \r\n\r\n)
+    // Handle chunked Transfer-Encoding by stripping chunk framing
     let revealed_body = revealed_recv.as_ref().and_then(|recv| {
-        recv.find("\r\n\r\n").map(|idx| recv[idx + 4..].to_string())
+        recv.find("\r\n\r\n").map(|idx| {
+            let raw_body = &recv[idx + 4..];
+            decode_chunked_body(raw_body).unwrap_or_else(|| raw_body.to_string())
+        })
     });
 
     // Extract HTTP response headers
@@ -87,6 +91,7 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
         recv.find("\r\n\r\n").map(|idx| recv[..idx].to_string())
     });
 
+    // Also strip chunked framing from revealed_headers if present
     Ok(json!({
         "valid": true,
         "server_name": server_name_str,
@@ -97,4 +102,39 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
         "revealed_recv": revealed_recv,
         "error": null,
     }))
+}
+
+/// Decode HTTP chunked transfer encoding.
+/// Input: "19\r\n{...json...}\r\n0\r\n\r\n"
+/// Output: "{...json...}"
+fn decode_chunked_body(raw: &str) -> Option<String> {
+    let mut result = String::new();
+    let mut remaining = raw;
+
+    loop {
+        // Find chunk size line
+        let crlf_pos = remaining.find("\r\n")?;
+        let size_str = remaining[..crlf_pos].trim();
+        let chunk_size = usize::from_str_radix(size_str, 16).ok()?;
+
+        if chunk_size == 0 {
+            break; // final chunk
+        }
+
+        let data_start = crlf_pos + 2;
+        if data_start + chunk_size > remaining.len() {
+            return None; // truncated
+        }
+
+        result.push_str(&remaining[data_start..data_start + chunk_size]);
+
+        // Skip past chunk data + \r\n
+        let next_start = data_start + chunk_size + 2;
+        if next_start > remaining.len() {
+            break;
+        }
+        remaining = &remaining[next_start..];
+    }
+
+    Some(result)
 }
