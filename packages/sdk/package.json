@@ -1,0 +1,14 @@
+{
+  "name": "anchr-sdk",
+  "version": "0.1.0",
+  "description": "AI Agent SDK for Anchr — buy cryptographically verified data with sats",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --target node",
+    "test": "bun test"
+  },
+  "keywords": ["tlsnotary", "oracle", "ai-agent", "cashu", "lightning", "nostr"],
+  "license": "MIT"
+}

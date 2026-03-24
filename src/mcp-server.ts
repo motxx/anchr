@@ -6,6 +6,7 @@ import { isNostrEnabled } from "./nostr/client";
 import { isCashuEnabled } from "./cashu/wallet";
 import type { QueryInput, QueryResult } from "./query-service";
 import type { RequesterMeta } from "./types";
+import { VERIFICATION_FACTORS } from "./types";
 
 function buildRequesterMeta(): RequesterMeta {
   return {
@@ -33,9 +34,10 @@ export async function startMcpServer() {
       location_hint: z.string().optional().describe("Region or location hint (e.g. 'IR', 'CN', '渋谷')"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
       oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
+      verification_requirements: z.array(z.enum(VERIFICATION_FACTORS)).optional().describe("Verification factors to require (e.g. 'gps', 'nonce'). Defaults to ['gps', 'ai_check']."),
     },
-    async ({ description, location_hint, ttl_seconds, oracle_ids }) => {
-      const input: QueryInput = { description, location_hint };
+    async ({ description, location_hint, ttl_seconds, oracle_ids, verification_requirements }) => {
+      const input: QueryInput = { description, location_hint, verification_requirements };
       const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],

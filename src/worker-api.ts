@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
@@ -27,7 +28,9 @@ import {
   type QueryService,
 } from "./query-service";
 import { VERIFICATION_FACTORS } from "./types";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, Query, QuoteInfo } from "./types";
+import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo, TlsnAttestation } from "./types";
+import { getRuntimeConfig as getConfig } from "./config";
+import { haversineKm } from "./verification/exif-validation";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
@@ -66,16 +69,32 @@ const verificationRequirementsSchema = z.array(
   z.enum(VERIFICATION_FACTORS),
 ).optional();
 
+const tlsnConditionSchema = z.object({
+  type: z.enum(["contains", "regex", "jsonpath"]),
+  expression: z.string().min(1),
+  expected: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const tlsnRequirementSchema = z.object({
+  target_url: z.string().url(),
+  method: z.enum(["GET", "POST"]).optional(),
+  conditions: z.array(tlsnConditionSchema).optional(),
+  max_attestation_age_seconds: z.number().int().min(60).max(86400).optional(),
+});
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
   expected_gps: gpsSchema,
+  max_gps_distance_km: z.number().min(0.01).max(1000).optional(),
   ttl_seconds: z.number().int().min(60).max(86_400).optional(),
   requester: requesterMetaSchema.optional(),
   bounty: bountySchema.optional(),
   oracle_ids: oracleIdsSchema,
   htlc: htlcSchema,
   verification_requirements: verificationRequirementsSchema,
+  tlsn_requirements: tlsnRequirementSchema.optional(),
 });
 
 // --- Auth Middleware ---
@@ -137,6 +156,8 @@ function querySummary(query: Query) {
     } : null,
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
+    max_gps_distance_km: query.max_gps_distance_km ?? null,
+    tlsn_requirements: query.tlsn_requirements ?? null,
   };
 }
 
@@ -159,6 +180,8 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
 }
 
 function queryDetail(query: Query, requestUrl: string) {
+  const config = getConfig();
+  const hasTlsn = query.verification_requirements.includes("tlsn");
   return {
     ...querySummary(query),
     created_at: query.created_at,
@@ -169,6 +192,10 @@ function queryDetail(query: Query, requestUrl: string) {
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
     blossom_keys: query.blossom_keys ?? null,
+    ...(hasTlsn && {
+      tlsn_verifier_url: config.tlsnVerifierUrl ?? null,
+      tlsn_proxy_url: config.tlsnProxyUrl ?? null,
+    }),
   };
 }
 
@@ -231,11 +258,40 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   const app = new Hono();
 
+  app.use("*", cors());
+
   app.get("/health", (c) => c.json({ ok: true }));
 
   app.get("/oracles", (c) => c.json(doListOracles()));
 
-  app.get("/queries", (c) => c.json(doListOpen().map(querySummary)));
+  app.get("/queries", (c) => {
+    const latParam = c.req.query("lat");
+    const lonParam = c.req.query("lon");
+    const maxDistParam = c.req.query("max_distance_km");
+
+    let queries = doListOpen();
+
+    // Server-side distance filter: only return queries near the worker's location
+    if (latParam && lonParam) {
+      const workerLat = parseFloat(latParam);
+      const workerLon = parseFloat(lonParam);
+      if (!Number.isFinite(workerLat) || !Number.isFinite(workerLon)) {
+        return c.json({ error: "lat and lon must be valid numbers" }, 400);
+      }
+      const maxDist = maxDistParam ? parseFloat(maxDistParam) : 50;
+      if (!Number.isFinite(maxDist) || maxDist <= 0) {
+        return c.json({ error: "max_distance_km must be a positive number" }, 400);
+      }
+
+      queries = queries.filter((q) => {
+        if (!q.expected_gps) return true; // queries without GPS requirement are visible to all
+        const queryMaxDist = q.max_gps_distance_km ?? maxDist;
+        return haversineKm(workerLat, workerLon, q.expected_gps.lat, q.expected_gps.lon) <= queryMaxDist;
+      });
+    }
+
+    return c.json(queries.map(querySummary));
+  });
 
   app.get("/queries/all", (c) => c.json(svc.listAllQueries().map(querySummary)));
 
@@ -265,7 +321,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         description: payload.description,
         location_hint: payload.location_hint,
         expected_gps: payload.expected_gps,
+        max_gps_distance_km: payload.max_gps_distance_km,
         verification_requirements: payload.verification_requirements,
+        tlsn_requirements: payload.tlsn_requirements,
       };
 
       const query = doCreateQuery(input, {
@@ -375,7 +433,17 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
     // E2E: accept ephemeral encryption keys for one-time oracle verification
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
-    const outcome = await doSubmit(id, body as unknown as QueryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
+    // Parse worker-reported GPS from request body
+    const bodyGps = body.gps as GpsCoord | undefined;
+    const queryResult: import("./types").QueryResult = {
+      attachments: Array.isArray(body.attachments) ? body.attachments : [],
+      notes: typeof body.notes === "string" ? body.notes : undefined,
+      gps: bodyGps && typeof bodyGps.lat === "number" && typeof bodyGps.lon === "number" ? bodyGps : undefined,
+      tlsn_attestation: typeof body.tlsn_presentation === "string"
+        ? { presentation: body.tlsn_presentation as string }
+        : (body.tlsn_attestation as TlsnAttestation | undefined),
+    };
+    const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404
       : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
       : outcome.ok ? 200 : 422;
@@ -454,9 +522,11 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
     if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
 
+    const resultGps = body.gps as GpsCoord | undefined;
     const result: QueryResult = {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
+      gps: resultGps && typeof resultGps.lat === "number" && typeof resultGps.lon === "number" ? resultGps : undefined,
     };
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
 

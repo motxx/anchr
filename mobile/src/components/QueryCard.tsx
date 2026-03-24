@@ -16,7 +16,6 @@ export function QueryCard({ query, userLocation }: Props) {
   const router = useRouter();
   const [, setTick] = useState(0);
 
-  // Update countdown every second
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
@@ -34,8 +33,7 @@ export function QueryCard({ query, userLocation }: Props) {
   return (
     <Pressable
       onPress={() => router.push(`/${query.id}`)}
-      className="bg-white rounded-xl border border-gray-200 overflow-hidden active:scale-[0.98]"
-      style={{ elevation: 1 }}
+      className="bg-surface rounded-xl border border-border overflow-hidden active:bg-surface-raised"
     >
       <View className="px-4 py-3.5">
         {/* Top row: status + timer */}
@@ -44,16 +42,16 @@ export function QueryCard({ query, userLocation }: Props) {
           <View className="flex-row items-center gap-1">
             <Ionicons
               name="time-outline"
-              size={12}
-              color={critical ? "#ef4444" : urgent ? "#f59e0b" : "#9ca3af"}
+              size={11}
+              color={critical ? "#ef4444" : urgent ? "#f59e0b" : "#52525b"}
             />
             <Text
               className={`text-xs font-medium ${
                 critical
-                  ? "text-red-500"
+                  ? "text-red-400"
                   : urgent
-                    ? "text-amber-500"
-                    : "text-gray-400"
+                    ? "text-amber-400"
+                    : "text-subtle"
               }`}
             >
               {timeLeft(query.expires_at)}
@@ -62,7 +60,7 @@ export function QueryCard({ query, userLocation }: Props) {
         </View>
 
         {/* Description */}
-        <Text className="text-sm text-gray-900 font-medium mb-2" numberOfLines={2}>
+        <Text className="text-sm text-foreground font-medium mb-2" numberOfLines={2}>
           {query.description}
         </Text>
 
@@ -71,16 +69,16 @@ export function QueryCard({ query, userLocation }: Props) {
           <View className="flex-row items-center gap-3">
             {query.location_hint && (
               <View className="flex-row items-center gap-1">
-                <Ionicons name="location-outline" size={12} color="#6b7280" />
-                <Text className="text-xs text-gray-500" numberOfLines={1}>
+                <Ionicons name="location-outline" size={11} color="#52525b" />
+                <Text className="text-xs text-muted-foreground" numberOfLines={1}>
                   {query.location_hint}
                 </Text>
               </View>
             )}
             {distance !== null && (
               <View className="flex-row items-center gap-1">
-                <Ionicons name="navigate-outline" size={12} color="#6b7280" />
-                <Text className="text-xs text-gray-500">
+                <Ionicons name="navigate-outline" size={11} color="#52525b" />
+                <Text className="text-xs text-muted-foreground">
                   {formatDistance(distance)}
                 </Text>
               </View>
@@ -90,13 +88,13 @@ export function QueryCard({ query, userLocation }: Props) {
           <View className="flex-row items-center gap-2">
             {query.bounty && query.bounty.amount_sats > 0 && (
               <View className="flex-row items-center gap-1">
-                <Ionicons name="flash" size={12} color="#f59e0b" />
-                <Text className="text-xs font-semibold text-amber-500">
+                <Ionicons name="flash" size={11} color="#f59e0b" />
+                <Text className="text-xs font-semibold text-amber-400">
                   {query.bounty.amount_sats} sats
                 </Text>
               </View>
             )}
-            <Ionicons name="chevron-forward" size={16} color="#d1d5db" />
+            <Ionicons name="chevron-forward" size={14} color="#3f3f46" />
           </View>
         </View>
       </View>

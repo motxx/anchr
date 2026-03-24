@@ -65,7 +65,7 @@ test("mcp tools expose query status and attachment metadata", async () => {
     // Create a query via MCP tool to verify creation works
     const created = await client.callTool({
       name: "create_query",
-      arguments: { description: "MCP Test Store の営業状況", ttl_seconds: 120 },
+      arguments: { description: "MCP Test Store の営業状況", ttl_seconds: 120, verification_requirements: [] },
     });
     const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
     expect(createdJson.query_id).toStartWith("query_");
@@ -142,6 +142,7 @@ test("mcp can use a remote HTTP query backend", async () => {
         description: "Remote MCP Smoke Store の営業状況",
         location_hint: "Tokyo",
         ttl_seconds: 180,
+        verification_requirements: [],
       },
     });
     const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });

@@ -21,6 +21,7 @@ export const builtInOracle: Oracle = {
       checks: detail.checks,
       failures: detail.failures,
       attested_at: Date.now(),
+      tlsn_verified: detail.tlsn_verified,
     };
   },
 };

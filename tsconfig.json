@@ -31,5 +31,6 @@
     "paths": {
       "src/ui/lib/utils": ["./src/ui/lib/utils.ts"]
     }
-  }
+  },
+  "exclude": ["mobile", "node_modules"]
 }

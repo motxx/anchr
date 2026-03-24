@@ -53,3 +53,8 @@ mobile/.expo/
 mobile/ios/
 mobile/android/
 mobile/node_modules/
+.gstack/
+
+# rust
+crates/*/target/
+crates/*/Cargo.lock

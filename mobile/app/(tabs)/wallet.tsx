@@ -6,74 +6,66 @@ import {
   Pressable,
   Alert,
 } from "react-native";
-import * as Clipboard from "expo-clipboard";
+import { clipboardProvider } from "../../src/platform/clipboard";
 import { Ionicons } from "@expo/vector-icons";
+import { formatShortTime } from "../../src/utils/time";
 import { useWalletStore, type WalletTransaction } from "../../src/store/wallet";
 
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  const hours = String(d.getHours()).padStart(2, "0");
-  const minutes = String(d.getMinutes()).padStart(2, "0");
-  return `${month}/${day} ${hours}:${minutes}`;
-}
-
-function TransactionRow({ tx }: { tx: WalletTransaction }) {
+const TransactionRow = React.memo(function TransactionRow({ tx }: { tx: WalletTransaction }) {
   const handleCopyToken = useCallback(async () => {
-    await Clipboard.setStringAsync(tx.cashuToken);
+    await clipboardProvider.copyText(tx.cashuToken);
     Alert.alert("Copied", "Cashu token copied to clipboard. Paste into any Cashu wallet to redeem.");
   }, [tx.cashuToken]);
 
   return (
     <Pressable
       onPress={handleCopyToken}
-      className="bg-white rounded-xl px-4 py-3.5 flex-row items-center"
+      className="bg-surface rounded-xl px-4 py-3.5 flex-row items-center"
     >
-      <View className="w-10 h-10 rounded-full bg-emerald-50 items-center justify-center mr-3">
+      <View className="w-10 h-10 rounded-full bg-emerald-950 items-center justify-center mr-3">
         <Ionicons name="arrow-down" size={18} color="#10b981" />
       </View>
       <View className="flex-1 mr-3">
-        <Text className="text-sm font-medium text-gray-900" numberOfLines={1}>
+        <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
           {tx.description}
         </Text>
-        <Text className="text-xs text-gray-400 mt-0.5">
-          {formatTime(tx.timestamp)}
+        <Text className="text-xs text-muted-foreground mt-0.5">
+          {formatShortTime(tx.timestamp)}
         </Text>
       </View>
       <View className="items-end">
-        <Text className="text-sm font-bold text-emerald-600">
+        <Text className="text-sm font-bold text-primary">
           +{tx.amountSats} sats
         </Text>
         <View className="flex-row items-center gap-1 mt-0.5">
-          <Ionicons name="copy-outline" size={10} color="#9ca3af" />
-          <Text className="text-[10px] text-gray-400">tap to copy</Text>
+          <Ionicons name="copy-outline" size={10} color="#52525b" />
+          <Text className="text-[10px] text-muted-foreground">tap to copy</Text>
         </View>
       </View>
     </Pressable>
   );
-}
+});
 
 export default function WalletScreen() {
   const { balance, transactions } = useWalletStore();
 
   return (
-    <View className="flex-1 bg-stone-50">
+    <View className="flex-1 bg-background">
       {/* Balance card */}
-      <View className="px-4 pt-14 pb-5 bg-stone-50">
-        <View className="bg-gray-900 rounded-2xl px-6 py-6">
-          <Text className="text-xs text-gray-400 uppercase tracking-widest mb-1">
+      <View className="px-4 pt-14 pb-5 bg-background">
+        <View className="bg-surface rounded-2xl px-6 py-6">
+          <Text className="text-xs text-muted-foreground uppercase tracking-widest mb-1">
             Balance
           </Text>
           <View className="flex-row items-baseline gap-2">
-            <Text className="text-4xl font-black text-white">
+            <Text className="text-4xl font-black text-foreground">
               {balance.toLocaleString()}
             </Text>
-            <Text className="text-lg font-semibold text-gray-400">sats</Text>
+            <Text className="text-lg font-semibold text-muted-foreground">sats</Text>
           </View>
           <View className="flex-row items-center gap-1.5 mt-3">
             <Ionicons name="flash" size={12} color="#f59e0b" />
-            <Text className="text-xs text-gray-500">
+            <Text className="text-xs text-muted-foreground">
               Cashu ecash {"\u2022"} earned from queries
             </Text>
           </View>
@@ -82,7 +74,7 @@ export default function WalletScreen() {
 
       {/* Transactions */}
       <View className="px-4 mb-2">
-        <Text className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+        <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
           Earnings
         </Text>
       </View>
@@ -94,13 +86,13 @@ export default function WalletScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 24 }}
         ListEmptyComponent={
           <View className="items-center justify-center py-16">
-            <View className="w-14 h-14 rounded-full bg-gray-100 items-center justify-center mb-3">
-              <Ionicons name="wallet-outline" size={24} color="#9ca3af" />
+            <View className="w-14 h-14 rounded-full bg-surface-raised items-center justify-center mb-3">
+              <Ionicons name="wallet-outline" size={24} color="#52525b" />
             </View>
-            <Text className="text-sm font-medium text-gray-500">
+            <Text className="text-sm font-medium text-muted-foreground">
               No earnings yet
             </Text>
-            <Text className="text-xs text-gray-400 mt-1 text-center">
+            <Text className="text-xs text-muted-foreground mt-1 text-center">
               Complete queries with bounties{"\n"}to earn sats
             </Text>
           </View>

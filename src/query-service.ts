@@ -188,6 +188,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         quotes: isHtlc ? [] : undefined,
         nostr_event_id: options?.nostrEventId,
         expected_gps: input.expected_gps,
+        max_gps_distance_km: input.max_gps_distance_km,
+        tlsn_requirements: input.tlsn_requirements,
       };
 
       store.set(query.id, query);
@@ -237,6 +239,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         passed: attestation.passed,
         checks: attestation.checks,
         failures: attestation.failures,
+        tlsn_verified: attestation.tlsn_verified,
       };
 
       const newStatus: QueryStatus = attestation.passed ? "approved" : "rejected";

@@ -60,7 +60,33 @@ export interface VerificationDetail {
   failures: string[];
 }
 
-export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check";
+export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check" | "tlsn";
+
+export interface TlsnCondition {
+  type: "contains" | "regex" | "jsonpath";
+  expression: string;
+  expected?: string;
+  description?: string;
+}
+
+export interface TlsnRequirement {
+  target_url: string;
+  method?: "GET" | "POST";
+  conditions?: TlsnCondition[];
+  max_attestation_age_seconds?: number;
+}
+
+export interface TlsnAttestation {
+  /** Base64-encoded TLSNotary presentation file. */
+  presentation: string;
+}
+
+export interface TlsnVerifiedData {
+  server_name: string;
+  revealed_body: string;
+  revealed_headers?: string;
+  session_timestamp: number;
+}
 
 /** Shape returned by GET /queries (querySummary presenter) */
 export interface QuerySummary {
@@ -78,6 +104,7 @@ export interface QuerySummary {
   htlc: HtlcSummary | null;
   quotes_count: number;
   expected_gps: GpsCoord | null;
+  tlsn_requirements: TlsnRequirement | null;
 }
 
 /** Shape returned by GET /queries/:id (queryDetail presenter) */
@@ -88,10 +115,14 @@ export interface QueryDetail extends QuerySummary {
   result?: {
     attachments: AttachmentRef[];
     notes?: string;
+    tlsn_attestation?: TlsnAttestation;
+    tlsn_verified?: TlsnVerifiedData;
   };
   verification?: VerificationDetail;
   payment_status: PaymentStatus;
   blossom_keys: BlossomKeyMap | null;
+  tlsn_verifier_url?: string | null;
+  tlsn_proxy_url?: string | null;
 }
 
 export interface UploadResponse {

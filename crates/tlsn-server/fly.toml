@@ -1,0 +1,27 @@
+app = "anchr-tlsn-verifier"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+
+[http_service]
+  internal_port = 7047
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+# TCP service for CLI prover
+[[services]]
+  internal_port = 7046
+  protocol = "tcp"
+  [[services.ports]]
+    port = 7046
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

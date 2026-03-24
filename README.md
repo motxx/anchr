@@ -1,296 +1,203 @@
 # Anchr
 
-Anonymous real-world information protocol on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
+Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
 
-Requesters post queries (photo proof, store status). Anonymous workers fulfill them on the ground. A minimal oracle verifies C2PA authenticity; workers receive ecash automatically on pass via HTLC.
+AI agents and humans buy verified API responses, price feeds, and real-world photos — with no trust required. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
 
-## Design Principles
+## SDK
 
-- **Pull-based**: Requesters specify what they want. Workers respond.
-- **Anonymous**: No accounts, no identities. Nostr keypairs only.
-- **Trustless payment**: Cashu HTLC escrow — funds release automatically on C2PA verification, refund on timeout.
-- **Minimal oracle**: Oracle generates HTLC preimage at query creation, verifies C2PA authenticity, and delivers preimage to Worker on pass. No content judgment.
+```typescript
+import { Anchr } from "anchr-sdk";
 
-> Future: Oracle can be replaced entirely by Cairo Spending Conditions (ZK-based) once the ecosystem matures.
+const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
+
+const result = await anchr.query({
+  description: "BTC price from CoinGecko",
+  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
+  maxSats: 21,
+});
+
+result.verified;    // true — cryptographically proven
+result.data;        // { bitcoin: { usd: 71000 } }
+result.serverName;  // "api.coingecko.com" — from TLS certificate
+result.proof;       // TLSNotary presentation (independently verifiable)
+```
 
 ## How It Works
 
-```mermaid
-sequenceDiagram
-    participant R as Requester
-    participant O as Oracle
-    participant N as Nostr Relay
-    participant W as Worker
-    participant B as Blossom
-    participant M as Cashu Mint
-
-    R->>O: request hash for new query
-    O->>O: generate preimage, store secretly
-    O->>R: return hash(preimage) only
-
-    Note over R: hold Cashu proofs locally<br/>(plain bearer tokens, no conditions yet)
-    R->>N: DVM Job Request (kind 5300)<br/>Requester pubkey + Oracle pubkey included
-
-    W->>N: subscribe and pick up query
-    W->>W: verify Oracle pubkey in Job Request<br/>against trusted Oracle whitelist → drop out if unknown
-    W->>N: quote (kind 7000 status=payment-required)<br/>Worker pubkey included
-    O->>N: listen for kind 7000 quotes → record Worker pubkey
-
-    R->>N: listen and receive quotes (possibly multiple Workers)
-    R->>R: select one Worker based on quote
-    R->>M: swap HTLC to add selected Worker pubkey<br/>condition: hash(preimage) AND Worker signature
-    R->>N: announce selection (kind 7000 status=processing)<br/>selected Worker pubkey included
-    O->>M: check HTLC condition → record selected Worker pubkey
-
-    loop all Workers watching Nostr
-        W->>N: watch for kind 7000 status=processing
-        alt own pubkey listed in announcement
-            W->>M: verify own pubkey is in HTLC condition
-            alt HTLC confirmed
-                M->>W: own pubkey confirmed → proceed
-            else HTLC mismatch
-                M->>W: pubkey not in HTLC → drop out (Requester lied)
-            end
-        else another pubkey listed
-            N->>W: another pubkey listed → drop out
-        end
-    end
-
-    W->>W: photograph on-site<br/>C2PA signed + EXIF strip
-    W->>W: generate symmetric key K<br/>encrypt blob with K (AES-256-GCM)<br/>encrypt K with Requester pubkey → K_R<br/>encrypt K with Oracle pubkey → K_O
-    W->>B: upload encrypted blob
-    W->>N: DVM Job Result (kind 6300)<br/>Blossom URL + blob hash + K_R + K_O
-
-    R->>N: listen and receive result (Blossom URL + K_R)
-    R->>B: download encrypted blob
-    R->>R: decrypt K_R with Requester privkey → K<br/>decrypt blob with K + verify C2PA + view result
-
-    O->>N: listen and receive result (Blossom URL + K_O)
-    O->>O: verify kind 6300 pubkey = selected Worker pubkey (from HTLC)<br/>verify kind 6300 references correct Job Request ID<br/>reject if mismatch → ignore event
-    O->>B: download encrypted blob
-    O->>O: verify blob hash matches Nostr event<br/>decrypt K_O with Oracle privkey → K<br/>decrypt blob with K + verify C2PA signature
-    alt C2PA valid
-        O->>N: send preimage via NIP-44 DM (kind 4) signed by Oracle privkey
-        W->>N: receive DM
-        W->>W: verify sender pubkey = Oracle pubkey in Job Request
-        W->>M: redeem token with preimage + Worker signature
-    else C2PA invalid
-        O->>N: send rejection via NIP-44 DM (kind 4) signed by Oracle privkey
-        W->>N: receive rejection
-        W->>W: verify sender pubkey = Oracle pubkey in Job Request → stop waiting
-        Note over M,R: timelock expires → Cashu refunds Requester automatically
-    end
+```
+Requester (AI agent / human)
+  │  "Prove what api.coingecko.com returns for BTC price"
+  │  Attaches 21 sats bounty
+  ▼
+Nostr relay (censorship-resistant broadcast)
+  │
+  ▼
+Worker (anyone — AI agent, server, mobile app, browser extension)
+  │  Fetches URL via MPC-TLS with Verifier Server
+  │  Generates cryptographic presentation (.presentation.tlsn)
+  ▼
+Oracle (Anchr server)
+  │  Verifies TLSNotary signature
+  │  Checks: domain matches, data fresh, conditions satisfied
+  │  All checks pass → bounty auto-released to Worker
+  ▼
+Requester receives verified data + cryptographic proof
 ```
 
-**Oracle cannot steal funds**: the HTLC requires both `hash(preimage)` AND the Worker's signature (NUT-14 `pubkeys` tag). Oracle alone cannot redeem — it knows the preimage but not the Worker's private key.
+**No trust required.** The proof is tied to the TLS certificate — if the data is wrong, the cryptographic verification fails. Payment is atomic via Cashu HTLC escrow.
 
-**Payment is trustless**: The Requester holds plain Cashu proofs locally until a Worker is selected. On selection, plain proofs are swapped for a Cashu HTLC token (NUT-14) locked to `hash(preimage) AND Worker pubkey`. Plain proofs are used in Phase 1 because the Requester does not know the preimage — the Mint requires it to spend hashlock-ed proofs. Oracle delivers the preimage to Worker via NIP-44 DM (kind 4) on C2PA pass. Timeout refunds the requester automatically via the `refund` tag (NUT-11).
+## Two Verification Modes
 
+### Web Data (TLSNotary)
 
-## Architecture
+Prove what any HTTPS server returned. Workers fetch the URL through a Multi-Party Computation TLS session — the Verifier Server co-signs the session without seeing the plaintext.
 
-```mermaid
-graph TB
-    subgraph Actors["Actors"]
-        direction LR
-        Requester["Requester<br/>(HTTP / SDK)"]
-        Worker["Worker<br/>(Worker UI / SDK)"]
-        Oracle["Oracle<br/>(preimage + C2PA + delivery)"]
-    end
+<p align="center">
+  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — Worker mobile app" width="280" />
+  &nbsp;&nbsp;
+  <img src="assets/tlsn-requester-proof.png" alt="TLSNotary proof — Requester web UI" width="480" />
+</p>
 
-    subgraph Bus["Nostr Relay Network — Message Bus"]
-        direction LR
-        K5300["kind 5300<br/>Job Request"]
-        K7000["kind 7000<br/>Feedback"]
-        K6300["kind 6300<br/>Job Result"]
-    end
+### Real-World Photos (C2PA)
 
-    subgraph Infra["Infrastructure"]
-        direction LR
-        Cashu["Cashu Mint<br/>HTLC escrow (NUT-14)"]
-        Blossom["Blossom<br/>AES-256-GCM blob store"]
-    end
+Prove what a location looks like right now. Workers photograph with a C2PA-signed camera — the Content Credentials are cryptographically bound to the image, GPS, and timestamp.
 
-    Actors --> Bus
-    Requester -->|"lock / swap HTLC"| Cashu
-    Worker -->|"verify / redeem HTLC"| Cashu
-    Oracle -->|"check HTLC condition"| Cashu
-    Worker -->|"upload encrypted blob"| Blossom
-    Oracle -->|"download blob for C2PA"| Blossom
-```
+## Use Cases
 
-## Payment Flow
+| Use case | Verification | Example |
+|----------|-------------|---------|
+| Price oracle (DeFi) | TLSNotary | Prove BTC/ETH price from CoinGecko, Binance |
+| Flight status | TLSNotary | Prove flight delay for parametric insurance |
+| API response proof | TLSNotary | Prove any HTTPS API returned specific data |
+| Location check | C2PA + GPS | Photograph a store, intersection, event |
+| Combined proof | Both | Photo of a price tag + API price verification |
 
-| Step | Actor | Action |
-|------|-------|--------|
-| 1 | Requester | Ask Oracle for hash (Oracle generates preimage secretly, returns hash only) |
-| 2 | Requester | Hold plain Cashu proofs locally (bearer tokens, no HTLC conditions yet) |
-| 3 | Requester | Post DVM Job Request (kind 5300) with Oracle pubkey |
-| 4 | Worker | Pick up query, verify Oracle pubkey against whitelist |
-| 5 | Worker | Send quote (kind 7000 status=payment-required) with Worker pubkey |
-| 6 | Requester | Select Worker, swap HTLC to add Worker pubkey |
-| 7 | Requester | Announce selection (kind 7000 status=processing) |
-| 8 | Oracle | Confirm selected Worker pubkey via HTLC |
-| 9 | Worker | Confirm own pubkey in HTLC, photograph, encrypt with KEM+DEM, upload to Blossom |
-| 10 | Worker | Post DVM Job Result (kind 6300) with Blossom URL + blob hash + K_R + K_O |
-| 11 | Oracle | Verify Worker identity, download blob, verify blob hash, verify C2PA |
-| 12 | Oracle | Send preimage via NIP-44 DM (kind 4) signed by Oracle privkey |
-| 13 | Worker | Verify Oracle pubkey in DM, redeem HTLC with preimage + Worker signature |
-| 14 (fallback) | Requester | Reclaim token automatically after timelock if no valid submission |
-
-**Why Oracle cannot steal**: Oracle knows the preimage but not the Worker's private key. Both are required to redeem — neither party can act alone.
-
-## Getting Started
-
-### Prerequisites
-
-- [Bun](https://bun.sh/) v1.3+
-- [Docker](https://www.docker.com/) (for local relay & Blossom)
-
-### Install & Demo
+## Quick Start
 
 ```bash
-git clone https://github.com/motxx/anchr.git
-cd anchr
 bun install
-bun run demo    # starts local relay + Blossom, runs full lifecycle
+bun run infra:up                    # relay + blossom + verifier (docker)
+bun run dev                         # server on :3000
 ```
 
-### Run
+Worker app (iOS / Android / Web):
+```bash
+cd mobile && bun install
+bun run ios                         # or: bun run web
+```
+
+## API
 
 ```bash
-bun run start           # HTTP + worker UI
-bun run dev             # with file watching
+# Web data query (TLSNotary)
+curl -X POST localhost:3000/queries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "BTC price from CoinGecko",
+    "verification_requirements": ["tlsn"],
+    "tlsn_requirements": {
+      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+      "conditions": [{"type": "jsonpath", "expression": "bitcoin.usd"}]
+    },
+    "bounty": {"amount_sats": 21}
+  }'
 
-# with local infrastructure
-bun run infra:up
-NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 bun run start
+# Photo query (C2PA)
+curl -X POST localhost:3000/queries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "渋谷スクランブル交差点の混雑状況",
+    "expected_gps": {"lat": 35.6595, "lon": 139.7004},
+    "max_gps_distance_km": 0.5,
+    "bounty": {"amount_sats": 100}
+  }'
 ```
-
-### Test
-
-```bash
-bun run test            # unit + integration
-bun run test:e2e        # E2E (starts docker compose)
-bun run test:all        # all
-```
-
-## Usage
-
-### HTTP API
-
-Write endpoints require `Authorization: Bearer <key>` when `HTTP_API_KEY` is set.
 
 <details>
-<summary>Endpoints</summary>
+<summary>Full endpoint list</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/oracles` | List registered oracles |
-| `GET` | `/queries` | List open queries |
+| `GET` | `/queries` | List open queries (`?lat=&lon=&max_distance_km=`) |
 | `GET` | `/queries/:id` | Query detail |
 | `POST` | `/queries` | Create query |
-| `POST` | `/queries/:id/upload` | Upload attachment |
+| `POST` | `/queries/:id/upload` | Upload photo (multipart) |
 | `POST` | `/queries/:id/submit` | Submit result |
 | `POST` | `/queries/:id/cancel` | Cancel query |
 | `GET` | `/queries/:id/attachments` | List attachments |
-| `GET` | `/queries/:id/attachments/:index` | Serve attachment |
-| `GET` | `/queries/:id/attachments/:index/meta` | Attachment metadata |
-| `GET` | `/queries/:id/attachments/:index/preview` | Resized preview |
-| `GET` | `/queries/:id/quotes` | List worker quotes (HTLC) |
-| `POST` | `/queries/:id/quotes` | Submit worker quote (HTLC) |
-| `POST` | `/queries/:id/select` | Select worker (HTLC) |
-| `POST` | `/queries/:id/result` | Submit worker result (HTLC) |
+| `POST` | `/queries/:id/quotes` | Worker quote (HTLC flow) |
+| `POST` | `/queries/:id/select` | Select worker (HTLC flow) |
+| `GET` | `/health` | Health check |
+| `GET` | `/oracles` | List oracles |
 
 </details>
 
-### SDK
+## Architecture
 
-```ts
-import { createQuery, queryTemplates } from "anchr";
-
-// Requester: create a query (fetches HTLC hash from Oracle internally)
-const query = await createQuery(
-  queryTemplates.photoProof("Shibuya crossing, Tokyo"),
-  {
-    ttlSeconds: 3600,
-    oraclePubkey: "npub1...",   // trusted Oracle pubkey
-    cashuMintUrl: "https://mint.example.com",
-  },
-);
-
-// query.htlcToken  — locked Cashu HTLC token
-// query.nostrEventId — kind 5300 Job Request ID
+```
+┌─────────────────────────────────────────────────┐
+│ Requester (AI agent / human / app)              │
+│   anchr.query({ targetUrl, conditions, sats })  │
+└────────────────────┬────────────────────────────┘
+                     │ Nostr broadcast
+                     ▼
+┌─────────────────────────────────────────────────┐
+│ Worker (CLI / mobile app / browser extension)   │
+│                                                 │
+│ TLSNotary path:     Photo path:                 │
+│   tlsn-prove          C2PA camera               │
+│     ↕ MPC-TLS           ↓                       │
+│   Verifier Server     Upload + GPS              │
+│     ↓                    ↓                       │
+│   .presentation.tlsn  C2PA manifest             │
+└────────────────────┬────────────────────────────┘
+                     │ Submit proof
+                     ▼
+┌─────────────────────────────────────────────────┐
+│ Oracle (Anchr server)                           │
+│   TLSNotary: tlsn-verifier → crypto verify      │
+│   C2PA: c2patool → signature verify             │
+│   Conditions: jsonpath / regex / GPS proximity  │
+│   Pass → Cashu HTLC bounty released             │
+└─────────────────────────────────────────────────┘
 ```
 
 ## Configuration
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `REFERENCE_APP_PORT` | `3000` | HTTP server port |
-| `NOSTR_RELAYS` | -- | Comma-separated relay WebSocket URLs |
-| `BLOSSOM_SERVERS` | -- | Comma-separated Blossom server URLs |
-| `HTTP_API_KEY` | -- | API key for write endpoints |
-| `CASHU_MINT_URL` | -- | Cashu mint URL for ecash payments |
-| `ORACLE_PORT` | `4000` | Oracle server port |
-| `ORACLE_API_KEY` | -- | Oracle server authentication |
-| `TRUSTED_ORACLE_PUBKEYS` | -- | Comma-separated pubkeys of trusted Oracles (Worker whitelist) |
+| Variable | Description |
+|----------|-------------|
+| `NOSTR_RELAYS` | Relay WebSocket URLs (comma-separated) |
+| `BLOSSOM_SERVERS` | Blossom blob server URLs |
+| `CASHU_MINT_URL` | Cashu mint for ecash payments |
+| `HTTP_API_KEY` | API key for write endpoints |
+| `TLSN_VERIFIER_URL` | TLSNotary Verifier Server URL |
+| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL |
 
-## Deployment
-
-Four Fly.io apps are deployed via CI/CD:
-
-```mermaid
-graph LR
-    subgraph Fly.io
-        Relay["anchr-relay<br/>nostr-rs-relay<br/>wss://anchr-relay.fly.dev"]
-        Blossom["anchr-blossom<br/>blossom-server<br/>https://anchr-blossom.fly.dev"]
-        App["anchr<br/>Bun app<br/>https://anchr.fly.dev"]
-        Oracle["anchr-oracle<br/>Bun app<br/>https://anchr-oracle.fly.dev"]
-    end
-
-    App -->|NOSTR_RELAYS| Relay
-    App -->|BLOSSOM_SERVERS| Blossom
-    Oracle -->|NOSTR_RELAYS| Relay
-    Oracle -->|BLOSSOM_SERVERS| Blossom
-```
-
-```mermaid
-graph TD
-    Push["push to main"] --> CI["CI<br/>typecheck + test + build"]
-    CI --> Infra["Deploy Infrastructure (parallel)"]
-    Infra --> R["anchr-relay"]
-    Infra --> B["anchr-blossom"]
-    R --> Deploy["Deploy anchr"]
-    R --> DeployOracle["Deploy anchr-oracle"]
-    B --> Deploy
-    B --> DeployOracle
-```
-
-### Initial Setup
+## Testing
 
 ```bash
-fly apps create anchr-relay
-fly volumes create relay_data --app anchr-relay --region nrt --size 1
-
-fly apps create anchr-blossom
-fly volumes create blossom_data --app anchr-blossom --region nrt --size 1
-
-fly launch --no-deploy --copy-config
-fly volumes create data --size 1 --region nrt
-fly secrets set HTTP_API_KEY=...
+bun test                         # all tests
+bun test src/                    # unit tests
+bun test e2e/tlsn.test.ts       # TLSNotary E2E (real MPC-TLS)
+bun test e2e/tlsn-browser.test.ts  # browser extension E2E
+bun run test:regtest             # Lightning + Cashu E2E
 ```
 
-Set `FLY_API_TOKEN` as a GitHub Actions secret. Pushes to main auto-deploy all four apps.
+## Stack
 
-## Roadmap
-
-- [ ] Oracle fee: two-HTLC design for trustless Worker+Oracle fee distribution (currently Oracle runs free)
-- [ ] Oracle discovery: NIP-89 (kind 31990) registration for decentralized Oracle registry — replaces hardcoded whitelist, enables multiple competing Oracles and graceful failover
-- [ ] Oracle → Cairo Spending Conditions (trustless C2PA verification via ZK)
-- [ ] Worker reputation layer
-- [ ] AI-assisted query decomposition (for non-Diaspora requesters)
+| Layer | Tech |
+|-------|------|
+| SDK | TypeScript (`anchr-sdk`) |
+| Server | Bun + Hono |
+| Messaging | Nostr (NIP-90 DVM) |
+| Storage | Blossom (E2E encrypted) |
+| Payment | Cashu ecash (NUT-14 HTLC) / Lightning |
+| Web Verification | TLSNotary (MPC-TLS + Rust verifier) |
+| Photo Verification | C2PA + EXIF + ProofMode + GPS |
+| TLS Verifier Server | Rust (async-tungstenite + WsStream) |
+| Mobile | React Native (Expo) + NativeWind |
 
 ## License
 

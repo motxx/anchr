@@ -30,16 +30,48 @@ export interface GpsCoord {
  * Verification factors that a Requester can request.
  * When omitted, defaults to ["gps", "ai_check"].
  */
-export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check"] as const;
+export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check", "tlsn"] as const;
 export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
+
+export interface TlsnCondition {
+  type: "contains" | "regex" | "jsonpath";
+  expression: string;
+  expected?: string;
+  description?: string;
+}
+
+export interface TlsnRequirement {
+  target_url: string;
+  method?: "GET" | "POST";
+  conditions?: TlsnCondition[];
+  /** Max age of attestation in seconds (default: 300). */
+  max_attestation_age_seconds?: number;
+}
+
+export interface TlsnAttestation {
+  /** Base64-encoded TLSNotary presentation file (.presentation.tlsn). */
+  presentation: string;
+}
+
+/** Cryptographically verified data extracted from a TLSNotary presentation by the oracle. */
+export interface TlsnVerifiedData {
+  server_name: string;
+  revealed_body: string;
+  revealed_headers?: string;
+  /** Session timestamp (unix seconds, from the cryptographic proof). */
+  session_timestamp: number;
+}
 
 export interface QueryInput {
   description: string;
   location_hint?: string;
   expected_gps?: GpsCoord;
+  /** Max allowed distance from expected_gps in km (default: 50). */
+  max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
+  tlsn_requirements?: TlsnRequirement;
 }
 
 export interface AttachmentRef {
@@ -79,12 +111,18 @@ export interface AttachmentHandle {
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
+  /** GPS coordinates reported by the worker's device at submission time. */
+  gps?: GpsCoord;
+  /** TLSNotary attestation submitted by the worker. */
+  tlsn_attestation?: TlsnAttestation;
 }
 
 export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
+  /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
+  tlsn_verified?: TlsnVerifiedData;
 }
 
 export interface RequesterMeta {
@@ -163,4 +201,8 @@ export interface Query {
   blossom_keys?: BlossomKeyMap;
   /** Expected GPS coordinates for proximity check. */
   expected_gps?: GpsCoord;
+  /** Max allowed distance from expected_gps in km (default: 50). */
+  max_gps_distance_km?: number;
+  /** TLSNotary requirements for web content verification. */
+  tlsn_requirements?: TlsnRequirement;
 }

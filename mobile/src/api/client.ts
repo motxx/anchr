@@ -24,33 +24,15 @@ function getHeaders(): Record<string, string> {
 }
 
 export async function fetchQueries(): Promise<QuerySummary[]> {
-  const url = `${getBaseUrl()}/queries`;
-  console.log(`[anchr-api] fetchQueries → ${url}`);
-  try {
-    const res = await fetch(url, {
-      headers: getHeaders(),
-    });
-    console.log(`[anchr-api] fetchQueries ← ${res.status}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    console.log(`[anchr-api] fetchQueries got ${data.length} queries`);
-    return data;
-  } catch (e) {
-    console.error(`[anchr-api] fetchQueries error:`, e);
-    return [];
-  }
+  const res = await fetch(`${getBaseUrl()}/queries`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Server error: ${res.status}`);
+  return res.json();
 }
 
-export async function fetchQueryDetail(id: string): Promise<QueryDetail | null> {
-  try {
-    const res = await fetch(`${getBaseUrl()}/queries/${id}`, {
-      headers: getHeaders(),
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
+export async function fetchQueryDetail(id: string): Promise<QueryDetail> {
+  const res = await fetch(`${getBaseUrl()}/queries/${id}`, { headers: getHeaders() });
+  if (!res.ok) throw new Error(`Query fetch failed: ${res.status}`);
+  return res.json();
 }
 
 export async function uploadPhoto(
@@ -70,7 +52,6 @@ export async function uploadPhoto(
     method: "POST",
     headers: {
       ...getHeaders(),
-      // Let fetch set Content-Type with boundary for multipart
       Accept: "application/json",
     },
     body: formData,
@@ -109,10 +90,13 @@ export async function submitResult(
   return res.json();
 }
 
-export async function healthCheck(): Promise<boolean> {
+/** Test server connectivity. Accepts optional URL to test before saving. */
+export async function healthCheck(serverUrl?: string): Promise<boolean> {
+  const url = serverUrl ?? getBaseUrl();
   try {
-    const res = await fetch(`${getBaseUrl()}/health`, {
+    const res = await fetch(`${url}/health`, {
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
     });
     const data = await res.json();
     return data.ok === true;

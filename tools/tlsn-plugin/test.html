@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TLSNotary Plugin Test — Anchr</title>
+  <style>
+    body { font-family: system-ui; max-width: 640px; margin: 40px auto; padding: 0 20px; background: #0a0a0a; color: #e0e0e0; }
+    h1 { font-size: 1.5em; }
+    .card { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; margin: 20px 0; }
+    .status { padding: 8px 16px; border-radius: 8px; font-size: 14px; margin: 8px 0; }
+    .ok { background: #0a3d1a; border: 1px solid #10b981; color: #10b981; }
+    .err { background: #3d0a0a; border: 1px solid #ef4444; color: #ef4444; }
+    .pending { background: #3d2f0a; border: 1px solid #f59e0b; color: #f59e0b; }
+    code { background: #111; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+    pre { background: #111; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px; white-space: pre-wrap; }
+    button { background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; width: 100%; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:hover:not(:disabled) { background: #059669; }
+    .instructions { font-size: 14px; line-height: 1.8; color: #999; }
+    .instructions li { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h1>🔒 TLSNotary Browser Extension Test</h1>
+  <p style="color:#999">Verifier Server: <code>ws://localhost:7048</code></p>
+
+  <div class="card">
+    <h3>Setup</h3>
+    <ol class="instructions">
+      <li>Install <a href="https://chromewebstore.google.com/detail/tlsnotary/gnoglgpcamodhflknhmafmjdahcejcgg" target="_blank" style="color:#10b981">TLSNotary Extension</a> from Chrome Web Store</li>
+      <li>Click the extension icon → open <strong>DevConsole</strong></li>
+      <li>In DevConsole, paste the plugin code below and click <strong>Run</strong></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h3>Plugin Code (copy this to DevConsole)</h3>
+    <pre id="plugin-code">// CoinGecko BTC Price — Anchr TLSNotary Test
+const VERIFIER_URL = 'ws://localhost:7048';
+const PROXY_URL = 'ws://localhost:7048/proxy?token=api.coingecko.com';
+
+export default {
+  config: {
+    name: 'Anchr: BTC Price Verification',
+    description: 'Prove Bitcoin USD price from CoinGecko API via Anchr Verifier',
+  },
+  main: async () => {
+    const proof = await prove(
+      {
+        url: 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+        method: 'GET',
+        headers: { 'Accept': 'application/json', 'Accept-Encoding': 'identity', 'Connection': 'close' },
+      },
+      {
+        verifierUrl: VERIFIER_URL,
+        proxyUrl: PROXY_URL,
+        maxRecvData: 16384,
+        maxSentData: 4096,
+        handlers: [
+          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
+          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
+          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
+        ],
+      }
+    );
+    console.log('Proof:', JSON.stringify(proof.results, null, 2));
+    return proof;
+  },
+};</pre>
+    <button onclick="copyPlugin()">Copy Plugin Code</button>
+  </div>
+
+  <div class="card">
+    <h3>Server Status</h3>
+    <div id="verifier-status" class="status pending">Checking verifier...</div>
+    <div id="anchr-status" class="status pending">Checking Anchr server...</div>
+  </div>
+
+  <script>
+    async function checkServers() {
+      try {
+        const r = await fetch('http://localhost:7048/health');
+        document.getElementById('verifier-status').className = 'status ok';
+        document.getElementById('verifier-status').textContent = '✓ Verifier Server running (localhost:7048)';
+      } catch {
+        document.getElementById('verifier-status').className = 'status err';
+        document.getElementById('verifier-status').textContent = '✗ Verifier Server not reachable';
+      }
+      try {
+        const r = await fetch('http://localhost:3000/health');
+        document.getElementById('anchr-status').className = 'status ok';
+        document.getElementById('anchr-status').textContent = '✓ Anchr Server running (localhost:3000)';
+      } catch {
+        document.getElementById('anchr-status').className = 'status err';
+        document.getElementById('anchr-status').textContent = '✗ Anchr Server not reachable';
+      }
+    }
+    checkServers();
+
+    function copyPlugin() {
+      navigator.clipboard.writeText(document.getElementById('plugin-code').textContent);
+      event.target.textContent = 'Copied!';
+      setTimeout(() => event.target.textContent = 'Copy Plugin Code', 2000);
+    }
+  </script>
+</body>
+</html>
