@@ -107,8 +107,8 @@ curl -X POST localhost:3000/queries/{id}/submit \
 | `BLOSSOM_SERVERS` | Blossom blob server URLs |
 | `CASHU_MINT_URL` | Cashu mint for ecash payments |
 | `HTTP_API_KEY` | API key for write endpoints |
-| `TRUSTED_NOTARY_PUBKEYS` | TLSNotary trusted notary pubkeys (comma-separated hex) |
-| `DEFAULT_NOTARY_URL` | Default TLSNotary notary URL |
+| `TLSN_VERIFIER_URL` | TLSNotary Verifier Server URL (served to workers) |
+| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL (served to workers) |
 
 ## Testing
 

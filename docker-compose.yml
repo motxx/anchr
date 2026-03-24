@@ -16,6 +16,12 @@ services:
       - blossom-data:/app/data
       - ./blossom-config.yml:/app/config.yml
 
+  tlsn-verifier:
+    build:
+      context: ./crates/tlsn-server
+    ports:
+      - "7047:7047"
+
   # --- Lightning regtest stack ---
 
   bitcoind:
