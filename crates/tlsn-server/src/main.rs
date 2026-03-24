@@ -215,30 +215,101 @@ async fn handle_session_ws_raw(
     if ws.send(Message::Text(resp.to_string())).await.is_err() { return; }
     eprintln!("[tlsn-server] WS session registered: {}", &session_id[..8]);
 
-    // Wait for verification result
-    match tokio::time::timeout(std::time::Duration::from_secs(120), result_rx).await {
-        Ok(Ok(result)) => {
-            let resp = serde_json::json!({
-                "type": "session_completed",
-                "serverName": result.server_name,
-                "sent": result.sent_transcript,
-                "recv": result.recv_transcript,
-                "results": [
-                    { "type": "SENT", "part": "ALL", "value": result.sent_transcript },
-                    { "type": "RECV", "part": "ALL", "value": result.recv_transcript },
-                ],
-                "connectionInfo": base64_encode(&bincode::serialize(&result.connection_info).unwrap_or_default()),
-                "serverEphemeralKey": base64_encode(&result.server_ephemeral_key),
-                "transcriptCommitments": base64_encode(&result.transcript_commitments),
-            });
-            let _ = ws.send(Message::Text(resp.to_string())).await;
-            eprintln!("[tlsn-server] WS session {} completed", &session_id[..8]);
-        }
+    // Wait for MPC verification result
+    let result = match tokio::time::timeout(std::time::Duration::from_secs(120), result_rx).await {
+        Ok(Ok(r)) => r,
         _ => {
             let resp = serde_json::json!({ "type": "error", "message": "Verification timed out" });
             let _ = ws.send(Message::Text(resp.to_string())).await;
+            return;
         }
+    };
+
+    eprintln!("[tlsn-server] WS MPC done for {}, waiting for reveal_config...", &session_id[..8]);
+
+    // Wait for reveal_config from extension (with timeout)
+    // The extension sends reveal_config after prove() extracts transcript ranges
+    let reveal_config = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        while let Some(Ok(msg)) = ws.next().await {
+            if let async_tungstenite::tungstenite::Message::Text(text) = msg {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if json["type"].as_str() == Some("reveal_config") {
+                        return Some(json);
+                    }
+                }
+            }
+        }
+        None
+    }).await;
+
+    // Build results based on reveal_config ranges
+    let mut results = Vec::new();
+
+    if let Ok(Some(config)) = reveal_config {
+        eprintln!("[tlsn-server] Received reveal_config for {}", &session_id[..8]);
+
+        // Process sent ranges
+        if let Some(sent_ranges) = config["sent"].as_array() {
+            for range in sent_ranges {
+                let start = range["start"].as_u64().unwrap_or(0) as usize;
+                let end = range["end"].as_u64().unwrap_or(0) as usize;
+                let handler_type = range.get("handler").and_then(|h| h["type"].as_str()).unwrap_or("SENT");
+                let handler_part = range.get("handler").and_then(|h| h["part"].as_str()).unwrap_or("ALL");
+
+                // Extract the range from the sent transcript
+                let value = if end <= result.sent_transcript.len() && start < end {
+                    result.sent_transcript[start..end].to_string()
+                } else {
+                    result.sent_transcript.clone()
+                };
+
+                results.push(serde_json::json!({
+                    "type": handler_type,
+                    "part": handler_part,
+                    "value": value,
+                }));
+            }
+        }
+
+        // Process recv ranges
+        if let Some(recv_ranges) = config["recv"].as_array() {
+            for range in recv_ranges {
+                let start = range["start"].as_u64().unwrap_or(0) as usize;
+                let end = range["end"].as_u64().unwrap_or(0) as usize;
+                let handler_type = range.get("handler").and_then(|h| h["type"].as_str()).unwrap_or("RECV");
+                let handler_part = range.get("handler").and_then(|h| h["part"].as_str()).unwrap_or("ALL");
+
+                let value = if end <= result.recv_transcript.len() && start < end {
+                    result.recv_transcript[start..end].to_string()
+                } else {
+                    result.recv_transcript.clone()
+                };
+
+                results.push(serde_json::json!({
+                    "type": handler_type,
+                    "part": handler_part,
+                    "value": value,
+                }));
+            }
+        }
+    } else {
+        eprintln!("[tlsn-server] No reveal_config received for {}, returning full transcript", &session_id[..8]);
+        results.push(serde_json::json!({ "type": "SENT", "part": "ALL", "value": result.sent_transcript }));
+        results.push(serde_json::json!({ "type": "RECV", "part": "ALL", "value": result.recv_transcript }));
     }
+
+    let resp = serde_json::json!({
+        "type": "session_completed",
+        "serverName": result.server_name,
+        "sent": result.sent_transcript,
+        "recv": result.recv_transcript,
+        "results": results,
+        "connectionInfo": base64_encode(&bincode::serialize(&result.connection_info).unwrap_or_default()),
+        "serverEphemeralKey": base64_encode(&result.server_ephemeral_key),
+        "transcriptCommitments": base64_encode(&result.transcript_commitments),
+    });
+    let _ = ws.send(Message::Text(resp.to_string())).await;
+    eprintln!("[tlsn-server] WS session {} completed with {} results", &session_id[..8], results.len());
 }
 
 // --- /verifier handler (MPC-TLS via WsStream, same as official) ---
@@ -278,12 +349,15 @@ async fn handle_verifier_ws_raw(
         let (output, verifier) = verifier.verify().await?.accept().await?;
 
         let server_name = output.server_name.map(|s| format!("{}", s));
+        eprintln!("[ws-verifier] server_name: {:?}, has_transcript: {}", server_name, output.transcript.is_some());
         let transcript = output.transcript.map(|mut t| {
             t.set_unauthed(0u8);
-            (
-                String::from_utf8_lossy(t.sent_unsafe()).to_string(),
-                String::from_utf8_lossy(t.received_unsafe()).to_string(),
-            )
+            let sent = String::from_utf8_lossy(t.sent_unsafe()).to_string();
+            let recv = String::from_utf8_lossy(t.received_unsafe()).to_string();
+            eprintln!("[ws-verifier] sent: {} bytes, recv: {} bytes", sent.len(), recv.len());
+            eprintln!("[ws-verifier] sent preview: {}", &sent[..std::cmp::min(100, sent.len())]);
+            eprintln!("[ws-verifier] recv preview: {}", &recv[..std::cmp::min(100, recv.len())]);
+            (sent, recv)
         });
 
         let tls_tx = verifier.tls_transcript().clone();
@@ -363,14 +437,33 @@ async fn handle_proxy_ws_raw(
     let host1 = host.clone();
     let ws_to_tcp = tokio::spawn(async move {
         let mut total = 0u64;
-        while let Some(Ok(msg)) = ws_stream.next().await {
-            match msg {
-                async_tungstenite::tungstenite::Message::Binary(data) => {
-                    total += data.len() as u64;
-                    if tcp_write.write_all(&data).await.is_err() { break; }
+        loop {
+            match ws_stream.next().await {
+                Some(Ok(msg)) => match msg {
+                    async_tungstenite::tungstenite::Message::Binary(data) => {
+                        total += data.len() as u64;
+                        eprintln!("[proxy] WS→TCP: {} bytes (total {})", data.len(), total);
+                        if tcp_write.write_all(&data).await.is_err() {
+                            eprintln!("[proxy] WS→TCP write error");
+                            break;
+                        }
+                    }
+                    async_tungstenite::tungstenite::Message::Close(reason) => {
+                        eprintln!("[proxy] WS close: {:?}", reason);
+                        break;
+                    }
+                    other => {
+                        eprintln!("[proxy] WS other msg: {:?}", std::mem::discriminant(&other));
+                    }
+                },
+                Some(Err(e)) => {
+                    eprintln!("[proxy] WS error: {}", e);
+                    break;
                 }
-                async_tungstenite::tungstenite::Message::Close(_) => break,
-                _ => {}
+                None => {
+                    eprintln!("[proxy] WS stream ended");
+                    break;
+                }
             }
         }
         eprintln!("[proxy] WS→TCP {} bytes for {}", total, host1);
@@ -389,7 +482,9 @@ async fn handle_proxy_ws_raw(
                 }
                 Ok(n) => {
                     total += n as u64;
+                    eprintln!("[proxy] TCP→WS: {} bytes (total {})", n, total);
                     if ws_sink.send(async_tungstenite::tungstenite::Message::Binary(buf[..n].to_vec())).await.is_err() {
+                        eprintln!("[proxy] TCP→WS send error");
                         break;
                     }
                 }
