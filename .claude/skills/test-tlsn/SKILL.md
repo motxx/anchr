@@ -131,35 +131,129 @@ crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc-ws.presentatio
 
 ## Phase 5: Browser Extension (`browser`)
 
-### 5a. Install TLSNotary Extension
+### 5a. Build extension from source (first time only)
 
-Chrome Web Store: https://chromewebstore.google.com/detail/tlsnotary/gnoglgpcamodhflknhmafmjdahcejcgg
-
-### 5b. Start local Verifier with WS+proxy
+The extension needs a 1-line fix for HTTP request URI format.
+See: https://github.com/tlsnotary/tlsn-extension/pull/268
 
 ```bash
-crates/tlsn-server/target/debug/tlsn-server --tcp-port 7047 --ws-port 7048 &
+cd /tmp
+git clone https://github.com/motxx/tlsn-extension.git  # fork with fix
+cd tlsn-extension
+git checkout fix/prove-manager-uri-absolute-form
+npm install
 ```
 
-Endpoints available:
-- `ws://localhost:7048/session` — session registration
-- `ws://localhost:7048/verifier?sessionId=<id>` — MPC-TLS
-- `ws://localhost:7048/proxy?token=<hostname>` — WS-to-TCP proxy
+Modify the default DevConsole template in
+`packages/extension/src/entries/DevConsole/index.tsx`:
 
-### 5c. Run plugin
-
-Open extension DevConsole and paste the plugin from `tools/tlsn-plugin/coingecko-btc.js`:
+Replace the default `X Profile Prover` template with:
 
 ```javascript
-const VERIFIER_URL = 'ws://localhost:7048';
-const PROXY_URL = 'ws://localhost:7048/proxy?token=api.coingecko.com';
+const VERIFIER_URL = 'http://localhost:7047';
+const PROXY_URL = 'ws://localhost:7047/proxy?token=httpbin.org';
+
+export default {
+  config: {
+    name: 'Anchr: httpbin.org Test',
+    description: 'Prove HTTP response from httpbin.org via Anchr Verifier',
+    requests: [{
+      method: 'GET',
+      host: 'httpbin.org',
+      pathname: '/**',
+      verifierUrl: VERIFIER_URL,
+    }],
+  },
+  main: async () => {
+    const proof = await prove(
+      {
+        url: 'https://httpbin.org/get',
+        method: 'GET',
+        headers: {
+          'Host': 'httpbin.org',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'identity',
+          'Connection': 'close',
+        },
+      },
+      {
+        verifierUrl: VERIFIER_URL,
+        proxyUrl: PROXY_URL,
+        maxRecvData: 16384,
+        maxSentData: 4096,
+        handlers: [
+          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
+          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
+          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
+        ],
+      }
+    );
+    done(proof);
+  },
+};
 ```
 
-### 5d. Expected flow
-1. Extension registers session via `/session`
-2. MPC-TLS runs via `/verifier` + `/proxy`
-3. Server returns `session_completed` with verified data
-4. Extension displays proof results
+Build:
+```bash
+npm run build
+```
+
+### 5b. Start Verifier Server
+
+```bash
+cd "$PROJECT_ROOT"
+crates/tlsn-server/target/debug/tlsn-server --tcp-port 7046 --ws-port 7047 &
+```
+
+Endpoints:
+- `ws://localhost:7047/session` — session registration
+- `ws://localhost:7047/verifier?sessionId=<id>` — MPC-TLS (WsStream)
+- `ws://localhost:7047/proxy?token=<hostname>` — WS-to-TCP bridge
+
+### 5c. Automated test
+
+```bash
+bun test e2e/tlsn-browser.test.ts
+```
+
+This launches Chrome for Testing with the built extension, opens DevConsole,
+auto-approves the confirmPopup, runs the plugin, and verifies:
+- Status code: 200
+- Response body contains httpbin.org JSON
+- Execution completes within 120s
+
+### 5d. Manual test
+
+```bash
+# Launch Chrome for Testing with extension
+CHROMIUM=~/.cache/puppeteer/chrome/*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing
+EXT=/tmp/tlsn-extension/packages/extension/build
+"$CHROMIUM" --no-first-run --disable-extensions-except="$EXT" --load-extension="$EXT"
+```
+
+1. Navigate to `chrome-extension://<ext-id>/devConsole.html`
+2. Click **Run Code**
+3. Click **Allow** on the confirmPopup
+4. Wait ~10s for MPC-TLS
+5. Result appears in Console:
+
+```json
+{
+  "results": [
+    { "type": "SENT", "part": "START_LINE", "value": "GET /get HTTP/1.1\r\n" },
+    { "type": "RECV", "part": "STATUS_CODE", "value": "200" },
+    { "type": "RECV", "part": "BODY", "value": "{\"args\":{},\"headers\":{...},\"url\":\"https://httpbin.org/get\"}" }
+  ]
+}
+```
+
+### 5e. Key findings
+
+- Extension's WASM prover sends HTTP requests through MPC-TLS, not the proxy
+- Proxy is only for the raw TLS connection (TCP bridge)
+- Plugin must include `Host` header explicitly
+- Plugin must call `done(proof)` instead of `return proof` for DevConsole to show results
+- URI fix (PR #268) required: full URL → path-only in request line
 
 ---
 
