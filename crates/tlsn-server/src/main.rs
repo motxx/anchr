@@ -386,56 +386,12 @@ async fn run_ws_verifier(
     max_sent: usize,
     max_recv: usize,
 ) -> Result<WsVerificationResult> {
-    // Convert axum WebSocket to async-tungstenite WebSocket for WsStream compatibility
-    // axum's WebSocket doesn't implement the right traits for WsStream
-    // Instead, we'll use a duplex bridge
-    let (duplex_a, duplex_b) = tokio::io::duplex(1 << 23);
+    // Convert axum WebSocket to a futures::AsyncRead + AsyncWrite stream
+    // using ws_stream_tungstenite-compatible approach: each WS binary message = one stream chunk
+    let ws_stream = AxumWsStream::new(ws);
 
-    // Relay WS <-> duplex_a
-    let (ws_sink, ws_stream) = ws.split();
-    let (duplex_read, duplex_write) = tokio::io::split(duplex_a);
-
-    // WS → duplex_write
-    let ws_to_duplex = tokio::spawn({
-        let mut ws_stream = ws_stream;
-        let mut duplex_write = duplex_write;
-        async move {
-            while let Some(Ok(msg)) = ws_stream.next().await {
-                match msg {
-                    axum::extract::ws::Message::Binary(data) => {
-                        if duplex_write.write_all(&data).await.is_err() { break; }
-                        if duplex_write.flush().await.is_err() { break; }
-                    }
-                    axum::extract::ws::Message::Close(_) => break,
-                    _ => {}
-                }
-            }
-            let _ = duplex_write.shutdown().await;
-        }
-    });
-
-    // duplex_read → WS
-    let duplex_to_ws = tokio::spawn({
-        let mut ws_sink = ws_sink;
-        let mut duplex_read = duplex_read;
-        async move {
-            let mut buf = vec![0u8; 65536];
-            loop {
-                match duplex_read.read(&mut buf).await {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        if ws_sink.send(axum::extract::ws::Message::Binary(buf[..n].to_vec().into())).await.is_err() {
-                            break;
-                        }
-                    }
-                    Err(_) => break,
-                }
-            }
-        }
-    });
-
-    // Run Session over duplex_b
-    let session = Session::new(duplex_b.compat());
+    // Run Session directly over the WS stream (no duplex relay)
+    let session = Session::new(ws_stream);
     let (driver, mut handle) = session.split();
     let driver_task = tokio::spawn(driver);
 
@@ -479,9 +435,6 @@ async fn run_ws_verifier(
     verifier.close().await?;
     handle.close();
     driver_task.await??;
-
-    ws_to_duplex.abort();
-    duplex_to_ws.abort();
 
     let (sent, recv) = transcript.unwrap_or_default();
 
@@ -640,6 +593,126 @@ async fn handle_tcp_attest(
 
     Ok(())
 }
+
+// --- AxumWsStream: Convert axum WebSocket to futures AsyncRead + AsyncWrite ---
+
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::collections::VecDeque;
+
+struct AxumWsStream {
+    ws: axum::extract::ws::WebSocket,
+    read_buf: VecDeque<u8>,
+    closed: bool,
+}
+
+impl AxumWsStream {
+    fn new(ws: axum::extract::ws::WebSocket) -> Self {
+        Self { ws, read_buf: VecDeque::new(), closed: false }
+    }
+}
+
+impl futures::AsyncRead for AxumWsStream {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<std::io::Result<usize>> {
+        // Drain buffered data first
+        if !self.read_buf.is_empty() {
+            let n = std::cmp::min(buf.len(), self.read_buf.len());
+            for i in 0..n {
+                buf[i] = self.read_buf.pop_front().unwrap();
+            }
+            return Poll::Ready(Ok(n));
+        }
+
+        if self.closed {
+            return Poll::Ready(Ok(0));
+        }
+
+        // Poll WebSocket for next message
+        match Pin::new(&mut self.ws).poll_next(cx) {
+            Poll::Ready(Some(Ok(msg))) => {
+                match msg {
+                    axum::extract::ws::Message::Binary(data) => {
+                        let n = std::cmp::min(buf.len(), data.len());
+                        buf[..n].copy_from_slice(&data[..n]);
+                        // Buffer remaining
+                        for &b in &data[n..] {
+                            self.read_buf.push_back(b);
+                        }
+                        Poll::Ready(Ok(n))
+                    }
+                    axum::extract::ws::Message::Close(_) => {
+                        self.closed = true;
+                        Poll::Ready(Ok(0))
+                    }
+                    _ => {
+                        // Text or Ping/Pong — skip
+                        cx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                }
+            }
+            Poll::Ready(Some(Err(e))) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+            Poll::Ready(None) => {
+                self.closed = true;
+                Poll::Ready(Ok(0))
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+impl futures::AsyncWrite for AxumWsStream {
+    fn poll_write(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let msg = axum::extract::ws::Message::Binary(buf.to_vec().into());
+        match Pin::new(&mut self.ws).poll_ready(cx) {
+            Poll::Ready(Ok(())) => {
+                match Pin::new(&mut self.ws).start_send(msg) {
+                    Ok(()) => Poll::Ready(Ok(buf.len())),
+                    Err(e) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+                }
+            }
+            Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_flush(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        match Pin::new(&mut self.ws).poll_flush(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+
+    fn poll_close(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        match Pin::new(&mut self.ws).poll_close(cx) {
+            Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
+            Poll::Ready(Err(e)) => Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+// Need to implement Stream + Sink traits for AxumWsStream to use poll_next/poll_ready etc.
+// Actually axum::extract::ws::WebSocket already implements Stream + Sink, so we can use it directly.
+use futures::Stream;
+use futures::Sink;
+
+impl Unpin for AxumWsStream {}
 
 fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
