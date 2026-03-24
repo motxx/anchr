@@ -227,7 +227,18 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
 
 // --- CSS Build ---
 
-async function buildCss(cssIn: string, cssOut: string, label: string) {
+async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
+  // Skip if pre-built CSS exists and is newer than source
+  const outFile = Bun.file(cssOut);
+  const inFile = Bun.file(cssIn);
+  if (await outFile.exists()) {
+    const outStat = outFile.lastModified;
+    const inStat = inFile.lastModified;
+    if (outStat >= inStat) {
+      return;
+    }
+  }
+
   const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
@@ -240,8 +251,8 @@ async function buildCss(cssIn: string, cssOut: string, label: string) {
 
 export async function prepareWorkerApiAssets() {
   await Promise.all([
-    buildCss(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
-    buildCss(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
   ]);
 }
 

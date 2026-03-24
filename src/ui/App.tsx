@@ -8,6 +8,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import { apiFetch } from "./api-config";
 import React, { useRef, useState } from "react";
 import { Button } from "./components/ui/button";
 import {
@@ -114,7 +115,7 @@ function SubmitForm({
       try {
         const fd = new FormData();
         fd.append("photo", file);
-        const res = await fetch(`/queries/${query.id}/upload`, {
+        const res = await apiFetch(`/queries/${query.id}/upload`, {
           method: "POST",
           body: fd,
         });
@@ -227,7 +228,7 @@ function QueryCard({ query }: { query: Query }) {
 
   const mut = useMutation<SubmitResponse, Error, Record<string, unknown>>({
     mutationFn: async (body) => {
-      const r = await fetch(`/queries/${query.id}/submit`, {
+      const r = await apiFetch(`/queries/${query.id}/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -349,7 +350,7 @@ function QueryCard({ query }: { query: Query }) {
 function QueryList() {
   const { data: queries = [], isError } = useQuery<Query[]>({
     queryKey: ["queries"],
-    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
+    queryFn: (): Promise<Query[]> => apiFetch("/queries").then((r) => r.json()),
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -394,7 +395,7 @@ function QueryList() {
 export default function App() {
   const { isFetching } = useQuery<Query[]>({
     queryKey: ["queries"],
-    queryFn: (): Promise<Query[]> => fetch("/queries").then((r) => r.json()),
+    queryFn: (): Promise<Query[]> => apiFetch("/queries").then((r) => r.json()),
     staleTime: 2000,
   });
 

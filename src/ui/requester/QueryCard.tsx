@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { apiFetch } from "../api-config";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { cn } from "../lib/utils";
@@ -311,7 +312,7 @@ export function QueryCard({ query }: { query: QuerySummary }) {
 
   const { data: detail } = useQuery<QueryDetail>({
     queryKey: ["query-detail", query.id],
-    queryFn: () => fetch(`/queries/${query.id}`).then((r) => r.json()),
+    queryFn: () => apiFetch(`/queries/${query.id}`).then((r) => r.json()),
     enabled: open,
     refetchInterval: open && isActive ? 3000 : false,
   });

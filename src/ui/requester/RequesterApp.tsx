@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Inbox, RefreshCw } from "lucide-react";
 import React from "react";
+import { apiFetch } from "../api-config";
 import { CreateQueryForm } from "./CreateQueryForm";
 import { QueryCard } from "./QueryCard";
 
@@ -26,7 +27,7 @@ interface QuerySummary {
 function QueryList() {
   const { data: queries = [], isError } = useQuery<QuerySummary[]>({
     queryKey: ["queries-all"],
-    queryFn: () => fetch("/queries/all").then((r) => r.json()),
+    queryFn: () => apiFetch("/queries/all").then((r) => r.json()),
     refetchInterval: 3000,
     refetchIntervalInBackground: true,
   });
@@ -68,7 +69,7 @@ function QueryList() {
 export function RequesterApp() {
   const { isFetching } = useQuery<QuerySummary[]>({
     queryKey: ["queries-all"],
-    queryFn: () => fetch("/queries/all").then((r) => r.json()),
+    queryFn: () => apiFetch("/queries/all").then((r) => r.json()),
     staleTime: 2000,
   });
 

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, MapPin, Plus } from "lucide-react";
 import React, { useRef, useState } from "react";
+import { apiFetch } from "../api-config";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -60,7 +61,7 @@ export function CreateQueryForm() {
       const ttlVal = Number(ttlRef.current?.value);
       if (ttlVal > 0) body.ttl_seconds = ttlVal * 60;
 
-      const res = await fetch("/queries", {
+      const res = await apiFetch("/queries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
