@@ -1,13 +1,34 @@
 ---
 name: test-tlsn
-description: TLSNotary verification E2E test with real cryptographic proofs. Generates a TLSNotary presentation via MPC-TLS, submits to Anchr, and verifies. Requires Docker (Verifier Server) and Rust toolchain (prover/verifier binaries).
+description: TLSNotary verification E2E test with real cryptographic proofs. Three worker modes — CLI/TCP, CLI/WebSocket, Browser Extension. Requires Docker (Verifier Server) and Rust toolchain.
 disable-model-invocation: false
-argument-hint: "[full|build|infra|query|mobile|requester|teardown]"
+argument-hint: "[full|build|infra|tcp|ws|browser|anchr|teardown]"
 ---
 
 # TLSNotary E2E Test Runbook
 
-Test the full TLSNotary flow with **real cryptographic proofs**: Docker Verifier Server → MPC-TLS Prover → Anchr API verification → mobile/web UI.
+Test the full TLSNotary flow with **real cryptographic proofs** across all three worker modes.
+
+## Architecture
+
+```
+┌──────────────────┐   TCP    ┌──────────────────────────────┐
+│ CLI Worker        │◄────────►│ Verifier Server (Docker)     │
+│ (tlsn-prove)      │   WS    │ TCP  :7047 — CLI prover      │
+│                   │◄────────►│ HTTP :7048 — /health, /info  │
+└────────┬─────────┘          │ WS   :7048 — /session        │
+         │                     │              /verifier        │
+         │ .presentation.tlsn  │              /proxy           │
+         ▼                     └──────────────────────────────┘
+┌──────────────────┐
+│ Anchr API (:3000) │ → tlsn-verifier binary → verify → pass/fail
+└──────────────────┘
+
+┌──────────────────┐   WS    ┌──────────────────────────────┐
+│ Browser Extension │◄────────►│ Same Verifier Server         │
+│ (Chrome)          │         │ /session + /verifier + /proxy │
+└──────────────────┘          └──────────────────────────────┘
+```
 
 ## Quick start
 
@@ -16,333 +37,217 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 cd "$PROJECT_ROOT"
 ```
 
-**Automated (no UI):**
+**Automated E2E (no browser):**
 ```bash
-# 1. Build Rust binaries
 cd crates/tlsn-prover && cargo build && cd ../tlsn-verifier && cargo build --release && cd "$PROJECT_ROOT"
-
-# 2. Start Verifier Server + Anchr
 docker compose up tlsn-verifier -d
 bun run src/index.ts &
 until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
-
-# 3. Run E2E tests
 bun test e2e/tlsn.test.ts
-
-# 4. Teardown
 docker compose down tlsn-verifier
 pkill -f "bun.*src/index.ts"
 ```
-
-**Full runbook (includes mobile):** Use `/test-tlsn full` and follow all phases below.
-
----
-
-Phases: `full` (default) | `build` | `infra` | `query` | `mobile` | `requester` | `teardown`
 
 ---
 
 ## Phase 1: Build (`build`)
 
-Build the Rust binaries (first time or after code changes).
-
 ```bash
 cd "$PROJECT_ROOT"
-
-# Prover (generates presentations)
 cd crates/tlsn-prover && cargo build
-# Verifier (cryptographic verification)
 cd ../tlsn-verifier && cargo build --release
+cd ../tlsn-server && cargo build
 cd "$PROJECT_ROOT"
 ```
 
-**Verification:**
+**Verify:**
 ```bash
 crates/tlsn-prover/target/debug/tlsn-prove --help
 crates/tlsn-verifier/target/release/tlsn-verifier --help
+crates/tlsn-server/target/debug/tlsn-server --help
 ```
 
 ---
 
 ## Phase 2: Infrastructure (`infra`)
 
-Start Docker Verifier Server and Anchr server.
-
+### Option A: Docker Verifier (TCP only, port 7047)
 ```bash
-cd "$PROJECT_ROOT"
-
-# Start Verifier Server (Docker)
 docker compose up tlsn-verifier -d
+docker compose ps tlsn-verifier
+```
 
-# Start Anchr server
-pkill -f "bun.*src/index.ts" 2>/dev/null || true
+### Option B: Local Verifier (dual protocol, TCP 7047 + WS 7048)
+```bash
+crates/tlsn-server/target/debug/tlsn-server --tcp-port 7047 --ws-port 7048 &
+```
+
+### Start Anchr server
+```bash
 bun run src/index.ts &
 until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
 ```
 
-**Verification:**
+**Verify:**
 ```bash
-docker compose ps tlsn-verifier
-# Expected: STATUS = Up, PORT = 0.0.0.0:7047->7047/tcp
-
-curl -s http://localhost:3000/health | jq .
-# Expected: {"ok": true}
+curl -s http://localhost:7048/health   # "ok" (WS server)
+curl -s http://localhost:7048/info     # version info
+curl -s http://localhost:3000/health   # Anchr server
 ```
 
 ---
 
-## Phase 3: Query + Real Presentation (`query`)
-
-### 3a. Generate a real TLSNotary presentation
+## Phase 3: CLI Worker — TCP mode (`tcp`)
 
 ```bash
-cd "$PROJECT_ROOT"
-
-# Prover connects to Docker Verifier via MPC-TLS, fetches CoinGecko, outputs presentation
 crates/tlsn-prover/target/debug/tlsn-prove \
   --verifier localhost:7047 \
   "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
-  -o /tmp/btc.presentation.tlsn
+  -o /tmp/btc-tcp.presentation.tlsn
+
+crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc-tcp.presentation.tlsn | jq '{valid, server_name, revealed_body}'
 ```
 
-**Expected output:**
-```
-[tlsn-prove] MPC connection established
-[tlsn-prove] Connected to api.coingecko.com:443
-[tlsn-prove] Response status: 200 OK
-[tlsn-prove] Attestation received and validated
-[tlsn-prove] Presentation saved to /tmp/btc.presentation.tlsn
-[tlsn-prove] Size: ~5000 bytes
-```
+**Expected:** `valid: true`, `server_name: "api.coingecko.com"`, `revealed_body: {"bitcoin":{"usd":XXXXX}}`
 
-### 3b. Verify the presentation independently
+---
+
+## Phase 4: CLI Worker — WebSocket mode (`ws`)
+
+Requires local Verifier (Option B from Phase 2).
 
 ```bash
-crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc.presentation.tlsn | jq .
+crates/tlsn-prover/target/debug/tlsn-prove \
+  --verifier ws://localhost:7048 \
+  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+  -o /tmp/btc-ws.presentation.tlsn
+
+crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc-ws.presentation.tlsn | jq '{valid, server_name, revealed_body}'
 ```
 
-**Expected:**
-```json
-{
-  "valid": true,
-  "server_name": "api.coingecko.com",
-  "revealed_body": "{\"bitcoin\":{\"usd\":XXXXX}}",
-  "time": 17XXXXXXXX
-}
-```
+**Expected:** Same as TCP mode.
 
-### 3c. Create Anchr query and submit real presentation
+---
+
+## Phase 5: Browser Extension (`browser`)
+
+### 5a. Install TLSNotary Extension
+
+Chrome Web Store: https://chromewebstore.google.com/detail/tlsnotary/gnoglgpcamodhflknhmafmjdahcejcgg
+
+### 5b. Start local Verifier with WS+proxy
 
 ```bash
-QUERY_ID=$(curl -s -X POST http://localhost:3000/queries \
+crates/tlsn-server/target/debug/tlsn-server --tcp-port 7047 --ws-port 7048 &
+```
+
+Endpoints available:
+- `ws://localhost:7048/session` — session registration
+- `ws://localhost:7048/verifier?sessionId=<id>` — MPC-TLS
+- `ws://localhost:7048/proxy?token=<hostname>` — WS-to-TCP proxy
+
+### 5c. Run plugin
+
+Open extension DevConsole and paste the plugin from `tools/tlsn-plugin/coingecko-btc.js`:
+
+```javascript
+const VERIFIER_URL = 'ws://localhost:7048';
+const PROXY_URL = 'ws://localhost:7048/proxy?token=api.coingecko.com';
+```
+
+### 5d. Expected flow
+1. Extension registers session via `/session`
+2. MPC-TLS runs via `/verifier` + `/proxy`
+3. Server returns `session_completed` with verified data
+4. Extension displays proof results
+
+---
+
+## Phase 6: Anchr API submission (`anchr`)
+
+Submit any generated presentation to Anchr:
+
+```bash
+PRESENTATION_B64=$(base64 -i /tmp/btc-tcp.presentation.tlsn | tr -d '\n')
+
+QID=$(curl -s -X POST http://localhost:3000/queries \
   -H "Content-Type: application/json" \
-  -d '{
-    "description": "Verify BTC price on CoinGecko",
-    "verification_requirements": ["tlsn"],
-    "tlsn_requirements": {
-      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-      "conditions": [{ "type": "jsonpath", "expression": "bitcoin.usd", "description": "BTC price exists" }]
-    },
-    "bounty": { "amount_sats": 21 },
-    "ttl_seconds": 600
-  }' | jq -r '.query_id')
-echo "Query: $QUERY_ID"
+  -d '{"description":"BTC price","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd","conditions":[{"type":"jsonpath","expression":"bitcoin.usd","description":"BTC price exists"}]},"bounty":{"amount_sats":21},"ttl_seconds":600}' | jq -r '.query_id')
 
-# Submit the real presentation (base64 on stdout from tlsn-prove)
-PRESENTATION_B64=$(base64 -i /tmp/btc.presentation.tlsn | tr -d '\n')
 python3 -c "import json; print(json.dumps({'tlsn_presentation': open('/dev/stdin').read().strip()}))" <<< "$PRESENTATION_B64" > /tmp/submit.json
 
-curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QID}/submit" \
   -H "Content-Type: application/json" \
-  -d @/tmp/submit.json | jq .
+  -d @/tmp/submit.json | jq '{ok, verification}'
 ```
 
-**Expected:**
-```json
-{
-  "ok": true,
-  "message": "Verification passed. Result accepted.",
-  "verification": {
-    "passed": true,
-    "checks": [
-      "TLSNotary: presentation signature valid (cryptographically verified)",
-      "TLSNotary: server name matches target (api.coingecko.com)",
-      "TLSNotary: attestation fresh (Xs old, max 300s)",
-      "TLSNotary condition passed: BTC price exists"
-    ],
-    "failures": []
-  }
-}
-```
-
-### 3d. Verify failure cases
-
-```bash
-# Missing presentation → fail
-FAIL_QID=$(curl -s -X POST http://localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{"description":"fail test","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://example.com"},"ttl_seconds":120}' | jq -r '.query_id')
-curl -s -X POST "http://localhost:3000/queries/${FAIL_QID}/submit" \
-  -H "Content-Type: application/json" -d '{}' | jq '{ok, message}'
-# Expected: ok=false, "no attestation provided"
-
-# Invalid presentation data → fail
-FAIL_QID2=$(curl -s -X POST http://localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{"description":"fail test 2","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://example.com"},"ttl_seconds":120}' | jq -r '.query_id')
-curl -s -X POST "http://localhost:3000/queries/${FAIL_QID2}/submit" \
-  -H "Content-Type: application/json" -d '{"tlsn_presentation":"dGVzdA=="}' | jq '{ok, message}'
-# Expected: ok=false, "presentation signature invalid"
-```
-
-### 3e. Run automated E2E tests
-
-```bash
-bun test e2e/tlsn.test.ts
-```
+**Expected:** `ok: true`, all 4 checks pass (signature, domain, freshness, condition).
 
 ---
 
-## Phase 4: Mobile App Test (`mobile`)
-
-### 4a. Start Metro bundler
-
-```bash
-cd "$PROJECT_ROOT/mobile"
-bun install
-bunx expo start --port 8082 &
-```
-
-### 4b. Open app
-
-```bash
-xcrun simctl openurl booted "exp://192.168.10.101:8082"
-```
-
-### 4c. Create pending query, open in app, submit presentation, verify UI
-
-```bash
-cd "$PROJECT_ROOT"
-
-# Create query
-MOBILE_QID=$(curl -s -X POST http://localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Verify ETH price on CoinGecko",
-    "verification_requirements": ["tlsn"],
-    "tlsn_requirements": {
-      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-      "conditions": [{ "type": "jsonpath", "expression": "ethereum.usd", "description": "ETH price exists" }]
-    },
-    "bounty": { "amount_sats": 15 },
-    "ttl_seconds": 600
-  }' | jq -r '.query_id')
-```
-
-1. Open the query in the mobile app — should show **"TLSNotary Verification Required"** (not Camera/Import)
-2. Generate and submit presentation:
-
-```bash
-crates/tlsn-prover/target/debug/tlsn-prove \
-  --verifier localhost:7047 \
-  "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd" \
-  -o /tmp/eth.presentation.tlsn
-
-PRESENTATION_B64=$(base64 -i /tmp/eth.presentation.tlsn | tr -d '\n')
-python3 -c "import json; print(json.dumps({'tlsn_presentation': open('/dev/stdin').read().strip()}))" <<< "$PRESENTATION_B64" > /tmp/eth-submit.json
-curl -s -X POST "http://localhost:3000/queries/${MOBILE_QID}/submit" \
-  -H "Content-Type: application/json" -d @/tmp/eth-submit.json | jq '{ok}'
-```
-
-3. Wait ~7s for poll, verify on mobile:
-   - **Approved** status
-   - **VERIFICATION**: "cryptographically verified", "server name matches", "ETH price exists"
-   - **TLSNOTARY PROOF (cryptographically verified)**: server name, conditions, Server Response (JSON)
-
----
-
-## Phase 5: Requester Web UI (`requester`)
-
-Open `http://localhost:3000/requester` in browser or gstack browse.
-
-1. Click query card to expand
-2. Verify: 承認 + 検証OK + TLSNotary Proof panel with server response
-
----
-
-## Phase 6: Teardown (`teardown`)
+## Phase 7: Teardown (`teardown`)
 
 ```bash
 pkill -f "bun.*src/index.ts" 2>/dev/null || true
-pkill -f "expo start" 2>/dev/null || true
-docker compose down tlsn-verifier
+pkill -f "tlsn-server" 2>/dev/null || true
+docker compose down tlsn-verifier 2>/dev/null || true
 ```
 
 ---
 
-## Unit Tests
+## Automated Tests
 
 ```bash
-bun test src/verification/tlsn-validation.test.ts
-# 18 tests: condition evaluation, binary-unavailable failure, mock binary tests, verify() integration
+bun test src/verification/tlsn-validation.test.ts   # 18 unit tests
+bun test e2e/tlsn.test.ts                           # 4 E2E tests (requires infra)
 ```
 
 ---
+
+## Worker Modes Summary
+
+| Mode | Transport | Proxy | Attestation | Status |
+|------|-----------|-------|-------------|--------|
+| CLI/TCP | TCP :7047 | Not needed | Server → Prover (direct) | **Working** |
+| CLI/WS | WS :7048 | Not needed (direct TCP) | Server → Prover (via session_completed) | **Working** |
+| Browser Extension | WS :7048 | Required (/proxy) | Server → Extension (via session_completed) | **Server ready** |
 
 ## Checklist
 
 | Step | Expected |
 |------|----------|
-| `cargo build` (prover + verifier) | Binaries built |
-| `docker compose up tlsn-verifier` | Container running on :7047 |
-| `tlsn-prove --verifier localhost:7047 <url>` | Presentation file generated (~5KB) |
-| `tlsn-verifier verify <file>` | `valid: true`, server_name + revealed_body extracted |
-| `POST /queries` with `tlsn` | Query created with `tlsn_requirements` |
-| Submit real presentation | `verification.passed: true`, 4 checks all pass |
-| Submit without presentation | Fails: "no attestation provided" |
-| Submit invalid data | Fails: "signature invalid" |
-| `bun test e2e/tlsn.test.ts` | All tests pass |
-| Mobile: pending tlsn query | Shows "TLSNotary Verification Required" (no Camera/Import) |
-| Mobile: after submit | VERIFICATION + TLSNOTARY PROOF sections |
-| Requester: expanded card | 検証OK + TLSNotary Proof panel |
-
-## Architecture
-
-```
-┌─────────────────┐     MPC-TLS     ┌──────────────────────┐
-│  tlsn-prove     │◄───────────────►│  tlsn-server         │
-│  (Prover CLI)   │                 │  (Docker :7047)      │
-└────────┬────────┘                 └──────────────────────┘
-         │ .presentation.tlsn (base64)
-         ▼
-┌─────────────────┐     verify      ┌──────────────────────┐
-│  Anchr API      │────────────────►│  tlsn-verifier       │
-│  (:3000)        │                 │  (sidecar binary)    │
-└────────┬────────┘                 └──────────────────────┘
-         │ conditions + verified data
-         ▼
-   pass/fail → bounty released
-```
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---------|-----|
-| `tlsn-prove` binary not found | `cd crates/tlsn-prover && cargo build` |
-| `tlsn-verifier` binary not found | `cd crates/tlsn-verifier && cargo build --release` |
-| Docker Verifier not starting | `docker compose build tlsn-verifier` (Rust build in Docker) |
-| MPC connection failed | Verify Verifier Server is running: `docker compose ps tlsn-verifier` |
-| "binary not available" in verification | Ensure `tlsn-verifier` is in PATH or `crates/tlsn-verifier/target/release/` |
-| Condition "jsonpath" fails | Check chunked body decoding: `tlsn-verifier verify <file> \| jq .revealed_body` |
-| Freshness check fails | Presentation must be submitted within 300s of generation |
-| Metro cache stale | Restart: `bunx expo start --port 8082 --clear` |
+| `cargo build` all crates | 3 binaries built |
+| Docker Verifier Server | Running on :7047 |
+| Local Verifier Server | Running on :7047 + :7048 |
+| TCP prover → presentation | ~5KB file, valid |
+| WS prover → presentation | ~5KB file, valid |
+| Anchr submit → verification | passed: true, 4 checks |
+| /health endpoint | "ok" |
+| /info endpoint | version + tlsn_version |
+| /proxy endpoint | WS-to-TCP bridge working |
 
 ## Port Reference
 
 | Service | Port |
 |---------|------|
+| Verifier Server (TCP) | 7047 |
+| Verifier Server (HTTP/WS) | 7048 |
 | Anchr Server | 3000 |
-| TLSNotary Verifier Server | 7047 |
 | Nostr Relay | 7777 |
 | Blossom | 3333 |
 | Metro Bundler | 8082 |
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Prover binary not found | `cd crates/tlsn-prover && cargo build` |
+| Verifier binary not found | `cd crates/tlsn-verifier && cargo build --release` |
+| Server binary not found | `cd crates/tlsn-server && cargo build` |
+| Docker build fails | Use `rust:1-bookworm` image (edition 2024 needs Rust 1.85+) |
+| MPC connection timeout | Check Verifier Server is running on correct port |
+| "binary not available" | `tlsn-verifier` must be in PATH or `crates/tlsn-verifier/target/release/` |
+| Freshness check fails | Submit within 300s of generation |
+| Chunked body condition fail | Update `tlsn-verifier` (chunked decoding added) |
+| WS session "error" | Check server logs for MPC failure details |
+| Browser extension "proxy error" | Ensure `/proxy` endpoint is accessible on WS port |
