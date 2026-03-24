@@ -126,6 +126,7 @@ async fn main() -> Result<()> {
         .route("/info", get(info_handler))
         .route("/session", get(session_ws_handler))
         .route("/verifier", get(verifier_ws_handler))
+        .route("/proxy", get(proxy_ws_handler))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -151,6 +152,13 @@ async fn info_handler() -> impl IntoResponse {
 struct VerifierQuery {
     #[serde(rename = "sessionId")]
     session_id: String,
+}
+
+#[derive(Deserialize)]
+struct ProxyQuery {
+    /// Target hostname (e.g. "api.coingecko.com" or "api.coingecko.com:443")
+    token: Option<String>,
+    host: Option<String>,
 }
 
 async fn session_ws_handler(
@@ -296,6 +304,81 @@ async fn handle_verifier_ws(ws: WebSocket, session_id: String, state: AppState) 
             eprintln!("[tlsn-server] WS session {} not found", &session_id[..8]);
         }
     }
+}
+
+// --- WebSocket-to-TCP Proxy (for browser extensions) ---
+
+async fn proxy_ws_handler(
+    ws: WebSocketUpgrade,
+    Query(query): Query<ProxyQuery>,
+    State(_state): State<AppState>,
+) -> impl IntoResponse {
+    let host = query.token.or(query.host).unwrap_or_default();
+    ws.on_upgrade(move |socket| handle_proxy_ws(socket, host))
+}
+
+async fn handle_proxy_ws(ws: WebSocket, host: String) {
+    let (host_part, port) = if host.contains(':') {
+        let parts: Vec<&str> = host.splitn(2, ':').collect();
+        (parts[0].to_string(), parts[1].parse::<u16>().unwrap_or(443))
+    } else {
+        (host.clone(), 443)
+    };
+
+    eprintln!("[tlsn-server] Proxy connecting to {}:{}", host_part, port);
+
+    let tcp = match tokio::net::TcpStream::connect((&*host_part, port)).await {
+        Ok(tcp) => tcp,
+        Err(e) => {
+            eprintln!("[tlsn-server] Proxy connect failed: {}", e);
+            return;
+        }
+    };
+
+    let (tcp_read, tcp_write) = tcp.into_split();
+    let (ws_sink, ws_stream) = ws.split();
+
+    // WS → TCP
+    let ws_to_tcp = tokio::spawn({
+        let mut ws_stream = ws_stream;
+        let mut tcp_write = tcp_write;
+        async move {
+            while let Some(Ok(msg)) = ws_stream.next().await {
+                match msg {
+                    axum::extract::ws::Message::Binary(data) => {
+                        if tcp_write.write_all(&data).await.is_err() { break; }
+                        if tcp_write.flush().await.is_err() { break; }
+                    }
+                    axum::extract::ws::Message::Close(_) => break,
+                    _ => {}
+                }
+            }
+            let _ = tcp_write.shutdown().await;
+        }
+    });
+
+    // TCP → WS
+    let tcp_to_ws = tokio::spawn({
+        let mut ws_sink = ws_sink;
+        let mut tcp_read = tcp_read;
+        async move {
+            let mut buf = vec![0u8; 65536];
+            loop {
+                match tcp_read.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if ws_sink.send(axum::extract::ws::Message::Binary(buf[..n].to_vec().into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
+    });
+
+    let _ = tokio::join!(ws_to_tcp, tcp_to_ws);
+    eprintln!("[tlsn-server] Proxy closed for {}", host);
 }
 
 async fn run_ws_verifier(
