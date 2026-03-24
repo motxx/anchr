@@ -26,6 +26,9 @@ clap = { version = "4", features = ["derive"] }
 hex = "0.4"
 rand = "0.8"
 url = "2"
+async-tungstenite = { version = "0.28", features = ["tokio-runtime", "tokio-native-tls"] }
+ws_stream_tungstenite = "0.14"
+futures = "0.3"
 
 [profile.release]
 strip = true

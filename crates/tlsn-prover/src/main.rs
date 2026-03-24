@@ -78,9 +78,15 @@ async fn main() -> Result<()> {
     eprintln!("[tlsn-prove] Target: {}:{}{}", host, port, path);
 
     let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
-        // Remote verifier mode: connect to external Verifier Server
-        eprintln!("[tlsn-prove] Using remote verifier: {}", verifier_addr);
-        run_with_remote_verifier(verifier_addr, &host, port, &path).await?
+        if verifier_addr.starts_with("wss://") || verifier_addr.starts_with("ws://") {
+            // WebSocket mode: connect to TLSNotary demo/extension verifier
+            eprintln!("[tlsn-prove] Using WebSocket verifier: {}", verifier_addr);
+            run_with_ws_verifier(verifier_addr, &host, port, &path).await?
+        } else {
+            // TCP mode: connect to our custom Verifier Server
+            eprintln!("[tlsn-prove] Using TCP verifier: {}", verifier_addr);
+            run_with_remote_verifier(verifier_addr, &host, port, &path).await?
+        }
     } else {
         // Local mode: run both prover and verifier in-process
         eprintln!("[tlsn-prove] Using in-process verifier");
@@ -123,6 +129,343 @@ async fn run_with_local_verifier(
     });
 
     run_prover(prover_socket, request_tx, attestation_rx, host, port, path).await
+}
+
+async fn run_with_ws_verifier(
+    verifier_url: &str,
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<(Attestation, Secrets)> {
+    use async_tungstenite::tokio::connect_async;
+    use async_tungstenite::tungstenite::Message;
+    use futures::{SinkExt, StreamExt};
+
+    // Step 1: Register session via /session WebSocket
+    let session_ws_url = format!("{}/session", verifier_url);
+    eprintln!("[tlsn-prove] Connecting to session endpoint: {}", session_ws_url);
+
+    let (mut session_ws, _) = connect_async(&session_ws_url).await
+        .map_err(|e| anyhow!("Failed to connect to session WS: {e}"))?;
+
+    // Send register message
+    let register_msg = serde_json::json!({
+        "type": "register",
+        "maxRecvData": MAX_RECV_DATA,
+        "maxSentData": MAX_SENT_DATA,
+        "sessionData": {}
+    });
+    session_ws.send(Message::Text(register_msg.to_string())).await?;
+
+    // Receive session_registered response
+    let resp = session_ws.next().await
+        .ok_or_else(|| anyhow!("Session WS closed"))??;
+    let resp_text = resp.into_text()?;
+    let resp_json: serde_json::Value = serde_json::from_str(&resp_text)?;
+    let session_id = resp_json["sessionId"].as_str()
+        .ok_or_else(|| anyhow!("No sessionId in response: {}", resp_text))?;
+    eprintln!("[tlsn-prove] Session registered: {}", session_id);
+
+    // Step 2: Connect to /verifier?sessionId=<id> for MPC-TLS
+    let verifier_ws_url = format!("{}/verifier?sessionId={}", verifier_url, session_id);
+    eprintln!("[tlsn-prove] Connecting to verifier: {}", verifier_ws_url);
+
+    let (verifier_ws, _) = connect_async(&verifier_ws_url).await
+        .map_err(|e| anyhow!("Failed to connect to verifier WS: {e}"))?;
+
+    // Wrap WebSocket as AsyncRead+AsyncWrite
+    // WsStream needs the inner WebSocket, not the wrapper
+    let ws_stream = ws_stream_tungstenite::WsStream::new(verifier_ws);
+
+    // Step 3: Run MPC-TLS prover over the WebSocket stream
+    // Session expects futures AsyncRead/AsyncWrite (it calls .compat() internally)
+    let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path).await?;
+
+    eprintln!("[tlsn-prove] MPC complete, sending reveal config...");
+
+    // Step 4: Send reveal_config on /session WebSocket
+    let transcript = prover_output.secrets.transcript();
+    let sent_len = transcript.sent().len();
+    let recv_len = transcript.received().len();
+
+    let reveal_config = serde_json::json!({
+        "type": "reveal_config",
+        "sent": [{"start": 0, "end": sent_len, "handler": {"type": "SENT", "part": "ALL"}}],
+        "recv": [{"start": 0, "end": recv_len, "handler": {"type": "RECV", "part": "ALL"}}]
+    });
+    session_ws.send(Message::Text(reveal_config.to_string())).await?;
+
+    // Receive session_completed
+    let resp = session_ws.next().await
+        .ok_or_else(|| anyhow!("Session WS closed before completion"))??;
+    let resp_text = resp.into_text()?;
+    let resp_json: serde_json::Value = serde_json::from_str(&resp_text)?;
+    eprintln!("[tlsn-prove] Session response: {}", resp_text);
+
+    // The demo server handles attestation signing internally.
+    // We build presentation from our local secrets (the prove() output gives us what we need).
+    // For the presentation, we need an Attestation. In the demo flow, the server
+    // doesn't send us the Attestation directly — it uses webhooks.
+    // We'll construct a self-attestation for now and note this limitation.
+
+    // Build a local attestation (self-signed) since the demo server
+    // doesn't return the signed attestation to the prover.
+    let (attestation, secrets) = build_local_attestation(prover_output)?;
+
+    session_ws.close(None).await.ok();
+
+    Ok((attestation, secrets))
+}
+
+/// Build a local (self-signed) attestation from MPC output.
+/// This is used with the demo server which doesn't return the attestation to the prover.
+fn build_local_attestation(output: ProverMpcOutput) -> Result<(Attestation, Secrets)> {
+    let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
+    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
+    let mut provider = CryptoProvider::default();
+    provider.signer.set_signer(signer);
+
+    let att_config = AttestationConfig::builder()
+        .supported_signature_algs(Vec::from_iter(provider.signer.supported_algs()))
+        .build()?;
+
+    // We need connection info, but we don't have it from the demo server.
+    // Use current time as approximation.
+    let connection_info = ConnectionInfo {
+        time: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs(),
+        version: tlsn::connection::TlsVersion::V1_2,
+        transcript_length: TranscriptLength {
+            sent: output.secrets.transcript().sent().len() as u32,
+            received: output.secrets.transcript().received().len() as u32,
+        },
+    };
+
+    // This is a self-attestation. The MPC-TLS session was co-signed by the demo server,
+    // but the attestation itself is self-signed because the demo server uses webhooks
+    // rather than returning the attestation to the prover.
+    // The demo server doesn't return attestation to the prover directly.
+    // It uses the webhook model. For CLI prover, this is a limitation.
+    // TODO: Implement webhook receiver to capture the attestation from demo server.
+    Err(anyhow!("Demo server webhook model not yet supported for CLI prover. Use --verifier <host:port> with self-hosted server instead."))
+}
+
+/// Run the MPC-TLS prover over a futures AsyncRead+AsyncWrite stream (for WebSocket).
+async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWrite + Send + Unpin + 'static>(
+    stream: S,
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<ProverMpcOutput> {
+    // Session::new expects futures AsyncRead+AsyncWrite
+    let session = Session::new(stream);
+    let (driver, mut handle) = session.split();
+    let driver_task = tokio::spawn(driver);
+
+    let prover = handle
+        .new_prover(ProverConfig::builder().build()?)?
+        .commit(
+            TlsCommitConfig::builder()
+                .protocol(
+                    MpcTlsConfig::builder()
+                        .max_sent_data(MAX_SENT_DATA)
+                        .max_recv_data(MAX_RECV_DATA)
+                        .build()?,
+                )
+                .build()?,
+        )
+        .await?;
+
+    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
+
+    let (tls_connection, prover_fut) = prover
+        .connect(
+            TlsClientConfig::builder()
+                .server_name(ServerName::Dns(host.try_into()?))
+                .root_store(tlsn::webpki::RootCertStore::mozilla())
+                .build()?,
+            target_tcp.compat(),
+        )
+        .await?;
+    let tls_connection = TokioIo::new(tls_connection.compat());
+    let prover_task = tokio::spawn(prover_fut);
+
+    let (mut request_sender, connection) =
+        hyper::client::conn::http1::handshake(tls_connection).await?;
+    tokio::spawn(connection);
+
+    let request = Request::builder()
+        .uri(path)
+        .header("Host", host)
+        .header("Accept", "application/json")
+        .header("Accept-Encoding", "identity")
+        .header("Connection", "close")
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
+        .body(Empty::<Bytes>::new())?;
+
+    eprintln!("[tlsn-prove] Sending HTTP request...");
+    let response = request_sender.send_request(request).await?;
+    eprintln!("[tlsn-prove] Response status: {}", response.status());
+
+    let mut prover = prover_task.await??;
+
+    let transcript = prover.transcript();
+    let sent_len = transcript.sent().len();
+    let recv_len = transcript.received().len();
+
+    let mut builder = TranscriptCommitConfig::builder(transcript);
+    builder.commit_sent(&(0..sent_len))?;
+    builder.commit_recv(&(0..recv_len))?;
+    let transcript_commit = builder.build()?;
+
+    let mut req_builder = RequestConfig::builder();
+    req_builder.transcript_commit(transcript_commit);
+    let request_config = req_builder.build()?;
+
+    let mut prove_builder = ProveConfig::builder(prover.transcript());
+    if let Some(tc) = request_config.transcript_commit() {
+        prove_builder.transcript_commit(tc.clone());
+    }
+    let disclosure_config = prove_builder.build()?;
+
+    let ProverOutput {
+        transcript_commitments,
+        transcript_secrets,
+        ..
+    } = prover.prove(&disclosure_config).await?;
+
+    let transcript = prover.transcript().clone();
+    let tls_transcript = prover.tls_transcript().clone();
+    prover.close().await?;
+
+    let mut att_builder = AttestationRequest::builder(&request_config);
+    att_builder
+        .server_name(ServerName::Dns(host.try_into()?))
+        .handshake_data(HandshakeData {
+            certs: tls_transcript.server_cert_chain().expect("cert chain").to_vec(),
+            sig: tls_transcript.server_signature().expect("signature").clone(),
+            binding: tls_transcript.certificate_binding().clone(),
+        })
+        .transcript(transcript)
+        .transcript_commitments(transcript_secrets, transcript_commitments);
+
+    let (request, secrets) = att_builder.build(&CryptoProvider::default())?;
+
+    handle.close();
+    driver_task.await??;
+
+    Ok(ProverMpcOutput { request, secrets, request_config })
+}
+
+/// Run the MPC-TLS prover over any tokio AsyncRead+AsyncWrite stream (for TCP).
+async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static>(
+    stream: S,
+    host: &str,
+    port: u16,
+    path: &str,
+) -> Result<ProverMpcOutput> {
+    use tokio_util::compat::TokioAsyncReadCompatExt;
+
+    let session = Session::new(stream.compat());
+    let (driver, mut handle) = session.split();
+    let driver_task = tokio::spawn(driver);
+
+    let prover = handle
+        .new_prover(ProverConfig::builder().build()?)?
+        .commit(
+            TlsCommitConfig::builder()
+                .protocol(
+                    MpcTlsConfig::builder()
+                        .max_sent_data(MAX_SENT_DATA)
+                        .max_recv_data(MAX_RECV_DATA)
+                        .build()?,
+                )
+                .build()?,
+        )
+        .await?;
+
+    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
+
+    let (tls_connection, prover_fut) = prover
+        .connect(
+            TlsClientConfig::builder()
+                .server_name(ServerName::Dns(host.try_into()?))
+                .root_store(tlsn::webpki::RootCertStore::mozilla())
+                .build()?,
+            target_tcp.compat(),
+        )
+        .await?;
+    let tls_connection = TokioIo::new(tls_connection.compat());
+    let prover_task = tokio::spawn(prover_fut);
+
+    let (mut request_sender, connection) =
+        hyper::client::conn::http1::handshake(tls_connection).await?;
+    tokio::spawn(connection);
+
+    let request = Request::builder()
+        .uri(path)
+        .header("Host", host)
+        .header("Accept", "application/json")
+        .header("Accept-Encoding", "identity")
+        .header("Connection", "close")
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
+        .body(Empty::<Bytes>::new())?;
+
+    eprintln!("[tlsn-prove] Sending HTTP request...");
+    let response = request_sender.send_request(request).await?;
+    eprintln!("[tlsn-prove] Response status: {}", response.status());
+
+    let mut prover = prover_task.await??;
+
+    let transcript = prover.transcript();
+    let sent_len = transcript.sent().len();
+    let recv_len = transcript.received().len();
+
+    let mut builder = TranscriptCommitConfig::builder(transcript);
+    builder.commit_sent(&(0..sent_len))?;
+    builder.commit_recv(&(0..recv_len))?;
+    let transcript_commit = builder.build()?;
+
+    let mut req_builder = RequestConfig::builder();
+    req_builder.transcript_commit(transcript_commit);
+    let request_config = req_builder.build()?;
+
+    let mut prove_builder = ProveConfig::builder(prover.transcript());
+    if let Some(tc) = request_config.transcript_commit() {
+        prove_builder.transcript_commit(tc.clone());
+    }
+    let disclosure_config = prove_builder.build()?;
+
+    let ProverOutput {
+        transcript_commitments,
+        transcript_secrets,
+        ..
+    } = prover.prove(&disclosure_config).await?;
+
+    let transcript = prover.transcript().clone();
+    let tls_transcript = prover.tls_transcript().clone();
+    prover.close().await?;
+
+    let mut att_builder = AttestationRequest::builder(&request_config);
+    att_builder
+        .server_name(ServerName::Dns(host.try_into()?))
+        .handshake_data(HandshakeData {
+            certs: tls_transcript.server_cert_chain().expect("cert chain").to_vec(),
+            sig: tls_transcript.server_signature().expect("signature").clone(),
+            binding: tls_transcript.certificate_binding().clone(),
+        })
+        .transcript(transcript)
+        .transcript_commitments(transcript_secrets, transcript_commitments);
+
+    let (request, secrets) = att_builder.build(&CryptoProvider::default())?;
+
+    handle.close();
+    driver_task.await??;
+
+    Ok(ProverMpcOutput { request, secrets, request_config })
 }
 
 async fn run_with_remote_verifier(
