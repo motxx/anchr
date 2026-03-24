@@ -239,6 +239,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         passed: attestation.passed,
         checks: attestation.checks,
         failures: attestation.failures,
+        tlsn_verified: attestation.tlsn_verified,
       };
 
       const newStatus: QueryStatus = attestation.passed ? "approved" : "rejected";
