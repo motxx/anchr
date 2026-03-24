@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
@@ -17,13 +18,13 @@ import { filePickerProvider } from "../src/platform/file-picker";
 import { useQueryDetail } from "../src/hooks/useQueries";
 import { ChallengeNonceDisplay } from "../src/components/ChallengeNonceDisplay";
 import { StatusBadge } from "../src/components/StatusBadge";
+import { QueryTypeBadge } from "../src/components/QueryTypeBadge";
 import { uploadPhoto, submitResult } from "../src/api/client";
 import { useWalletStore } from "../src/store/wallet";
 import { timeLeft, isExpired } from "../src/utils/time";
 import type {
   AttachmentRef,
   BlossomKeyMap,
-  BlossomKeyMaterial,
   SubmitResponse,
   TlsnRequirement,
   TlsnVerifiedData,
@@ -153,6 +154,80 @@ function TlsnProofSection({
   );
 }
 
+/** Status info for TLSNotary queries that are being auto-fulfilled */
+function TlsnStatusPanel({ query }: { query: { status: string; tlsn_requirements?: TlsnRequirement | null } }) {
+  const isPending = query.status === "pending";
+  const isProcessing = query.status === "processing" || query.status === "verifying";
+  const isApproved = query.status === "approved";
+  const isRejected = query.status === "rejected";
+
+  return (
+    <View className="mt-5 p-4 rounded-xl bg-surface border border-border gap-3">
+      <View className="flex-row items-center gap-2">
+        <Ionicons name="globe-outline" size={16} color="#60a5fa" />
+        <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Web Proof — Auto-Worker
+        </Text>
+      </View>
+
+      {/* Target URL */}
+      {query.tlsn_requirements?.target_url && (
+        <View className="bg-black/30 rounded-lg px-3 py-2">
+          <View className="flex-row items-center gap-1.5 mb-1">
+            <Ionicons name="lock-closed" size={10} color="#60a5fa" />
+            <Text className="text-xs text-blue-400 font-medium" numberOfLines={1}>
+              {query.tlsn_requirements.target_url}
+            </Text>
+          </View>
+          {query.tlsn_requirements.conditions?.map((cond, i) => (
+            <Text key={i} className="text-[11px] text-muted-foreground ml-4">
+              {cond.description ?? `${cond.type}: ${cond.expression}`}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      {/* Status message */}
+      {isPending && (
+        <View className="flex-row items-center gap-2">
+          <ActivityIndicator size="small" color="#60a5fa" />
+          <Text className="text-sm text-blue-400">
+            Waiting for Auto-Worker to pick up...
+          </Text>
+        </View>
+      )}
+      {isProcessing && (
+        <View className="flex-row items-center gap-2">
+          <ActivityIndicator size="small" color="#f59e0b" />
+          <Text className="text-sm text-amber-400">
+            Running MPC-TLS proof...
+          </Text>
+        </View>
+      )}
+      {isApproved && (
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+          <Text className="text-sm text-emerald-400">
+            Proof verified successfully
+          </Text>
+        </View>
+      )}
+      {isRejected && (
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="close-circle" size={16} color="#ef4444" />
+          <Text className="text-sm text-red-400">
+            Verification failed
+          </Text>
+        </View>
+      )}
+
+      <Text className="text-[11px] text-muted-foreground">
+        TLSNotary queries are automatically fulfilled by the Auto-Worker daemon via MPC-TLS.
+      </Text>
+    </View>
+  );
+}
+
 export default function QueryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: query, isLoading, isError } = useQueryDetail(id);
@@ -248,13 +323,11 @@ export default function QueryDetailScreen() {
 
   const handleOpenCamera = useCallback(async () => {
     if (Platform.OS === "web") {
-      // On web, use file input with capture attribute
       if (webFileInputRef.current) {
         webFileInputRef.current.click();
       }
       return;
     }
-    // Native: use expo-camera
     const granted = await cameraProvider.requestPermission();
     if (!granted) {
       Alert.alert("Camera Permission", "Camera access is required to take photos.");
@@ -273,7 +346,7 @@ export default function QueryDetailScreen() {
     setCapturedUri(photo.uri);
     setCapturedFilename(photo.filename);
     setCapturedMimeType(photo.mimeType);
-    input.value = ""; // Reset so same file can be re-selected
+    input.value = "";
   }, []);
 
   const handlePickDocument = useCallback(async () => {
@@ -316,7 +389,7 @@ export default function QueryDetailScreen() {
     !query.verification_requirements.includes("nonce") &&
     !query.verification_requirements.includes("gps");
 
-  // Camera fullscreen view (native only — web uses file input)
+  // Camera fullscreen view (native only)
   if (cameraActive && Platform.OS !== "web") {
     const NativeCameraView = require("expo-camera").CameraView;
     return (
@@ -326,7 +399,6 @@ export default function QueryDetailScreen() {
           className="flex-1"
           facing="back"
         >
-          {/* Nonce overlay (only when nonce required) */}
           {query.challenge_nonce && (
             <View className="absolute top-16 left-0 right-0 items-center">
               <View className="bg-black/60 rounded-xl px-5 py-3">
@@ -340,7 +412,6 @@ export default function QueryDetailScreen() {
             </View>
           )}
 
-          {/* Bottom controls */}
           <View className="absolute bottom-12 left-0 right-0 flex-row items-center justify-center gap-8">
             <Pressable
               onPress={async () => {
@@ -367,9 +438,12 @@ export default function QueryDetailScreen() {
 
   return (
     <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16 }}>
-      {/* Status + Timer */}
+      {/* Status + Type + Timer */}
       <View className="flex-row items-center justify-between mb-4">
-        <StatusBadge status={query.status} />
+        <View className="flex-row items-center gap-2">
+          <QueryTypeBadge requirements={query.verification_requirements} />
+          <StatusBadge status={query.status} />
+        </View>
         <View className="flex-row items-center gap-1">
           <Ionicons name="time-outline" size={14} color="#52525b" />
           <Text className="text-sm text-muted-foreground">{timeLeft(query.expires_at)}</Text>
@@ -399,33 +473,14 @@ export default function QueryDetailScreen() {
         )}
       </View>
 
-      {/* Challenge Nonce (only when nonce verification is required) */}
+      {/* Challenge Nonce */}
       {query.challenge_nonce && query.challenge_rule && (
         <ChallengeNonceDisplay nonce={query.challenge_nonce} rule={query.challenge_rule} />
       )}
 
-      {/* TLSNotary requirement info (for tlsn-only queries) */}
-      {!submitted && !expired && isTlsnOnly && (
-        <View className="mt-6 p-4 rounded-xl bg-surface border border-border gap-3">
-          <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            TLSNotary Verification Required
-          </Text>
-          <Text className="text-sm text-muted-foreground">
-            Use the TLSNotary browser extension to prove the server response.
-          </Text>
-          {query.tlsn_requirements && (
-            <View className="gap-1.5">
-              <Text className="text-xs text-foreground font-medium">
-                {query.tlsn_requirements.target_url}
-              </Text>
-              {query.tlsn_requirements.conditions?.map((cond, i) => (
-                <Text key={i} className="text-xs text-muted-foreground">
-                  {cond.description ?? `${cond.type}: ${cond.expression}`}
-                </Text>
-              ))}
-            </View>
-          )}
-        </View>
+      {/* TLSNotary status panel (for tlsn-only queries) */}
+      {isTlsnOnly && (
+        <TlsnStatusPanel query={query} />
       )}
 
       {/* Action area (photo queries only) */}
@@ -469,6 +524,24 @@ export default function QueryDetailScreen() {
             </View>
           )}
 
+          {/* Notes input */}
+          {capturedUri && (
+            <View>
+              <Text className="text-sm font-medium text-muted-foreground mb-1.5">
+                Notes (optional)
+              </Text>
+              <TextInput
+                className="bg-surface border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"
+                placeholder="Add context about this photo..."
+                placeholderTextColor="#52525b"
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                numberOfLines={2}
+              />
+            </View>
+          )}
+
           {/* Submit */}
           {capturedUri && (
             <Pressable
@@ -483,9 +556,7 @@ export default function QueryDetailScreen() {
               {submitMutation.isPending ? (
                 <View className="flex-row items-center gap-2">
                   <ActivityIndicator size="small" color="white" />
-                  <Text className="text-white font-semibold">
-                    {"Submitting..."}
-                  </Text>
+                  <Text className="text-white font-semibold">Submitting...</Text>
                 </View>
               ) : (
                 <Text className="text-white font-bold text-base">Submit</Text>
@@ -550,7 +621,7 @@ export default function QueryDetailScreen() {
         </View>
       )}
 
-      {/* Verification detail (if available) */}
+      {/* Verification detail */}
       {query.verification && (
         <View className="mt-5 p-4 rounded-xl bg-surface border border-border">
           <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
@@ -571,7 +642,7 @@ export default function QueryDetailScreen() {
         </View>
       )}
 
-      {/* TLSNotary Proof detail (from cryptographically verified data) */}
+      {/* TLSNotary Proof detail */}
       {(query.verification?.tlsn_verified || query.result?.tlsn_verified) && (
         <TlsnProofSection
           verified={(query.verification?.tlsn_verified || query.result?.tlsn_verified)!}

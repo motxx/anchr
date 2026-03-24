@@ -58,6 +58,7 @@ export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
+  tlsn_verified?: TlsnVerifiedData;
 }
 
 export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check" | "tlsn";

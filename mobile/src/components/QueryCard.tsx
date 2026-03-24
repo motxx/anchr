@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StatusBadge } from "./StatusBadge";
+import { QueryTypeBadge } from "./QueryTypeBadge";
 import { timeLeft, isExpired, isUrgent, isCritical } from "../utils/time";
 import { haversineKm, formatDistance } from "../utils/distance";
 import type { QuerySummary, GpsCoord } from "../api/types";
@@ -10,6 +11,14 @@ import type { QuerySummary, GpsCoord } from "../api/types";
 interface Props {
   query: QuerySummary;
   userLocation?: GpsCoord | null;
+}
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
 }
 
 export function QueryCard({ query, userLocation }: Props) {
@@ -30,15 +39,20 @@ export function QueryCard({ query, userLocation }: Props) {
       ? haversineKm(userLocation, query.expected_gps)
       : null;
 
+  const isTlsn = query.verification_requirements.includes("tlsn");
+
   return (
     <Pressable
       onPress={() => router.push(`/${query.id}`)}
       className="bg-surface rounded-xl border border-border overflow-hidden active:bg-surface-raised"
     >
       <View className="px-4 py-3.5">
-        {/* Top row: status + timer */}
+        {/* Top row: type badge + status + timer */}
         <View className="flex-row items-center justify-between mb-2">
-          <StatusBadge status={query.status} />
+          <View className="flex-row items-center gap-2">
+            <QueryTypeBadge requirements={query.verification_requirements} />
+            <StatusBadge status={query.status} />
+          </View>
           <View className="flex-row items-center gap-1">
             <Ionicons
               name="time-outline"
@@ -60,12 +74,22 @@ export function QueryCard({ query, userLocation }: Props) {
         </View>
 
         {/* Description */}
-        <Text className="text-sm text-foreground font-medium mb-2" numberOfLines={2}>
+        <Text className="text-sm text-foreground font-medium mb-1.5" numberOfLines={2}>
           {query.description}
         </Text>
 
+        {/* TLSNotary target domain */}
+        {isTlsn && query.tlsn_requirements?.target_url && (
+          <View className="flex-row items-center gap-1.5 mb-1.5">
+            <Ionicons name="lock-closed" size={10} color="#60a5fa" />
+            <Text className="text-xs text-blue-400" numberOfLines={1}>
+              {extractDomain(query.tlsn_requirements.target_url)}
+            </Text>
+          </View>
+        )}
+
         {/* Bottom row: location + bounty + distance */}
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between mt-0.5">
           <View className="flex-row items-center gap-3">
             {query.location_hint && (
               <View className="flex-row items-center gap-1">
