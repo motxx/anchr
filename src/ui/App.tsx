@@ -5,7 +5,10 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Globe,
+  Camera,
   Loader2,
+  Lock,
   RefreshCw,
 } from "lucide-react";
 import { apiFetch } from "./api-config";
@@ -17,7 +20,6 @@ import {
   CardHeader,
 } from "./components/ui/card";
 import { Input } from "./components/ui/input";
-import { Textarea } from "./components/ui/textarea";
 import { cn } from "./lib/utils";
 import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../types";
 
@@ -25,6 +27,17 @@ import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../types"
 
 interface Bounty {
   amount_sats: number;
+}
+
+interface TlsnCondition {
+  type: string;
+  expression: string;
+  description?: string;
+}
+
+interface TlsnRequirement {
+  target_url: string;
+  conditions?: TlsnCondition[];
 }
 
 interface UploadResponse {
@@ -39,6 +52,9 @@ interface Query {
   description: string;
   challenge_nonce: string | null;
   challenge_rule: string | null;
+  verification_requirements?: string[];
+  tlsn_requirements?: TlsnRequirement | null;
+  status?: string;
   expires_at: number;
   expires_in_seconds: number;
   bounty?: Bounty | null;
@@ -50,7 +66,7 @@ interface SubmitResponse {
   verification?: { failures: string[] };
 }
 
-// ---- Time helpers ----
+// ---- Helpers ----
 
 function timeLeft(expiresAt: number): string {
   const s = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
@@ -66,15 +82,82 @@ function timerClasses(expiresAt: number): string {
   return "text-muted-foreground tabular-nums";
 }
 
-// ---- Submit form ----
+function isTlsnQuery(query: Query): boolean {
+  return query.verification_requirements?.includes("tlsn") === true;
+}
 
-function FieldLabel({
-  children,
-  required,
-}: {
-  children: React.ReactNode;
-  required?: boolean;
-}) {
+function extractDomain(url: string): string {
+  try { return new URL(url).hostname; } catch { return url; }
+}
+
+// ---- Type badge ----
+
+function QueryTypeBadge({ query }: { query: Query }) {
+  const tlsn = isTlsnQuery(query);
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded",
+      tlsn ? "bg-blue-950/50 text-blue-400" : "bg-violet-950/50 text-violet-400",
+    )}>
+      {tlsn ? <Globe className="w-2.5 h-2.5" /> : <Camera className="w-2.5 h-2.5" />}
+      {tlsn ? "Web Proof" : "Photo"}
+    </span>
+  );
+}
+
+// ---- TLSNotary info panel ----
+
+function TlsnInfoPanel({ query }: { query: Query }) {
+  const req = query.tlsn_requirements;
+  const isPending = query.status === "pending";
+  const isProcessing = query.status === "processing" || query.status === "verifying";
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Globe className="w-4 h-4 text-blue-400" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Web Proof — Auto-Worker
+        </span>
+      </div>
+
+      {req?.target_url && (
+        <div className="bg-black/30 rounded-lg px-3 py-2.5 space-y-1">
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3 h-3 text-blue-400" />
+            <span className="text-xs text-blue-400 font-medium truncate">{req.target_url}</span>
+          </div>
+          {req.conditions?.map((c, i) => (
+            <p key={i} className="text-[11px] text-muted-foreground ml-4">
+              {c.description ?? `${c.type}: ${c.expression}`}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {isPending && (
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+          <span className="text-sm text-blue-400">Waiting for Auto-Worker to pick up...</span>
+        </div>
+      )}
+      {isProcessing && (
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+          <span className="text-sm text-amber-400">Running MPC-TLS proof...</span>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">
+        TLSNotary queries are automatically fulfilled by the Auto-Worker daemon via MPC-TLS.
+      </p>
+    </div>
+  );
+}
+
+// ---- Submit form (photo queries) ----
+
+function FieldLabel({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
     <label className="text-xs font-medium text-muted-foreground">
       {children}
@@ -142,7 +225,6 @@ function SubmitForm({
 
   return (
     <div className="space-y-4">
-      {/* Photo/video upload area */}
       <div className="space-y-1.5">
         <FieldLabel required>Photo / Video</FieldLabel>
         <label
@@ -155,18 +237,9 @@ function SubmitForm({
         >
           {preview ? (
             isVideo ? (
-              <video
-                src={preview}
-                controls
-                muted
-                className="w-full max-h-64 object-contain rounded-md"
-              />
+              <video src={preview} controls muted className="w-full max-h-64 object-contain rounded-md" />
             ) : (
-              <img
-                src={preview}
-                alt="preview"
-                className="w-full max-h-64 object-contain rounded-md"
-              />
+              <img src={preview} alt="preview" className="w-full max-h-64 object-contain rounded-md" />
             )
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -178,13 +251,7 @@ function SubmitForm({
               <span className="text-xs opacity-60">C2PA-verified media recommended</span>
             </div>
           )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*,video/*"
-            className="sr-only"
-            onChange={handleFileChange}
-          />
+          <input ref={fileRef} type="file" accept="image/*,video/*" className="sr-only" onChange={handleFileChange} />
         </label>
         {preview && (
           <button
@@ -199,7 +266,7 @@ function SubmitForm({
 
       <div className="space-y-1.5">
         <FieldLabel>Notes</FieldLabel>
-        <Input ref={notesRef} type="text" placeholder="補足メモ（任意）" />
+        <Input ref={notesRef} type="text" placeholder="Optional notes" />
       </div>
       <Button className="w-full" disabled={busy} onClick={handleSubmit}>
         {uploading ? (
@@ -219,6 +286,7 @@ function SubmitForm({
 function QueryCard({ query }: { query: Query }) {
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
+  const tlsn = isTlsnQuery(query);
 
   React.useEffect(() => {
     if (!open) return;
@@ -243,29 +311,29 @@ function QueryCard({ query }: { query: Query }) {
 
   return (
     <Card className={cn("overflow-hidden py-0 gap-0", open && "border-border/80")}>
-      {/* Header */}
       <CardHeader
         className="px-4 py-3.5 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
         <div className="flex items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <QueryTypeBadge query={query} />
             <span className="text-sm text-foreground truncate">
               {query.description}
             </span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {tlsn && query.tlsn_requirements && (
+              <span className="text-[10px] text-blue-400/70 hidden sm:inline">
+                {extractDomain(query.tlsn_requirements.target_url)}
+              </span>
+            )}
             {query.bounty && query.bounty.amount_sats > 0 && (
               <span className="text-xs font-semibold text-amber-400">
                 {query.bounty.amount_sats} sats
               </span>
             )}
-            <span
-              className={cn(
-                "text-xs flex items-center gap-1",
-                timerClasses(query.expires_at)
-              )}
-            >
+            <span className={cn("text-xs flex items-center gap-1", timerClasses(query.expires_at))}>
               <Clock className="w-3 h-3 shrink-0" />
               {timeLeft(query.expires_at)}
             </span>
@@ -278,10 +346,9 @@ function QueryCard({ query }: { query: Query }) {
         </div>
       </CardHeader>
 
-      {/* Body */}
       {open && (
         <CardContent className="px-4 pb-5 pt-4 border-t border-border space-y-5">
-          {/* Nonce box (only when nonce verification is required) */}
+          {/* Nonce box */}
           {query.challenge_nonce && (
             <div className="bg-amber-950/30 border border-amber-800/50 rounded-lg px-4 py-4">
               <p className="text-[10px] uppercase tracking-widest text-amber-700 font-semibold mb-2">
@@ -296,27 +363,23 @@ function QueryCard({ query }: { query: Query }) {
             </div>
           )}
 
-          {/* Submission form */}
-          {!submitted && (
+          {/* TLSNotary info or photo submit form */}
+          {tlsn ? (
+            <TlsnInfoPanel query={query} />
+          ) : !submitted ? (
             <div className="pt-1">
-              <SubmitForm
-                query={query}
-                onSubmit={mut.mutate}
-                isPending={mut.isPending}
-              />
+              <SubmitForm query={query} onSubmit={mut.mutate} isPending={mut.isPending} />
             </div>
-          )}
+          ) : null}
 
           {/* Result feedback */}
           {mut.isSuccess && (
-            <div
-              className={cn(
-                "flex items-start gap-3 p-3.5 rounded-lg text-sm leading-relaxed",
-                mut.data.ok
-                  ? "bg-emerald-950/50 border border-emerald-800/60 text-emerald-400"
-                  : "bg-red-950/50 border border-red-900/60 text-red-400"
-              )}
-            >
+            <div className={cn(
+              "flex items-start gap-3 p-3.5 rounded-lg text-sm leading-relaxed",
+              mut.data.ok
+                ? "bg-emerald-950/50 border border-emerald-800/60 text-emerald-400"
+                : "bg-red-950/50 border border-red-900/60 text-red-400"
+            )}>
               {mut.data.ok ? (
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
               ) : (
@@ -402,7 +465,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-10">
-        {/* Header */}
         <header className="mb-8">
           <div className="flex items-start justify-between">
             <div>
@@ -410,7 +472,7 @@ export default function App() {
                 Anchr
               </h1>
               <p className="text-xs text-muted-foreground mt-1">
-                Ground truth from the street
+                Earn sats by proving ground truth
               </p>
             </div>
             <div className="flex items-center gap-2 mt-1">
