@@ -115,6 +115,8 @@ export interface QueryResult {
   gps?: GpsCoord;
   /** TLSNotary attestation submitted by the worker. */
   tlsn_attestation?: TlsnAttestation;
+  /** TLSNotary browser extension result (results[] from MPC-TLS session). */
+  tlsn_extension_result?: unknown;
 }
 
 export interface VerificationDetail {

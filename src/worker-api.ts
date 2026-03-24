@@ -453,6 +453,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       tlsn_attestation: typeof body.tlsn_presentation === "string"
         ? { presentation: body.tlsn_presentation as string }
         : (body.tlsn_attestation as TlsnAttestation | undefined),
+      tlsn_extension_result: body.tlsn_extension_result != null
+        ? body.tlsn_extension_result
+        : undefined,
     };
     const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
     const status = !outcome.query ? 404

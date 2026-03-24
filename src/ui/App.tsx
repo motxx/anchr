@@ -169,17 +169,12 @@ export default {
       }
     );
 
-    // Auto-submit to Anchr
+    // Copy result for pasting into Anchr Worker page
     try {
-      const res = await fetch(API + '/queries/' + QUERY_ID + '/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tlsn_presentation: btoa(JSON.stringify(proof)) }),
-      });
-      const data = await res.json();
-      console.log('[Anchr] Submit result:', data);
+      await navigator.clipboard.writeText(JSON.stringify(proof));
+      console.log('[Anchr] Result copied to clipboard — paste it in the Worker page');
     } catch (e) {
-      console.error('[Anchr] Submit failed:', e);
+      console.log('[Anchr] Copy to clipboard:', JSON.stringify(proof));
     }
 
     done(proof);
@@ -199,6 +194,7 @@ function TlsnWorkerPanel({
   const req = query.tlsn_requirements;
   const [copied, setCopied] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [pastedResult, setPastedResult] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -261,7 +257,7 @@ function TlsnWorkerPanel({
           <li>Copy the plugin code below</li>
           <li>Open TLSNotary extension → DevConsole</li>
           <li>Paste and click <strong className="text-foreground">Run Code</strong></li>
-          <li>Proof is generated and auto-submitted to Anchr</li>
+          <li>Result is copied to clipboard — paste it below</li>
         </ol>
 
         {/* Plugin code */}
@@ -282,10 +278,33 @@ function TlsnWorkerPanel({
         </div>
       </div>
 
-      {/* Waiting indicator */}
-      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-        <Loader2 className="w-3 h-3 animate-spin" />
-        Waiting for proof submission... (this page auto-refreshes)
+      {/* Paste result */}
+      <div className="space-y-2">
+        <FieldLabel required>Paste proof result from extension</FieldLabel>
+        <textarea
+          className="w-full h-24 rounded-lg border border-border bg-black/30 px-3 py-2 text-xs text-foreground font-mono placeholder:text-muted-foreground/50 resize-none focus:outline-none focus:border-blue-800"
+          placeholder='Paste the JSON result here (auto-copied to clipboard after plugin runs)'
+          value={pastedResult}
+          onChange={(e) => setPastedResult(e.target.value)}
+        />
+        <Button
+          className="w-full"
+          disabled={busy || !pastedResult.trim()}
+          onClick={() => {
+            try {
+              const proof = JSON.parse(pastedResult);
+              onSubmit({ tlsn_extension_result: proof });
+            } catch {
+              onSubmit({ tlsn_extension_result: pastedResult });
+            }
+          }}
+        >
+          {busy ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+          ) : (
+            "Submit Proof →"
+          )}
+        </Button>
       </div>
 
       {/* Manual upload fallback */}
