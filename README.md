@@ -1,16 +1,84 @@
 # Anchr
 
-Anonymous real-world verification on [Nostr](https://nostr.com/), paid with [Cashu](https://cashu.space/) ecash.
+Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
 
-Post a query. A nearby worker photographs it — or proves web content via TLSNotary. Verified cryptographically. Ecash released automatically.
+AI agents and humans buy verified API responses, price feeds, and real-world photos — with no trust required. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
+
+## SDK
+
+```typescript
+import { Anchr } from "anchr-sdk";
+
+const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
+
+const result = await anchr.query({
+  description: "BTC price from CoinGecko",
+  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
+  maxSats: 21,
+});
+
+result.verified;    // true — cryptographically proven
+result.data;        // { bitcoin: { usd: 71000 } }
+result.serverName;  // "api.coingecko.com" — from TLS certificate
+result.proof;       // TLSNotary presentation (independently verifiable)
+```
+
+## How It Works
+
+```
+Requester (AI agent / human)
+  │  "Prove what api.coingecko.com returns for BTC price"
+  │  Attaches 21 sats bounty
+  ▼
+Nostr relay (censorship-resistant broadcast)
+  │
+  ▼
+Worker (anyone — AI agent, server, mobile app, browser extension)
+  │  Fetches URL via MPC-TLS with Verifier Server
+  │  Generates cryptographic presentation (.presentation.tlsn)
+  ▼
+Oracle (Anchr server)
+  │  Verifies TLSNotary signature
+  │  Checks: domain matches, data fresh, conditions satisfied
+  │  All checks pass → bounty auto-released to Worker
+  ▼
+Requester receives verified data + cryptographic proof
+```
+
+**No trust required.** The proof is tied to the TLS certificate — if the data is wrong, the cryptographic verification fails. Payment is atomic via Cashu HTLC escrow.
+
+## Two Verification Modes
+
+### Web Data (TLSNotary)
+
+Prove what any HTTPS server returned. Workers fetch the URL through a Multi-Party Computation TLS session — the Verifier Server co-signs the session without seeing the plaintext.
+
+<p align="center">
+  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — Worker mobile app" width="280" />
+  &nbsp;&nbsp;
+  <img src="assets/tlsn-requester-proof.png" alt="TLSNotary proof — Requester web UI" width="480" />
+</p>
+
+### Real-World Photos (C2PA)
+
+Prove what a location looks like right now. Workers photograph with a C2PA-signed camera — the Content Credentials are cryptographically bound to the image, GPS, and timestamp.
+
+## Use Cases
+
+| Use case | Verification | Example |
+|----------|-------------|---------|
+| Price oracle (DeFi) | TLSNotary | Prove BTC/ETH price from CoinGecko, Binance |
+| Flight status | TLSNotary | Prove flight delay for parametric insurance |
+| API response proof | TLSNotary | Prove any HTTPS API returned specific data |
+| Location check | C2PA + GPS | Photograph a store, intersection, event |
+| Combined proof | Both | Photo of a price tag + API price verification |
 
 ## Quick Start
 
 ```bash
 bun install
-bun run infra:up                    # relay + blossom (docker)
-NOSTR_RELAYS=ws://localhost:7777 \
-BLOSSOM_SERVERS=http://localhost:3333 \
+bun run infra:up                    # relay + blossom + verifier (docker)
 bun run dev                         # server on :3000
 ```
 
@@ -20,64 +88,31 @@ cd mobile && bun install
 bun run ios                         # or: bun run web
 ```
 
-## How It Works
-
-### Photo Verification (C2PA)
-
-1. **Requester** creates a query with GPS + bounty (Cashu ecash)
-2. Query broadcasts via **Nostr** relay to nearby workers
-3. **Worker** photographs the location (C2PA-signed camera)
-4. **Oracle** verifies C2PA signature + GPS proximity
-5. Verification passes → bounty released to worker automatically
-
-### Web Content Verification (TLSNotary)
-
-1. **Requester** creates a query with target URL + conditions
-2. **Worker** fetches the URL through a TLSNotary session
-3. **Oracle** verifies attestation signature, domain, freshness, and content conditions
-4. Verification passes → bounty released, proof viewable on-chain
-
-<p align="center">
-  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — Worker mobile app" width="280" />
-  &nbsp;&nbsp;
-  <img src="assets/tlsn-requester-proof.png" alt="TLSNotary proof — Requester web UI" width="480" />
-</p>
-
-Payment is trustless: Cashu HTLC escrow (NUT-14) — preimage held by Oracle, redeemed by Worker on pass, refunded to Requester on timeout.
-
 ## API
 
 ```bash
-# Create photo query
+# Web data query (TLSNotary)
+curl -X POST localhost:3000/queries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "BTC price from CoinGecko",
+    "verification_requirements": ["tlsn"],
+    "tlsn_requirements": {
+      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+      "conditions": [{"type": "jsonpath", "expression": "bitcoin.usd"}]
+    },
+    "bounty": {"amount_sats": 21}
+  }'
+
+# Photo query (C2PA)
 curl -X POST localhost:3000/queries \
   -H "Content-Type: application/json" \
   -d '{
     "description": "渋谷スクランブル交差点の混雑状況",
     "expected_gps": {"lat": 35.6595, "lon": 139.7004},
     "max_gps_distance_km": 0.5,
-    "bounty": {"amount_sats": 21}
+    "bounty": {"amount_sats": 100}
   }'
-
-# Create TLSNotary query
-curl -X POST localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "Verify BTC price on CoinGecko",
-    "verification_requirements": ["tlsn"],
-    "tlsn_requirements": {
-      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-      "conditions": [{"type": "jsonpath", "expression": "bitcoin.usd", "description": "BTC price exists"}]
-    },
-    "bounty": {"amount_sats": 21}
-  }'
-
-# List queries (with distance filter)
-curl "localhost:3000/queries?lat=35.66&lon=139.70"
-
-# Submit photo result
-curl -X POST localhost:3000/queries/{id}/submit \
-  -H "Content-Type: application/json" \
-  -d '{"gps": {"lat": 35.6595, "lon": 139.7004}, "notes": "混雑してます"}'
 ```
 
 <details>
@@ -99,6 +134,36 @@ curl -X POST localhost:3000/queries/{id}/submit \
 
 </details>
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│ Requester (AI agent / human / app)              │
+│   anchr.query({ targetUrl, conditions, sats })  │
+└────────────────────┬────────────────────────────┘
+                     │ Nostr broadcast
+                     ▼
+┌─────────────────────────────────────────────────┐
+│ Worker (CLI / mobile app / browser extension)   │
+│                                                 │
+│ TLSNotary path:     Photo path:                 │
+│   tlsn-prove          C2PA camera               │
+│     ↕ MPC-TLS           ↓                       │
+│   Verifier Server     Upload + GPS              │
+│     ↓                    ↓                       │
+│   .presentation.tlsn  C2PA manifest             │
+└────────────────────┬────────────────────────────┘
+                     │ Submit proof
+                     ▼
+┌─────────────────────────────────────────────────┐
+│ Oracle (Anchr server)                           │
+│   TLSNotary: tlsn-verifier → crypto verify      │
+│   C2PA: c2patool → signature verify             │
+│   Conditions: jsonpath / regex / GPS proximity  │
+│   Pass → Cashu HTLC bounty released             │
+└─────────────────────────────────────────────────┘
+```
+
 ## Configuration
 
 | Variable | Description |
@@ -107,40 +172,32 @@ curl -X POST localhost:3000/queries/{id}/submit \
 | `BLOSSOM_SERVERS` | Blossom blob server URLs |
 | `CASHU_MINT_URL` | Cashu mint for ecash payments |
 | `HTTP_API_KEY` | API key for write endpoints |
-| `TLSN_VERIFIER_URL` | TLSNotary Verifier Server URL (served to workers) |
-| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL (served to workers) |
+| `TLSN_VERIFIER_URL` | TLSNotary Verifier Server URL |
+| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL |
 
 ## Testing
 
 ```bash
-bun run test:unit       # unit tests (no Docker)
-bun run test            # full suite (starts Docker)
-bun run test:regtest    # regtest Lightning + Cashu E2E
+bun test                         # all tests
+bun test src/                    # unit tests
+bun test e2e/tlsn.test.ts       # TLSNotary E2E (real MPC-TLS)
+bun test e2e/tlsn-browser.test.ts  # browser extension E2E
+bun run test:regtest             # Lightning + Cashu E2E
 ```
-
-## Deploy
-
-CI/CD via GitHub Actions → [fly.io](https://fly.io):
-
-```
-anchr-app.fly.dev       — server + worker UI
-anchr-relay.fly.dev     — Nostr relay
-anchr-blossom.fly.dev   — Blossom blob store
-```
-
-Push to `main` auto-deploys all services.
 
 ## Stack
 
 | Layer | Tech |
 |-------|------|
+| SDK | TypeScript (`anchr-sdk`) |
 | Server | Bun + Hono |
 | Messaging | Nostr (NIP-90 DVM) |
 | Storage | Blossom (E2E encrypted) |
-| Payment | Cashu ecash (NUT-14 HTLC) |
-| Verification | C2PA + EXIF + ProofMode + GPS + TLSNotary |
+| Payment | Cashu ecash (NUT-14 HTLC) / Lightning |
+| Web Verification | TLSNotary (MPC-TLS + Rust verifier) |
+| Photo Verification | C2PA + EXIF + ProofMode + GPS |
+| TLS Verifier Server | Rust (async-tungstenite + WsStream) |
 | Mobile | React Native (Expo) + NativeWind |
-| Web | Same codebase via Expo Web |
 
 ## License
 
