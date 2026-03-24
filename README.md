@@ -4,10 +4,6 @@ Anonymous real-world verification on [Nostr](https://nostr.com/), paid with [Cas
 
 Post a query. A nearby worker photographs it — or proves web content via TLSNotary. Verified cryptographically. Ecash released automatically.
 
-<p align="center">
-  <img src="assets/demo.gif" alt="Anchr Worker app — iOS + Web" width="560" />
-</p>
-
 ## Quick Start
 
 ```bash
