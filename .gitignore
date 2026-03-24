@@ -54,3 +54,6 @@ mobile/ios/
 mobile/android/
 mobile/node_modules/
 .gstack/
+
+# rust
+crates/*/target/

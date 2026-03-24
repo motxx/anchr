@@ -26,6 +26,27 @@ let tlsnVerifierPath: string | null | undefined;
 
 function findTlsnVerifier(): string | null {
   if (tlsnVerifierPath !== undefined) return tlsnVerifierPath;
+
+  // Check project-local binary first (built from crates/tlsn-verifier)
+  const localPaths = [
+    join(import.meta.dir, "../../.local/bin/tlsn-verifier"),
+    join(import.meta.dir, "../../crates/tlsn-verifier/target/release/tlsn-verifier"),
+    join(import.meta.dir, "../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
+  ];
+  for (const p of localPaths) {
+    if (Bun.which(p) || (typeof Bun.file === "function" && Bun.file(p).size > 0)) {
+      try {
+        const stat = require("node:fs").statSync(p);
+        if (stat.isFile()) {
+          tlsnVerifierPath = p;
+          console.error(`[tlsn] Found tlsn-verifier at ${p}`);
+          return tlsnVerifierPath;
+        }
+      } catch { /* not found */ }
+    }
+  }
+
+  // Fall back to PATH
   tlsnVerifierPath = Bun.which("tlsn-verifier");
   if (tlsnVerifierPath) {
     console.error(`[tlsn] Found tlsn-verifier at ${tlsnVerifierPath}`);
@@ -121,13 +142,25 @@ export async function validateTlsn(
   let serverIdentityValid = false;
 
   // --- Cryptographic verification via sidecar binary ---
+  // When the binary is available, it provides cryptographically verified server_name
+  // and revealed_body that override the self-reported values from the attestation.
+  let verifiedBody = attestation.revealed_body;
+  let verifiedServerName = attestation.server_name;
+
   if (verifierPath) {
     const cryptoResult = await runVerifierBinary(verifierPath, attestation);
     signatureValid = cryptoResult.signatureValid;
     if (signatureValid) {
-      checks.push("TLSNotary: attestation signature valid (binary verified)");
+      checks.push("TLSNotary: presentation signature valid (cryptographically verified)");
+      // Use cryptographically verified values instead of self-reported ones
+      if (cryptoResult.verifiedServerName) {
+        verifiedServerName = cryptoResult.verifiedServerName;
+      }
+      if (cryptoResult.verifiedBody) {
+        verifiedBody = cryptoResult.verifiedBody;
+      }
     } else {
-      failures.push(`TLSNotary: attestation signature invalid — ${cryptoResult.error ?? "verification failed"}`);
+      failures.push(`TLSNotary: presentation signature invalid — ${cryptoResult.error ?? "verification failed"}`);
     }
   } else {
     checks.push("TLSNotary: tlsn-verifier not available — crypto verification deferred");
@@ -145,12 +178,13 @@ export async function validateTlsn(
   }
 
   // --- Server identity / domain matching ---
+  // Use cryptographically verified server name when available
   const expectedHostname = extractHostname(requirement.target_url);
-  if (expectedHostname && attestation.server_name === expectedHostname) {
+  if (expectedHostname && verifiedServerName === expectedHostname) {
     checks.push(`TLSNotary: server name matches target (${expectedHostname})`);
     serverIdentityValid = true;
   } else if (expectedHostname) {
-    failures.push(`TLSNotary: server name "${attestation.server_name}" does not match target "${expectedHostname}"`);
+    failures.push(`TLSNotary: server name "${verifiedServerName}" does not match target "${expectedHostname}"`);
   }
 
   // --- Freshness check ---
@@ -163,10 +197,11 @@ export async function validateTlsn(
   }
 
   // --- Condition evaluation ---
+  // Use cryptographically verified body when available
   const conditionResults: TlsnValidationResult["conditionResults"] = [];
   if (requirement.conditions) {
     for (const condition of requirement.conditions) {
-      const result = evaluateCondition(condition, attestation.revealed_body);
+      const result = evaluateCondition(condition, verifiedBody);
       conditionResults.push({ condition, ...result });
       const label = condition.description ?? `${condition.type}:${condition.expression}`;
       if (result.passed) {
@@ -193,6 +228,12 @@ export async function validateTlsn(
 
 interface VerifierBinaryResult {
   signatureValid: boolean;
+  /** Server name extracted from the cryptographic proof (if available). */
+  verifiedServerName?: string;
+  /** HTTP response body extracted from the revealed transcript. */
+  verifiedBody?: string;
+  /** Session timestamp from the proof (unix seconds). */
+  verifiedTime?: number;
   error?: string;
 }
 
@@ -201,14 +242,14 @@ async function runVerifierBinary(
   attestation: TlsnAttestation,
 ): Promise<VerifierBinaryResult> {
   const tempDir = await mkdtemp(join(tmpdir(), "anchr-tlsn-"));
-  const attestationPath = join(tempDir, "attestation.bin");
+  const presentationPath = join(tempDir, "presentation.tlsn");
 
   try {
-    // Write base64-decoded attestation to temp file
-    const attestationData = Buffer.from(attestation.attestation_doc, "base64");
-    await Bun.write(attestationPath, attestationData);
+    // Write base64-decoded presentation to temp file
+    const presentationData = Buffer.from(attestation.attestation_doc, "base64");
+    await Bun.write(presentationPath, presentationData);
 
-    const proc = Bun.spawn([verifierPath, "verify", attestationPath], {
+    const proc = Bun.spawn([verifierPath, "verify", presentationPath], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -221,8 +262,20 @@ async function runVerifierBinary(
 
     const stdout = await new Response(proc.stdout).text();
     try {
-      const result = JSON.parse(stdout) as { valid?: boolean };
-      return { signatureValid: result.valid === true };
+      const result = JSON.parse(stdout) as {
+        valid?: boolean;
+        server_name?: string;
+        revealed_body?: string;
+        time?: number;
+        error?: string;
+      };
+      return {
+        signatureValid: result.valid === true,
+        verifiedServerName: result.server_name ?? undefined,
+        verifiedBody: result.revealed_body ?? undefined,
+        verifiedTime: result.time ?? undefined,
+        error: result.error ?? undefined,
+      };
     } catch {
       return { signatureValid: false, error: "failed to parse verifier output" };
     }
