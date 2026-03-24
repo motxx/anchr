@@ -4,6 +4,7 @@
 @source "./RequesterApp.tsx";
 @source "./CreateQueryForm.tsx";
 @source "./QueryCard.tsx";
+@source "./SdkPlayground.tsx";
 @source "../components/**/*.tsx";
 @source "../lib/**/*.ts";
 
