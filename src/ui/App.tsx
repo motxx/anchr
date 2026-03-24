@@ -109,6 +109,76 @@ function QueryTypeBadge({ query }: { query: Query }) {
 
 // ---- TLSNotary Worker panel ----
 
+function generatePluginCode(query: Query, apiOrigin: string): string {
+  const req = query.tlsn_requirements;
+  if (!req) return "";
+  const url = req.target_url;
+  let hostname: string;
+  let pathname: string;
+  try {
+    const u = new URL(url);
+    hostname = u.hostname;
+    pathname = u.pathname + u.search;
+  } catch {
+    hostname = url;
+    pathname = "/";
+  }
+
+  return `// Anchr plugin — auto-proves and submits
+const QUERY_ID = '${query.id}';
+const API = '${apiOrigin}';
+
+export default {
+  config: {
+    name: 'Anchr: ${hostname}',
+    description: '${query.description.replace(/'/g, "\\'")}',
+    requests: [{
+      method: 'GET',
+      host: '${hostname}',
+      pathname: '/**',
+    }],
+  },
+  main: async () => {
+    const proof = await prove(
+      {
+        url: '${url}',
+        method: 'GET',
+        headers: {
+          'Host': '${hostname}',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'identity',
+          'Connection': 'close',
+        },
+      },
+      {
+        maxRecvData: 16384,
+        maxSentData: 4096,
+        handlers: [
+          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
+          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
+          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
+        ],
+      }
+    );
+
+    // Auto-submit to Anchr
+    try {
+      const res = await fetch(API + '/queries/' + QUERY_ID + '/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tlsn_presentation: btoa(JSON.stringify(proof)) }),
+      });
+      const data = await res.json();
+      console.log('[Anchr] Submit result:', data);
+    } catch (e) {
+      console.error('[Anchr] Submit failed:', e);
+    }
+
+    done(proof);
+  },
+};`;
+}
+
 function TlsnWorkerPanel({
   query,
   onSubmit,
@@ -119,14 +189,24 @@ function TlsnWorkerPanel({
   isPending: boolean;
 }) {
   const req = query.tlsn_requirements;
+  const [copied, setCopied] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmitPresentation() {
+  const apiOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const pluginCode = generatePluginCode(query, apiOrigin);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(pluginCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleSubmitFile() {
     const file = fileRef.current?.files?.[0];
     if (!file) return;
-
     setSubmitting(true);
     try {
       const buf = await file.arrayBuffer();
@@ -163,68 +243,100 @@ function TlsnWorkerPanel({
         </div>
       )}
 
-      {/* How to generate proof */}
-      <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-2.5 space-y-2">
+      {/* Extension integration */}
+      <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-3 space-y-3">
         <p className="text-xs font-medium text-blue-400 flex items-center gap-1.5">
           <ExternalLink className="w-3 h-3" />
-          How to generate the proof
+          Prove with TLSNotary Extension
         </p>
-        <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside">
-          <li>Open the TLSNotary browser extension</li>
-          <li>Configure the target URL and verifier server</li>
-          <li>Run the plugin — MPC-TLS generates a cryptographic presentation</li>
-          <li>Upload the <code className="text-blue-400">.presentation.tlsn</code> file below</li>
+        <ol className="text-[11px] text-muted-foreground space-y-1.5 list-decimal list-inside">
+          <li>Copy the plugin code below</li>
+          <li>Open TLSNotary extension → DevConsole</li>
+          <li>Paste and click <strong className="text-foreground">Run Code</strong></li>
+          <li>Proof is generated and auto-submitted to Anchr</li>
         </ol>
-      </div>
 
-      {/* Upload presentation file */}
-      <div className="space-y-1.5">
-        <FieldLabel required>Presentation file (.presentation.tlsn)</FieldLabel>
-        <label
-          className={cn(
-            "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors py-6",
-            fileName
-              ? "border-blue-800 bg-blue-950/20"
-              : "border-border hover:border-blue-800/50 bg-muted/20 hover:bg-muted/40"
-          )}
-        >
-          {fileName ? (
-            <div className="flex items-center gap-2 text-blue-400">
-              <FileUp className="w-5 h-5" />
-              <span className="text-sm font-medium">{fileName}</span>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-              <FileUp className="w-6 h-6" />
-              <span className="text-sm">Click to select presentation file</span>
-            </div>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".tlsn,.bin,application/octet-stream"
-            className="sr-only"
-            onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
-          />
-        </label>
-        {fileName && (
+        {/* Plugin code */}
+        <div className="relative group">
+          <pre className="bg-black/50 rounded-lg p-3 overflow-x-auto text-[11px] leading-relaxed max-h-48 overflow-y-auto">
+            <code className="text-emerald-300 font-mono whitespace-pre">{pluginCode}</code>
+          </pre>
           <button
-            type="button"
-            className="text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => { setFileName(null); if (fileRef.current) fileRef.current.value = ""; }}
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-1.5 rounded-md bg-white/5 hover:bg-white/10 transition-opacity flex items-center gap-1"
           >
-            Remove
+            {copied ? (
+              <><CheckCircle2 className="w-3 h-3 text-emerald-400" /><span className="text-[10px] text-emerald-400">Copied</span></>
+            ) : (
+              <><FileUp className="w-3 h-3 text-muted-foreground" /><span className="text-[10px] text-muted-foreground">Copy</span></>
+            )}
           </button>
-        )}
+        </div>
       </div>
 
-      <Button className="w-full" disabled={busy || !fileName} onClick={handleSubmitPresentation}>
-        {busy ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
-        ) : (
-          "Submit Presentation →"
+      {/* Waiting indicator */}
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Waiting for proof submission... (this page auto-refreshes)
+      </div>
+
+      {/* Manual upload fallback */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowManual((v) => !v)}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+        >
+          {showManual ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          Manual upload (.presentation.tlsn)
+        </button>
+
+        {showManual && (
+          <div className="mt-2 space-y-2">
+            <label
+              className={cn(
+                "flex flex-col items-center justify-center w-full rounded-lg border-2 border-dashed cursor-pointer transition-colors py-4",
+                fileName
+                  ? "border-blue-800 bg-blue-950/20"
+                  : "border-border hover:border-blue-800/50 bg-muted/20 hover:bg-muted/40"
+              )}
+            >
+              {fileName ? (
+                <div className="flex items-center gap-2 text-blue-400">
+                  <FileUp className="w-4 h-4" />
+                  <span className="text-xs font-medium">{fileName}</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                  <FileUp className="w-5 h-5" />
+                  <span className="text-xs">Select presentation file</span>
+                </div>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".tlsn,.bin,application/octet-stream"
+                className="sr-only"
+                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+              />
+            </label>
+            {fileName && (
+              <>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => { setFileName(null); if (fileRef.current) fileRef.current.value = ""; }}
+                >
+                  Remove
+                </button>
+                <Button className="w-full" size="sm" disabled={busy} onClick={handleSubmitFile}>
+                  {busy ? <><Loader2 className="w-3 h-3 animate-spin" /> Submitting…</> : "Submit File →"}
+                </Button>
+              </>
+            )}
+          </div>
         )}
-      </Button>
+      </div>
     </div>
   );
 }
