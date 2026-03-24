@@ -150,6 +150,7 @@ export default {
         method: 'GET',
         headers: {
           'Host': '${hostname}',
+          'User-Agent': 'anchr-worker/1.0',
           'Accept': 'application/json',
           'Accept-Encoding': 'identity',
           'Connection': 'close',
