@@ -1,19 +1,39 @@
-//! TLSNotary Verifier Server — accepts MPC-TLS sessions and signs attestations.
+//! TLSNotary Verifier Server
 //!
-//! Protocol: two TCP connections per session.
-//! Connection 1 (cmd='M'): 1-byte cmd + 16-byte session_id, then MPC-TLS Session runs.
-//! Connection 2 (cmd='A'): 1-byte cmd + 16-byte session_id + length-prefixed
-//!   bincode(AttestationRequest), server responds with length-prefixed bincode(Attestation).
+//! Supports two modes:
+//! - **TCP** (port 7047): CLI prover protocol — attestation returned to prover
+//! - **HTTP/WS** (port 7048): Browser extension protocol — session registration +
+//!   MPC-TLS over WebSocket + webhook to Anchr Oracle
+//!
+//! TCP Protocol (CLI):
+//!   Connection 1: cmd='M' + 16-byte session_id → MPC-TLS Session
+//!   Connection 2: cmd='A' + 16-byte session_id + len-prefixed AttestationRequest
+//!                 → len-prefixed Attestation response
+//!
+//! WebSocket Protocol (Browser Extension):
+//!   GET /health → "ok"
+//!   GET /info → version info
+//!   WS /session → register session, receive results
+//!   WS /verifier?sessionId=<id> → MPC-TLS session
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
+use axum::{
+    extract::{ws::WebSocket, Query, State, WebSocketUpgrade},
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
 use clap::Parser;
+use futures::{SinkExt, StreamExt};
+use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, oneshot};
 use tokio_util::compat::TokioAsyncReadCompatExt;
+use tower_http::cors::CorsLayer;
 
 use tlsn::{
     attestation::{
@@ -32,47 +52,387 @@ use tlsn::{
 #[derive(Parser)]
 #[command(name = "tlsn-server", about = "TLSNotary Verifier Server")]
 struct Cli {
-    #[arg(short, long, default_value = "7047")]
-    port: u16,
+    /// TCP port for CLI prover protocol
+    #[arg(long, default_value = "7047")]
+    tcp_port: u16,
+
+    /// HTTP/WS port for browser extension protocol
+    #[arg(long, default_value = "7048")]
+    ws_port: u16,
+
+    /// Anchr Oracle webhook URL (e.g. http://localhost:3000)
+    #[arg(long)]
+    webhook_url: Option<String>,
 }
 
-/// State stored between the MPC connection and the attestation connection.
+// --- Shared state ---
+
 struct SessionState {
     verifier_output: VerifierOutput,
     connection_info: ConnectionInfo,
-    server_ephemeral_key: Vec<u8>,  // serialized
-    tls_transcript_data: TlsTranscriptData,
+    server_ephemeral_key: Vec<u8>,
 }
 
-struct TlsTranscriptData {
-    time: u64,
-    version: tlsn::connection::TlsVersion,
-    sent_app_len: u32,
-    recv_app_len: u32,
+struct WsSession {
+    max_sent_data: usize,
+    max_recv_data: usize,
+    /// Sends the prover's WebSocket to the verifier task
+    prover_tx: oneshot::Sender<WebSocket>,
 }
 
-type Store = Arc<Mutex<HashMap<[u8; 16], SessionState>>>;
+struct WsVerificationResult {
+    server_name: Option<String>,
+    sent_transcript: String,
+    recv_transcript: String,
+    /// Signed attestation (bincode, for CLI provers that need to build presentations)
+    attestation_bytes: Option<Vec<u8>>,
+    /// Secrets needed to build presentation (bincode)
+    connection_info: ConnectionInfo,
+    server_ephemeral_key: Vec<u8>,
+    transcript_commitments: Vec<u8>,
+}
+
+#[derive(Clone)]
+struct AppState {
+    /// TCP session store (CLI protocol)
+    tcp_sessions: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+    /// WebSocket session store (browser extension protocol)
+    ws_sessions: Arc<Mutex<HashMap<String, WsSession>>>,
+    webhook_url: Option<String>,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
-    let listener = TcpListener::bind(("0.0.0.0", cli.port)).await?;
-    let store: Store = Arc::new(Mutex::new(HashMap::new()));
 
-    eprintln!("[tlsn-server] Listening on 0.0.0.0:{}", cli.port);
+    let state = AppState {
+        tcp_sessions: Arc::new(Mutex::new(HashMap::new())),
+        ws_sessions: Arc::new(Mutex::new(HashMap::new())),
+        webhook_url: cli.webhook_url.clone(),
+    };
+
+    // Start TCP listener (CLI protocol)
+    let tcp_state = state.clone();
+    let tcp_port = cli.tcp_port;
+    tokio::spawn(async move {
+        if let Err(e) = run_tcp_server(tcp_port, tcp_state).await {
+            eprintln!("[tlsn-server] TCP server error: {:#}", e);
+        }
+    });
+
+    // Start HTTP/WS server (browser extension protocol)
+    let app = Router::new()
+        .route("/health", get(|| async { "ok" }))
+        .route("/info", get(info_handler))
+        .route("/session", get(session_ws_handler))
+        .route("/verifier", get(verifier_ws_handler))
+        .layer(CorsLayer::permissive())
+        .with_state(state);
+
+    let ws_listener = tokio::net::TcpListener::bind(("0.0.0.0", cli.ws_port)).await?;
+    eprintln!("[tlsn-server] TCP  on 0.0.0.0:{}", cli.tcp_port);
+    eprintln!("[tlsn-server] HTTP/WS on 0.0.0.0:{}", cli.ws_port);
+
+    axum::serve(ws_listener, app).await?;
+    Ok(())
+}
+
+async fn info_handler() -> impl IntoResponse {
+    axum::Json(serde_json::json!({
+        "version": "0.1.0",
+        "tlsn_version": "0.1.0-alpha.14",
+        "protocols": ["tcp", "ws"]
+    }))
+}
+
+// --- WebSocket protocol (browser extension compatible) ---
+
+#[derive(Deserialize)]
+struct VerifierQuery {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+}
+
+async fn session_ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|socket| handle_session_ws(socket, state))
+}
+
+async fn handle_session_ws(mut ws: WebSocket, state: AppState) {
+    // Wait for register message
+    let msg = match ws.recv().await {
+        Some(Ok(msg)) => msg,
+        _ => return,
+    };
+
+    let text = match msg.into_text() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    let register: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    if register["type"].as_str() != Some("register") {
+        return;
+    }
+
+    let max_sent = register["maxSentData"].as_u64().unwrap_or(4096) as usize;
+    let max_recv = register["maxRecvData"].as_u64().unwrap_or(16384) as usize;
+    let session_id = uuid::Uuid::new_v4().to_string();
+
+    // Create oneshot channels for prover connection and result
+    let (prover_tx, prover_rx) = oneshot::channel::<WebSocket>();
+    let (result_tx, result_rx) = oneshot::channel::<WsVerificationResult>();
+
+    state.ws_sessions.lock().await.insert(session_id.clone(), WsSession {
+        max_sent_data: max_sent,
+        max_recv_data: max_recv,
+        prover_tx,
+    });
+
+    // Send session_registered
+    let resp = serde_json::json!({
+        "type": "session_registered",
+        "sessionId": session_id,
+    });
+    if ws.send(axum::extract::ws::Message::Text(resp.to_string().into())).await.is_err() {
+        return;
+    }
+
+    eprintln!("[tlsn-server] WS session registered: {}", &session_id[..8]);
+
+    // Spawn verifier task (waits for prover to connect)
+    let sid = session_id.clone();
+    let webhook_url = state.webhook_url.clone();
+    tokio::spawn(async move {
+        // Wait for prover to connect (30s timeout)
+        let prover_ws = match tokio::time::timeout(
+            std::time::Duration::from_secs(30),
+            prover_rx,
+        ).await {
+            Ok(Ok(ws)) => ws,
+            _ => {
+                eprintln!("[tlsn-server] WS session {} timed out", &sid[..8]);
+                return;
+            }
+        };
+
+        eprintln!("[tlsn-server] WS MPC starting for {}", &sid[..8]);
+
+        // Run MPC-TLS verifier over WebSocket
+        match run_ws_verifier(prover_ws, max_sent, max_recv).await {
+            Ok(result) => {
+                eprintln!("[tlsn-server] WS MPC complete for {}", &sid[..8]);
+                let _ = result_tx.send(result);
+            }
+            Err(e) => {
+                eprintln!("[tlsn-server] WS MPC error for {}: {:#}", &sid[..8], e);
+            }
+        }
+    });
+
+    // Wait for result (or reveal_config from extension)
+    // For now, wait for the verifier to complete and send results
+    match tokio::time::timeout(std::time::Duration::from_secs(120), result_rx).await {
+        Ok(Ok(result)) => {
+            let att_b64 = result.attestation_bytes.as_ref().map(|b| base64_encode(b));
+            let resp = serde_json::json!({
+                "type": "session_completed",
+                "serverName": result.server_name,
+                "sent": result.sent_transcript,
+                "recv": result.recv_transcript,
+                "attestation": att_b64,
+                "connectionInfo": base64_encode(&bincode::serialize(&result.connection_info).unwrap_or_default()),
+                "serverEphemeralKey": base64_encode(&result.server_ephemeral_key),
+                "transcriptCommitments": base64_encode(&result.transcript_commitments),
+            });
+            let _ = ws.send(axum::extract::ws::Message::Text(resp.to_string().into())).await;
+            eprintln!("[tlsn-server] WS session {} completed", &session_id[..8]);
+
+            // Fire webhook if configured
+            if let Some(ref url) = state.webhook_url {
+                let payload = serde_json::json!({
+                    "session_id": session_id,
+                    "server_name": result.server_name,
+                    "recv_transcript": result.recv_transcript,
+                });
+                if let Err(e) = reqwest::Client::new()
+                    .post(url)
+                    .json(&payload)
+                    .send()
+                    .await
+                {
+                    eprintln!("[tlsn-server] Webhook error: {}", e);
+                }
+            }
+        }
+        _ => {
+            let resp = serde_json::json!({ "type": "error", "message": "Verification timed out" });
+            let _ = ws.send(axum::extract::ws::Message::Text(resp.to_string().into())).await;
+        }
+    }
+}
+
+async fn verifier_ws_handler(
+    ws: WebSocketUpgrade,
+    Query(query): Query<VerifierQuery>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_verifier_ws(socket, query.session_id, state))
+}
+
+async fn handle_verifier_ws(ws: WebSocket, session_id: String, state: AppState) {
+    let session = state.ws_sessions.lock().await.remove(&session_id);
+    match session {
+        Some(s) => {
+            let _ = s.prover_tx.send(ws);
+        }
+        None => {
+            eprintln!("[tlsn-server] WS session {} not found", &session_id[..8]);
+        }
+    }
+}
+
+async fn run_ws_verifier(
+    ws: WebSocket,
+    max_sent: usize,
+    max_recv: usize,
+) -> Result<WsVerificationResult> {
+    // Convert axum WebSocket to async-tungstenite WebSocket for WsStream compatibility
+    // axum's WebSocket doesn't implement the right traits for WsStream
+    // Instead, we'll use a duplex bridge
+    let (duplex_a, duplex_b) = tokio::io::duplex(1 << 23);
+
+    // Relay WS <-> duplex_a
+    let (ws_sink, ws_stream) = ws.split();
+    let (duplex_read, duplex_write) = tokio::io::split(duplex_a);
+
+    // WS → duplex_write
+    let ws_to_duplex = tokio::spawn({
+        let mut ws_stream = ws_stream;
+        let mut duplex_write = duplex_write;
+        async move {
+            while let Some(Ok(msg)) = ws_stream.next().await {
+                match msg {
+                    axum::extract::ws::Message::Binary(data) => {
+                        if duplex_write.write_all(&data).await.is_err() { break; }
+                        if duplex_write.flush().await.is_err() { break; }
+                    }
+                    axum::extract::ws::Message::Close(_) => break,
+                    _ => {}
+                }
+            }
+            let _ = duplex_write.shutdown().await;
+        }
+    });
+
+    // duplex_read → WS
+    let duplex_to_ws = tokio::spawn({
+        let mut ws_sink = ws_sink;
+        let mut duplex_read = duplex_read;
+        async move {
+            let mut buf = vec![0u8; 65536];
+            loop {
+                match duplex_read.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if ws_sink.send(axum::extract::ws::Message::Binary(buf[..n].to_vec().into())).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+        }
+    });
+
+    // Run Session over duplex_b
+    let session = Session::new(duplex_b.compat());
+    let (driver, mut handle) = session.split();
+    let driver_task = tokio::spawn(driver);
+
+    let verifier = handle
+        .new_verifier(
+            VerifierConfig::builder()
+                .root_store(RootCertStore::mozilla())
+                .build()?,
+        )?
+        .commit().await?
+        .accept().await?
+        .run().await?;
+
+    let (output, verifier) = verifier.verify().await?.accept().await?;
+
+    let server_name = output.server_name.map(|s| format!("{}", s));
+    let transcript = output.transcript.map(|mut t| {
+        t.set_unauthed(0u8);
+        let sent = String::from_utf8_lossy(t.sent_unsafe()).to_string();
+        let recv = String::from_utf8_lossy(t.received_unsafe()).to_string();
+        (sent, recv)
+    });
+
+    let tls_tx = verifier.tls_transcript().clone();
+
+    let sent_app_len = tls_tx.sent().iter()
+        .filter_map(|r| match r.typ { ContentType::ApplicationData => Some(r.ciphertext.len()), _ => None })
+        .sum::<usize>();
+    let recv_app_len = tls_tx.recv().iter()
+        .filter_map(|r| match r.typ { ContentType::ApplicationData => Some(r.ciphertext.len()), _ => None })
+        .sum::<usize>();
+
+    let connection_info = ConnectionInfo {
+        time: tls_tx.time(),
+        version: *tls_tx.version(),
+        transcript_length: TranscriptLength { sent: sent_app_len as u32, received: recv_app_len as u32 },
+    };
+    let server_ephemeral_key = bincode::serialize(tls_tx.server_ephemeral_key())?;
+    let transcript_commitments = bincode::serialize(&output.transcript_commitments)?;
+
+    verifier.close().await?;
+    handle.close();
+    driver_task.await??;
+
+    ws_to_duplex.abort();
+    duplex_to_ws.abort();
+
+    let (sent, recv) = transcript.unwrap_or_default();
+
+    Ok(WsVerificationResult {
+        server_name,
+        sent_transcript: sent,
+        recv_transcript: recv,
+        attestation_bytes: None, // Will be signed by prover with returned data
+        connection_info,
+        server_ephemeral_key,
+        transcript_commitments,
+    })
+}
+
+// --- TCP protocol (CLI prover) ---
+
+async fn run_tcp_server(port: u16, state: AppState) -> Result<()> {
+    let listener = TcpListener::bind(("0.0.0.0", port)).await?;
 
     loop {
         let (tcp, addr) = listener.accept().await?;
-        let store = store.clone();
+        let store = state.tcp_sessions.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle(tcp, store).await {
-                eprintln!("[tlsn-server] Error ({}): {:#}", addr, e);
+            if let Err(e) = handle_tcp(tcp, store).await {
+                eprintln!("[tlsn-server] TCP error ({}): {:#}", addr, e);
             }
         });
     }
 }
 
-async fn handle(mut tcp: tokio::net::TcpStream, store: Store) -> Result<()> {
+async fn handle_tcp(
+    mut tcp: tokio::net::TcpStream,
+    store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+) -> Result<()> {
     let mut cmd = [0u8; 1];
     tcp.read_exact(&mut cmd).await?;
     let mut sid = [0u8; 16];
@@ -81,21 +441,25 @@ async fn handle(mut tcp: tokio::net::TcpStream, store: Store) -> Result<()> {
 
     match cmd[0] {
         b'M' => {
-            eprintln!("[tlsn-server] MPC session {} starting", sid_hex);
-            handle_mpc(tcp, sid, store).await?;
-            eprintln!("[tlsn-server] MPC session {} complete", sid_hex);
+            eprintln!("[tlsn-server] TCP MPC {} starting", sid_hex);
+            handle_tcp_mpc(tcp, sid, store).await?;
+            eprintln!("[tlsn-server] TCP MPC {} complete", sid_hex);
         }
         b'A' => {
-            eprintln!("[tlsn-server] Attest request for {}", sid_hex);
-            handle_attest(tcp, sid, store).await?;
-            eprintln!("[tlsn-server] Attestation {} signed", sid_hex);
+            eprintln!("[tlsn-server] TCP attest {}", sid_hex);
+            handle_tcp_attest(tcp, sid, store).await?;
+            eprintln!("[tlsn-server] TCP attest {} signed", sid_hex);
         }
         _ => return Err(anyhow!("Unknown command: {}", cmd[0])),
     }
     Ok(())
 }
 
-async fn handle_mpc(tcp: tokio::net::TcpStream, sid: [u8; 16], store: Store) -> Result<()> {
+async fn handle_tcp_mpc(
+    tcp: tokio::net::TcpStream,
+    sid: [u8; 16],
+    store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+) -> Result<()> {
     let session = Session::new(tcp.compat());
     let (driver, mut handle) = session.split();
     let driver_task = tokio::spawn(driver);
@@ -130,12 +494,6 @@ async fn handle_mpc(tcp: tokio::net::TcpStream, sid: [u8; 16], store: Store) -> 
             transcript_length: TranscriptLength { sent: sent_len as u32, received: recv_len as u32 },
         },
         server_ephemeral_key: bincode::serialize(tls_tx.server_ephemeral_key())?,
-        tls_transcript_data: TlsTranscriptData {
-            time: tls_tx.time(),
-            version: *tls_tx.version(),
-            sent_app_len: sent_len as u32,
-            recv_app_len: recv_len as u32,
-        },
     };
 
     store.lock().await.insert(sid, state);
@@ -145,8 +503,11 @@ async fn handle_mpc(tcp: tokio::net::TcpStream, sid: [u8; 16], store: Store) -> 
     Ok(())
 }
 
-async fn handle_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store: Store) -> Result<()> {
-    // Read length-prefixed AttestationRequest
+async fn handle_tcp_attest(
+    mut tcp: tokio::net::TcpStream,
+    sid: [u8; 16],
+    store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+) -> Result<()> {
     let mut len_buf = [0u8; 4];
     tcp.read_exact(&mut len_buf).await?;
     let req_len = u32::from_be_bytes(len_buf) as usize;
@@ -155,7 +516,7 @@ async fn handle_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store: Sto
 
     let request: AttestationRequest = bincode::deserialize(&req_buf)?;
 
-    // Wait for MPC session to complete and store state (with timeout)
+    // Wait for MPC state with retry
     let state = {
         let mut attempts = 0;
         loop {
@@ -164,13 +525,12 @@ async fn handle_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store: Sto
             }
             attempts += 1;
             if attempts > 50 {
-                return Err(anyhow!("Timeout waiting for MPC session to complete"));
+                return Err(anyhow!("Timeout waiting for MPC session"));
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
     };
 
-    // Sign with random key
     let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
     let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
     let mut provider = CryptoProvider::default();
@@ -196,4 +556,20 @@ async fn handle_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store: Sto
     tcp.flush().await?;
 
     Ok(())
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as u32;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
+        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
+        if chunk.len() > 1 { result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char); } else { result.push('='); }
+        if chunk.len() > 2 { result.push(CHARS[(triple & 0x3F) as usize] as char); } else { result.push('='); }
+    }
+    result
 }

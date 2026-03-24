@@ -181,27 +181,58 @@ async fn run_with_ws_verifier(
     // Session expects futures AsyncRead/AsyncWrite (it calls .compat() internally)
     let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path).await?;
 
-    eprintln!("[tlsn-prove] MPC complete with demo server");
+    eprintln!("[tlsn-prove] MPC complete, waiting for session result...");
 
-    // The demo server doesn't return attestation to CLI provers (webhook model).
-    // Since MPC-TLS was co-signed by demo.tlsnotary.org, the transcript is
-    // cryptographically authentic. We self-sign the attestation locally.
-    let (attestation, secrets) = build_self_attestation(prover_output)?;
+    // Wait for session_completed from server (includes verifier data for attestation)
+    let resp = session_ws.next().await
+        .ok_or_else(|| anyhow!("Session WS closed before completion"))??;
+    let resp_text = resp.into_text()?;
+    let resp_json: serde_json::Value = serde_json::from_str(&resp_text)?;
+
+    let resp_type = resp_json["type"].as_str().unwrap_or("");
+    eprintln!("[tlsn-prove] Session response type: {}", resp_type);
+
+    if resp_type == "error" {
+        return Err(anyhow!("Verifier error: {}", resp_json["message"].as_str().unwrap_or("unknown")));
+    }
+
+    if resp_type != "session_completed" {
+        return Err(anyhow!("Unexpected response type: {}", resp_type));
+    }
+
+    // Check if server returned verifier data (our self-hosted server does)
+    let has_verifier_data = resp_json["connectionInfo"].is_string()
+        && resp_json["serverEphemeralKey"].is_string()
+        && resp_json["transcriptCommitments"].is_string();
+
+    let (attestation, secrets) = if has_verifier_data {
+        eprintln!("[tlsn-prove] Building attestation from server-provided verifier data");
+        build_attestation_from_server_data(prover_output, &resp_json)?
+    } else {
+        // External server (like demo.tlsnotary.org) that doesn't return verifier data
+        return Err(anyhow!("Server did not return verifier data. Use a self-hosted Verifier Server."));
+    };
 
     session_ws.close(None).await.ok();
 
     Ok((attestation, secrets))
 }
 
-/// Build a self-signed attestation from MPC output.
-///
-/// Used with external verifier servers (like demo.tlsnotary.org) that don't
-/// return the attestation to the CLI prover. The MPC-TLS session was co-signed
-/// by the external verifier, guaranteeing transcript authenticity. The attestation
-/// signature is local — it wraps the real MPC output.
-fn build_self_attestation(output: ProverMpcOutput) -> Result<(Attestation, Secrets)> {
-    eprintln!("[tlsn-prove] Building self-signed attestation (MPC co-signed by external verifier)");
+/// Build attestation using verifier data returned from a self-hosted server via WS.
+fn build_attestation_from_server_data(
+    output: ProverMpcOutput,
+    resp: &serde_json::Value,
+) -> Result<(Attestation, Secrets)> {
+    // Decode server-provided verifier data
+    let conn_info_bytes = base64_decode(resp["connectionInfo"].as_str().unwrap_or(""))?;
+    let eph_key_bytes = base64_decode(resp["serverEphemeralKey"].as_str().unwrap_or(""))?;
+    let commitments_bytes = base64_decode(resp["transcriptCommitments"].as_str().unwrap_or(""))?;
 
+    let connection_info: ConnectionInfo = bincode::deserialize(&conn_info_bytes)?;
+    let server_ephemeral_key = bincode::deserialize(&eph_key_bytes)?;
+    let transcript_commitments = bincode::deserialize(&commitments_bytes)?;
+
+    // Sign attestation locally (the verifier data is from the real MPC session)
     let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
     let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
     let mut provider = CryptoProvider::default();
@@ -211,26 +242,39 @@ fn build_self_attestation(output: ProverMpcOutput) -> Result<(Attestation, Secre
         .supported_signature_algs(Vec::from_iter(provider.signer.supported_algs()))
         .build()?;
 
-    let transcript = output.secrets.transcript();
-    let connection_info = ConnectionInfo {
-        time: std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs(),
-        version: tlsn::connection::TlsVersion::V1_2,
-        transcript_length: TranscriptLength {
-            sent: transcript.sent().len() as u32,
-            received: transcript.received().len() as u32,
-        },
-    };
-
     let mut builder = Attestation::builder(&att_config)
         .accept_request(output.request)?;
-    builder.connection_info(connection_info);
+    builder
+        .connection_info(connection_info)
+        .server_ephemeral_key(server_ephemeral_key)
+        .transcript_commitments(transcript_commitments);
 
     let attestation = builder.build(&provider)?;
 
     Ok((attestation, output.secrets))
+}
+
+fn base64_decode(s: &str) -> Result<Vec<u8>> {
+    const TABLE: [u8; 128] = {
+        let mut t = [255u8; 128];
+        let chars = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut i = 0;
+        while i < 64 { t[chars[i] as usize] = i as u8; i += 1; }
+        t
+    };
+    let bytes: Vec<u8> = s.bytes().filter(|&b| b != b'=' && b != b'\n' && b != b'\r').collect();
+    let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
+    for chunk in bytes.chunks(4) {
+        let mut buf = [0u32; 4];
+        for (i, &b) in chunk.iter().enumerate() {
+            buf[i] = TABLE.get(b as usize).copied().unwrap_or(0) as u32;
+        }
+        let triple = (buf[0] << 18) | (buf[1] << 12) | (buf[2] << 6) | buf[3];
+        out.push((triple >> 16) as u8);
+        if chunk.len() > 2 { out.push((triple >> 8) as u8); }
+        if chunk.len() > 3 { out.push(triple as u8); }
+    }
+    Ok(out)
 }
 
 /// Run the MPC-TLS prover over a futures AsyncRead+AsyncWrite stream (for WebSocket).
