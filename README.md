@@ -38,8 +38,7 @@ bun run ios                         # or: bun run web
 4. Verification passes → bounty released, proof viewable on-chain
 
 <p align="center">
-  <img src="assets/tlsn-proof-detail.png" alt="TLSNotary proof — verification + proof detail" width="280" />
-  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — server response expanded" width="280" />
+  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — verified server response" width="280" />
 </p>
 
 Payment is trustless: Cashu HTLC escrow (NUT-14) — preimage held by Oracle, redeemed by Worker on pass, refunded to Requester on timeout.
