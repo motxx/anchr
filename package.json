@@ -10,6 +10,7 @@
   "scripts": {
     "start": "bun run src/server.ts",
     "dev": "bun --watch run src/server.ts",
+    "mcp": "bun run src/mcp.ts",
     "typecheck": "bunx tsc --noEmit",
     "test:unit": "bun test src/ mobile/src/",
     "test:ci": "bun test src/ mobile/src/",

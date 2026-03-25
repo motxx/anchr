@@ -128,6 +128,60 @@ curl -X POST localhost:3000/queries \
 
 </details>
 
+## MCP (AI Agent Integration)
+
+Anchr exposes an MCP server so AI agents (Claude Desktop, Claude Code, etc.) can request cryptographically verified data.
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "anchr": {
+      "command": "bun",
+      "args": ["run", "/path/to/anchr/src/mcp.ts"],
+      "env": {
+        "REMOTE_QUERY_API_BASE_URL": "https://anchr-app.fly.dev"
+      }
+    }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add anchr -- bun run /path/to/anchr/src/mcp.ts
+```
+
+### Available tools
+
+| Tool | Description |
+|------|-------------|
+| `create_query` | Request verified web data (TLSNotary) or real-world photos (C2PA) |
+| `get_query_status` | Poll query status and retrieve verified results |
+| `list_available_queries` | List open queries |
+| `cancel_query` | Cancel a pending query |
+| `get_query_attachment` | Get attachment URL/metadata |
+| `get_query_attachment_preview` | Get resized preview image |
+
+### Example: AI agent verifies BTC price
+
+```
+Human: "What is the current BTC price? I need a cryptographic proof."
+
+Claude uses create_query:
+  verification_requirements: ["tlsn"]
+  target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
+  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }]
+
+→ Auto-worker fetches via MPC-TLS, generates cryptographic proof
+→ Claude polls get_query_status, receives verified data
+→ "BTC is $XX,XXX (cryptographically proven via TLSNotary — server: api.coingecko.com)"
+```
+
 ## Architecture
 
 ```

@@ -24,20 +24,40 @@ export async function startMcpServer() {
 
   server.tool(
     "create_query",
-    "Request an anonymous human to observe, photograph, or verify something in the real world. " +
-    "Describe what you need — the worker will submit C2PA-verified media as evidence. " +
+    "Request cryptographically verified data. Two modes:\n" +
+    "1. Web data (TLSNotary): Prove what an HTTPS API returned. Set verification_requirements=['tlsn'] and provide target_url. " +
+    "An auto-worker fetches the URL via MPC-TLS and returns a cryptographic proof tied to the server's TLS certificate.\n" +
+    "2. Real-world observation (C2PA): Request a human to photograph or observe something. " +
+    "The worker submits C2PA-verified media with GPS proof.\n" +
     (isNostrEnabled() ? "Query is broadcast via Nostr relays. " : "") +
     (isCashuEnabled() ? "Bounty paid via Cashu ecash (anonymous). " : "") +
-    "Returns a query_id for polling.",
+    "Returns a query_id — poll with get_query_status.",
     {
-      description: z.string().describe("What should be observed, photographed, or verified, e.g. 'テヘラン市街の現在の様子' or 'セブンイレブン渋谷店の営業状況'"),
-      location_hint: z.string().optional().describe("Region or location hint (e.g. 'IR', 'CN', '渋谷')"),
+      description: z.string().describe("What to verify, e.g. 'BTC price from CoinGecko' or '渋谷スクランブル交差点の混雑状況'"),
+      location_hint: z.string().optional().describe("Region or location hint for real-world queries (e.g. '渋谷')"),
       ttl_seconds: z.number().int().min(60).max(600).optional().describe("Query time limit in seconds (default 600)"),
       oracle_ids: z.array(z.string()).optional().describe("Acceptable oracle IDs for verification. Omit to accept any."),
-      verification_requirements: z.array(z.enum(VERIFICATION_FACTORS)).optional().describe("Verification factors to require (e.g. 'gps', 'nonce'). Defaults to ['gps', 'ai_check']."),
+      verification_requirements: z.array(z.enum(VERIFICATION_FACTORS)).optional().describe("Verification factors: ['tlsn'] for web data, ['gps','ai_check'] for photos (default)."),
+      target_url: z.string().url().optional().describe("HTTPS URL to prove via TLSNotary (e.g. 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'). Required when verification_requirements includes 'tlsn'."),
+      target_method: z.enum(["GET", "POST"]).optional().describe("HTTP method for TLSNotary request (default GET)."),
+      conditions: z.array(z.object({
+        type: z.enum(["contains", "regex", "jsonpath"]).describe("Condition type"),
+        expression: z.string().describe("Expression to evaluate (e.g. JSONPath 'bitcoin.usd', regex pattern, or substring)"),
+        expected: z.string().optional().describe("Expected value (for jsonpath/regex)"),
+        description: z.string().optional().describe("Human-readable description of what this checks"),
+      })).optional().describe("Conditions to verify against the proven response body."),
     },
-    async ({ description, location_hint, ttl_seconds, oracle_ids, verification_requirements }) => {
-      const input: QueryInput = { description, location_hint, verification_requirements };
+    async ({ description, location_hint, ttl_seconds, oracle_ids, verification_requirements, target_url, target_method, conditions }) => {
+      const input: QueryInput = {
+        description,
+        location_hint,
+        verification_requirements,
+        tlsn_requirements: target_url ? {
+          target_url,
+          method: target_method,
+          conditions,
+        } : undefined,
+      };
       const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
       return {
         content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],

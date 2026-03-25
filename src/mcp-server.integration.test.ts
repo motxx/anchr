@@ -110,6 +110,38 @@ test("mcp tools expose query status and attachment metadata", async () => {
   }
 });
 
+test("mcp create_query supports TLSNotary parameters", async () => {
+  const client = await createMcpClient();
+
+  try {
+    const created = await client.callTool({
+      name: "create_query",
+      arguments: {
+        description: "BTC price from CoinGecko",
+        verification_requirements: ["tlsn"],
+        target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+        conditions: [
+          { type: "jsonpath", expression: "bitcoin.usd", description: "BTC price exists" },
+        ],
+        ttl_seconds: 120,
+      },
+    });
+    const json = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
+    expect(json.query_id).toStartWith("query_");
+    expect(json.verification_requirements).toContain("tlsn");
+
+    // Verify status includes tlsn_requirements
+    const status = await client.callTool({
+      name: "get_query_status",
+      arguments: { query_id: json.query_id },
+    });
+    const statusJson = parseTextPayload(status as { content: Array<{ type: string; text?: string }> });
+    expect(statusJson.status).toBe("pending");
+  } finally {
+    await client.close();
+  }
+});
+
 test("mcp can use a remote HTTP query backend", async () => {
   const baseUrl = "http://remote.test";
   const bootstrapPreamble = [
