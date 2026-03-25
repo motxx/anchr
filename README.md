@@ -54,12 +54,6 @@ Requester receives verified data + cryptographic proof
 
 Prove what any HTTPS server returned. Workers fetch the URL through a Multi-Party Computation TLS session — the Verifier Server co-signs the session without seeing the plaintext.
 
-<p align="center">
-  <img src="assets/tlsn-proof-expanded.png" alt="TLSNotary proof — Worker mobile app" width="280" />
-  &nbsp;&nbsp;
-  <img src="assets/tlsn-requester-proof.png" alt="TLSNotary proof — Requester web UI" width="480" />
-</p>
-
 ### Real-World Photos (C2PA)
 
 Prove what a location looks like right now. Workers photograph with a C2PA-signed camera — the Content Credentials are cryptographically bound to the image, GPS, and timestamp.
