@@ -5,6 +5,7 @@ primary_region = "nrt"
   dockerfile = "Dockerfile"
 
 [env]
+  SOCKS_PROXY = "socks5://127.0.0.1:9050"
 
 # WS port exposed via fly.io HTTP (TLS terminated by fly.io)
 [http_service]

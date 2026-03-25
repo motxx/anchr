@@ -17,7 +17,7 @@ FROM oven/bun:1.3.8 AS app
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends imagemagick ca-certificates curl \
+  && apt-get install -y --no-install-recommends imagemagick ca-certificates curl tor \
   && curl -sSL https://github.com/contentauth/c2pa-rs/releases/download/c2patool-v0.26.37/c2patool-v0.26.37-x86_64-unknown-linux-gnu.tar.gz \
      | tar -xz --strip-components=1 -C /usr/local/bin c2patool \
   && rm -rf /var/lib/apt/lists/*
@@ -35,6 +35,10 @@ ENV NODE_ENV=production
 ENV REFERENCE_APP_PORT=8080
 ENV RUNTIME_DATA_DIR=/data
 
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 8080
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["bun", "run", "src/server.ts"]

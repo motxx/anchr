@@ -219,12 +219,16 @@ export class AnchrWorker {
   private async generateProof(targetUrl: string): Promise<string> {
     const tmpFile = `/tmp/anchr-worker-${Date.now()}.presentation.tlsn`;
 
-    const proc = Bun.spawn([
+    const args = [
       this.config.proverBin,
       "--verifier", this.config.verifierHost,
       targetUrl,
       "-o", tmpFile,
-    ], {
+    ];
+    const socksProxy = process.env.TLSN_SOCKS_PROXY;
+    if (socksProxy) args.push("--socks-proxy", socksProxy);
+
+    const proc = Bun.spawn(args, {
       stdout: "pipe",
       stderr: "pipe",
     });

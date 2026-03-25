@@ -56,6 +56,23 @@ struct Cli {
     /// Verifier server address (e.g. localhost:7047). If omitted, runs verifier in-process.
     #[arg(short, long)]
     verifier: Option<String>,
+
+    /// SOCKS5 proxy for target connections (e.g. socks5://127.0.0.1:9050 for Tor)
+    #[arg(long)]
+    socks_proxy: Option<String>,
+}
+
+async fn connect_target(host: &str, port: u16, socks_proxy: Option<&str>) -> Result<tokio::net::TcpStream> {
+    match socks_proxy {
+        Some(proxy) => {
+            let addr = proxy.strip_prefix("socks5://").unwrap_or(proxy);
+            eprintln!("[tlsn-prove] Connecting to {}:{} via SOCKS5 ({})", host, port, addr);
+            let stream = tokio_socks::tcp::Socks5Stream::connect(addr, (host, port)).await
+                .map_err(|e| anyhow!("SOCKS5 connect failed: {e}"))?;
+            Ok(stream.into_inner())
+        }
+        None => Ok(tokio::net::TcpStream::connect((host, port)).await?),
+    }
 }
 
 #[tokio::main]
@@ -77,20 +94,22 @@ async fn main() -> Result<()> {
 
     eprintln!("[tlsn-prove] Target: {}:{}{}", host, port, path);
 
+    let socks_proxy = cli.socks_proxy.as_deref();
+
     let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
         if verifier_addr.starts_with("wss://") || verifier_addr.starts_with("ws://") {
             // WebSocket mode: connect to TLSNotary demo/extension verifier
             eprintln!("[tlsn-prove] Using WebSocket verifier: {}", verifier_addr);
-            run_with_ws_verifier(verifier_addr, &host, port, &path).await?
+            run_with_ws_verifier(verifier_addr, &host, port, &path, socks_proxy).await?
         } else {
             // TCP mode: connect to our custom Verifier Server
             eprintln!("[tlsn-prove] Using TCP verifier: {}", verifier_addr);
-            run_with_remote_verifier(verifier_addr, &host, port, &path).await?
+            run_with_remote_verifier(verifier_addr, &host, port, &path, socks_proxy).await?
         }
     } else {
         // Local mode: run both prover and verifier in-process
         eprintln!("[tlsn-prove] Using in-process verifier");
-        run_with_local_verifier(&host, port, &path).await?
+        run_with_local_verifier(&host, port, &path, socks_proxy).await?
     };
 
     // Build presentation with full disclosure
@@ -116,6 +135,7 @@ async fn run_with_local_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<(Attestation, Secrets)> {
     let (verifier_socket, prover_socket) = tokio::io::duplex(1 << 23);
     let (request_tx, request_rx) = oneshot::channel::<AttestationRequest>();
@@ -128,7 +148,7 @@ async fn run_with_local_verifier(
         }
     });
 
-    run_prover(prover_socket, request_tx, attestation_rx, host, port, path).await
+    run_prover(prover_socket, request_tx, attestation_rx, host, port, path, socks_proxy).await
 }
 
 async fn run_with_ws_verifier(
@@ -136,6 +156,7 @@ async fn run_with_ws_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<(Attestation, Secrets)> {
     use async_tungstenite::tokio::connect_async;
     use async_tungstenite::tungstenite::Message;
@@ -179,7 +200,7 @@ async fn run_with_ws_verifier(
 
     // Step 3: Run MPC-TLS prover over the WebSocket stream
     // Session expects futures AsyncRead/AsyncWrite (it calls .compat() internally)
-    let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path).await?;
+    let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path, socks_proxy).await?;
 
     eprintln!("[tlsn-prove] MPC complete, waiting for session result...");
 
@@ -283,6 +304,7 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<ProverMpcOutput> {
     // Session::new expects futures AsyncRead+AsyncWrite
     let session = Session::new(stream);
@@ -303,7 +325,7 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -391,6 +413,7 @@ async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<ProverMpcOutput> {
     use tokio_util::compat::TokioAsyncReadCompatExt;
 
@@ -412,7 +435,7 @@ async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -499,6 +522,7 @@ async fn run_with_remote_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<(Attestation, Secrets)> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -516,7 +540,7 @@ async fn run_with_remote_verifier(
     eprintln!("[tlsn-prove] MPC connection established");
 
     // Run prover (MPC session) — no oneshot channels, we handle attestation over TCP
-    let prover_output = run_prover_mpc(mpc_tcp, host, port, path).await?;
+    let prover_output = run_prover_mpc(mpc_tcp, host, port, path, socks_proxy).await?;
 
     eprintln!("[tlsn-prove] MPC complete, requesting attestation...");
 
@@ -560,6 +584,7 @@ async fn run_prover_mpc(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<ProverMpcOutput> {
     let session = Session::new(tcp.compat());
     let (driver, mut handle) = session.split();
@@ -579,7 +604,7 @@ async fn run_prover_mpc(
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -696,6 +721,7 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
 ) -> Result<(Attestation, Secrets)> {
     let session = Session::new(socket.compat());
     let (driver, mut handle) = session.split();
@@ -716,7 +742,7 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
         .await?;
 
     // Connect to the real target server
-    let tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
