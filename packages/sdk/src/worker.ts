@@ -233,7 +233,7 @@ export class AnchrWorker {
 
     if (proc.exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text();
-      throw new Error(`tlsn-prove failed (exit ${proc.exitCode}): ${stderr.slice(0, 200)}`);
+      throw new Error(`tlsn-prove failed (exit ${proc.exitCode}): ${stderr.slice(0, 1000)}`);
     }
 
     // stdout contains base64 presentation
