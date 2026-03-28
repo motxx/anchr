@@ -21,6 +21,7 @@ services:
       context: ./crates/tlsn-server
     ports:
       - "7047:7047"
+      - "7048:7048"
 
   # --- Lightning regtest stack ---
 
