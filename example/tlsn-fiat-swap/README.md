@@ -10,17 +10,24 @@ Peer-to-peer fiat ↔ Bitcoin trades require trust: after the buyer sends fiat, 
 
 Anchr enables **trustless P2P on-ramp** by combining:
 
-- **TLSNotary** — Cryptographic proof that a PayPal/Venmo payment was completed, without revealing the full page content
+- **TLSNotary** — Cryptographic proof that a Stripe payment was completed, without revealing the full page content
 - **Cashu HTLC** — Hash Time-Locked Contract escrow on Bitcoin/Lightning via ecash, ensuring atomic settlement
 
-The buyer proves they sent fiat by generating a TLSNotary attestation of the PayPal transaction page. Anchr's oracle verifies the proof and releases the HTLC preimage, allowing the buyer to redeem the escrowed BTC.
+The buyer pays via a Stripe Payment Link, then generates a TLSNotary attestation of the Stripe receipt page. Anchr's oracle verifies the proof and releases the HTLC preimage, allowing the buyer to redeem the escrowed BTC.
+
+## Why Stripe?
+
+- Stripe offers a [Crypto Onramp](https://stripe.com/use-cases/crypto) product — no ToS conflict with crypto-related usage
+- Payment Links provide a simple, hosted checkout flow
+- Receipt pages on `checkout.stripe.com` are standard HTTPS — ideal for TLSNotary proofs
+- Clear "succeeded" status on receipts makes condition matching straightforward
 
 ## Comparison with zkP2P
 
 | | [zkP2P](https://zkp2p.xyz/) | Anchr TLSNotary Fiat Swap |
 |---|---|---|
 | Proof system | ZK-SNARK (circom) | TLSNotary (MPC-TLS) |
-| Data source | Venmo email receipts | Any HTTPS page (PayPal, Venmo, bank portals) |
+| Data source | Venmo email receipts | Any HTTPS page (Stripe, bank portals, etc.) |
 | Settlement | Ethereum smart contract | Cashu HTLC (Bitcoin/Lightning) |
 | Infrastructure | On-chain (Ethereum) | Nostr relay + Cashu mint |
 | Privacy | ZK proof reveals nothing | Selective disclosure of page content |
@@ -30,23 +37,24 @@ The buyer proves they sent fiat by generating a TLSNotary attestation of the Pay
 ```
 Seller (has BTC)                         Buyer (has fiat)
 ┌──────────────────┐                     ┌──────────────────┐
-│ Lock 100k sats   │                     │ Send $70 via     │
-│ in Cashu HTLC    │                     │ PayPal           │
-│                  │                     │                  │
+│ Lock 100k sats   │                     │ Pay $70 via      │
+│ in Cashu HTLC    │                     │ Stripe Payment   │
+│                  │                     │ Link             │
 │ Create Anchr     │  ── Nostr ──▶       │ Generate TLSNotary│
-│ query with       │                     │ proof of PayPal  │
-│ conditions       │                     │ transaction page │
+│ query with       │                     │ proof of Stripe  │
+│ conditions       │                     │ receipt page     │
 └──────────────────┘                     └──────────────────┘
          │                                        │
          │              ┌───────────┐             │
          └─────────────▶│  Oracle   │◀────────────┘
                         │           │
-                        │ 1. TLSNotary signature  │
-                        │ 2. Domain = paypal.com  │
-                        │ 3. Body has "Completed" │
-                        │ 4. Body has "$70.00"    │
-                        │ 5. Body has seller email│
-                        │ 6. Attestation fresh    │
+                        │ 1. TLSNotary signature     │
+                        │ 2. Domain = checkout.stripe │
+                        │    .com                     │
+                        │ 3. Body has "succeeded"     │
+                        │ 4. Body has "$70.00"        │
+                        │ 5. Body has payment_intent  │
+                        │ 6. Attestation fresh        │
                         └───────────┘
                               │
                         Release HTLC preimage
@@ -59,13 +67,14 @@ Seller (has BTC)                         Buyer (has fiat)
 
 ### Phase 1: Order Creation
 
-The seller locks BTC in a Cashu HTLC escrow and creates an Anchr query specifying what constitutes valid proof of payment.
+The seller creates a Stripe Payment Link for the fiat amount, locks BTC in a Cashu HTLC escrow, and creates an Anchr query specifying what constitutes valid proof of payment.
 
 ```
+Seller → Stripe: Create Payment Link ($70.00)
 Seller → Cashu Mint: Lock 100k sats (HTLC, preimage held by Oracle)
 Seller → Anchr: Create query {
-  target_url: "https://www.paypal.com/activity/payment/{txId}",
-  conditions: ["Completed", "$70.00", "seller@example.com"],
+  target_url: "https://checkout.stripe.com/c/pay/{session_id}",
+  conditions: ["succeeded", "$70.00", "pi_{payment_intent_id}"],
   max_attestation_age_seconds: 600
 }
 Anchr → Nostr: Broadcast order
@@ -73,14 +82,14 @@ Anchr → Nostr: Broadcast order
 
 ### Phase 2: Fiat Payment
 
-The buyer sends fiat via PayPal. This happens entirely off-chain — no crypto involved yet.
+The buyer pays via the Stripe Payment Link (credit card, Apple Pay, Google Pay, etc.). This happens entirely off-chain — no crypto involved yet.
 
 ### Phase 3: Payment Proof
 
-The buyer opens the PayPal transaction page in a TLSNotary-enabled browser extension. The MPC-TLS protocol generates a cryptographic attestation proving the page content without revealing it to the verifier during the TLS session.
+The buyer opens the Stripe receipt page in a TLSNotary-enabled browser extension. The MPC-TLS protocol generates a cryptographic attestation proving the page content without revealing it to the verifier during the TLS session.
 
 ```
-Buyer → PayPal: Open transaction page
+Buyer → Stripe: Open receipt page
 Buyer → TLSNotary Verifier: MPC-TLS session
 Buyer → Anchr: Submit .presentation.tlsn proof
 ```
@@ -91,10 +100,10 @@ Anchr's oracle verifies the TLSNotary proof and checks all conditions. If everyt
 
 ```
 Oracle: Verify TLSNotary signature ✓
-Oracle: server_name === "www.paypal.com" ✓
-Oracle: body contains "Completed" ✓
+Oracle: server_name === "checkout.stripe.com" ✓
+Oracle: body contains "succeeded" ✓
 Oracle: body contains "$70.00" ✓
-Oracle: body contains "seller@example.com" ✓
+Oracle: body contains "pi_{payment_intent_id}" ✓
 Oracle: attestation age < 600s ✓
 Oracle → Buyer: Release HTLC preimage
 Buyer → Cashu Mint: Redeem 100k sats with preimage + signature
@@ -104,11 +113,11 @@ Buyer → Cashu Mint: Redeem 100k sats with preimage + signature
 
 | Threat | Mitigation |
 |--------|-----------|
-| **Buyer fakes PayPal page** | TLSNotary verifies the TLS certificate chain. `server_name` must be `www.paypal.com` — a fake server would have a different certificate |
+| **Buyer fakes Stripe page** | TLSNotary verifies the TLS certificate chain. `server_name` must be `checkout.stripe.com` — a fake server would have a different certificate |
 | **Buyer replays old transaction** | `max_attestation_age_seconds` enforces freshness. The attestation timestamp is part of the cryptographic proof |
 | **Seller withdraws BTC after payment** | Cashu HTLC: funds cannot be unlocked without the preimage. The seller cannot access the escrowed funds |
 | **Oracle steals via preimage** | HTLC redemption requires both the preimage AND the buyer's signature. The oracle alone cannot redeem |
-| **PayPal reverses the transaction** | Out of scope for TLSNotary. The seller accepts PayPal's dispute policy risk. Mitigation: use payment methods with finality |
+| **Stripe chargeback** | Out of scope for TLSNotary. The seller accepts chargeback risk. Mitigation: wait for settlement period before releasing large amounts |
 | **Buyer never submits proof** | HTLC locktime expires → seller reclaims funds automatically |
 
 ## Running the Example
@@ -142,5 +151,5 @@ For actual TLSNotary proof generation, you need:
 
 ## Files
 
-- **seller.ts** — BTC seller SDK demo: creates an on-ramp order with Cashu HTLC escrow and TLSNotary conditions
+- **seller.ts** — BTC seller SDK demo: creates a Stripe Payment Link order with Cashu HTLC escrow and TLSNotary conditions
 - **buyer.ts** — BTC buyer SDK demo: discovers orders, shows the proof submission flow

@@ -3,8 +3,8 @@
  *
  * The buyer:
  *   1. Discovers open on-ramp orders on the Anchr network
- *   2. Sends fiat via PayPal (off-chain, manual step)
- *   3. Generates a TLSNotary proof of the PayPal transaction page
+ *   2. Pays via the seller's Stripe Payment Link (off-chain, manual step)
+ *   3. Generates a TLSNotary proof of the Stripe receipt page
  *   4. Submits the proof to Anchr to redeem escrowed BTC
  *
  * Usage:
@@ -26,7 +26,7 @@ console.log(`Server: ${SERVER_URL}\n`);
 console.log("Step 1: Finding open on-ramp orders...\n");
 
 const orders = await anchr.listOpenQueries();
-const onramp = orders.find((o) => o.description.includes("PayPal payment"));
+const onramp = orders.find((o) => o.description.includes("Stripe payment"));
 
 if (!onramp) {
   console.log("No open on-ramp orders found.");
@@ -53,15 +53,16 @@ if (onramp.tlsn_requirements) {
 
 // --- Step 2: Instructions for fiat payment ---
 
-console.log("\n--- Step 2: Send Fiat Payment ---\n");
-console.log("Send $70.00 to seller@example.com via PayPal.");
-console.log("Keep the transaction page open — you'll need it for the proof.\n");
+console.log("\n--- Step 2: Pay via Stripe ---\n");
+console.log("Open the Stripe Payment Link provided by the seller.");
+console.log("Complete the payment (credit card, Apple Pay, etc.).");
+console.log("Keep the receipt page open — you'll need it for the proof.\n");
 
 // --- Step 3: Generate TLSNotary proof ---
 
 console.log("--- Step 3: Generate TLSNotary Proof ---\n");
 console.log("Use the TLSNotary browser extension to generate a proof:");
-console.log("  1. Open the PayPal transaction page in your browser");
+console.log("  1. Open the Stripe receipt page in your browser");
 console.log("  2. Click the TLSN extension icon");
 console.log("  3. Start a notarization session");
 console.log("  4. The extension generates a .presentation.tlsn file\n");
@@ -73,7 +74,7 @@ console.log("--- Step 4: Submit Proof ---\n");
 // In a real flow, the buyer would load the .presentation.tlsn file
 // and submit it to Anchr:
 //
-//   const proofFile = Bun.file("transaction.presentation.tlsn");
+//   const proofFile = Bun.file("stripe-receipt.presentation.tlsn");
 //   const proofBase64 = Buffer.from(await proofFile.arrayBuffer()).toString("base64");
 //   const result = await anchr.submitPresentation(onramp.id, proofBase64);
 //   console.log(`Submitted: ${result.ok}`);
@@ -83,7 +84,7 @@ console.log("--- Step 4: Submit Proof ---\n");
 // and the buyer can redeem the escrowed sats.
 
 console.log("Example submission code:\n");
-console.log('  const proof = Bun.file("transaction.presentation.tlsn");');
+console.log('  const proof = Bun.file("stripe-receipt.presentation.tlsn");');
 console.log('  const proofBase64 = Buffer.from(await proof.arrayBuffer()).toString("base64");');
 console.log(`  const result = await anchr.submitPresentation("${onramp.id}", proofBase64);`);
 console.log();
