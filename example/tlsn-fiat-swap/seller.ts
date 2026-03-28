@@ -1,5 +1,5 @@
 /**
- * zkP2P On-ramp — Seller (has BTC, wants fiat)
+ * TLSNotary Fiat Swap — Seller (has BTC, wants fiat)
  *
  * The seller creates an on-ramp order:
  *   1. Defines the payment conditions (PayPal amount, recipient, status)
@@ -12,7 +12,7 @@
  *   - Submit the proof to Anchr to redeem the escrowed BTC
  *
  * Usage:
- *   bun run example/zkp2p-onramp/seller.ts
+ *   bun run example/tlsn-fiat-swap/seller.ts
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
@@ -22,7 +22,7 @@ const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
 
-console.log("=== zkP2P On-ramp — Seller ===\n");
+console.log("=== TLSNotary Fiat Swap — Seller ===\n");
 console.log(`Server: ${SERVER_URL}\n`);
 
 // Create an on-ramp order.

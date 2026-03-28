@@ -1,4 +1,4 @@
-# zkP2P On-ramp
+# TLSNotary Fiat Swap
 
 Trustless fiat-to-Bitcoin exchange using [TLSNotary](https://tlsnotary.org/) proofs and Cashu HTLC escrow — no centralized exchange required.
 
@@ -17,7 +17,7 @@ The buyer proves they sent fiat by generating a TLSNotary attestation of the Pay
 
 ## Comparison with zkP2P
 
-| | [zkP2P](https://zkp2p.xyz/) | Anchr zkP2P |
+| | [zkP2P](https://zkp2p.xyz/) | Anchr TLSNotary Fiat Swap |
 |---|---|---|
 | Proof system | ZK-SNARK (circom) | TLSNotary (MPC-TLS) |
 | Data source | Venmo email receipts | Any HTTPS page (PayPal, Venmo, bank portals) |
@@ -118,10 +118,10 @@ Buyer → Cashu Mint: Redeem 100k sats with preimage + signature
 bun run dev
 
 # Terminal 1: Seller creates an on-ramp order
-bun run example/zkp2p-onramp/seller.ts
+bun run example/tlsn-fiat-swap/seller.ts
 
 # Terminal 2: Buyer finds the order and gets instructions
-bun run example/zkp2p-onramp/buyer.ts
+bun run example/tlsn-fiat-swap/buyer.ts
 ```
 
 ### Full Flow (requires TLSNotary infrastructure)

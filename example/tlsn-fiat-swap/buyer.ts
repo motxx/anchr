@@ -1,5 +1,5 @@
 /**
- * zkP2P On-ramp — Buyer (has fiat, wants BTC)
+ * TLSNotary Fiat Swap — Buyer (has fiat, wants BTC)
  *
  * The buyer:
  *   1. Discovers open on-ramp orders on the Anchr network
@@ -8,7 +8,7 @@
  *   4. Submits the proof to Anchr to redeem escrowed BTC
  *
  * Usage:
- *   bun run example/zkp2p-onramp/buyer.ts
+ *   bun run example/tlsn-fiat-swap/buyer.ts
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
@@ -18,7 +18,7 @@ const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
 
-console.log("=== zkP2P On-ramp — Buyer ===\n");
+console.log("=== TLSNotary Fiat Swap — Buyer ===\n");
 console.log(`Server: ${SERVER_URL}\n`);
 
 // --- Step 1: Discover open on-ramp orders ---
