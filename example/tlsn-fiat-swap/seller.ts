@@ -25,14 +25,11 @@ const anchr = new Anchr({ serverUrl: SERVER_URL });
 console.log("=== TLSNotary Fiat Swap — Seller ===\n");
 console.log(`Server: ${SERVER_URL}\n`);
 
-// In a real flow, the seller would create a Stripe Payment Link first:
-//   const link = await stripe.paymentLinks.create({ ... });
-//   const paymentIntentId = "pi_xxxxx";
-const PAYMENT_LINK = "https://buy.stripe.com/test_xxxxx";
-const PAYMENT_INTENT_ID = "pi_demo_xxxxx";
+// Stripe Payment Link (created via Stripe Dashboard)
+// In test mode: use card 4242 4242 4242 4242, any future expiry, any CVC
+const PAYMENT_LINK = "https://buy.stripe.com/test_4gMcN67U309vevr1bwbV600";
 
-console.log(`Stripe Payment Link: ${PAYMENT_LINK}`);
-console.log(`Payment Intent: ${PAYMENT_INTENT_ID}\n`);
+console.log(`Stripe Payment Link: ${PAYMENT_LINK}\n`);
 
 // Create an on-ramp order.
 // The SDK handles:
@@ -40,7 +37,7 @@ console.log(`Payment Intent: ${PAYMENT_INTENT_ID}\n`);
 //   2. Building the query with TLSNotary verification requirements
 //   3. Broadcasting the order via Nostr relay
 const queryId = await anchr.createTlsnQuery({
-  description: "Prove Stripe payment of $70.00 (pi_demo_xxxxx)",
+  description: "Prove Stripe payment of $70.00",
   targetUrl: "https://checkout.stripe.com/c/pay/{session_id}",
   conditions: [
     {
@@ -55,8 +52,8 @@ const queryId = await anchr.createTlsnQuery({
     },
     {
       type: "contains",
-      expression: PAYMENT_INTENT_ID,
-      description: "Must match the specific payment intent",
+      expression: "succeeded",
+      description: "Payment must have succeeded status",
     },
   ],
   maxSats: 100_000,
