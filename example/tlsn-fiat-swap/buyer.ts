@@ -3,9 +3,12 @@
  *
  * The buyer:
  *   1. Discovers open on-ramp orders on the Anchr network
- *   2. Pays via the seller's Stripe Payment Link (off-chain, manual step)
- *   3. Generates a TLSNotary proof of the Stripe receipt page
- *   4. Submits the proof to Anchr to redeem escrowed BTC
+ *   2. Pays via the seller's Stripe Payment Link
+ *   3. Receives the Stripe API key + Session ID from the seller
+ *      (via NIP-44 encrypted_context in the Nostr selection event)
+ *   4. Fetches the Checkout Session status from Stripe API
+ *   5. Generates a TLSNotary proof of the JSON response
+ *   6. Submits the proof to Anchr to redeem escrowed BTC
  *
  * Usage:
  *   bun run example/tlsn-fiat-swap/buyer.ts
@@ -39,7 +42,8 @@ console.log(`  Description: ${onramp.description}`);
 console.log(`  Bounty: ${onramp.bounty?.amount_sats ?? 0} sats`);
 
 if (onramp.tlsn_requirements) {
-  console.log(`  Target URL: ${onramp.tlsn_requirements.target_url}`);
+  const domain = onramp.tlsn_requirements.domain_hint ?? onramp.tlsn_requirements.target_url;
+  console.log(`  Domain: ${domain}`);
   if (onramp.tlsn_requirements.conditions) {
     console.log("  Conditions:");
     for (const cond of onramp.tlsn_requirements.conditions) {
@@ -51,42 +55,55 @@ if (onramp.tlsn_requirements) {
   }
 }
 
-// --- Step 2: Instructions for fiat payment ---
+// --- Step 2: Pay via Stripe ---
 
 console.log("\n--- Step 2: Pay via Stripe ---\n");
-console.log("Open the Stripe Payment Link provided by the seller.");
-console.log("Complete the payment (credit card, Apple Pay, etc.).");
-console.log("Keep the receipt page open — you'll need it for the proof.\n");
+console.log("Open the seller's Stripe Payment Link and complete the payment.");
+console.log("Use test card: 4242 4242 4242 4242, any future expiry, any CVC.\n");
 
-// --- Step 3: Generate TLSNotary proof ---
+// --- Step 3: TLSNotary proof of Stripe API ---
 
-console.log("--- Step 3: Generate TLSNotary Proof ---\n");
-console.log("Use the TLSNotary browser extension to generate a proof:");
-console.log("  1. Open the Stripe receipt page in your browser");
-console.log("  2. Click the TLSN extension icon");
-console.log("  3. Start a notarization session");
-console.log("  4. The extension generates a .presentation.tlsn file\n");
+console.log("--- Step 3: Generate TLSNotary Proof of Stripe API ---\n");
+console.log("After the seller shares the Stripe API key and Checkout Session ID");
+console.log("(via NIP-44 encrypted_context), fetch the session status:\n");
+console.log("  Target URL: https://api.stripe.com/v1/checkout/sessions/{cs_test_...}");
+console.log("  Header: Authorization: Bearer {stripe_secret_key}");
+console.log();
+console.log("The TLSNotary proof captures the JSON response from api.stripe.com:");
+console.log('  { "payment_status": "paid", "amount_total": 10000, ... }');
+console.log();
+console.log("The proof cryptographically verifies:");
+console.log("  1. Domain: api.stripe.com (from TLS certificate)");
+console.log('  2. Body contains: "payment_status":"paid"');
+console.log("  3. Attestation is fresh (< max_attestation_age_seconds)");
 
 // --- Step 4: Submit proof ---
 
-console.log("--- Step 4: Submit Proof ---\n");
+console.log("\n--- Step 4: Submit Proof ---\n");
 
-// In a real flow, the buyer would load the .presentation.tlsn file
-// and submit it to Anchr:
+// In a real flow with NIP-44 encrypted_context:
 //
-//   const proofFile = Bun.file("stripe-receipt.presentation.tlsn");
-//   const proofBase64 = Buffer.from(await proofFile.arrayBuffer()).toString("base64");
+//   // Worker receives encrypted_context after being selected
+//   const ctx = decryptedContext; // { target_url, headers }
+//
+//   // Generate proof using tlsn-prove with custom headers
+//   // tlsn-prove -H "Authorization: Bearer sk_test_..." https://api.stripe.com/v1/checkout/sessions/cs_test_...
+//
+//   // Submit to Anchr
 //   const result = await anchr.submitPresentation(onramp.id, proofBase64);
-//   console.log(`Submitted: ${result.ok}`);
-//   console.log(`Message: ${result.message}`);
-//
-// If verification passes, the Oracle releases the HTLC preimage
-// and the buyer can redeem the escrowed sats.
 
-console.log("Example submission code:\n");
-console.log('  const proof = Bun.file("stripe-receipt.presentation.tlsn");');
-console.log('  const proofBase64 = Buffer.from(await proof.arrayBuffer()).toString("base64");');
-console.log(`  const result = await anchr.submitPresentation("${onramp.id}", proofBase64);`);
+console.log("Example with curl + Anchr submit:\n");
+console.log("  # Generate TLSNotary proof (via tlsn-prove CLI)");
+console.log('  tlsn-prove \\');
+console.log('    --verifier localhost:7047 \\');
+console.log('    -H "Authorization: Bearer $STRIPE_SECRET_KEY" \\');
+console.log('    "https://api.stripe.com/v1/checkout/sessions/$SESSION_ID" \\');
+console.log('    -o proof.presentation.tlsn');
+console.log();
+console.log("  # Submit to Anchr");
+console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/submit \\`);
+console.log('    -H "Content-Type: application/json" \\');
+console.log('    -d \'{"tlsn_presentation": "<base64-of-proof>"}\'');
 console.log();
 console.log("After successful verification:");
 console.log("  - Oracle releases HTLC preimage");
