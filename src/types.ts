@@ -48,6 +48,20 @@ export interface TlsnRequirement {
   conditions?: TlsnCondition[];
   /** Max age of attestation in seconds (default: 300). */
   max_attestation_age_seconds?: number;
+  /** Domain hint for public display when actual URL is delivered via encrypted_context. */
+  domain_hint?: string;
+}
+
+/** Sensitive context encrypted to Worker — never stored publicly. */
+export interface TlsnEncryptedContext {
+  /** The actual target URL (may contain session IDs). */
+  target_url: string;
+  /** Custom HTTP headers (e.g., Authorization). */
+  headers?: Record<string, string>;
+  /** HTTP method override (default: GET). */
+  method?: "GET" | "POST";
+  /** Request body for POST requests. */
+  body?: string;
 }
 
 export interface TlsnAttestation {

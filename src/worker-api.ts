@@ -81,6 +81,7 @@ const tlsnRequirementSchema = z.object({
   method: z.enum(["GET", "POST"]).optional(),
   conditions: z.array(tlsnConditionSchema).optional(),
   max_attestation_age_seconds: z.number().int().min(60).max(86400).optional(),
+  domain_hint: z.string().optional(),
 });
 
 const createQuerySchema = z.object({

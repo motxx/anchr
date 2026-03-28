@@ -16,7 +16,7 @@
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { VerificationFactor } from "../types";
+import type { TlsnEncryptedContext, VerificationFactor } from "../types";
 import type { NostrIdentity } from "./identity";
 import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
 
@@ -80,6 +80,9 @@ export interface SelectionFeedbackPayload {
   selected_worker_pubkey: string;
   /** HTLC token (swapped to include Worker pubkey). */
   htlc_token?: string;
+  /** Sensitive TLSNotary context for proof generation (target_url, headers).
+   *  Delivered only to the selected Worker via NIP-44 encrypted kind 7000 event. */
+  encrypted_context?: TlsnEncryptedContext;
 }
 
 /** Completion feedback: kind 7000 with status=success or error. */

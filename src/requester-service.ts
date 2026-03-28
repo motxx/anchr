@@ -31,7 +31,7 @@ import {
   swapHtlcBindWorker,
   type EscrowToken,
 } from "./cashu/escrow";
-import type { HtlcInfo, QuoteInfo } from "./types";
+import type { HtlcInfo, QuoteInfo, TlsnEncryptedContext } from "./types";
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */
@@ -207,6 +207,7 @@ export async function selectWorker(
   state: RequesterQueryState,
   workerPubkey: string,
   relayUrls?: string[],
+  encryptedContext?: TlsnEncryptedContext,
 ): Promise<EscrowToken | null> {
   // Step 5: Swap HTLC to bind Worker
   const finalToken = await swapHtlcBindWorker(
@@ -230,6 +231,7 @@ export async function selectWorker(
     status: "processing",
     selected_worker_pubkey: workerPubkey,
     htlc_token: finalToken.token,
+    encrypted_context: encryptedContext,
   };
 
   const event = buildSelectionFeedbackEvent(

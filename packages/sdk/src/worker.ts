@@ -216,7 +216,7 @@ export class AnchrWorker {
     return event;
   }
 
-  private async generateProof(targetUrl: string): Promise<string> {
+  private async generateProof(targetUrl: string, headers?: Record<string, string>): Promise<string> {
     const tmpFile = `/tmp/anchr-worker-${Date.now()}.presentation.tlsn`;
 
     const args = [
@@ -225,6 +225,12 @@ export class AnchrWorker {
       targetUrl,
       "-o", tmpFile,
     ];
+    // Pass custom headers (e.g., Authorization from encrypted_context)
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        args.push("-H", `${key}: ${value}`);
+      }
+    }
     const socksProxy = process.env.TLSN_SOCKS_PROXY;
     if (socksProxy) args.push("--socks-proxy", socksProxy);
 

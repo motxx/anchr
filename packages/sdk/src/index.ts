@@ -47,6 +47,10 @@ export interface QueryOptions {
   pollTimeoutSeconds?: number;
   /** Maximum allowed age of attestation in seconds (default: 300) */
   maxAttestationAgeSeconds?: number;
+  /** Domain hint for public display when targetUrl contains sensitive info.
+   *  When set, the public query shows only the domain; the full targetUrl is
+   *  delivered to the selected Worker via NIP-44 encrypted_context. */
+  domainHint?: string;
 }
 
 export interface QueryCondition {
@@ -279,11 +283,19 @@ export class Anchr {
   // --- Internal ---
 
   private async createQuery(options: QueryOptions): Promise<string> {
+    // When domainHint is set, use a domain-only placeholder as the public target_url.
+    // The full targetUrl (with credentials/session IDs) is delivered to the selected
+    // Worker via NIP-44 encrypted_context in the Nostr selection event.
+    const publicTargetUrl = options.domainHint
+      ? `https://${options.domainHint}/`
+      : options.targetUrl;
+
     const body: Record<string, unknown> = {
       description: options.description,
       verification_requirements: ["tlsn"],
       tlsn_requirements: {
-        target_url: options.targetUrl,
+        target_url: publicTargetUrl,
+        ...(options.domainHint && { domain_hint: options.domainHint }),
         ...(options.conditions?.length && {
           conditions: options.conditions.map((c) => ({
             type: c.type,
