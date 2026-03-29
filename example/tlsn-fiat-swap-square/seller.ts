@@ -49,7 +49,7 @@ const queryId = await anchr.createTlsnQuery({
   conditions: [
     {
       type: "contains",
-      expression: '"status":"COMPLETED"',
+      expression: '"status": "COMPLETED"',
       description: "Payment must have status=COMPLETED",
     },
   ],
