@@ -43,6 +43,11 @@ export interface AnchrWorkerConfig {
   minBountySats?: number;
   /** Filter: only accept queries for these domains (empty = all) */
   allowedDomains?: string[];
+  /** Max bytes of sent data for MPC-TLS circuit (default: 4096) */
+  maxSentData?: number;
+  /** Max bytes of received data for MPC-TLS circuit (default: 4096).
+   *  Smaller values reduce MPC computation time. Set close to expected response size. */
+  maxRecvData?: number;
 }
 
 export interface FulfilledEvent {
@@ -79,6 +84,8 @@ export class AnchrWorker {
       maxConcurrent: config.maxConcurrent ?? 1,
       minBountySats: config.minBountySats ?? 0,
       allowedDomains: config.allowedDomains ?? [],
+      maxSentData: config.maxSentData ?? 4096,
+      maxRecvData: config.maxRecvData ?? 4096,
     };
 
     this.anchr = new Anchr({
@@ -222,6 +229,8 @@ export class AnchrWorker {
     const args = [
       this.config.proverBin,
       "--verifier", this.config.verifierHost,
+      "--max-sent-data", String(this.config.maxSentData),
+      "--max-recv-data", String(this.config.maxRecvData),
       targetUrl,
       "-o", tmpFile,
     ];

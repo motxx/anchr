@@ -11,7 +11,7 @@
  *
  * The buyer must then:
  *   - Pay via the Stripe Payment Link
- *   - Use the Stripe API key (from encrypted_context) to fetch session status
+ *   - Use the Stripe API key (from encrypted_context) to fetch Payment Intent status
  *   - Generate a TLSNotary proof of the Stripe API response
  *   - Submit the proof to Anchr to redeem the escrowed BTC
  *
@@ -55,8 +55,8 @@ const queryId = await anchr.createTlsnQuery({
   conditions: [
     {
       type: "contains",
-      expression: '"payment_status":"paid"',
-      description: "Checkout session must have payment_status=paid",
+      expression: '"status":"succeeded"',
+      description: "Payment Intent must have status=succeeded",
     },
   ],
   maxSats: 100_000,
@@ -68,7 +68,7 @@ const queryId = await anchr.createTlsnQuery({
 // encrypted_context when selecting a Worker:
 //
 //   await selectWorker(state, workerPubkey, relayUrls, {
-//     target_url: `https://api.stripe.com/v1/checkout/sessions/${sessionId}`,
+//     target_url: `https://api.stripe.com/v1/payment_intents/${paymentIntentId}`,
 //     headers: { "Authorization": `Bearer ${STRIPE_SECRET_KEY}` },
 //   });
 //
@@ -83,10 +83,10 @@ console.log(`Timeout:  1 hour`);
 console.log();
 console.log("Waiting for buyer to:");
 console.log(`  1. Pay via Stripe Payment Link: ${PAYMENT_LINK}`);
-console.log("  2. Fetch Stripe Checkout Session via API (TLSNotary proves the JSON response)");
+console.log("  2. Fetch Stripe Payment Intent via API (TLSNotary proves the JSON response)");
 console.log("  3. Submit proof to Anchr");
 console.log();
-console.log("After buyer pays, get the Checkout Session ID from Stripe Dashboard:");
+console.log("After buyer pays, get the Payment Intent ID from Stripe Dashboard:");
 console.log("  https://dashboard.stripe.com/test/payments");
 console.log();
 

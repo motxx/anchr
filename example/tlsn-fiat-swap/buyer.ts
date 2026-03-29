@@ -4,9 +4,9 @@
  * The buyer:
  *   1. Discovers open on-ramp orders on the Anchr network
  *   2. Pays via the seller's Stripe Payment Link
- *   3. Receives the Stripe API key + Session ID from the seller
+ *   3. Receives the Stripe API key + Payment Intent ID from the seller
  *      (via NIP-44 encrypted_context in the Nostr selection event)
- *   4. Fetches the Checkout Session status from Stripe API
+ *   4. Fetches the Payment Intent status from Stripe API
  *   5. Generates a TLSNotary proof of the JSON response
  *   6. Submits the proof to Anchr to redeem escrowed BTC
  *
@@ -64,17 +64,17 @@ console.log("Use test card: 4242 4242 4242 4242, any future expiry, any CVC.\n")
 // --- Step 3: TLSNotary proof of Stripe API ---
 
 console.log("--- Step 3: Generate TLSNotary Proof of Stripe API ---\n");
-console.log("After the seller shares the Stripe API key and Checkout Session ID");
-console.log("(via NIP-44 encrypted_context), fetch the session status:\n");
-console.log("  Target URL: https://api.stripe.com/v1/checkout/sessions/{cs_test_...}");
+console.log("After the seller shares the Stripe API key and Payment Intent ID");
+console.log("(via NIP-44 encrypted_context), fetch the Payment Intent status:\n");
+console.log("  Target URL: https://api.stripe.com/v1/payment_intents/{pi_...}");
 console.log("  Header: Authorization: Bearer {stripe_secret_key}");
 console.log();
 console.log("The TLSNotary proof captures the JSON response from api.stripe.com:");
-console.log('  { "payment_status": "paid", "amount_total": 10000, ... }');
+console.log('  { "status": "succeeded", "amount": 100, ... }');
 console.log();
 console.log("The proof cryptographically verifies:");
 console.log("  1. Domain: api.stripe.com (from TLS certificate)");
-console.log('  2. Body contains: "payment_status":"paid"');
+console.log('  2. Body contains: "status":"succeeded"');
 console.log("  3. Attestation is fresh (< max_attestation_age_seconds)");
 
 // --- Step 4: Submit proof ---
@@ -86,20 +86,19 @@ console.log("\n--- Step 4: Submit Proof ---\n");
 //   // Worker receives encrypted_context after being selected
 //   const ctx = decryptedContext; // { target_url, headers }
 //
-//   // Generate proof using tlsn-prove with custom headers
-//   // tlsn-prove -H "Authorization: Bearer sk_test_..." https://api.stripe.com/v1/checkout/sessions/cs_test_...
+//   // Generate proof using TLSNotary Extension DevConsole
+//   // See RUNBOOK.md Step 6 for the plugin code
 //
 //   // Submit to Anchr
 //   const result = await anchr.submitPresentation(onramp.id, proofBase64);
 
-console.log("Example with curl + Anchr submit:\n");
-console.log("  # Generate TLSNotary proof (via tlsn-prove CLI)");
-console.log('  tlsn-prove \\');
-console.log('    --verifier localhost:7047 \\');
-console.log('    -H "Authorization: Bearer $STRIPE_SECRET_KEY" \\');
-console.log('    "https://api.stripe.com/v1/checkout/sessions/$SESSION_ID" \\');
-console.log('    -o proof.presentation.tlsn');
-console.log();
+console.log("Generate proof using TLSNotary Extension DevConsole:\n");
+console.log("  1. Open Chrome for Testing with TLSNotary Extension loaded");
+console.log("     bun run scripts/launch-chrome-tlsn.ts\n");
+console.log("  2. Open DevConsole: chrome-extension://<id>/devConsole.html\n");
+console.log("  3. Paste the plugin code from RUNBOOK.md Step 6");
+console.log("     (set PAYMENT_INTENT_ID and STRIPE_KEY to actual values)\n");
+console.log("  4. Click 'Run Code' → Allow → proof is copied to clipboard\n");
 console.log("  # Submit to Anchr");
 console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/submit \\`);
 console.log('    -H "Content-Type: application/json" \\');
