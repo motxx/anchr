@@ -82,79 +82,13 @@ console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Square: bo
 const flow = (step: number, status: string, detail?: string) =>
   flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [step, status, detail ?? ""]);
 
-// ============================================================
-// Step 1: Seller mints Cashu bounty token + creates Anchr query
-// ============================================================
-console.log(`[${elapsed()}] === Step 1: Seller mints Cashu bounty + creates Anchr query ===`);
-await flow(0, "active", "Creating query...");
-
 const BOUNTY_SATS = 100;
 
-// Mint Cashu token via Lightning
-const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
-const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
-await cashuWallet.loadMint();
-
-const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-await flow(0, "complete", "Query params ready");
-await flow(1, "active", `Minting ${BOUNTY_SATS} sats...`);
-console.log(`[${elapsed()}] Lightning invoice created (${BOUNTY_SATS} sats)`);
-
-// Pay invoice from LND user node
-const payProc = Bun.spawn(["bash", "-c",
-  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
-], { stdout: "pipe", stderr: "pipe" });
-await payProc.exited;
-const payOut = await new Response(payProc.stdout).text();
-console.log(`[${elapsed()}] Lightning payment: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
-
-// Mint ecash proofs
-const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
-const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
-await flow(1, "complete", `${BOUNTY_SATS} sats minted`);
-console.log(`[${elapsed()}] Cashu token minted: ${cashuToken.slice(0, 40)}... (${BOUNTY_SATS} sats)`);
-await flow(2, "active", "Posting to Anchr...");
-
-// Create Anchr query with Cashu bounty
-const queryResp = await fetch(`${ANCHR_URL}/queries`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    description: "Prove Square payment — pay via Payment Link, then prove payment status",
-    verification_requirements: ["tlsn"],
-    ttl_seconds: 600,
-    tlsn_requirements: {
-      target_url: "https://connect.squareupsandbox.com/",
-      domain_hint: "connect.squareupsandbox.com",
-      conditions: [
-        {
-          type: "contains",
-          expression: '"status": "COMPLETED"',
-          description: "Payment must have status=COMPLETED",
-        },
-      ],
-      max_attestation_age_seconds: 600,
-    },
-    bounty: { amount_sats: BOUNTY_SATS, cashu_token: cashuToken },
-  }),
-});
-
-const queryData = await queryResp.json();
-const QUERY_ID = queryData.query_id;
-await flow(2, "complete", `ID: ${QUERY_ID.slice(0, 12)}`);
-console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
-console.log(`[${elapsed()}] Status: ${queryData.status}`);
-
-if (!QUERY_ID) {
-  console.error("Failed to create query:", JSON.stringify(queryData));
-  process.exit(1);
-}
-
 // ============================================================
-// Step 2: Seller creates Square Payment Link
+// Step 1: Seller creates Square Payment Link
 // ============================================================
-await flow(3, "active", "Creating link...");
-console.log(`\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`);
+await flow(0, "active", "Creating link...");
+console.log(`[${elapsed()}] === Step 1: Seller creates Square Payment Link ===`);
 
 const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
   headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
@@ -177,7 +111,7 @@ const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-chec
 });
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
-await flow(3, "complete", "Link created");
+await flow(0, "complete", "Link created");
 console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 
 // ============================================================
@@ -230,13 +164,14 @@ if (await nextBtn1.count() > 0) {
     await page.screenshot({ path: "/tmp/square-step2-debug.png" });
   }
 }
-await flow(4, "complete", "Payment done");
+await flow(1, "complete", "Payment done");
 console.log(`[${elapsed()}] Payment completed in browser`);
 
 // ============================================================
-// Step 4: Buyer gets Payment ID
+// Step 3: Get Payment ID from Square API
 // ============================================================
-console.log(`\n[${elapsed()}] === Step 4: Buyer gets Payment ID ===`);
+await flow(2, "active", "Getting Payment ID...");
+console.log(`\n[${elapsed()}] === Step 3: Get Payment ID ===`);
 
 // Poll for a new payment (created after we started)
 let PAYMENT_ID = "";
@@ -255,7 +190,6 @@ for (let attempt = 0; attempt < 10; attempt++) {
     paymentStatus = payment.status;
     break;
   }
-  // Also accept any COMPLETED payment as fallback
   if (payment?.status === "COMPLETED" && attempt >= 5) {
     PAYMENT_ID = payment.id;
     paymentStatus = payment.status;
@@ -264,15 +198,85 @@ for (let attempt = 0; attempt < 10; attempt++) {
   console.log(`[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`);
   await new Promise(r => setTimeout(r, 2000));
 }
+await flow(2, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
 console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`);
 
 if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
-  console.error("Payment not completed! Check if Test Payment button was clicked.");
+  console.error("Payment not completed!");
   process.exit(1);
 }
 
 // ============================================================
-// Step 5: Buyer generates TLSNotary proof
+// Step 4: Seller mints Cashu bounty token
+// ============================================================
+await flow(3, "active", `Minting ${BOUNTY_SATS} sats...`);
+console.log(`\n[${elapsed()}] === Step 4: Seller mints Cashu bounty ===`);
+
+const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
+const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
+await cashuWallet.loadMint();
+
+const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
+const payProc = Bun.spawn(["bash", "-c",
+  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
+], { stdout: "pipe", stderr: "pipe" });
+await payProc.exited;
+const payOut = await new Response(payProc.stdout).text();
+console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
+
+const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
+const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+await flow(3, "complete", `${BOUNTY_SATS} sats minted`);
+console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
+
+// ============================================================
+// Step 5: Seller creates Anchr query (with Payment ID condition)
+// ============================================================
+await flow(4, "active", "Creating query...");
+console.log(`\n[${elapsed()}] === Step 5: Seller creates Anchr query ===`);
+
+const queryResp = await fetch(`${ANCHR_URL}/queries`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    description: "Prove Square payment — pay via Payment Link, then prove payment status",
+    verification_requirements: ["tlsn"],
+    ttl_seconds: 600,
+    tlsn_requirements: {
+      target_url: `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
+      domain_hint: "connect.squareupsandbox.com",
+      conditions: [
+        {
+          type: "contains",
+          expression: '"status": "COMPLETED"',
+          description: "Payment must have status=COMPLETED",
+        },
+        {
+          type: "jsonpath",
+          expression: "payment.id",
+          expected: PAYMENT_ID,
+          description: `Payment ID must match ${PAYMENT_ID.slice(0, 8)}...`,
+        },
+      ],
+      max_attestation_age_seconds: 600,
+    },
+    bounty: { amount_sats: BOUNTY_SATS, cashu_token: cashuToken },
+  }),
+});
+
+const queryData = await queryResp.json();
+const QUERY_ID = queryData.query_id;
+await flow(4, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
+console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
+console.log(`[${elapsed()}] Conditions: status=COMPLETED + payment.id=${PAYMENT_ID.slice(0, 8)}...`);
+
+if (!QUERY_ID) {
+  console.error("Failed to create query:", JSON.stringify(queryData));
+  process.exit(1);
+}
+
+// ============================================================
+// Step 6: Buyer generates TLSNotary proof
 // ============================================================
 await flow(5, "active", "MPC-TLS...");
 console.log(`\n[${elapsed()}] === Step 5: Buyer generates TLSNotary proof ===`);
@@ -301,6 +305,7 @@ if (proc.exitCode !== 0) {
 }
 
 await flow(5, "complete", `${proveTime}s`);
+await flow(6, "active", "Submitting proof...");
 console.log(`[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`);
 for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
   console.log(`  ${line}`);
@@ -309,7 +314,6 @@ for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
 // ============================================================
 // Step 6: Buyer submits proof to Anchr
 // ============================================================
-await flow(6, "active", "Submitting proof...");
 console.log(`\n[${elapsed()}] === Step 6: Buyer submits proof to Anchr ===`);
 
 const submitResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/submit`, {
