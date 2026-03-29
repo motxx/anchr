@@ -1,18 +1,17 @@
 /**
  * Full E2E: Seller (Requester) → Buyer (Worker) via Anchr + Square + TLSNotary + HTLC Escrow
  *
- * HTLC Flow:
+ * Flow (Worker-first):
  * 1. Seller: POST /hash → get preimage hash from Oracle
- * 2. Seller: Mint Cashu bounty + create HTLC token locked to hash
- * 3. Seller: Create Square Payment Link
- * 4. Buyer:  Browser pays via Payment Link (Sandbox Testing Panel)
- * 5. Buyer:  Get Payment ID from Square API
- * 6. Seller: POST /queries with htlc info + TLSNotary conditions
- * 7. Buyer:  POST /queries/:id/quotes (Worker submits quote)
- * 8. Seller: POST /queries/:id/select (selects Worker, provides HTLC token)
- * 9. Buyer:  Generate TLSNotary proof via CLI
- * 10. Buyer: POST /queries/:id/result → inline verification → preimage returned
- * 11. Buyer: Redeem HTLC token on Cashu mint using preimage
+ * 2. Seller: Create Square Payment Link (URL only, no payment yet)
+ * 3. Seller: Mint Cashu bounty + create HTLC token
+ * 4. Seller: POST /queries — Worker UI now shows the job
+ * 5. Buyer:  POST /quotes → Seller selects Worker (Worker accepts the job)
+ * 6. Buyer:  Browser pays via Payment Link (Sandbox Testing Panel)
+ * 7. Buyer:  Get Payment ID from Square API
+ * 8. Buyer:  Generate TLSNotary proof via CLI
+ * 9. Buyer:  POST /queries/:id/result → inline verification → preimage returned
+ * 10. Verify final status
  */
 import { chromium } from "playwright";
 
@@ -65,6 +64,15 @@ const workerPage = await workerBrowser.newPage();
 await workerPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await workerPage.goto(`${ANCHR_URL}/`);
 
+// Square Payment browser — bottom left (blank until payment step)
+const browser = await chromium.launch({
+  headless: false,
+  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,${HALF_H}`],
+});
+const blankPage = await browser.newPage();
+await blankPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+await blankPage.setContent('<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Square Payment — waiting for Worker to accept job...</p></body></html>');
+
 // Flow visualization UI — bottom right
 const flowHtml = await Bun.file(import.meta.dir + "/e2e-flow-ui.html").text();
 const flowBrowser = await pw.chromium.launch({
@@ -84,6 +92,11 @@ const flow = (step: number, status: string, detail?: string) =>
 
 const BOUNTY_SATS = 100;
 
+// Use fixed pubkeys (in production, these would be real Nostr pubkeys)
+const ORACLE_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000001";
+const REQUESTER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000002";
+const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
+
 // ============================================================
 // Step 1: Oracle generates preimage hash (POST /hash)
 // ============================================================
@@ -97,7 +110,7 @@ console.log(`[${elapsed()}] HTLC hash: ${HTLC_HASH.slice(0, 16)}...`);
 await flow(0, "complete", `Hash: ${HTLC_HASH.slice(0, 8)}`);
 
 // ============================================================
-// Step 2: Seller creates Square Payment Link
+// Step 2: Seller creates Square Payment Link (URL only)
 // ============================================================
 await flow(1, "active", "Creating link...");
 console.log(`\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`);
@@ -123,20 +136,135 @@ const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-chec
 });
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
+const PAYMENT_LINK_ID = linkData.payment_link?.id;
 await flow(1, "complete", "Link created");
 console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 
 // ============================================================
-// Step 3: Buyer pays via browser (Sandbox Testing Panel)
+// Step 3: Seller mints Cashu bounty + creates HTLC token
 // ============================================================
-await flow(2, "active", "Buyer paying...");
-console.log(`\n[${elapsed()}] === Step 3: Buyer pays via browser ===`);
+await flow(2, "active", `Minting ${BOUNTY_SATS} sats...`);
+console.log(`\n[${elapsed()}] === Step 3: Seller mints Cashu bounty ===`);
 
-// Square Payment browser — bottom left
-const browser = await chromium.launch({
-  headless: false,
-  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,${HALF_H}`],
+const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
+const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
+await cashuWallet.loadMint();
+
+const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
+const payProc = Bun.spawn(["bash", "-c",
+  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
+], { stdout: "pipe", stderr: "pipe" });
+await payProc.exited;
+const payOut = await new Response(payProc.stdout).text();
+console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
+
+const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
+const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+await flow(2, "complete", `${BOUNTY_SATS} sats minted`);
+console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
+
+// ============================================================
+// Step 4: Seller creates Anchr query — Worker UI shows the job
+// ============================================================
+await flow(3, "active", "Creating query...");
+console.log(`\n[${elapsed()}] === Step 4: Seller creates Anchr query ===`);
+
+// TLSNotary target: Square payments list (most recent).
+// The specific Payment ID isn't known yet (payment hasn't happened).
+// Conditions check for COMPLETED status — the worker will prove the
+// specific payment endpoint after it completes.
+const queryResp = await fetch(`${ANCHR_URL}/queries`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    description: `Prove Square payment (¥100 BTC Swap) — Payment Link ready`,
+    verification_requirements: ["tlsn"],
+    ttl_seconds: 600,
+    tlsn_requirements: {
+      target_url: "https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1",
+      domain_hint: "connect.squareupsandbox.com",
+      conditions: [
+        {
+          type: "contains",
+          expression: '"status": "COMPLETED"',
+          description: "Payment must have status=COMPLETED",
+        },
+      ],
+      max_attestation_age_seconds: 600,
+    },
+    bounty: { amount_sats: BOUNTY_SATS, cashu_token: cashuToken },
+    htlc: {
+      hash: HTLC_HASH,
+      oracle_pubkey: ORACLE_PUBKEY,
+      requester_pubkey: REQUESTER_PUBKEY,
+      locktime: Math.floor(Date.now() / 1000) + 3600,
+    },
+  }),
 });
+
+const queryData = await queryResp.json();
+const QUERY_ID = queryData.query_id;
+await flow(3, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
+console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
+console.log(`[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${HTLC_HASH.slice(0, 8)}...)`);
+
+if (!QUERY_ID) {
+  console.error("Failed to create query:", JSON.stringify(queryData));
+  process.exit(1);
+}
+
+// Wait for Worker UI to show the query
+console.log(`[${elapsed()}] Waiting for Worker UI to display the query...`);
+await new Promise(r => setTimeout(r, 5000));
+
+// ============================================================
+// Step 5: Worker accepts job (quote + select)
+// ============================================================
+await flow(4, "active", "Worker accepting...");
+console.log(`\n[${elapsed()}] === Step 5: Worker accepts job ===`);
+
+// Worker submits quote
+const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    worker_pubkey: WORKER_PUBKEY,
+    amount_sats: BOUNTY_SATS,
+    quote_event_id: `quote_${Date.now()}`,
+  }),
+});
+const quoteData = await quoteResp.json();
+console.log(`[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`);
+
+// Seller selects worker + provides HTLC token
+const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    worker_pubkey: WORKER_PUBKEY,
+    htlc_token: cashuToken,
+  }),
+});
+const selectData = await selectResp.json();
+console.log(`[${elapsed()}] Select: ${selectData.ok ? "worker selected" : selectData.message}`);
+
+if (!selectData.ok) {
+  console.error("Failed to select worker:", JSON.stringify(selectData));
+  process.exit(1);
+}
+await flow(4, "complete", "Job accepted");
+
+// Wait for UI to reflect worker_selected state
+await new Promise(r => setTimeout(r, 3000));
+
+// ============================================================
+// Step 6: Buyer pays via browser (Sandbox Testing Panel)
+// ============================================================
+await flow(5, "active", "Buyer paying...");
+console.log(`\n[${elapsed()}] === Step 6: Buyer pays via browser ===`);
+
+// Close blank page, open payment page in the same browser
+await blankPage.close();
 const squarePage = await browser.newPage();
 await squarePage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await squarePage.goto(PAYMENT_LINK_URL!);
@@ -172,14 +300,14 @@ if (await nextBtn1.count() > 0) {
     await page.screenshot({ path: "/tmp/square-step2-debug.png" });
   }
 }
-await flow(2, "complete", "Payment done");
+await flow(5, "complete", "Payment done");
 console.log(`[${elapsed()}] Payment completed in browser`);
 
 // ============================================================
-// Step 4: Get Payment ID from Square API
+// Step 7: Get Payment ID from Square API
 // ============================================================
-await flow(3, "active", "Getting Payment ID...");
-console.log(`\n[${elapsed()}] === Step 4: Get Payment ID ===`);
+await flow(6, "active", "Getting Payment ID...");
+console.log(`\n[${elapsed()}] === Step 7: Get Payment ID ===`);
 
 let PAYMENT_ID = "";
 let paymentStatus = "";
@@ -205,7 +333,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   console.log(`[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`);
   await new Promise(r => setTimeout(r, 2000));
 }
-await flow(3, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
+await flow(6, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
 console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`);
 
 if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
@@ -214,132 +342,15 @@ if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
 }
 
 // ============================================================
-// Step 5: Seller mints Cashu bounty + creates HTLC token
-// ============================================================
-await flow(4, "active", `Minting ${BOUNTY_SATS} sats...`);
-console.log(`\n[${elapsed()}] === Step 5: Seller mints Cashu bounty ===`);
-
-const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
-const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
-await cashuWallet.loadMint();
-
-const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-const payProc = Bun.spawn(["bash", "-c",
-  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
-], { stdout: "pipe", stderr: "pipe" });
-await payProc.exited;
-const payOut = await new Response(payProc.stdout).text();
-console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
-
-const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
-const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
-await flow(4, "complete", `${BOUNTY_SATS} sats minted`);
-console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
-
-// ============================================================
-// Step 6: Seller creates Anchr query (HTLC + TLSNotary conditions)
-// ============================================================
-await flow(5, "active", "Creating query...");
-console.log(`\n[${elapsed()}] === Step 6: Seller creates Anchr query ===`);
-
-// Use a fixed oracle pubkey (in production, this would be the oracle's real Nostr pubkey)
-const ORACLE_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000001";
-const REQUESTER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000002";
-const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
-
-const queryResp = await fetch(`${ANCHR_URL}/queries`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    description: "Prove Square payment — pay via Payment Link, then prove payment status",
-    verification_requirements: ["tlsn"],
-    ttl_seconds: 600,
-    tlsn_requirements: {
-      target_url: `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
-      domain_hint: "connect.squareupsandbox.com",
-      conditions: [
-        {
-          type: "contains",
-          expression: '"status": "COMPLETED"',
-          description: "Payment must have status=COMPLETED",
-        },
-        {
-          type: "jsonpath",
-          expression: "payment.id",
-          expected: PAYMENT_ID,
-          description: `Payment ID must match ${PAYMENT_ID.slice(0, 8)}...`,
-        },
-      ],
-      max_attestation_age_seconds: 600,
-    },
-    bounty: { amount_sats: BOUNTY_SATS, cashu_token: cashuToken },
-    htlc: {
-      hash: HTLC_HASH,
-      oracle_pubkey: ORACLE_PUBKEY,
-      requester_pubkey: REQUESTER_PUBKEY,
-      locktime: Math.floor(Date.now() / 1000) + 3600,
-    },
-  }),
-});
-
-const queryData = await queryResp.json();
-const QUERY_ID = queryData.query_id;
-await flow(5, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
-console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
-console.log(`[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${HTLC_HASH.slice(0, 8)}...)`);
-console.log(`[${elapsed()}] Conditions: status=COMPLETED + payment.id=${PAYMENT_ID.slice(0, 8)}...`);
-
-if (!QUERY_ID) {
-  console.error("Failed to create query:", JSON.stringify(queryData));
-  process.exit(1);
-}
-
-// ============================================================
-// Step 7: Worker submits quote + Seller selects Worker
-// ============================================================
-await flow(6, "active", "Quote + Select...");
-console.log(`\n[${elapsed()}] === Step 7: Worker quote + Seller select ===`);
-
-// Worker submits quote
-const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    worker_pubkey: WORKER_PUBKEY,
-    amount_sats: BOUNTY_SATS,
-    quote_event_id: `quote_${Date.now()}`,
-  }),
-});
-const quoteData = await quoteResp.json();
-console.log(`[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`);
-
-// Seller selects worker + provides HTLC token
-const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    worker_pubkey: WORKER_PUBKEY,
-    htlc_token: cashuToken,
-  }),
-});
-const selectData = await selectResp.json();
-console.log(`[${elapsed()}] Select: ${selectData.ok ? "worker selected" : selectData.message}`);
-
-if (!selectData.ok) {
-  console.error("Failed to select worker:", JSON.stringify(selectData));
-  process.exit(1);
-}
-await flow(6, "complete", "Worker selected");
-
-// ============================================================
-// Step 8: Buyer generates TLSNotary proof
+// Step 8: Worker generates TLSNotary proof
 // ============================================================
 await flow(7, "active", "MPC-TLS...");
-console.log(`\n[${elapsed()}] === Step 8: Buyer generates TLSNotary proof ===`);
+console.log(`\n[${elapsed()}] === Step 8: Worker generates TLSNotary proof ===`);
 
 const proofFile = `/tmp/e2e-square-${Date.now()}.presentation.tlsn`;
 const proveStart = Date.now();
 
+// Prove the specific payment endpoint (Payment ID is now known)
 const proc = Bun.spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
   "--verifier", "localhost:7046",
@@ -367,9 +378,9 @@ for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
 }
 
 // ============================================================
-// Step 9: Buyer submits proof via POST /result (HTLC inline verification)
+// Step 9: Worker submits proof via POST /result (HTLC verification)
 // ============================================================
-console.log(`\n[${elapsed()}] === Step 9: Buyer submits proof to Anchr (HTLC result) ===`);
+console.log(`\n[${elapsed()}] === Step 9: Worker submits proof to Anchr ===`);
 
 const resultResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/result`, {
   method: "POST",
@@ -394,10 +405,12 @@ if (resultData.preimage) {
   console.log(`\n[${elapsed()}] === HTLC Preimage Revealed ===`);
   console.log(`  Preimage: ${resultData.preimage.slice(0, 16)}...`);
   console.log(`  → Worker can now redeem HTLC token on Cashu mint`);
-  console.log(`  → redeemHtlcToken(proofs, preimage, workerPrivkey)`);
 } else {
   console.log(`[${elapsed()}] preimage: null (verification failed or no preimage store)`);
 }
+
+// Wait for UIs to show results
+await new Promise(r => setTimeout(r, 3000));
 
 // ============================================================
 // Step 10: Verify query status

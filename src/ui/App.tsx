@@ -1,20 +1,29 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   Clock,
+  Copy,
   Globe,
   Camera,
   ExternalLink,
+  Eye,
+  FileText,
   FileUp,
+  Image,
   Loader2,
   Lock,
+  MapPin,
+  Paperclip,
   RefreshCw,
+  Shield,
+  Terminal,
+  XCircle,
 } from "lucide-react";
 import { apiFetch } from "./api-config";
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "./components/ui/button";
 import {
   Card,
@@ -49,6 +58,64 @@ interface UploadResponse {
   error?: string;
 }
 
+interface TlsnVerifiedData {
+  server_name: string;
+  revealed_body: string;
+  revealed_headers?: string;
+  session_timestamp: number;
+}
+
+interface VerificationDetail {
+  passed: boolean;
+  checks: string[];
+  failures: string[];
+  tlsn_verified?: TlsnVerifiedData;
+}
+
+interface OracleAttestationRecord {
+  oracle_id: string;
+  passed: boolean;
+  checks: string[];
+  failures: string[];
+  attested_at: number;
+  tlsn_verified?: TlsnVerifiedData;
+}
+
+interface HtlcSummary {
+  hash: string;
+  oracle_pubkey: string;
+  worker_pubkey?: string | null;
+  locktime: number;
+  verified_escrow_sats?: number | null;
+}
+
+interface GpsCoord {
+  lat: number;
+  lon: number;
+}
+
+interface QueryResultAttachment {
+  id: string;
+  uri: string;
+  mime_type: string;
+  storage_kind: string;
+  filename?: string;
+  size_bytes?: number;
+}
+
+interface QueryResultData {
+  attachments: QueryResultAttachment[];
+  notes?: string;
+  gps?: GpsCoord;
+  tlsn_attestation?: { presentation: string };
+  tlsn_extension_result?: unknown;
+}
+
+interface SubmissionMeta {
+  executor_type: string;
+  channel: string;
+}
+
 interface Query {
   id: string;
   description: string;
@@ -62,12 +129,38 @@ interface Query {
   bounty?: Bounty | null;
   tlsn_verifier_url?: string | null;
   tlsn_proxy_url?: string | null;
+  // Detail fields (from GET /queries/:id)
+  verification?: VerificationDetail;
+  payment_status?: string;
+  htlc?: HtlcSummary | null;
+  submitted_at?: number;
+  assigned_oracle_id?: string | null;
+  attestations?: OracleAttestationRecord[] | null;
+  result?: QueryResultData;
+  submission_meta?: SubmissionMeta;
 }
 
-interface SubmitResponse {
+interface ResultResponse {
   ok: boolean;
   message: string;
-  verification?: { failures: string[] };
+  verification?: VerificationDetail;
+  oracle_id?: string | null;
+  payment_status?: string;
+  preimage?: string | null;
+}
+
+// ---- localStorage helpers ----
+
+const STORAGE_KEY = "anchr_worker_queries";
+const MAX_STORED = 20;
+
+function addStoredQueryId(id: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const ids: string[] = raw ? JSON.parse(raw) : [];
+    const next = [id, ...ids.filter((x) => x !== id)].slice(0, MAX_STORED);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch { /* ignore */ }
 }
 
 // ---- Helpers ----
@@ -496,9 +589,13 @@ function SubmitForm({
 
 // ---- QueryCard ----
 
-function QueryCard({ query }: { query: Query }) {
+// Placeholder worker pubkey (future: Nostr key integration)
+const WORKER_PUBKEY = "worker_ui_placeholder_pubkey";
+
+function QueryCard({ query, onSubmitted }: { query: Query; onSubmitted?: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const [, setTick] = useState(0);
+  const [resultData, setResultData] = useState<ResultResponse | null>(null);
   const tlsn = isTlsnQuery(query);
 
   React.useEffect(() => {
@@ -507,16 +604,23 @@ function QueryCard({ query }: { query: Query }) {
     return () => clearInterval(id);
   }, [open]);
 
-  const mut = useMutation<SubmitResponse, Error, Record<string, unknown>>({
+  const mut = useMutation<ResultResponse, Error, Record<string, unknown>>({
     mutationFn: async (body) => {
-      const r = await apiFetch(`/queries/${query.id}/submit`, {
+      const r = await apiFetch(`/queries/${query.id}/result`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ worker_pubkey: WORKER_PUBKEY, ...body }),
       });
       if (!r.ok && r.status >= 500)
         throw new Error(`Server error ${r.status}`);
-      return r.json() as Promise<SubmitResponse>;
+      return r.json() as Promise<ResultResponse>;
+    },
+    onSuccess: (data) => {
+      setResultData(data);
+      if (data.ok) {
+        addStoredQueryId(query.id);
+        onSubmitted?.(query.id);
+      }
     },
   });
 
@@ -585,28 +689,33 @@ function QueryCard({ query }: { query: Query }) {
             </div>
           ) : null}
 
-          {/* Result feedback */}
+          {/* Inline result feedback with verification details */}
           {mut.isSuccess && (
-            <div className={cn(
-              "flex items-start gap-3 p-3.5 rounded-lg text-sm leading-relaxed",
-              mut.data.ok
-                ? "bg-emerald-950/50 border border-emerald-800/60 text-emerald-400"
-                : "bg-red-950/50 border border-red-900/60 text-red-400"
-            )}>
-              {mut.data.ok ? (
-                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-              ) : (
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-              )}
-              <div className="space-y-1">
-                <p>{mut.data.message}</p>
-                {(mut.data.verification?.failures?.length ?? 0) > 0 && (
-                  <p className="text-xs opacity-70">
-                    {mut.data.verification!.failures.join(", ")}
-                  </p>
+            <>
+              <div className={cn(
+                "flex items-start gap-3 p-3.5 rounded-lg text-sm leading-relaxed",
+                mut.data.ok
+                  ? "bg-emerald-950/50 border border-emerald-800/60 text-emerald-400"
+                  : "bg-red-950/50 border border-red-900/60 text-red-400"
+              )}>
+                {mut.data.ok ? (
+                  <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                 )}
+                <div className="space-y-1">
+                  <p>{mut.data.message}</p>
+                </div>
               </div>
-            </div>
+              {resultData && (
+                <VerificationPanel
+                  verification={resultData.verification}
+                  preimage={resultData.preimage}
+                  paymentStatus={resultData.payment_status}
+                  oracleId={resultData.oracle_id}
+                />
+              )}
+            </>
           )}
 
           {mut.isError && (
@@ -621,9 +730,506 @@ function QueryCard({ query }: { query: Query }) {
   );
 }
 
+// ---- VerificationPanel ----
+
+function VerificationPanel({
+  verification,
+  preimage,
+  paymentStatus,
+  oracleId,
+  htlc,
+  attestations,
+}: {
+  verification?: VerificationDetail;
+  preimage?: string | null;
+  paymentStatus?: string;
+  oracleId?: string | null;
+  htlc?: HtlcSummary | null;
+  attestations?: OracleAttestationRecord[] | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
+
+  if (!verification && !preimage) return null;
+
+  function handleCopy(text: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function formatBody(raw: string): string {
+    try { return JSON.stringify(JSON.parse(raw), null, 2); } catch { return raw; }
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Checks */}
+      {verification && verification.checks.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Checks</p>
+          {verification.checks.map((c, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs text-emerald-400">
+              <CheckCircle2 className="w-3 h-3 shrink-0" />
+              <span>{c}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Failures */}
+      {verification && verification.failures.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Failures</p>
+          {verification.failures.map((f, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs text-red-400">
+              <XCircle className="w-3 h-3 shrink-0" />
+              <span>{f}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* TLSNotary Verified Data */}
+      {verification?.tlsn_verified && (
+        <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-2.5 space-y-2">
+          <p className="text-[10px] uppercase tracking-widest text-blue-400 font-semibold flex items-center gap-1">
+            <Shield className="w-3 h-3" />
+            TLSNotary Verified Data
+          </p>
+          <div className="space-y-1 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Server:</span>
+              <span className="text-foreground font-mono">{verification.tlsn_verified.server_name}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Session:</span>
+              <span className="text-foreground font-mono">
+                {new Date(verification.tlsn_verified.session_timestamp * 1000).toLocaleString()}
+              </span>
+            </div>
+          </div>
+          {verification.tlsn_verified.revealed_body && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setBodyExpanded((v) => !v)}
+                className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300"
+              >
+                <Eye className="w-3 h-3" />
+                {bodyExpanded ? "Hide" : "Show"} revealed body
+              </button>
+              {bodyExpanded && (
+                <pre className="mt-1.5 bg-black/50 rounded-lg p-2.5 overflow-x-auto text-[11px] leading-relaxed max-h-48 overflow-y-auto">
+                  <code className="text-emerald-300 font-mono whitespace-pre">
+                    {formatBody(verification.tlsn_verified.revealed_body)}
+                  </code>
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* HTLC Info */}
+      {(preimage || (htlc && htlc.verified_escrow_sats)) && (
+        <div className="bg-amber-950/20 border border-amber-800/30 rounded-lg px-3 py-2.5 space-y-2">
+          <p className="text-[10px] uppercase tracking-widest text-amber-400 font-semibold flex items-center gap-1">
+            <Lock className="w-3 h-3" />
+            HTLC Info
+          </p>
+          {preimage && (
+            <div className="space-y-1">
+              <span className="text-[10px] text-muted-foreground">Preimage</span>
+              <div className="flex items-center gap-2">
+                <code className="text-xs text-amber-300 font-mono bg-black/30 px-2 py-1 rounded break-all flex-1">
+                  {preimage}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(preimage)}
+                  className="p-1 rounded hover:bg-white/10 shrink-0"
+                >
+                  {copied ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+          {paymentStatus && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Payment:</span>
+              <span className={cn(
+                "font-medium",
+                paymentStatus === "released" || paymentStatus === "htlc_swapped" ? "text-emerald-400" :
+                paymentStatus === "cancelled" ? "text-red-400" : "text-amber-400"
+              )}>{paymentStatus}</span>
+            </div>
+          )}
+          {htlc?.verified_escrow_sats != null && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Escrow:</span>
+              <span className="text-amber-400 font-semibold">{htlc.verified_escrow_sats} sats</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Oracle Attestations (quorum) */}
+      {attestations && attestations.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Oracle Attestations</p>
+          {attestations.map((a, i) => (
+            <div key={i} className="flex items-center gap-2 text-xs">
+              {a.passed ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+              ) : (
+                <XCircle className="w-3 h-3 text-red-400 shrink-0" />
+              )}
+              <span className="text-muted-foreground font-mono text-[10px] truncate">{a.oracle_id}</span>
+              <span className={a.passed ? "text-emerald-400" : "text-red-400"}>
+                {a.passed ? "pass" : "fail"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Oracle ID (single oracle) */}
+      {oracleId && !attestations?.length && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Oracle:</span>
+          <span className="text-foreground font-mono text-[10px]">{oracleId}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- ResultProofPanel ----
+
+function ResultProofPanel({ query }: { query: Query }) {
+  const result = query.result;
+  const [extExpanded, setExtExpanded] = useState(false);
+  const [tlsnExpanded, setTlsnExpanded] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  if (!result) return null;
+
+  const hasAnyProof = (result.attachments?.length ?? 0) > 0
+    || result.tlsn_attestation
+    || result.tlsn_extension_result
+    || result.notes
+    || result.gps;
+
+  if (!hasAnyProof) return null;
+
+  function handleCopy(label: string, text: string) {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const apiOrigin = typeof window !== "undefined" ? window.location.origin : "";
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1">
+        <Paperclip className="w-3 h-3" />
+        Submitted Proof
+      </p>
+
+      {/* Photo / Video Attachments */}
+      {result.attachments.length > 0 && (
+        <div className="space-y-2">
+          {result.attachments.map((att, i) => {
+            const isImage = att.mime_type.startsWith("image/");
+            const isVideo = att.mime_type.startsWith("video/");
+            const previewUrl = `${apiOrigin}/queries/${query.id}/attachments/${i}/preview`;
+            const viewUrl = `${apiOrigin}/queries/${query.id}/attachments/${i}`;
+            return (
+              <div key={att.id || i} className="bg-black/20 rounded-lg p-2 space-y-1.5">
+                <div className="flex items-center gap-2 text-xs">
+                  <Image className="w-3 h-3 text-violet-400 shrink-0" />
+                  <span className="text-foreground truncate">{att.filename || att.id}</span>
+                  <span className="text-muted-foreground text-[10px]">{att.mime_type}</span>
+                  {att.size_bytes != null && (
+                    <span className="text-muted-foreground text-[10px]">
+                      {att.size_bytes > 1024 * 1024
+                        ? `${(att.size_bytes / (1024 * 1024)).toFixed(1)}MB`
+                        : `${Math.round(att.size_bytes / 1024)}KB`}
+                    </span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground/60">{att.storage_kind}</span>
+                </div>
+                {isImage && (
+                  <a href={viewUrl} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={previewUrl}
+                      alt={att.filename || "attachment"}
+                      className="w-full max-h-48 object-contain rounded-md bg-black/30"
+                      loading="lazy"
+                    />
+                  </a>
+                )}
+                {isVideo && (
+                  <video src={viewUrl} controls muted className="w-full max-h-48 rounded-md" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* TLSNotary Presentation (base64) */}
+      {result.tlsn_attestation && (
+        <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-2.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-widest text-blue-400 font-semibold flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              TLSNotary Presentation
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">
+                {Math.round(result.tlsn_attestation.presentation.length * 0.75 / 1024)}KB
+              </span>
+              <button
+                type="button"
+                onClick={() => handleCopy("tlsn", result.tlsn_attestation!.presentation)}
+                className="p-1 rounded hover:bg-white/10"
+              >
+                {copied === "tlsn" ? (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setTlsnExpanded((v) => !v)}
+            className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300"
+          >
+            {tlsnExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            {tlsnExpanded ? "Hide" : "Show"} raw base64
+          </button>
+          {tlsnExpanded && (
+            <pre className="bg-black/50 rounded-lg p-2 overflow-x-auto text-[10px] leading-relaxed max-h-32 overflow-y-auto break-all">
+              <code className="text-blue-300 font-mono">{result.tlsn_attestation.presentation}</code>
+            </pre>
+          )}
+        </div>
+      )}
+
+      {/* TLSNotary Extension Result */}
+      {result.tlsn_extension_result != null ? (
+        <div className="bg-blue-950/20 border border-blue-900/30 rounded-lg px-3 py-2.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-widest text-blue-400 font-semibold flex items-center gap-1">
+              <ExternalLink className="w-3 h-3" />
+              Extension Result
+            </p>
+            <button
+              type="button"
+              onClick={() => handleCopy("ext", JSON.stringify(result.tlsn_extension_result, null, 2))}
+              className="p-1 rounded hover:bg-white/10"
+            >
+              {copied === "ext" ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              ) : (
+                <Copy className="w-3 h-3 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExtExpanded((v) => !v)}
+            className="flex items-center gap-1 text-[11px] text-blue-400 hover:text-blue-300"
+          >
+            {extExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            {extExpanded ? "Hide" : "Show"} JSON
+          </button>
+          {extExpanded && (
+            <pre className="bg-black/50 rounded-lg p-2 overflow-x-auto text-[11px] leading-relaxed max-h-48 overflow-y-auto">
+              <code className="text-emerald-300 font-mono whitespace-pre">
+                {JSON.stringify(result.tlsn_extension_result, null, 2)}
+              </code>
+            </pre>
+          )}
+        </div>
+      ) : null}
+
+      {/* GPS */}
+      {result.gps && (
+        <div className="flex items-center gap-2 text-xs">
+          <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
+          <span className="text-muted-foreground">GPS:</span>
+          <span className="text-foreground font-mono">{result.gps.lat.toFixed(6)}, {result.gps.lon.toFixed(6)}</span>
+        </div>
+      )}
+
+      {/* Notes */}
+      {result.notes && (
+        <div className="flex items-start gap-2 text-xs">
+          <FileText className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+          <span className="text-foreground">{result.notes}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Status badge ----
+
+function StatusBadge({ status }: { status?: string }) {
+  const cfg = status === "approved"
+    ? { bg: "bg-emerald-950/50 text-emerald-400", label: "approved" }
+    : status === "rejected"
+    ? { bg: "bg-red-950/50 text-red-400", label: "rejected" }
+    : status === "verifying"
+    ? { bg: "bg-yellow-950/50 text-yellow-400", label: "verifying" }
+    : status === "processing"
+    ? { bg: "bg-blue-950/50 text-blue-400", label: "processing" }
+    : { bg: "bg-zinc-800/50 text-muted-foreground", label: status ?? "unknown" };
+
+  return (
+    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded", cfg.bg)}>
+      {cfg.label}
+    </span>
+  );
+}
+
+// ---- MyResults ----
+
+// ---- ClosedQueryCard (inline, no individual fetch needed) ----
+
+function ClosedQueryCard({ query }: { query: Query }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Card className={cn("overflow-hidden py-0 gap-0", open && "border-border/80")}>
+      <CardHeader
+        className="px-4 py-3.5 cursor-pointer hover:bg-accent/50 transition-colors"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div className="flex items-center justify-between gap-3 w-full">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <StatusBadge status={query.status} />
+            <QueryTypeBadge query={query} />
+            <span className="text-sm text-foreground truncate">
+              {query.description}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {query.bounty && query.bounty.amount_sats > 0 && (
+              <span className="text-xs font-semibold text-amber-400">
+                {query.bounty.amount_sats} sats
+              </span>
+            )}
+            {open ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            )}
+          </div>
+        </div>
+      </CardHeader>
+
+      {open && <ClosedQueryDetail queryId={query.id} />}
+    </Card>
+  );
+}
+
+/** Fetches full detail only when the card is expanded. */
+function ClosedQueryDetail({ queryId }: { queryId: string }) {
+  const { data: query, isLoading } = useQuery<Query>({
+    queryKey: ["query", queryId],
+    queryFn: (): Promise<Query> => apiFetch(`/queries/${queryId}`).then((r) => {
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json();
+    }),
+    staleTime: 10000,
+  });
+
+  if (isLoading || !query) {
+    return (
+      <CardContent className="px-4 pb-4 pt-3 border-t border-border">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span className="text-xs">Loading details...</span>
+        </div>
+      </CardContent>
+    );
+  }
+
+  return (
+    <CardContent className="px-4 pb-5 pt-4 border-t border-border space-y-4">
+      {query.tlsn_requirements && (
+        <div className="flex items-center gap-1.5 text-xs">
+          <Lock className="w-3 h-3 text-blue-400 shrink-0" />
+          <span className="text-blue-400 font-mono truncate">{query.tlsn_requirements.target_url}</span>
+        </div>
+      )}
+
+      {query.submission_meta && (
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span>Channel: <span className="text-foreground">{query.submission_meta.channel}</span></span>
+          <span>Executor: <span className="text-foreground">{query.submission_meta.executor_type}</span></span>
+        </div>
+      )}
+
+      <VerificationPanel
+        verification={query.verification}
+        preimage={undefined}
+        paymentStatus={query.payment_status}
+        oracleId={query.assigned_oracle_id}
+        htlc={query.htlc}
+        attestations={query.attestations}
+      />
+
+      <ResultProofPanel query={query} />
+    </CardContent>
+  );
+}
+
+// ---- ClosedQueryList ----
+
+const OPEN_STATUSES = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+
+function ClosedQueryList() {
+  const { data: allQueries = [] } = useQuery<Query[]>({
+    queryKey: ["queries-all"],
+    queryFn: (): Promise<Query[]> => apiFetch("/queries/all").then((r) => r.json()),
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
+  });
+
+  const closed = allQueries.filter((q) => !OPEN_STATUSES.includes(q.status ?? ""));
+
+  if (!closed.length) return null;
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+        Completed Queries
+        <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{closed.length}</span>
+      </h2>
+      <div className="flex flex-col gap-3">
+        {closed.map((q) => (
+          <ClosedQueryCard key={q.id} query={q} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---- QueryList ----
 
-function QueryList() {
+function QueryList({ onSubmitted }: { onSubmitted?: (id: string) => void }) {
   const { data: queries = [], isError } = useQuery<Query[]>({
     queryKey: ["queries"],
     queryFn: (): Promise<Query[]> => apiFetch("/queries").then((r) => r.json()),
@@ -660,8 +1266,220 @@ function QueryList() {
   return (
     <div className="flex flex-col gap-3">
       {queries.map((query) => (
-        <QueryCard key={query.id} query={query} />
+        <QueryCard key={query.id} query={query} onSubmitted={onSubmitted} />
       ))}
+    </div>
+  );
+}
+
+// ---- LogsPanel ----
+
+interface LogEntry {
+  service: string;
+  message: string;
+  ts: number;
+}
+
+const SERVICE_COLORS: Record<string, string> = {
+  relay: "text-purple-400",
+  blossom: "text-pink-400",
+  "tlsn-verifier": "text-blue-400",
+  bitcoind: "text-orange-400",
+  "lnd-mint": "text-yellow-400",
+  "lnd-user": "text-lime-400",
+  "cashu-mint": "text-green-400",
+  anchr: "text-cyan-400",
+  docker: "text-zinc-400",
+  system: "text-red-400",
+};
+
+const ALL_SERVICES = Object.keys(SERVICE_COLORS);
+
+function LogsPanel() {
+  const [open, setOpen] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [autoScroll, setAutoScroll] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const esRef = useRef<EventSource | null>(null);
+
+  // Connect/disconnect EventSource when panel opens/closes
+  useEffect(() => {
+    if (!open) {
+      esRef.current?.close();
+      esRef.current = null;
+      return;
+    }
+
+    const apiBase = typeof window !== "undefined" ? window.location.origin : "";
+    const es = new EventSource(`${apiBase}/logs/stream`);
+    esRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const entry = JSON.parse(e.data) as LogEntry;
+        setLogs((prev) => {
+          const next = [...prev, entry];
+          return next.length > 500 ? next.slice(-500) : next;
+        });
+      } catch { /* ignore parse errors */ }
+    };
+
+    es.onerror = () => {
+      // Reconnect is automatic with EventSource
+    };
+
+    return () => {
+      es.close();
+      esRef.current = null;
+    };
+  }, [open]);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [logs, autoScroll]);
+
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setAutoScroll(atBottom);
+  }
+
+  function toggleService(svc: string) {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.has(svc) ? next.delete(svc) : next.add(svc);
+      return next;
+    });
+  }
+
+  const filtered = hidden.size > 0 ? logs.filter((l) => !hidden.has(l.service)) : logs;
+
+  // Count per service for badges
+  const counts: Record<string, number> = {};
+  for (const l of logs) counts[l.service] = (counts[l.service] || 0) + 1;
+  const activeServices = Object.keys(counts).sort();
+
+  return (
+    <div className="border-t border-border bg-black/30">
+      {/* Toggle bar */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-2 flex items-center justify-between hover:bg-accent/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-muted-foreground">Container Logs</span>
+          {logs.length > 0 && (
+            <span className="text-[10px] text-muted-foreground/60">{logs.length}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {!open && activeServices.length > 0 && (
+            <div className="flex items-center gap-1">
+              {activeServices.slice(0, 5).map((svc) => (
+                <span
+                  key={svc}
+                  className={cn("text-[9px] font-mono px-1 py-0.5 rounded bg-black/40", SERVICE_COLORS[svc] || "text-zinc-400")}
+                >
+                  {svc}
+                </span>
+              ))}
+              {activeServices.length > 5 && (
+                <span className="text-[9px] text-muted-foreground">+{activeServices.length - 5}</span>
+              )}
+            </div>
+          )}
+          {open ? (
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-border">
+          {/* Service filter chips */}
+          <div className="px-4 py-2 flex items-center gap-1.5 flex-wrap border-b border-border/50">
+            {(activeServices.length > 0 ? activeServices : ALL_SERVICES).map((svc) => (
+              <button
+                key={svc}
+                type="button"
+                onClick={() => toggleService(svc)}
+                className={cn(
+                  "text-[10px] font-mono px-1.5 py-0.5 rounded transition-opacity",
+                  hidden.has(svc) ? "opacity-30 bg-black/20" : "opacity-100 bg-black/40",
+                  SERVICE_COLORS[svc] || "text-zinc-400",
+                )}
+              >
+                {svc}
+                {counts[svc] ? ` (${counts[svc]})` : ""}
+              </button>
+            ))}
+            {logs.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { setLogs([]); setHidden(new Set()); }}
+                className="text-[10px] text-muted-foreground hover:text-foreground ml-auto"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Log output */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="h-64 overflow-y-auto overflow-x-hidden font-mono text-[11px] leading-relaxed px-4 py-2"
+          >
+            {filtered.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground/50 text-xs">
+                {logs.length === 0 ? "Connecting to log stream..." : "All services filtered"}
+              </div>
+            ) : (
+              filtered.map((entry, i) => (
+                <div key={i} className="flex gap-2 hover:bg-white/[0.02] py-px">
+                  <span className="text-[10px] text-muted-foreground/40 tabular-nums shrink-0 w-16 text-right">
+                    {new Date(entry.ts).toLocaleTimeString("en-GB", { hour12: false })}
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 w-24 text-right truncate font-semibold",
+                      SERVICE_COLORS[entry.service] || "text-zinc-400",
+                    )}
+                  >
+                    {entry.service}
+                  </span>
+                  <span className="text-foreground/80 break-all">{entry.message}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Scroll indicator */}
+          {!autoScroll && (
+            <div className="px-4 py-1 border-t border-border/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setAutoScroll(true);
+                  scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+                }}
+                className="text-[10px] text-blue-400 hover:text-blue-300"
+              >
+                ↓ Scroll to bottom
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -669,15 +1487,22 @@ function QueryList() {
 // ---- App ----
 
 export default function App() {
+  const queryClient = useQueryClient();
+
   const { isFetching } = useQuery<Query[]>({
     queryKey: ["queries"],
     queryFn: (): Promise<Query[]> => apiFetch("/queries").then((r) => r.json()),
     staleTime: 2000,
   });
 
+  const handleSubmitted = useCallback((_id: string) => {
+    // Invalidate all-queries so ClosedQueryList picks up the new result
+    queryClient.invalidateQueries({ queryKey: ["queries-all"] });
+  }, [queryClient]);
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-2xl mx-auto px-4 py-10">
+    <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex-1 max-w-2xl mx-auto px-4 py-10 w-full">
         <header className="mb-8">
           <div className="flex items-start justify-between">
             <div>
@@ -699,8 +1524,17 @@ export default function App() {
           </div>
         </header>
 
-        <QueryList />
+        <div className="space-y-8">
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground mb-4">Open Queries</h2>
+            <QueryList onSubmitted={handleSubmitted} />
+          </div>
+
+          <ClosedQueryList />
+        </div>
       </div>
+
+      <LogsPanel />
     </div>
   );
 }

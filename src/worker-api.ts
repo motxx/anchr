@@ -559,5 +559,76 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
+  // --- Log streaming (SSE) ---
+
+  app.get("/logs/stream", (c) => {
+    let dockerProc: ReturnType<typeof Bun.spawn> | null = null;
+    let unsubscribe: (() => void) | null = null;
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (entry: { service: string; message: string; ts: number }) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(entry)}\n\n`));
+          } catch { /* client gone */ }
+        };
+
+        // Send recent buffered server logs
+        const { getRecentLogs, subscribeLog } = await import("./log-stream");
+        for (const entry of getRecentLogs()) send(entry);
+
+        // Subscribe to live server logs
+        unsubscribe = subscribeLog(send);
+
+        // Stream docker compose logs
+        try {
+          dockerProc = Bun.spawn(
+            ["docker", "compose", "logs", "-f", "--tail=30", "--no-color"],
+            { stdout: "pipe", stderr: "pipe" },
+          );
+
+          const reader = (dockerProc.stdout as ReadableStream<Uint8Array>).getReader();
+          let buf = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buf += new TextDecoder().decode(value);
+            const lines = buf.split("\n");
+            buf = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const match = line.match(/^(\S+)\s+\|\s+(.*)/);
+              const service = match?.[1]
+                ? match[1].replace(/^anchr-/, "").replace(/-\d+$/, "")
+                : "docker";
+              const message = match?.[2] ?? line;
+              send({ service, message, ts: Date.now() });
+            }
+          }
+        } catch (err) {
+          send({ service: "system", message: `Docker logs unavailable: ${err}`, ts: Date.now() });
+        }
+
+        controller.close();
+      },
+      cancel() {
+        dockerProc?.kill();
+        unsubscribe?.();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  });
+
   return app;
 }

@@ -1,4 +1,5 @@
 import { getRuntimeConfig } from "./config";
+import { setupServerLogCapture } from "./log-stream";
 import { createPreimageStore } from "./oracle/preimage-store";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 // @ts-ignore — Bun HTML import
@@ -7,6 +8,7 @@ import uiHtml from "./ui/index.html";
 import requesterHtml from "./ui/requester/index.html";
 
 export async function startReferenceApp() {
+  setupServerLogCapture();
   await prepareWorkerApiAssets();
 
   const preimageStore = createPreimageStore();
