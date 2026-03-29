@@ -1,5 +1,6 @@
 import { normalizeQueryResult } from "./attachments";
 import { verifyToken } from "./cashu/wallet";
+import type { WalletStore } from "./cashu/wallet-store";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
@@ -99,6 +100,7 @@ export interface QueryServiceDeps {
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
   hooks?: QueryHooks;
+  walletStore?: WalletStore;
 }
 
 export interface HtlcOutcome {
@@ -161,6 +163,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const registry = deps?.oracleRegistry;
   const preimageStore = deps?.preimageStore;
   const hooks = deps?.hooks;
+  const walletStore = deps?.walletStore;
 
   function doResolveOracle(oracleId: string | undefined, acceptableIds: string[] | undefined) {
     return registry
@@ -306,6 +309,16 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         quorum: options?.quorum,
       };
 
+      // Lock bounty proofs from requester wallet → escrow
+      if (walletStore && options?.bounty?.amount_sats && options.htlc?.requester_pubkey) {
+        const sats = options.bounty.amount_sats;
+        const pub = options.htlc.requester_pubkey;
+        const locked = walletStore.lockForQuery("requester", pub, query.id, sats);
+        if (!locked) {
+          console.error(`[wallet] Requester ${pub} insufficient proofs for ${sats} sats`);
+        }
+      }
+
       store.set(query.id, query);
       hooks?.onCreated?.(query);
       return query;
@@ -379,6 +392,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       if (!query) return { ok: false, message: "Query not found" };
       if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
       store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
+      // Refund locked proofs to requester
+      if (walletStore && query.htlc?.requester_pubkey) {
+        walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, id);
+      }
       return { ok: true, message: "Query cancelled" };
     },
 
@@ -529,7 +546,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         oracleId,
       );
 
-      // 3. Complete verification
+      // 3. Complete verification + wallet settlement
       const newStatus: QueryStatus = passed ? "approved" : "rejected";
       const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
       const firstOracle = attestations[0]?.oracle_id;
@@ -542,6 +559,18 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         attestations: verifyingQuery.quorum ? attestations : undefined,
       };
       store.set(queryId, updated);
+
+      // Settle wallet: transfer proofs to worker (approved) or refund requester (rejected)
+      if (walletStore && query.htlc?.requester_pubkey) {
+        if (passed) {
+          walletStore.transferLocked(
+            "requester", query.htlc.requester_pubkey, queryId,
+            "worker", workerPubkey,
+          );
+        } else {
+          walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, queryId);
+        }
+      }
 
       // 4. Return preimage on success (look up by HTLC hash)
       if (passed && preimageStore && query.htlc?.hash) {

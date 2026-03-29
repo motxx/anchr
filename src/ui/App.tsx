@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Shield,
   Terminal,
+  Wallet,
   XCircle,
 } from "lucide-react";
 import { apiFetch } from "./api-config";
@@ -1484,6 +1485,56 @@ function LogsPanel() {
   );
 }
 
+// ---- BalanceCard ----
+
+interface BalanceData {
+  role: string;
+  pubkey: string;
+  balance_sats: number;
+  pending_sats: number;
+  mint_url: string | null;
+}
+
+function BalanceCard() {
+  const { data, isLoading } = useQuery<BalanceData>({
+    queryKey: ["wallet-balance-worker"],
+    queryFn: () =>
+      apiFetch(`/wallet/balance?role=worker&pubkey=${WORKER_PUBKEY}`).then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch balance");
+        return r.json();
+      }),
+    refetchInterval: 5000,
+  });
+
+  return (
+    <div className="mb-6 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Earned Balance
+          </span>
+        </div>
+        {data?.pending_sats ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Pending</span>
+            <span className="text-xs font-semibold text-amber-400/70">
+              {data.pending_sats} sats
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <p className="text-2xl font-bold text-amber-400 mt-1">
+        {isLoading ? (
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        ) : (
+          <>{data?.balance_sats ?? 0} sats</>
+        )}
+      </p>
+    </div>
+  );
+}
+
 // ---- App ----
 
 export default function App() {
@@ -1523,6 +1574,8 @@ export default function App() {
             </div>
           </div>
         </header>
+
+        <BalanceCard />
 
         <div className="space-y-8">
           <div>

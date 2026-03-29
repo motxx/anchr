@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Code2, Inbox, LayoutDashboard, RefreshCw } from "lucide-react";
+import { AlertCircle, Code2, Inbox, LayoutDashboard, Loader2, RefreshCw, Wallet } from "lucide-react";
 import React, { useState } from "react";
 import { apiFetch } from "../api-config";
 import { CreateQueryForm } from "./CreateQueryForm";
@@ -28,6 +28,59 @@ interface QuerySummary {
 
 type Tab = "dashboard" | "sdk";
 type Filter = "all" | "pending" | "approved" | "rejected";
+
+const REQUESTER_PUBKEY = "requester_demo";
+
+interface BalanceData {
+  role: string;
+  pubkey: string;
+  balance_sats: number;
+  pending_sats: number;
+  mint_url: string | null;
+}
+
+function BalanceHeader() {
+  const { data, isLoading } = useQuery<BalanceData>({
+    queryKey: ["wallet-balance-requester"],
+    queryFn: () =>
+      apiFetch(`/wallet/balance?role=requester&pubkey=${REQUESTER_PUBKEY}`).then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch balance");
+        return r.json();
+      }),
+    refetchInterval: 5000,
+  });
+
+  return (
+    <div className="mb-6 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-emerald-400" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Wallet Balance
+          </span>
+        </div>
+        {data?.pending_sats ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">In escrow</span>
+            <span className="text-xs font-semibold text-amber-400/70">
+              {data.pending_sats} sats
+            </span>
+          </div>
+        ) : null}
+        {data?.mint_url ? (
+          <span className="text-[10px] text-emerald-500/60">mint-verified</span>
+        ) : null}
+      </div>
+      <p className="text-2xl font-bold text-emerald-400 mt-1">
+        {isLoading ? (
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        ) : (
+          <>{data?.balance_sats ?? 0} sats</>
+        )}
+      </p>
+    </div>
+  );
+}
 
 function Stats({ queries }: { queries: QuerySummary[] }) {
   const pending = queries.filter((q) => ["pending", "processing", "verifying", "submitted"].includes(q.status)).length;
@@ -179,6 +232,7 @@ export function RequesterApp() {
         {/* Dashboard tab */}
         {!isError && tab === "dashboard" && (
           <div className="space-y-6">
+            <BalanceHeader />
             <Stats queries={queries} />
             <CreateQueryForm />
             <QueryList queries={queries} />

@@ -102,7 +102,9 @@ export async function verifyToken(token: string, expectedMinSats?: number): Prom
         }
         console.error(`[cashu] Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`);
       } catch (err) {
-        console.error(`[cashu] Mint checkstate failed — falling back to offline verification:`, err instanceof Error ? err.message : err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[cashu] Mint checkstate failed:`, msg);
+        return { valid: false, amountSats: totalAmount, error: `Mint verification failed: ${msg}` };
       }
     }
 
