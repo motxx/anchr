@@ -2,16 +2,21 @@ import { normalizeQueryResult } from "./attachments";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
+import type { PreimageStore } from "./oracle/preimage-store";
+import type { OracleAttestation } from "./oracle/types";
 import type {
   BlossomKeyMap,
   BountyInfo,
   ExecutorType,
   HtlcInfo,
+  HtlcSubmitOutcome,
+  OracleAttestationRecord,
   PaymentStatus,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
+  QuorumConfig,
   QuoteInfo,
   RequesterMeta,
   SubmissionMeta,
@@ -46,6 +51,8 @@ export interface CreateQueryOptions {
   htlc?: HtlcInfo;
   /** Nostr event ID of the kind 5300 Job Request. */
   nostrEventId?: string;
+  /** Multi-oracle quorum config. */
+  quorum?: QuorumConfig;
 }
 
 export interface SubmitQueryOutcome {
@@ -89,6 +96,7 @@ export interface QueryHooks {
 export interface QueryServiceDeps {
   store?: QueryStore;
   oracleRegistry?: OracleRegistry;
+  preimageStore?: PreimageStore;
   hooks?: QueryHooks;
 }
 
@@ -124,6 +132,14 @@ export interface QueryService {
   recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
   /** Complete Oracle verification (transition to approved/rejected). */
   completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
+  /** Submit result for HTLC query with inline verification — returns preimage on success. */
+  submitHtlcResult(
+    queryId: string,
+    result: QueryResult,
+    workerPubkey: string,
+    oracleId?: string,
+    blossomKeys?: BlossomKeyMap,
+  ): Promise<HtlcSubmitOutcome>;
 }
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
@@ -142,6 +158,7 @@ function generateQueryId(): string {
 export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const store = deps?.store ?? createQueryStore();
   const registry = deps?.oracleRegistry;
+  const preimageStore = deps?.preimageStore;
   const hooks = deps?.hooks;
 
   function doResolveOracle(oracleId: string | undefined, acceptableIds: string[] | undefined) {
@@ -160,6 +177,101 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
   function isHtlcQuery(query: Query): boolean {
     return query.htlc !== undefined;
+  }
+
+  async function verifyWithQuorum(
+    query: Query,
+    result: QueryResult,
+    blossomKeys?: BlossomKeyMap,
+    oracleId?: string,
+  ): Promise<{
+    passed: boolean;
+    attestations: OracleAttestationRecord[];
+    verification: VerificationDetail;
+  }> {
+    if (!query.quorum) {
+      // Single oracle — backward compatible
+      const oracle = doResolveOracle(oracleId, query.oracle_ids);
+      if (!oracle) {
+        return {
+          passed: false,
+          attestations: [],
+          verification: {
+            passed: false,
+            checks: [],
+            failures: [oracleId
+              ? `Oracle "${oracleId}" is not available or not accepted for this query`
+              : "No oracle available for this query"],
+          },
+        };
+      }
+      const att = await oracle.verify(query, result, blossomKeys);
+      const record: OracleAttestationRecord = {
+        oracle_id: att.oracle_id,
+        passed: att.passed,
+        checks: att.checks,
+        failures: att.failures,
+        attested_at: att.attested_at,
+        tlsn_verified: att.tlsn_verified,
+      };
+      return {
+        passed: att.passed,
+        attestations: [record],
+        verification: {
+          passed: att.passed,
+          checks: att.checks,
+          failures: att.failures,
+          tlsn_verified: att.tlsn_verified,
+        },
+      };
+    }
+
+    // Multi-oracle quorum
+    const resolveMultiple = registry?.resolveMultiple;
+    if (!resolveMultiple) {
+      return {
+        passed: false,
+        attestations: [],
+        verification: { passed: false, checks: [], failures: ["No oracle registry with resolveMultiple support"] },
+      };
+    }
+    const needed = query.quorum.min_approvals + 2;
+    const oracles = resolveMultiple(query.oracle_ids, needed);
+    if (oracles.length < query.quorum.min_approvals) {
+      return {
+        passed: false,
+        attestations: [],
+        verification: { passed: false, checks: [], failures: [`Need ${query.quorum.min_approvals} oracles but only ${oracles.length} available`] },
+      };
+    }
+
+    const rawAtts = await Promise.all(oracles.map((o) => o.verify(query, result, blossomKeys)));
+    const records: OracleAttestationRecord[] = rawAtts.map((a) => ({
+      oracle_id: a.oracle_id,
+      passed: a.passed,
+      checks: a.checks,
+      failures: a.failures,
+      attested_at: a.attested_at,
+      tlsn_verified: a.tlsn_verified,
+    }));
+
+    const passCount = records.filter((a) => a.passed).length;
+    const passed = passCount >= query.quorum.min_approvals;
+    // Use the first passing oracle's tlsn_verified data
+    const firstPass = records.find((a) => a.passed);
+    const allChecks = records.flatMap((a) => a.checks);
+    const allFailures = records.flatMap((a) => a.failures);
+
+    return {
+      passed,
+      attestations: records,
+      verification: {
+        passed,
+        checks: allChecks,
+        failures: allFailures,
+        tlsn_verified: firstPass?.tlsn_verified,
+      },
+    };
   }
 
   return {
@@ -190,6 +302,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         expected_gps: input.expected_gps,
         max_gps_distance_km: input.max_gps_distance_km,
         tlsn_requirements: input.tlsn_requirements,
+        quorum: options?.quorum,
       };
 
       store.set(query.id, query);
@@ -226,24 +339,17 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         return { ok: false, query, message: "Query has expired" };
       }
 
-      const oracle = doResolveOracle(oracleId, query.oracle_ids);
-      if (!oracle) {
-        return { ok: false, query, message: oracleId
-          ? `Oracle "${oracleId}" is not available or not accepted for this query`
-          : "No oracle available for this query" };
+      const normalizedResult = normalizeQueryResult(result);
+      const { passed, attestations, verification } = await verifyWithQuorum(query, normalizedResult, blossomKeys, oracleId);
+
+      if (!passed && attestations.length === 0) {
+        // Oracle resolution failed
+        return { ok: false, query, message: verification.failures[0] ?? "No oracle available" };
       }
 
-      const normalizedResult = normalizeQueryResult(result);
-      const attestation = await oracle.verify(query, normalizedResult, blossomKeys);
-      const verification: VerificationDetail = {
-        passed: attestation.passed,
-        checks: attestation.checks,
-        failures: attestation.failures,
-        tlsn_verified: attestation.tlsn_verified,
-      };
-
-      const newStatus: QueryStatus = attestation.passed ? "approved" : "rejected";
-      const paymentStatus: PaymentStatus = attestation.passed ? "released" : "cancelled";
+      const newStatus: QueryStatus = passed ? "approved" : "rejected";
+      const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
+      const firstOracle = attestations[0]?.oracle_id;
       const updated: Query = {
         ...query,
         status: newStatus,
@@ -252,17 +358,18 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         verification,
         submission_meta: submissionMeta,
         payment_status: paymentStatus,
-        assigned_oracle_id: attestation.oracle_id,
+        assigned_oracle_id: firstOracle,
         blossom_keys: blossomKeys,
+        attestations: query.quorum ? attestations : undefined,
       };
       store.set(id, updated);
 
       return {
-        ok: attestation.passed,
+        ok: passed,
         query: updated,
-        message: attestation.passed
+        message: passed
           ? "Verification passed. Result accepted."
-          : `Verification failed: ${attestation.failures.join(", ")}`,
+          : `Verification failed: ${verification.failures.join(", ")}`,
       };
     },
 
@@ -371,6 +478,77 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         assigned_oracle_id: oracleId,
       });
       return { ok: true, message: passed ? "Verification passed" : "Verification failed" };
+    },
+
+    async submitHtlcResult(
+      queryId: string,
+      result: QueryResult,
+      workerPubkey: string,
+      oracleId?: string,
+      blossomKeys?: BlossomKeyMap,
+    ): Promise<HtlcSubmitOutcome> {
+      const query = store.get(queryId);
+      if (!query) return { ok: false, query: null, message: "Query not found" };
+      if (!isHtlcQuery(query)) return { ok: false, query, message: "Not an HTLC query" };
+      if (query.status !== "processing") return { ok: false, query, message: `Query is ${query.status}, not processing` };
+      if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+        return { ok: false, query, message: "Worker pubkey does not match selected worker" };
+      }
+
+      // 1. Record result (processing → verifying)
+      const normalizedResult = normalizeQueryResult(result);
+      const verifyingQuery: Query = {
+        ...query,
+        status: "verifying",
+        result: normalizedResult,
+        submitted_at: Date.now(),
+        submission_meta: { executor_type: "human", channel: "worker_api" },
+        blossom_keys: blossomKeys,
+      };
+      store.set(queryId, verifyingQuery);
+
+      // 2. Verify with oracle(s)
+      const { passed, attestations, verification } = await verifyWithQuorum(
+        verifyingQuery,
+        normalizedResult,
+        blossomKeys,
+        oracleId,
+      );
+
+      // 3. Complete verification
+      const newStatus: QueryStatus = passed ? "approved" : "rejected";
+      const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
+      const firstOracle = attestations[0]?.oracle_id;
+      const updated: Query = {
+        ...verifyingQuery,
+        status: newStatus,
+        payment_status: paymentStatus,
+        verification,
+        assigned_oracle_id: firstOracle,
+        attestations: verifyingQuery.quorum ? attestations : undefined,
+      };
+      store.set(queryId, updated);
+
+      // 4. Return preimage on success
+      if (passed && preimageStore) {
+        const preimage = preimageStore.getPreimage(queryId);
+        if (preimage) {
+          return {
+            ok: true,
+            query: updated,
+            message: "Verification passed. Preimage revealed for HTLC redemption.",
+            preimage,
+          };
+        }
+      }
+
+      return {
+        ok: passed,
+        query: updated,
+        message: passed
+          ? "Verification passed."
+          : `Verification failed: ${verification.failures.join(", ")}`,
+      };
     },
   };
 }

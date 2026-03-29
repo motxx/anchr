@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createPreimageStore } from "./oracle/preimage-store";
 import { createOracleRegistry } from "./oracle/registry";
 import type { Oracle, OracleAttestation } from "./oracle/types";
 import { createQueryService, createQueryStore } from "./query-service";
@@ -228,7 +229,7 @@ describe("HTLC endpoints", () => {
     expect(queryService.getQuery(query.id)?.status).toBe("processing");
   }));
 
-  test("POST /queries/:id/result records result", withOpenAuth(async () => {
+  test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
     queryService.selectWorker(query.id, "w1");
@@ -236,12 +237,16 @@ describe("HTLC endpoints", () => {
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "done" }),
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "done", oracle_id: "test-oracle" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { ok: boolean };
+    const json = await res.json() as { ok: boolean; oracle_id: string; payment_status: string; preimage: string | null };
     expect(json.ok).toBe(true);
-    expect(queryService.getQuery(query.id)?.status).toBe("verifying");
+    expect(json.oracle_id).toBe("test-oracle");
+    expect(json.payment_status).toBe("released");
+    // No preimage store configured in basic test
+    expect(json.preimage).toBeNull();
+    expect(queryService.getQuery(query.id)?.status).toBe("approved");
   }));
 
   test("GET /queries/:id includes HTLC info", withOpenAuth(async () => {
@@ -255,7 +260,7 @@ describe("HTLC endpoints", () => {
     expect(json.payment_status).toBe("htlc_locked");
   }));
 
-  test("HTLC full lifecycle via HTTP", withOpenAuth(async () => {
+  test("HTLC full lifecycle via HTTP (inline verification)", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
 
     // Create HTLC query
@@ -283,16 +288,189 @@ describe("HTLC endpoints", () => {
     });
     expect((await selectRes.json() as { ok: boolean }).ok).toBe(true);
 
-    // Submit result
+    // Submit result — now does inline verification for HTLC queries
     const resultRes = await app.request(`http://localhost/queries/${query_id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "photo" }),
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "photo", oracle_id: "test-oracle" }),
     });
-    expect((await resultRes.json() as { ok: boolean }).ok).toBe(true);
-
-    // Complete verification (done server-side, tested via service)
-    queryService.completeVerification(query_id, true);
+    const resultJson = await resultRes.json() as { ok: boolean; oracle_id: string; payment_status: string };
+    expect(resultJson.ok).toBe(true);
+    expect(resultJson.oracle_id).toBe("test-oracle");
+    expect(resultJson.payment_status).toBe("released");
     expect(queryService.getQuery(query_id)?.status).toBe("approved");
+  }));
+});
+
+describe("POST /queries/:id/hash", () => {
+  const htlcInfo = {
+    hash: "abcd1234",
+    oracle_pubkey: "oracle_pub",
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  function makeTestAppWithPreimage() {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const oracle = makeMockOracle("test-oracle");
+    registry.register(oracle);
+    const preimageStore = createPreimageStore();
+    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const app = buildWorkerApiApp({ queryService, oracleRegistry: registry, preimageStore });
+    return { app, store, registry, queryService, preimageStore };
+  }
+
+  test("generates hash for query", withOpenAuth(async () => {
+    const { app, queryService } = makeTestAppWithPreimage();
+    const query = queryService.createQuery({ description: "Test" });
+    const res = await app.request(`http://localhost/queries/${query.id}/hash`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { hash: string; query_id: string };
+    expect(json.hash).toBeTruthy();
+    expect(json.query_id).toBe(query.id);
+  }));
+
+  test("returns 404 for unknown query", withOpenAuth(async () => {
+    const { app } = makeTestAppWithPreimage();
+    const res = await app.request("http://localhost/queries/nonexistent/hash", {
+      method: "POST",
+    });
+    expect(res.status).toBe(404);
+  }));
+
+  test("returns 409 when hash already set", withOpenAuth(async () => {
+    const { app, queryService } = makeTestAppWithPreimage();
+    const query = queryService.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const res = await app.request(`http://localhost/queries/${query.id}/hash`, {
+      method: "POST",
+    });
+    expect(res.status).toBe(409);
+  }));
+});
+
+describe("HTLC inline verification with preimage", () => {
+  const htlcInfo = {
+    hash: "abcd1234",
+    oracle_pubkey: "oracle_pub",
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  function makeTestAppWithPreimage() {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const oracle = makeMockOracle("test-oracle");
+    registry.register(oracle);
+    const preimageStore = createPreimageStore();
+    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const app = buildWorkerApiApp({ queryService, oracleRegistry: registry, preimageStore });
+    return { app, store, registry, queryService, preimageStore };
+  }
+
+  test("POST /queries/:id/result returns preimage for HTLC on success", withOpenAuth(async () => {
+    const { app, queryService, preimageStore } = makeTestAppWithPreimage();
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const entry = preimageStore.create(query.id);
+    queryService.selectWorker(query.id, "w1");
+
+    const res = await app.request(`http://localhost/queries/${query.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "done", oracle_id: "test-oracle" }),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { ok: boolean; preimage: string | null; oracle_id: string };
+    expect(json.ok).toBe(true);
+    expect(json.preimage).toBe(entry.preimage);
+    expect(json.oracle_id).toBe("test-oracle");
+  }));
+
+  test("full HTLC lifecycle with preimage via HTTP", withOpenAuth(async () => {
+    const { app, queryService, preimageStore } = makeTestAppWithPreimage();
+
+    // 1. Create query (no htlc yet — will get hash first)
+    const query = queryService.createQuery({ description: "Full HTLC with preimage" });
+
+    // 2. Generate hash
+    const hashRes = await app.request(`http://localhost/queries/${query.id}/hash`, {
+      method: "POST",
+    });
+    expect(hashRes.status).toBe(200);
+    const { hash } = await hashRes.json() as { hash: string };
+    expect(hash).toBeTruthy();
+
+    // Verify preimage was stored
+    expect(preimageStore.getHash(query.id)).toBe(hash);
+    expect(preimageStore.getPreimage(query.id)).toBeTruthy();
+  }));
+});
+
+describe("Quorum via HTTP", () => {
+  function makeMockOracleWithPass(id: string, pass: boolean): Oracle {
+    return {
+      info: { id, name: `Mock ${id}`, fee_ppm: 0 },
+      async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
+        return {
+          oracle_id: id,
+          query_id: query.id,
+          passed: pass,
+          checks: pass ? ["mock passed"] : [],
+          failures: pass ? [] : ["mock failed"],
+          attested_at: Date.now(),
+        };
+      },
+    };
+  }
+
+  test("POST /queries creates query with quorum config", withOpenAuth(async () => {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracleWithPass("oracle-a", true));
+    registry.register(makeMockOracleWithPass("oracle-b", true));
+    const queryService = createQueryService({ store, oracleRegistry: registry });
+    const app = buildWorkerApiApp({ queryService, oracleRegistry: registry });
+
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "Quorum query",
+        oracle_ids: ["oracle-a", "oracle-b"],
+        quorum: { min_approvals: 2 },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const json = await res.json() as { query_id: string };
+    const query = queryService.getQuery(json.query_id);
+    expect(query?.quorum).toEqual({ min_approvals: 2 });
+  }));
+
+  test("GET /queries/:id exposes quorum and attestations", withOpenAuth(async () => {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracleWithPass("oracle-a", true));
+    registry.register(makeMockOracleWithPass("oracle-b", true));
+    const queryService = createQueryService({ store, oracleRegistry: registry });
+    const app = buildWorkerApiApp({ queryService, oracleRegistry: registry });
+
+    const query = queryService.createQuery(
+      { description: "Quorum test" },
+      { oracleIds: ["oracle-a", "oracle-b"], quorum: { min_approvals: 2 } },
+    );
+    await queryService.submitQueryResult(
+      query.id,
+      { attachments: [], notes: "test" },
+      { executor_type: "human", channel: "worker_api" },
+    );
+
+    const res = await app.request(`http://localhost/queries/${query.id}`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { quorum: { min_approvals: number }; attestations: Array<{ oracle_id: string; passed: boolean }> };
+    expect(json.quorum).toEqual({ min_approvals: 2 });
+    expect(json.attestations).toHaveLength(2);
+    expect(json.attestations.every((a) => a.passed)).toBe(true);
   }));
 });

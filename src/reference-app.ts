@@ -1,4 +1,5 @@
 import { getRuntimeConfig } from "./config";
+import { createPreimageStore } from "./oracle/preimage-store";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 // @ts-ignore — Bun HTML import
 import uiHtml from "./ui/index.html";
@@ -8,7 +9,8 @@ import requesterHtml from "./ui/requester/index.html";
 export async function startReferenceApp() {
   await prepareWorkerApiAssets();
 
-  const app = buildWorkerApiApp();
+  const preimageStore = createPreimageStore();
+  const app = buildWorkerApiApp({ preimageStore });
   const port = getRuntimeConfig().referenceAppPort;
 
   Bun.serve({

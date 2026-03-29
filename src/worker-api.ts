@@ -16,6 +16,7 @@ import {
 import { getRuntimeConfig } from "./config";
 import { listOracles } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
+import type { PreimageStore } from "./oracle/preimage-store";
 import {
   cancelQuery,
   createQuery,
@@ -28,13 +29,14 @@ import {
   type QueryService,
 } from "./query-service";
 import { VERIFICATION_FACTORS } from "./types";
-import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo, TlsnAttestation } from "./types";
+import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "./types";
 import { getRuntimeConfig as getConfig } from "./config";
 import { haversineKm } from "./verification/exif-validation";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
   oracleRegistry?: OracleRegistry;
+  preimageStore?: PreimageStore;
 }
 
 // --- Schemas ---
@@ -84,6 +86,10 @@ const tlsnRequirementSchema = z.object({
   domain_hint: z.string().optional(),
 });
 
+const quorumSchema = z.object({
+  min_approvals: z.number().int().min(1),
+}).optional();
+
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
@@ -96,6 +102,7 @@ const createQuerySchema = z.object({
   htlc: htlcSchema,
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
+  quorum: quorumSchema,
 });
 
 // --- Auth Middleware ---
@@ -159,6 +166,7 @@ function querySummary(query: Query) {
     expected_gps: query.expected_gps ?? null,
     max_gps_distance_km: query.max_gps_distance_km ?? null,
     tlsn_requirements: query.tlsn_requirements ?? null,
+    quorum: query.quorum ?? null,
   };
 }
 
@@ -193,6 +201,7 @@ function queryDetail(query: Query, requestUrl: string) {
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
     blossom_keys: query.blossom_keys ?? null,
+    attestations: query.attestations ?? null,
     ...(hasTlsn && {
       tlsn_verifier_url: config.tlsnVerifierUrl ?? null,
       tlsn_proxy_url: config.tlsnProxyUrl ?? null,
@@ -261,6 +270,7 @@ export async function prepareWorkerApiAssets() {
 
 export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   const svc = deps?.queryService ?? defaultQueryService;
+  const pStore = deps?.preimageStore;
   const doCreateQuery = svc.createQuery.bind(svc);
   const doGetQuery = svc.getQuery.bind(svc);
   const doListOpen = svc.listOpenQueries.bind(svc);
@@ -344,6 +354,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         bounty: payload.bounty,
         oracleIds: payload.oracle_ids,
         htlc: payload.htlc as HtlcInfo | undefined,
+        quorum: payload.quorum as QuorumConfig | undefined,
       });
 
       return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
@@ -486,6 +497,18 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   // --- HTLC lifecycle endpoints ---
 
+  app.post("/queries/:id/hash", writeAuth, (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    if (!pStore) return c.json({ error: "Preimage store not configured" }, 500);
+    const query = doGetQuery(id);
+    if (!query) return c.json({ error: "Query not found" }, 404);
+    // Only allow hash generation before query has a result
+    if (query.htlc?.hash) return c.json({ error: "Hash already set for this query" }, 409);
+    const entry = pStore.create(id);
+    return c.json({ hash: entry.hash, query_id: id });
+  });
+
   app.get("/queries/:id/quotes", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
@@ -542,9 +565,34 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
       gps: resultGps && typeof resultGps.lat === "number" && typeof resultGps.lon === "number" ? resultGps : undefined,
+      tlsn_attestation: typeof body.tlsn_presentation === "string"
+        ? { presentation: body.tlsn_presentation as string }
+        : (body.tlsn_attestation as TlsnAttestation | undefined),
+      tlsn_extension_result: body.tlsn_extension_result != null
+        ? body.tlsn_extension_result
+        : undefined,
     };
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
+    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
 
+    // Detect HTLC query — use inline verification (submitHtlcResult)
+    const query = doGetQuery(id);
+    if (query?.htlc) {
+      const htlcOutcome = await svc.submitHtlcResult(id, result, workerPubkey, oracleId, blossomKeys);
+      const status = !htlcOutcome.query ? 404
+        : !htlcOutcome.ok ? 422
+        : 200;
+      return c.json({
+        ok: htlcOutcome.ok,
+        message: htlcOutcome.message,
+        verification: htlcOutcome.query?.verification,
+        oracle_id: htlcOutcome.query?.assigned_oracle_id ?? null,
+        payment_status: htlcOutcome.query?.payment_status,
+        preimage: htlcOutcome.preimage ?? null,
+      }, status);
+    }
+
+    // Non-HTLC: just record result
     const outcome = svc.recordResult(id, result, workerPubkey, blossomKeys);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });

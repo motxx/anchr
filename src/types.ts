@@ -185,6 +185,30 @@ export interface QuoteInfo {
   received_at: number;
 }
 
+/** Outcome of submitHtlcResult — includes preimage on success. */
+export interface HtlcSubmitOutcome {
+  ok: boolean;
+  query: Query | null;
+  message: string;
+  /** Preimage revealed on verification success (Worker uses this to redeem HTLC token). */
+  preimage?: string;
+}
+
+export interface QuorumConfig {
+  /** Minimum number of oracle approvals required. */
+  min_approvals: number;
+}
+
+/** Individual oracle attestation stored for quorum tracking. */
+export interface OracleAttestationRecord {
+  oracle_id: string;
+  passed: boolean;
+  checks: string[];
+  failures: string[];
+  attested_at: number;
+  tlsn_verified?: TlsnVerifiedData;
+}
+
 export interface Query {
   id: string;
   status: QueryStatus;
@@ -221,4 +245,8 @@ export interface Query {
   max_gps_distance_km?: number;
   /** TLSNotary requirements for web content verification. */
   tlsn_requirements?: TlsnRequirement;
+  /** Multi-oracle quorum config (if set, multiple oracles verify independently). */
+  quorum?: QuorumConfig;
+  /** Individual oracle attestations collected during quorum verification. */
+  attestations?: OracleAttestationRecord[];
 }

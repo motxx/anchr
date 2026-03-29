@@ -492,6 +492,233 @@ describe("HTLC lifecycle", () => {
   });
 });
 
+describe("submitHtlcResult", () => {
+  function makeIsolatedServiceWithPreimage(opts?: {
+    mockOracle?: Oracle;
+  }) {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const oracle = opts?.mockOracle ?? makeMockOracle("test-oracle");
+    registry.register(oracle);
+    const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
+    const preimageStore = createPreimageStore();
+    return {
+      service: createQueryService({
+        store,
+        oracleRegistry: registry,
+        preimageStore,
+      }),
+      store,
+      registry,
+      preimageStore,
+    };
+  }
+
+  const htlcInfo = {
+    hash: "abcd1234",
+    oracle_pubkey: "oracle_pub",
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  test("submitHtlcResult returns preimage on verification success", async () => {
+    const { service, preimageStore } = makeIsolatedServiceWithPreimage();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    // Generate a preimage for this query
+    const entry = preimageStore.create(query.id);
+    service.selectWorker(query.id, "w1");
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [], notes: "done" },
+      "w1",
+      "test-oracle",
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.preimage).toBe(entry.preimage);
+    expect(outcome.query?.status).toBe("approved");
+    expect(outcome.query?.payment_status).toBe("released");
+  });
+
+  test("submitHtlcResult does not return preimage on verification failure", async () => {
+    const { service, preimageStore } = makeIsolatedServiceWithPreimage({
+      mockOracle: makeMockOracle("strict-oracle", () => false),
+    });
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    preimageStore.create(query.id);
+    service.selectWorker(query.id, "w1");
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "strict-oracle",
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.preimage).toBeUndefined();
+    expect(outcome.query?.status).toBe("rejected");
+    expect(outcome.query?.payment_status).toBe("cancelled");
+  });
+
+  test("submitHtlcResult fails for non-HTLC query", async () => {
+    const { service } = makeIsolatedServiceWithPreimage();
+    const query = service.createQuery({ description: "Simple query" });
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Not an HTLC query");
+  });
+
+  test("submitHtlcResult fails for wrong worker", async () => {
+    const { service, preimageStore } = makeIsolatedServiceWithPreimage();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    preimageStore.create(query.id);
+    service.selectWorker(query.id, "w1");
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [] },
+      "wrong_worker",
+      "test-oracle",
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("does not match");
+  });
+
+  test("submitHtlcResult fails for wrong state", async () => {
+    const { service } = makeIsolatedServiceWithPreimage();
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    // Still in awaiting_quotes, not processing
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("not processing");
+  });
+});
+
+describe("verifyWithQuorum", () => {
+  function makeQuorumService(oracleSpecs: Array<{ id: string; pass: boolean }>) {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    for (const spec of oracleSpecs) {
+      registry.register(makeMockOracle(spec.id, () => spec.pass));
+    }
+    return {
+      service: createQueryService({ store, oracleRegistry: registry }),
+      store,
+      registry,
+    };
+  }
+
+  test("2-of-3 quorum passes when 2 oracles approve", async () => {
+    const { service } = makeQuorumService([
+      { id: "oracle-a", pass: true },
+      { id: "oracle-b", pass: true },
+      { id: "oracle-c", pass: false },
+    ]);
+    const query = service.createQuery(
+      { description: "Quorum test" },
+      {
+        oracleIds: ["oracle-a", "oracle-b", "oracle-c"],
+        quorum: { min_approvals: 2 },
+      },
+    );
+    const outcome = await service.submitQueryResult(
+      query.id,
+      { attachments: [], notes: "test" },
+      { executor_type: "human", channel: "worker_api" },
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.query?.status).toBe("approved");
+    expect(outcome.query?.attestations).toHaveLength(3);
+    expect(outcome.query?.attestations?.filter((a) => a.passed)).toHaveLength(2);
+  });
+
+  test("2-of-3 quorum fails when only 1 oracle approves", async () => {
+    const { service } = makeQuorumService([
+      { id: "oracle-a", pass: true },
+      { id: "oracle-b", pass: false },
+      { id: "oracle-c", pass: false },
+    ]);
+    const query = service.createQuery(
+      { description: "Quorum test" },
+      {
+        oracleIds: ["oracle-a", "oracle-b", "oracle-c"],
+        quorum: { min_approvals: 2 },
+      },
+    );
+    const outcome = await service.submitQueryResult(
+      query.id,
+      { attachments: [], notes: "test" },
+      { executor_type: "human", channel: "worker_api" },
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.query?.status).toBe("rejected");
+    expect(outcome.query?.attestations).toHaveLength(3);
+  });
+
+  test("no quorum config uses single oracle (backward compat)", async () => {
+    const { service } = makeQuorumService([
+      { id: "oracle-a", pass: true },
+      { id: "oracle-b", pass: false },
+    ]);
+    const query = service.createQuery(
+      { description: "No quorum" },
+      { oracleIds: ["oracle-a"] },
+    );
+    const outcome = await service.submitQueryResult(
+      query.id,
+      { attachments: [], notes: "test" },
+      { executor_type: "human", channel: "worker_api" },
+      "oracle-a",
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.query?.status).toBe("approved");
+    expect(outcome.query?.attestations).toBeUndefined();
+  });
+
+  test("quorum with HTLC submitHtlcResult", async () => {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracle("oracle-a", () => true));
+    registry.register(makeMockOracle("oracle-b", () => true));
+    const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
+    const preimageStore = createPreimageStore();
+    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+
+    const htlcInfo = {
+      hash: "test_hash",
+      oracle_pubkey: "oracle_pub",
+      requester_pubkey: "req_pub",
+      locktime: Math.floor(Date.now() / 1000) + 3600,
+    };
+    const query = service.createQuery(
+      { description: "Quorum HTLC" },
+      {
+        htlc: htlcInfo,
+        oracleIds: ["oracle-a", "oracle-b"],
+        quorum: { min_approvals: 2 },
+      },
+    );
+    const entry = preimageStore.create(query.id);
+    service.selectWorker(query.id, "w1");
+
+    const outcome = await service.submitHtlcResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.preimage).toBe(entry.preimage);
+    expect(outcome.query?.attestations).toHaveLength(2);
+  });
+});
+
 describe("createIntegrityStore isolation", () => {
   test("instances do not share state", () => {
     const store1 = createIntegrityStore();
