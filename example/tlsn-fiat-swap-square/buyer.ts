@@ -65,14 +65,14 @@ console.log("Open the seller's Square Payment Link and complete the payment.\n")
 console.log("--- Step 3: Generate TLSNotary Proof ---\n");
 console.log("After the seller shares the Square access token and Payment ID");
 console.log("(via NIP-44 encrypted_context), prove the Payment status:\n");
-console.log("  Target URL: https://connect.squareup.com/v2/payments/{payment_id}");
+console.log("  Target URL: https://connect.squareupsandbox.com/v2/payments/{payment_id}");
 console.log("  Header: Authorization: Bearer {access_token}");
 console.log();
-console.log("The TLSNotary proof captures the JSON response from connect.squareup.com:");
+console.log("The TLSNotary proof captures the JSON response from connect.squareupsandbox.com:");
 console.log('  { "payment": { "status": "COMPLETED", "amount_money": { ... } } }');
 console.log();
 console.log("The proof cryptographically verifies:");
-console.log("  1. Domain: connect.squareup.com (from TLS certificate, ECDSA)");
+console.log("  1. Domain: connect.squareupsandbox.com (from TLS certificate, ECDSA)");
 console.log('  2. Body contains: "status":"COMPLETED"');
 console.log("  3. Attestation is fresh (< max_attestation_age_seconds)");
 
@@ -85,7 +85,7 @@ console.log("Generate proof using tlsn-prove CLI:\n");
 console.log("  tlsn-prove \\");
 console.log('    --verifier localhost:7046 \\');
 console.log('    -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \\');
-console.log('    "https://connect.squareup.com/v2/payments/$PAYMENT_ID" \\');
+console.log('    "https://connect.squareupsandbox.com/v2/payments/$PAYMENT_ID" \\');
 console.log("    -o proof.presentation.tlsn");
 console.log();
 console.log("  # Submit to Anchr");

@@ -4,7 +4,7 @@
  * The seller creates an on-ramp order:
  *   1. Creates a Square Payment Link for the fiat amount
  *   2. Creates an Anchr query with TLSNotary requirements
- *      - Public: domain_hint = "connect.squareup.com" (visible to all Workers)
+ *      - Public: domain_hint = "connect.squareupsandbox.com" (visible to all Workers)
  *      - Private: Square access token + Payment ID (delivered via
  *        NIP-44 encrypted_context to the selected Worker only)
  *   3. The SDK locks BTC in Cashu HTLC escrow and broadcasts via Nostr
@@ -44,8 +44,8 @@ console.log(`Square Payment Link: ${PAYMENT_LINK}\n`);
 // Step 2: Create an Anchr query with domain_hint
 const queryId = await anchr.createTlsnQuery({
   description: "Prove Square payment — pay via Payment Link, then prove payment status",
-  targetUrl: "https://connect.squareup.com/",
-  domainHint: "connect.squareup.com",
+  targetUrl: "https://connect.squareupsandbox.com/",
+  domainHint: "connect.squareupsandbox.com",
   conditions: [
     {
       type: "contains",
@@ -60,7 +60,7 @@ const queryId = await anchr.createTlsnQuery({
 
 // Note: In the full Nostr HTLC flow:
 //   await selectWorker(state, workerPubkey, relayUrls, {
-//     target_url: `https://connect.squareup.com/v2/payments/${paymentId}`,
+//     target_url: `https://connect.squareupsandbox.com/v2/payments/${paymentId}`,
 //     headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
 //   });
 
