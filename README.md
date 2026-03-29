@@ -26,27 +26,100 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 ## How It Works
 
-```
-Requester (AI agent / human)
-  │  "Prove what api.coingecko.com returns for BTC price"
-  │  Attaches 21 sats bounty
-  ▼
-Nostr relay (censorship-resistant broadcast)
-  │
-  ▼
-Worker (anyone — AI agent, server, mobile app, browser extension)
-  │  Fetches URL via MPC-TLS with Verifier Server
-  │  Generates cryptographic presentation (.presentation.tlsn)
-  ▼
-Oracle (Anchr server)
-  │  Verifies TLSNotary signature
-  │  Checks: domain matches, data fresh, conditions satisfied
-  │  All checks pass → bounty auto-released to Worker
-  ▼
-Requester receives verified data + cryptographic proof
+**No trust required.** Proof is tied to the TLS certificate (web) or C2PA signature (photo) — if data is wrong, cryptographic verification fails. Payment is atomic via Cashu HTLC escrow: the Oracle holds a secret preimage, and only reveals it when verification passes, unlocking the bounty for the Worker.
+
+### Protocol Sequence
+
+```mermaid
+sequenceDiagram
+    participant R as Requester
+    participant O as Oracle<br/>(Anchr Server)
+    participant M as Cashu Mint
+    participant N as Nostr Relay
+    participant W as Worker
+    participant V as TLSNotary<br/>Verifier
+    participant T as Target Server
+    participant B as Blossom
+
+    Note over R,B: Phase 1 — Setup & Escrow
+
+    R->>O: POST /hash
+    Note right of O: Generate preimage (secret)<br/>Store in preimageStore
+    O-->>R: hash = SHA256(preimage)
+
+    R->>M: Mint ecash (pay Lightning invoice)
+    M-->>R: Cashu Proof[] (e.g. 100 sats)
+
+    R->>O: POST /queries (HTLC mode)
+    Note right of R: description, bounty,<br/>HTLC{hash, locktime},<br/>verification_requirements,<br/>tlsn_requirements or GPS
+    O-->>R: query_id (awaiting_quotes)
+    Note right of O: WalletStore locks<br/>Requester's Proof[] for query
+
+    R->>N: kind 5300 Job Request
+    Note right of N: Broadcast to all Workers
+
+    Note over R,B: Phase 2 — Worker Discovery & Selection
+
+    N-->>W: Job Request received
+    W->>O: POST /queries/:id/quotes
+    Note right of W: worker_pubkey, amount_sats
+
+    R->>O: POST /queries/:id/select
+    Note right of R: worker_pubkey,<br/>htlc_token (Cashu HTLC)
+    O->>M: checkProofsStates
+    M-->>O: All proofs UNSPENT ✓
+    O-->>R: status: processing
+
+    R->>N: kind 7000 (NIP-44 encrypted → Worker)
+    Note right of R: HTLC token + target details
+
+    Note over R,B: Phase 3 — Proof Generation
+
+    alt Web Data (TLSNotary)
+        W->>V: MPC-TLS handshake
+        W->>T: HTTPS request (co-signed session)
+        T-->>W: HTTPS response
+        V-->>W: .presentation.tlsn
+    else Real-World Photo (C2PA)
+        Note over W: Capture with C2PA camera<br/>(GPS + timestamp embedded)
+    end
+
+    W->>B: Upload AES-256-GCM encrypted blob
+    B-->>W: Blossom URI + SHA256
+
+    Note over R,B: Phase 4 — Verification & Settlement
+
+    W->>O: POST /queries/:id/result
+    Note right of W: proof (tlsn_presentation<br/>or photo attachments)
+
+    alt TLSNotary
+        Note over O: 1. Decode .presentation.tlsn<br/>2. Verify MPC-TLS signatures<br/>3. Extract server_name from TLS cert<br/>4. Evaluate conditions (jsonpath/regex)<br/>5. Check attestation freshness
+    else C2PA + GPS
+        Note over O: 1. Verify C2PA manifest signature<br/>2. Validate EXIF GPS + timestamp<br/>3. Check haversine distance ≤ max_km<br/>4. Challenge nonce (if required)
+    end
+
+    O-->>W: preimage + status: approved
+    Note right of O: WalletStore transfers<br/>Proof[] → Worker
+
+    W->>M: Redeem HTLC (preimage + signature)
+    M-->>W: New unrestricted Proof[] (100 sats)
+
+    Note over R,B: ✓ Requester has verified data<br/>✓ Worker earned sats<br/>✓ No party could cheat
 ```
 
-**No trust required.** The proof is tied to the TLS certificate — if the data is wrong, the cryptographic verification fails. Payment is atomic via Cashu HTLC escrow.
+### State Machine
+
+```
+awaiting_quotes → processing → verifying → approved  (preimage revealed, sats released)
+                                         → rejected  (proofs refunded to Requester)
+```
+
+### Key Properties
+
+- **Atomic payment**: Cashu HTLC locks funds — Worker can only redeem with the preimage, which Oracle only reveals on successful verification
+- **Timeout refund**: If HTLC locktime expires, Requester reclaims the escrowed sats
+- **Privacy**: Cashu blind signatures prevent Mint from linking token issuance to redemption; Nostr provides pseudonymous identity
+- **Two proof types**: TLSNotary (web API data) and C2PA (real-world photos) — both cryptographically bound to source
 
 ## Two Verification Modes
 
@@ -114,17 +187,21 @@ curl -X POST localhost:3000/queries \
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `POST` | `/hash` | Oracle generates preimage/hash pair |
+| `POST` | `/queries` | Create query (HTLC mode) |
 | `GET` | `/queries` | List open queries (`?lat=&lon=&max_distance_km=`) |
+| `GET` | `/queries/all` | List all queries (any status) |
 | `GET` | `/queries/:id` | Query detail |
-| `POST` | `/queries` | Create query |
+| `POST` | `/queries/:id/quotes` | Worker submits quote |
+| `POST` | `/queries/:id/select` | Select worker + verify HTLC token |
+| `POST` | `/queries/:id/result` | Submit proof (inline verification → preimage) |
 | `POST` | `/queries/:id/upload` | Upload photo (multipart) |
-| `POST` | `/queries/:id/submit` | Submit result |
-| `POST` | `/queries/:id/cancel` | Cancel query |
+| `POST` | `/queries/:id/cancel` | Cancel query (refund proofs) |
 | `GET` | `/queries/:id/attachments` | List attachments |
-| `POST` | `/queries/:id/quotes` | Worker quote (HTLC flow) |
-| `POST` | `/queries/:id/select` | Select worker (HTLC flow) |
+| `GET` | `/wallet/balance` | Wallet balance (`?role=&pubkey=&verify=true`) |
 | `GET` | `/health` | Health check |
 | `GET` | `/oracles` | List oracles |
+| `GET` | `/logs/stream` | Server log stream (SSE) |
 
 </details>
 
@@ -185,31 +262,42 @@ Claude uses create_query:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│ Requester (AI agent / human / app)              │
-│   anchr.query({ targetUrl, conditions, sats })  │
-└────────────────────┬────────────────────────────┘
-                     │ Nostr broadcast
-                     ▼
-┌─────────────────────────────────────────────────┐
-│ Worker (CLI / mobile app / browser extension)   │
-│                                                 │
-│ TLSNotary path:     Photo path:                 │
-│   tlsn-prove          C2PA camera               │
-│     ↕ MPC-TLS           ↓                       │
-│   Verifier Server     Upload + GPS              │
-│     ↓                    ↓                       │
-│   .presentation.tlsn  C2PA manifest             │
-└────────────────────┬────────────────────────────┘
-                     │ Submit proof
-                     ▼
-┌─────────────────────────────────────────────────┐
-│ Oracle (Anchr server)                           │
-│   TLSNotary: tlsn-verifier → crypto verify      │
-│   C2PA: c2patool → signature verify             │
-│   Conditions: jsonpath / regex / GPS proximity  │
-│   Pass → Cashu HTLC bounty released             │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Requester                                 │
+│  anchr.query({ targetUrl, conditions, sats })                    │
+└────────────┬─────────────────────────────────┬───────────────────┘
+             │ Nostr kind 5300                  │ Cashu Proof[]
+             ▼                                  ▼
+┌────────────────────┐                ┌─────────────────┐
+│    Nostr Relay      │                │   Cashu Mint     │
+│  (broadcast + DM)   │                │ (Lightning-backed)│
+└────────────┬────────┘                └──────┬──────────┘
+             │ kind 5300                       │ checkProofsStates
+             ▼                                 │
+┌──────────────────────────────────────────────┼───────────────────┐
+│                        Worker                │                    │
+│                                              │                    │
+│  TLSNotary path:          Photo path:        │                    │
+│    tlsn-prove               C2PA camera      │                    │
+│      ↕ MPC-TLS                ↓              │                    │
+│    Verifier Server          Upload + GPS     │                    │
+│      ↓                        ↓              │                    │
+│    .presentation.tlsn       C2PA manifest    │                    │
+│              ↓                 ↓             │                    │
+│              └── Blossom (E2E encrypted) ────┘                    │
+└────────────┬─────────────────────────────────────────────────────┘
+             │ POST /queries/:id/result
+             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     Oracle (Anchr Server)                         │
+│                                                                   │
+│  TLSNotary: tlsn-verifier → MPC-TLS signature verify             │
+│  C2PA: c2patool → Content Credentials signature verify            │
+│  Conditions: jsonpath / regex / GPS haversine / nonce challenge   │
+│                                                                   │
+│  ✓ Pass → reveal preimage → Cashu HTLC bounty → Worker           │
+│  ✗ Fail → refund Proof[] → Requester                             │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Configuration
