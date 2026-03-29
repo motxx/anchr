@@ -266,6 +266,7 @@ export async function prepareWorkerApiAssets() {
   await Promise.all([
     buildCssIfNeeded(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
     buildCssIfNeeded(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/dashboard/globals.css"), join(import.meta.dir, "ui/dashboard/generated.css"), "dashboard"),
   ]);
 }
 

@@ -9,6 +9,8 @@ import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 import uiHtml from "./ui/index.html";
 // @ts-ignore — Bun HTML import
 import requesterHtml from "./ui/requester/index.html";
+// @ts-ignore — Bun HTML import
+import dashboardHtml from "./ui/dashboard/index.html";
 
 const REQUESTER_DEMO_PUBKEY = "requester_demo";
 
@@ -32,12 +34,14 @@ export async function startReferenceApp() {
     routes: {
       "/": uiHtml,
       "/requester": requesterHtml,
+      "/dashboard": dashboardHtml,
     },
     fetch: app.fetch,
   });
 
   console.error(`[reference-app] Worker    → http://localhost:${port}`);
   console.error(`[reference-app] Requester → http://localhost:${port}/requester`);
+  console.error(`[reference-app] Dashboard → http://localhost:${port}/dashboard`);
 
   // Seed requester wallet with initial proofs (async, non-blocking)
   if (isCashuEnabled()) {
