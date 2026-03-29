@@ -575,18 +575,24 @@ describe("submitHtlcResult", () => {
     };
   }
 
-  const htlcInfo = {
-    hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
-    requester_pubkey: "requester_pub",
-    locktime: Math.floor(Date.now() / 1000) + 3600,
-  };
+  /** Create htlcInfo using a real preimage hash from the store. */
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("./oracle/preimage-store").createPreimageStore>) {
+    const entry = preimageStore.create();
+    return {
+      htlcInfo: {
+        hash: entry.hash,
+        oracle_pubkey: "oracle_pub",
+        requester_pubkey: "requester_pub",
+        locktime: Math.floor(Date.now() / 1000) + 3600,
+      },
+      entry,
+    };
+  }
 
   test("submitHtlcResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
+    const { htlcInfo, entry } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
-    // Generate a preimage for this query
-    const entry = preimageStore.create(query.id);
     service.selectWorker(query.id, "w1");
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -604,8 +610,8 @@ describe("submitHtlcResult", () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
+    const { htlcInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
-    preimageStore.create(query.id);
     service.selectWorker(query.id, "w1");
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -634,8 +640,8 @@ describe("submitHtlcResult", () => {
 
   test("submitHtlcResult fails for wrong worker", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
+    const { htlcInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
-    preimageStore.create(query.id);
     service.selectWorker(query.id, "w1");
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -648,7 +654,8 @@ describe("submitHtlcResult", () => {
   });
 
   test("submitHtlcResult fails for wrong state", async () => {
-    const { service } = makeIsolatedServiceWithPreimage();
+    const { service, preimageStore } = makeIsolatedServiceWithPreimage();
+    const { htlcInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     // Still in awaiting_quotes, not processing
     const outcome = await service.submitHtlcResult(
@@ -752,8 +759,9 @@ describe("verifyWithQuorum", () => {
     const preimageStore = createPreimageStore();
     const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
 
+    const entry = preimageStore.create();
     const htlcInfo = {
-      hash: "test_hash",
+      hash: entry.hash,
       oracle_pubkey: "oracle_pub",
       requester_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
@@ -766,7 +774,6 @@ describe("verifyWithQuorum", () => {
         quorum: { min_approvals: 2 },
       },
     );
-    const entry = preimageStore.create(query.id);
     service.selectWorker(query.id, "w1");
 
     const outcome = await service.submitHtlcResult(

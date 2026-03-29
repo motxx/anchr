@@ -1,13 +1,18 @@
 /**
- * Full E2E: Seller (Requester) → Buyer (Worker) via Anchr + Square + TLSNotary
+ * Full E2E: Seller (Requester) → Buyer (Worker) via Anchr + Square + TLSNotary + HTLC Escrow
  *
- * 1. Seller: Create Anchr query with Square domain_hint
- * 2. Seller: Create Square Payment Link
- * 3. Buyer:  Browser pays via Payment Link (Sandbox Testing Panel)
- * 4. Buyer:  Get Payment ID from Square API
- * 5. Buyer:  Generate TLSNotary proof via CLI
- * 6. Buyer:  Submit proof to Anchr
- * 7. Both:   Verify query status = "approved"
+ * HTLC Flow:
+ * 1. Seller: POST /hash → get preimage hash from Oracle
+ * 2. Seller: Mint Cashu bounty + create HTLC token locked to hash
+ * 3. Seller: Create Square Payment Link
+ * 4. Buyer:  Browser pays via Payment Link (Sandbox Testing Panel)
+ * 5. Buyer:  Get Payment ID from Square API
+ * 6. Seller: POST /queries with htlc info + TLSNotary conditions
+ * 7. Buyer:  POST /queries/:id/quotes (Worker submits quote)
+ * 8. Seller: POST /queries/:id/select (selects Worker, provides HTLC token)
+ * 9. Buyer:  Generate TLSNotary proof via CLI
+ * 10. Buyer: POST /queries/:id/result → inline verification → preimage returned
+ * 11. Buyer: Redeem HTLC token on Cashu mint using preimage
  */
 import { chromium } from "playwright";
 
@@ -37,11 +42,6 @@ console.log(`[${elapsed()}] === Step 0: Open Anchr UI ===`);
 const pw = await import("playwright");
 
 // Layout: 4 windows on screen (logical ~1512x982 for 3024x1964 Retina)
-// ┌──────────┬──────────┐
-// │Requester │ Worker   │
-// ├──────────┼──────────┤
-// │ Square   │ Flow UI  │
-// └──────────┴──────────┘
 const SCREEN_W = 1512;
 const SCREEN_H = 982;
 const HALF_W = Math.floor(SCREEN_W / 2);
@@ -85,10 +85,22 @@ const flow = (step: number, status: string, detail?: string) =>
 const BOUNTY_SATS = 100;
 
 // ============================================================
-// Step 1: Seller creates Square Payment Link
+// Step 1: Oracle generates preimage hash (POST /hash)
 // ============================================================
-await flow(0, "active", "Creating link...");
-console.log(`[${elapsed()}] === Step 1: Seller creates Square Payment Link ===`);
+await flow(0, "active", "Getting hash...");
+console.log(`\n[${elapsed()}] === Step 1: Oracle generates preimage hash ===`);
+
+const hashResp = await fetch(`${ANCHR_URL}/hash`, { method: "POST" });
+const hashData = await hashResp.json() as { hash: string };
+const HTLC_HASH = hashData.hash;
+console.log(`[${elapsed()}] HTLC hash: ${HTLC_HASH.slice(0, 16)}...`);
+await flow(0, "complete", `Hash: ${HTLC_HASH.slice(0, 8)}`);
+
+// ============================================================
+// Step 2: Seller creates Square Payment Link
+// ============================================================
+await flow(1, "active", "Creating link...");
+console.log(`\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`);
 
 const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
   headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
@@ -111,13 +123,13 @@ const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-chec
 });
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
-await flow(0, "complete", "Link created");
+await flow(1, "complete", "Link created");
 console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 
 // ============================================================
 // Step 3: Buyer pays via browser (Sandbox Testing Panel)
 // ============================================================
-await flow(4, "active", "Buyer paying...");
+await flow(2, "active", "Buyer paying...");
 console.log(`\n[${elapsed()}] === Step 3: Buyer pays via browser ===`);
 
 // Square Payment browser — bottom left
@@ -132,7 +144,6 @@ const page = squarePage;
 await page.waitForLoadState("networkidle");
 
 // Navigate Sandbox Testing Panel: Overview → Test Payment → Checkout Complete
-// Step 1: Click "Next" on Overview page
 const nextBtn1 = page.locator('button:has-text("Next")').first();
 if (await nextBtn1.count() > 0) {
   console.log(`[${elapsed()}] Clicking Next (Overview → Test Payment)...`);
@@ -140,8 +151,6 @@ if (await nextBtn1.count() > 0) {
   await page.waitForLoadState("networkidle");
   await page.screenshot({ path: "/tmp/square-step2.png" });
 
-  // Step 2: "Test Payment" page — find all buttons and click the right one
-  // Wait for the page to fully render
   await page.waitForTimeout(1500);
   const allButtons = page.locator('button:visible');
   const btnCount = await allButtons.count();
@@ -151,7 +160,6 @@ if (await nextBtn1.count() > 0) {
     console.log(`  Button ${i}: "${text?.trim()}"`);
   }
 
-  // Try clicking various possible button texts for completing the test payment
   const payBtn = page.locator('button:has-text("Complete"), button:has-text("Pay"), button:has-text("Next"), button:has-text("Simulate"), button:has-text("Submit")').first();
   if (await payBtn.count() > 0) {
     const payBtnText = await payBtn.textContent();
@@ -164,16 +172,15 @@ if (await nextBtn1.count() > 0) {
     await page.screenshot({ path: "/tmp/square-step2-debug.png" });
   }
 }
-await flow(1, "complete", "Payment done");
+await flow(2, "complete", "Payment done");
 console.log(`[${elapsed()}] Payment completed in browser`);
 
 // ============================================================
-// Step 3: Get Payment ID from Square API
+// Step 4: Get Payment ID from Square API
 // ============================================================
-await flow(2, "active", "Getting Payment ID...");
-console.log(`\n[${elapsed()}] === Step 3: Get Payment ID ===`);
+await flow(3, "active", "Getting Payment ID...");
+console.log(`\n[${elapsed()}] === Step 4: Get Payment ID ===`);
 
-// Poll for a new payment (created after we started)
 let PAYMENT_ID = "";
 let paymentStatus = "";
 for (let attempt = 0; attempt < 10; attempt++) {
@@ -198,7 +205,7 @@ for (let attempt = 0; attempt < 10; attempt++) {
   console.log(`[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`);
   await new Promise(r => setTimeout(r, 2000));
 }
-await flow(2, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
+await flow(3, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
 console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`);
 
 if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
@@ -207,10 +214,10 @@ if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
 }
 
 // ============================================================
-// Step 4: Seller mints Cashu bounty token
+// Step 5: Seller mints Cashu bounty + creates HTLC token
 // ============================================================
-await flow(3, "active", `Minting ${BOUNTY_SATS} sats...`);
-console.log(`\n[${elapsed()}] === Step 4: Seller mints Cashu bounty ===`);
+await flow(4, "active", `Minting ${BOUNTY_SATS} sats...`);
+console.log(`\n[${elapsed()}] === Step 5: Seller mints Cashu bounty ===`);
 
 const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
 const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
@@ -226,14 +233,19 @@ console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEED
 
 const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
 const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
-await flow(3, "complete", `${BOUNTY_SATS} sats minted`);
+await flow(4, "complete", `${BOUNTY_SATS} sats minted`);
 console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
 
 // ============================================================
-// Step 5: Seller creates Anchr query (with Payment ID condition)
+// Step 6: Seller creates Anchr query (HTLC + TLSNotary conditions)
 // ============================================================
-await flow(4, "active", "Creating query...");
-console.log(`\n[${elapsed()}] === Step 5: Seller creates Anchr query ===`);
+await flow(5, "active", "Creating query...");
+console.log(`\n[${elapsed()}] === Step 6: Seller creates Anchr query ===`);
+
+// Use a fixed oracle pubkey (in production, this would be the oracle's real Nostr pubkey)
+const ORACLE_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000001";
+const REQUESTER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000002";
+const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
 
 const queryResp = await fetch(`${ANCHR_URL}/queries`, {
   method: "POST",
@@ -261,13 +273,20 @@ const queryResp = await fetch(`${ANCHR_URL}/queries`, {
       max_attestation_age_seconds: 600,
     },
     bounty: { amount_sats: BOUNTY_SATS, cashu_token: cashuToken },
+    htlc: {
+      hash: HTLC_HASH,
+      oracle_pubkey: ORACLE_PUBKEY,
+      requester_pubkey: REQUESTER_PUBKEY,
+      locktime: Math.floor(Date.now() / 1000) + 3600,
+    },
   }),
 });
 
 const queryData = await queryResp.json();
 const QUERY_ID = queryData.query_id;
-await flow(4, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
+await flow(5, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
 console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
+console.log(`[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${HTLC_HASH.slice(0, 8)}...)`);
 console.log(`[${elapsed()}] Conditions: status=COMPLETED + payment.id=${PAYMENT_ID.slice(0, 8)}...`);
 
 if (!QUERY_ID) {
@@ -276,10 +295,47 @@ if (!QUERY_ID) {
 }
 
 // ============================================================
-// Step 6: Buyer generates TLSNotary proof
+// Step 7: Worker submits quote + Seller selects Worker
 // ============================================================
-await flow(5, "active", "MPC-TLS...");
-console.log(`\n[${elapsed()}] === Step 5: Buyer generates TLSNotary proof ===`);
+await flow(6, "active", "Quote + Select...");
+console.log(`\n[${elapsed()}] === Step 7: Worker quote + Seller select ===`);
+
+// Worker submits quote
+const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    worker_pubkey: WORKER_PUBKEY,
+    amount_sats: BOUNTY_SATS,
+    quote_event_id: `quote_${Date.now()}`,
+  }),
+});
+const quoteData = await quoteResp.json();
+console.log(`[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`);
+
+// Seller selects worker + provides HTLC token
+const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    worker_pubkey: WORKER_PUBKEY,
+    htlc_token: cashuToken,
+  }),
+});
+const selectData = await selectResp.json();
+console.log(`[${elapsed()}] Select: ${selectData.ok ? "worker selected" : selectData.message}`);
+
+if (!selectData.ok) {
+  console.error("Failed to select worker:", JSON.stringify(selectData));
+  process.exit(1);
+}
+await flow(6, "complete", "Worker selected");
+
+// ============================================================
+// Step 8: Buyer generates TLSNotary proof
+// ============================================================
+await flow(7, "active", "MPC-TLS...");
+console.log(`\n[${elapsed()}] === Step 8: Buyer generates TLSNotary proof ===`);
 
 const proofFile = `/tmp/e2e-square-${Date.now()}.presentation.tlsn`;
 const proveStart = Date.now();
@@ -304,55 +360,55 @@ if (proc.exitCode !== 0) {
   process.exit(1);
 }
 
-await flow(5, "complete", `${proveTime}s`);
-await flow(6, "active", "Submitting proof...");
+await flow(7, "complete", `${proveTime}s`);
 console.log(`[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`);
 for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
   console.log(`  ${line}`);
 }
 
 // ============================================================
-// Step 6: Buyer submits proof to Anchr
+// Step 9: Buyer submits proof via POST /result (HTLC inline verification)
 // ============================================================
-console.log(`\n[${elapsed()}] === Step 6: Buyer submits proof to Anchr ===`);
+console.log(`\n[${elapsed()}] === Step 9: Buyer submits proof to Anchr (HTLC result) ===`);
 
-const submitResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/submit`, {
+const resultResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/result`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
+    worker_pubkey: WORKER_PUBKEY,
+    attachments: [],
     tlsn_presentation: proofB64,
   }),
 });
 
-const submitResult = await submitResp.json();
-await flow(6, submitResult.ok ? "complete" : "error", submitResult.ok ? "Verified ✓" : "Failed");
-console.log(`[${elapsed()}] Verification: ${submitResult.ok ? "PASSED" : "FAILED"}`);
-if (submitResult.verification?.checks) {
-  for (const c of submitResult.verification.checks) console.log(`  ✓ ${c}`);
+const resultData = await resultResp.json();
+console.log(`[${elapsed()}] Verification: ${resultData.ok ? "PASSED" : "FAILED"}`);
+if (resultData.verification?.checks) {
+  for (const c of resultData.verification.checks) console.log(`  ✓ ${c}`);
 }
-if (submitResult.verification?.failures?.length) {
-  for (const f of submitResult.verification.failures) console.log(`  ✗ ${f}`);
+if (resultData.verification?.failures?.length) {
+  for (const f of resultData.verification.failures) console.log(`  ✗ ${f}`);
 }
-if (submitResult.cashu_token) {
-  await flow(7, "active", "Releasing bounty...");
-  await flow(7, "complete", `${submitResult.bounty_amount_sats} sats`);
-  console.log(`\n[${elapsed()}] === Cashu Bounty Released to Worker ===`);
-  console.log(`  Token: ${submitResult.cashu_token.slice(0, 50)}...`);
-  console.log(`  Amount: ${submitResult.bounty_amount_sats} sats`);
-  console.log(`  → Paste this token into any Cashu wallet (Minibits, Nutstash, etc.) to redeem`);
+
+if (resultData.preimage) {
+  console.log(`\n[${elapsed()}] === HTLC Preimage Revealed ===`);
+  console.log(`  Preimage: ${resultData.preimage.slice(0, 16)}...`);
+  console.log(`  → Worker can now redeem HTLC token on Cashu mint`);
+  console.log(`  → redeemHtlcToken(proofs, preimage, workerPrivkey)`);
 } else {
-  console.log(`[${elapsed()}] cashu_token: null (no bounty released)`);
+  console.log(`[${elapsed()}] preimage: null (verification failed or no preimage store)`);
 }
 
 // ============================================================
-// Step 7: Verify query status
+// Step 10: Verify query status
 // ============================================================
-console.log(`\n[${elapsed()}] === Step 7: Verify query status ===`);
+console.log(`\n[${elapsed()}] === Step 10: Verify query status ===`);
 
 const statusResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}`);
 const statusData = await statusResp.json();
 
 console.log(`[${elapsed()}] Query status: ${statusData.status}`);
+console.log(`[${elapsed()}] Payment status: ${statusData.payment_status}`);
 
 if (statusData.verification) {
   if (statusData.verification.checks?.length) {
@@ -387,9 +443,11 @@ console.log(`[${elapsed()}] UI screenshots saved`);
 const totalTime = ((Date.now() - startTime) / 1000).toFixed(1);
 console.log(`\n${"=".repeat(60)}`);
 if (statusData.status === "approved") {
-  console.log(`✓ E2E SUCCESS in ${totalTime}s`);
+  console.log(`✓ E2E SUCCESS in ${totalTime}s (HTLC Escrow)`);
   console.log(`  Query: ${QUERY_ID}`);
   console.log(`  Payment: ${PAYMENT_ID}`);
+  console.log(`  HTLC hash: ${HTLC_HASH.slice(0, 16)}...`);
+  console.log(`  Preimage revealed: ${resultData.preimage ? "YES" : "NO"}`);
   console.log(`  Proof time: ${proveTime}s`);
   console.log(`\nBrowser open — press Ctrl+C to close.`);
   await new Promise(() => {}); // Keep browser open

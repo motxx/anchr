@@ -313,14 +313,7 @@ describe("HTLC endpoints", () => {
   }));
 });
 
-describe("POST /queries/:id/hash", () => {
-  const htlcInfo = {
-    hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
-    requester_pubkey: "requester_pub",
-    locktime: Math.floor(Date.now() / 1000) + 3600,
-  };
-
+describe("POST /hash", () => {
   function makeTestAppWithPreimage() {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
@@ -332,44 +325,25 @@ describe("POST /queries/:id/hash", () => {
     return { app, store, registry, queryService, preimageStore };
   }
 
-  test("generates hash for query", withOpenAuth(async () => {
-    const { app, queryService } = makeTestAppWithPreimage();
-    const query = queryService.createQuery({ description: "Test" });
-    const res = await app.request(`http://localhost/queries/${query.id}/hash`, {
-      method: "POST",
-    });
-    expect(res.status).toBe(200);
-    const json = await res.json() as { hash: string; query_id: string };
-    expect(json.hash).toBeTruthy();
-    expect(json.query_id).toBe(query.id);
-  }));
-
-  test("returns 404 for unknown query", withOpenAuth(async () => {
+  test("generates hash", withOpenAuth(async () => {
     const { app } = makeTestAppWithPreimage();
-    const res = await app.request("http://localhost/queries/nonexistent/hash", {
-      method: "POST",
-    });
-    expect(res.status).toBe(404);
+    const res = await app.request("http://localhost/hash", { method: "POST" });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { hash: string };
+    expect(json.hash).toBeTruthy();
   }));
 
-  test("returns 409 when hash already set", withOpenAuth(async () => {
-    const { app, queryService } = makeTestAppWithPreimage();
-    const query = queryService.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
-    const res = await app.request(`http://localhost/queries/${query.id}/hash`, {
-      method: "POST",
-    });
-    expect(res.status).toBe(409);
+  test("each call generates a unique hash", withOpenAuth(async () => {
+    const { app } = makeTestAppWithPreimage();
+    const res1 = await app.request("http://localhost/hash", { method: "POST" });
+    const res2 = await app.request("http://localhost/hash", { method: "POST" });
+    const json1 = await res1.json() as { hash: string };
+    const json2 = await res2.json() as { hash: string };
+    expect(json1.hash).not.toBe(json2.hash);
   }));
 });
 
 describe("HTLC inline verification with preimage", () => {
-  const htlcInfo = {
-    hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
-    requester_pubkey: "requester_pub",
-    locktime: Math.floor(Date.now() / 1000) + 3600,
-  };
-
   function makeTestAppWithPreimage() {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
@@ -383,8 +357,15 @@ describe("HTLC inline verification with preimage", () => {
 
   test("POST /queries/:id/result returns preimage for HTLC on success", withOpenAuth(async () => {
     const { app, queryService, preimageStore } = makeTestAppWithPreimage();
+    // Generate hash first, then create query with it
+    const entry = preimageStore.create();
+    const htlcInfo = {
+      hash: entry.hash,
+      oracle_pubkey: "oracle_pub",
+      requester_pubkey: "requester_pub",
+      locktime: Math.floor(Date.now() / 1000) + 3600,
+    };
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
-    const entry = preimageStore.create(query.id);
     queryService.selectWorker(query.id, "w1");
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
@@ -399,23 +380,18 @@ describe("HTLC inline verification with preimage", () => {
     expect(json.oracle_id).toBe("test-oracle");
   }));
 
-  test("full HTLC lifecycle with preimage via HTTP", withOpenAuth(async () => {
-    const { app, queryService, preimageStore } = makeTestAppWithPreimage();
+  test("full HTLC lifecycle with POST /hash", withOpenAuth(async () => {
+    const { app, preimageStore } = makeTestAppWithPreimage();
 
-    // 1. Create query (no htlc yet — will get hash first)
-    const query = queryService.createQuery({ description: "Full HTLC with preimage" });
-
-    // 2. Generate hash
-    const hashRes = await app.request(`http://localhost/queries/${query.id}/hash`, {
-      method: "POST",
-    });
+    // 1. Generate hash via API
+    const hashRes = await app.request("http://localhost/hash", { method: "POST" });
     expect(hashRes.status).toBe(200);
     const { hash } = await hashRes.json() as { hash: string };
     expect(hash).toBeTruthy();
 
-    // Verify preimage was stored
-    expect(preimageStore.getHash(query.id)).toBe(hash);
-    expect(preimageStore.getPreimage(query.id)).toBeTruthy();
+    // Verify preimage was stored keyed by hash
+    expect(preimageStore.has(hash)).toBe(true);
+    expect(preimageStore.getPreimage(hash)).toBeTruthy();
   }));
 });
 

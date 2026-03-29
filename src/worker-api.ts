@@ -465,16 +465,10 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   // --- HTLC lifecycle endpoints ---
 
-  app.post("/queries/:id/hash", writeAuth, (c) => {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "Query id is required" }, 400);
+  app.post("/hash", writeAuth, (c) => {
     if (!pStore) return c.json({ error: "Preimage store not configured" }, 500);
-    const query = doGetQuery(id);
-    if (!query) return c.json({ error: "Query not found" }, 404);
-    // Only allow hash generation before query has a result
-    if (query.htlc?.hash) return c.json({ error: "Hash already set for this query" }, 409);
-    const entry = pStore.create(id);
-    return c.json({ hash: entry.hash, query_id: id });
+    const entry = pStore.create();
+    return c.json({ hash: entry.hash });
   });
 
   app.get("/queries/:id/quotes", (c) => {

@@ -543,9 +543,9 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       };
       store.set(queryId, updated);
 
-      // 4. Return preimage on success
-      if (passed && preimageStore) {
-        const preimage = preimageStore.getPreimage(queryId);
+      // 4. Return preimage on success (look up by HTLC hash)
+      if (passed && preimageStore && query.htlc?.hash) {
+        const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
           return {
             ok: true,
