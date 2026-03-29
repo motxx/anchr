@@ -75,18 +75,35 @@ export function encodeToken(mintUrl: string, proofs: Proof[]): string {
 
 /**
  * Verify that a Cashu token is valid and has sufficient value.
+ * Queries the Cashu mint's /v1/checkstate to confirm proofs are UNSPENT.
  */
-export function verifyToken(token: string, expectedMinSats?: number): {
+export async function verifyToken(token: string, expectedMinSats?: number): Promise<{
   valid: boolean;
   amountSats: number;
   error?: string;
-} {
+}> {
   try {
     const decoded = getDecodedToken(token);
     const totalAmount = decoded.proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
 
     if (expectedMinSats && totalAmount < expectedMinSats) {
       return { valid: false, amountSats: totalAmount, error: `Insufficient amount: ${totalAmount} < ${expectedMinSats}` };
+    }
+
+    // Query the Cashu mint to verify proofs are actually unspent
+    const wallet = getCashuWallet();
+    if (wallet) {
+      try {
+        await wallet.loadMint();
+        const states = await wallet.checkProofsStates(decoded.proofs);
+        const spent = states.filter((s) => s.state !== "UNSPENT");
+        if (spent.length > 0) {
+          return { valid: false, amountSats: totalAmount, error: `${spent.length} proof(s) already spent on mint` };
+        }
+        console.error(`[cashu] Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`);
+      } catch (err) {
+        console.error(`[cashu] Mint checkstate failed — falling back to offline verification:`, err instanceof Error ? err.message : err);
+      }
     }
 
     return { valid: true, amountSats: totalAmount };

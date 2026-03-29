@@ -243,7 +243,7 @@ describe("HTLC endpoints", () => {
   test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
-    queryService.selectWorker(query.id, "w1");
+    await queryService.selectWorker(query.id, "w1");
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
@@ -366,7 +366,7 @@ describe("HTLC inline verification with preimage", () => {
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
-    queryService.selectWorker(query.id, "w1");
+    await queryService.selectWorker(query.id, "w1");
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",

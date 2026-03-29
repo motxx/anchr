@@ -128,7 +128,7 @@ export interface QueryService {
   /** Record a Worker quote for an HTLC query. */
   recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
   /** Select a Worker and transition to worker_selected/processing. */
-  selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): HtlcOutcome;
+  selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<HtlcOutcome>;
   /** Record a Worker's result submission (transition to verifying). */
   recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
   /** Complete Oracle verification (transition to approved/rejected). */
@@ -422,18 +422,18 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       return { ok: true, message: "Quote recorded" };
     },
 
-    selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): HtlcOutcome {
+    async selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<HtlcOutcome> {
       const query = store.get(queryId);
       if (!query) return { ok: false, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
       if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
-      // Verify HTLC token amount matches claimed bounty
+      // Verify HTLC token amount matches bounty — queries Cashu mint for proof state
       const tokenToVerify = htlcToken ?? query.htlc!.escrow_token;
       const expectedSats = query.bounty?.amount_sats;
       let verifiedEscrowSats: number | undefined;
       if (tokenToVerify && expectedSats) {
-        const check = verifyToken(tokenToVerify, expectedSats);
+        const check = await verifyToken(tokenToVerify, expectedSats);
         if (!check.valid) {
           return { ok: false, message: `Escrow token verification failed: ${check.error}` };
         }

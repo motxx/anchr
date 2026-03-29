@@ -509,7 +509,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
     const htlcToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
 
-    const outcome = svc.selectWorker(id, workerPubkey, htlcToken);
+    const outcome = await svc.selectWorker(id, workerPubkey, htlcToken);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
