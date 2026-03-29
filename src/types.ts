@@ -171,6 +171,8 @@ export interface HtlcInfo {
   locktime: number;
   /** Encoded Cashu HTLC token (held by Requester until swap). */
   escrow_token?: string;
+  /** Server-verified escrow amount in sats (set after token verification at worker selection). */
+  verified_escrow_sats?: number;
 }
 
 /** A quote from a Worker offering to fulfill a query. */

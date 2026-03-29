@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { getEncodedToken } from "@cashu/cashu-ts";
 import {
   createOracleRegistry,
 } from "./oracle/registry";
@@ -9,6 +10,14 @@ import {
 } from "./query-service";
 import type { Query, QueryResult } from "./types";
 import { createIntegrityStore } from "./verification/integrity-store";
+
+/** Create a fake encoded Cashu token with the given total sats. */
+function makeFakeToken(amountSats: number): string {
+  return getEncodedToken({
+    mint: "https://mint.example.com",
+    proofs: [{ amount: amountSats, id: "test", secret: "s", C: "C" }],
+  });
+}
 
 function makeMockOracle(id: string, passFn?: (query: Query, result: QueryResult) => boolean): Oracle {
   return {
@@ -410,6 +419,58 @@ describe("HTLC lifecycle", () => {
     expect(updated.status).toBe("processing");
     expect(updated.htlc?.worker_pubkey).toBe("worker_pub_1");
     expect(updated.payment_status).toBe("htlc_swapped");
+  });
+
+  test("selectWorker verifies escrow token amount matches bounty", () => {
+    const { service } = makeIsolatedService();
+    const validToken = makeFakeToken(100);
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+    );
+    const outcome = service.selectWorker(query.id, "worker_pub_1", validToken);
+    expect(outcome.ok).toBe(true);
+    const updated = service.getQuery(query.id)!;
+    expect(updated.htlc?.verified_escrow_sats).toBe(100);
+  });
+
+  test("selectWorker rejects escrow token with insufficient amount", () => {
+    const { service } = makeIsolatedService();
+    const smallToken = makeFakeToken(50);
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+    );
+    const outcome = service.selectWorker(query.id, "worker_pub_1", smallToken);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Insufficient amount");
+    expect(outcome.message).toContain("50");
+    // Query should remain in awaiting_quotes
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+  });
+
+  test("selectWorker rejects invalid escrow token", () => {
+    const { service } = makeIsolatedService();
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+    );
+    const outcome = service.selectWorker(query.id, "worker_pub_1", "not_a_valid_token");
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Escrow token verification failed");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+  });
+
+  test("selectWorker accepts token with more than bounty amount", () => {
+    const { service } = makeIsolatedService();
+    const bigToken = makeFakeToken(200);
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+    );
+    const outcome = service.selectWorker(query.id, "worker_pub_1", bigToken);
+    expect(outcome.ok).toBe(true);
+    expect(service.getQuery(query.id)?.htlc?.verified_escrow_sats).toBe(200);
   });
 
   test("selectWorker fails on wrong state", () => {

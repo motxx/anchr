@@ -1,4 +1,5 @@
 import { normalizeQueryResult } from "./attachments";
+import { verifyToken } from "./cashu/wallet";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
@@ -427,10 +428,23 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
       if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
+      // Verify HTLC token amount matches claimed bounty
+      const tokenToVerify = htlcToken ?? query.htlc!.escrow_token;
+      const expectedSats = query.bounty?.amount_sats;
+      let verifiedEscrowSats: number | undefined;
+      if (tokenToVerify && expectedSats) {
+        const check = verifyToken(tokenToVerify, expectedSats);
+        if (!check.valid) {
+          return { ok: false, message: `Escrow token verification failed: ${check.error}` };
+        }
+        verifiedEscrowSats = check.amountSats;
+      }
+
       const htlc: HtlcInfo = {
         ...query.htlc!,
         worker_pubkey: workerPubkey,
-        escrow_token: htlcToken ?? query.htlc!.escrow_token,
+        escrow_token: tokenToVerify,
+        verified_escrow_sats: verifiedEscrowSats,
       };
 
       store.set(queryId, {

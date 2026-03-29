@@ -161,6 +161,7 @@ function querySummary(query: Query) {
       oracle_pubkey: query.htlc.oracle_pubkey,
       worker_pubkey: query.htlc.worker_pubkey ?? null,
       locktime: query.htlc.locktime,
+      verified_escrow_sats: query.htlc.verified_escrow_sats ?? null,
     } : null,
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
