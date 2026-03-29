@@ -36,38 +36,57 @@ console.log(`[${elapsed()}] === Step 0: Open Anchr UI ===`);
 
 const pw = await import("playwright");
 
-// Layout: 3 windows tiled on screen (logical ~1512x982 for 3024x1964 Retina)
+// Layout: 4 windows on screen (logical ~1512x982 for 3024x1964 Retina)
+// ┌──────────┬──────────┐
+// │Requester │ Worker   │
+// ├──────────┼──────────┤
+// │ Square   │ Flow UI  │
+// └──────────┴──────────┘
 const SCREEN_W = 1512;
 const SCREEN_H = 982;
-const TOP_H = Math.floor(SCREEN_H * 0.55);
-const BOTTOM_H = SCREEN_H - TOP_H;
 const HALF_W = Math.floor(SCREEN_W / 2);
+const HALF_H = Math.floor(SCREEN_H / 2);
 
 // Requester UI — top left
 const requesterBrowser = await pw.chromium.launch({
   headless: false,
-  args: [`--window-size=${HALF_W},${TOP_H}`, `--window-position=0,0`],
+  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,0`],
 });
 const requesterPage = await requesterBrowser.newPage();
-await requesterPage.setViewportSize({ width: HALF_W - 16, height: TOP_H - 80 });
+await requesterPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await requesterPage.goto(`${ANCHR_URL}/requester`);
 
 // Worker UI — top right
 const workerBrowser = await pw.chromium.launch({
   headless: false,
-  args: [`--window-size=${HALF_W},${TOP_H}`, `--window-position=${HALF_W},0`],
+  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=${HALF_W},0`],
 });
 const workerPage = await workerBrowser.newPage();
-await workerPage.setViewportSize({ width: HALF_W - 16, height: TOP_H - 80 });
+await workerPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await workerPage.goto(`${ANCHR_URL}/`);
 
-console.log(`[${elapsed()}] Requester UI: ${ANCHR_URL}/requester (top-left)`);
-console.log(`[${elapsed()}] Worker UI: ${ANCHR_URL}/ (top-right)`);
+// Flow visualization UI — bottom right
+const flowHtml = await Bun.file(import.meta.dir + "/e2e-flow-ui.html").text();
+const flowBrowser = await pw.chromium.launch({
+  headless: false,
+  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=${HALF_W},${HALF_H}`],
+});
+const flowPage = await flowBrowser.newPage();
+await flowPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+await flowPage.setContent(flowHtml);
+await flowPage.waitForFunction(() => typeof (window as any).flowUpdate === 'function');
+await flowPage.evaluate((ts) => (window as any).flowSetStart(ts), startTime);
+
+console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Square: bottom-left | Flow: bottom-right`);
+
+const flow = (step: number, status: string, detail?: string) =>
+  flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [step, status, detail ?? ""]);
 
 // ============================================================
 // Step 1: Seller mints Cashu bounty token + creates Anchr query
 // ============================================================
 console.log(`[${elapsed()}] === Step 1: Seller mints Cashu bounty + creates Anchr query ===`);
+await flow(0, "active", "Creating query...");
 
 const BOUNTY_SATS = 100;
 
@@ -77,6 +96,8 @@ const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
 await cashuWallet.loadMint();
 
 const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
+await flow(0, "complete", "Query params ready");
+await flow(1, "active", `Minting ${BOUNTY_SATS} sats...`);
 console.log(`[${elapsed()}] Lightning invoice created (${BOUNTY_SATS} sats)`);
 
 // Pay invoice from LND user node
@@ -90,7 +111,9 @@ console.log(`[${elapsed()}] Lightning payment: ${payOut.includes("SUCCEEDED") ? 
 // Mint ecash proofs
 const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
 const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+await flow(1, "complete", `${BOUNTY_SATS} sats minted`);
 console.log(`[${elapsed()}] Cashu token minted: ${cashuToken.slice(0, 40)}... (${BOUNTY_SATS} sats)`);
+await flow(2, "active", "Posting to Anchr...");
 
 // Create Anchr query with Cashu bounty
 const queryResp = await fetch(`${ANCHR_URL}/queries`, {
@@ -118,6 +141,7 @@ const queryResp = await fetch(`${ANCHR_URL}/queries`, {
 
 const queryData = await queryResp.json();
 const QUERY_ID = queryData.query_id;
+await flow(2, "complete", `ID: ${QUERY_ID.slice(0, 12)}`);
 console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
 console.log(`[${elapsed()}] Status: ${queryData.status}`);
 
@@ -129,6 +153,7 @@ if (!QUERY_ID) {
 // ============================================================
 // Step 2: Seller creates Square Payment Link
 // ============================================================
+await flow(3, "active", "Creating link...");
 console.log(`\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`);
 
 const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
@@ -152,66 +177,104 @@ const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-chec
 });
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
+await flow(3, "complete", "Link created");
 console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 
 // ============================================================
 // Step 3: Buyer pays via browser (Sandbox Testing Panel)
 // ============================================================
+await flow(4, "active", "Buyer paying...");
 console.log(`\n[${elapsed()}] === Step 3: Buyer pays via browser ===`);
 
-// Square Payment browser — bottom
+// Square Payment browser — bottom left
 const browser = await chromium.launch({
   headless: false,
-  args: [`--window-size=${SCREEN_W},${BOTTOM_H}`, `--window-position=0,${TOP_H}`],
+  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,${HALF_H}`],
 });
-const page = await browser.newPage();
-await page.setViewportSize({ width: SCREEN_W - 16, height: BOTTOM_H - 80 });
-await page.goto(PAYMENT_LINK_URL!);
+const squarePage = await browser.newPage();
+await squarePage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+await squarePage.goto(PAYMENT_LINK_URL!);
+const page = squarePage;
 await page.waitForLoadState("networkidle");
 
-// Zoom out page content to fit in the bottom window
-await page.evaluate(() => {
-  document.body.style.zoom = '0.8';
-});
+// Navigate Sandbox Testing Panel: Overview → Test Payment → Checkout Complete
+// Step 1: Click "Next" on Overview page
+const nextBtn1 = page.locator('button:has-text("Next")').first();
+if (await nextBtn1.count() > 0) {
+  console.log(`[${elapsed()}] Clicking Next (Overview → Test Payment)...`);
+  await nextBtn1.click();
+  await page.waitForLoadState("networkidle");
+  await page.screenshot({ path: "/tmp/square-step2.png" });
 
-// Navigate Sandbox Testing Panel: Next → Next (completes payment)
-const nextButton = page.locator('button:has-text("Next")').first();
-if (await nextButton.count() > 0) {
-  await nextButton.click();
-  await page.waitForTimeout(2000);
-  const completeButton = page.locator('button:has-text("Next"), button:has-text("Complete")').first();
-  if (await completeButton.count() > 0) {
-    await completeButton.click();
+  // Step 2: "Test Payment" page — find all buttons and click the right one
+  // Wait for the page to fully render
+  await page.waitForTimeout(1500);
+  const allButtons = page.locator('button:visible');
+  const btnCount = await allButtons.count();
+  console.log(`[${elapsed()}] Test Payment page: ${btnCount} buttons found`);
+  for (let i = 0; i < btnCount; i++) {
+    const text = await allButtons.nth(i).textContent().catch(() => "");
+    console.log(`  Button ${i}: "${text?.trim()}"`);
+  }
+
+  // Try clicking various possible button texts for completing the test payment
+  const payBtn = page.locator('button:has-text("Complete"), button:has-text("Pay"), button:has-text("Next"), button:has-text("Simulate"), button:has-text("Submit")').first();
+  if (await payBtn.count() > 0) {
+    const payBtnText = await payBtn.textContent();
+    console.log(`[${elapsed()}] Clicking "${payBtnText?.trim()}"...`);
+    await payBtn.click();
     await page.waitForTimeout(3000);
+    await page.screenshot({ path: "/tmp/square-step3.png" });
+  } else {
+    console.log(`[${elapsed()}] No payment button found on Test Payment page`);
+    await page.screenshot({ path: "/tmp/square-step2-debug.png" });
   }
 }
+await flow(4, "complete", "Payment done");
 console.log(`[${elapsed()}] Payment completed in browser`);
-await browser.close();
 
 // ============================================================
 // Step 4: Buyer gets Payment ID
 // ============================================================
 console.log(`\n[${elapsed()}] === Step 4: Buyer gets Payment ID ===`);
 
-const paymentsResp = await fetch("https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1", {
-  headers: {
-    "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json",
-  },
-});
-const paymentsData = await paymentsResp.json();
-const payment = paymentsData.payments?.[0];
-const PAYMENT_ID = payment?.id;
-console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${payment?.status})`);
+// Poll for a new payment (created after we started)
+let PAYMENT_ID = "";
+let paymentStatus = "";
+for (let attempt = 0; attempt < 10; attempt++) {
+  const paymentsResp = await fetch("https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1", {
+    headers: {
+      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const paymentsData = await paymentsResp.json();
+  const payment = paymentsData.payments?.[0];
+  if (payment?.status === "COMPLETED" && new Date(payment.created_at).getTime() > startTime) {
+    PAYMENT_ID = payment.id;
+    paymentStatus = payment.status;
+    break;
+  }
+  // Also accept any COMPLETED payment as fallback
+  if (payment?.status === "COMPLETED" && attempt >= 5) {
+    PAYMENT_ID = payment.id;
+    paymentStatus = payment.status;
+    break;
+  }
+  console.log(`[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`);
+  await new Promise(r => setTimeout(r, 2000));
+}
+console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`);
 
-if (payment?.status !== "COMPLETED") {
-  console.error("Payment not completed!");
+if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
+  console.error("Payment not completed! Check if Test Payment button was clicked.");
   process.exit(1);
 }
 
 // ============================================================
 // Step 5: Buyer generates TLSNotary proof
 // ============================================================
+await flow(5, "active", "MPC-TLS...");
 console.log(`\n[${elapsed()}] === Step 5: Buyer generates TLSNotary proof ===`);
 
 const proofFile = `/tmp/e2e-square-${Date.now()}.presentation.tlsn`;
@@ -237,6 +300,7 @@ if (proc.exitCode !== 0) {
   process.exit(1);
 }
 
+await flow(5, "complete", `${proveTime}s`);
 console.log(`[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`);
 for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
   console.log(`  ${line}`);
@@ -245,6 +309,7 @@ for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
 // ============================================================
 // Step 6: Buyer submits proof to Anchr
 // ============================================================
+await flow(6, "active", "Submitting proof...");
 console.log(`\n[${elapsed()}] === Step 6: Buyer submits proof to Anchr ===`);
 
 const submitResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/submit`, {
@@ -256,6 +321,7 @@ const submitResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/submit`, {
 });
 
 const submitResult = await submitResp.json();
+await flow(6, submitResult.ok ? "complete" : "error", submitResult.ok ? "Verified ✓" : "Failed");
 console.log(`[${elapsed()}] Verification: ${submitResult.ok ? "PASSED" : "FAILED"}`);
 if (submitResult.verification?.checks) {
   for (const c of submitResult.verification.checks) console.log(`  ✓ ${c}`);
@@ -264,6 +330,8 @@ if (submitResult.verification?.failures?.length) {
   for (const f of submitResult.verification.failures) console.log(`  ✗ ${f}`);
 }
 if (submitResult.cashu_token) {
+  await flow(7, "active", "Releasing bounty...");
+  await flow(7, "complete", `${submitResult.bounty_amount_sats} sats`);
   console.log(`\n[${elapsed()}] === Cashu Bounty Released to Worker ===`);
   console.log(`  Token: ${submitResult.cashu_token.slice(0, 50)}...`);
   console.log(`  Amount: ${submitResult.bounty_amount_sats} sats`);
