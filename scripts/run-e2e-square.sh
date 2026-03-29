@@ -50,6 +50,17 @@ if [ -z "${SANDBOX_ACCESS_TOKEN:-}" ]; then
 fi
 
 # ============================================================
+# 0. Kill any existing Anchr server (in-memory store = stale data)
+# ============================================================
+if lsof -ti:3000 >/dev/null 2>&1; then
+  echo ""
+  echo "[0] Killing existing process on port 3000..."
+  lsof -ti:3000 | xargs kill 2>/dev/null || true
+  sleep 1
+  echo "  ✓ Port 3000 freed"
+fi
+
+# ============================================================
 # 1. Clean slate — remove containers + volumes
 # ============================================================
 echo ""
