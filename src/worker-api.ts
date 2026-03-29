@@ -60,7 +60,7 @@ const htlcSchema = z.object({
   requester_pubkey: z.string().min(1),
   locktime: z.number().int().min(0),
   escrow_token: z.string().min(1).optional(),
-}).optional();
+});
 
 const gpsSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -448,44 +448,11 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     });
   });
 
-  app.post("/queries/:id/submit", writeAuth, async (c) => {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "Query id is required" }, 400);
-    let body: Record<string, unknown>;
-    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
-    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
-    // E2E: accept ephemeral encryption keys for one-time oracle verification
-    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
-    // Parse worker-reported GPS from request body
-    const bodyGps = body.gps as GpsCoord | undefined;
-    const queryResult: import("./types").QueryResult = {
-      attachments: Array.isArray(body.attachments) ? body.attachments : [],
-      notes: typeof body.notes === "string" ? body.notes : undefined,
-      gps: bodyGps && typeof bodyGps.lat === "number" && typeof bodyGps.lon === "number" ? bodyGps : undefined,
-      tlsn_attestation: typeof body.tlsn_presentation === "string"
-        ? { presentation: body.tlsn_presentation as string }
-        : (body.tlsn_attestation as TlsnAttestation | undefined),
-      tlsn_extension_result: body.tlsn_extension_result != null
-        ? body.tlsn_extension_result
-        : undefined,
-    };
-    const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
-    const status = !outcome.query ? 404
-      : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
-      : outcome.ok ? 200 : 422;
-    // Release bounty token to Worker on approval
-    const cashuToken = outcome.ok && outcome.query?.bounty?.cashu_token
-      ? outcome.query.bounty.cashu_token
-      : undefined;
+  app.post("/queries/:id/submit", writeAuth, (c) => {
     return c.json({
-      ok: outcome.ok,
-      message: outcome.message,
-      verification: outcome.query?.verification,
-      oracle_id: outcome.query?.assigned_oracle_id ?? null,
-      payment_status: outcome.query?.payment_status,
-      bounty_amount_sats: outcome.query?.bounty?.amount_sats ?? null,
-      cashu_token: cashuToken ?? null,
-    }, status);
+      error: "Deprecated",
+      hint: "All queries now require HTLC escrow. Use POST /queries/:id/result with the HTLC flow instead.",
+    }, 410);
   });
 
   app.post("/queries/:id/cancel", writeAuth, (c) => {

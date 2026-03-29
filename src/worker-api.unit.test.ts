@@ -75,18 +75,34 @@ describe("buildWorkerApiApp with injected deps", () => {
     expect(json).toHaveLength(0);
   });
 
-  test("POST /queries creates a query via injected service", withOpenAuth(async () => {
+  test("POST /queries requires htlc field", withOpenAuth(async () => {
+    const { app } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ description: "No HTLC" }),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string };
+    expect(json.error).toBe("Invalid query payload");
+  }));
+
+  test("POST /queries creates an HTLC query via injected service", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "Test Store status check" }),
+      body: JSON.stringify({
+        description: "Test Store status check",
+        htlc: { hash: "abc123", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: 9999999 },
+      }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; description: string; status: string };
+    const json = await res.json() as { query_id: string; description: string; status: string; htlc: { hash: string } };
     expect(json.query_id).toStartWith("query_");
     expect(json.description).toBe("Test Store status check");
-    expect(json.status).toBe("pending");
+    expect(json.status).toBe("awaiting_quotes");
+    expect(json.htlc.hash).toBe("abc123");
     expect(queryService.getQuery(json.query_id)).not.toBeNull();
   }));
 
@@ -107,23 +123,18 @@ describe("buildWorkerApiApp with injected deps", () => {
     expect(res.status).toBe(404);
   });
 
-  test("POST /queries/:id/submit verifies with injected oracle", withOpenAuth(async () => {
+  test("POST /queries/:id/submit returns 410 (deprecated)", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
     const query = queryService.createQuery({ description: "Test query" });
     const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        attachments: [],
-        notes: "open",
-        oracle_id: "test-oracle",
-      }),
+      body: JSON.stringify({ attachments: [], notes: "open" }),
     });
-    expect(res.status).toBe(200);
-    const json = await res.json() as { ok: boolean; oracle_id: string; payment_status: string };
-    expect(json.ok).toBe(true);
-    expect(json.oracle_id).toBe("test-oracle");
-    expect(json.payment_status).toBe("released");
+    expect(res.status).toBe(410);
+    const json = await res.json() as { error: string; hint: string };
+    expect(json.error).toBe("Deprecated");
+    expect(json.hint).toContain("HTLC");
   }));
 
   test("POST /queries/:id/cancel cancels via injected service", withOpenAuth(async () => {
@@ -440,6 +451,7 @@ describe("Quorum via HTTP", () => {
         description: "Quorum query",
         oracle_ids: ["oracle-a", "oracle-b"],
         quorum: { min_approvals: 2 },
+        htlc: { hash: "qhash", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: 9999999 },
       }),
     });
     expect(res.status).toBe(201);
