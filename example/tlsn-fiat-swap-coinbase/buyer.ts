@@ -79,14 +79,20 @@ console.log("  3. Attestation is fresh (< max_attestation_age_seconds)");
 
 console.log("\n--- Step 4: Submit Proof ---\n");
 
-console.log("Generate proof using tlsn-prove CLI:\n");
+// Coinbase Commerce uses ECDSA → both CLI and Extension work in ~2s
+console.log("=== Method A: CLI (tlsn-prove) ===\n");
 console.log("  tlsn-prove \\");
 console.log('    --verifier localhost:7046 \\');
 console.log('    -H "X-CC-Api-Key: $COINBASE_COMMERCE_API_KEY" \\');
 console.log('    "https://api.commerce.coinbase.com/charges/$CHARGE_ID" \\');
-console.log("    -o proof.presentation.tlsn");
-console.log();
-console.log("  # Submit to Anchr");
+console.log("    -o proof.presentation.tlsn\n");
+
+console.log("=== Method B: TLSNotary Extension (DevConsole) ===\n");
+console.log("  1. bun run scripts/launch-chrome-tlsn.ts");
+console.log("  2. Open DevConsole → paste plugin code from RUNBOOK Step 6b");
+console.log("  3. Run Code → Allow → proof copied to clipboard\n");
+
+console.log("=== Submit to Anchr ===\n");
 console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/submit \\`);
 console.log('    -H "Content-Type: application/json" \\');
 console.log('    -d \'{"tlsn_presentation": "<base64-of-proof>"}\'');

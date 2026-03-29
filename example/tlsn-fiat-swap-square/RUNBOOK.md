@@ -125,7 +125,9 @@ curl -s https://connect.squareupsandbox.com/v2/payments \
 
 ## 6. Buyer: TLSNotary proof 生成
 
-Square は ECDSA 証明書のため、CLI prover で ~2秒で完了する。
+Square は ECDSA 証明書のため、CLI / Extension どちらでも ~2秒で完了する。
+
+### 6a. CLI (`tlsn-prove`)
 
 ```bash
 PAYMENT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Step 5 で取得
@@ -141,15 +143,85 @@ PAYMENT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Step 5 で取得
 
 期待される出力:
 ```
-[tlsn-prove] Target: connect.squareup.com:443/v2/payments/...
+[tlsn-prove] Target: connect.squareupsandbox.com:443/v2/payments/...
 [tlsn-prove] MPC limits: max_sent=4096, max_recv=4096
 [tlsn-prove] MPC connection established
-[tlsn-prove] Connected to connect.squareup.com:443
+[tlsn-prove] Connected to connect.squareupsandbox.com:443
 [tlsn-prove] Sending HTTP request...
 [tlsn-prove] Response status: 200 OK
 [tlsn-prove] MPC complete, requesting attestation...
 [tlsn-prove] Presentation saved to proof.presentation.tlsn
 ```
+
+### 6b. TLSNotary Extension (DevConsole)
+
+Chrome for Testing を起動:
+```bash
+bun run scripts/launch-chrome-tlsn.ts
+```
+
+DevConsole (`chrome-extension://<id>/devConsole.html`) に以下を貼り付けて **Run Code**:
+
+**`PAYMENT_ID` と `SQUARE_KEY` を実際の値に置き換える:**
+
+```javascript
+// Anchr: prove Square Payment status via API
+const PAYMENT_ID = 'JYQNlEG29vRfsVibEeOiNMr25lbZY';  // ← Step 5 で取得した Payment ID
+const SQUARE_KEY = 'EAAAl...';  // ← Seller から受け取った Square Access Token
+const VERIFIER_URL = 'ws://localhost:7047';
+const PROXY_URL = 'ws://localhost:7047/proxy?token=connect.squareupsandbox.com';
+
+export default {
+  config: {
+    name: 'Anchr: Square API',
+    description: 'Prove Square Payment status',
+    requests: [{
+      method: 'GET',
+      host: 'connect.squareupsandbox.com',
+      pathname: '/**',
+      verifierUrl: VERIFIER_URL,
+    }],
+  },
+  main: async () => {
+    const proof = await prove(
+      {
+        url: `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
+        method: 'GET',
+        headers: {
+          'Host': 'connect.squareupsandbox.com',
+          'Authorization': `Bearer ${SQUARE_KEY}`,
+          'Accept': 'application/json',
+          'Accept-Encoding': 'identity',
+          'Connection': 'close',
+        },
+      },
+      {
+        verifierUrl: VERIFIER_URL,
+        proxyUrl: PROXY_URL,
+        maxRecvData: 4096,
+        maxSentData: 4096,
+        handlers: [
+          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
+          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
+          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
+          // Authorization ヘッダーは REVEAL しない → proof に API Key が含まれない
+        ],
+      }
+    );
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(proof));
+      console.log('[Anchr] Proof copied to clipboard');
+    } catch (e) {
+      console.log('[Anchr] Proof:', JSON.stringify(proof).slice(0, 200));
+    }
+
+    done(proof);
+  },
+};
+```
+
+**確認ポップアップ** が表示されたら **Allow** をクリック。~2秒で完了。
 
 > **レスポンスサイズの確認:**
 > ```bash

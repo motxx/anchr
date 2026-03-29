@@ -83,6 +83,10 @@ curl -s https://api.commerce.coinbase.com/charges \
 
 ## 6. Buyer: TLSNotary proof 生成
 
+Coinbase Commerce は ECDSA 証明書のため、CLI / Extension どちらでも ~2秒で完了する。
+
+### 6a. CLI (`tlsn-prove`)
+
 ```bash
 CHARGE_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Step 5 で取得
 
@@ -93,6 +97,71 @@ CHARGE_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Step 5 で取得
   -H "X-CC-Api-Key: $COINBASE_COMMERCE_API_KEY" \
   "https://api.commerce.coinbase.com/charges/$CHARGE_ID" \
   -o proof.presentation.tlsn
+```
+
+### 6b. TLSNotary Extension (DevConsole)
+
+Chrome for Testing を起動:
+```bash
+bun run scripts/launch-chrome-tlsn.ts
+```
+
+DevConsole に以下を貼り付けて **Run Code**:
+
+```javascript
+// Anchr: prove Coinbase Commerce Charge status via API
+const CHARGE_ID = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx';  // ← Step 5 で取得
+const CC_API_KEY = 'xxx';  // ← Seller から受け取った Commerce API Key
+const VERIFIER_URL = 'ws://localhost:7047';
+const PROXY_URL = 'ws://localhost:7047/proxy?token=api.commerce.coinbase.com';
+
+export default {
+  config: {
+    name: 'Anchr: Coinbase Commerce API',
+    description: 'Prove Coinbase Commerce Charge status',
+    requests: [{
+      method: 'GET',
+      host: 'api.commerce.coinbase.com',
+      pathname: '/**',
+      verifierUrl: VERIFIER_URL,
+    }],
+  },
+  main: async () => {
+    const proof = await prove(
+      {
+        url: `https://api.commerce.coinbase.com/charges/${CHARGE_ID}`,
+        method: 'GET',
+        headers: {
+          'Host': 'api.commerce.coinbase.com',
+          'X-CC-Api-Key': CC_API_KEY,
+          'Accept': 'application/json',
+          'Accept-Encoding': 'identity',
+          'Connection': 'close',
+        },
+      },
+      {
+        verifierUrl: VERIFIER_URL,
+        proxyUrl: PROXY_URL,
+        maxRecvData: 4096,
+        maxSentData: 4096,
+        handlers: [
+          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
+          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
+          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
+        ],
+      }
+    );
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(proof));
+      console.log('[Anchr] Proof copied to clipboard');
+    } catch (e) {
+      console.log('[Anchr] Proof:', JSON.stringify(proof).slice(0, 200));
+    }
+
+    done(proof);
+  },
+};
 ```
 
 > **注意:** Coinbase Commerce のレスポンスは Charge の内容によって ~1-4KB。
