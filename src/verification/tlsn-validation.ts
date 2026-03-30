@@ -139,11 +139,16 @@ export function evaluateCondition(
   }
 }
 
+/** Blocked property names to prevent prototype chain traversal. */
+const BLOCKED_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+
 function resolveDotPath(obj: unknown, path: string): unknown {
   const parts = path.split(".");
   let current: unknown = obj;
   for (const part of parts) {
     if (current == null || typeof current !== "object") return undefined;
+    if (BLOCKED_PROPS.has(part)) return undefined;
+    if (!Object.prototype.hasOwnProperty.call(current, part)) return undefined;
     current = (current as Record<string, unknown>)[part];
   }
   return current;

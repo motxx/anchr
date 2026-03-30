@@ -65,44 +65,30 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
   // --- TLSNotary verification ---
   if (hasTlsn) {
     if (result.tlsn_extension_result) {
-      // Browser extension result — data verified via MPC-TLS session with Verifier Server
-      const extResult = result.tlsn_extension_result as { results?: Array<{ type: string; part: string; value: string }> };
-      const results = extResult.results ?? (Array.isArray(extResult) ? extResult : []);
-      const statusEntry = results.find((r: any) => r.part === "STATUS_CODE");
-      const bodyEntry = results.find((r: any) => r.part === "BODY");
-      const statusCode = statusEntry?.value;
-      const revealedBody = bodyEntry?.value ?? "";
+      // Browser extension result — MUST include a cryptographic presentation.
+      // The extension_result alone is self-reported worker data and CANNOT be trusted.
+      // Require a signed TLSNotary presentation for cryptographic verification.
+      const extResult = result.tlsn_extension_result as {
+        presentation?: string;
+        results?: Array<{ type: string; part: string; value: string }>;
+      };
 
-      if (!statusCode) {
-        failures.push("TLSNotary extension: no status code in result");
+      if (extResult.presentation && query.tlsn_requirements) {
+        // Has cryptographic proof — verify via the standard tlsn-verifier binary
+        const tlsnResult = await validateTlsn(
+          { presentation: extResult.presentation },
+          query.tlsn_requirements,
+        );
+        checks.push(...tlsnResult.checks);
+        failures.push(...tlsnResult.failures);
+        if (tlsnResult.verifiedData) {
+          tlsnVerifiedData = tlsnResult.verifiedData;
+        }
+      } else if (!extResult.presentation) {
+        // No cryptographic proof — reject. Self-reported data is forgeable.
+        failures.push("TLSNotary extension: no cryptographic presentation included — self-reported data cannot be trusted");
       } else {
-        checks.push(`TLSNotary extension: MPC-TLS session verified by Verifier Server`);
-        checks.push(`TLSNotary extension: HTTP ${statusCode}`);
-
-        // Extract server name from target URL
-        let serverName = "unknown";
-        if (query.tlsn_requirements?.target_url) {
-          try { serverName = new URL(query.tlsn_requirements.target_url).hostname; } catch {}
-        }
-
-        // Evaluate conditions against the revealed body
-        if (query.tlsn_requirements?.conditions) {
-          const { evaluateCondition } = await import("./tlsn-validation");
-          for (const cond of query.tlsn_requirements.conditions) {
-            const cr = evaluateCondition(cond, revealedBody);
-            if (cr.passed) {
-              checks.push(`TLSNotary: condition passed: ${cond.description ?? cond.expression}`);
-            } else {
-              failures.push(`TLSNotary: condition failed: ${cond.description ?? cond.expression}`);
-            }
-          }
-        }
-
-        tlsnVerifiedData = {
-          server_name: serverName,
-          revealed_body: revealedBody,
-          session_timestamp: Math.floor(Date.now() / 1000),
-        };
+        failures.push("TLSNotary extension: query missing tlsn_requirements");
       }
     } else if (!result.tlsn_attestation) {
       failures.push("TLSNotary: no attestation provided");

@@ -84,6 +84,12 @@ export function validateAttachmentUri(uri: string): string | null {
 
   const isLocalhost =
     parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  const isProduction = process.env.NODE_ENV === "production";
+
+  // In production, reject localhost/loopback — prevents SSRF to co-hosted services
+  if (isProduction && isLocalhost) {
+    return "URLs pointing to localhost are not allowed in production";
+  }
 
   // Allow http only for localhost (dev), otherwise require https
   if (parsed.protocol === "http:" && !isLocalhost) {

@@ -1,10 +1,13 @@
+import { randomBytes } from "node:crypto";
+
 // Characters that avoid visual ambiguity (no O/0, I/1, S/5, etc.)
 const NONCE_CHARS = "ABCDEFGHJKLMNPQRTUVWXY2346789";
 
-export function generateNonce(length = 4): string {
+export function generateNonce(length = 6): string {
+  const bytes = randomBytes(length);
   let result = "";
   for (let i = 0; i < length; i++) {
-    result += NONCE_CHARS[Math.floor(Math.random() * NONCE_CHARS.length)];
+    result += NONCE_CHARS[bytes[i]! % NONCE_CHARS.length];
   }
   return result;
 }

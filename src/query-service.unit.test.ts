@@ -115,7 +115,7 @@ describe("createQueryService", () => {
       { description: "Test query", verification_requirements: ["nonce", "gps"] },
     );
     expect(query.challenge_nonce).toBeTruthy();
-    expect(query.challenge_nonce!.length).toBe(4);
+    expect(query.challenge_nonce!.length).toBe(6);
     expect(query.verification_requirements).toEqual(["nonce", "gps"]);
   });
 

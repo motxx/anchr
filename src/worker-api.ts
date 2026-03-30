@@ -69,7 +69,7 @@ const htlcSchema = z.object({
 const gpsSchema = z.object({
   lat: z.number().min(-90).max(90),
   lon: z.number().min(-180).max(180),
-}).optional();
+});
 
 const verificationRequirementsSchema = z.array(
   z.enum(VERIFICATION_FACTORS),
@@ -92,12 +92,12 @@ const tlsnRequirementSchema = z.object({
 
 const quorumSchema = z.object({
   min_approvals: z.number().int().min(1),
-}).optional();
+});
 
 const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
-  expected_gps: gpsSchema,
+  expected_gps: gpsSchema.optional(),
   max_gps_distance_km: z.number().min(0.01).max(1000).optional(),
   ttl_seconds: z.number().int().min(60).max(86_400).optional(),
   requester: requesterMetaSchema.optional(),
@@ -106,20 +106,18 @@ const createQuerySchema = z.object({
   htlc: htlcSchema.optional(),
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
-  quorum: quorumSchema,
+  quorum: quorumSchema.optional(),
 });
 
 // --- Auth Middleware ---
 
-/** Constant-time string comparison to prevent timing attacks. */
+/** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
+  const { createHash } = require("node:crypto");
+  // Hash both inputs to fixed-length digests to prevent length leakage.
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB) && a.length === b.length;
 }
 
 function extractApiKey(c: Context): string | null {
@@ -152,13 +150,35 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
 
 // --- Presenters ---
 
+/** Allowed hosts for X-Forwarded-Host trust (set via TRUSTED_PROXY_HOSTS env). */
+const TRUSTED_HOSTS = new Set(
+  (process.env.TRUSTED_PROXY_HOSTS ?? "")
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean),
+);
+
 function getPublicRequestUrl(c: Context): string {
+  // Prefer explicit PUBLIC_BASE_URL to avoid header-based URL poisoning
+  const publicBase = process.env.PUBLIC_BASE_URL;
+  if (publicBase) {
+    const url = new URL(c.req.url);
+    const base = new URL(publicBase);
+    url.protocol = base.protocol;
+    url.host = base.host;
+    return url.toString();
+  }
+
   const url = new URL(c.req.url);
-  const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
-  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim();
-  const host = forwardedHost || c.req.header("host")?.trim();
-  if (forwardedProto) url.protocol = `${forwardedProto}:`;
-  if (host) url.host = host;
+  // Only trust forwarded headers if the host is in the allow-list
+  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim()?.toLowerCase();
+  if (forwardedHost && TRUSTED_HOSTS.has(forwardedHost)) {
+    url.host = forwardedHost;
+    const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+    if (forwardedProto === "https" || forwardedProto === "http") {
+      url.protocol = `${forwardedProto}:`;
+    }
+  }
   return url.toString();
 }
 
@@ -302,7 +322,14 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   const app = new Hono();
 
-  app.use("*", cors({ origin: process.env.CORS_ORIGIN || "*" }));
+  // CORS: require explicit CORS_ORIGIN in production — wildcard allows cross-origin attacks
+  const corsOrigin = process.env.CORS_ORIGIN;
+  if (!corsOrigin && process.env.NODE_ENV === "production") {
+    console.error("[security] WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only");
+  }
+  app.use("*", cors({
+    origin: corsOrigin || (process.env.NODE_ENV === "production" ? "" : "*"),
+  }));
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -556,29 +583,59 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
+  const attachmentRefSchema = z.object({
+    id: z.string().min(1),
+    uri: z.string().min(1),
+    mime_type: z.string().min(1).optional(),
+    storage_kind: z.string().optional(),
+    filename: z.string().optional(),
+    size_bytes: z.number().int().min(0).optional(),
+    blossom_hash: z.string().optional(),
+    blossom_servers: z.array(z.string()).optional(),
+  });
+
+  const resultBodySchema = z.object({
+    worker_pubkey: z.string().min(1),
+    attachments: z.array(attachmentRefSchema).default([]),
+    notes: z.string().optional(),
+    gps: z.object({
+      lat: z.number().min(-90).max(90),
+      lon: z.number().min(-180).max(180),
+    }).optional(),
+    tlsn_presentation: z.string().optional(),
+    tlsn_attestation: z.object({ presentation: z.string().min(1) }).optional(),
+    tlsn_extension_result: z.record(z.string(), z.unknown()).optional(),
+    encryption_keys: z.record(z.string(), z.unknown()).optional(),
+    oracle_id: z.string().optional(),
+  });
+
   app.post("/queries/:id/result", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
-    let body: Record<string, unknown>;
-    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+    let rawBody: unknown;
+    try { rawBody = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
 
-    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
-    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+    const parsed = resultBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json({
+        error: "Invalid result payload",
+        issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      }, 400);
+    }
+    const body = parsed.data;
+    const workerPubkey = body.worker_pubkey;
 
-    const resultGps = body.gps as GpsCoord | undefined;
     const result: QueryResult = {
-      attachments: Array.isArray(body.attachments) ? body.attachments : [],
-      notes: typeof body.notes === "string" ? body.notes : undefined,
-      gps: resultGps && typeof resultGps.lat === "number" && typeof resultGps.lon === "number" ? resultGps : undefined,
-      tlsn_attestation: typeof body.tlsn_presentation === "string"
-        ? { presentation: body.tlsn_presentation as string }
-        : (body.tlsn_attestation as TlsnAttestation | undefined),
-      tlsn_extension_result: body.tlsn_extension_result != null
-        ? body.tlsn_extension_result
-        : undefined,
+      attachments: body.attachments as AttachmentRef[],
+      notes: body.notes,
+      gps: body.gps,
+      tlsn_attestation: body.tlsn_presentation
+        ? { presentation: body.tlsn_presentation }
+        : body.tlsn_attestation,
+      tlsn_extension_result: body.tlsn_extension_result,
     };
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
-    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
+    const oracleId = body.oracle_id;
 
     // Detect HTLC query — use inline verification (submitHtlcResult)
     const query = doGetQuery(id);
@@ -674,7 +731,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
+        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || (process.env.NODE_ENV === "production" ? "" : "*"),
       },
     });
   });

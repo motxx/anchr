@@ -157,7 +157,8 @@ function resolveTtlMs(options?: CreateQueryOptions): number {
 }
 
 function generateQueryId(): string {
-  return `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const { randomBytes } = require("node:crypto");
+  return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
 }
 
 /** Minimum HTLC locktime in seconds (10 minutes). */

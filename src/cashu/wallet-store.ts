@@ -77,11 +77,16 @@ export interface WalletStore {
 
   /** Get proofs locked for a specific query (for HTLC verification). */
   getLockedProofs(role: WalletRole, pubkey: string, queryId: string): Proof[];
+
+  /** Serialize concurrent mutations on a per-wallet basis. */
+  withLock<T>(role: WalletRole, pubkey: string, fn: () => T | Promise<T>): Promise<T>;
 }
 
 export function createWalletStore(): WalletStore {
   const wallets = new Map<string, WalletData>();
   const mintUrl = getCashuConfig()?.mintUrl ?? null;
+  /** Per-wallet mutex: prevents concurrent lock/transfer/unlock races. */
+  const locks = new Map<string, Promise<void>>();
 
   function getData(role: WalletRole, pubkey: string): WalletData {
     const key = makeKey(role, pubkey);
@@ -91,6 +96,21 @@ export function createWalletStore(): WalletStore {
       wallets.set(key, data);
     }
     return data;
+  }
+
+  /** Acquire a per-wallet mutex to serialize state mutations. */
+  async function withLock<T>(role: WalletRole, pubkey: string, fn: () => T | Promise<T>): Promise<T> {
+    const key = makeKey(role, pubkey);
+    const prev = locks.get(key) ?? Promise.resolve();
+    let resolve: () => void;
+    const next = new Promise<void>((r) => { resolve = r; });
+    locks.set(key, next);
+    try {
+      await prev;
+      return await fn();
+    } finally {
+      resolve!();
+    }
   }
 
   function computeBalance(data: WalletData): WalletBalance {
@@ -111,6 +131,8 @@ export function createWalletStore(): WalletStore {
     },
 
     lockForQuery(role, pubkey, queryId, amountSats) {
+      // Synchronous path — callers that need atomicity should use the async
+      // withLock wrapper at the service layer. This remains sync for compat.
       const data = getData(role, pubkey);
       const result = selectProofs(data.confirmed, amountSats);
       if (!result) return null;
@@ -142,6 +164,8 @@ export function createWalletStore(): WalletStore {
     getLockedProofs(role, pubkey, queryId) {
       return getData(role, pubkey).pending.get(queryId) ?? [];
     },
+
+    withLock,
 
     async getVerifiedBalance(role, pubkey) {
       const data = getData(role, pubkey);

@@ -18,16 +18,13 @@ import type { Query, QueryResult } from "../types";
 import type { OracleAttestation } from "./types";
 import { createPreimageStore, type PreimageStore } from "./preimage-store";
 
-/** Constant-time string comparison to prevent timing attacks. */
+/** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    // Compare against self to keep constant time, then return false
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
+  const { createHash } = require("node:crypto");
+  // Hash both inputs to fixed-length digests to prevent length leakage.
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB) && a.length === b.length;
 }
 
 const ORACLE_ID = process.env.ORACLE_ID ?? "remote-oracle";
