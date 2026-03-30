@@ -197,7 +197,7 @@ async function runDemo() {
 
   const preimageStore = createPreimageStore();
   const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const preimageEntry = preimageStore.create(queryId);
+  const preimageEntry = preimageStore.create();
 
   ok(`Hash: ${preimageEntry.hash.slice(0, 16)}...`);
   info(`Preimage stored secretly by Oracle (never exposed to Requester)`);
@@ -559,7 +559,7 @@ async function runDemo() {
   ok(`C2PA verification passed (stub)`);
 
   // Deliver preimage via NIP-44 DM (kind 4)
-  const preimage = preimageStore.getPreimage(queryId);
+  const preimage = preimageStore.getPreimage(preimageEntry.hash);
   if (!preimage) {
     fail("Oracle lost preimage");
     return;

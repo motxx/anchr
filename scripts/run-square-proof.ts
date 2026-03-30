@@ -182,7 +182,7 @@ for (let i = 0; i < 30; i++) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
 
   // Check if proof completed by looking at console
-  const consoleText = await page.locator('.console, [class*="console"]').textContent().catch(() => "");
+  const consoleText = await page.locator('.console, [class*="console"]').textContent().catch(() => "") ?? "";
   if (consoleText.includes("Proof copied") || consoleText.includes("Proof:")) {
     console.log(`\n=== PROOF COMPLETED in ${elapsed}s ===`);
     await page.screenshot({ path: "/tmp/square-proof-done.png" });

@@ -39,6 +39,9 @@ export function buildOracleApp(
   const resolvedApiKey = opts.apiKey ?? apiKey;
   const preimageStore = opts.preimageStore ?? createPreimageStore();
 
+  // Map queryId → hash for lookup by query ID
+  const queryHashMap = new Map<string, string>();
+
   const app = new Hono();
 
   // Auth middleware for protected endpoints
@@ -75,12 +78,13 @@ export function buildOracleApp(
       return c.json({ error: "Missing query_id" }, 400);
     }
 
-    const existing = preimageStore.getHash(body.query_id);
+    const existing = queryHashMap.get(body.query_id);
     if (existing) {
       return c.json({ query_id: body.query_id, hash: existing });
     }
 
-    const entry = preimageStore.create(body.query_id);
+    const entry = preimageStore.create();
+    queryHashMap.set(body.query_id, entry.hash);
     return c.json({
       query_id: body.query_id,
       hash: entry.hash,
@@ -92,7 +96,7 @@ export function buildOracleApp(
    */
   app.get("/hash/:queryId", authMiddleware, (c) => {
     const queryId = c.req.param("queryId");
-    const hash = preimageStore.getHash(queryId);
+    const hash = queryHashMap.get(queryId);
     if (!hash) return c.json({ error: "No hash found for this query" }, 404);
     return c.json({ query_id: queryId, hash });
   });
@@ -131,7 +135,12 @@ export function buildOracleApp(
       return c.json({ error: "Missing query_id" }, 400);
     }
 
-    const preimage = preimageStore.getPreimage(body.query_id);
+    const hash = queryHashMap.get(body.query_id);
+    if (!hash) {
+      return c.json({ error: "No preimage found for this query" }, 404);
+    }
+
+    const preimage = preimageStore.getPreimage(hash);
     if (!preimage) {
       return c.json({ error: "No preimage found for this query" }, 404);
     }

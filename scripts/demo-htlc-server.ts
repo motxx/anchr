@@ -165,7 +165,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
 
   const preimageStore = createPreimageStore();
   const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const preimageEntry = preimageStore.create(queryId);
+  const preimageEntry = preimageStore.create();
 
   emitOk("oracle", "Preimage generated", { hash: preimageEntry.hash.slice(0, 16) + "..." });
   emitInfo("oracle", "Preimage stored secretly (never exposed to Requester)");
@@ -454,7 +454,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   emitOk("oracle", "Decrypted oracle_payload from kind 6300 tags");
   emitOk("oracle", "C2PA verification passed (stub)");
 
-  const preimage = preimageStore.getPreimage(queryId);
+  const preimage = preimageStore.getPreimage(preimageEntry.hash);
   if (!preimage) {
     emitFail("oracle", "Lost preimage");
     return;

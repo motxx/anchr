@@ -192,7 +192,7 @@ async function attemptRedeem(
     const outAmount = totalSats - fee;
     if (outAmount <= 0) return null;
 
-    const outputs = buildOutputs(outAmount, htlcProofs[0].id);
+    const outputs = buildOutputs(outAmount, htlcProofs[0]!.id);
 
     // 3. Send directly to Mint /v1/swap (no client-side bypass)
     const res = await fetch(`${MINT_URL}/v1/swap`, {

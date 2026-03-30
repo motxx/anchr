@@ -71,6 +71,8 @@ interface WatchedQuery {
 export function createOracleNostrService(config: OracleNostrServiceConfig): OracleNostrService {
   const preimageStore = config.preimageStore ?? createPreimageStore();
   const watched = new Map<string, WatchedQuery>();
+  // Map queryId → hash for lookup by query ID
+  const queryHashMap = new Map<string, string>();
 
   function handleFeedbackEvent(queryId: string, event: Event) {
     const entry = watched.get(queryId);
@@ -157,16 +159,18 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     workerPubkey: string,
   ): Promise<boolean> {
     const detail = await verify(query, result);
-    const preimage = preimageStore.getPreimage(queryId);
+    const hash = queryHashMap.get(queryId);
+    const preimage = hash ? preimageStore.getPreimage(hash) : null;
 
-    if (detail.passed && preimage) {
+    if (detail.passed && preimage && hash) {
       // C2PA valid → deliver preimage via NIP-44 DM
       const dm = buildPreimageDM(config.identity, workerPubkey, queryId, preimage);
       const publishResult = await publishEvent(dm, config.relayUrls);
       if (publishResult.successes.length > 0) {
         console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId}`);
       }
-      preimageStore.delete(queryId);
+      preimageStore.delete(hash);
+      queryHashMap.delete(queryId);
       return true;
     } else {
       // C2PA invalid → deliver rejection
@@ -180,7 +184,8 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
 
   return {
     generateHash(queryId: string) {
-      const entry = preimageStore.create(queryId);
+      const entry = preimageStore.create();
+      queryHashMap.set(queryId, entry.hash);
       return { hash: entry.hash };
     },
 

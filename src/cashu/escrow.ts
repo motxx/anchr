@@ -397,7 +397,7 @@ export function verifyHtlcProofs(
 
   // 2. Verify each proof's HTLC secret and spending authorization
   for (let i = 0; i < htlcProofs.length; i++) {
-    const proof = htlcProofs[i];
+    const proof = htlcProofs[i]!;
     try {
       const secret = JSON.parse(proof.secret);
       if (!Array.isArray(secret) || secret[0] !== "HTLC") {
