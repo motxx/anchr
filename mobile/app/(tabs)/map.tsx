@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { View, Text, Platform } from "react-native";
+import { View, Text, Platform, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useQueries } from "../../src/hooks/useQueries";
@@ -36,34 +36,45 @@ function MapPin({ query, onPress }: { query: QuerySummary; onPress: () => void }
 function WebFallback({ queries, userLocation }: { queries: QuerySummary[]; userLocation: { lat: number; lon: number } | null }) {
   const router = useRouter();
   return (
-    <View className="flex-1 bg-background px-4 pt-14">
-      <Text className="text-lg font-bold text-foreground mb-4">Nearby Queries</Text>
+    <View className="flex-1 bg-background px-5 pt-16">
+      <Text className="text-2xl font-black text-foreground tracking-tight mb-2">Map</Text>
       {userLocation && (
-        <Text className="text-xs text-muted-foreground mb-3">
+        <Text className="text-[11px] text-muted-foreground mb-4">
           Your location: {userLocation.lat.toFixed(4)}, {userLocation.lon.toFixed(4)}
         </Text>
       )}
       {queries.length === 0 ? (
-        <View className="items-center py-12">
-          <Ionicons name="location-outline" size={32} color="#52525b" />
-          <Text className="text-sm text-muted-foreground mt-2">No queries with GPS</Text>
+        <View className="items-center py-20">
+          <View className="w-16 h-16 rounded-full bg-surface items-center justify-center mb-4">
+            <Ionicons name="location-outline" size={28} color="#52525b" />
+          </View>
+          <Text className="text-[15px] font-semibold text-foreground">No queries with GPS</Text>
+          <Text className="text-[13px] text-muted-foreground mt-1">
+            Queries with location data will appear here
+          </Text>
         </View>
       ) : (
         queries.map((q) => (
-          <View key={q.id} className="bg-surface rounded-lg p-3 mb-2 flex-row items-center gap-3 border border-border"
-            onTouchEnd={() => router.push(`/${q.id}`)}
+          <Pressable
+            key={q.id}
+            className="bg-surface rounded-2xl p-4 mb-2 flex-row items-center gap-3 active:opacity-80"
+            onPress={() => router.push(`/${q.id}`)}
           >
-            <Ionicons name="location" size={16} color="#10b981" />
+            <View className="w-10 h-10 rounded-full bg-emerald-950 items-center justify-center">
+              <Ionicons name="location" size={18} color="#10b981" />
+            </View>
             <View className="flex-1">
-              <Text className="text-sm text-foreground" numberOfLines={1}>{q.description}</Text>
-              <Text className="text-xs text-muted-foreground">
+              <Text className="text-[15px] text-foreground font-semibold" numberOfLines={1}>{q.description}</Text>
+              <Text className="text-[11px] text-muted-foreground mt-0.5">
                 {q.expected_gps?.lat.toFixed(4)}, {q.expected_gps?.lon.toFixed(4)}
               </Text>
             </View>
             {q.bounty && (
-              <Text className="text-xs font-semibold text-amber-400">{q.bounty.amount_sats} sats</Text>
+              <View className="bg-emerald-950 rounded-full px-3 py-1.5">
+                <Text className="text-[13px] font-bold text-primary">{q.bounty.amount_sats} sats</Text>
+              </View>
             )}
-          </View>
+          </Pressable>
         ))
       )}
     </View>
@@ -123,8 +134,11 @@ export default function MapScreen() {
       </MapView>
 
       {/* Overlay: query count */}
-      <View className="absolute top-14 left-4 bg-background/90 rounded-lg px-3 py-2 border border-border">
-        <Text className="text-xs font-medium text-foreground">
+      <View className="absolute top-16 left-5 bg-background/95 rounded-2xl px-4 py-2.5 border border-border flex-row items-center gap-2">
+        <View className="w-6 h-6 rounded-full bg-emerald-950 items-center justify-center">
+          <Ionicons name="location" size={12} color="#10b981" />
+        </View>
+        <Text className="text-[13px] font-semibold text-foreground">
           {queriesWithGps.length} {queriesWithGps.length === 1 ? "query" : "queries"} nearby
         </Text>
       </View>

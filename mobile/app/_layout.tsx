@@ -49,11 +49,8 @@ export default function RootLayout() {
         <Stack.Screen
           name="[id]"
           options={{
-            headerShown: true,
-            headerTitle: "Query",
-            headerBackTitle: "Back",
-            headerTintColor: "#fafafa",
-            headerStyle: { backgroundColor: "#09090b" },
+            headerShown: false,
+            contentStyle: { backgroundColor: "#09090b" },
           }}
         />
       </Stack>

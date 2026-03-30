@@ -168,7 +168,7 @@ function DecryptedImage({
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 p-3 rounded-md border bg-red-50 text-xs text-red-600">
+      <div className="flex items-center gap-2 p-3 rounded-md border bg-red-50 text-xs text-red-400">
         <XCircle className="w-4 h-4 shrink-0" />
         {error}
       </div>
@@ -320,19 +320,21 @@ export function QueryCard({ query }: { query: QuerySummary }) {
   const blossomKeys = detail?.blossom_keys;
 
   return (
-    <Card className={cn("overflow-hidden py-0 gap-0 transition-shadow", open && "shadow-sm")}>
+    <Card className={cn("overflow-hidden py-0 gap-0 transition-shadow rounded-2xl", open && "shadow-sm")}>
       <CardHeader
-        className="px-4 py-3.5 cursor-pointer hover:bg-accent/50 transition-colors"
+        className="px-4 py-4 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
         <div className="flex items-center justify-between gap-3 w-full">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <StatusIcon status={query.status} />
-            <span className="text-sm text-foreground truncate">{query.description}</span>
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
+              <StatusIcon status={query.status} />
+            </div>
+            <span className="text-[15px] font-semibold text-foreground truncate">{query.description}</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {query.bounty && query.bounty.amount_sats > 0 && (
-              <span className="text-xs font-semibold text-amber-500">
+              <span className="text-[13px] font-bold text-emerald-400 bg-emerald-950 rounded-full px-3 py-1">
                 {query.bounty.amount_sats} sats
               </span>
             )}
@@ -377,8 +379,8 @@ export function QueryCard({ query }: { query: QuerySummary }) {
 
           {/* HTLC info */}
           {query.htlc && (
-            <div className="rounded-lg border bg-blue-50 px-3 py-3 space-y-1">
-              <p className="text-[10px] uppercase tracking-widest text-blue-600 font-semibold">HTLC Escrow</p>
+            <div className="rounded-xl border border-blue-950 bg-blue-950/30 px-3 py-3 space-y-1">
+              <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">HTLC Escrow</p>
               <p className="text-xs text-muted-foreground font-mono truncate">Hash: {query.htlc.hash}</p>
               {query.htlc.worker_pubkey && (
                 <p className="text-xs text-muted-foreground font-mono truncate">Worker: {query.htlc.worker_pubkey}</p>
@@ -399,17 +401,17 @@ export function QueryCard({ query }: { query: QuerySummary }) {
           {/* Verification result */}
           {detail?.verification && (
             <div className={cn(
-              "rounded-lg border px-3 py-3",
+              "rounded-xl border px-3 py-3",
               detail.verification.passed
-                ? "bg-emerald-50 border-emerald-200"
-                : "bg-red-50 border-red-200",
+                ? "bg-emerald-950/30 border-emerald-800"
+                : "bg-red-950/30 border-red-900",
             )}>
               <div className="flex items-center gap-2 mb-1">
                 {detail.verification.passed
-                  ? <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  : <XCircle className="w-4 h-4 text-red-500" />
+                  ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  : <XCircle className="w-4 h-4 text-red-400" />
                 }
-                <span className={cn("text-sm font-medium", detail.verification.passed ? "text-emerald-700" : "text-red-700")}>
+                <span className={cn("text-sm font-semibold", detail.verification.passed ? "text-emerald-400" : "text-red-400")}>
                   {detail.verification.passed ? "検証OK" : "検証NG"}
                 </span>
               </div>
@@ -421,7 +423,7 @@ export function QueryCard({ query }: { query: QuerySummary }) {
                 </ul>
               )}
               {detail.verification.failures.length > 0 && (
-                <ul className="text-xs text-red-600 mt-1 space-y-0.5">
+                <ul className="text-xs text-red-400 mt-1 space-y-0.5">
                   {detail.verification.failures.map((f, i) => (
                     <li key={i}>{f}</li>
                   ))}
