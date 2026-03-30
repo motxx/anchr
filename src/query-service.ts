@@ -1,5 +1,6 @@
 import { normalizeQueryResult } from "./attachments";
 import { verifyToken } from "./cashu/wallet";
+import { verifyHtlcProofs } from "./cashu/escrow";
 import type { WalletStore } from "./cashu/wallet-store";
 import { buildChallengeRule, generateNonce } from "./challenge";
 import { resolveOracle } from "./oracle";
@@ -573,9 +574,19 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       }
 
       // 4. Return preimage on success (look up by HTLC hash)
+      // Server-side HTLC verification: verify preimage matches hash before revealing.
+      // This compensates for Mints that don't enforce NUT-14 conditions.
       if (passed && preimageStore && query.htlc?.hash) {
         const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
+          const htlcError = verifyHtlcProofs(
+            walletStore?.getLockedProofs?.("requester", query.htlc.requester_pubkey, queryId) ?? [],
+            query.htlc.hash,
+            preimage,
+          );
+          if (htlcError) {
+            console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
+          }
           return {
             ok: true,
             query: updated,

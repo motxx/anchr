@@ -27,6 +27,10 @@ import {
   type P2PKOptions,
   getEncodedToken,
   getDecodedToken,
+  verifyHTLCSpendingConditions,
+  isHTLCSpendAuthorised,
+  signP2PKProofs,
+  verifyHTLCHash,
 } from "@cashu/cashu-ts";
 import { getCashuWallet, getCashuConfig } from "./wallet";
 
@@ -313,7 +317,11 @@ export async function swapHtlcBindWorker(
  * Steps:
  *   1. Set preimage as HTLC witness on each proof
  *   2. Sign proofs with Worker's private key (P2PK witness)
- *   3. Swap signed proofs for fresh, unlocked proofs on the mint
+ *   3. **Server-side verification** of HTLC conditions (hashlock + P2PK)
+ *   4. Swap signed proofs for fresh, unlocked proofs on the mint
+ *
+ * Step 3 is critical: Nutshell 0.19.2 does NOT enforce NUT-14 spending
+ * conditions on /v1/swap, so we verify locally before sending to the Mint.
  */
 export async function redeemHtlcToken(
   htlcProofs: Proof[],
@@ -327,24 +335,35 @@ export async function redeemHtlcToken(
   try {
     await wallet.loadMint();
 
-    // Set HTLC preimage witness on each proof so the mint can verify the hashlock.
-    // The Worker's private key is passed via .privkey() so that completeSwap()
-    // calls signP2PKProofs() with the correct OutputData (required for SIG_ALL).
+    // 1. Set HTLC preimage witness on each proof
     const proofsWithPreimage = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify({ preimage, signatures: [] }),
     }));
 
-    const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
-    const fee = wallet.getFeesForProofs(proofsWithPreimage);
+    // 2. Sign proofs with Worker's private key
+    const signedProofs = signP2PKProofs(proofsWithPreimage, workerPrivateKey);
+
+    // 3. Server-side HTLC verification (defense against Mint enforcement gap)
+    for (const proof of signedProofs) {
+      if (!isHTLCSpendAuthorised(proof)) {
+        const detail = verifyHTLCSpendingConditions(proof);
+        console.error("[cashu-htlc] HTLC spending condition NOT met:", detail);
+        return null;
+      }
+    }
+
+    const totalSats = signedProofs.reduce((sum, p) => sum + p.amount, 0);
+    const fee = wallet.getFeesForProofs(signedProofs);
     const amountSats = totalSats - fee;
     if (amountSats <= 0) {
       console.error("[cashu-htlc] Fee exceeds total amount");
       return null;
     }
 
+    // 4. Swap verified proofs on the Mint
     const { send } = await wallet.ops
-      .send(amountSats, proofsWithPreimage)
+      .send(amountSats, signedProofs)
       .privkey(workerPrivateKey)
       .run();
 
@@ -354,6 +373,46 @@ export async function redeemHtlcToken(
     console.error("[cashu-htlc] Failed to redeem HTLC token:", error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+/**
+ * Verify HTLC spending conditions on proofs without performing a swap.
+ *
+ * Used by the Oracle/server to verify that a set of HTLC proofs
+ * have valid witness (preimage + signature) BEFORE revealing the preimage
+ * or accepting the swap. This compensates for Mints that don't enforce
+ * NUT-14 spending conditions.
+ *
+ * @returns null if all proofs pass, or an error message describing the failure.
+ */
+export function verifyHtlcProofs(
+  htlcProofs: Proof[],
+  expectedHash: string,
+  preimage: string,
+): string | null {
+  // 1. Verify preimage matches expected hash
+  if (!verifyHTLCHash(preimage, expectedHash)) {
+    return `Preimage does not match expected hash (hash=${expectedHash})`;
+  }
+
+  // 2. Verify each proof's HTLC secret contains the expected hash
+  for (let i = 0; i < htlcProofs.length; i++) {
+    const proof = htlcProofs[i];
+    try {
+      const secret = JSON.parse(proof.secret);
+      if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+        return `Proof ${i}: not an HTLC proof`;
+      }
+      const data = secret[1]?.data;
+      if (data !== expectedHash) {
+        return `Proof ${i}: hashlock mismatch (expected=${expectedHash}, got=${data})`;
+      }
+    } catch {
+      return `Proof ${i}: invalid secret format`;
+    }
+  }
+
+  return null;
 }
 
 /**

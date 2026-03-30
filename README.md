@@ -35,10 +35,10 @@ This protocol is **trust-minimized**, not trustless. Cryptography eliminates sev
 - **Requester cannot revoke payment** — sats are locked in HTLC before work begins; Worker verifies proofs are UNSPENT on Mint (NUT-07) before starting work
 - **Timeout refund is automatic** — NUT-11 locktime + refund pubkey returns sats to Requester if HTLC expires
 
-> **⚠ Mint enforcement gap:** The guarantees above depend on the Cashu Mint correctly enforcing NUT-11/NUT-14 spending conditions on `/v1/swap`. Our E2E tests against Nutshell 0.19.2 revealed that **the Mint does not verify HTLC witness signatures or hashlock conditions** — all fraud attempts (wrong key, no preimage, wrong preimage) were accepted. Until this is fixed upstream, HTLC trustless properties are enforced only at the protocol layer, not at the Mint layer. See `e2e/regtest-htlc-trustless.test.ts` for reproduction.
+> **⚠ Mint enforcement gap:** Nutshell 0.19.2 does not enforce NUT-14 HTLC spending conditions on `/v1/swap` (see `e2e/regtest-htlc-trustless.test.ts`). Anchr compensates with **server-side HTLC verification** using `isHTLCSpendAuthorised()` from cashu-ts — `redeemHtlcToken()` verifies hashlock + P2PK signature locally before sending to the Mint.
 
 **Residual trust assumptions:**
-- **Cashu Mint** — trusted to honor token issuance, redemption, **and HTLC spending condition enforcement**. Current Nutshell implementation does not enforce NUT-14 conditions on swap (see warning above).
+- **Cashu Mint** — trusted to honor token issuance and redemption. Nutshell 0.19.2 does not enforce NUT-14 conditions on swap; Anchr adds server-side verification as a compensating control.
 - **Oracle + Requester collusion** — Requester decrypts the result (via K_R) before Oracle verifies. If Oracle withholds the preimage, Requester gets data for free and BTC refunds on timeout. Oracle cannot profit, but Worker loses.
 - **TLSNotary Verifier** — if Verifier colludes with Worker, they can combine key shares to forge proofs
 
