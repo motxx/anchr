@@ -173,12 +173,17 @@ async function attemptRedeem(
   privateKey: string | undefined,
 ): Promise<Proof[] | null> {
   try {
-    // 1. Build witness with preimage
+    // 1. Build witness
+    // - With preimage: receiver path (preimage + signatures)
+    // - With key but no preimage: refund path (signatures only)
+    // - Neither: no witness at all
     let proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: preimage
         ? JSON.stringify({ preimage, signatures: [] })
-        : undefined,
+        : privateKey
+          ? JSON.stringify({ signatures: [] })
+          : undefined,
     }));
 
     // 2. Build outputs first (needed for SIG_ALL signing)
@@ -417,6 +422,121 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, wrongPreimage, worker.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — wrong preimage
+  }, 60_000);
+
+  // ---------------------------------------------------------------------------
+  // 7. No witness at all
+  // ---------------------------------------------------------------------------
+
+  test("ATTACK: No witness at all → Mint REJECTS", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash, preimage } = createHTLCHash();
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // No preimage, no key — completely missing witness
+    const result = await attemptRedeem(wallet, htlcProofs, undefined, undefined);
+
+    expect(result).toBeNull(); // Mint MUST reject — no witness
+  }, 60_000);
+
+  // ---------------------------------------------------------------------------
+  // 8. Refund path BEFORE locktime (Requester tries early refund)
+  // ---------------------------------------------------------------------------
+
+  test("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash, preimage } = createHTLCHash();
+    // Locktime 1 hour from now — lock is ACTIVE
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Requester tries to reclaim with refund key (no preimage) before locktime
+    const result = await attemptRedeem(wallet, htlcProofs, undefined, requester.secretKey);
+
+    expect(result).toBeNull(); // Mint MUST reject — locktime not expired
+  }, 60_000);
+
+  // ---------------------------------------------------------------------------
+  // 9. Refund path AFTER locktime (legitimate timeout refund)
+  // ---------------------------------------------------------------------------
+
+  test("LEGIT: Requester refund key after locktime → Mint ACCEPTS", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash, preimage } = createHTLCHash();
+    // Locktime clearly expired (60 seconds in the past)
+    const locktime = Math.floor(Date.now() / 1000) - 60;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Requester reclaims via cashu-ts (handles SIG_ALL signing correctly)
+    const proofsForRefund = htlcProofs.map((p) => ({
+      ...p,
+      witness: JSON.stringify({ signatures: [] }),
+    }));
+    const totalSats = proofsForRefund.reduce((sum, p) => sum + p.amount, 0);
+    const fee = wallet.getFeesForProofs(proofsForRefund);
+    const { send: result } = await wallet.ops
+      .send(totalSats - fee, proofsForRefund)
+      .privkey(requester.secretKey)
+      .run();
+
+    expect(result).not.toBeNull();
+    expect(result.length).toBeGreaterThan(0);
+  }, 60_000);
+
+  // ---------------------------------------------------------------------------
+  // 10. Tampered proof secret (altered hash in secret)
+  // ---------------------------------------------------------------------------
+
+  test("ATTACK: Tampered proof secret → Mint REJECTS", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash, preimage } = createHTLCHash();
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Tamper with the secret: replace the hash with a different one
+    const { hash: fakeHash } = createHTLCHash();
+    const tamperedProofs = htlcProofs.map((p) => ({
+      ...p,
+      secret: p.secret.replace(hash, fakeHash),
+    }));
+
+    // Try to swap with the real preimage (matching original hash, not tampered)
+    const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
+
+    expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for tampered secret
   }, 60_000);
 });
 
