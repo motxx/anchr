@@ -59,17 +59,19 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./scripts/init-regtest.sh
 
-      - name: Start Cashu mint
+      - name: Start Cashu mint (with restart for LND cert refresh)
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d cashu-mint
-          echo "Waiting for Cashu mint to be ready (up to 30s)..."
-          for i in $(seq 1 10); do
+          sleep 5
+          docker compose restart cashu-mint
+          echo "Waiting for Cashu mint to be ready (up to 60s)..."
+          for i in $(seq 1 20); do
             if curl -sf http://localhost:3338/v1/info > /dev/null 2>&1; then
               echo "Cashu mint is ready."
               break
             fi
-            echo "  Waiting... ($i/10)"
+            echo "  Waiting... ($i/20)"
             sleep 3
           done
 

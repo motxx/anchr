@@ -193,7 +193,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
 
     // 4. Submit result with GPS
     const submitRes = await app.request(
-      `http://localhost/queries/${created.query_id}/submit`,
+      `http://localhost/queries/${created.query_id}/result`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -262,7 +262,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
     const { query_id } = (await createRes.json()) as { query_id: string };
 
     const submitRes = await app.request(
-      `http://localhost/queries/${query_id}/submit`,
+      `http://localhost/queries/${query_id}/result`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
