@@ -72,25 +72,10 @@ fi
 
 # 3. Fund LND nodes
 echo "[3/5] Funding LND nodes..."
-set +e
-MINT_ADDR_JSON=$($LNCLI_MINT newaddress p2wkh 2>&1)
-MINT_RC=$?
-set -e
-if [ $MINT_RC -ne 0 ]; then
-  echo "ERROR: lnd-mint newaddress failed (rc=$MINT_RC): $MINT_ADDR_JSON" >&2
-  exit 1
-fi
-MINT_ADDR=$(echo "$MINT_ADDR_JSON" | grep -o '"address": "[^"]*"' | cut -d'"' -f4)
-
-set +e
-USER_ADDR_JSON=$($LNCLI_USER newaddress p2wkh 2>&1)
-USER_RC=$?
-set -e
-if [ $USER_RC -ne 0 ]; then
-  echo "ERROR: lnd-user newaddress failed (rc=$USER_RC): $USER_ADDR_JSON" >&2
-  exit 1
-fi
-USER_ADDR=$(echo "$USER_ADDR_JSON" | grep -o '"address": "[^"]*"' | cut -d'"' -f4)
+MINT_ADDR=$($LNCLI_MINT newaddress p2wkh 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['address'])")
+USER_ADDR=$($LNCLI_USER newaddress p2wkh 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['address'])")
+echo "      mint addr: $MINT_ADDR"
+echo "      user addr: $USER_ADDR"
 
 $BITCOIN_CLI sendtoaddress "$MINT_ADDR" 10 > /dev/null
 $BITCOIN_CLI sendtoaddress "$USER_ADDR" 10 > /dev/null
@@ -102,7 +87,7 @@ sleep 5
 
 # 4. Open channel: lnd-user -> lnd-mint (10M sats, 5M push)
 echo "[4/5] Opening channel (10M sats)..."
-MINT_PUBKEY=$($LNCLI_MINT getinfo | grep -o '"identity_pubkey": "[^"]*"' | cut -d'"' -f4)
+MINT_PUBKEY=$($LNCLI_MINT getinfo 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['identity_pubkey'])")
 $LNCLI_USER connect "${MINT_PUBKEY}@lnd-mint:9735" 2>/dev/null || true
 $LNCLI_USER openchannel "$MINT_PUBKEY" 10000000 5000000 > /dev/null
 
@@ -124,8 +109,8 @@ done
 # Summary
 echo ""
 echo "=== Ready ==="
-MINT_BAL=$($LNCLI_MINT channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4 || true)
-USER_BAL=$($LNCLI_USER channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4 || true)
+MINT_BAL=$($LNCLI_MINT channelbalance 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('local_balance',{}).get('sat','0'))" 2>/dev/null || echo "0")
+USER_BAL=$($LNCLI_USER channelbalance 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('local_balance',{}).get('sat','0'))" 2>/dev/null || echo "0")
 echo "  lnd-mint channel balance: ${MINT_BAL:-0} sats"
 echo "  lnd-user channel balance: ${USER_BAL:-0} sats"
 echo ""
