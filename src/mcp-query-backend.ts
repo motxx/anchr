@@ -253,10 +253,10 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       return json;
     },
     async submitQueryResult(queryId, result, oracleId) {
-      const { json } = await fetchJson(`/queries/${queryId}/submit`, {
+      const { json } = await fetchJson(`/queries/${queryId}/result`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...result, oracle_id: oracleId }),
+        body: JSON.stringify({ ...result, worker_pubkey: "mcp-remote", oracle_id: oracleId }),
       });
       return json;
     },

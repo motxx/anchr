@@ -90,10 +90,11 @@ describe("worker api photo proof (Blossom)", () => {
 
       const encryptionKeys = { [uploadJson.attachment.id]: uploadJson.encryption };
 
-      const submitResponse = await app.request(`http://localhost/queries/${query.id}/submit`, {
+      const submitResponse = await app.request(`http://localhost/queries/${query.id}/result`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          worker_pubkey: "integration-test-worker",
           attachments: [uploadJson.attachment],
           notes: "worker api integration",
           encryption_keys: encryptionKeys,

@@ -170,10 +170,11 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     expect(detail.challenge_nonce).toBe(challenge_nonce);
 
     // 4. Submit result
-    const submitRes = await app.request(`http://localhost/queries/${query_id}/submit`, {
+    const submitRes = await app.request(`http://localhost/queries/${query_id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        worker_pubkey: "e2e-test-worker",
         attachments: [],
         notes: `E2E test observation${challenge_nonce ? ` ${challenge_nonce}` : ""}`,
       }),

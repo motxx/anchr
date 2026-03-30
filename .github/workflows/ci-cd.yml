@@ -54,6 +54,7 @@ jobs:
           BLOSSOM_SERVERS: http://localhost:3333
 
       - name: Wait for LND nodes to start
+        if: ${{ !cancelled() }}
         run: |
           echo "Waiting for LND nodes to start (up to 60s)..."
           for i in $(seq 1 20); do
@@ -68,9 +69,11 @@ jobs:
           done
 
       - name: Initialize regtest (fund nodes + open channel)
+        if: ${{ !cancelled() }}
         run: ./scripts/init-regtest.sh
 
       - name: Start Cashu mint
+        if: ${{ !cancelled() }}
         run: |
           docker compose up -d cashu-mint
           echo "Waiting for Cashu mint to be ready (up to 30s)..."
@@ -84,6 +87,7 @@ jobs:
           done
 
       - name: Regtest E2E tests (HTLC + Cashu)
+        if: ${{ !cancelled() }}
         run: bun test e2e/regtest-htlc-trustless.test.ts e2e/regtest-cashu.test.ts
         env:
           CASHU_MINT_URL: http://localhost:3338

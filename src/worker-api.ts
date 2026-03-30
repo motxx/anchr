@@ -101,7 +101,7 @@ const createQuerySchema = z.object({
   requester: requesterMetaSchema.optional(),
   bounty: bountySchema.optional(),
   oracle_ids: oracleIdsSchema,
-  htlc: htlcSchema,
+  htlc: htlcSchema.optional(),
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
   quorum: quorumSchema,
@@ -575,9 +575,15 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       }, status);
     }
 
-    // Non-HTLC: just record result
-    const outcome = svc.recordResult(id, result, workerPubkey, blossomKeys);
-    return c.json(outcome, outcome.ok ? 200 : 400);
+    // Non-HTLC: use legacy submitQueryResult for backward-compatible verification
+    const outcome = await doSubmit(id, result, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
+    return c.json({
+      ok: outcome.ok,
+      message: outcome.message,
+      verification: outcome.query?.verification,
+      oracle_id: outcome.query?.assigned_oracle_id ?? null,
+      payment_status: outcome.query?.payment_status,
+    }, outcome.ok ? 200 : 400);
   });
 
   // --- Log streaming (SSE) ---
