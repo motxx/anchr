@@ -337,7 +337,10 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
   const rateLimit: MiddlewareHandler = async (c, next) => {
-    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    // Use last X-Forwarded-For value (proxy-appended, harder to spoof) or fall back to "unknown"
+    const xff = c.req.header("x-forwarded-for");
+    const xffParts = xff?.split(",").map((s) => s.trim()).filter(Boolean);
+    const ip = xffParts?.length ? xffParts[xffParts.length - 1]! : "unknown";
     const now = Date.now();
     let bucket = rateBuckets.get(ip);
     if (!bucket || now > bucket.resetAt) {
