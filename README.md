@@ -38,6 +38,8 @@ This protocol is **trust-minimized**, not trustless. Cryptography eliminates sev
 - **Cashu Mint** — trusted to honor token issuance and redemption (standard Cashu trust model)
 - **TLSNotary Verifier** — if Verifier colludes with Worker, they can combine key shares to forge proofs
 
+**Mitigation — Oracle whitelist:** Requester specifies acceptable Oracles in the Job Request; Worker independently verifies the Oracle pubkey against its own trusted whitelist before accepting work. Both parties must agree on the Oracle, so a colluding Oracle would need to compromise the trust of both sides.
+
 ### Trustless Flow
 
 ```mermaid
