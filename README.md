@@ -28,10 +28,12 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 This protocol is **trust-minimized**, not trustless. Cryptography eliminates several attack vectors, but residual trust assumptions remain.
 
-**Cryptographic guarantees:**
-- **Oracle cannot steal BTC** — HTLC redemption requires Worker's signature, which Oracle cannot forge
+**Cryptographic guarantees (Cashu [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) P2PK + [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) HTLC + [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) State Check):**
+- **Oracle cannot steal BTC** — HTLC redemption requires Worker's signature (NUT-11 P2PK), which Oracle cannot forge
 - **Worker cannot forge proofs** — TLSNotary Verifier holds an independent MPC-TLS key share; Worker cannot alter the server's response
-- **Requester cannot revoke payment** — sats are locked in HTLC before work begins
+- **Worker cannot redeem without valid proof** — Oracle holds the preimage; HTLC hashlock (NUT-14) prevents redemption without it
+- **Requester cannot revoke payment** — sats are locked in HTLC before work begins; Worker verifies proofs are UNSPENT on Mint (NUT-07) before starting work
+- **Timeout refund is automatic** — NUT-11 locktime + refund pubkey returns sats to Requester if HTLC expires
 
 **Residual trust assumptions:**
 - **Oracle + Requester collusion** — Requester decrypts the result (via K_R) before Oracle verifies. If Oracle withholds the preimage, Requester gets data for free and BTC refunds on timeout. Oracle cannot profit, but Worker loses.
