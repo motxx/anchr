@@ -33,78 +33,71 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 ```mermaid
 sequenceDiagram
     participant R as Requester
-    participant O as Oracle<br/>(Anchr Server)
-    participant M as Cashu Mint
+    participant O as Oracle
     participant N as Nostr Relay
     participant W as Worker
-    participant V as TLSNotary<br/>Verifier
-    participant T as Target Server
+    participant V as TLSNotary Verifier
     participant B as Blossom
+    participant M as Cashu Mint
 
-    Note over R,B: Phase 1 — Setup & Escrow
+    R->>O: request hash for new query
+    O->>O: generate preimage, store secretly
+    O->>R: return hash(preimage) only
 
-    R->>O: POST /hash
-    Note right of O: Generate preimage (secret)<br/>Store in preimageStore
-    O-->>R: hash = SHA256(preimage)
+    Note over R: hold Cashu proofs locally<br/>(plain bearer tokens, no conditions yet)
+    R->>N: DVM Job Request (kind 5300)<br/>Requester pubkey + Oracle pubkey included
 
-    R->>M: Mint ecash (pay Lightning invoice)
-    M-->>R: Cashu Proof[] (e.g. 100 sats)
+    W->>N: subscribe and pick up query
+    W->>W: verify Oracle pubkey in Job Request<br/>against trusted Oracle whitelist → drop out if unknown
+    W->>N: quote (kind 7000 status=payment-required)<br/>Worker pubkey included
+    O->>N: listen for kind 7000 quotes → record Worker pubkey
 
-    R->>O: POST /queries (HTLC mode)
-    Note right of R: description, bounty,<br/>HTLC{hash, locktime},<br/>verification_requirements,<br/>tlsn_requirements or GPS
-    O-->>R: query_id (awaiting_quotes)
-    Note right of O: WalletStore locks<br/>Requester's Proof[] for query
+    R->>N: listen and receive quotes (possibly multiple Workers)
+    R->>R: select one Worker based on quote
+    R->>M: swap HTLC to add selected Worker pubkey<br/>condition: hash(preimage) AND Worker signature
+    R->>N: announce selection (kind 7000 status=processing)<br/>selected Worker pubkey included
+    O->>M: check HTLC condition → record selected Worker pubkey
 
-    R->>N: kind 5300 Job Request
-    Note right of N: Broadcast to all Workers
-
-    Note over R,B: Phase 2 — Worker Discovery & Selection
-
-    N-->>W: Job Request received
-    W->>O: POST /queries/:id/quotes
-    Note right of W: worker_pubkey, amount_sats
-
-    R->>O: POST /queries/:id/select
-    Note right of R: worker_pubkey,<br/>htlc_token (Cashu HTLC)
-    O->>M: checkProofsStates
-    M-->>O: All proofs UNSPENT ✓
-    O-->>R: status: processing
-
-    R->>N: kind 7000 (NIP-44 encrypted → Worker)
-    Note right of R: HTLC token + target details
-
-    Note over R,B: Phase 3 — Proof Generation
+    loop all Workers watching Nostr
+        W->>N: watch for kind 7000 status=processing
+        alt own pubkey selected
+            W->>M: verify own pubkey in HTLC condition → proceed
+        else another pubkey or HTLC mismatch
+            W->>W: drop out
+        end
+    end
 
     alt Web Data (TLSNotary)
         W->>V: MPC-TLS handshake
-        W->>T: HTTPS request (co-signed session)
-        T-->>W: HTTPS response
+        W->>W: HTTPS request via co-signed TLS session
         V-->>W: .presentation.tlsn
     else Real-World Photo (C2PA)
-        Note over W: Capture with C2PA camera<br/>(GPS + timestamp embedded)
+        W->>W: photograph on-site<br/>C2PA signed + EXIF strip
     end
 
-    W->>B: Upload AES-256-GCM encrypted blob
-    B-->>W: Blossom URI + SHA256
+    W->>W: generate symmetric key K<br/>encrypt blob with K (AES-256-GCM)<br/>encrypt K with Requester pubkey → K_R<br/>encrypt K with Oracle pubkey → K_O
+    W->>B: upload encrypted blob
+    W->>N: DVM Job Result (kind 6300)<br/>Blossom URL + blob hash + K_R + K_O
 
-    Note over R,B: Phase 4 — Verification & Settlement
+    R->>N: listen and receive result (Blossom URL + K_R)
+    R->>B: download encrypted blob
+    R->>R: decrypt K_R with Requester privkey → K<br/>decrypt blob with K → verify + view result
 
-    W->>O: POST /queries/:id/result
-    Note right of W: proof (tlsn_presentation<br/>or photo attachments)
-
-    alt TLSNotary
-        Note over O: 1. Decode .presentation.tlsn<br/>2. Verify MPC-TLS signatures<br/>3. Extract server_name from TLS cert<br/>4. Evaluate conditions (jsonpath/regex)<br/>5. Check attestation freshness
-    else C2PA + GPS
-        Note over O: 1. Verify C2PA manifest signature<br/>2. Validate EXIF GPS + timestamp<br/>3. Check haversine distance ≤ max_km<br/>4. Challenge nonce (if required)
+    O->>N: listen and receive result (Blossom URL + K_O)
+    O->>O: verify kind 6300 pubkey = selected Worker pubkey<br/>verify references correct Job Request ID
+    O->>B: download encrypted blob
+    O->>O: decrypt K_O with Oracle privkey → K<br/>decrypt blob with K
+    O->>O: verify proof<br/>(TLSNotary: MPC-TLS signatures + conditions<br/>C2PA: manifest signature + GPS proximity)
+    alt verification passed
+        O->>N: send preimage via NIP-44 DM (kind 4)
+        W->>N: receive DM
+        W->>W: verify sender pubkey = Oracle pubkey in Job Request
+        W->>M: redeem token with preimage + Worker signature
+    else verification failed
+        O->>N: send rejection via NIP-44 DM (kind 4)
+        W->>W: verify sender → stop waiting
+        Note over M,R: timelock expires → Cashu refunds Requester automatically
     end
-
-    O-->>W: preimage + status: approved
-    Note right of O: WalletStore transfers<br/>Proof[] → Worker
-
-    W->>M: Redeem HTLC (preimage + signature)
-    M-->>W: New unrestricted Proof[] (100 sats)
-
-    Note over R,B: ✓ Requester has verified data<br/>✓ Worker earned sats<br/>✓ No party could cheat
 ```
 
 ### State Machine
