@@ -55,22 +55,7 @@ jobs:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
 
-      - name: Wait for LND nodes to sync
-        if: ${{ !cancelled() }}
-        run: |
-          echo "Waiting for LND nodes to sync to chain (up to 120s)..."
-          for i in $(seq 1 40); do
-            MINT_SYNCED=$(docker compose exec -T lnd-mint lncli --network regtest --rpcserver lnd-mint:10009 getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
-            USER_SYNCED=$(docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009 getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
-            if [ -n "$MINT_SYNCED" ] && [ -n "$USER_SYNCED" ]; then
-              echo "Both LND nodes synced to chain."
-              break
-            fi
-            echo "  Waiting... ($i/40)"
-            sleep 3
-          done
-
-      - name: Initialize regtest (fund nodes + open channel)
+      - name: Initialize regtest (wait for LND + fund + open channel)
         if: ${{ !cancelled() }}
         run: ./scripts/init-regtest.sh
 

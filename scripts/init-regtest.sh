@@ -19,14 +19,28 @@ LNCLI_USER="docker compose exec -T lnd-user lncli --network regtest --rpcserver 
 
 echo "=== Regtest Lightning Init ==="
 
-# 1. Create wallet & mine blocks
-echo "[1/5] Creating Bitcoin wallet and mining 150 blocks..."
+# 1. Wait for LND nodes to be reachable
+echo "[1/5] Waiting for LND nodes to be reachable..."
+for i in $(seq 1 40); do
+  MINT_UP=$(docker compose exec -T lnd-mint lncli --network regtest --rpcserver lnd-mint:10009 getinfo 2>/dev/null && echo "yes" || true)
+  USER_UP=$(docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009 getinfo 2>/dev/null && echo "yes" || true)
+  if [ -n "$MINT_UP" ] && [ -n "$USER_UP" ]; then
+    echo "      Both LND nodes reachable."
+    break
+  fi
+  echo "      Waiting... ($i/40)"
+  sleep 3
+done
+
+# 2. Create wallet & mine blocks
+echo "[2/5] Creating Bitcoin wallet and mining 150 blocks..."
 $BITCOIN_CLI createwallet cashu 2>/dev/null || $BITCOIN_CLI loadwallet cashu 2>/dev/null || true
 $BITCOIN_CLI -generate 150 > /dev/null
-echo "      Done."
+echo "      Done. Waiting for LND to sync..."
 
-# 2. Wait for LND nodes to sync
-echo "[2/5] Waiting for LND nodes to sync..."
+# Wait for LND to sync the mined blocks
+MINT_SYNCED=""
+USER_SYNCED=""
 for i in $(seq 1 60); do
   MINT_SYNCED=$($LNCLI_MINT getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
   USER_SYNCED=$($LNCLI_USER getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
@@ -40,6 +54,11 @@ done
 
 if [ -z "$MINT_SYNCED" ] || [ -z "$USER_SYNCED" ]; then
   echo "ERROR: LND nodes failed to sync after 180s" >&2
+  echo "  lnd-mint synced: ${MINT_SYNCED:-no}" >&2
+  echo "  lnd-user synced: ${USER_SYNCED:-no}" >&2
+  # Dump last logs for debugging
+  docker compose logs --tail=20 lnd-mint 2>&1 | head -15 >&2
+  docker compose logs --tail=20 lnd-user 2>&1 | head -15 >&2
   exit 1
 fi
 
