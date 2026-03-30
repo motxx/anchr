@@ -72,9 +72,24 @@ fi
 
 # 3. Fund LND nodes
 echo "[3/5] Funding LND nodes..."
-MINT_ADDR_JSON=$($LNCLI_MINT newaddress p2wkh 2>&1) || { echo "ERROR: lnd-mint newaddress failed: $MINT_ADDR_JSON" >&2; exit 1; }
+set +e
+MINT_ADDR_JSON=$($LNCLI_MINT newaddress p2wkh 2>&1)
+MINT_RC=$?
+set -e
+if [ $MINT_RC -ne 0 ]; then
+  echo "ERROR: lnd-mint newaddress failed (rc=$MINT_RC): $MINT_ADDR_JSON" >&2
+  exit 1
+fi
 MINT_ADDR=$(echo "$MINT_ADDR_JSON" | grep -o '"address": "[^"]*"' | cut -d'"' -f4)
-USER_ADDR_JSON=$($LNCLI_USER newaddress p2wkh 2>&1) || { echo "ERROR: lnd-user newaddress failed: $USER_ADDR_JSON" >&2; exit 1; }
+
+set +e
+USER_ADDR_JSON=$($LNCLI_USER newaddress p2wkh 2>&1)
+USER_RC=$?
+set -e
+if [ $USER_RC -ne 0 ]; then
+  echo "ERROR: lnd-user newaddress failed (rc=$USER_RC): $USER_ADDR_JSON" >&2
+  exit 1
+fi
 USER_ADDR=$(echo "$USER_ADDR_JSON" | grep -o '"address": "[^"]*"' | cut -d'"' -f4)
 
 $BITCOIN_CLI sendtoaddress "$MINT_ADDR" 10 > /dev/null
