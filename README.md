@@ -1,5 +1,7 @@
 # Anchr
 
+[![CI](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml)
+
 Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
 
 AI agents and humans buy verified API responses, price feeds, and real-world photos — with minimized trust. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
