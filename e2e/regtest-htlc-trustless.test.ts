@@ -471,6 +471,71 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   }, 60_000);
 
+  test("redeemHtlcToken rejects wrong Worker's key (server-side P2PK check)", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const impostor = generateKeypair();
+    const requester = generateKeypair();
+    const { hash, preimage } = createHTLCHash();
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    process.env.CASHU_MINT_URL = MINT_URL;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Impostor tries to redeem with correct preimage but wrong key
+    const result = await redeemHtlcToken(htlcProofs, preimage, impostor.secretKey);
+    expect(result).toBeNull();
+  }, 60_000);
+
+  test("redeemHtlcToken rejects missing preimage (server-side hashlock check)", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash } = createHTLCHash();
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    process.env.CASHU_MINT_URL = MINT_URL;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Worker has correct key but no preimage — empty string as preimage
+    const result = await redeemHtlcToken(htlcProofs, "", worker.secretKey);
+    expect(result).toBeNull();
+  }, 60_000);
+
+  test("redeemHtlcToken rejects wrong preimage (server-side hashlock check)", async () => {
+    if (skipIfNotReady()) return;
+
+    const worker = generateKeypair();
+    const requester = generateKeypair();
+    const { hash } = createHTLCHash();
+    const { preimage: wrongPreimage } = createHTLCHash();
+    const locktime = Math.floor(Date.now() / 1000) + 3600;
+
+    process.env.CASHU_MINT_URL = MINT_URL;
+
+    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const htlcProofs = await createHtlcProofs(
+      wallet, sourceProofs, AMOUNT_SATS,
+      hash, worker.publicKey, requester.publicKey, locktime,
+    );
+
+    // Worker has correct key but wrong preimage
+    const result = await redeemHtlcToken(htlcProofs, wrongPreimage, worker.secretKey);
+    expect(result).toBeNull();
+  }, 60_000);
+
   test("redeemHtlcToken accepts correct Worker key + preimage", async () => {
     if (skipIfNotReady()) return;
 
