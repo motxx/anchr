@@ -2,7 +2,7 @@
 
 Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
 
-AI agents and humans buy verified API responses, price feeds, and real-world photos — with no trust required. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
+AI agents and humans buy verified API responses, price feeds, and real-world photos — with minimized trust. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
 
 ## SDK
 
@@ -26,7 +26,17 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 ## How It Works
 
-**No trust required.** Proof is tied to the TLS certificate (web) or C2PA signature (photo) — if data is wrong, cryptographic verification fails. Payment is atomic via Cashu HTLC escrow: the Oracle holds a secret preimage, and only reveals it when verification passes, unlocking the bounty for the Worker.
+This protocol is **trust-minimized**, not trustless. Cryptography eliminates several attack vectors, but residual trust assumptions remain.
+
+**Cryptographic guarantees:**
+- **Oracle cannot steal BTC** — HTLC redemption requires Worker's signature, which Oracle cannot forge
+- **Worker cannot forge proofs** — TLSNotary Verifier holds an independent MPC-TLS key share; Worker cannot alter the server's response
+- **Requester cannot revoke payment** — sats are locked in HTLC before work begins
+
+**Residual trust assumptions:**
+- **Oracle + Requester collusion** — Requester decrypts the result (via K_R) before Oracle verifies. If Oracle withholds the preimage, Requester gets data for free and BTC refunds on timeout. Oracle cannot profit, but Worker loses.
+- **Cashu Mint** — trusted to honor token issuance and redemption (standard Cashu trust model)
+- **TLSNotary Verifier** — if Verifier colludes with Worker, they can combine key shares to forge proofs
 
 ### Trustless Flow
 
@@ -66,7 +76,8 @@ sequenceDiagram
     Note over R,M: timeout → HTLC refunds to Requester<br/>(Oracle cannot profit, only deny payment)
 ```
 
-### Protocol Sequence (detailed)
+<details>
+<summary>Protocol Sequence (detailed)</summary>
 
 ```mermaid
 sequenceDiagram
@@ -151,6 +162,9 @@ awaiting_quotes → processing → verifying → approved  (preimage revealed, s
 - **Timeout refund**: If HTLC locktime expires, Requester reclaims the escrowed sats
 - **Privacy**: Cashu blind signatures prevent Mint from linking token issuance to redemption; Nostr provides pseudonymous identity
 - **Two proof types**: TLSNotary (web API data) and C2PA (real-world photos) — both cryptographically bound to source
+- **Trust boundary**: Oracle honesty and Verifier independence are assumed — see [trust model](#how-it-works) above
+
+</details>
 
 ## Two Verification Modes
 
