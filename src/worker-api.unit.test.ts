@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createWalletStore } from "./cashu/wallet-store";
 import { createPreimageStore } from "./oracle/preimage-store";
 import { createOracleRegistry } from "./oracle/registry";
 import type { Oracle, OracleAttestation } from "./oracle/types";
@@ -320,9 +321,10 @@ describe("POST /hash", () => {
     const oracle = makeMockOracle("test-oracle");
     registry.register(oracle);
     const preimageStore = createPreimageStore();
-    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const walletStore = createWalletStore();
+    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore, walletStore });
     const app = buildWorkerApiApp({ queryService, oracleRegistry: registry, preimageStore });
-    return { app, store, registry, queryService, preimageStore };
+    return { app, store, registry, queryService, preimageStore, walletStore };
   }
 
   test("generates hash", withOpenAuth(async () => {
@@ -350,9 +352,10 @@ describe("HTLC inline verification with preimage", () => {
     const oracle = makeMockOracle("test-oracle");
     registry.register(oracle);
     const preimageStore = createPreimageStore();
-    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const walletStore = createWalletStore();
+    const queryService = createQueryService({ store, oracleRegistry: registry, preimageStore, walletStore });
     const app = buildWorkerApiApp({ queryService, oracleRegistry: registry, preimageStore });
-    return { app, store, registry, queryService, preimageStore };
+    return { app, store, registry, queryService, preimageStore, walletStore };
   }
 
   test("POST /queries/:id/result returns preimage for HTLC on success", withOpenAuth(async () => {

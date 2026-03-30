@@ -562,16 +562,20 @@ describe("submitHtlcResult", () => {
     const oracle = opts?.mockOracle ?? makeMockOracle("test-oracle");
     registry.register(oracle);
     const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
+    const { createWalletStore } = require("./cashu/wallet-store") as typeof import("./cashu/wallet-store");
     const preimageStore = createPreimageStore();
+    const walletStore = createWalletStore();
     return {
       service: createQueryService({
         store,
         oracleRegistry: registry,
         preimageStore,
+        walletStore,
       }),
       store,
       registry,
       preimageStore,
+      walletStore,
     };
   }
 
@@ -756,8 +760,10 @@ describe("verifyWithQuorum", () => {
     registry.register(makeMockOracle("oracle-a", () => true));
     registry.register(makeMockOracle("oracle-b", () => true));
     const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
+    const { createWalletStore } = require("./cashu/wallet-store") as typeof import("./cashu/wallet-store");
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const walletStore = createWalletStore();
+    const service = createQueryService({ store, oracleRegistry: registry, preimageStore, walletStore });
 
     const entry = preimageStore.create();
     const htlcInfo = {

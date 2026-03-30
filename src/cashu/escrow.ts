@@ -52,8 +52,8 @@ export interface EscrowToken {
   token: string;
   /** Raw proofs. */
   proofs: Proof[];
-  /** The P2PK options used. */
-  p2pkOptions: P2PKOptions;
+  /** The P2PK options used (null for Phase 1 plain proofs). */
+  p2pkOptions: P2PKOptions | null;
   /** Total amount in sats. */
   amountSats: number;
 }
@@ -261,7 +261,7 @@ export async function createHtlcToken(
       .run();
 
     const token = getEncodedToken({ mint: config.mintUrl, proofs: send });
-    return { token, proofs: send, p2pkOptions: {} as P2PKOptions, amountSats };
+    return { token, proofs: send, p2pkOptions: null, amountSats };
   } catch (error) {
     console.error("[cashu-htlc] Failed to create initial hold token:", error instanceof Error ? error.message : error);
     return null;
@@ -395,7 +395,7 @@ export function verifyHtlcProofs(
     return `Preimage does not match expected hash (hash=${expectedHash})`;
   }
 
-  // 2. Verify each proof's HTLC secret contains the expected hash
+  // 2. Verify each proof's HTLC secret and spending authorization
   for (let i = 0; i < htlcProofs.length; i++) {
     const proof = htlcProofs[i];
     try {
@@ -409,6 +409,13 @@ export function verifyHtlcProofs(
       }
     } catch {
       return `Proof ${i}: invalid secret format`;
+    }
+
+    // 3. If proof has witness, verify P2PK + HTLC spending authorization
+    if (proof.witness) {
+      if (!isHTLCSpendAuthorised(proof)) {
+        return `Proof ${i}: HTLC spending conditions not met`;
+      }
     }
   }
 

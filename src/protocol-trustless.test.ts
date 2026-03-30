@@ -90,11 +90,18 @@ function makeHtlcInfo(preimageStore: PreimageStore) {
 async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
+  walletStore?: WalletStore,
   opts?: { workerPubkey?: string; bountyAmount?: number },
 ) {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
   const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
+  // Seed wallet so lockForQuery succeeds
+  if (walletStore) {
+    walletStore.addProofs("requester", "requester_pub", [
+      { amount: bounty, id: "k_drive", secret: `s_drive_${Date.now()}`, C: `C_drive_${Date.now()}` },
+    ]);
+  }
   const query = service.createQuery(
     { description: "Trustless test" },
     { htlc: htlcInfo, bounty: { amount_sats: bounty } },
@@ -149,8 +156,8 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
   });
 
   test("preimage is NOT returned to Oracle — only to Worker via submitHtlcResult", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
 
     // Oracle's verification returns preimage to the caller (Worker endpoint)
     const outcome = await service.submitHtlcResult(
@@ -163,10 +170,10 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBe(entry.preimage);
 
-    // The preimage store is controlled by Oracle — Oracle can read it,
-    // but the HTLC requires Worker's sig to redeem, so knowing preimage alone is useless
+    // After successful preimage reveal, preimage is deleted from store
+    // (defense-in-depth: prevents re-reading after one-time delivery)
     const storedPreimage = preimageStore.getPreimage(entry.hash);
-    expect(storedPreimage).toBe(entry.preimage);
+    expect(storedPreimage).toBeNull();
   });
 });
 
@@ -176,10 +183,10 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
 
 describe("NUT-14: Worker cannot redeem without valid proof", () => {
   test("preimage is NOT returned when verification fails", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage({
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -271,11 +278,13 @@ describe("NUT-07: Requester cannot revoke payment", () => {
       { htlc: htlcInfo1, bounty: { amount_sats: 100 } },
     );
 
-    // Second query — insufficient funds (already locked)
-    service.createQuery(
-      { description: "Query 2" },
-      { htlc: htlcInfo2, bounty: { amount_sats: 100 } },
-    );
+    // Second query — insufficient funds (already locked) → throws
+    expect(() => {
+      service.createQuery(
+        { description: "Query 2" },
+        { htlc: htlcInfo2, bounty: { amount_sats: 100 } },
+      );
+    }).toThrow("Insufficient balance");
 
     // Balance should still show 0 available, 100 pending (first lock only)
     const balance = walletStore.getBalance("requester", "requester_pub");
@@ -284,9 +293,12 @@ describe("NUT-07: Requester cannot revoke payment", () => {
   });
 
   test("escrow token amount is verified at worker selection", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage();
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
+    walletStore.addProofs("requester", "requester_pub", [
+      { amount: 100, id: "k1", secret: "s_escrow1", C: "C_escrow1" },
+    ]);
     const query = service.createQuery(
       { description: "Escrow verify test" },
       { htlc: htlcInfo, bounty: { amount_sats: 100 } },
@@ -310,9 +322,12 @@ describe("NUT-07: Requester cannot revoke payment", () => {
   });
 
   test("invalid escrow token is rejected at worker selection", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage();
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
+    walletStore.addProofs("requester", "requester_pub", [
+      { amount: 100, id: "k1", secret: "s_invalid1", C: "C_invalid1" },
+    ]);
     const query = service.createQuery(
       { description: "Invalid token test" },
       { htlc: htlcInfo, bounty: { amount_sats: 100 } },
@@ -414,8 +429,8 @@ describe("NUT-11: Timeout refund", () => {
 
 describe("Worker impersonation prevention", () => {
   test("wrong Worker cannot submit result for selected Worker", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore);
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { query, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -461,8 +476,8 @@ describe("Worker impersonation prevention", () => {
 describe("Oracle + Requester collusion limits", () => {
   test("Oracle withholding preimage: Worker loses but Oracle cannot profit", async () => {
     // Simulate: Oracle verifies valid proof but preimage store has been cleared
-    const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
 
     // Oracle "withholds" by deleting preimage before result submission
     preimageStore.delete(entry.hash);
@@ -560,7 +575,7 @@ describe("Preimage reveal conditions", () => {
   test("preimage returned ONLY when verification passes", async () => {
     // Pass case
     const pass = makeServiceWithPreimage();
-    const passCtx = await driveToProcessing(pass.service, pass.preimageStore);
+    const passCtx = await driveToProcessing(pass.service, pass.preimageStore, pass.walletStore);
     const passOutcome = await pass.service.submitHtlcResult(
       passCtx.query.id,
       { attachments: [] },
@@ -573,7 +588,7 @@ describe("Preimage reveal conditions", () => {
     const fail = makeServiceWithPreimage({
       mockOracle: makeMockOracle("fail-oracle", () => false),
     });
-    const failCtx = await driveToProcessing(fail.service, fail.preimageStore);
+    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, fail.walletStore);
     const failOutcome = await fail.service.submitHtlcResult(
       failCtx.query.id,
       { attachments: [] },
@@ -650,8 +665,8 @@ describe("HTLC state machine — invalid transitions blocked", () => {
   });
 
   test("cannot submit result twice", async () => {
-    const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore);
+    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { query, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
 
     const first = await service.submitHtlcResult(
       query.id,

@@ -226,41 +226,34 @@ async function attemptRedeem(
   }
 }
 
+// --- Infrastructure readiness (top-level await for test.skipIf) ---
+
+const [MINT_REACHABLE, LND_REACHABLE] = await Promise.all([
+  isCashuMintReachable(),
+  isLndUserReachable(),
+]);
+const INFRA_READY = MINT_REACHABLE && LND_REACHABLE;
+
+if (!INFRA_READY) {
+  console.warn("[e2e] Infrastructure not ready – tests will be skipped.");
+  console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
+}
+
 // =============================================================================
 
 describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
-  let mintReachable = false;
-  let lndReachable = false;
   let wallet: Wallet;
 
   beforeAll(async () => {
-    [mintReachable, lndReachable] = await Promise.all([
-      isCashuMintReachable(),
-      isLndUserReachable(),
-    ]);
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] Infrastructure not ready – tests will be skipped.");
-      console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
-      return;
-    }
+    if (!INFRA_READY) return;
     wallet = await createWallet();
   });
-
-  function skipIfNotReady() {
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] SKIPPED – infrastructure not ready");
-      return true;
-    }
-    return false;
-  }
 
   // ---------------------------------------------------------------------------
   // 1. Oracle tries to redeem with preimage only (no Worker sig)
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Oracle has preimage but no Worker key → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Oracle has preimage but no Worker key → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const oracle = generateKeypair(); // Oracle's own key (NOT the Worker's)
@@ -284,9 +277,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 2. Worker tries to redeem without preimage
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Worker has correct key but no preimage → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Worker has correct key but no preimage → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash } = createHTLCHash();
@@ -308,9 +299,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 3. Wrong Worker tries to redeem with correct preimage
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Wrong Worker has preimage but wrong key → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Wrong Worker has preimage but wrong key → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const impostor = generateKeypair(); // different keypair
     const requester = generateKeypair();
@@ -333,9 +322,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 4. Worker redeems with correct preimage + correct sig → SUCCESS
   // ---------------------------------------------------------------------------
 
-  test("LEGIT: Worker has preimage + correct key → Mint ACCEPTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("LEGIT: Worker has preimage + correct key → Mint ACCEPTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -367,9 +354,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 5. Double-spend: reuse same HTLC proofs after redemption
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Reuse spent HTLC proofs → Mint REJECTS (double-spend)", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Reuse spent HTLC proofs → Mint REJECTS (double-spend)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -403,9 +388,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 6. Wrong preimage with correct Worker key
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Worker has correct key but wrong preimage → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Worker has correct key but wrong preimage → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash } = createHTLCHash();
@@ -428,9 +411,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 7. No witness at all
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: No witness at all → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: No witness at all → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -452,9 +433,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 8. Refund path BEFORE locktime (Requester tries early refund)
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -477,9 +456,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 9. Refund path AFTER locktime (legitimate timeout refund)
   // ---------------------------------------------------------------------------
 
-  test("LEGIT: Requester refund key after locktime → Mint ACCEPTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("LEGIT: Requester refund key after locktime → Mint ACCEPTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -512,9 +489,7 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 10. Tampered proof secret (altered hash in secret)
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Tampered proof secret → Mint REJECTS", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("ATTACK: Tampered proof secret → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -545,30 +520,14 @@ describe("e2e: HTLC trustless properties (real Cashu Mint)", () => {
 // =============================================================================
 
 describe("e2e: Anchr server-side HTLC enforcement", () => {
-  let mintReachable = false;
-  let lndReachable = false;
   let wallet: Wallet;
 
   beforeAll(async () => {
-    [mintReachable, lndReachable] = await Promise.all([
-      isCashuMintReachable(),
-      isLndUserReachable(),
-    ]);
-    if (!mintReachable || !lndReachable) return;
+    if (!INFRA_READY) return;
     wallet = await createWallet();
   });
 
-  function skipIfNotReady() {
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] SKIPPED – infrastructure not ready");
-      return true;
-    }
-    return false;
-  }
-
-  test("verifyHtlcProofs rejects wrong preimage", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("verifyHtlcProofs rejects wrong preimage", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash } = createHTLCHash();
@@ -586,9 +545,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(error).toContain("Preimage does not match");
   }, 60_000);
 
-  test("verifyHtlcProofs rejects mismatched hash in proofs", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("verifyHtlcProofs rejects mismatched hash in proofs", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -607,9 +564,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     // Either preimage doesn't match differentHash, or proof hashlock mismatch
   }, 60_000);
 
-  test("verifyHtlcProofs accepts correct preimage + matching proofs", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("verifyHtlcProofs accepts correct preimage + matching proofs", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -625,9 +580,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(error).toBeNull(); // All good
   }, 60_000);
 
-  test("redeemHtlcToken rejects Oracle's key (server-side P2PK check)", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("redeemHtlcToken rejects Oracle's key (server-side P2PK check)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const oracle = generateKeypair();
@@ -647,9 +600,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   }, 60_000);
 
-  test("redeemHtlcToken rejects wrong Worker's key (server-side P2PK check)", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("redeemHtlcToken rejects wrong Worker's key (server-side P2PK check)", async () => {
     const worker = generateKeypair();
     const impostor = generateKeypair();
     const requester = generateKeypair();
@@ -669,9 +620,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   }, 60_000);
 
-  test("redeemHtlcToken rejects missing preimage (server-side hashlock check)", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("redeemHtlcToken rejects missing preimage (server-side hashlock check)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash } = createHTLCHash();
@@ -690,9 +639,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   }, 60_000);
 
-  test("redeemHtlcToken rejects wrong preimage (server-side hashlock check)", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("redeemHtlcToken rejects wrong preimage (server-side hashlock check)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash } = createHTLCHash();
@@ -712,9 +659,7 @@ describe("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   }, 60_000);
 
-  test("redeemHtlcToken accepts correct Worker key + preimage", async () => {
-    if (skipIfNotReady()) return;
-
+  test.skipIf(!INFRA_READY)("redeemHtlcToken accepts correct Worker key + preimage", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();

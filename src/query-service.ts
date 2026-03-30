@@ -174,11 +174,14 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
   /** Valid state transitions for HTLC queries. */
   const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
-    awaiting_quotes: ["worker_selected"],
-    worker_selected: ["processing"],
+    awaiting_quotes: ["processing"],
     processing: ["verifying"],
     verifying: ["approved", "rejected"],
   };
+
+  function validateTransition(from: QueryStatus, to: QueryStatus): boolean {
+    return HTLC_TRANSITIONS[from]?.includes(to) ?? false;
+  }
 
   function isHtlcQuery(query: Query): boolean {
     return query.htlc !== undefined;
@@ -316,7 +319,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         const pub = options.htlc.requester_pubkey;
         const locked = walletStore.lockForQuery("requester", pub, query.id, sats);
         if (!locked) {
-          console.error(`[wallet] Requester ${pub} insufficient proofs for ${sats} sats`);
+          throw new Error(`Insufficient balance: Requester ${pub} cannot lock ${sats} sats`);
         }
       }
 
@@ -391,7 +394,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     cancelQuery(id: string): CancelQueryOutcome {
       const query = store.get(id);
       if (!query) return { ok: false, message: "Query not found" };
-      if (query.status !== "pending") return { ok: false, message: `Query is already ${query.status}` };
+      const cancellableStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+      if (!cancellableStatuses.includes(query.status)) {
+        return { ok: false, message: `Query is already ${query.status}` };
+      }
       store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
       // Refund locked proofs to requester
       if (walletStore && query.htlc?.requester_pubkey) {
@@ -403,9 +409,13 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     expireQueries(): number {
       const now = Date.now();
       let count = 0;
+      const expirableStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
       for (const query of store.values()) {
-        if (query.status === "pending" && query.expires_at < now) {
+        if (expirableStatuses.includes(query.status) && query.expires_at < now) {
           store.set(query.id, { ...query, status: "expired", payment_status: "cancelled" });
+          if (walletStore && query.htlc?.requester_pubkey) {
+            walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, query.id);
+          }
           count++;
         }
       }
@@ -444,7 +454,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const query = store.get(queryId);
       if (!query) return { ok: false, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
-      if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
+      if (!validateTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
       // Verify HTLC token amount matches bounty — queries Cashu mint for proof state
       const tokenToVerify = htlcToken ?? query.htlc!.escrow_token;
@@ -478,7 +488,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const query = store.get(queryId);
       if (!query) return { ok: false, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
-      if (query.status !== "processing") return { ok: false, message: `Query is ${query.status}, not processing` };
+      if (!validateTransition(query.status, "verifying")) return { ok: false, message: `Query is ${query.status}, not processing` };
       if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
         return { ok: false, message: "Worker pubkey does not match selected worker" };
       }
@@ -499,9 +509,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const query = store.get(queryId);
       if (!query) return { ok: false, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
-      if (query.status !== "verifying") return { ok: false, message: `Query is ${query.status}, not verifying` };
+      const verifyTarget: QueryStatus = passed ? "approved" : "rejected";
+      if (!validateTransition(query.status, verifyTarget)) return { ok: false, message: `Query is ${query.status}, not verifying` };
 
-      const newStatus: QueryStatus = passed ? "approved" : "rejected";
+      const newStatus: QueryStatus = verifyTarget;
       const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
       store.set(queryId, {
         ...query,
@@ -522,7 +533,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       const query = store.get(queryId);
       if (!query) return { ok: false, query: null, message: "Query not found" };
       if (!isHtlcQuery(query)) return { ok: false, query, message: "Not an HTLC query" };
-      if (query.status !== "processing") return { ok: false, query, message: `Query is ${query.status}, not processing` };
+      if (!validateTransition(query.status, "verifying")) return { ok: false, query, message: `Query is ${query.status}, not processing` };
       if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
         return { ok: false, query, message: "Worker pubkey does not match selected worker" };
       }
@@ -578,22 +589,28 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       if (passed && preimageStore && query.htlc?.hash) {
         const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
-          if (walletStore) {
-            const lockedProofs = walletStore.getLockedProofs(
-              "requester", query.htlc.requester_pubkey, queryId,
-            );
-            if (lockedProofs.length > 0) {
-              const htlcError = verifyHtlcProofs(lockedProofs, query.htlc.hash, preimage);
-              if (htlcError) {
-                console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
-                return {
-                  ok: false,
-                  query: updated,
-                  message: `HTLC proof verification failed: ${htlcError}`,
-                };
-              }
+          if (!walletStore) {
+            return {
+              ok: false,
+              query: updated,
+              message: "HTLC preimage cannot be revealed without walletStore",
+            };
+          }
+          const lockedProofs = walletStore.getLockedProofs(
+            "requester", query.htlc.requester_pubkey, queryId,
+          );
+          if (lockedProofs.length > 0) {
+            const htlcError = verifyHtlcProofs(lockedProofs, query.htlc.hash, preimage);
+            if (htlcError) {
+              console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
+              return {
+                ok: false,
+                query: updated,
+                message: `HTLC proof verification failed: ${htlcError}`,
+              };
             }
           }
+          preimageStore.delete(query.htlc.hash);
           return {
             ok: true,
             query: updated,
