@@ -1,7 +1,8 @@
-import { expect, test, beforeEach } from "bun:test";
-import { verify } from "./verifier";
+import { afterEach, describe, expect, test, beforeEach } from "bun:test";
+import { verify, _setValidateTlsnForTest } from "./verifier";
 import { storeIntegrity, clearIntegrityStore } from "./integrity-store";
-import type { Query, QueryResult } from "../types";
+import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../types";
+import type { TlsnValidationResult } from "./tlsn-validation";
 
 beforeEach(() => {
   clearIntegrityStore();
@@ -198,4 +199,164 @@ test("missing body GPS fails when GPS verification required", async () => {
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain("GPS coordinates missing from submission body — required by verification policy");
+});
+
+// --- TLSNotary extension result path ---
+
+function makeTlsnQuery(overrides: Partial<Query> = {}): Query {
+  return {
+    id: "query_tlsn",
+    status: "pending",
+    description: "TLSNotary test",
+    verification_requirements: ["tlsn"],
+    created_at: Date.now(),
+    expires_at: Date.now() + 60_000,
+    payment_status: "locked",
+    tlsn_requirements: {
+      target_url: "https://httpbin.org/get",
+      conditions: [{ type: "contains", expression: "httpbin", description: "contains httpbin" }],
+    },
+    ...overrides,
+  };
+}
+
+const now = Math.floor(Date.now() / 1000);
+
+function mockValidateTlsnSuccess() {
+  return async (_att: TlsnAttestation, _req: TlsnRequirement): Promise<TlsnValidationResult> => ({
+    available: true,
+    signatureValid: true,
+    serverIdentityValid: true,
+    conditionResults: [{ condition: { type: "contains", expression: "httpbin" }, passed: true, actual_value: "httpbin" }],
+    attestationFresh: true,
+    verifiedData: {
+      server_name: "httpbin.org",
+      revealed_body: '{"ok":true,"url":"https://httpbin.org/get"}',
+      session_timestamp: now,
+    },
+    checks: ["TLSNotary: presentation signature valid (cryptographically verified)", "TLSNotary: server name matches target (httpbin.org)", "TLSNotary condition passed: contains httpbin"],
+    failures: [],
+  });
+}
+
+function mockValidateTlsnFailure() {
+  return async (_att: TlsnAttestation, _req: TlsnRequirement): Promise<TlsnValidationResult> => ({
+    available: true,
+    signatureValid: false,
+    serverIdentityValid: false,
+    conditionResults: [],
+    attestationFresh: false,
+    verifiedData: undefined,
+    checks: [],
+    failures: ["TLSNotary: presentation signature invalid — verification failed"],
+  });
+}
+
+describe("verify() TLSNotary extension result path", () => {
+  beforeEach(() => {
+    clearIntegrityStore();
+  });
+
+  afterEach(() => {
+    _setValidateTlsnForTest(null);
+  });
+
+  test("extension result + presentation → validateTlsn is called and verifies", async () => {
+    _setValidateTlsnForTest(mockValidateTlsnSuccess());
+    const query = makeTlsnQuery();
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: { presentation: "dGVzdA==" },
+    };
+
+    const verification = await verify(query, result);
+
+    expect(verification.passed).toBe(true);
+    expect(verification.checks.some(c => c.includes("cryptographically verified"))).toBe(true);
+    expect(verification.checks.some(c => c.includes("server name matches"))).toBe(true);
+  });
+
+  test("extension result + presentation + verification pass → tlsn_verified data is returned", async () => {
+    _setValidateTlsnForTest(mockValidateTlsnSuccess());
+    const query = makeTlsnQuery();
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: { presentation: "dGVzdA==" },
+    };
+
+    const verification = await verify(query, result);
+
+    expect(verification.tlsn_verified).toBeDefined();
+    expect(verification.tlsn_verified!.server_name).toBe("httpbin.org");
+    expect(verification.tlsn_verified!.revealed_body).toContain("httpbin");
+    expect(verification.tlsn_verified!.session_timestamp).toBe(now);
+  });
+
+  test("extension result + presentation + verification failure → failures populated", async () => {
+    _setValidateTlsnForTest(mockValidateTlsnFailure());
+    const query = makeTlsnQuery();
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: { presentation: "dGVzdA==" },
+    };
+
+    const verification = await verify(query, result);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures.some(f => f.includes("signature invalid"))).toBe(true);
+    expect(verification.tlsn_verified).toBeUndefined();
+  });
+
+  test("extension result WITHOUT presentation → rejected (self-reported data not trusted)", async () => {
+    _setValidateTlsnForTest(mockValidateTlsnSuccess()); // should NOT be called
+    const query = makeTlsnQuery();
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: {
+        results: [{ type: "text", part: "body", value: "fake data" }],
+      },
+    };
+
+    const verification = await verify(query, result);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures).toContain(
+      "TLSNotary extension: no cryptographic presentation included — self-reported data cannot be trusted",
+    );
+  });
+
+  test("extension result + presentation BUT no tlsn_requirements → rejected", async () => {
+    _setValidateTlsnForTest(mockValidateTlsnSuccess()); // should NOT be called
+    const query = makeTlsnQuery({ tlsn_requirements: undefined });
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: { presentation: "dGVzdA==" },
+    };
+
+    const verification = await verify(query, result);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures).toContain("TLSNotary extension: query missing tlsn_requirements");
+  });
+
+  test("extension result and CLI attestation both present → extension path takes priority", async () => {
+    const query = makeTlsnQuery();
+    const result: QueryResult = {
+      attachments: [],
+      tlsn_extension_result: { presentation: "ZXh0ZW5zaW9u" },
+      tlsn_attestation: { presentation: "Y2xp" },
+    };
+
+    let calledWith: string | undefined;
+    _setValidateTlsnForTest(async (att, req) => {
+      calledWith = att.presentation;
+      return mockValidateTlsnSuccess()(att, req);
+    });
+
+    const verification = await verify(query, result);
+
+    expect(verification.passed).toBe(true);
+    // The extension presentation should be used, not the CLI one
+    expect(calledWith).toBe("ZXh0ZW5zaW9u");
+  });
 });

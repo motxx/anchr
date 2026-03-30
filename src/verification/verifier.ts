@@ -14,6 +14,13 @@ import type {
   TlsnVerifiedData,
   VerificationDetail,
 } from "../types";
+/** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
+let _validateTlsnFn: typeof validateTlsn = validateTlsn;
+
+/** Allow tests to override the validateTlsn implementation. Pass null to reset. */
+export function _setValidateTlsnForTest(fn: typeof validateTlsn | null): void {
+  _validateTlsnFn = fn ?? validateTlsn;
+}
 
 /** Default maximum distance (km) between reported GPS and expected GPS. */
 const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
@@ -75,7 +82,7 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
 
       if (extResult.presentation && query.tlsn_requirements) {
         // Has cryptographic proof — verify via the standard tlsn-verifier binary
-        const tlsnResult = await validateTlsn(
+        const tlsnResult = await _validateTlsnFn(
           { presentation: extResult.presentation },
           query.tlsn_requirements,
         );
@@ -95,7 +102,7 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
     } else if (!query.tlsn_requirements) {
       failures.push("TLSNotary: query missing tlsn_requirements");
     } else {
-      const tlsnResult = await validateTlsn(
+      const tlsnResult = await _validateTlsnFn(
         result.tlsn_attestation,
         query.tlsn_requirements,
       );

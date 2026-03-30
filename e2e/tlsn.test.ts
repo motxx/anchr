@@ -190,6 +190,54 @@ describe("TLSNotary E2E", () => {
     expect(outcome.query?.verification?.failures.some(f => f.includes("no attestation"))).toBe(true);
   });
 
+  test("extension result with CLI-generated presentation verifies via HTTP API", async () => {
+    if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
+      console.error("[e2e] SKIPPED — infrastructure not ready");
+      return;
+    }
+
+    const app = buildWorkerApiApp();
+    const targetUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
+
+    // Create query
+    const createRes = await app.request("/queries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: "E2E: extension result test",
+        verification_requirements: ["tlsn"],
+        tlsn_requirements: {
+          target_url: targetUrl,
+          conditions: [{ type: "jsonpath", expression: "bitcoin.usd", description: "BTC price exists" }],
+        },
+        ttl_seconds: 600,
+      }),
+    });
+    expect(createRes.status).toBe(201);
+    const { query_id } = await createRes.json() as { query_id: string };
+
+    // Generate real presentation via CLI prover
+    const presentationB64 = await generatePresentation(targetUrl);
+
+    // Submit as extension result (not CLI attestation) — exercises the extension path in verifier.ts
+    const submitRes = await app.request(`/queries/${query_id}/submit`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tlsn_extension_result: { presentation: presentationB64 },
+      }),
+    });
+
+    const submitData = await submitRes.json() as Record<string, unknown>;
+    expect(submitData.ok).toBe(true);
+    expect((submitData.verification as any)?.passed).toBe(true);
+
+    // Verify that tlsn_verified data is populated
+    const verified = (submitData.verification as any)?.tlsn_verified;
+    expect(verified?.server_name).toBe("api.coingecko.com");
+    expect(verified?.revealed_body).toContain("bitcoin");
+  }, 120_000);
+
   test("HTTP API accepts tlsn_presentation field", async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
