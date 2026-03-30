@@ -74,6 +74,9 @@ export interface WalletStore {
 
   /** Get balance verified against the Cashu mint (removes spent proofs). */
   getVerifiedBalance(role: WalletRole, pubkey: string): Promise<WalletBalance>;
+
+  /** Get proofs locked for a specific query (for HTLC verification). */
+  getLockedProofs(role: WalletRole, pubkey: string, queryId: string): Proof[];
 }
 
 export function createWalletStore(): WalletStore {
@@ -134,6 +137,10 @@ export function createWalletStore(): WalletStore {
 
     getBalance(role, pubkey) {
       return computeBalance(getData(role, pubkey));
+    },
+
+    getLockedProofs(role, pubkey, queryId) {
+      return getData(role, pubkey).pending.get(queryId) ?? [];
     },
 
     async getVerifiedBalance(role, pubkey) {

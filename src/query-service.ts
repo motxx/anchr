@@ -575,17 +575,24 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
       // 4. Return preimage on success (look up by HTLC hash)
       // Server-side HTLC verification: verify preimage matches hash before revealing.
-      // This compensates for Mints that don't enforce NUT-14 conditions.
       if (passed && preimageStore && query.htlc?.hash) {
         const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
-          const htlcError = verifyHtlcProofs(
-            walletStore?.getLockedProofs?.("requester", query.htlc.requester_pubkey, queryId) ?? [],
-            query.htlc.hash,
-            preimage,
-          );
-          if (htlcError) {
-            console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
+          if (walletStore) {
+            const lockedProofs = walletStore.getLockedProofs(
+              "requester", query.htlc.requester_pubkey, queryId,
+            );
+            if (lockedProofs.length > 0) {
+              const htlcError = verifyHtlcProofs(lockedProofs, query.htlc.hash, preimage);
+              if (htlcError) {
+                console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
+                return {
+                  ok: false,
+                  query: updated,
+                  message: `HTLC proof verification failed: ${htlcError}`,
+                };
+              }
+            }
           }
           return {
             ok: true,
