@@ -91,10 +91,11 @@ async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
   walletStore?: WalletStore,
-  opts?: { workerPubkey?: string; bountyAmount?: number },
+  opts?: { workerPubkey?: string; bountyAmount?: number; oracleIds?: string[] },
 ) {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
+  const oracleIds = opts?.oracleIds ?? ["test-oracle"];
   const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
   // Seed wallet so lockForQuery succeeds
   if (walletStore) {
@@ -104,7 +105,7 @@ async function driveToProcessing(
   }
   const query = service.createQuery(
     { description: "Trustless test" },
-    { htlc: htlcInfo, bounty: { amount_sats: bounty } },
+    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds },
   );
   service.recordQuote(query.id, {
     worker_pubkey: workerPub,
@@ -186,7 +187,7 @@ describe("NUT-14: Worker cannot redeem without valid proof", () => {
     const { service, preimageStore, walletStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore, { oracleIds: ["strict-oracle"] });
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -397,7 +398,7 @@ describe("NUT-11: Timeout refund", () => {
 
     const query = service.createQuery(
       { description: "Reject refund test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -508,7 +509,7 @@ describe("Oracle + Requester collusion limits", () => {
 
     const query = service.createQuery(
       { description: "Settlement test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -545,7 +546,7 @@ describe("Oracle + Requester collusion limits", () => {
 
     const query = service.createQuery(
       { description: "Reject test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -588,7 +589,7 @@ describe("Preimage reveal conditions", () => {
     const fail = makeServiceWithPreimage({
       mockOracle: makeMockOracle("fail-oracle", () => false),
     });
-    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, fail.walletStore);
+    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, fail.walletStore, { oracleIds: ["fail-oracle"] });
     const failOutcome = await fail.service.submitHtlcResult(
       failCtx.query.id,
       { attachments: [] },

@@ -1,4 +1,5 @@
 import { normalizeQueryResult } from "./attachments";
+import { getDecodedToken } from "@cashu/cashu-ts";
 import { verifyToken } from "./cashu/wallet";
 import { verifyHtlcProofs } from "./cashu/escrow";
 import type { WalletStore } from "./cashu/wallet-store";
@@ -159,6 +160,9 @@ function generateQueryId(): string {
   return `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Minimum HTLC locktime in seconds (10 minutes). */
+export const MIN_HTLC_LOCKTIME_SECS = 600;
+
 export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const store = deps?.store ?? createQueryStore();
   const registry = deps?.oracleRegistry;
@@ -197,9 +201,13 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     attestations: OracleAttestationRecord[];
     verification: VerificationDetail;
   }> {
+    // CTF-1: When query has no acceptable oracle list, ignore worker-supplied oracleId.
+    // Otherwise a worker can register a malicious oracle and force its use.
+    const effectiveOracleId = query.oracle_ids?.length ? oracleId : undefined;
+
     if (!query.quorum) {
       // Single oracle — backward compatible
-      const oracle = doResolveOracle(oracleId, query.oracle_ids);
+      const oracle = doResolveOracle(effectiveOracleId, query.oracle_ids);
       if (!oracle) {
         return {
           passed: false,
@@ -207,8 +215,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
           verification: {
             passed: false,
             checks: [],
-            failures: [oracleId
-              ? `Oracle "${oracleId}" is not available or not accepted for this query`
+            failures: [effectiveOracleId
+              ? `Oracle "${effectiveOracleId}" is not available or not accepted for this query`
               : "No oracle available for this query"],
           },
         };
@@ -285,6 +293,17 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   return {
     createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
       const now = Date.now();
+
+      // CTF-3: Enforce minimum HTLC locktime to prevent immediate-refund race attacks.
+      if (options?.htlc?.locktime) {
+        const nowSecs = Math.floor(now / 1000);
+        if (options.htlc.locktime - nowSecs < MIN_HTLC_LOCKTIME_SECS) {
+          throw new Error(
+            `HTLC locktime must be at least ${MIN_HTLC_LOCKTIME_SECS}s in the future (got ${options.htlc.locktime - nowSecs}s)`,
+          );
+        }
+      }
+
       const requirements = input.verification_requirements
         ?? DEFAULT_VERIFICATION_FACTORS;
       const needsNonce = requirements.includes("nonce");
@@ -466,6 +485,41 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
           return { ok: false, message: `Escrow token verification failed: ${check.error}` };
         }
         verifiedEscrowSats = check.amountSats;
+      }
+
+      // CTF-2: Verify HTLC token P2PK lock target and hashlock.
+      // Without this, a requester could submit a token locked to their own key
+      // instead of the worker's, then redeem after preimage is revealed.
+      if (tokenToVerify && query.htlc?.hash) {
+        try {
+          const decoded = getDecodedToken(tokenToVerify);
+          for (const proof of decoded.proofs) {
+            let secret: unknown;
+            try { secret = JSON.parse(proof.secret); } catch { continue; }
+            if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+
+            // Verify hashlock matches query hash
+            if (secret[1]?.data !== query.htlc.hash) {
+              return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+            }
+
+            // Verify P2PK lock includes worker pubkey
+            const tags: string[][] | undefined = secret[1]?.tags;
+            const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
+            if (pubkeyTag) {
+              const lockedKeys = pubkeyTag.slice(1);
+              // Accept both compressed (02/03-prefixed) and raw hex
+              const workerHex = workerPubkey.startsWith("02") || workerPubkey.startsWith("03")
+                ? workerPubkey
+                : `02${workerPubkey}`;
+              if (!lockedKeys.includes(workerPubkey) && !lockedKeys.includes(workerHex)) {
+                return { ok: false, message: "HTLC token not locked to selected worker" };
+              }
+            }
+          }
+        } catch {
+          // Token decode failed — non-fatal, amount check already passed
+        }
       }
 
       const htlc: HtlcInfo = {

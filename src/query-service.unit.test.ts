@@ -196,7 +196,7 @@ describe("createQueryService", () => {
 
   test("submitQueryResult approves valid submission", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" });
+    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -213,7 +213,7 @@ describe("createQueryService", () => {
     const { service } = makeIsolatedService({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const query = service.createQuery({ description: "Test query" });
+    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["strict-oracle"] });
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -254,7 +254,7 @@ describe("createQueryService", () => {
 
   test("submitQueryResult fails for already-submitted query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" });
+    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -304,7 +304,7 @@ describe("createQueryService", () => {
 
   test("cancelQuery fails for already-approved query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" });
+    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -596,7 +596,7 @@ describe("submitHtlcResult", () => {
   test("submitHtlcResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { htlcInfo, entry } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await service.selectWorker(query.id, "w1");
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -615,7 +615,7 @@ describe("submitHtlcResult", () => {
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
     const { htlcInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["strict-oracle"] });
     await service.selectWorker(query.id, "w1");
     const outcome = await service.submitHtlcResult(
       query.id,

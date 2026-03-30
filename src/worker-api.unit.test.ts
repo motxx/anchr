@@ -95,7 +95,7 @@ describe("buildWorkerApiApp with injected deps", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         description: "Test Store status check",
-        htlc: { hash: "abc123", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: 9999999 },
+        htlc: { hash: "abc123", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);
@@ -243,7 +243,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
@@ -279,7 +279,7 @@ describe("HTLC endpoints", () => {
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "Full HTLC lifecycle", htlc: htlcInfo }),
+      body: JSON.stringify({ description: "Full HTLC lifecycle", htlc: htlcInfo, oracle_ids: ["test-oracle"] }),
     });
     expect(createRes.status).toBe(201);
     const { query_id } = await createRes.json() as { query_id: string };
@@ -368,7 +368,7 @@ describe("HTLC inline verification with preimage", () => {
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
@@ -430,7 +430,7 @@ describe("Quorum via HTTP", () => {
         description: "Quorum query",
         oracle_ids: ["oracle-a", "oracle-b"],
         quorum: { min_approvals: 2 },
-        htlc: { hash: "qhash", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: 9999999 },
+        htlc: { hash: "qhash", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);
