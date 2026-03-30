@@ -229,8 +229,6 @@ export class AnchrWorker {
     const args = [
       this.config.proverBin,
       "--verifier", this.config.verifierHost,
-      "--max-sent-data", String(this.config.maxSentData),
-      "--max-recv-data", String(this.config.maxRecvData),
       targetUrl,
       "-o", tmpFile,
     ];

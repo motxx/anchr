@@ -17,7 +17,7 @@ import type { QueryInput, QueryResult } from "../src/types";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 
-const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7047";
+const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
 const PROVER_BIN = join(import.meta.dir, "../crates/tlsn-prover/target/debug/tlsn-prove");
 const VERIFIER_BIN = join(import.meta.dir, "../crates/tlsn-verifier/target/release/tlsn-verifier");
 
