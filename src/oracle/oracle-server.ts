@@ -10,12 +10,25 @@
  *   ORACLE_PORT=4000 ORACLE_API_KEY=secret bun src/oracle/oracle-server.ts
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../types";
 import type { OracleAttestation } from "./types";
 import { createPreimageStore, type PreimageStore } from "./preimage-store";
+
+/** Constant-time string comparison to prevent timing attacks. */
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    // Compare against self to keep constant time, then return false
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
 
 const ORACLE_ID = process.env.ORACLE_ID ?? "remote-oracle";
 const ORACLE_API_KEY = process.env.ORACLE_API_KEY?.trim();
@@ -42,6 +55,9 @@ export function buildOracleApp(
   // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
 
+  // Map queryId → verified status (true only after POST /verify returns passed:true)
+  const verifiedQueries = new Map<string, boolean>();
+
   const app = new Hono();
 
   // Auth middleware for protected endpoints
@@ -50,7 +66,7 @@ export function buildOracleApp(
     const auth = c.req.header("authorization");
     const key = c.req.header("x-api-key");
     const token = auth?.startsWith("Bearer ") ? auth.slice(7) : key;
-    if (token !== resolvedApiKey) {
+    if (!token || !safeCompare(token, resolvedApiKey)) {
       return c.json({ error: "Unauthorized" }, 401);
     }
     await next();
@@ -120,6 +136,11 @@ export function buildOracleApp(
       attested_at: Date.now(),
     };
 
+    // Record verification result for preimage gating
+    if (detail.passed) {
+      verifiedQueries.set(body.query.id, true);
+    }
+
     return c.json(attestation);
   });
 
@@ -133,6 +154,11 @@ export function buildOracleApp(
     const body = await c.req.json<{ query_id: string }>().catch(() => null);
     if (!body?.query_id) {
       return c.json({ error: "Missing query_id" }, 400);
+    }
+
+    // Only release preimage if verification passed
+    if (!verifiedQueries.get(body.query_id)) {
+      return c.json({ error: "Verification has not passed for this query" }, 403);
     }
 
     const hash = queryHashMap.get(body.query_id);

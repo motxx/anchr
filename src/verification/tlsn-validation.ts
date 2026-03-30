@@ -87,9 +87,22 @@ export function evaluateCondition(
       return { passed, actual_value: passed ? condition.expression : undefined };
     }
     case "regex": {
-      const re = new RegExp(condition.expression);
-      const match = re.exec(body);
-      return { passed: match !== null, actual_value: match?.[0] };
+      // Guard against catastrophic backtracking (ReDoS)
+      const pattern = condition.expression;
+      if (pattern.length > 500) {
+        return { passed: false, actual_value: "regex pattern too long (max 500 chars)" };
+      }
+      // Reject nested quantifiers that cause exponential backtracking
+      if (/\([^)]*[+*][^)]*\)[+*]/.test(pattern) || /\([^)]*\{[^}]*\}[^)]*\)[+*{]/.test(pattern)) {
+        return { passed: false, actual_value: "regex rejected: nested quantifiers detected" };
+      }
+      try {
+        const re = new RegExp(pattern);
+        const match = re.exec(body);
+        return { passed: match !== null, actual_value: match?.[0] };
+      } catch {
+        return { passed: false, actual_value: "invalid regex pattern" };
+      }
     }
     case "jsonpath": {
       try {

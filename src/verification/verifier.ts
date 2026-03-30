@@ -4,6 +4,7 @@ import { haversineKm } from "./exif-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import { validateTlsn } from "./tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
+import { validateAttachmentUri } from "../url-validation";
 import type {
   AttachmentRef,
   BlossomKeyMap,
@@ -279,15 +280,20 @@ async function verifyC2paFromAttachments(
       data = await fetchBlossomAttachment(att, keyMaterial);
     }
 
-    // Try to fetch from URL (external path)
+    // Try to fetch from URL (external path) — validate URI to prevent SSRF
     if (!data && att.uri) {
-      try {
-        const response = await fetch(att.uri);
-        if (response.ok) {
-          data = new Uint8Array(await response.arrayBuffer());
+      const uriError = validateAttachmentUri(att.uri);
+      if (uriError) {
+        failures.push(`C2PA: attachment URI rejected (${uriError})`);
+      } else {
+        try {
+          const response = await fetch(att.uri);
+          if (response.ok) {
+            data = new Uint8Array(await response.arrayBuffer());
+          }
+        } catch {
+          // fetch failed, continue
         }
-      } catch {
-        // fetch failed, continue
       }
     }
 

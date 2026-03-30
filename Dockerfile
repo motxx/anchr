@@ -38,6 +38,9 @@ ENV RUNTIME_DATA_DIR=/data
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+RUN adduser --disabled-password --gecos "" anchr
+USER anchr
+
 EXPOSE 8080
 
 ENTRYPOINT ["docker-entrypoint.sh"]

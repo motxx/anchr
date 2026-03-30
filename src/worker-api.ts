@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -33,6 +34,7 @@ import { VERIFICATION_FACTORS } from "./types";
 import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "./types";
 import { getRuntimeConfig as getConfig } from "./config";
 import { haversineKm } from "./verification/exif-validation";
+import { validateAttachmentUri } from "./url-validation";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
@@ -109,6 +111,17 @@ const createQuerySchema = z.object({
 
 // --- Auth Middleware ---
 
+/** Constant-time string comparison to prevent timing attacks. */
+function safeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) {
+    timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+
 function extractApiKey(c: Context): string | null {
   const authorization = c.req.header("authorization");
   if (authorization?.startsWith("Bearer ")) {
@@ -120,10 +133,15 @@ function extractApiKey(c: Context): string | null {
 
 const writeAuth: MiddlewareHandler = async (c, next) => {
   const { httpApiKeys } = getRuntimeConfig();
-  if (httpApiKeys.length === 0) return next();
+  if (httpApiKeys.length === 0) {
+    if (process.env.NODE_ENV === "production") {
+      return c.json({ error: "Server misconfigured: no API keys set" }, 503);
+    }
+    return next();
+  }
 
   const supplied = extractApiKey(c);
-  if (supplied && httpApiKeys.includes(supplied)) return next();
+  if (supplied && httpApiKeys.some((key) => safeCompare(supplied, key))) return next();
 
   return c.json(
     { error: "Unauthorized", hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints." },
@@ -284,7 +302,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   const app = new Hono();
 
-  app.use("*", cors());
+  app.use("*", cors({ origin: process.env.CORS_ORIGIN || "*" }));
 
   app.get("/health", (c) => c.json({ ok: true }));
 
@@ -424,6 +442,10 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
     // All attachments are stored on Blossom (encrypted). Redirect to the blob URL.
     // Clients must decrypt using keys obtained via NIP-44 encrypted Nostr events.
+    const uriError = validateAttachmentUri(attachment.uri);
+    if (uriError) {
+      return c.json({ error: `Invalid attachment URI: ${uriError}` }, 400);
+    }
     return c.redirect(attachment.uri, 302);
   });
 
@@ -652,7 +674,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
       },
     });
   });
