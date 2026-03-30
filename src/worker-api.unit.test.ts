@@ -76,16 +76,16 @@ describe("buildWorkerApiApp with injected deps", () => {
     expect(json).toHaveLength(0);
   });
 
-  test("POST /queries requires htlc field", withOpenAuth(async () => {
+  test("POST /queries succeeds without htlc field", withOpenAuth(async () => {
     const { app } = makeTestApp();
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ description: "No HTLC" }),
     });
-    expect(res.status).toBe(400);
-    const json = await res.json() as { error: string };
-    expect(json.error).toBe("Invalid query payload");
+    expect(res.status).toBe(201);
+    const json = await res.json() as { id: string; status: string };
+    expect(json.status).toBe("pending");
   }));
 
   test("POST /queries creates an HTLC query via injected service", withOpenAuth(async () => {

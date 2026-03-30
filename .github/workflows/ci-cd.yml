@@ -45,9 +45,11 @@ jobs:
             | xargs bun test
 
       - name: Start infrastructure (relay + Blossom + regtest Lightning)
+        if: ${{ !cancelled() }}
         run: docker compose up -d relay blossom bitcoind lnd-mint lnd-user && sleep 5
 
       - name: Integration & E2E tests (relay + Blossom)
+        if: ${{ !cancelled() }}
         run: bun test src/worker-api.integration.test.ts src/mcp-server.integration.test.ts e2e/relay.test.ts
         env:
           NOSTR_RELAYS: ws://localhost:7777
