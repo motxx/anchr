@@ -331,6 +331,32 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     origin: corsOrigin || (process.env.NODE_ENV === "production" ? "" : "*"),
   }));
 
+  // --- Rate limiting for write endpoints ---
+  const RATE_WINDOW_MS = 60_000;
+  const RATE_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX) || 60;
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+  const rateLimit: MiddlewareHandler = async (c, next) => {
+    const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const now = Date.now();
+    let bucket = rateBuckets.get(ip);
+    if (!bucket || now > bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + RATE_WINDOW_MS };
+      rateBuckets.set(ip, bucket);
+    }
+    bucket.count++;
+    if (bucket.count > RATE_MAX_REQUESTS) {
+      return c.json({ error: "Rate limit exceeded" }, 429);
+    }
+    // Periodically prune stale buckets (every ~100 requests)
+    if (rateBuckets.size > 1000) {
+      for (const [k, v] of rateBuckets) {
+        if (now > v.resetAt) rateBuckets.delete(k);
+      }
+    }
+    return next();
+  };
+
   app.get("/health", (c) => c.json({ ok: true }));
 
   // --- Wallet balance ---
@@ -394,6 +420,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   app.post(
     "/queries",
+    rateLimit,
     writeAuth,
     zValidator("json", createQuerySchema, (result, c) => {
       if (!result.success) {
@@ -497,9 +524,19 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     });
   });
 
-  app.post("/queries/:id/upload", writeAuth, async (c) => {
+  /** Maximum upload size: 100 MB. */
+  const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+  app.post("/queries/:id/upload", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
+
+    // Reject oversized uploads early via Content-Length header
+    const contentLength = Number(c.req.header("content-length") ?? 0);
+    if (contentLength > MAX_UPLOAD_BYTES) {
+      return c.json({ error: `Upload too large: ${contentLength} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+    }
+
     const query = doGetQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
@@ -507,6 +544,12 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     try { formData = await c.req.formData(); } catch { return c.json({ error: "Expected multipart/form-data" }, 400); }
     const file = formData.get("photo");
     if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
+
+    // Enforce file size limit after parsing (Content-Length can be spoofed)
+    if ((file as File).size > MAX_UPLOAD_BYTES) {
+      return c.json({ error: `File too large: ${(file as File).size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+    }
+
     const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
     const allowed = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
     if (!allowed.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
@@ -535,7 +578,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   // --- HTLC lifecycle endpoints ---
 
-  app.post("/hash", writeAuth, (c) => {
+  app.post("/hash", rateLimit, writeAuth, (c) => {
     if (!pStore) return c.json({ error: "Preimage store not configured" }, 500);
     const entry = pStore.create();
     return c.json({ hash: entry.hash });
@@ -549,7 +592,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     return c.json(query.quotes ?? []);
   });
 
-  app.post("/queries/:id/quotes", writeAuth, async (c) => {
+  app.post("/queries/:id/quotes", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: Record<string, unknown>;
@@ -609,7 +652,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     oracle_id: z.string().optional(),
   });
 
-  app.post("/queries/:id/result", writeAuth, async (c) => {
+  app.post("/queries/:id/result", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let rawBody: unknown;
