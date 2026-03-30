@@ -28,13 +28,24 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 16 }}>
-      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-4">
-        Server
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}>
+      <Text className="text-2xl font-black text-foreground tracking-tight pt-16 mb-6">
+        Settings
       </Text>
-      <View className="bg-surface rounded-xl border border-border p-4 gap-4">
+
+      {/* Server section */}
+      <View className="flex-row items-center gap-2.5 mb-3">
+        <View className="w-7 h-7 rounded-full bg-surface-raised items-center justify-center">
+          <Ionicons name="server-outline" size={13} color="#a1a1aa" />
+        </View>
+        <Text className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+          Server
+        </Text>
+      </View>
+
+      <View className="bg-surface rounded-2xl p-5 gap-5">
         <View>
-          <Text className="text-sm font-medium text-muted-foreground mb-1">
+          <Text className="text-[13px] font-semibold text-muted-foreground mb-2">
             Server URL
           </Text>
           <TextInput
@@ -45,12 +56,12 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
-            className="bg-surface-raised border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"
+            className="bg-background border border-border rounded-xl px-4 py-3 text-[15px] text-foreground"
           />
         </View>
 
         <View>
-          <Text className="text-sm font-medium text-muted-foreground mb-1">
+          <Text className="text-[13px] font-semibold text-muted-foreground mb-2">
             API Key
           </Text>
           <TextInput
@@ -61,7 +72,7 @@ export default function SettingsScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
-            className="bg-surface-raised border border-border rounded-lg px-3 py-2.5 text-sm text-foreground"
+            className="bg-background border border-border rounded-xl px-4 py-3 text-[15px] text-foreground"
           />
         </View>
 
@@ -69,7 +80,7 @@ export default function SettingsScreen() {
           <Pressable
             onPress={() => testConnection.mutate()}
             disabled={testConnection.isPending}
-            className="flex-1 bg-surface-raised rounded-lg py-2.5 items-center flex-row justify-center gap-2"
+            className="flex-1 bg-surface-raised rounded-xl py-3 items-center flex-row justify-center gap-2 active:opacity-80"
           >
             <Ionicons
               name={
@@ -88,26 +99,40 @@ export default function SettingsScreen() {
                     : "#6b7280"
               }
             />
-            <Text className="text-sm font-medium text-muted-foreground">
+            <Text className="text-[13px] font-semibold text-muted-foreground">
               {testConnection.isPending ? "Testing..." : "Test"}
             </Text>
           </Pressable>
           <Pressable
             onPress={handleSave}
-            className="flex-1 bg-primary rounded-lg py-2.5 items-center"
+            className="flex-1 bg-primary rounded-xl py-3 items-center active:opacity-80"
           >
-            <Text className="text-sm font-semibold text-white">Save</Text>
+            <Text className="text-[13px] font-bold text-white">Save</Text>
           </Pressable>
         </View>
       </View>
 
-      <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 mt-6">
-        About
-      </Text>
-      <View className="bg-surface rounded-xl border border-border p-4">
-        <Text className="text-sm text-muted-foreground font-medium">Anchr Worker</Text>
-        <Text className="text-xs text-muted-foreground mt-1">v0.1.0 — Phase 1</Text>
-        <Text className="text-xs text-muted-foreground mt-2">
+      {/* About section */}
+      <View className="flex-row items-center gap-2.5 mb-3 mt-8">
+        <View className="w-7 h-7 rounded-full bg-surface-raised items-center justify-center">
+          <Ionicons name="information-circle-outline" size={13} color="#a1a1aa" />
+        </View>
+        <Text className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+          About
+        </Text>
+      </View>
+
+      <View className="bg-surface rounded-2xl p-5">
+        <View className="flex-row items-center gap-3 mb-3">
+          <View className="w-10 h-10 rounded-full bg-emerald-950 items-center justify-center">
+            <Ionicons name="shield-checkmark" size={20} color="#10b981" />
+          </View>
+          <View>
+            <Text className="text-[15px] text-foreground font-semibold">Anchr Worker</Text>
+            <Text className="text-[11px] text-muted-foreground mt-0.5">v0.1.0 — Phase 1</Text>
+          </View>
+        </View>
+        <Text className="text-[13px] text-muted-foreground leading-5">
           Ground truth from the street.{"\n"}
           Decentralized photo verification with C2PA, Nostr, and Cashu.
         </Text>

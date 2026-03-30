@@ -1,12 +1,25 @@
 {
   "name": "anchr-sdk",
   "version": "0.1.0",
+  "type": "module",
   "description": "AI Agent SDK for Anchr — buy cryptographically verified data with sats",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "default": "./dist/worker.js"
+    }
+  },
   "files": ["dist"],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outdir dist --target node && bun build src/worker.ts --outdir dist --target node && bunx tsc -p tsconfig.json",
     "test": "bun test"
   },
   "keywords": ["tlsnotary", "oracle", "ai-agent", "cashu", "lightning", "nostr"],

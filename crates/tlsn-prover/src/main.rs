@@ -40,9 +40,6 @@ use tlsn::{
 };
 use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
 
-const MAX_SENT_DATA: usize = 1 << 12; // 4096
-const MAX_RECV_DATA: usize = 1 << 14; // 16384
-
 #[derive(Parser)]
 #[command(name = "tlsn-prove", about = "Generate a TLSNotary presentation for a URL")]
 struct Cli {
@@ -56,6 +53,36 @@ struct Cli {
     /// Verifier server address (e.g. localhost:7047). If omitted, runs verifier in-process.
     #[arg(short, long)]
     verifier: Option<String>,
+
+    /// SOCKS5 proxy for target connections (e.g. socks5://127.0.0.1:9050 for Tor)
+    #[arg(long)]
+    socks_proxy: Option<String>,
+
+    /// Custom HTTP header (format: "Key: Value"). Can be specified multiple times.
+    #[arg(short = 'H', long = "header")]
+    headers: Vec<String>,
+
+    /// Maximum bytes of sent data for MPC-TLS circuit (default: 4096).
+    #[arg(long, default_value_t = 4096)]
+    max_sent_data: usize,
+
+    /// Maximum bytes of received data for MPC-TLS circuit (default: 4096).
+    /// Smaller values reduce MPC computation time. Set close to expected response size.
+    #[arg(long, default_value_t = 4096)]
+    max_recv_data: usize,
+}
+
+async fn connect_target(host: &str, port: u16, socks_proxy: Option<&str>) -> Result<tokio::net::TcpStream> {
+    match socks_proxy {
+        Some(proxy) => {
+            let addr = proxy.strip_prefix("socks5://").unwrap_or(proxy);
+            eprintln!("[tlsn-prove] Connecting to {}:{} via SOCKS5 ({})", host, port, addr);
+            let stream = tokio_socks::tcp::Socks5Stream::connect(addr, (host, port)).await
+                .map_err(|e| anyhow!("SOCKS5 connect failed: {e}"))?;
+            Ok(stream.into_inner())
+        }
+        None => Ok(tokio::net::TcpStream::connect((host, port)).await?),
+    }
 }
 
 #[tokio::main]
@@ -77,20 +104,31 @@ async fn main() -> Result<()> {
 
     eprintln!("[tlsn-prove] Target: {}:{}{}", host, port, path);
 
+    let socks_proxy = cli.socks_proxy.as_deref();
+
+    let custom_headers: Vec<(String, String)> = cli.headers.iter().filter_map(|h| {
+        let (k, v) = h.split_once(':')?;
+        Some((k.trim().to_string(), v.trim().to_string()))
+    }).collect();
+
+    let max_sent = cli.max_sent_data;
+    let max_recv = cli.max_recv_data;
+    eprintln!("[tlsn-prove] MPC limits: max_sent={}, max_recv={}", max_sent, max_recv);
+
     let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
         if verifier_addr.starts_with("wss://") || verifier_addr.starts_with("ws://") {
             // WebSocket mode: connect to TLSNotary demo/extension verifier
             eprintln!("[tlsn-prove] Using WebSocket verifier: {}", verifier_addr);
-            run_with_ws_verifier(verifier_addr, &host, port, &path).await?
+            run_with_ws_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
         } else {
             // TCP mode: connect to our custom Verifier Server
             eprintln!("[tlsn-prove] Using TCP verifier: {}", verifier_addr);
-            run_with_remote_verifier(verifier_addr, &host, port, &path).await?
+            run_with_remote_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
         }
     } else {
         // Local mode: run both prover and verifier in-process
         eprintln!("[tlsn-prove] Using in-process verifier");
-        run_with_local_verifier(&host, port, &path).await?
+        run_with_local_verifier(&host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
     };
 
     // Build presentation with full disclosure
@@ -116,6 +154,10 @@ async fn run_with_local_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<(Attestation, Secrets)> {
     let (verifier_socket, prover_socket) = tokio::io::duplex(1 << 23);
     let (request_tx, request_rx) = oneshot::channel::<AttestationRequest>();
@@ -128,7 +170,7 @@ async fn run_with_local_verifier(
         }
     });
 
-    run_prover(prover_socket, request_tx, attestation_rx, host, port, path).await
+    run_prover(prover_socket, request_tx, attestation_rx, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await
 }
 
 async fn run_with_ws_verifier(
@@ -136,6 +178,10 @@ async fn run_with_ws_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<(Attestation, Secrets)> {
     use async_tungstenite::tokio::connect_async;
     use async_tungstenite::tungstenite::Message;
@@ -151,8 +197,8 @@ async fn run_with_ws_verifier(
     // Send register message
     let register_msg = serde_json::json!({
         "type": "register",
-        "maxRecvData": MAX_RECV_DATA,
-        "maxSentData": MAX_SENT_DATA,
+        "maxRecvData": max_recv_data,
+        "maxSentData": max_sent_data,
         "sessionData": {}
     });
     session_ws.send(Message::Text(register_msg.to_string())).await?;
@@ -179,7 +225,7 @@ async fn run_with_ws_verifier(
 
     // Step 3: Run MPC-TLS prover over the WebSocket stream
     // Session expects futures AsyncRead/AsyncWrite (it calls .compat() internally)
-    let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path).await?;
+    let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await?;
 
     eprintln!("[tlsn-prove] MPC complete, waiting for session result...");
 
@@ -283,6 +329,10 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<ProverMpcOutput> {
     // Session::new expects futures AsyncRead+AsyncWrite
     let session = Session::new(stream);
@@ -295,15 +345,15 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
             TlsCommitConfig::builder()
                 .protocol(
                     MpcTlsConfig::builder()
-                        .max_sent_data(MAX_SENT_DATA)
-                        .max_recv_data(MAX_RECV_DATA)
+                        .max_sent_data(max_sent_data)
+                        .max_recv_data(max_recv_data)
                         .build()?,
                 )
                 .build()?,
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -322,14 +372,17 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
         hyper::client::conn::http1::handshake(tls_connection).await?;
     tokio::spawn(connection);
 
-    let request = Request::builder()
+    let mut request_builder = Request::builder()
         .uri(path)
         .header("Host", host)
         .header("Accept", "application/json")
         .header("Accept-Encoding", "identity")
         .header("Connection", "close")
-        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
-        .body(Empty::<Bytes>::new())?;
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0");
+    for (k, v) in custom_headers {
+        request_builder = request_builder.header(k.as_str(), v.as_str());
+    }
+    let request = request_builder.body(Empty::<Bytes>::new())?;
 
     eprintln!("[tlsn-prove] Sending HTTP request...");
     let response = request_sender.send_request(request).await?;
@@ -391,6 +444,10 @@ async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<ProverMpcOutput> {
     use tokio_util::compat::TokioAsyncReadCompatExt;
 
@@ -404,15 +461,15 @@ async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
             TlsCommitConfig::builder()
                 .protocol(
                     MpcTlsConfig::builder()
-                        .max_sent_data(MAX_SENT_DATA)
-                        .max_recv_data(MAX_RECV_DATA)
+                        .max_sent_data(max_sent_data)
+                        .max_recv_data(max_recv_data)
                         .build()?,
                 )
                 .build()?,
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -431,14 +488,17 @@ async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite +
         hyper::client::conn::http1::handshake(tls_connection).await?;
     tokio::spawn(connection);
 
-    let request = Request::builder()
+    let mut request_builder = Request::builder()
         .uri(path)
         .header("Host", host)
         .header("Accept", "application/json")
         .header("Accept-Encoding", "identity")
         .header("Connection", "close")
-        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
-        .body(Empty::<Bytes>::new())?;
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0");
+    for (k, v) in custom_headers {
+        request_builder = request_builder.header(k.as_str(), v.as_str());
+    }
+    let request = request_builder.body(Empty::<Bytes>::new())?;
 
     eprintln!("[tlsn-prove] Sending HTTP request...");
     let response = request_sender.send_request(request).await?;
@@ -499,6 +559,10 @@ async fn run_with_remote_verifier(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<(Attestation, Secrets)> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -516,7 +580,7 @@ async fn run_with_remote_verifier(
     eprintln!("[tlsn-prove] MPC connection established");
 
     // Run prover (MPC session) — no oneshot channels, we handle attestation over TCP
-    let prover_output = run_prover_mpc(mpc_tcp, host, port, path).await?;
+    let prover_output = run_prover_mpc(mpc_tcp, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await?;
 
     eprintln!("[tlsn-prove] MPC complete, requesting attestation...");
 
@@ -560,6 +624,10 @@ async fn run_prover_mpc(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<ProverMpcOutput> {
     let session = Session::new(tcp.compat());
     let (driver, mut handle) = session.split();
@@ -571,15 +639,15 @@ async fn run_prover_mpc(
             TlsCommitConfig::builder()
                 .protocol(
                     MpcTlsConfig::builder()
-                        .max_sent_data(MAX_SENT_DATA)
-                        .max_recv_data(MAX_RECV_DATA)
+                        .max_sent_data(max_sent_data)
+                        .max_recv_data(max_recv_data)
                         .build()?,
                 )
                 .build()?,
         )
         .await?;
 
-    let target_tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let target_tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -598,14 +666,17 @@ async fn run_prover_mpc(
         hyper::client::conn::http1::handshake(tls_connection).await?;
     tokio::spawn(connection);
 
-    let request = Request::builder()
+    let mut request_builder = Request::builder()
         .uri(path)
         .header("Host", host)
         .header("Accept", "application/json")
         .header("Accept-Encoding", "identity")
         .header("Connection", "close")
-        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
-        .body(Empty::<Bytes>::new())?;
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0");
+    for (k, v) in custom_headers {
+        request_builder = request_builder.header(k.as_str(), v.as_str());
+    }
+    let request = request_builder.body(Empty::<Bytes>::new())?;
 
     eprintln!("[tlsn-prove] Sending HTTP request...");
     let response = request_sender.send_request(request).await?;
@@ -696,6 +767,10 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
     host: &str,
     port: u16,
     path: &str,
+    socks_proxy: Option<&str>,
+    custom_headers: &[(String, String)],
+    max_sent_data: usize,
+    max_recv_data: usize,
 ) -> Result<(Attestation, Secrets)> {
     let session = Session::new(socket.compat());
     let (driver, mut handle) = session.split();
@@ -707,8 +782,8 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
             TlsCommitConfig::builder()
                 .protocol(
                     MpcTlsConfig::builder()
-                        .max_sent_data(MAX_SENT_DATA)
-                        .max_recv_data(MAX_RECV_DATA)
+                        .max_sent_data(max_sent_data)
+                        .max_recv_data(max_recv_data)
                         .build()?,
                 )
                 .build()?,
@@ -716,7 +791,7 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
         .await?;
 
     // Connect to the real target server
-    let tcp = tokio::net::TcpStream::connect((host, port)).await?;
+    let tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
     let (tls_connection, prover_fut) = prover
@@ -735,14 +810,17 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
         hyper::client::conn::http1::handshake(tls_connection).await?;
     tokio::spawn(connection);
 
-    let request = Request::builder()
+    let mut request_builder = Request::builder()
         .uri(path)
         .header("Host", host)
         .header("Accept", "application/json")
         .header("Accept-Encoding", "identity")
         .header("Connection", "close")
-        .header("User-Agent", "anchr-tlsn-prover/0.1.0")
-        .body(Empty::<Bytes>::new())?;
+        .header("User-Agent", "anchr-tlsn-prover/0.1.0");
+    for (k, v) in custom_headers {
+        request_builder = request_builder.header(k.as_str(), v.as_str());
+    }
+    let request = request_builder.body(Empty::<Bytes>::new())?;
 
     eprintln!("[tlsn-prove] Sending HTTP request...");
     let response = request_sender.send_request(request).await?;

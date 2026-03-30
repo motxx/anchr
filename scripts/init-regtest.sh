@@ -75,8 +75,8 @@ done
 # Summary
 echo ""
 echo "=== Ready ==="
-MINT_BAL=$($LNCLI_MINT channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4)
-USER_BAL=$($LNCLI_USER channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4)
+MINT_BAL=$($LNCLI_MINT channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4 || true)
+USER_BAL=$($LNCLI_USER channelbalance | grep -o '"local_balance": {[^}]*"sat": "[^"]*"' | grep -o '"sat": "[^"]*"' | head -1 | cut -d'"' -f4 || true)
 echo "  lnd-mint channel balance: ${MINT_BAL:-0} sats"
 echo "  lnd-user channel balance: ${USER_BAL:-0} sats"
 echo ""

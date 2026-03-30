@@ -167,7 +167,7 @@ export async function validateTlsn(
 
   // --- Server identity / domain matching ---
   let serverIdentityValid = false;
-  const expectedHostname = extractHostname(requirement.target_url);
+  const expectedHostname = requirement.domain_hint ?? extractHostname(requirement.target_url);
   if (expectedHostname && verifiedServerName === expectedHostname) {
     checks.push(`TLSNotary: server name matches target (${expectedHostname})`);
     serverIdentityValid = true;

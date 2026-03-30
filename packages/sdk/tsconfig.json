@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["bun-types"]
+  },
+  "include": ["src/index.ts", "src/worker.ts"]
+}

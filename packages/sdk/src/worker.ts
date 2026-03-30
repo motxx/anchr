@@ -43,6 +43,11 @@ export interface AnchrWorkerConfig {
   minBountySats?: number;
   /** Filter: only accept queries for these domains (empty = all) */
   allowedDomains?: string[];
+  /** Max bytes of sent data for MPC-TLS circuit (default: 4096) */
+  maxSentData?: number;
+  /** Max bytes of received data for MPC-TLS circuit (default: 4096).
+   *  Smaller values reduce MPC computation time. Set close to expected response size. */
+  maxRecvData?: number;
 }
 
 export interface FulfilledEvent {
@@ -79,6 +84,8 @@ export class AnchrWorker {
       maxConcurrent: config.maxConcurrent ?? 1,
       minBountySats: config.minBountySats ?? 0,
       allowedDomains: config.allowedDomains ?? [],
+      maxSentData: config.maxSentData ?? 4096,
+      maxRecvData: config.maxRecvData ?? 4096,
     };
 
     this.anchr = new Anchr({
@@ -126,7 +133,7 @@ export class AnchrWorker {
   /** Run once: poll, fulfill one query, return */
   async runOnce(): Promise<FulfilledEvent | null> {
     const queries = await this.fetchEligibleQueries();
-    if (queries.length === 0) return null;
+    if (queries.length === 0 || !queries[0]) return null;
     return this.fulfillQuery(queries[0]);
   }
 
@@ -164,7 +171,7 @@ export class AnchrWorker {
 
     return queries.filter((q) => {
       // Only TLSNotary queries
-      if (!q.verification_requirements?.includes("tlsn")) return false;
+      if (!Array.isArray(q.verification_requirements) || !q.verification_requirements.includes("tlsn")) return false;
       if (!q.tlsn_requirements?.target_url) return false;
 
       // Bounty filter
@@ -216,15 +223,27 @@ export class AnchrWorker {
     return event;
   }
 
-  private async generateProof(targetUrl: string): Promise<string> {
+  private async generateProof(targetUrl: string, headers?: Record<string, string>): Promise<string> {
     const tmpFile = `/tmp/anchr-worker-${Date.now()}.presentation.tlsn`;
 
-    const proc = Bun.spawn([
+    const args = [
       this.config.proverBin,
       "--verifier", this.config.verifierHost,
+      "--max-sent-data", String(this.config.maxSentData),
+      "--max-recv-data", String(this.config.maxRecvData),
       targetUrl,
       "-o", tmpFile,
-    ], {
+    ];
+    // Pass custom headers (e.g., Authorization from encrypted_context)
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        args.push("-H", `${key}: ${value}`);
+      }
+    }
+    const socksProxy = process.env.TLSN_SOCKS_PROXY;
+    if (socksProxy) args.push("--socks-proxy", socksProxy);
+
+    const proc = Bun.spawn(args, {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -233,7 +252,7 @@ export class AnchrWorker {
 
     if (proc.exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text();
-      throw new Error(`tlsn-prove failed (exit ${proc.exitCode}): ${stderr.slice(0, 200)}`);
+      throw new Error(`tlsn-prove failed (exit ${proc.exitCode}): ${stderr.slice(0, 1000)}`);
     }
 
     // stdout contains base64 presentation

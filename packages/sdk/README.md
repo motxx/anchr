@@ -13,7 +13,7 @@ bun add anchr-sdk
 ```typescript
 import { Anchr } from "anchr-sdk";
 
-const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
+const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
 
 // Get cryptographically verified BTC price
 const result = await anchr.query({
@@ -44,7 +44,7 @@ No trust required — the proof is independently verifiable.
 
 ```typescript
 const anchr = new Anchr({
-  serverUrl: "http://localhost:3000",  // Anchr server URL
+  serverUrl: "https://anchr-app.fly.dev",  // or http://localhost:3000 for local dev
   apiKey: "optional-api-key",          // for authenticated endpoints
   defaultTimeoutSeconds: 300,          // default query TTL
   pollIntervalMs: 3000,               // polling interval

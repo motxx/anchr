@@ -11,10 +11,11 @@ import { AnchrWorker } from "./worker";
 
 function parseArgs(): Record<string, string> {
   const args: Record<string, string> = {};
-  const argv = process.argv.slice(2);
+  const argv = process.argv?.slice(2) ?? [];
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i].startsWith("--") && i + 1 < argv.length) {
-      args[argv[i].slice(2)] = argv[i + 1];
+    const key = argv[i]!;
+    if (key.startsWith("--") && i + 1 < argv.length) {
+      args[key.slice(2)] = argv[i + 1]!;
       i++;
     }
   }

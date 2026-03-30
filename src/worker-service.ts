@@ -16,6 +16,7 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
+import type { TlsnEncryptedContext } from "./types";
 import type { NostrIdentity } from "./nostr/identity";
 import { generateEphemeralIdentity } from "./nostr/identity";
 import {
@@ -131,7 +132,7 @@ export async function submitQuote(
 export function waitForSelection(
   identity: NostrIdentity,
   query: DiscoveredQuery,
-  onSelected: (htlcToken?: string) => void,
+  onSelected: (htlcToken?: string, encryptedContext?: TlsnEncryptedContext) => void,
   onRejected: () => void,
   relayUrls?: string[],
 ): SubCloser {
@@ -148,7 +149,7 @@ export function waitForSelection(
         if (payload.status === "processing") {
           const selection = payload as SelectionFeedbackPayload;
           if (selection.selected_worker_pubkey === identity.publicKey) {
-            onSelected(selection.htlc_token);
+            onSelected(selection.htlc_token, selection.encrypted_context);
           } else {
             // Another Worker was selected
             onRejected();

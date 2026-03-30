@@ -6,6 +6,8 @@ export interface OracleRegistry {
   list(): OracleInfo[];
   register(oracle: Oracle): void;
   resolve(oracleId: string | undefined, acceptableIds: string[] | undefined): Oracle | null;
+  /** Resolve up to `count` oracles from the acceptable set (for quorum). */
+  resolveMultiple(acceptableIds: string[] | undefined, count: number): Oracle[];
 }
 
 export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): OracleRegistry {
@@ -31,6 +33,22 @@ export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): Oracl
       }
       if (acceptableIds?.length === 1) return registry.get(acceptableIds[0]!);
       return registry.get(BUILT_IN_ORACLE_ID);
+    },
+    resolveMultiple(acceptableIds, count) {
+      const result: Oracle[] = [];
+      if (acceptableIds?.length) {
+        for (const id of acceptableIds) {
+          if (result.length >= count) break;
+          const o = oracles.get(id);
+          if (o) result.push(o);
+        }
+      } else {
+        for (const o of oracles.values()) {
+          if (result.length >= count) break;
+          result.push(o);
+        }
+      }
+      return result;
     },
   };
 

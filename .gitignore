@@ -58,3 +58,4 @@ mobile/node_modules/
 # rust
 crates/*/target/
 crates/*/Cargo.lock
+test-results

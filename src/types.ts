@@ -48,6 +48,20 @@ export interface TlsnRequirement {
   conditions?: TlsnCondition[];
   /** Max age of attestation in seconds (default: 300). */
   max_attestation_age_seconds?: number;
+  /** Domain hint for public display when actual URL is delivered via encrypted_context. */
+  domain_hint?: string;
+}
+
+/** Sensitive context encrypted to Worker — never stored publicly. */
+export interface TlsnEncryptedContext {
+  /** The actual target URL (may contain session IDs). */
+  target_url: string;
+  /** Custom HTTP headers (e.g., Authorization). */
+  headers?: Record<string, string>;
+  /** HTTP method override (default: GET). */
+  method?: "GET" | "POST";
+  /** Request body for POST requests. */
+  body?: string;
 }
 
 export interface TlsnAttestation {
@@ -115,6 +129,8 @@ export interface QueryResult {
   gps?: GpsCoord;
   /** TLSNotary attestation submitted by the worker. */
   tlsn_attestation?: TlsnAttestation;
+  /** TLSNotary browser extension result (results[] from MPC-TLS session). */
+  tlsn_extension_result?: unknown;
 }
 
 export interface VerificationDetail {
@@ -155,6 +171,8 @@ export interface HtlcInfo {
   locktime: number;
   /** Encoded Cashu HTLC token (held by Requester until swap). */
   escrow_token?: string;
+  /** Server-verified escrow amount in sats (set after token verification at worker selection). */
+  verified_escrow_sats?: number;
 }
 
 /** A quote from a Worker offering to fulfill a query. */
@@ -167,6 +185,30 @@ export interface QuoteInfo {
   quote_event_id: string;
   /** Timestamp when the quote was received. */
   received_at: number;
+}
+
+/** Outcome of submitHtlcResult — includes preimage on success. */
+export interface HtlcSubmitOutcome {
+  ok: boolean;
+  query: Query | null;
+  message: string;
+  /** Preimage revealed on verification success (Worker uses this to redeem HTLC token). */
+  preimage?: string;
+}
+
+export interface QuorumConfig {
+  /** Minimum number of oracle approvals required. */
+  min_approvals: number;
+}
+
+/** Individual oracle attestation stored for quorum tracking. */
+export interface OracleAttestationRecord {
+  oracle_id: string;
+  passed: boolean;
+  checks: string[];
+  failures: string[];
+  attested_at: number;
+  tlsn_verified?: TlsnVerifiedData;
 }
 
 export interface Query {
@@ -205,4 +247,8 @@ export interface Query {
   max_gps_distance_km?: number;
   /** TLSNotary requirements for web content verification. */
   tlsn_requirements?: TlsnRequirement;
+  /** Multi-oracle quorum config (if set, multiple oracles verify independently). */
+  quorum?: QuorumConfig;
+  /** Individual oracle attestations collected during quorum verification. */
+  attestations?: OracleAttestationRecord[];
 }

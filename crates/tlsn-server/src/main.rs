@@ -406,6 +406,18 @@ async fn handle_verifier_ws_raw(
     }
 }
 
+async fn connect_proxy_target(host: &str, port: u16) -> std::io::Result<tokio::net::TcpStream> {
+    if let Ok(proxy) = std::env::var("SOCKS_PROXY") {
+        let addr = proxy.strip_prefix("socks5://").unwrap_or(&proxy);
+        eprintln!("[tlsn-server] Proxy {}:{} via SOCKS5 ({})", host, port, addr);
+        tokio_socks::tcp::Socks5Stream::connect(addr, (host, port)).await
+            .map(|s| s.into_inner())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::ConnectionRefused, e))
+    } else {
+        tokio::net::TcpStream::connect((host, port)).await
+    }
+}
+
 // --- /proxy handler (WS-to-TCP bridge, same approach as official) ---
 
 async fn handle_proxy_ws_raw(
@@ -421,7 +433,7 @@ async fn handle_proxy_ws_raw(
 
     eprintln!("[tlsn-server] Proxy connecting to {}:{}", host_part, port);
 
-    let tcp = match tokio::net::TcpStream::connect((&*host_part, port)).await {
+    let tcp = match connect_proxy_target(&host_part, port).await {
         Ok(tcp) => tcp,
         Err(e) => {
             eprintln!("[tlsn-server] Proxy connect failed: {}", e);

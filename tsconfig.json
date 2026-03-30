@@ -32,5 +32,5 @@
       "src/ui/lib/utils": ["./src/ui/lib/utils.ts"]
     }
   },
-  "exclude": ["mobile", "node_modules"]
+  "exclude": ["mobile", "node_modules", "example"]
 }

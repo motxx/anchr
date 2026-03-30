@@ -111,3 +111,46 @@ describe("resolve", () => {
     expect(registry.resolve(undefined, ["a", "b"])).toBe(builtInOracle);
   });
 });
+
+describe("resolveMultiple", () => {
+  test("returns oracles matching acceptable IDs", () => {
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeFakeOracle("a"));
+    registry.register(makeFakeOracle("b"));
+    registry.register(makeFakeOracle("c"));
+    const result = registry.resolveMultiple(["a", "b"], 5);
+    expect(result).toHaveLength(2);
+    expect(result.map((o) => o.info.id)).toEqual(["a", "b"]);
+  });
+
+  test("returns all registered when acceptableIds is undefined", () => {
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeFakeOracle("a"));
+    registry.register(makeFakeOracle("b"));
+    const result = registry.resolveMultiple(undefined, 10);
+    expect(result).toHaveLength(2);
+  });
+
+  test("limits to count parameter", () => {
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeFakeOracle("a"));
+    registry.register(makeFakeOracle("b"));
+    registry.register(makeFakeOracle("c"));
+    const result = registry.resolveMultiple(undefined, 2);
+    expect(result).toHaveLength(2);
+  });
+
+  test("skips unknown IDs in acceptable list", () => {
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeFakeOracle("a"));
+    const result = registry.resolveMultiple(["a", "unknown", "also-unknown"], 5);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.info.id).toBe("a");
+  });
+
+  test("returns empty when no oracles match", () => {
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const result = registry.resolveMultiple(["unknown"], 5);
+    expect(result).toHaveLength(0);
+  });
+});

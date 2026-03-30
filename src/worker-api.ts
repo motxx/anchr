@@ -16,6 +16,8 @@ import {
 import { getRuntimeConfig } from "./config";
 import { listOracles } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
+import type { PreimageStore } from "./oracle/preimage-store";
+import type { WalletStore } from "./cashu/wallet-store";
 import {
   cancelQuery,
   createQuery,
@@ -28,13 +30,15 @@ import {
   type QueryService,
 } from "./query-service";
 import { VERIFICATION_FACTORS } from "./types";
-import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuoteInfo, TlsnAttestation } from "./types";
+import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "./types";
 import { getRuntimeConfig as getConfig } from "./config";
 import { haversineKm } from "./verification/exif-validation";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
   oracleRegistry?: OracleRegistry;
+  preimageStore?: PreimageStore;
+  walletStore?: WalletStore;
 }
 
 // --- Schemas ---
@@ -58,7 +62,7 @@ const htlcSchema = z.object({
   requester_pubkey: z.string().min(1),
   locktime: z.number().int().min(0),
   escrow_token: z.string().min(1).optional(),
-}).optional();
+});
 
 const gpsSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -81,7 +85,12 @@ const tlsnRequirementSchema = z.object({
   method: z.enum(["GET", "POST"]).optional(),
   conditions: z.array(tlsnConditionSchema).optional(),
   max_attestation_age_seconds: z.number().int().min(60).max(86400).optional(),
+  domain_hint: z.string().optional(),
 });
+
+const quorumSchema = z.object({
+  min_approvals: z.number().int().min(1),
+}).optional();
 
 const createQuerySchema = z.object({
   description: z.string().min(1),
@@ -95,6 +104,7 @@ const createQuerySchema = z.object({
   htlc: htlcSchema,
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
+  quorum: quorumSchema,
 });
 
 // --- Auth Middleware ---
@@ -153,11 +163,13 @@ function querySummary(query: Query) {
       oracle_pubkey: query.htlc.oracle_pubkey,
       worker_pubkey: query.htlc.worker_pubkey ?? null,
       locktime: query.htlc.locktime,
+      verified_escrow_sats: query.htlc.verified_escrow_sats ?? null,
     } : null,
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
     max_gps_distance_km: query.max_gps_distance_km ?? null,
     tlsn_requirements: query.tlsn_requirements ?? null,
+    quorum: query.quorum ?? null,
   };
 }
 
@@ -192,6 +204,7 @@ function queryDetail(query: Query, requestUrl: string) {
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
     blossom_keys: query.blossom_keys ?? null,
+    attestations: query.attestations ?? null,
     ...(hasTlsn && {
       tlsn_verifier_url: config.tlsnVerifierUrl ?? null,
       tlsn_proxy_url: config.tlsnProxyUrl ?? null,
@@ -227,7 +240,18 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
 
 // --- CSS Build ---
 
-async function buildCss(cssIn: string, cssOut: string, label: string) {
+async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
+  // Skip if pre-built CSS exists and is newer than source
+  const outFile = Bun.file(cssOut);
+  const inFile = Bun.file(cssIn);
+  if (await outFile.exists()) {
+    const outStat = outFile.lastModified;
+    const inStat = inFile.lastModified;
+    if (outStat >= inStat) {
+      return;
+    }
+  }
+
   const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
@@ -240,8 +264,9 @@ async function buildCss(cssIn: string, cssOut: string, label: string) {
 
 export async function prepareWorkerApiAssets() {
   await Promise.all([
-    buildCss(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
-    buildCss(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(import.meta.dir, "ui/dashboard/globals.css"), join(import.meta.dir, "ui/dashboard/generated.css"), "dashboard"),
   ]);
 }
 
@@ -249,6 +274,7 @@ export async function prepareWorkerApiAssets() {
 
 export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   const svc = deps?.queryService ?? defaultQueryService;
+  const pStore = deps?.preimageStore;
   const doCreateQuery = svc.createQuery.bind(svc);
   const doGetQuery = svc.getQuery.bind(svc);
   const doListOpen = svc.listOpenQueries.bind(svc);
@@ -261,6 +287,24 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   app.use("*", cors());
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  // --- Wallet balance ---
+
+  app.get("/wallet/balance", async (c) => {
+    const wStore = deps?.walletStore;
+    if (!wStore) return c.json({ error: "Wallet store not configured" }, 500);
+    const role = c.req.query("role");
+    const pubkey = c.req.query("pubkey");
+    if (!role || !pubkey) return c.json({ error: "role and pubkey are required" }, 400);
+    if (role !== "requester" && role !== "worker") return c.json({ error: "role must be requester or worker" }, 400);
+
+    const verify = c.req.query("verify") === "true";
+    const balance = verify
+      ? await wStore.getVerifiedBalance(role, pubkey)
+      : wStore.getBalance(role, pubkey);
+
+    return c.json({ role, pubkey, ...balance });
+  });
 
   app.get("/oracles", (c) => c.json(doListOracles()));
 
@@ -332,6 +376,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
         bounty: payload.bounty,
         oracleIds: payload.oracle_ids,
         htlc: payload.htlc as HtlcInfo | undefined,
+        quorum: payload.quorum as QuorumConfig | undefined,
       });
 
       return c.json(buildCreatedQueryPayload(query, getPublicRequestUrl(c)), 201);
@@ -425,41 +470,11 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     });
   });
 
-  app.post("/queries/:id/submit", writeAuth, async (c) => {
-    const id = c.req.param("id");
-    if (!id) return c.json({ error: "Query id is required" }, 400);
-    let body: Record<string, unknown>;
-    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
-    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
-    // E2E: accept ephemeral encryption keys for one-time oracle verification
-    const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
-    // Parse worker-reported GPS from request body
-    const bodyGps = body.gps as GpsCoord | undefined;
-    const queryResult: import("./types").QueryResult = {
-      attachments: Array.isArray(body.attachments) ? body.attachments : [],
-      notes: typeof body.notes === "string" ? body.notes : undefined,
-      gps: bodyGps && typeof bodyGps.lat === "number" && typeof bodyGps.lon === "number" ? bodyGps : undefined,
-      tlsn_attestation: typeof body.tlsn_presentation === "string"
-        ? { presentation: body.tlsn_presentation as string }
-        : (body.tlsn_attestation as TlsnAttestation | undefined),
-    };
-    const outcome = await doSubmit(id, queryResult, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
-    const status = !outcome.query ? 404
-      : !outcome.ok && outcome.query.status !== "pending" && outcome.query.status !== "rejected" ? 409
-      : outcome.ok ? 200 : 422;
-    // Release bounty token to Worker on approval
-    const cashuToken = outcome.ok && outcome.query?.bounty?.cashu_token
-      ? outcome.query.bounty.cashu_token
-      : undefined;
+  app.post("/queries/:id/submit", writeAuth, (c) => {
     return c.json({
-      ok: outcome.ok,
-      message: outcome.message,
-      verification: outcome.query?.verification,
-      oracle_id: outcome.query?.assigned_oracle_id ?? null,
-      payment_status: outcome.query?.payment_status,
-      bounty_amount_sats: outcome.query?.bounty?.amount_sats ?? null,
-      cashu_token: cashuToken ?? null,
-    }, status);
+      error: "Deprecated",
+      hint: "All queries now require HTLC escrow. Use POST /queries/:id/result with the HTLC flow instead.",
+    }, 410);
   });
 
   app.post("/queries/:id/cancel", writeAuth, (c) => {
@@ -470,6 +485,12 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   });
 
   // --- HTLC lifecycle endpoints ---
+
+  app.post("/hash", writeAuth, (c) => {
+    if (!pStore) return c.json({ error: "Preimage store not configured" }, 500);
+    const entry = pStore.create();
+    return c.json({ hash: entry.hash });
+  });
 
   app.get("/queries/:id/quotes", (c) => {
     const id = c.req.param("id");
@@ -509,7 +530,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
     if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
     const htlcToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
 
-    const outcome = svc.selectWorker(id, workerPubkey, htlcToken);
+    const outcome = await svc.selectWorker(id, workerPubkey, htlcToken);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
@@ -527,11 +548,107 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
       attachments: Array.isArray(body.attachments) ? body.attachments : [],
       notes: typeof body.notes === "string" ? body.notes : undefined,
       gps: resultGps && typeof resultGps.lat === "number" && typeof resultGps.lon === "number" ? resultGps : undefined,
+      tlsn_attestation: typeof body.tlsn_presentation === "string"
+        ? { presentation: body.tlsn_presentation as string }
+        : (body.tlsn_attestation as TlsnAttestation | undefined),
+      tlsn_extension_result: body.tlsn_extension_result != null
+        ? body.tlsn_extension_result
+        : undefined,
     };
     const blossomKeys = body.encryption_keys as BlossomKeyMap | undefined;
+    const oracleId = typeof body.oracle_id === "string" ? body.oracle_id : undefined;
 
+    // Detect HTLC query — use inline verification (submitHtlcResult)
+    const query = doGetQuery(id);
+    if (query?.htlc) {
+      const htlcOutcome = await svc.submitHtlcResult(id, result, workerPubkey, oracleId, blossomKeys);
+      const status = !htlcOutcome.query ? 404
+        : !htlcOutcome.ok ? 422
+        : 200;
+      return c.json({
+        ok: htlcOutcome.ok,
+        message: htlcOutcome.message,
+        verification: htlcOutcome.query?.verification,
+        oracle_id: htlcOutcome.query?.assigned_oracle_id ?? null,
+        payment_status: htlcOutcome.query?.payment_status,
+        preimage: htlcOutcome.preimage ?? null,
+      }, status);
+    }
+
+    // Non-HTLC: just record result
     const outcome = svc.recordResult(id, result, workerPubkey, blossomKeys);
     return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
+  // --- Log streaming (SSE) ---
+
+  app.get("/logs/stream", (c) => {
+    let dockerProc: ReturnType<typeof Bun.spawn> | null = null;
+    let unsubscribe: (() => void) | null = null;
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (entry: { service: string; message: string; ts: number }) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(entry)}\n\n`));
+          } catch { /* client gone */ }
+        };
+
+        // Send recent buffered server logs
+        const { getRecentLogs, subscribeLog } = await import("./log-stream");
+        for (const entry of getRecentLogs()) send(entry);
+
+        // Subscribe to live server logs
+        unsubscribe = subscribeLog(send);
+
+        // Stream docker compose logs
+        try {
+          dockerProc = Bun.spawn(
+            ["docker", "compose", "logs", "-f", "--tail=30", "--no-color"],
+            { stdout: "pipe", stderr: "pipe" },
+          );
+
+          const reader = (dockerProc.stdout as ReadableStream<Uint8Array>).getReader();
+          let buf = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buf += new TextDecoder().decode(value);
+            const lines = buf.split("\n");
+            buf = lines.pop() || "";
+
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              const match = line.match(/^(\S+)\s+\|\s+(.*)/);
+              const service = match?.[1]
+                ? match[1].replace(/^anchr-/, "").replace(/-\d+$/, "")
+                : "docker";
+              const message = match?.[2] ?? line;
+              send({ service, message, ts: Date.now() });
+            }
+          }
+        } catch (err) {
+          send({ service: "system", message: `Docker logs unavailable: ${err}`, ts: Date.now() });
+        }
+
+        controller.close();
+      },
+      cancel() {
+        dockerProc?.kill();
+        unsubscribe?.();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   });
 
   return app;
