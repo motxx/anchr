@@ -28,16 +28,18 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 This protocol is **trust-minimized**, not trustless. Cryptography eliminates several attack vectors, but residual trust assumptions remain.
 
-**Cryptographic guarantees (Cashu [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) P2PK + [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) HTLC + [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) State Check):**
+**Protocol-level guarantees (Cashu [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) P2PK + [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) HTLC + [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) State Check):**
 - **Oracle cannot steal BTC** — HTLC redemption requires Worker's signature (NUT-11 P2PK), which Oracle cannot forge
 - **Worker cannot forge proofs** — TLSNotary Verifier holds an independent MPC-TLS key share; Worker cannot alter the server's response
 - **Worker cannot redeem without valid proof** — Oracle holds the preimage; HTLC hashlock (NUT-14) prevents redemption without it
 - **Requester cannot revoke payment** — sats are locked in HTLC before work begins; Worker verifies proofs are UNSPENT on Mint (NUT-07) before starting work
 - **Timeout refund is automatic** — NUT-11 locktime + refund pubkey returns sats to Requester if HTLC expires
 
+> **⚠ Mint enforcement gap:** The guarantees above depend on the Cashu Mint correctly enforcing NUT-11/NUT-14 spending conditions on `/v1/swap`. Our E2E tests against Nutshell 0.19.2 revealed that **the Mint does not verify HTLC witness signatures or hashlock conditions** — all fraud attempts (wrong key, no preimage, wrong preimage) were accepted. Until this is fixed upstream, HTLC trustless properties are enforced only at the protocol layer, not at the Mint layer. See `e2e/regtest-htlc-trustless.test.ts` for reproduction.
+
 **Residual trust assumptions:**
+- **Cashu Mint** — trusted to honor token issuance, redemption, **and HTLC spending condition enforcement**. Current Nutshell implementation does not enforce NUT-14 conditions on swap (see warning above).
 - **Oracle + Requester collusion** — Requester decrypts the result (via K_R) before Oracle verifies. If Oracle withholds the preimage, Requester gets data for free and BTC refunds on timeout. Oracle cannot profit, but Worker loses.
-- **Cashu Mint** — trusted to honor token issuance and redemption (standard Cashu trust model)
 - **TLSNotary Verifier** — if Verifier colludes with Worker, they can combine key shares to forge proofs
 
 **Mitigation — Oracle whitelist:** Requester specifies acceptable Oracles in the Job Request; Worker independently verifies the Oracle pubkey against its own trusted whitelist before accepting work. Both parties must agree on the Oracle, so a colluding Oracle would need to compromise the trust of both sides.
