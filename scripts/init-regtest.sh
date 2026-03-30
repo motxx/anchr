@@ -48,8 +48,10 @@ CHAIN_HEIGHT=$($BITCOIN_CLI getblockcount)
 echo "      Chain height: $CHAIN_HEIGHT. Waiting for LND to reach it..."
 SYNCED=""
 for i in $(seq 1 90); do
-  MINT_HEIGHT=$($LNCLI_MINT getinfo 2>/dev/null | grep -o '"block_height": [0-9]*' | grep -o '[0-9]*' || echo "0")
-  USER_HEIGHT=$($LNCLI_USER getinfo 2>/dev/null | grep -o '"block_height": [0-9]*' | grep -o '[0-9]*' || echo "0")
+  MINT_HEIGHT=$($LNCLI_MINT getinfo 2>/dev/null | grep '"block_height"' | head -1 | sed 's/[^0-9]//g')
+  USER_HEIGHT=$($LNCLI_USER getinfo 2>/dev/null | grep '"block_height"' | head -1 | sed 's/[^0-9]//g')
+  MINT_HEIGHT=${MINT_HEIGHT:-0}
+  USER_HEIGHT=${USER_HEIGHT:-0}
   if [ "$MINT_HEIGHT" -ge "$CHAIN_HEIGHT" ] && [ "$USER_HEIGHT" -ge "$CHAIN_HEIGHT" ]; then
     echo "      Both nodes at height $CHAIN_HEIGHT."
     SYNCED="yes"
