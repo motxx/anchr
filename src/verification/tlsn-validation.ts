@@ -14,6 +14,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../types";
 
+/**
+ * Detect regex patterns likely to cause catastrophic backtracking (ReDoS).
+ * Catches: (a+)+, ((a+))+, (a|a)+, (a{1,5})*, nested groups with quantifiers.
+ */
+export function isSuspiciousRegex(pattern: string): boolean {
+  // Strip character classes [...] to avoid false positives on brackets inside them
+  const stripped = pattern.replace(/\[(?:[^\]\\]|\\.)*\]/g, "X");
+  // 1. Quantified group containing alternation: (a|b)+ (a|b)* (a|b){
+  if (/\([^)]*\|[^)]*\)[+*{]/.test(stripped)) return true;
+  // 2. Quantifier followed by close-paren(s) followed by quantifier: ...+)+ or ...+))+ etc.
+  //    This catches (a+)+, ((a+))+, (a{1,5})+ and any nesting depth.
+  if (/[+*}]\)+[+*{]/.test(stripped)) return true;
+  return false;
+}
+
 export interface TlsnValidationResult {
   available: boolean;
   signatureValid: boolean;
@@ -92,9 +107,10 @@ export function evaluateCondition(
       if (pattern.length > 500) {
         return { passed: false, actual_value: "regex pattern too long (max 500 chars)" };
       }
-      // Reject nested quantifiers that cause exponential backtracking
-      if (/\([^)]*[+*][^)]*\)[+*]/.test(pattern) || /\([^)]*\{[^}]*\}[^)]*\)[+*{]/.test(pattern)) {
-        return { passed: false, actual_value: "regex rejected: nested quantifiers detected" };
+      // Reject patterns with nested quantifiers that cause exponential backtracking.
+      // Covers: (a+)+, ((a+))+, (a|a)+, (a{1,5})*, etc.
+      if (isSuspiciousRegex(pattern)) {
+        return { passed: false, actual_value: "regex rejected: potential ReDoS pattern detected" };
       }
       try {
         const re = new RegExp(pattern);
