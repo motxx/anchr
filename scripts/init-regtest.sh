@@ -27,16 +27,21 @@ echo "      Done."
 
 # 2. Wait for LND nodes to sync
 echo "[2/5] Waiting for LND nodes to sync..."
-for i in $(seq 1 30); do
+for i in $(seq 1 60); do
   MINT_SYNCED=$($LNCLI_MINT getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
   USER_SYNCED=$($LNCLI_USER getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
   if [ -n "$MINT_SYNCED" ] && [ -n "$USER_SYNCED" ]; then
     echo "      Both nodes synced."
     break
   fi
-  echo "      Waiting... ($i/30)"
+  echo "      Waiting... ($i/60)"
   sleep 3
 done
+
+if [ -z "$MINT_SYNCED" ] || [ -z "$USER_SYNCED" ]; then
+  echo "ERROR: LND nodes failed to sync after 180s" >&2
+  exit 1
+fi
 
 # 3. Fund LND nodes
 echo "[3/5] Funding LND nodes..."
