@@ -44,26 +44,27 @@ $BITCOIN_CLI -generate 50 > /dev/null
 echo "      Done. Waiting for LND to sync..."
 
 # Wait for LND to sync the mined blocks
-MINT_SYNCED=""
-USER_SYNCED=""
-for i in $(seq 1 60); do
-  MINT_SYNCED=$($LNCLI_MINT getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
-  USER_SYNCED=$($LNCLI_USER getinfo 2>/dev/null | grep -o '"synced_to_chain": true' || true)
-  if [ -n "$MINT_SYNCED" ] && [ -n "$USER_SYNCED" ]; then
-    echo "      Both nodes synced."
+CHAIN_HEIGHT=$($BITCOIN_CLI getblockcount)
+echo "      Chain height: $CHAIN_HEIGHT. Waiting for LND to reach it..."
+SYNCED=""
+for i in $(seq 1 90); do
+  MINT_HEIGHT=$($LNCLI_MINT getinfo 2>/dev/null | grep -o '"block_height": [0-9]*' | grep -o '[0-9]*' || echo "0")
+  USER_HEIGHT=$($LNCLI_USER getinfo 2>/dev/null | grep -o '"block_height": [0-9]*' | grep -o '[0-9]*' || echo "0")
+  if [ "$MINT_HEIGHT" -ge "$CHAIN_HEIGHT" ] && [ "$USER_HEIGHT" -ge "$CHAIN_HEIGHT" ]; then
+    echo "      Both nodes at height $CHAIN_HEIGHT."
+    SYNCED="yes"
     break
   fi
-  echo "      Waiting... ($i/60)"
+  echo "      Waiting... ($i/90) mint=$MINT_HEIGHT user=$USER_HEIGHT target=$CHAIN_HEIGHT"
   sleep 3
 done
 
-if [ -z "$MINT_SYNCED" ] || [ -z "$USER_SYNCED" ]; then
-  echo "ERROR: LND nodes failed to sync after 180s" >&2
-  echo "  lnd-mint synced: ${MINT_SYNCED:-no}" >&2
-  echo "  lnd-user synced: ${USER_SYNCED:-no}" >&2
-  # Dump last logs for debugging
-  docker compose logs --tail=20 lnd-mint 2>&1 | head -15 >&2
-  docker compose logs --tail=20 lnd-user 2>&1 | head -15 >&2
+if [ -z "$SYNCED" ]; then
+  echo "ERROR: LND nodes failed to reach chain height $CHAIN_HEIGHT after 270s" >&2
+  echo "  lnd-mint height: $MINT_HEIGHT" >&2
+  echo "  lnd-user height: $USER_HEIGHT" >&2
+  docker compose logs --tail=10 lnd-mint 2>&1 | head -10 >&2
+  docker compose logs --tail=10 lnd-user 2>&1 | head -10 >&2
   exit 1
 fi
 
