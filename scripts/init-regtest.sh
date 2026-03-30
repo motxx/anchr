@@ -32,10 +32,15 @@ for i in $(seq 1 40); do
   sleep 3
 done
 
-# 2. Create wallet & mine blocks
+# 2. Create wallet & mine blocks (in batches for LND sync)
 echo "[2/5] Creating Bitcoin wallet and mining 150 blocks..."
 $BITCOIN_CLI createwallet cashu 2>/dev/null || $BITCOIN_CLI loadwallet cashu 2>/dev/null || true
-$BITCOIN_CLI -generate 150 > /dev/null
+# Mine in batches to let LND process block notifications
+$BITCOIN_CLI -generate 50 > /dev/null
+sleep 2
+$BITCOIN_CLI -generate 50 > /dev/null
+sleep 2
+$BITCOIN_CLI -generate 50 > /dev/null
 echo "      Done. Waiting for LND to sync..."
 
 # Wait for LND to sync the mined blocks
