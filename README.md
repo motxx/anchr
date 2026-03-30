@@ -28,7 +28,30 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 **No trust required.** Proof is tied to the TLS certificate (web) or C2PA signature (photo) — if data is wrong, cryptographic verification fails. Payment is atomic via Cashu HTLC escrow: the Oracle holds a secret preimage, and only reveals it when verification passes, unlocking the bounty for the Worker.
 
-### Protocol Sequence
+### Trustless Flow
+
+```mermaid
+sequenceDiagram
+    participant R as Requester
+    participant O as Oracle
+    participant W as Worker
+    participant M as Cashu Mint
+
+    R->>O: get hash(preimage)
+    R->>M: lock sats in HTLC<br/>condition: hash + Worker sig
+
+    W->>W: generate cryptographic proof<br/>(TLSNotary or C2PA)
+    W->>O: submit proof
+
+    alt proof valid
+        O->>W: reveal preimage
+        W->>M: redeem HTLC (preimage + sig)
+    else proof invalid or timeout
+        Note over R,M: HTLC expires → sats refund to Requester
+    end
+```
+
+### Protocol Sequence (detailed)
 
 ```mermaid
 sequenceDiagram
