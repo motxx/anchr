@@ -572,20 +572,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       };
       store.set(queryId, updated);
 
-      // Settle wallet: transfer proofs to worker (approved) or refund requester (rejected)
-      if (walletStore && query.htlc?.requester_pubkey) {
-        if (passed) {
-          walletStore.transferLocked(
-            "requester", query.htlc.requester_pubkey, queryId,
-            "worker", workerPubkey,
-          );
-        } else {
-          walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, queryId);
-        }
-      }
-
       // 4. Return preimage on success (look up by HTLC hash)
       // Server-side HTLC verification: verify preimage matches hash before revealing.
+      // IMPORTANT: Read locked proofs BEFORE wallet settlement to avoid VULN-1
+      // (transferLocked deletes proofs from pending, making getLockedProofs return []).
       if (passed && preimageStore && query.htlc?.hash) {
         const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
@@ -596,13 +586,22 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
               message: "HTLC preimage cannot be revealed without walletStore",
             };
           }
+          // Read proofs BEFORE transfer (they're deleted from pending on transfer)
           const lockedProofs = walletStore.getLockedProofs(
             "requester", query.htlc.requester_pubkey, queryId,
           );
-          if (lockedProofs.length > 0) {
-            const htlcError = verifyHtlcProofs(lockedProofs, query.htlc.hash, preimage);
+          // Only verify proofs that are actually HTLC-formatted (Phase 2 swapped proofs).
+          // Plain bookkeeping proofs in the wallet store pass through — the real HTLC
+          // enforcement happens at the Cashu Mint when the worker redeems.
+          const htlcProofs = lockedProofs.filter((p) => {
+            try { const s = JSON.parse(p.secret); return Array.isArray(s) && s[0] === "HTLC"; } catch { return false; }
+          });
+          if (htlcProofs.length > 0) {
+            const htlcError = verifyHtlcProofs(htlcProofs, query.htlc.hash, preimage);
             if (htlcError) {
               console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
+              // Refund on verification failure
+              walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, queryId);
               return {
                 ok: false,
                 query: updated,
@@ -610,6 +609,11 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
               };
             }
           }
+          // Verification passed (or no locked proofs to check) — settle wallet
+          walletStore.transferLocked(
+            "requester", query.htlc.requester_pubkey, queryId,
+            "worker", workerPubkey,
+          );
           preimageStore.delete(query.htlc.hash);
           return {
             ok: true,
@@ -617,6 +621,18 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
             message: "Verification passed. Preimage revealed for HTLC redemption.",
             preimage,
           };
+        }
+      }
+
+      // Settle wallet for non-preimage paths (no preimage store, or preimage not found)
+      if (walletStore && query.htlc?.requester_pubkey) {
+        if (passed) {
+          walletStore.transferLocked(
+            "requester", query.htlc.requester_pubkey, queryId,
+            "worker", workerPubkey,
+          );
+        } else {
+          walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, queryId);
         }
       }
 
