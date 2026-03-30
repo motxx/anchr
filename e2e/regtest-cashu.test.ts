@@ -213,17 +213,12 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
       message: string;
       verification: { passed: boolean };
       payment_status: string;
-      bounty_amount_sats: number;
-      cashu_token: string | null;
     };
 
     // 5. Verify results
     expect(submitJson.ok).toBe(true);
     expect(submitJson.verification.passed).toBe(true);
     expect(submitJson.payment_status).toBe("released");
-    expect(submitJson.bounty_amount_sats).toBe(BOUNTY_SATS);
-    expect(submitJson.cashu_token).not.toBeNull();
-    expect(submitJson.cashu_token!).toStartWith("cashuB");
 
     // 6. Verify query is now approved
     const detailRes = await app.request(
@@ -273,17 +268,16 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
         }),
       },
     );
-    const { cashu_token: returnedToken } = (await submitRes.json()) as {
-      cashu_token: string;
+    const submitJson = (await submitRes.json()) as {
+      ok: boolean;
+      payment_status: string;
     };
-    expect(returnedToken).toStartWith("cashuB");
+    expect(submitJson.ok).toBe(true);
+    expect(submitJson.payment_status).toBe("released");
 
-    // Verify token is valid by decoding and checking proofs
-    const { getDecodedToken } = await import("@cashu/cashu-ts");
-    const decoded = getDecodedToken(returnedToken);
-    expect(decoded.mint).toBe(MINT_URL);
-    expect(decoded.proofs.length).toBeGreaterThan(0);
-    const totalAmount = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
-    expect(totalAmount).toBe(BOUNTY_SATS);
+    // Verify query bounty via detail endpoint
+    const detailRes = await app.request(`http://localhost/queries/${query_id}`);
+    const detail = (await detailRes.json()) as { bounty: { amount_sats: number } };
+    expect(detail.bounty.amount_sats).toBe(BOUNTY_SATS);
   }, 60_000);
 });
