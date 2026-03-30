@@ -34,21 +34,36 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 sequenceDiagram
     participant R as Requester
     participant O as Oracle
-    participant W as Worker
     participant M as Cashu Mint
+    participant W as Worker
+    participant V as TLSNotary Verifier
+    participant T as Target Server
 
     R->>O: get hash(preimage)
-    R->>M: lock sats in HTLC<br/>condition: hash + Worker sig
+    R->>M: create HTLC token<br/>condition: hash(preimage) AND Worker sig
+    R->>W: send HTLC token
 
-    W->>W: generate cryptographic proof<br/>(TLSNotary or C2PA)
-    W->>O: submit proof
+    Note over O,M: Oracle has preimage but not Worker's key<br/>→ cannot redeem HTLC
 
-    alt proof valid
+    W->>V: MPC-TLS handshake (joint key shares)
+    W->>T: HTTPS request (co-signed TLS session)
+    T-->>W: HTTPS response
+    V-->>W: .presentation.tlsn
+
+    Note over W,V: Worker sees plaintext but can't alter it<br/>(Verifier holds independent key share)
+
+    W->>O: submit .presentation.tlsn
+    O->>O: verify MPC-TLS signatures + conditions
+
+    alt verification passed
         O->>W: reveal preimage
-        W->>M: redeem HTLC (preimage + sig)
-    else proof invalid or timeout
-        Note over R,M: HTLC expires → sats refund to Requester
+        W->>M: redeem HTLC (preimage + Worker sig)
+        M-->>W: unlocked sats
+    else verification failed
+        Note over O,W: Oracle withholds preimage
     end
+
+    Note over R,M: timeout → HTLC refunds to Requester<br/>(Oracle cannot profit, only deny payment)
 ```
 
 ### Protocol Sequence (detailed)
