@@ -1,4 +1,5 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { validateAttachmentUri } from "./url-validation";
 
 describe("validateAttachmentUri", () => {

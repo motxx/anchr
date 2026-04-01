@@ -1,4 +1,5 @@
-import { expect, test } from "bun:test";
+import { test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "./identity";
 import {
   buildOracleAttestationEvent,

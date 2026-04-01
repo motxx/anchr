@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 /**
  * Anchr HTLC Demo — Full 3-actor lifecycle (Requester → Worker → Oracle).
  *
@@ -9,8 +8,7 @@
  *
  * Run:
  *   docker compose up -d && sleep 3
- *   NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun run scripts/demo-htlc.ts
- *   or: bun run demo:htlc
+ *   NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 deno run --allow-all --env scripts/demo-htlc.ts
  */
 
 import { generateEphemeralIdentity, type NostrIdentity } from "../src/nostr/identity";
@@ -117,7 +115,7 @@ async function checkRelay(): Promise<boolean> {
       });
       if (ok) return true;
     } catch { /* retry */ }
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
@@ -244,7 +242,7 @@ async function runDemo() {
     return;
   }
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   // ============================================================
   // Step 4 (README): Worker discovers query, verifies Oracle pubkey
@@ -313,7 +311,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives and decrypts Worker quote...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const feedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -397,7 +395,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives selection, confirms own pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const selFeedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -506,7 +504,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives result, decrypts K_R, accesses blob...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const responseEvents = await readRelayEvents({
     kinds: [6300],
@@ -580,7 +578,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives preimage via DM, verifies Oracle pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const dmEvents = await readRelayEvents({
     kinds: [4],

@@ -20,7 +20,9 @@
  *   bun test e2e/regtest-cashu.test.ts
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spawn } from "../src/runtime/mod.ts";
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/worker-api";
 import { clearQueryStore } from "../src/query-service";
@@ -40,12 +42,13 @@ async function isCashuMintReachable(): Promise<boolean> {
 
 async function isLndUserReachable(): Promise<boolean> {
   try {
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "getinfo",
     ], { stdout: "pipe", stderr: "pipe" });
-    return (await proc.exited) === 0;
+    await proc.exited;
+    return proc.exitCode === 0;
   } catch {
     return false;
   }
@@ -53,12 +56,13 @@ async function isLndUserReachable(): Promise<boolean> {
 
 async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "payinvoice", "--force", bolt11,
     ], { stdout: "pipe", stderr: "pipe" });
-    return (await proc.exited) === 0;
+    await proc.exited;
+    return proc.exitCode === 0;
   } catch {
     return false;
   }
@@ -72,7 +76,7 @@ async function mintCashuToken(amountSats: number): Promise<{ token: string; proo
   const paid = await payInvoiceViaLndUser(mintQuote.request);
   if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
 
-  await Bun.sleep(2000);
+  await new Promise(r => setTimeout(r, 2000));
 
   const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
   const token = getEncodedToken({ mint: MINT_URL, proofs });
@@ -117,7 +121,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
       console.warn("[e2e] SKIPPED – lnd-user not reachable");
       return;
     }
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "channelbalance",
@@ -135,7 +139,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
     }
 
     const { token, proofs } = await mintCashuToken(BOUNTY_SATS);
-    expect(token).toStartWith("cashuB");
+    expect(token).toMatch(/^cashuB/);
     expect(proofs.length).toBeGreaterThan(0);
 
     const totalAmount = proofs.reduce((sum, p) => sum + p.amount, 0);
@@ -152,7 +156,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
 
     // 1. Mint Cashu token
     const { token } = await mintCashuToken(BOUNTY_SATS);
-    expect(token).toStartWith("cashuB");
+    expect(token).toMatch(/^cashuB/);
 
     // 2. Create query with bounty
     const createRes = await app.request("http://localhost/queries", {
@@ -177,7 +181,7 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
       status: string;
       payment_status: string;
     };
-    expect(created.query_id).toStartWith("query_");
+    expect(created.query_id).toMatch(/^query_/);
     expect(created.status).toBe("pending");
     expect(created.payment_status).toBe("locked");
 

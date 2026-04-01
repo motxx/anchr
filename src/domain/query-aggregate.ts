@@ -17,6 +17,7 @@ import type {
   RequesterMeta,
 } from "./types";
 import { DEFAULT_VERIFICATION_FACTORS } from "./types";
+import { randomBytes } from "node:crypto";
 import { isValidTransition, isCancellable, isExpirable } from "./query-transitions";
 import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects";
 import { buildChallengeRule, generateNonce } from "./challenge";
@@ -39,7 +40,6 @@ export interface CreateQueryAggregateOptions {
 export const MIN_HTLC_LOCKTIME_SECS = 600;
 
 function generateQueryId(): string {
-  const { randomBytes } = require("node:crypto");
   return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
 }
 

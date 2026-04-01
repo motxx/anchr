@@ -1,4 +1,5 @@
-import { test, expect, describe } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "./worker-api";
 import { createQueryService, createQueryStore } from "../application/query-service";
 import type { QueryService } from "../application/query-service";

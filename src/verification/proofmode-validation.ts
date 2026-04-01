@@ -13,6 +13,7 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { spawn } from "../runtime/mod.ts";
 
 export interface ProofModeData {
   /** The extracted photo buffer. */
@@ -178,14 +179,14 @@ export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeDat
  */
 async function extractZipEntries(zipBuffer: Buffer): Promise<Record<string, Buffer> | null> {
   try {
-    // Use unzip via Bun.spawn for reliability
+    // Use unzip via spawn for reliability
     const tmpDir = `/tmp/proofmode-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } = await import("node:fs");
     mkdirSync(tmpDir, { recursive: true });
 
     const zipPath = `${tmpDir}/input.zip`;
     writeFileSync(zipPath, zipBuffer);
-    const proc = Bun.spawn(["unzip", "-o", "-q", "-d", tmpDir, zipPath], {
+    const proc = spawn(["unzip", "-o", "-q", "-d", tmpDir, zipPath], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -244,7 +245,7 @@ async function verifyPgpSignature(
     const gpgHome = `${tmpDir}/gnupg`;
     mkdirSync(gpgHome, { mode: 0o700 });
 
-    const importProc = Bun.spawn([
+    const importProc = spawn([
       "gpg", "--homedir", gpgHome, "--batch", "--yes", "--import", `${tmpDir}/pubkey.asc`,
     ], { stdout: "pipe", stderr: "pipe" });
     await importProc.exited;
@@ -253,7 +254,7 @@ async function verifyPgpSignature(
       return null; // gpg not available or import failed
     }
 
-    const verifyProc = Bun.spawn([
+    const verifyProc = spawn([
       "gpg", "--homedir", gpgHome, "--batch", "--verify",
       `${tmpDir}/photo.sig.asc`, `${tmpDir}/photo.jpg`,
     ], { stdout: "pipe", stderr: "pipe" });

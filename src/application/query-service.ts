@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { createQueryStore } from "../domain/query-store";
 import type { QueryStore } from "../domain/query-store";
 import { normalizeQueryResult } from "../infrastructure/attachments";
@@ -138,7 +139,6 @@ function resolveTtlMs(options?: CreateQueryOptions): number {
 }
 
 function generateQueryId(): string {
-  const { randomBytes } = require("node:crypto");
   return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
 }
 

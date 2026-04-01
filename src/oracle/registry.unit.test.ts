@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in";
 import { createOracleRegistry } from "./registry";
 import type { Oracle, OracleAttestation } from "./types";

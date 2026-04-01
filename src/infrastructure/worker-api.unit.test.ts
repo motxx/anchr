@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { createPreimageStore } from "../oracle/preimage-store";
 import { createOracleRegistry } from "../oracle/registry";
 import type { Oracle, OracleAttestation } from "../oracle/types";
@@ -99,7 +100,7 @@ describe("buildWorkerApiApp with injected deps", () => {
     });
     expect(res.status).toBe(201);
     const json = await res.json() as { query_id: string; description: string; status: string; htlc: { hash: string } };
-    expect(json.query_id).toStartWith("query_");
+    expect(json.query_id).toMatch(/^query_/);
     expect(json.description).toBe("Test Store status check");
     expect(json.status).toBe("awaiting_quotes");
     expect(json.htlc.hash).toBe("abc123");

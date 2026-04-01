@@ -9,7 +9,8 @@
  *   5. Cross-Query Attacks — submit to wrong query
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "./oracle/registry";
 import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store";
@@ -234,7 +235,7 @@ describe("Attack: Race Conditions & Timing", () => {
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
 
     // Wait a tick to ensure expiry
-    await Bun.sleep(5);
+    await new Promise(r => setTimeout(r, 5));
 
     // Run expiry sweep
     const expired = service.expireQueries();
@@ -262,7 +263,7 @@ describe("Attack: Race Conditions & Timing", () => {
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
 
-    await Bun.sleep(5);
+    await new Promise(r => setTimeout(r, 5));
     service.expireQueries();
 
     // Worker tries to submit result after expiry

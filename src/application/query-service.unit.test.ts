@@ -1,5 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
+import { createPreimageStore } from "../oracle/preimage-store";
 import {
   createOracleRegistry,
 } from "../oracle/registry";
@@ -106,7 +108,7 @@ describe("createQueryService", () => {
     expect(query.status).toBe("pending");
     expect(query.challenge_nonce).toBeUndefined();
     expect(query.verification_requirements).toEqual(["gps", "ai_check"]);
-    expect(query.id).toStartWith("query_");
+    expect(query.id).toMatch(/^query_/);
   });
 
   test("createQuery generates nonce when nonce factor is requested", async () => {
@@ -561,7 +563,6 @@ describe("submitHtlcResult", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const oracle = opts?.mockOracle ?? makeMockOracle("test-oracle");
     registry.register(oracle);
-    const { createPreimageStore } = require("../oracle/preimage-store") as typeof import("../oracle/preimage-store");
     const preimageStore = createPreimageStore();
     return {
       service: createQueryService({
@@ -755,7 +756,6 @@ describe("verifyWithQuorum", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("oracle-a", () => true));
     registry.register(makeMockOracle("oracle-b", () => true));
-    const { createPreimageStore } = require("../oracle/preimage-store") as typeof import("../oracle/preimage-store");
     const preimageStore = createPreimageStore();
     const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
 

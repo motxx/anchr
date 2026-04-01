@@ -1,4 +1,5 @@
-import { test, expect } from "bun:test";
+import { test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { haversineKm } from "./geo";
 
 test("haversineKm returns 0 for same point", () => {

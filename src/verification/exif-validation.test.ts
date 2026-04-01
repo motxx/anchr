@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { extractExifMetadata, validateExif } from "./exif-validation";
 
 // Minimal valid JPEG with EXIF APP1 segment containing Make, Model, DateTime

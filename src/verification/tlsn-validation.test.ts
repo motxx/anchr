@@ -1,5 +1,7 @@
-import { test, expect, describe, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest } from "./tlsn-validation";
+import { verify } from "./verifier";
 import type { TlsnAttestation, TlsnRequirement } from "../domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -211,7 +213,7 @@ describe("validateTlsn with mock binary", () => {
 // --- Integration: verify() with tlsn ---
 
 describe("verify() integration with tlsn", () => {
-  const { verify } = require("./verifier") as typeof import("./verifier");
+  // verify is imported at the top of this file
 
   test("tlsn query with missing attestation fails", async () => {
     _setVerifierPathForTest(null);

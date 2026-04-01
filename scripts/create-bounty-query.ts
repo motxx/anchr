@@ -1,10 +1,9 @@
-#!/usr/bin/env bun
 /**
  * Create a query with a real Cashu bounty for mobile wallet testing.
  *
  * Usage:
- *   CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts
- *   CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts --text-only
+ *   CASHU_MINT_URL=http://localhost:3338 deno run --allow-all --env scripts/create-bounty-query.ts
+ *   CASHU_MINT_URL=http://localhost:3338 deno run --allow-all --env scripts/create-bounty-query.ts --text-only
  *
  * Flags:
  *   --text-only  Create with verification_requirements: [] so text-only
@@ -16,6 +15,7 @@
  */
 
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { spawn } from "../src/runtime/mod.ts";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
@@ -28,13 +28,13 @@ const TEXT_ONLY = process.argv.includes("--text-only");
  */
 async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "payinvoice", "--force", bolt11,
     ], { stdout: "pipe", stderr: "pipe" });
-    const exitCode = await proc.exited;
-    return exitCode === 0;
+    await proc.exited;
+    return proc.exitCode === 0;
   } catch {
     return false;
   }

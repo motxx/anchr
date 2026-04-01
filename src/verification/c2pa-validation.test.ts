@@ -1,8 +1,10 @@
-import { test, expect, describe, beforeAll } from "bun:test";
-import { validateC2pa, isC2paAvailable } from "./c2pa-validation";
+import { beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { validateC2pa, isC2paAvailable } from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawn, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).
@@ -52,8 +54,8 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
     const outputPath = join(tmpDir, "signed.jpg");
     const manifestPath = join(tmpDir, "manifest.json");
 
-    await Bun.write(inputPath, jpegBuf);
-    await Bun.write(manifestPath, JSON.stringify({
+    await writeFile(inputPath, jpegBuf);
+    await writeFile(manifestPath, JSON.stringify({
       claim_generator: "anchr-test/1.0",
       assertions: [
         { label: "c2pa.actions", data: { actions: [{ action: "c2pa.created" }] } },
@@ -64,7 +66,7 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
       ],
     }));
 
-    const proc = Bun.spawn(["c2patool", inputPath, "-m", manifestPath, "-o", outputPath, "-f"], {
+    const proc = spawn(["c2patool", inputPath, "-m", manifestPath, "-o", outputPath, "-f"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -75,7 +77,7 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
       throw new Error(`c2patool signing failed: ${stderr}`);
     }
 
-    return Buffer.from(await Bun.file(outputPath).arrayBuffer());
+    return Buffer.from(await readFileAsArrayBuffer(outputPath));
   } finally {
     await rm(tmpDir, { recursive: true, force: true });
   }
@@ -95,7 +97,8 @@ describe("c2pa-validation", () => {
     signedJpeg = await signWithC2pa(unsignedJpeg);
   });
 
-  test.skipIf(skip)("validates a C2PA-signed JPEG", async () => {
+  test("validates a C2PA-signed JPEG", async () => {
+    if (skip) return;
     const result = await validateC2pa(signedJpeg, "photo.jpg");
 
     expect(result.available).toBe(true);
@@ -108,7 +111,8 @@ describe("c2pa-validation", () => {
     expect(result.failures).toHaveLength(0);
   });
 
-  test.skipIf(skip)("detects unsigned JPEG (no manifest)", async () => {
+  test("detects unsigned JPEG (no manifest)", async () => {
+    if (skip) return;
     const result = await validateC2pa(unsignedJpeg, "unsigned.jpg");
 
     expect(result.available).toBe(true);
@@ -116,7 +120,8 @@ describe("c2pa-validation", () => {
     expect(result.signatureValid).toBe(false);
   });
 
-  test.skipIf(skip)("detects tampered image", async () => {
+  test("detects tampered image", async () => {
+    if (skip) return;
     const tampered = Buffer.from(signedJpeg);
     for (let i = tampered.length - 50; i < tampered.length - 2; i++) {
       tampered[i] = tampered[i]! ^ 0xff;
@@ -131,7 +136,8 @@ describe("c2pa-validation", () => {
     expect(result.signatureValid).toBe(false);
   });
 
-  test.skipIf(skip)("rejects unsupported file format", async () => {
+  test("rejects unsupported file format", async () => {
+    if (skip) return;
     const result = await validateC2pa(Buffer.from("test"), "doc.pdf");
 
     expect(result.available).toBe(true);

@@ -9,6 +9,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { which, writeFile, spawn } from "../runtime/mod.ts";
 
 export interface C2paManifest {
   title?: string;
@@ -38,7 +39,7 @@ let c2paToolPath: string | null | undefined;
 
 function findC2paTool(): string | null {
   if (c2paToolPath !== undefined) return c2paToolPath;
-  c2paToolPath = Bun.which("c2patool");
+  c2paToolPath = which("c2patool");
   if (c2paToolPath) {
     console.error(`[c2pa] Found c2patool at ${c2paToolPath}`);
   }
@@ -69,9 +70,9 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
   const inputPath = join(tempDir, `input${ext}`);
 
   try {
-    await Bun.write(inputPath, data);
+    await writeFile(inputPath, data);
 
-    const proc = Bun.spawn([toolPath, inputPath], {
+    const proc = spawn([toolPath, inputPath], {
       stdout: "pipe",
       stderr: "pipe",
     });

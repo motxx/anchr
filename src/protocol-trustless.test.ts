@@ -12,7 +12,8 @@
  *   7. Preimage is only revealed on verification pass
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "./oracle/registry";
 import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store";

@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "../blossom/client";
 import { createQuery, getQuery } from "../application/query-service";
 import { storeIntegrity } from "../verification/integrity-store";
@@ -198,7 +199,7 @@ test("worker api creates queries over HTTP and enforces write API keys", async (
       query_api_url: string;
     };
 
-    expect(createJson.query_id).toStartWith("query_");
+    expect(createJson.query_id).toMatch(/^query_/);
     expect(createJson.description).toBe("Check if Authorized Test Store is open");
     expect(createJson.status).toBe("pending");
     expect(createJson.requester_meta?.requester_type).toBe("app");
@@ -304,7 +305,7 @@ describe("POST /queries validation", () => {
     expect(res.status).toBe(400);
     const json = await res.json() as { error: string; issues?: unknown[] };
     expect(json.error).toBe("Invalid query payload");
-    expect(json.issues).toBeArray();
+    expect(Array.isArray(json.issues)).toBe(true);
   }));
 
   test("rejects ttl_seconds out of range", withEnv(openEnv, async () => {
@@ -337,7 +338,7 @@ describe("POST /queries validation", () => {
     expect(res.status).toBe(201);
     const json = await res.json() as { description: string; query_id: string };
     expect(json.description).toBe("Check if Shibuya ramen shop is open");
-    expect(json.query_id).toStartWith("query_");
+    expect(json.query_id).toMatch(/^query_/);
   }));
 
   test("rejects non-JSON body", withEnv(openEnv, async () => {

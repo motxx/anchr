@@ -10,7 +10,7 @@
  *   ORACLE_PORT=4000 ORACLE_API_KEY=secret bun src/oracle/oracle-server.ts
  */
 
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
@@ -20,7 +20,6 @@ import { createPreimageStore, type PreimageStore } from "./preimage-store";
 
 /** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {
-  const { createHash } = require("node:crypto");
   // Hash both inputs to fixed-length digests to prevent length leakage.
   const hashA = createHash("sha256").update(a).digest();
   const hashB = createHash("sha256").update(b).digest();
@@ -179,8 +178,5 @@ if (import.meta.main) {
   const app = buildOracleApp(ORACLE_ID, ORACLE_API_KEY);
   console.log(`[oracle-server] Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
 
-  Bun.serve({
-    port: ORACLE_PORT,
-    fetch: app.fetch,
-  });
+  Deno.serve({ port: ORACLE_PORT }, app.fetch);
 }

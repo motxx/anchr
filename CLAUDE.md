@@ -1,35 +1,45 @@
 ---
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
+description: Use Deno instead of Node.js, npm, pnpm, or vite.
+globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, deno.json"
 alwaysApply: false
 ---
 
-Default to using Bun instead of Node.js.
+Default to using Deno instead of Node.js.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build <file.html|file.ts|file.css>` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads .env, so don't use dotenv.
+- Use `deno run --allow-all <file>` instead of `node <file>` or `ts-node <file>`
+- Use `deno test` instead of `jest` or `vitest`
+- Use `deno task build:ui` to build frontend bundles (esbuild under the hood)
+- Use `deno install` instead of `npm install` or `yarn install` or `pnpm install`
+- Use `deno task <name>` instead of `npm run <name>` (tasks defined in `deno.json`)
+- Use `npx <package> <command>` for CLI tools not yet on JSR
+- Deno auto-loads `.env` via `--env` flag in task definitions. Don't use dotenv.
+
+## Import Map (deno.json)
+
+JSR packages (supply-chain safe, no npm):
+- `hono` → `jsr:@hono/hono`
+- `zod` → `jsr:@zod/zod`
+- `@noble/hashes` → `jsr:@noble/hashes`
+- Test imports: `@std/testing/bdd` + `@std/expect`
+
+npm packages (via `npm:` prefix):
+- `@cashu/cashu-ts`, `nostr-tools`, `@anthropic-ai/sdk`, `@modelcontextprotocol/sdk`
+- React/UI: `react`, `react-dom`, `@tanstack/react-query`, `lucide-react`, `radix-ui`, `clsx`, `tailwind-merge`, `class-variance-authority`
 
 ## APIs
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
+- `Deno.serve()` for HTTP servers. Use Hono for routing. Don't use `express`.
+- `Deno.upgradeWebSocket()` for WebSocket support.
+- Runtime compat layer at `src/runtime/mod.ts` provides: `spawn`, `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `which`, `moduleDir`
 - `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- Bun.$`ls` instead of execa.
 
 ## Testing
 
-Use `bun test` to run tests.
+Use `deno test` to run tests. Tests use JSR standard library:
 
 ```ts#index.test.ts
-import { test, expect } from "bun:test";
+import { test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 
 test("hello world", () => {
   expect(1).toBe(1);
@@ -38,77 +48,19 @@ test("hello world", () => {
 
 ## Frontend
 
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
+UI is pre-built with esbuild (`deno task build:ui`) and served as static files via Hono's `serveStatic`:
 
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
+```ts
+import { serveStatic } from "hono/deno";
+app.get("/", serveStatic({ path: "./dist/ui/index.html" }));
+app.get("/assets/*", serveStatic({ root: "./dist/ui/" }));
+Deno.serve({ port }, app.fetch);
 ```
 
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-import { createRoot } from "react-dom/client";
-
-// import .css files directly and it works
-import './index.css';
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
+Run the server:
 ```sh
-bun --hot ./index.ts
+deno task build:ui && deno task build:css && deno task dev
 ```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.mdx`.
 
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.

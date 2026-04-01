@@ -10,7 +10,9 @@
  *   bun test e2e/tlsn.test.ts
  */
 
-import { describe, test, expect, beforeAll } from "bun:test";
+import { beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spawn } from "../src/runtime/mod.ts";
 import { buildWorkerApiApp } from "../src/worker-api";
 import { createQueryService, createQueryStore } from "../src/query-service";
 import type { QueryInput, QueryResult } from "../src/types";
@@ -23,15 +25,11 @@ const VERIFIER_BIN = join(import.meta.dir, "../crates/tlsn-verifier/target/relea
 
 async function isVerifierReachable(): Promise<boolean> {
   try {
-    const conn = await Bun.connect({
+    const conn = await Deno.connect({
       hostname: VERIFIER_HOST.split(":")[0]!,
       port: parseInt(VERIFIER_HOST.split(":")[1] ?? "7047", 10),
-      socket: {
-        data() {},
-        open(socket) { socket.end(); },
-        error() {},
-      },
     });
+    conn.close();
     return true;
   } catch {
     return false;
@@ -47,7 +45,7 @@ function hasVerifierBin(): boolean {
 }
 
 async function generatePresentation(targetUrl: string): Promise<string> {
-  const proc = Bun.spawn([PROVER_BIN, "--verifier", VERIFIER_HOST, targetUrl, "-o", "/tmp/e2e-tlsn.presentation.tlsn"], {
+  const proc = spawn([PROVER_BIN, "--verifier", VERIFIER_HOST, targetUrl, "-o", "/tmp/e2e-tlsn.presentation.tlsn"], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -62,7 +60,7 @@ async function generatePresentation(targetUrl: string): Promise<string> {
 }
 
 async function verifyPresentation(path: string): Promise<Record<string, unknown>> {
-  const proc = Bun.spawn([VERIFIER_BIN, "verify", path], {
+  const proc = spawn([VERIFIER_BIN, "verify", path], {
     stdout: "pipe",
     stderr: "pipe",
   });

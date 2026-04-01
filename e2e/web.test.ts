@@ -11,14 +11,16 @@
  *   bun test e2e/web.test.ts
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spawn, fileExists } from "../src/runtime/mod.ts";
 
 const BROWSE = `${process.env.HOME}/.claude/skills/gstack/browse/dist/browse`;
 const SERVER_URL = "http://localhost:3000";
 const WEB_URL = "http://localhost:8082";
 
 async function browse(...args: string[]): Promise<string> {
-  const proc = Bun.spawn([BROWSE, ...args], {
+  const proc = spawn([BROWSE, ...args], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -47,8 +49,7 @@ async function isServerReachable(): Promise<boolean> {
 
 async function hasBrowseTool(): Promise<boolean> {
   try {
-    const file = Bun.file(BROWSE);
-    return await file.exists();
+    return await fileExists(BROWSE);
   } catch {
     return false;
   }
@@ -112,7 +113,7 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(res.status).toBe(201);
     const data = (await res.json()) as { query_id: string };
     testQueryId = data.query_id;
-    expect(testQueryId).toStartWith("query_");
+    expect(testQueryId).toMatch(/^query_/);
   });
 
   test("web app loads and shows queries", async () => {
@@ -121,7 +122,7 @@ describe("e2e: Anchr Worker Web app", () => {
     await browse("goto", WEB_URL);
     // Wait for React Query to fetch data
     await browse("wait", "--networkidle");
-    await Bun.sleep(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     const text = await browse("text");
     expect(text).toContain("Anchr");
@@ -146,7 +147,7 @@ describe("e2e: Anchr Worker Web app", () => {
     // Navigate directly to the detail URL (expo-router web routing)
     await browse("goto", `${WEB_URL}/${testQueryId}`);
     await browse("wait", "--networkidle");
-    await Bun.sleep(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     const text = await browse("text");
 
@@ -163,7 +164,7 @@ describe("e2e: Anchr Worker Web app", () => {
     // Go back to tabs first
     await browse("goto", WEB_URL);
     await browse("wait", "--networkidle");
-    await Bun.sleep(1500);
+    await new Promise(r => setTimeout(r, 1500));
 
     // Click Wallet tab
     await browse("js", `
@@ -171,7 +172,7 @@ describe("e2e: Anchr Worker Web app", () => {
         .find(e => e.textContent.includes('Wallet'));
       if (tab) tab.click();
     `);
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Balance");
@@ -186,7 +187,7 @@ describe("e2e: Anchr Worker Web app", () => {
         .find(e => e.textContent.includes('Settings'));
       if (tab) tab.click();
     `);
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Settings");
@@ -201,7 +202,7 @@ describe("e2e: Anchr Worker Web app", () => {
         .find(e => e.textContent.includes('Map'));
       if (tab) tab.click();
     `);
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Map");
@@ -226,7 +227,7 @@ describe("e2e: Anchr Worker Web app", () => {
     // Navigate back to queries tab and verify
     await browse("goto", WEB_URL);
     await browse("wait", "--networkidle");
-    await Bun.sleep(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     const text = await browse("text");
     // Query should no longer be in pending list (it's completed)

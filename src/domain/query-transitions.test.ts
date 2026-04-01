@@ -1,4 +1,5 @@
-import { test, expect, describe } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { isValidTransition, isCancellable, isExpirable, isTerminal } from "./query-transitions";
 import type { QueryStatus } from "./types";
 

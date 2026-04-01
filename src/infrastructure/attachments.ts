@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
 import { getRuntimeConfig } from "./config";
 import type {
   AttachmentAccess,
@@ -59,7 +60,7 @@ function resolvePreviewCommand():
     };
   }
 
-  const magick = Bun.which("magick");
+  const magick = which("magick");
   if (magick) {
     return {
       command: magick,
@@ -76,7 +77,7 @@ function resolvePreviewCommand():
     };
   }
 
-  const convert = Bun.which("convert");
+  const convert = which("convert");
   if (convert) {
     return {
       command: convert,
@@ -310,8 +311,8 @@ export async function renderStoredAttachmentPreview(
   const outputPath = join(tempDir, "preview.jpg");
 
   try {
-    await Bun.write(inputPath, attachment.data);
-    const proc = Bun.spawn([
+    await writeFile(inputPath, attachment.data);
+    const proc = spawn([
       previewCommand.command,
       ...previewCommand.args(inputPath, outputPath, maxDimension, jpegQuality),
     ], {
@@ -323,12 +324,11 @@ export async function renderStoredAttachmentPreview(
       return null;
     }
 
-    const output = Bun.file(outputPath);
-    if (!(await output.exists())) {
+    if (!(await fileExists(outputPath))) {
       return null;
     }
 
-    const data = Buffer.from(await output.arrayBuffer());
+    const data = Buffer.from(await readFileAsArrayBuffer(outputPath));
     return {
       data: data.toString("base64"),
       mimeType: "image/jpeg",

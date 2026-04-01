@@ -1,5 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqual, createHash } from "node:crypto";
 import { join } from "node:path";
+import { spawn, fileExists, fileLastModified, moduleDir } from "../runtime/mod.ts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
@@ -111,7 +112,6 @@ const createQuerySchema = z.object({
 
 /** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {
-  const { createHash } = require("node:crypto");
   // Hash both inputs to fixed-length digests to prevent length leakage.
   const hashA = createHash("sha256").update(a).digest();
   const hashB = createHash("sha256").update(b).digest();
@@ -278,17 +278,15 @@ async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, i
 
 async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
   // Skip if pre-built CSS exists and is newer than source
-  const outFile = Bun.file(cssOut);
-  const inFile = Bun.file(cssIn);
-  if (await outFile.exists()) {
-    const outStat = outFile.lastModified;
-    const inStat = inFile.lastModified;
+  if (await fileExists(cssOut)) {
+    const outStat = await fileLastModified(cssOut);
+    const inStat = await fileLastModified(cssIn);
     if (outStat >= inStat) {
       return;
     }
   }
 
-  const proc = Bun.spawn([process.execPath, "x", "tailwindcss", "-i", cssIn, "-o", cssOut], {
+  const proc = spawn(["npx", "tailwindcss", "-i", cssIn, "-o", cssOut], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -299,10 +297,11 @@ async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
 }
 
 export async function prepareWorkerApiAssets() {
+  const dir = moduleDir(import.meta);
   await Promise.all([
-    buildCssIfNeeded(join(import.meta.dir, "../ui/globals.css"), join(import.meta.dir, "../ui/generated.css"), "worker"),
-    buildCssIfNeeded(join(import.meta.dir, "../ui/requester/globals.css"), join(import.meta.dir, "../ui/requester/generated.css"), "requester"),
-    buildCssIfNeeded(join(import.meta.dir, "../ui/dashboard/globals.css"), join(import.meta.dir, "../ui/dashboard/generated.css"), "dashboard"),
+    buildCssIfNeeded(join(dir, "../ui/globals.css"), join(dir, "../ui/generated.css"), "worker"),
+    buildCssIfNeeded(join(dir, "../ui/requester/globals.css"), join(dir, "../ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(dir, "../ui/dashboard/globals.css"), join(dir, "../ui/dashboard/generated.css"), "dashboard"),
   ]);
 }
 
@@ -695,7 +694,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   // --- Log streaming (SSE) ---
 
   app.get("/logs/stream", (c) => {
-    let dockerProc: ReturnType<typeof Bun.spawn> | null = null;
+    let dockerProc: ReturnType<typeof spawn> | null = null;
     let unsubscribe: (() => void) | null = null;
     const encoder = new TextEncoder();
 
@@ -716,7 +715,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
         // Stream docker compose logs
         try {
-          dockerProc = Bun.spawn(
+          dockerProc = spawn(
             ["docker", "compose", "logs", "-f", "--tail=30", "--no-color"],
             { stdout: "pipe", stderr: "pipe" },
           );

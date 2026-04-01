@@ -6,6 +6,8 @@
  * For non-JPEG formats, uses sips/magick if available.
  */
 
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
+
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
 const JPEG_SOS = 0xffda;
@@ -93,45 +95,44 @@ async function stripExifWithTool(data: Buffer, ext: string): Promise<Buffer> {
   const outputPath = join(tempDir, `output${ext}`);
 
   try {
-    await Bun.write(inputPath, data);
+    await writeFile(inputPath, data);
 
     // Prefer exiftool: strips EXIF/XMP/IPTC but preserves JUMBF (C2PA)
-    const exiftool = Bun.which("exiftool");
+    const exiftool = which("exiftool");
     if (exiftool) {
       const { copyFile } = await import("node:fs/promises");
       await copyFile(inputPath, outputPath);
-      const proc = Bun.spawn([exiftool, "-all=", "--jumbf:all", "-overwrite_original", outputPath], {
+      const proc = spawn([exiftool, "-all=", "--jumbf:all", "-overwrite_original", outputPath], {
         stdout: "pipe",
         stderr: "pipe",
       });
       await proc.exited;
       if (proc.exitCode === 0) {
-        const outputFile = Bun.file(outputPath);
-        if (await outputFile.exists()) {
-          return Buffer.from(await outputFile.arrayBuffer());
+        if (await fileExists(outputPath)) {
+          return Buffer.from(await readFileAsArrayBuffer(outputPath));
         }
       }
       // Fall through to other tools if exiftool fails
     }
 
     // Fallback: magick/sips (WARNING: destroys C2PA)
-    const magick = Bun.which("magick");
+    const magick = which("magick");
     const sips = process.platform === "darwin" ? "/usr/bin/sips" : null;
 
     if (!magick && !sips) {
       return data;
     }
 
-    let proc: ReturnType<typeof Bun.spawn>;
+    let proc: ReturnType<typeof spawn>;
     if (magick) {
-      proc = Bun.spawn([magick, inputPath, "-strip", outputPath], {
+      proc = spawn([magick, inputPath, "-strip", outputPath], {
         stdout: "pipe",
         stderr: "pipe",
       });
     } else {
       const { copyFile } = await import("node:fs/promises");
       await copyFile(inputPath, outputPath);
-      proc = Bun.spawn([sips!, "-d", "allExif", outputPath], {
+      proc = spawn([sips!, "-d", "allExif", outputPath], {
         stdout: "pipe",
         stderr: "pipe",
       });
@@ -142,9 +143,8 @@ async function stripExifWithTool(data: Buffer, ext: string): Promise<Buffer> {
       return data;
     }
 
-    const outputFile = Bun.file(outputPath);
-    if (await outputFile.exists()) {
-      return Buffer.from(await outputFile.arrayBuffer());
+    if (await fileExists(outputPath)) {
+      return Buffer.from(await readFileAsArrayBuffer(outputPath));
     }
     return data;
   } finally {

@@ -1,5 +1,6 @@
-import { test, expect, describe, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm, readdir } from "node:fs/promises";
+import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { mkdtemp, rm, readdir, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clearQueryStore, createQuery, expireQueries } from "./query-service";
@@ -44,8 +45,9 @@ describe("data purge", () => {
 
   test("deletes attachment files for expired queries", async () => {
     const uploadsDir = join(tempDir, "uploads");
-    await Bun.write(join(uploadsDir, "q1_photo.jpg"), "fake image data");
-    await Bun.write(join(uploadsDir, "q2_photo.jpg"), "keep this");
+    await mkdir(uploadsDir, { recursive: true });
+    await writeFile(join(uploadsDir, "q1_photo.jpg"), "fake image data");
+    await writeFile(join(uploadsDir, "q2_photo.jpg"), "keep this");
 
     let files = await readdir(uploadsDir);
     expect(files.length).toBe(2);

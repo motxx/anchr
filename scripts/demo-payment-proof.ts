@@ -7,13 +7,15 @@
  *   3. Verify — Anchr verifies the proof independently
  *
  * Usage:
- *   SANDBOX_ACCESS_TOKEN=xxx bun scripts/demo-payment-proof.ts
+ *   SANDBOX_ACCESS_TOKEN=xxx deno run --allow-all --env scripts/demo-payment-proof.ts
  *
  * Prerequisites:
- *   - Anchr server running (bun src/reference-app.ts)
+ *   - Anchr server running (deno run --allow-all --env src/reference-app.ts)
  *   - TLSNotary verifier running (docker)
  *   - tlsn-prove binary built
  */
+
+import { spawn } from "../src/runtime/mod.ts";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
@@ -42,7 +44,7 @@ const LEFT_W = Math.floor(SCREEN_W * 0.5);
 const RIGHT_W = SCREEN_W - LEFT_W;
 
 // Demo UI — left
-const demoHtml = await Bun.file(import.meta.dir + "/demo-payment-proof.html").text();
+const demoHtml = await Deno.readTextFile(new URL("./demo-payment-proof.html", import.meta.url).pathname);
 const demoBrowser = await pw.chromium.launch({
   headless: false,
   args: [`--window-size=${LEFT_W},${SCREEN_H}`, `--window-position=0,0`],
@@ -169,7 +171,7 @@ console.log(`[${elapsed()}] Generating TLSNotary proof...`);
 
 const proofFile = `/tmp/demo-proof-${Date.now()}.tlsn`;
 const proveStart = Date.now();
-const proc = Bun.spawn(
+const proc = spawn(
   [
     "./crates/tlsn-prover/target/release/tlsn-prove",
     "--verifier",

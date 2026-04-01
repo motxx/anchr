@@ -14,6 +14,7 @@
  * 10. Verify final status
  */
 import { chromium } from "playwright";
+import { spawn } from "../src/runtime/mod.ts";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
@@ -74,7 +75,7 @@ await blankPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await blankPage.setContent('<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Square Payment — waiting for Worker to accept job...</p></body></html>');
 
 // Flow visualization UI — bottom right
-const flowHtml = await Bun.file(import.meta.dir + "/e2e-flow-ui.html").text();
+const flowHtml = await Deno.readTextFile(new URL("./e2e-flow-ui.html", import.meta.url).pathname);
 const flowBrowser = await pw.chromium.launch({
   headless: false,
   args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=${HALF_W},${HALF_H}`],
@@ -151,7 +152,7 @@ const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
 await cashuWallet.loadMint();
 
 const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-const payProc = Bun.spawn(["bash", "-c",
+const payProc = spawn(["bash", "-c",
   `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
 ], { stdout: "pipe", stderr: "pipe" });
 await payProc.exited;
@@ -351,7 +352,7 @@ const proofFile = `/tmp/e2e-square-${Date.now()}.presentation.tlsn`;
 const proveStart = Date.now();
 
 // Prove the specific payment endpoint (Payment ID is now known)
-const proc = Bun.spawn([
+const proc = spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
   "--verifier", "localhost:7046",
   "--max-recv-data", "4096",

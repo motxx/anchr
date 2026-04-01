@@ -12,12 +12,12 @@ COPY crates/tlsn-prover/src/ ./crates/tlsn-prover/src/
 RUN cd crates/tlsn-prover && cargo build --release
 
 # Main app
-FROM oven/bun:1.3.8 AS app
+FROM denoland/deno:2 AS app
 
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends imagemagick ca-certificates curl tor \
+  && apt-get install -y --no-install-recommends imagemagick ca-certificates curl tor npm \
   && curl -sSL https://github.com/contentauth/c2pa-rs/releases/download/c2patool-v0.26.37/c2patool-v0.26.37-x86_64-unknown-linux-gnu.tar.gz \
      | tar -xz --strip-components=1 -C /usr/local/bin c2patool \
   && rm -rf /var/lib/apt/lists/*
@@ -26,10 +26,13 @@ RUN apt-get update \
 COPY --from=rust-builder /build/crates/tlsn-verifier/target/release/tlsn-verifier /usr/local/bin/
 COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /usr/local/bin/
 
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+COPY deno.json ./
+RUN deno install
 
 COPY . .
+
+# Build frontend
+RUN deno task build:ui && deno task build:css
 
 ENV NODE_ENV=production
 ENV REFERENCE_APP_PORT=8080
@@ -44,4 +47,4 @@ USER anchr
 EXPOSE 8080
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["bun", "run", "src/server.ts"]
+CMD ["deno", "task", "start"]

@@ -10,7 +10,8 @@
  *   bun test e2e/tlsn-browser.test.ts
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -34,11 +35,11 @@ function hasExtension(): boolean {
 
 async function isVerifierRunning(): Promise<boolean> {
   try {
-    const conn = await Bun.connect({
+    const conn = await Deno.connect({
       hostname: "localhost",
       port: VERIFIER_WS_PORT,
-      socket: { data() {}, open(s) { s.end(); }, error() {} },
     });
+    conn.close();
     return true;
   } catch {
     return false;

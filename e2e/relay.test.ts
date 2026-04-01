@@ -11,7 +11,8 @@
  * For production the only change is NOSTR_RELAYS pointing to real relays.
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
@@ -104,12 +105,12 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       challenge_nonce: string | null;
       reference_app_url: string;
     };
-    expect(createJson.query_id).toStartWith("query_");
+    expect(createJson.query_id).toMatch(/^query_/);
     expect(createJson.description).toBe("E2E Ramen Shop の営業状況");
     expect(createJson.status).toBe("pending");
 
     // Wait for fire-and-forget relay publish to complete
-    await Bun.sleep(1500);
+    await new Promise(r => setTimeout(r, 1500));
 
     // Verify the event appeared on the relay
     const events = await waitForRelayEvent(RELAY_URL, {
@@ -241,7 +242,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     );
 
     // Wait for relay publish
-    await Bun.sleep(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     const events = await waitForRelayEvent(RELAY_URL, {
       kinds: [ANCHR_QUERY_REQUEST],

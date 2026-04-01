@@ -1,7 +1,11 @@
 import { join } from "node:path";
-import { expect, test } from "bun:test";
+import { writeFileSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { expect } from "@std/expect";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { JSONRPCMessage, JSONRPCMessageSchema } from "@modelcontextprotocol/sdk/types.js";
+import { moduleDir } from "../runtime/mod.ts";
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -16,22 +20,99 @@ function parseTextPayload(result: { content: Array<{ type: string; text?: string
   return JSON.parse(text);
 }
 
+/**
+ * Custom MCP stdio transport using Deno.Command directly.
+ * StdioClientTransport uses node:child_process which has pipe issues under Deno's Node compat.
+ */
+class DenoStdioTransport implements Transport {
+  private child: Deno.ChildProcess | null = null;
+  private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
+  private encoder = new TextEncoder();
+  private decoder = new TextDecoder();
+
+  onclose?: () => void;
+  onerror?: (error: Error) => void;
+  onmessage?: (message: JSONRPCMessage) => void;
+
+  constructor(
+    private scriptPath: string,
+    private env: Record<string, string> = {},
+  ) {}
+
+  async start(): Promise<void> {
+    this.child = new Deno.Command(Deno.execPath(), {
+      args: ["run", "--allow-all", "--unstable-sloppy-imports", "--unstable-detect-cjs", "--no-check", `--config=${join(moduleDir(import.meta), "../../deno.json")}`, this.scriptPath],
+      stdin: "piped",
+      stdout: "piped",
+      stderr: "inherit",
+      env: this.env,
+    }).spawn();
+
+    this.writer = this.child.stdin.getWriter();
+
+    // Read stdout line by line for JSON-RPC messages
+    const reader = this.child.stdout.getReader();
+    let buf = "";
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += this.decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              const parsed = JSONRPCMessageSchema.parse(msg);
+              this.onmessage?.(parsed);
+            } catch { /* skip non-JSON lines */ }
+          }
+        }
+      } catch (e) {
+        this.onerror?.(e instanceof Error ? e : new Error(String(e)));
+      }
+      this.onclose?.();
+    };
+    pump();
+  }
+
+  async send(message: JSONRPCMessage): Promise<void> {
+    if (!this.writer) throw new Error("Transport not started");
+    const data = JSON.stringify(message) + "\n";
+    await this.writer.write(this.encoder.encode(data));
+  }
+
+  async close(): Promise<void> {
+    try {
+      await this.writer?.close();
+    } catch { /* already closed */ }
+    try {
+      this.child?.kill();
+    } catch { /* already dead */ }
+    this.child = null;
+    this.writer = null;
+  }
+}
+
 async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
   const bootstrap = [
     bootstrapPreamble,
-    `const { startMcpServer } = await import(${JSON.stringify(join(import.meta.dir, "mcp-server.ts"))});`,
+    `const { startMcpServer } = await import(${JSON.stringify(join(moduleDir(import.meta), "mcp-server.ts"))});`,
     "await startMcpServer();",
     "await new Promise(() => {});",
-  ].join(" ");
+  ].join("\n");
 
-  const transport = new StdioClientTransport({
-    command: process.execPath,
-    args: ["-e", bootstrap],
-    env: {
-      ...process.env,
-      REFERENCE_APP_PORT: process.env.REFERENCE_APP_PORT ?? "3000",
-      ...envOverrides,
-    },
+  const tmpDir = mkdtempSync(join(tmpdir(), "anchr-mcp-test-"));
+  const scriptPath = join(tmpDir, "bootstrap.ts");
+  writeFileSync(scriptPath, bootstrap);
+
+  const transport = new DenoStdioTransport(scriptPath, {
+    ...process.env as Record<string, string>,
+    REFERENCE_APP_PORT: process.env.REFERENCE_APP_PORT ?? "3000",
+    ...envOverrides,
   });
 
   const client = new Client({ name: "mcp-integration-test", version: "0.0.0" });
@@ -39,14 +120,14 @@ async function createMcpClient(envOverrides: Record<string, string> = {}, bootst
   return client;
 }
 
-test("mcp tools expose query status and attachment metadata", async () => {
+Deno.test({ name: "mcp tools expose query status and attachment metadata", sanitizeResources: false, sanitizeOps: false, fn: async () => {
   const attachmentId = `integration_${Date.now()}`;
 
   // Bootstrap: create query + submit result inside the MCP subprocess so
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
-    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(import.meta.dir, "../application/query-service.ts"))});`,
-    `const { storeIntegrity } = await import(${JSON.stringify(join(import.meta.dir, "../verification/integrity-store.ts"))});`,
+    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
+    `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "../verification/integrity-store.ts"))});`,
     `const query = createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,
@@ -68,7 +149,7 @@ test("mcp tools expose query status and attachment metadata", async () => {
       arguments: { description: "MCP Test Store の営業状況", ttl_seconds: 120, verification_requirements: [] },
     });
     const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
-    expect(createdJson.query_id).toStartWith("query_");
+    expect(createdJson.query_id).toMatch(/^query_/);
 
     // Submit via MCP to verify + get the query_id from the subprocess
     const submitResult = await client.callTool({
@@ -108,9 +189,9 @@ test("mcp tools expose query status and attachment metadata", async () => {
   } finally {
     await client.close();
   }
-});
+} });
 
-test("mcp create_query supports TLSNotary parameters", async () => {
+Deno.test({ name: "mcp create_query supports TLSNotary parameters", sanitizeResources: false, sanitizeOps: false, fn: async () => {
   const client = await createMcpClient();
 
   try {
@@ -127,7 +208,7 @@ test("mcp create_query supports TLSNotary parameters", async () => {
       },
     });
     const json = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
-    expect(json.query_id).toStartWith("query_");
+    expect(json.query_id).toMatch(/^query_/);
     expect(json.verification_requirements).toContain("tlsn");
 
     // Verify status includes tlsn_requirements
@@ -140,13 +221,13 @@ test("mcp create_query supports TLSNotary parameters", async () => {
   } finally {
     await client.close();
   }
-});
+} });
 
-test("mcp can use a remote HTTP query backend", async () => {
+Deno.test({ name: "mcp can use a remote HTTP query backend", sanitizeResources: false, sanitizeOps: false, fn: async () => {
   const baseUrl = "http://remote.test";
   const bootstrapPreamble = [
     `process.env.HTTP_API_KEY = "remote-test-key";`,
-    `const { buildWorkerApiApp } = await import(${JSON.stringify(join(import.meta.dir, "worker-api.ts"))});`,
+    `const { buildWorkerApiApp } = await import(${JSON.stringify(join(moduleDir(import.meta), "worker-api.ts"))});`,
     `const app = buildWorkerApiApp();`,
     `const originalFetch = globalThis.fetch.bind(globalThis);`,
     `globalThis.fetch = async (input, init) => {`,
@@ -178,7 +259,7 @@ test("mcp can use a remote HTTP query backend", async () => {
       },
     });
     const createdJson = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });
-    expect(createdJson.query_id).toStartWith("query_");
+    expect(createdJson.query_id).toMatch(/^query_/);
     expect(createdJson.reference_app_url).toContain(baseUrl);
     expect(createdJson.requester_meta?.client_name).toBe("mcp-remote");
 
@@ -213,4 +294,4 @@ test("mcp can use a remote HTTP query backend", async () => {
   } finally {
     await client.close();
   }
-});
+} });

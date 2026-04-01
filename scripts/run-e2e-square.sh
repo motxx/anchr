@@ -39,7 +39,7 @@ if [ ! -f crates/tlsn-prover/target/release/tlsn-prove ]; then
   exit 1
 fi
 
-# Load .env if present (Bun does this automatically, but we need it for shell checks)
+# Load .env if present (Deno loads .env via --env flag, but we need it for shell checks)
 if [ -f .env ]; then
   set -a; source .env; set +a
 fi
@@ -175,7 +175,7 @@ echo "[6/6] Starting Anchr server..."
 NOSTR_RELAYS=ws://localhost:7777 \
 BLOSSOM_SERVERS=http://localhost:3333 \
 CASHU_MINT_URL=http://localhost:3338 \
-bun --hot src/infrastructure/server.ts > "$LOGS_DIR/anchr-server.log" 2>&1 &
+deno run --watch --allow-all --env src/infrastructure/server.ts > "$LOGS_DIR/anchr-server.log" 2>&1 &
 ANCHR_PID=$!
 PIDS+=($ANCHR_PID)
 
@@ -202,4 +202,4 @@ echo " Running Square E2E..."
 echo "=========================================="
 echo ""
 
-bun run scripts/e2e-square-full.ts
+deno run --allow-all --env scripts/e2e-square-full.ts

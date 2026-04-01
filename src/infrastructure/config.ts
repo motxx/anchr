@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { moduleDir } from "../runtime/mod.ts";
 
 function readNumberEnv(name: string, fallback: number): number {
   const value = process.env[name];
@@ -43,7 +44,7 @@ export interface RuntimeConfig {
   tlsnProxyUrl?: string;
 }
 
-export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(import.meta.dir, "..", ".local");
+export const DEFAULT_RUNTIME_DATA_DIR = process.env.RUNTIME_DATA_DIR ?? join(moduleDir(import.meta), "..", ".local");
 export function getRuntimeConfig(): RuntimeConfig {
   return {
     referenceAppPort: readNumberEnv("REFERENCE_APP_PORT", readNumberEnv("PORT", 3000)),

@@ -7,6 +7,7 @@
  * 4. tlsn-prove で proof 生成
  */
 import { chromium } from "playwright";
+import { spawn } from "../src/runtime/mod.ts";
 
 const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
 if (!SQUARE_ACCESS_TOKEN) {
@@ -133,7 +134,7 @@ if (latestPayment) {
     console.log("\n=== Step 5: TLSNotary proof ===");
     console.log(`Running tlsn-prove against Payment ID: ${PAYMENT_ID}`);
 
-    const proc = Bun.spawn([
+    const proc = spawn([
       "./crates/tlsn-prover/target/release/tlsn-prove",
       "--verifier", "localhost:7046",
       "--max-recv-data", "4096",

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
 import { readStoredAttachmentBuffer } from "../infrastructure/attachments";
 import { getRuntimeConfig } from "../infrastructure/config";
 import type { AttachmentRef, BlossomKeyMap, Query, QueryResult } from "../domain/types";
@@ -48,7 +49,7 @@ async function extractVideoFrames(
   inputExt: string,
   maxFrames = 3,
 ): Promise<{ data: Buffer; mimeType: ImageMediaType }[]> {
-  const ffmpeg = Bun.which("ffmpeg");
+  const ffmpeg = which("ffmpeg");
   if (!ffmpeg) return [];
 
   const tempDir = await mkdtemp(join(tmpdir(), "anchr-frames-"));
@@ -56,9 +57,9 @@ async function extractVideoFrames(
   const outputPattern = join(tempDir, "frame_%03d.jpg");
 
   try {
-    await Bun.write(inputPath, videoBuffer);
+    await writeFile(inputPath, videoBuffer);
 
-    const proc = Bun.spawn(
+    const proc = spawn(
       [ffmpeg, "-i", inputPath, "-vf", "fps=1", "-frames:v", String(maxFrames), "-q:v", "2", outputPattern],
       { stdout: "pipe", stderr: "pipe" },
     );
@@ -68,10 +69,9 @@ async function extractVideoFrames(
     const frames: { data: Buffer; mimeType: ImageMediaType }[] = [];
     for (let i = 1; i <= maxFrames; i++) {
       const framePath = join(tempDir, `frame_${String(i).padStart(3, "0")}.jpg`);
-      const file = Bun.file(framePath);
-      if (await file.exists()) {
+      if (await fileExists(framePath)) {
         frames.push({
-          data: Buffer.from(await file.arrayBuffer()),
+          data: Buffer.from(await readFileAsArrayBuffer(framePath)),
           mimeType: "image/jpeg",
         });
       }

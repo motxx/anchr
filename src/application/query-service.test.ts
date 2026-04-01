@@ -1,4 +1,5 @@
-import { expect, test, beforeEach } from "bun:test";
+import { beforeEach, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import {
   clearQueryStore,
   createQuery,

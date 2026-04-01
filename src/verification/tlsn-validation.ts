@@ -12,6 +12,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { moduleDir, which, writeFile, spawn } from "../runtime/mod.ts";
 import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../domain/types";
 
 /**
@@ -53,8 +54,8 @@ function findTlsnVerifier(): string | null {
 
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
-    join(import.meta.dir, "../../crates/tlsn-verifier/target/release/tlsn-verifier"),
-    join(import.meta.dir, "../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
+    join(moduleDir(import.meta), "../../crates/tlsn-verifier/target/release/tlsn-verifier"),
+    join(moduleDir(import.meta), "../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
   ];
   for (const p of localPaths) {
     try {
@@ -67,7 +68,7 @@ function findTlsnVerifier(): string | null {
   }
 
   // Fall back to PATH
-  tlsnVerifierPath = Bun.which("tlsn-verifier");
+  tlsnVerifierPath = which("tlsn-verifier");
   if (tlsnVerifierPath) {
     console.error(`[tlsn] Found tlsn-verifier at ${tlsnVerifierPath}`);
   }
@@ -276,9 +277,9 @@ async function runVerifierBinary(
 
   try {
     const presentationData = Buffer.from(attestation.presentation, "base64");
-    await Bun.write(presentationPath, presentationData);
+    await writeFile(presentationPath, presentationData);
 
-    const proc = Bun.spawn([verifierPath, "verify", presentationPath], {
+    const proc = spawn([verifierPath, "verify", presentationPath], {
       stdout: "pipe",
       stderr: "pipe",
     });

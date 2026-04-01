@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import type { C2paValidationResult } from "./c2pa-validation";
 import type { ExifValidationResult } from "./exif-validation";
 import {

@@ -18,7 +18,9 @@
  *   bun test e2e/regtest-htlc-attacks.test.ts
  */
 
-import { describe, test, expect, beforeAll } from "bun:test";
+import { beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spawn } from "../src/runtime/mod.ts";
 import {
   Wallet,
   type Proof,
@@ -46,12 +48,13 @@ async function isCashuMintReachable(): Promise<boolean> {
 
 async function isLndUserReachable(): Promise<boolean> {
   try {
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "getinfo",
     ], { stdout: "pipe", stderr: "pipe" });
-    return (await proc.exited) === 0;
+    await proc.exited;
+    return proc.exitCode === 0;
   } catch {
     return false;
   }
@@ -59,12 +62,13 @@ async function isLndUserReachable(): Promise<boolean> {
 
 async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn([
+    const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
       "payinvoice", "--force", bolt11,
     ], { stdout: "pipe", stderr: "pipe" });
-    return (await proc.exited) === 0;
+    await proc.exited;
+    return proc.exitCode === 0;
   } catch {
     return false;
   }
@@ -90,7 +94,7 @@ async function mintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> 
   const mintQuote = await wallet.createMintQuote(amountSats);
   const paid = await payInvoiceViaLndUser(mintQuote.request);
   if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-  await Bun.sleep(2000);
+  await new Promise(r => setTimeout(r, 2000));
   return wallet.mintProofs(amountSats, mintQuote.quote);
 }
 
