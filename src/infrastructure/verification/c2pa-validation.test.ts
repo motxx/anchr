@@ -85,20 +85,19 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
 
 // Skip all tests if c2patool is not installed
 const skip = !isC2paAvailable();
+const suite = skip ? describe.ignore : describe;
 
 // Shared fixtures — created once, reused across tests
 let unsignedJpeg: Buffer;
 let signedJpeg: Buffer;
 
-describe("c2pa-validation", () => {
+suite("c2pa-validation", () => {
   beforeAll(async () => {
-    if (skip) return;
     unsignedJpeg = buildMinimalJpeg();
     signedJpeg = await signWithC2pa(unsignedJpeg);
   });
 
   test("validates a C2PA-signed JPEG", async () => {
-    if (skip) return;
     const result = await validateC2pa(signedJpeg, "photo.jpg");
 
     expect(result.available).toBe(true);
@@ -112,7 +111,6 @@ describe("c2pa-validation", () => {
   });
 
   test("detects unsigned JPEG (no manifest)", async () => {
-    if (skip) return;
     const result = await validateC2pa(unsignedJpeg, "unsigned.jpg");
 
     expect(result.available).toBe(true);
@@ -121,7 +119,6 @@ describe("c2pa-validation", () => {
   });
 
   test("detects tampered image", async () => {
-    if (skip) return;
     const tampered = Buffer.from(signedJpeg);
     for (let i = tampered.length - 50; i < tampered.length - 2; i++) {
       tampered[i] = tampered[i]! ^ 0xff;
@@ -137,7 +134,6 @@ describe("c2pa-validation", () => {
   });
 
   test("rejects unsupported file format", async () => {
-    if (skip) return;
     const result = await validateC2pa(Buffer.from("test"), "doc.pdf");
 
     expect(result.available).toBe(true);

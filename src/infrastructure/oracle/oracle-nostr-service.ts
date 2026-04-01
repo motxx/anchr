@@ -33,6 +33,20 @@ import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 
+/** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */
+let _publishEventFn: typeof publishEvent = publishEvent;
+let _verifyFn: typeof verify = verify;
+
+/** Allow tests to override the publishEvent implementation. Pass null to reset. */
+export function _setPublishEventForTest(fn: typeof publishEvent | null): void {
+  _publishEventFn = fn ?? publishEvent;
+}
+
+/** Allow tests to override the verify implementation. Pass null to reset. */
+export function _setVerifyForTest(fn: typeof verify | null): void {
+  _verifyFn = fn ?? verify;
+}
+
 export interface OracleNostrServiceConfig {
   /** Oracle's persistent Nostr identity (loaded from secret key). */
   identity: NostrIdentity;
@@ -158,14 +172,14 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     result: QueryResult,
     workerPubkey: string,
   ): Promise<boolean> {
-    const detail = await verify(query, result);
+    const detail = await _verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
     const preimage = hash ? preimageStore.getPreimage(hash) : null;
 
     if (detail.passed && preimage && hash) {
       // C2PA valid → deliver preimage via NIP-44 DM
       const dm = buildPreimageDM(config.identity, workerPubkey, queryId, preimage);
-      const publishResult = await publishEvent(dm, config.relayUrls);
+      const publishResult = await _publishEventFn(dm, config.relayUrls);
       if (publishResult.successes.length > 0) {
         console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId}`);
       }
@@ -176,7 +190,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       // C2PA invalid → deliver rejection
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
-      await publishEvent(dm, config.relayUrls);
+      await _publishEventFn(dm, config.relayUrls);
       console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
       return false;
     }
