@@ -16,9 +16,9 @@ import {
   statStoredAttachment,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { listOracles } from "../oracle";
-import type { OracleRegistry } from "../oracle/registry";
-import type { PreimageStore } from "../oracle/preimage-store";
+import { listOracles } from "./oracle";
+import type { OracleRegistry } from "./oracle/registry";
+import type { PreimageStore } from "./cashu/preimage-store";
 import {
   cancelQuery,
   createQuery,
@@ -33,7 +33,7 @@ import {
 import { VERIFICATION_FACTORS } from "../domain/types";
 import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "../domain/types";
 import { getRuntimeConfig as getConfig } from "./config";
-import { haversineKm } from "../verification/exif-validation";
+import { haversineKm } from "./verification/exif-validation";
 import { validateAttachmentUri } from "./url-validation";
 
 export interface WorkerApiDeps {

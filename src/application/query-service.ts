@@ -3,12 +3,12 @@ import { createQueryStore } from "../domain/query-store";
 import type { QueryStore } from "../domain/query-store";
 import { normalizeQueryResult } from "../infrastructure/attachments";
 import { getDecodedToken } from "@cashu/cashu-ts";
-import { verifyToken } from "../cashu/wallet";
+import { verifyToken } from "../infrastructure/cashu/wallet";
 import { buildChallengeRule, generateNonce } from "../domain/challenge";
-import { resolveOracle } from "../oracle";
-import type { OracleRegistry } from "../oracle/registry";
-import type { PreimageStore } from "../oracle/preimage-store";
-import type { OracleAttestation } from "../oracle/types";
+import { resolveOracle } from "../infrastructure/oracle";
+import type { OracleRegistry } from "../infrastructure/oracle/registry";
+import type { PreimageStore } from "../infrastructure/cashu/preimage-store";
+import type { OracleAttestation } from "../domain/oracle-types";
 import type {
   BlossomKeyMap,
   BountyInfo,
@@ -620,10 +620,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 // --- Relay publish hook (default for production) ---
 
 function publishQueryToRelay(query: Query): void {
-  import("../nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
+  import("../infrastructure/nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
     if (!isNostrEnabled()) return;
-    const { buildQueryRequestEvent } = await import("../nostr/events");
-    const { generateEphemeralIdentity } = await import("../nostr/identity");
+    const { buildQueryRequestEvent } = await import("../infrastructure/nostr/events");
+    const { generateEphemeralIdentity } = await import("../infrastructure/nostr/identity");
 
     const identity = generateEphemeralIdentity();
     const event = buildQueryRequestEvent(identity, query.id, {

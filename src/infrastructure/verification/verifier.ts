@@ -4,7 +4,7 @@ import { haversineKm } from "./exif-validation";
 import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
 import { validateTlsn } from "./tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
-import { validateAttachmentUri } from "../infrastructure/url-validation";
+import { validateAttachmentUri } from "../url-validation";
 import type {
   AttachmentRef,
   BlossomKeyMap,
@@ -13,7 +13,7 @@ import type {
   QueryResult,
   TlsnVerifiedData,
   VerificationDetail,
-} from "../domain/types";
+} from "../../domain/types";
 /** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 

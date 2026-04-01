@@ -1,8 +1,8 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isBlossomEnabled, getBlossomConfig } from "../blossom/client";
+import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
 import { createQuery, getQuery } from "../application/query-service";
-import { storeIntegrity } from "../verification/integrity-store";
+import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 
 function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {

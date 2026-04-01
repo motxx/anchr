@@ -6,7 +6,7 @@
  *
  *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/nostr/identity";
+import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -21,18 +21,18 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/nostr/events";
-import { buildPreimageDM, parseOracleDM } from "../src/nostr/dm";
-import { publishEvent, closePool } from "../src/nostr/client";
-import { deriveConversationKey, encryptNip44 } from "../src/nostr/encryption";
-import { createPreimageStore } from "../src/oracle/preimage-store";
-import { createBountyToken } from "../src/cashu/wallet";
+} from "../src/infrastructure/nostr/events";
+import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
+import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
+import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
+import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
+import { createBountyToken } from "../src/infrastructure/cashu/wallet";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,
   inspectEscrowToken,
-} from "../src/cashu/escrow";
-import { workerUpload } from "../src/blossom/worker-upload";
+} from "../src/infrastructure/cashu/escrow";
+import { workerUpload } from "../src/infrastructure/blossom/worker-upload";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";

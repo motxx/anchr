@@ -14,9 +14,9 @@ import { timingSafeEqual, createHash } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../domain/types";
-import type { OracleAttestation } from "./types";
-import { createPreimageStore, type PreimageStore } from "./preimage-store";
+import type { Query, QueryResult } from "../../domain/types";
+import type { OracleAttestation } from "../../domain/oracle-types";
+import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store";
 
 /** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {

@@ -1,4 +1,4 @@
-import type { BlossomKeyMap, Query, QueryResult, TlsnVerifiedData, VerificationDetail } from "../domain/types";
+import type { BlossomKeyMap, Query, QueryResult, TlsnVerifiedData, VerificationDetail } from "./types";
 
 /** Metadata about an oracle service. */
 export interface OracleInfo {

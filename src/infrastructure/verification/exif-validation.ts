@@ -255,7 +255,7 @@ function parseExifDateTime(dt: string): Date | null {
 }
 
 // Re-export from domain layer for backward compatibility
-export { haversineKm } from "../domain/geo";
+export { haversineKm } from "../../domain/geo";
 
 export interface ExifValidationOptions {
   /** Max allowed age of photo timestamp in ms (default: 1 hour) */

@@ -259,7 +259,7 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("./types").BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../domain/types").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
   // Requires ephemeral key material — keys are never stored in AttachmentRef (E2E).
   if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {

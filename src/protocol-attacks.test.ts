@@ -12,9 +12,9 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createOracleRegistry } from "./oracle/registry";
-import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store";
-import type { Oracle, OracleAttestation } from "./oracle/types";
+import { createOracleRegistry } from "./infrastructure/oracle/registry";
+import { createPreimageStore, type PreimageStore } from "./infrastructure/cashu/preimage-store";
+import type { Oracle, OracleAttestation } from "./domain/oracle-types";
 import { createQueryService, createQueryStore } from "./application/query-service";
 import type { Query, QueryResult } from "./domain/types";
 // --- Test helpers (same as protocol-trustless.test.ts) ---

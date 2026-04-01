@@ -1,6 +1,6 @@
 import { getRuntimeConfig } from "./config";
 import { setupServerLogCapture } from "./log-stream";
-import { createPreimageStore } from "../oracle/preimage-store";
+import { createPreimageStore } from "./cashu/preimage-store";
 import { createQueryService } from "../application/query-service";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 import { serveStatic } from "hono/deno";

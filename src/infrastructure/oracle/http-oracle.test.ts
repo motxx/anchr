@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server";
 import { createHttpOracle } from "./http-oracle";
-import type { Query, QueryResult } from "../domain/types";
+import type { Query, QueryResult } from "../../domain/types";
 
 const TEST_ORACLE_ID = "test-http-oracle";
 const TEST_API_KEY = "test-secret";

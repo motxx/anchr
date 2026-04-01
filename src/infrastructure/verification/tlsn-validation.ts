@@ -12,8 +12,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, which, writeFile, spawn } from "../runtime/mod.ts";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../domain/types";
+import { moduleDir, which, writeFile, spawn } from "../../runtime/mod.ts";
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../domain/types";
 
 /**
  * Detect regex patterns likely to cause catastrophic backtracking (ReDoS).

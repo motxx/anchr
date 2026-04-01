@@ -8,7 +8,7 @@ import {
   cancelQuery,
   submitQueryResult,
 } from "./query-service";
-import { storeIntegrity, clearIntegrityStore } from "../verification/integrity-store";
+import { storeIntegrity, clearIntegrityStore } from "../infrastructure/verification/integrity-store";
 
 beforeEach(() => {
   clearQueryStore();

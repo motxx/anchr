@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest } from "./tlsn-validation";
 import { verify } from "./verifier";
-import type { TlsnAttestation, TlsnRequirement } from "../domain/types";
+import type { TlsnAttestation, TlsnRequirement } from "../../domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

@@ -8,7 +8,7 @@
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { NostrIdentity } from "./identity";
-import type { OracleAttestation } from "../oracle/types";
+import type { OracleAttestation } from "../../domain/oracle-types";
 
 export const ANCHR_ORACLE_ATTESTATION = 30103;
 

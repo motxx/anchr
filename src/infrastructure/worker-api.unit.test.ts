@@ -1,8 +1,8 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "../oracle/preimage-store";
-import { createOracleRegistry } from "../oracle/registry";
-import type { Oracle, OracleAttestation } from "../oracle/types";
+import { createPreimageStore } from "./cashu/preimage-store";
+import { createOracleRegistry } from "./oracle/registry";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types";
 import { createQueryService, createQueryStore } from "../application/query-service";
 import type { Query, QueryResult } from "../domain/types";
 import { buildWorkerApiApp } from "./worker-api";

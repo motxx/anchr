@@ -7,10 +7,10 @@
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../src/worker-api";
-import { clearQueryStore } from "../src/query-service";
-import { closePool } from "../src/nostr/client";
-import { ANCHR_QUERY_REQUEST } from "../src/nostr/events";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
+import { clearQueryStore } from "../src/application/query-service";
+import { closePool } from "../src/infrastructure/nostr/client";
+import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events";
 
 // --- Formatting ---
 

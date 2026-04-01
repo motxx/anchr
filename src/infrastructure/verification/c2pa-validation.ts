@@ -9,7 +9,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn } from "../runtime/mod.ts";
+import { which, writeFile, spawn } from "../../runtime/mod.ts";
 
 export interface C2paManifest {
   title?: string;

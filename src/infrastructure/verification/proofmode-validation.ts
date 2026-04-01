@@ -13,7 +13,7 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { spawn } from "../runtime/mod.ts";
+import { spawn } from "../../runtime/mod.ts";
 
 export interface ProofModeData {
   /** The extracted photo buffer. */

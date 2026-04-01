@@ -3,7 +3,7 @@
  * as an Oracle interface so it can be used seamlessly in the registry.
  */
 
-import type { BlossomKeyMap, Query, QueryResult } from "../domain/types";
+import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types";
 import type { Oracle, OracleAttestation, OracleInfo } from "./types";
 
 export interface HttpOracleConfig {

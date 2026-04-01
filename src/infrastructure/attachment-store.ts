@@ -1,10 +1,10 @@
-import { isBlossomEnabled } from "../blossom/client";
-import { workerUpload } from "../blossom/worker-upload";
-import { validateC2pa } from "../verification/c2pa-validation";
-import { validateExif } from "../verification/exif-validation";
-import { storeIntegrity } from "../verification/integrity-store";
-import type { ProofModeIntegrity } from "../verification/integrity-store";
-import { parseProofModeZip } from "../verification/proofmode-validation";
+import { isBlossomEnabled } from "./blossom/client";
+import { workerUpload } from "./blossom/worker-upload";
+import { validateC2pa } from "./verification/c2pa-validation";
+import { validateExif } from "./verification/exif-validation";
+import { storeIntegrity } from "./verification/integrity-store";
+import type { ProofModeIntegrity } from "./verification/integrity-store";
+import { parseProofModeZip } from "./verification/proofmode-validation";
 import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types";
 
 export interface UploadResult {

@@ -14,8 +14,8 @@
 import type { Proof } from "@cashu/cashu-ts";
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "../nostr/identity";
-import { generateEphemeralIdentity } from "../nostr/identity";
+import type { NostrIdentity } from "../infrastructure/nostr/identity";
+import { generateEphemeralIdentity } from "../infrastructure/nostr/identity";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -24,13 +24,13 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "../nostr/events";
-import { publishEvent, subscribeToFeedback, subscribeToResponses } from "../nostr/client";
+} from "../infrastructure/nostr/events";
+import { publishEvent, subscribeToFeedback, subscribeToResponses } from "../infrastructure/nostr/client";
 import {
   createHtlcToken,
   swapHtlcBindWorker,
   type EscrowToken,
-} from "../cashu/escrow";
+} from "../infrastructure/cashu/escrow";
 import type { HtlcInfo, QuoteInfo, TlsnEncryptedContext } from "../domain/types";
 
 export interface RequesterConfig {

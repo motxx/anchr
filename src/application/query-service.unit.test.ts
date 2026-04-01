@@ -1,17 +1,17 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore } from "../oracle/preimage-store";
+import { createPreimageStore } from "../infrastructure/cashu/preimage-store";
 import {
   createOracleRegistry,
-} from "../oracle/registry";
-import type { Oracle, OracleAttestation } from "../oracle/types";
+} from "../infrastructure/oracle/registry";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types";
 import {
   createQueryService,
   createQueryStore,
 } from "./query-service";
 import type { Query, QueryResult } from "../domain/types";
-import { createIntegrityStore } from "../verification/integrity-store";
+import { createIntegrityStore } from "../infrastructure/verification/integrity-store";
 
 /** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {
@@ -577,7 +577,7 @@ describe("submitHtlcResult", () => {
   }
 
   /** Create htlcInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../oracle/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../infrastructure/cashu/preimage-store").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
       htlcInfo: {
