@@ -18,7 +18,6 @@ import { getRuntimeConfig } from "./config";
 import { listOracles } from "../oracle";
 import type { OracleRegistry } from "../oracle/registry";
 import type { PreimageStore } from "../oracle/preimage-store";
-import type { WalletStore } from "../cashu/wallet-store";
 import {
   cancelQuery,
   createQuery,
@@ -40,7 +39,6 @@ export interface WorkerApiDeps {
   queryService?: QueryService;
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
-  walletStore?: WalletStore;
 }
 
 // --- Schemas ---
@@ -302,9 +300,9 @@ async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
 
 export async function prepareWorkerApiAssets() {
   await Promise.all([
-    buildCssIfNeeded(join(import.meta.dir, "ui/globals.css"), join(import.meta.dir, "ui/generated.css"), "worker"),
-    buildCssIfNeeded(join(import.meta.dir, "ui/requester/globals.css"), join(import.meta.dir, "ui/requester/generated.css"), "requester"),
-    buildCssIfNeeded(join(import.meta.dir, "ui/dashboard/globals.css"), join(import.meta.dir, "ui/dashboard/generated.css"), "dashboard"),
+    buildCssIfNeeded(join(import.meta.dir, "../ui/globals.css"), join(import.meta.dir, "../ui/generated.css"), "worker"),
+    buildCssIfNeeded(join(import.meta.dir, "../ui/requester/globals.css"), join(import.meta.dir, "../ui/requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(import.meta.dir, "../ui/dashboard/globals.css"), join(import.meta.dir, "../ui/dashboard/generated.css"), "dashboard"),
   ]);
 }
 
@@ -362,23 +360,6 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   app.get("/health", (c) => c.json({ ok: true }));
 
-  // --- Wallet balance ---
-
-  app.get("/wallet/balance", async (c) => {
-    const wStore = deps?.walletStore;
-    if (!wStore) return c.json({ error: "Wallet store not configured" }, 500);
-    const role = c.req.query("role");
-    const pubkey = c.req.query("pubkey");
-    if (!role || !pubkey) return c.json({ error: "role and pubkey are required" }, 400);
-    if (role !== "requester" && role !== "worker") return c.json({ error: "role must be requester or worker" }, 400);
-
-    const verify = c.req.query("verify") === "true";
-    const balance = verify
-      ? await wStore.getVerifiedBalance(role, pubkey)
-      : wStore.getBalance(role, pubkey);
-
-    return c.json({ role, pubkey, ...balance });
-  });
 
   app.get("/oracles", (c) => c.json(doListOracles()));
 

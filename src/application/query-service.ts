@@ -3,8 +3,6 @@ import type { QueryStore } from "../domain/query-store";
 import { normalizeQueryResult } from "../infrastructure/attachments";
 import { getDecodedToken } from "@cashu/cashu-ts";
 import { verifyToken } from "../cashu/wallet";
-import { verifyHtlcProofs } from "../cashu/escrow";
-import type { WalletStore } from "../cashu/wallet-store";
 import { buildChallengeRule, generateNonce } from "../domain/challenge";
 import { resolveOracle } from "../oracle";
 import type { OracleRegistry } from "../oracle/registry";
@@ -86,7 +84,6 @@ export interface QueryServiceDeps {
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
   hooks?: QueryHooks;
-  walletStore?: WalletStore;
 }
 
 export interface HtlcOutcome {
@@ -153,7 +150,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const registry = deps?.oracleRegistry;
   const preimageStore = deps?.preimageStore;
   const hooks = deps?.hooks;
-  const walletStore = deps?.walletStore;
 
   function doResolveOracle(oracleId: string | undefined, acceptableIds: string[] | undefined) {
     return registry
@@ -317,16 +313,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         quorum: options?.quorum,
       };
 
-      // Lock bounty proofs from requester wallet → escrow
-      if (walletStore && options?.bounty?.amount_sats && options.htlc?.requester_pubkey) {
-        const sats = options.bounty.amount_sats;
-        const pub = options.htlc.requester_pubkey;
-        const locked = walletStore.lockForQuery("requester", pub, query.id, sats);
-        if (!locked) {
-          throw new Error(`Insufficient balance: Requester ${pub} cannot lock ${sats} sats`);
-        }
-      }
-
       store.set(query.id, query);
       hooks?.onCreated?.(query);
       return query;
@@ -403,10 +389,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         return { ok: false, message: `Query is already ${query.status}` };
       }
       store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
-      // Refund locked proofs to requester
-      if (walletStore && query.htlc?.requester_pubkey) {
-        walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, id);
-      }
       return { ok: true, message: "Query cancelled" };
     },
 
@@ -417,9 +399,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
       for (const query of store.values()) {
         if (expirableStatuses.includes(query.status) && query.expires_at < now) {
           store.set(query.id, { ...query, status: "expired", payment_status: "cancelled" });
-          if (walletStore && query.htlc?.requester_pubkey) {
-            walletStore.unlockForQuery("requester", query.htlc.requester_pubkey, query.id);
-          }
           count++;
         }
       }
@@ -613,47 +592,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
       // 4. Return preimage on success (look up by HTLC hash)
       // Server-side HTLC verification: verify preimage matches hash before revealing.
-      // IMPORTANT: Read locked proofs BEFORE wallet settlement to avoid VULN-1
-      // (transferLocked deletes proofs from pending, making getLockedProofs return []).
+      // Reveal preimage on success (HTLC settlement = preimage disclosure)
       if (passed && preimageStore && query.htlc?.hash) {
         const preimage = preimageStore.getPreimage(query.htlc.hash);
         if (preimage) {
-          if (!walletStore) {
-            return {
-              ok: false,
-              query: updated,
-              message: "HTLC preimage cannot be revealed without walletStore",
-            };
-          }
-          // Serialize wallet mutations to prevent concurrent double-spend
-          const settlementResult = await walletStore.withLock(
-            "requester", query.htlc.requester_pubkey, () => {
-              // Read proofs BEFORE transfer (they're deleted from pending on transfer)
-              const lockedProofs = walletStore.getLockedProofs(
-                "requester", query.htlc!.requester_pubkey, queryId,
-              );
-              // Only verify proofs that are actually HTLC-formatted (Phase 2 swapped proofs).
-              const htlcProofs = lockedProofs.filter((p) => {
-                try { const s = JSON.parse(p.secret); return Array.isArray(s) && s[0] === "HTLC"; } catch { return false; }
-              });
-              if (htlcProofs.length > 0) {
-                const htlcError = verifyHtlcProofs(htlcProofs, query.htlc!.hash, preimage);
-                if (htlcError) {
-                  console.error(`[htlc] HTLC proof verification failed: ${htlcError}`);
-                  walletStore.unlockForQuery("requester", query.htlc!.requester_pubkey, queryId);
-                  return { ok: false as const, message: `HTLC proof verification failed: ${htlcError}` };
-                }
-              }
-              walletStore.transferLocked(
-                "requester", query.htlc!.requester_pubkey, queryId,
-                "worker", workerPubkey,
-              );
-              return { ok: true as const };
-            },
-          );
-          if (!settlementResult.ok) {
-            return { ok: false, query: updated, message: settlementResult.message };
-          }
           preimageStore.delete(query.htlc.hash);
           return {
             ok: true,
@@ -662,20 +604,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
             preimage,
           };
         }
-      }
-
-      // Settle wallet for non-preimage paths (no preimage store, or preimage not found)
-      if (walletStore && query.htlc?.requester_pubkey) {
-        await walletStore.withLock("requester", query.htlc.requester_pubkey, () => {
-          if (passed) {
-            walletStore.transferLocked(
-              "requester", query.htlc!.requester_pubkey, queryId,
-              "worker", workerPubkey,
-            );
-          } else {
-            walletStore.unlockForQuery("requester", query.htlc!.requester_pubkey, queryId);
-          }
-        });
       }
 
       return {

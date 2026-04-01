@@ -1,13 +1,12 @@
 /**
  * Protocol-level attack vector tests for Anchr HTLC protocol.
  *
- * Tests adversarial scenarios across six attack categories:
+ * Tests adversarial scenarios across five attack categories:
  *   1. Preimage Isolation — reuse, leak, re-request
  *   2. Race Conditions & Timing — cancel, expiry, double-submit
- *   3. Wallet Manipulation — double-spend, irreversible transfer, refund idempotency
- *   4. Oracle Manipulation — dishonest oracle, flip-flop, quorum split, unreachable
- *   5. State Machine Attacks — illegal transitions
- *   6. Cross-Query Attacks — submit to wrong query, transfer to wrong worker
+ *   3. Oracle Manipulation — dishonest oracle, flip-flop, quorum split, unreachable
+ *   4. State Machine Attacks — illegal transitions
+ *   5. Cross-Query Attacks — submit to wrong query
  */
 
 import { describe, expect, test } from "bun:test";
@@ -17,8 +16,6 @@ import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store
 import type { Oracle, OracleAttestation } from "./oracle/types";
 import { createQueryService, createQueryStore } from "./application/query-service";
 import type { Query, QueryResult } from "./domain/types";
-import { createWalletStore, type WalletStore } from "./cashu/wallet-store";
-
 // --- Test helpers (same as protocol-trustless.test.ts) ---
 
 function makeFakeToken(amountSats: number): string {
@@ -55,18 +52,15 @@ function makeServiceWithPreimage(opts?: { mockOracle?: Oracle; mockOracles?: Ora
     registry.register(oracle);
   }
   const preimageStore = createPreimageStore();
-  const walletStore = createWalletStore();
   return {
     service: createQueryService({
       store,
       oracleRegistry: registry,
       preimageStore,
-      walletStore,
     }),
     store,
     registry,
     preimageStore,
-    walletStore,
   };
 }
 
@@ -87,18 +81,12 @@ function makeHtlcInfo(preimageStore: PreimageStore) {
 async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
-  walletStore?: WalletStore,
   opts?: { workerPubkey?: string; bountyAmount?: number; oracleIds?: string[] },
 ) {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
   const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
-  if (walletStore) {
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: bounty, id: "k_drive", secret: `s_drive_${Date.now()}_${Math.random()}`, C: `C_drive_${Date.now()}_${Math.random()}` },
-    ]);
-  }
   const query = service.createQuery(
     { description: "Attack test" },
     { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds },
@@ -119,7 +107,7 @@ async function driveToProcessing(
 
 describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { service, preimageStore } = makeServiceWithPreimage();
 
     // Create first query using entry1
     const entry1 = preimageStore.create();
@@ -129,12 +117,6 @@ describe("Attack: Preimage Isolation", () => {
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
-
-    // Seed enough for both queries
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_iso_1", C: "C_iso_1" },
-      { amount: 100, id: "k2", secret: "s_iso_2", C: "C_iso_2" },
-    ]);
 
     const q1 = service.createQuery(
       { description: "Query 1" },
@@ -175,10 +157,10 @@ describe("Attack: Preimage Isolation", () => {
   });
 
   test("preimage not leaked on rejected verification", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore, { oracleIds: ["strict-oracle"] });
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -194,8 +176,8 @@ describe("Attack: Preimage Isolation", () => {
   });
 
   test("deleted preimage cannot be re-requested via second submitHtlcResult", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     // First submit — preimage revealed and deleted
     const first = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
@@ -215,12 +197,8 @@ describe("Attack: Preimage Isolation", () => {
 // =============================================================================
 
 describe("Attack: Race Conditions & Timing", () => {
-  test("cancel during processing steals bounty — worker's funds NOT transferred", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_cancel_1", C: "C_cancel_1" },
-    ]);
+  test("cancel during processing — query moves to rejected", async () => {
+    const { service, preimageStore } = makeServiceWithPreimage();
 
     const { htlcInfo } = makeHtlcInfo(preimageStore);
     const query = service.createQuery(
@@ -233,21 +211,12 @@ describe("Attack: Race Conditions & Timing", () => {
     // Query is now "processing" — requester cancels
     const cancel = service.cancelQuery(query.id);
     expect(cancel.ok).toBe(true);
-
-    // Worker should NOT have received any funds
-    expect(walletStore.getBalance("worker", "w1").balance_sats).toBe(0);
-    // Requester gets refund (proofs unlocked back)
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(0);
+    expect(service.getQuery(query.id)?.status).toBe("rejected");
   });
 
-  test("expiry during processing refunds correctly", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+  test("expiry during processing expires correctly", async () => {
+    const { service, preimageStore } = makeServiceWithPreimage();
     const entry = preimageStore.create();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_expire_1", C: "C_expire_1" },
-    ]);
 
     const htlcInfo = {
       hash: entry.hash,
@@ -271,20 +240,13 @@ describe("Attack: Race Conditions & Timing", () => {
     const expired = service.expireQueries();
     expect(expired).toBeGreaterThanOrEqual(1);
 
-    // Verify refund: requester gets proofs back
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(0);
-    // Worker got nothing
-    expect(walletStore.getBalance("worker", "w1").balance_sats).toBe(0);
+    // Query should be expired
+    expect(service.getQuery(query.id)?.status).toBe("expired");
   });
 
   test("submit result to expired query fails", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { service, preimageStore } = makeServiceWithPreimage();
     const entry = preimageStore.create();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_expire_submit", C: "C_expire_submit" },
-    ]);
 
     const htlcInfo = {
       hash: entry.hash,
@@ -310,8 +272,8 @@ describe("Attack: Race Conditions & Timing", () => {
   });
 
   test("double-submit by worker — second attempt fails, first preimage valid", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     const first = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(first.ok).toBe(true);
@@ -324,133 +286,18 @@ describe("Attack: Race Conditions & Timing", () => {
   });
 });
 
-// =============================================================================
-// 3. Wallet Manipulation
-// =============================================================================
-
-describe("Attack: Wallet Manipulation", () => {
-  test("wallet double-spend across queries — second query throws Insufficient balance", () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    // Requester has exactly 100 sats
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_ds_1", C: "C_ds_1" },
-    ]);
-
-    const { htlcInfo: htlcInfo1 } = makeHtlcInfo(preimageStore);
-    service.createQuery(
-      { description: "Query 1" },
-      { htlc: htlcInfo1, bounty: { amount_sats: 100 } },
-    );
-
-    // All 100 sats are now locked
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(0);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(100);
-
-    const { htlcInfo: htlcInfo2 } = makeHtlcInfo(preimageStore);
-    expect(() => {
-      service.createQuery(
-        { description: "Query 2 double-spend" },
-        { htlc: htlcInfo2, bounty: { amount_sats: 100 } },
-      );
-    }).toThrow("Insufficient balance");
-  });
-
-  test("approved transfer is irreversible — requester balance is 0 after transfer", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_irrev_1", C: "C_irrev_1" },
-    ]);
-
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
-    const query = service.createQuery(
-      { description: "Irreversible transfer" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
-    );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
-
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "test-oracle");
-    expect(outcome.ok).toBe(true);
-
-    // Requester balance is 0 — no phantom balance from pending
-    const reqBal = walletStore.getBalance("requester", "requester_pub");
-    expect(reqBal.balance_sats).toBe(0);
-    expect(reqBal.pending_sats).toBe(0);
-
-    // Worker has the proofs
-    expect(walletStore.getBalance("worker", "w1").balance_sats).toBe(100);
-  });
-
-  test("refund doesn't duplicate proofs — total supply is conserved", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
-      mockOracle: makeMockOracle("strict-oracle", () => false),
-    });
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_dup_1", C: "C_dup_1" },
-    ]);
-
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
-    const query = service.createQuery(
-      { description: "Refund dup test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
-    );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
-
-    // Rejection triggers refund
-    await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "strict-oracle");
-
-    // Total supply conserved: requester has original 100, worker has 0
-    const reqBal = walletStore.getBalance("requester", "requester_pub");
-    const workerBal = walletStore.getBalance("worker", "w1");
-    expect(reqBal.balance_sats).toBe(100);
-    expect(reqBal.pending_sats).toBe(0);
-    expect(workerBal.balance_sats).toBe(0);
-    // Total supply = 100 (no duplication)
-    expect(reqBal.balance_sats + reqBal.pending_sats + workerBal.balance_sats).toBe(100);
-  });
-
-  test("cancel refund is idempotent — balance only refunded once", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_idem_1", C: "C_idem_1" },
-    ]);
-
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
-    const query = service.createQuery(
-      { description: "Idempotent cancel" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
-    );
-
-    // First cancel — refunds proofs
-    const cancel1 = service.cancelQuery(query.id);
-    expect(cancel1.ok).toBe(true);
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-
-    // Second cancel — query is already rejected, cancel is no-op
-    const cancel2 = service.cancelQuery(query.id);
-    expect(cancel2.ok).toBe(false);
-
-    // Balance should still be exactly 100, not 200
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-  });
-});
 
 // =============================================================================
-// 4. Oracle Manipulation
+// 3. Oracle Manipulation
 // =============================================================================
 
 describe("Attack: Oracle Manipulation", () => {
   test("dishonest oracle approves garbage — preimage still revealed (oracle judgment is final)", async () => {
     // Oracle always passes, even for garbage input
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("rubber-stamp", () => true),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore, { oracleIds: ["rubber-stamp"] });
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["rubber-stamp"] });
 
     // Worker submits completely empty result
     const outcome = await service.submitHtlcResult(
@@ -467,13 +314,9 @@ describe("Attack: Oracle Manipulation", () => {
 
   test("oracle flip-flop — first rejects, new query with fresh preimage works", async () => {
     // First oracle rejects
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("flip-oracle", () => false),
     });
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 200, id: "k1", secret: "s_flip_1", C: "C_flip_1" },
-    ]);
 
     const { htlcInfo: htlcInfo1 } = makeHtlcInfo(preimageStore);
     const q1 = service.createQuery(
@@ -487,12 +330,8 @@ describe("Attack: Oracle Manipulation", () => {
     expect(outcome1.ok).toBe(false);
     expect(outcome1.preimage).toBeUndefined();
 
-    // After refund, requester can create new query with new preimage
-    // (oracle behavior changes — now switch to a passing oracle for the retry)
-    const { service: service2, preimageStore: ps2, walletStore: ws2 } = makeServiceWithPreimage();
-    ws2.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k2", secret: "s_flip_2", C: "C_flip_2" },
-    ]);
+    // Requester can create new query with new preimage using a passing oracle
+    const { service: service2, preimageStore: ps2 } = makeServiceWithPreimage();
 
     const { htlcInfo: htlcInfo2, entry: entry2 } = makeHtlcInfo(ps2);
     const q2 = service2.createQuery(
@@ -508,20 +347,15 @@ describe("Attack: Oracle Manipulation", () => {
   });
 
   test("quorum split: 1 pass + 2 fail out of 3 — rejected, preimage NOT revealed", async () => {
-    let callCount = 0;
     const oracles = [
       makeMockOracle("oracle-pass", () => true),
       makeMockOracle("oracle-fail-1", () => false),
       makeMockOracle("oracle-fail-2", () => false),
     ];
 
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracles: oracles,
     });
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_quorum_1", C: "C_quorum_1" },
-    ]);
 
     const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
     const query = service.createQuery(
@@ -548,12 +382,7 @@ describe("Attack: Oracle Manipulation", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     // Deliberately register NO oracles
     const preimageStore = createPreimageStore();
-    const walletStore = createWalletStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore, walletStore });
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_unreachable", C: "C_unreachable" },
-    ]);
+    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
 
     const entry = preimageStore.create();
     const htlcInfo = {
@@ -579,7 +408,7 @@ describe("Attack: Oracle Manipulation", () => {
 });
 
 // =============================================================================
-// 5. State Machine Attacks
+// 4. State Machine Attacks
 // =============================================================================
 
 describe("Attack: State Machine — illegal transitions", () => {
@@ -600,8 +429,8 @@ describe("Attack: State Machine — illegal transitions", () => {
   });
 
   test("revert approved to processing: submit another result after approval", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
     // Get approval
     const approval = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
@@ -616,8 +445,8 @@ describe("Attack: State Machine — illegal transitions", () => {
   });
 
   test("record quote on processing query fails", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query } = await driveToProcessing(service, preimageStore);
 
     // Query is in processing — try to add another quote
     const quoteResult = service.recordQuote(query.id, {
@@ -631,8 +460,8 @@ describe("Attack: State Machine — illegal transitions", () => {
   });
 
   test("complete verification on non-verifying query fails", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query } = await driveToProcessing(service, preimageStore);
 
     // Query is in "processing" — try to complete verification (needs "verifying")
     const result = service.completeVerification(query.id, true, "test-oracle");
@@ -642,18 +471,12 @@ describe("Attack: State Machine — illegal transitions", () => {
 });
 
 // =============================================================================
-// 6. Cross-Query Attacks
+// 5. Cross-Query Attacks
 // =============================================================================
 
 describe("Attack: Cross-Query", () => {
   test("worker accepted on query A tries to submit on query B — fails", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    // Seed enough proofs for both queries
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_cross_a", C: "C_cross_a" },
-      { amount: 100, id: "k2", secret: "s_cross_b", C: "C_cross_b" },
-    ]);
+    const { service, preimageStore } = makeServiceWithPreimage();
 
     // Create query A with worker_a
     const { htlcInfo: htlcInfoA, entry: entryA } = makeHtlcInfo(preimageStore);
@@ -682,30 +505,4 @@ describe("Attack: Cross-Query", () => {
     expect(service.getQuery(qB.id)?.status).toBe("processing");
   });
 
-  test("transfer proofs go to specific selected worker, not any worker", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_target_1", C: "C_target_1" },
-    ]);
-
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
-    const query = service.createQuery(
-      { description: "Targeted transfer" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
-    );
-    service.recordQuote(query.id, { worker_pubkey: "correct_worker", quote_event_id: "e1", received_at: Date.now() });
-    await service.selectWorker(query.id, "correct_worker", makeFakeToken(100));
-
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "correct_worker", "test-oracle");
-    expect(outcome.ok).toBe(true);
-
-    // Proofs go to the selected worker
-    expect(walletStore.getBalance("worker", "correct_worker").balance_sats).toBe(100);
-    // Other worker gets nothing
-    expect(walletStore.getBalance("worker", "other_worker").balance_sats).toBe(0);
-    // Requester has nothing left
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(0);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(0);
-  });
 });
