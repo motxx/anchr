@@ -3,18 +3,6 @@ import { expect } from "@std/expect";
 import { checkAttachmentContent } from "./ai-content-check";
 import type { Query, QueryResult } from "../../domain/types";
 
-/**
- * AI content check tests.
- *
- * checkAttachmentContent requires AI_CONTENT_CHECK=true and ANTHROPIC_API_KEY
- * to be set. Without these, it returns null (opt-in guard). We test:
- * - Guard behavior (returns null when disabled)
- * - Null on empty attachments
- * - MIME type classification helpers (via behavior)
- *
- * Actual API calls are not tested here (requires real API key + costs money).
- */
-
 const makeQuery = (opts?: Partial<Query>): Query => ({
   id: "q1",
   status: "pending",
@@ -28,107 +16,70 @@ const makeQuery = (opts?: Partial<Query>): Query => ({
   ...opts,
 } as Query);
 
+function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
+  const saved: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(overrides)) {
+    saved[key] = process.env[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  const restore = () => {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+  const result = fn();
+  if (result instanceof Promise) return result.finally(restore);
+  restore();
+}
+
 describe("checkAttachmentContent", () => {
-  test("returns null when AI content check is disabled", async () => {
-    const saved = {
-      AI_CONTENT_CHECK: process.env.AI_CONTENT_CHECK,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    };
-    delete process.env.AI_CONTENT_CHECK;
-    delete process.env.ANTHROPIC_API_KEY;
-
-    try {
-      const query = makeQuery();
-      const result: QueryResult = {
-        attachments: [{
-          id: "att1",
-          uri: "https://example.com/photo.jpg",
-          mime_type: "image/jpeg",
-          storage_kind: "external",
-        }],
-      };
-
-      const check = await checkAttachmentContent(query, result);
-      expect(check).toBeNull();
-    } finally {
-      if (saved.AI_CONTENT_CHECK !== undefined) process.env.AI_CONTENT_CHECK = saved.AI_CONTENT_CHECK;
-      if (saved.ANTHROPIC_API_KEY !== undefined) process.env.ANTHROPIC_API_KEY = saved.ANTHROPIC_API_KEY;
-    }
+  test("returns null when AI_CONTENT_CHECK is not enabled", async () => {
+    await withEnv({ AI_CONTENT_CHECK: undefined, ANTHROPIC_API_KEY: undefined }, async () => {
+      const result = await checkAttachmentContent(
+        makeQuery(),
+        { attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }] },
+      );
+      expect(result).toBeNull();
+    });
   });
 
-  test("returns null when no API key is set", async () => {
-    const saved = {
-      AI_CONTENT_CHECK: process.env.AI_CONTENT_CHECK,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    };
-    process.env.AI_CONTENT_CHECK = "true";
-    delete process.env.ANTHROPIC_API_KEY;
-
-    try {
-      const query = makeQuery();
-      const result: QueryResult = {
-        attachments: [{
-          id: "att1",
-          uri: "https://example.com/photo.jpg",
-          mime_type: "image/jpeg",
-          storage_kind: "external",
-        }],
-      };
-
-      const check = await checkAttachmentContent(query, result);
-      expect(check).toBeNull();
-    } finally {
-      if (saved.AI_CONTENT_CHECK !== undefined) process.env.AI_CONTENT_CHECK = saved.AI_CONTENT_CHECK;
-      else delete process.env.AI_CONTENT_CHECK;
-      if (saved.ANTHROPIC_API_KEY !== undefined) process.env.ANTHROPIC_API_KEY = saved.ANTHROPIC_API_KEY;
-    }
+  test("returns null when ANTHROPIC_API_KEY is missing even if enabled", async () => {
+    await withEnv({ AI_CONTENT_CHECK: "true", ANTHROPIC_API_KEY: undefined }, async () => {
+      const result = await checkAttachmentContent(
+        makeQuery(),
+        { attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }] },
+      );
+      expect(result).toBeNull();
+    });
   });
 
-  test("returns null when no attachments", async () => {
-    const query = makeQuery();
-    const result: QueryResult = { attachments: [] };
-
-    const check = await checkAttachmentContent(query, result);
-    expect(check).toBeNull();
+  test("returns null when attachments array is empty", async () => {
+    const result = await checkAttachmentContent(makeQuery(), { attachments: [] });
+    expect(result).toBeNull();
   });
 
   test("returns null when attachments is undefined", async () => {
-    const query = makeQuery();
-    const result: QueryResult = {};
-
-    const check = await checkAttachmentContent(query, result);
-    expect(check).toBeNull();
-  });
-});
-
-describe("MIME type classification", () => {
-  // We verify the MIME sets by checking behavior through the module's
-  // internal classification (tested indirectly via loadImageContent paths).
-
-  const imageMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-  const videoMimes = ["video/mp4", "video/quicktime", "video/webm"];
-  const unsupportedMimes = ["application/pdf", "text/plain", "audio/mp3", "image/heic"];
-
-  test("image MIME types are recognized", () => {
-    const IMAGE_MIME_TYPES = new Set(imageMimes);
-    for (const mime of imageMimes) {
-      expect(IMAGE_MIME_TYPES.has(mime)).toBe(true);
-    }
+    const result = await checkAttachmentContent(makeQuery(), {});
+    expect(result).toBeNull();
   });
 
-  test("video MIME types are recognized", () => {
-    const VIDEO_MIME_TYPES = new Set(videoMimes);
-    for (const mime of videoMimes) {
-      expect(VIDEO_MIME_TYPES.has(mime)).toBe(true);
-    }
-  });
-
-  test("unsupported MIME types are not in either set", () => {
-    const IMAGE_MIME_TYPES = new Set(imageMimes);
-    const VIDEO_MIME_TYPES = new Set(videoMimes);
-    for (const mime of unsupportedMimes) {
-      expect(IMAGE_MIME_TYPES.has(mime)).toBe(false);
-      expect(VIDEO_MIME_TYPES.has(mime)).toBe(false);
-    }
+  test("returns null when enabled but all attachments have unsupported MIME types", async () => {
+    // Even if API key is set, loadImageContent filters by MIME type.
+    // With unsupported MIME types, no images are loaded → returns null before API call.
+    await withEnv({ AI_CONTENT_CHECK: "true", ANTHROPIC_API_KEY: "sk-test-fake" }, async () => {
+      const result = await checkAttachmentContent(
+        makeQuery(),
+        {
+          attachments: [
+            { id: "a1", uri: "https://example.com/file.pdf", mime_type: "application/pdf", storage_kind: "external" },
+            { id: "a2", uri: "https://example.com/file.txt", mime_type: "text/plain", storage_kind: "external" },
+          ],
+        },
+      );
+      // loadImageContent returns [] for unsupported MIME → checkAttachmentContent returns null
+      expect(result).toBeNull();
+    });
   });
 });

@@ -1,8 +1,7 @@
+import { describe, test, afterAll, beforeAll } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
 import { requestOracleHash } from "./requester-service";
-
-// --- Mock oracle server ---
 
 const ORACLE_PORT = 18900 + Math.floor(Math.random() * 100);
 const oracleApp = new Hono();
@@ -16,73 +15,38 @@ oracleApp.post("/hash", (c) => {
   return c.json({ hash: "abc123hash" });
 });
 
+let server: Deno.HttpServer;
 const abortController = new AbortController();
-const server = Deno.serve(
-  { port: ORACLE_PORT, signal: abortController.signal, onListen: () => {} },
-  oracleApp.fetch,
-);
+
+beforeAll(() => {
+  server = Deno.serve(
+    { port: ORACLE_PORT, signal: abortController.signal, onListen: () => {} },
+    oracleApp.fetch,
+  );
+});
+
+afterAll(async () => {
+  abortController.abort();
+  await server.finished;
+});
 
 const endpoint = `http://localhost:${ORACLE_PORT}`;
 
-Deno.test({
-  name: "requestOracleHash — returns hash from oracle",
-  sanitizeResources: false,
-  sanitizeOps: false,
-  async fn() {
+describe("requestOracleHash", () => {
+  test("returns hash from oracle", async () => {
     const result = await requestOracleHash("q1", endpoint, ORACLE_API_KEY);
     expect(result.hash).toBe("abc123hash");
-  },
-});
+  });
 
-Deno.test({
-  name: "requestOracleHash — rejects without API key",
-  sanitizeResources: false,
-  sanitizeOps: false,
-  async fn() {
-    try {
-      await requestOracleHash("q1", endpoint);
-      throw new Error("should have thrown");
-    } catch (e) {
-      expect((e as Error).message).toContain("Oracle /hash failed: 401");
-    }
-  },
-});
+  test("rejects without API key", async () => {
+    await expect(requestOracleHash("q1", endpoint)).rejects.toThrow("Oracle /hash failed: 401");
+  });
 
-Deno.test({
-  name: "requestOracleHash — rejects with wrong API key",
-  sanitizeResources: false,
-  sanitizeOps: false,
-  async fn() {
-    try {
-      await requestOracleHash("q1", endpoint, "wrong-key");
-      throw new Error("should have thrown");
-    } catch (e) {
-      expect((e as Error).message).toContain("Oracle /hash failed: 401");
-    }
-  },
-});
+  test("rejects with wrong API key", async () => {
+    await expect(requestOracleHash("q1", endpoint, "wrong-key")).rejects.toThrow("Oracle /hash failed: 401");
+  });
 
-Deno.test({
-  name: "requestOracleHash — throws on unreachable endpoint",
-  sanitizeResources: false,
-  sanitizeOps: false,
-  async fn() {
-    try {
-      await requestOracleHash("q1", "http://localhost:1");
-      throw new Error("should have thrown");
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-    }
-  },
-});
-
-// Cleanup
-Deno.test({
-  name: "requester-service — cleanup",
-  sanitizeResources: false,
-  sanitizeOps: false,
-  async fn() {
-    abortController.abort();
-    await server.finished;
-  },
+  test("throws on unreachable endpoint", async () => {
+    await expect(requestOracleHash("q1", "http://localhost:1")).rejects.toThrow();
+  });
 });

@@ -2,14 +2,6 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { uploadAttachment } from "./attachment-store";
 
-/**
- * Tests for attachment-store upload orchestration.
- *
- * The uploadAttachment function requires BLOSSOM_SERVERS to be configured.
- * Without it, the function throws immediately — we test this guard behavior
- * and the zip detection logic.
- */
-
 describe("uploadAttachment", () => {
   test("throws when Blossom is not configured", async () => {
     const saved = process.env.BLOSSOM_SERVERS;
@@ -23,24 +15,34 @@ describe("uploadAttachment", () => {
     }
   });
 
-  test("detects zip by extension", () => {
-    // Test the detection logic directly — uploadAttachment checks both
-    // extension and magic bytes. We verify both patterns.
-    const jpgFile = new File([new Uint8Array([0xFF, 0xD8])], "photo.jpg");
-    const zipFile = new File([new Uint8Array([0x50, 0x4B])], "bundle.zip");
+  test("rejects invalid zip (no photo inside) when Blossom is configured", async () => {
+    const saved = process.env.BLOSSOM_SERVERS;
+    process.env.BLOSSOM_SERVERS = "http://localhost:9999";
 
-    // Extension-based detection
-    expect(jpgFile.name.endsWith(".zip")).toBe(false);
-    expect(zipFile.name.endsWith(".zip")).toBe(true);
+    try {
+      // PK magic bytes → detected as zip, but contains no photo
+      const fakeZip = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
+      const file = new File([fakeZip], "bundle.zip", { type: "application/zip" });
+      await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");
+    } finally {
+      if (saved !== undefined) process.env.BLOSSOM_SERVERS = saved;
+      else delete process.env.BLOSSOM_SERVERS;
+    }
   });
 
-  test("detects zip by magic bytes (PK header)", () => {
-    const pkHeader = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
-    const isZip = pkHeader[0] === 0x50 && pkHeader[1] === 0x4B;
-    expect(isZip).toBe(true);
+  test("detects zip by magic bytes even without .zip extension", async () => {
+    const saved = process.env.BLOSSOM_SERVERS;
+    process.env.BLOSSOM_SERVERS = "http://localhost:9999";
 
-    const jpgHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
-    const isNotZip = jpgHeader[0] === 0x50 && jpgHeader[1] === 0x4B;
-    expect(isNotZip).toBe(false);
+    try {
+      // PK header but named .jpg — should still be treated as zip
+      const fakeZip = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
+      const file = new File([fakeZip], "disguised.jpg", { type: "image/jpeg" });
+      // Will be detected as zip due to PK magic bytes → "Invalid zip: no photo found"
+      await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");
+    } finally {
+      if (saved !== undefined) process.env.BLOSSOM_SERVERS = saved;
+      else delete process.env.BLOSSOM_SERVERS;
+    }
   });
 });

@@ -83,7 +83,10 @@ export async function requestOracleHash(
     body: JSON.stringify({ query_id: queryId }),
   });
 
-  if (!res.ok) throw new Error(`Oracle /hash failed: ${res.status}`);
+  if (!res.ok) {
+    await res.body?.cancel();
+    throw new Error(`Oracle /hash failed: ${res.status}`);
+  }
   const data = await res.json() as { hash: string };
   return { hash: data.hash };
 }
