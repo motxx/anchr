@@ -2,7 +2,7 @@ import { expect, test, beforeEach } from "bun:test";
 import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in";
 import { getOracle, listOracles, registerOracle, resolveOracle } from "./registry";
 import type { Oracle, OracleAttestation } from "./types";
-import type { Query, QueryResult } from "../types";
+import type { Query, QueryResult } from "../domain/types";
 
 function makeFakeOracle(id: string, feePpm = 50_000): Oracle {
   return {

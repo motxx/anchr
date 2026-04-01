@@ -1,4 +1,4 @@
-export { queryTemplates } from "./query-templates";
+export { queryTemplates } from "./domain/query-templates";
 export {
   cancelQuery,
   clearQueryStore,
@@ -9,7 +9,7 @@ export {
   getQuery,
   listOpenQueries,
   submitQueryResult,
-} from "./query-service";
+} from "./application/query-service";
 export type {
   AttachmentRef,
   AttachmentStorageKind,
@@ -30,17 +30,28 @@ export type {
   QuerySubmissionMeta,
   QueryVerification,
   SubmitQueryOutcome,
-} from "./query-service";
-export type { HtlcInfo, QuoteInfo } from "./types";
-export { startMcpServer as startMcpAdapter } from "./mcp-server";
-export { startReferenceApp } from "./reference-app";
-export { startReferenceRuntime } from "./runtime";
-export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./worker-api";
+} from "./application/query-service";
+export type { HtlcInfo, QuoteInfo } from "./domain/types";
+export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./domain/query-transitions";
+export {
+  validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
+} from "./domain/value-objects";
+export {
+  createQueryAggregate, submitResult, expireQuery, cancelQuery as cancelQueryAggregate,
+  addQuote, selectWorker as selectWorkerAggregate, recordResult, completeVerification,
+} from "./domain/query-aggregate";
+export type { TransitionResult, CreateQueryAggregateOptions } from "./domain/query-aggregate";
+export { createInMemoryQueryRepository, toRepository } from "./domain/query-repository";
+export type { QueryRepository } from "./domain/query-repository";
+export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server";
+export { startReferenceApp } from "./infrastructure/reference-app";
+export { startReferenceRuntime } from "./infrastructure/runtime";
+export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./infrastructure/worker-api";
 export { verify as verifyQueryResult } from "./verification/verifier";
 export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./oracle";
 export type { Oracle, OracleInfo, OracleAttestation, OracleRegistry, HttpOracleConfig } from "./oracle";
-export { stripExif } from "./exif-strip";
-export { purgeExpiredQueries } from "./data-purge";
+export { stripExif } from "./infrastructure/exif-strip";
+export { purgeExpiredQueries } from "./application/data-purge";
 export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./cashu/wallet";
 export {
   buildEscrowP2PKOptions, calculateOracleFee, createEscrowToken, executeEscrowSwap, inspectEscrowToken,
@@ -62,18 +73,18 @@ export {
   encryptAndUpload,
   publishResult,
   waitForPreimage,
-} from "./worker-service";
-export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./worker-service";
+} from "./application/worker-service";
+export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./application/worker-service";
 export {
   requestOracleHash,
   createHtlcQuery,
   subscribeToQuotes,
   selectWorker,
-} from "./requester-service";
-export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./requester-service";
+} from "./application/requester-service";
+export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./application/requester-service";
 export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./oracle/oracle-nostr-service";
 export type { OracleNostrServiceConfig, OracleNostrService } from "./oracle/oracle-nostr-service";
 
 if (import.meta.main) {
-  await import("./server");
+  await import("./infrastructure/server");
 }

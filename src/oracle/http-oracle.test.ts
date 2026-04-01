@@ -1,7 +1,7 @@
 import { expect, test, afterAll } from "bun:test";
 import { buildOracleApp } from "./oracle-server";
 import { createHttpOracle } from "./http-oracle";
-import type { Query, QueryResult } from "../types";
+import type { Query, QueryResult } from "../domain/types";
 
 const TEST_ORACLE_ID = "test-http-oracle";
 const TEST_API_KEY = "test-secret";

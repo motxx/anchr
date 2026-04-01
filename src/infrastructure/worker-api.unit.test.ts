@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { createWalletStore } from "./cashu/wallet-store";
-import { createPreimageStore } from "./oracle/preimage-store";
-import { createOracleRegistry } from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "./oracle/types";
-import { createQueryService, createQueryStore } from "./query-service";
-import type { Query, QueryResult } from "./types";
+import { createWalletStore } from "../cashu/wallet-store";
+import { createPreimageStore } from "../oracle/preimage-store";
+import { createOracleRegistry } from "../oracle/registry";
+import type { Oracle, OracleAttestation } from "../oracle/types";
+import { createQueryService, createQueryStore } from "../application/query-service";
+import type { Query, QueryResult } from "../domain/types";
 import { buildWorkerApiApp } from "./worker-api";
 
 function makeMockOracle(id: string): Oracle {

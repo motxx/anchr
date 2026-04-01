@@ -254,19 +254,8 @@ function parseExifDateTime(dt: string): Date | null {
   return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`);
 }
 
-/**
- * Haversine distance in km between two GPS coordinates.
- */
-export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// Re-export from domain layer for backward compatibility
+export { haversineKm } from "../domain/geo";
 
 export interface ExifValidationOptions {
   /** Max allowed age of photo timestamp in ms (default: 1 hour) */

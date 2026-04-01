@@ -8,7 +8,7 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   QueryResult,
-} from "./types";
+} from "../domain/types";
 
 type AttachmentLike = AttachmentRef | string;
 

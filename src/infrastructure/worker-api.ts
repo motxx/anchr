@@ -15,10 +15,10 @@ import {
   statStoredAttachment,
 } from "./attachments";
 import { getRuntimeConfig } from "./config";
-import { listOracles } from "./oracle";
-import type { OracleRegistry } from "./oracle/registry";
-import type { PreimageStore } from "./oracle/preimage-store";
-import type { WalletStore } from "./cashu/wallet-store";
+import { listOracles } from "../oracle";
+import type { OracleRegistry } from "../oracle/registry";
+import type { PreimageStore } from "../oracle/preimage-store";
+import type { WalletStore } from "../cashu/wallet-store";
 import {
   cancelQuery,
   createQuery,
@@ -29,11 +29,11 @@ import {
   type QueryInput,
   type QueryResult,
   type QueryService,
-} from "./query-service";
-import { VERIFICATION_FACTORS } from "./types";
-import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "./types";
+} from "../application/query-service";
+import { VERIFICATION_FACTORS } from "../domain/types";
+import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "../domain/types";
 import { getRuntimeConfig as getConfig } from "./config";
-import { haversineKm } from "./verification/exif-validation";
+import { haversineKm } from "../verification/exif-validation";
 import { validateAttachmentUri } from "./url-validation";
 
 export interface WorkerApiDeps {

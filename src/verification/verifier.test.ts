@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, beforeEach } from "bun:test";
 import { verify, _setValidateTlsnForTest } from "./verifier";
 import { storeIntegrity, clearIntegrityStore } from "./integrity-store";
-import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../types";
+import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../domain/types";
 import type { TlsnValidationResult } from "./tlsn-validation";
 
 beforeEach(() => {

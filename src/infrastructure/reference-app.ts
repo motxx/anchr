@@ -1,16 +1,16 @@
-import { createBountyToken, isCashuEnabled } from "./cashu/wallet";
-import { createWalletStore } from "./cashu/wallet-store";
+import { createBountyToken, isCashuEnabled } from "../cashu/wallet";
+import { createWalletStore } from "../cashu/wallet-store";
 import { getRuntimeConfig } from "./config";
 import { setupServerLogCapture } from "./log-stream";
-import { createPreimageStore } from "./oracle/preimage-store";
-import { createQueryService } from "./query-service";
+import { createPreimageStore } from "../oracle/preimage-store";
+import { createQueryService } from "../application/query-service";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 // @ts-ignore — Bun HTML import
-import uiHtml from "./ui/index.html";
+import uiHtml from "../ui/index.html";
 // @ts-ignore — Bun HTML import
-import requesterHtml from "./ui/requester/index.html";
+import requesterHtml from "../ui/requester/index.html";
 // @ts-ignore — Bun HTML import
-import dashboardHtml from "./ui/dashboard/index.html";
+import dashboardHtml from "../ui/dashboard/index.html";
 
 const REQUESTER_DEMO_PUBKEY = "requester_demo";
 

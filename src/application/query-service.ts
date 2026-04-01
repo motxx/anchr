@@ -1,13 +1,15 @@
-import { normalizeQueryResult } from "./attachments";
+import { createQueryStore } from "../domain/query-store";
+import type { QueryStore } from "../domain/query-store";
+import { normalizeQueryResult } from "../infrastructure/attachments";
 import { getDecodedToken } from "@cashu/cashu-ts";
-import { verifyToken } from "./cashu/wallet";
-import { verifyHtlcProofs } from "./cashu/escrow";
-import type { WalletStore } from "./cashu/wallet-store";
-import { buildChallengeRule, generateNonce } from "./challenge";
-import { resolveOracle } from "./oracle";
-import type { OracleRegistry } from "./oracle/registry";
-import type { PreimageStore } from "./oracle/preimage-store";
-import type { OracleAttestation } from "./oracle/types";
+import { verifyToken } from "../cashu/wallet";
+import { verifyHtlcProofs } from "../cashu/escrow";
+import type { WalletStore } from "../cashu/wallet-store";
+import { buildChallengeRule, generateNonce } from "../domain/challenge";
+import { resolveOracle } from "../oracle";
+import type { OracleRegistry } from "../oracle/registry";
+import type { PreimageStore } from "../oracle/preimage-store";
+import type { OracleAttestation } from "../oracle/types";
 import type {
   BlossomKeyMap,
   BountyInfo,
@@ -26,8 +28,8 @@ import type {
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
-} from "./types";
-import { DEFAULT_VERIFICATION_FACTORS } from "./types";
+} from "../domain/types";
+import { DEFAULT_VERIFICATION_FACTORS } from "../domain/types";
 
 export type {
   AttachmentRef,
@@ -39,7 +41,7 @@ export type {
   VerificationFactor,
   RequesterMeta,
   RequesterType,
-} from "./types";
+} from "../domain/types";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
 export type QuerySubmissionMeta = SubmissionMeta;
@@ -70,26 +72,8 @@ export interface CancelQueryOutcome {
   message: string;
 }
 
-// --- QueryStore interface ---
-
-export interface QueryStore {
-  get(id: string): Query | null;
-  set(id: string, query: Query): void;
-  values(): Query[];
-  delete(id: string): void;
-  clear(): void;
-}
-
-export function createQueryStore(): QueryStore {
-  const queries = new Map<string, Query>();
-  return {
-    get: (id) => queries.get(id) ?? null,
-    set: (id, query) => { queries.set(id, query); },
-    values: () => Array.from(queries.values()),
-    delete: (id) => { queries.delete(id); },
-    clear: () => { queries.clear(); },
-  };
-}
+// --- QueryStore (extracted to domain layer) ---
+export { createQueryStore, type QueryStore } from "../domain/query-store";
 
 // --- QueryService ---
 
@@ -708,10 +692,10 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 // --- Relay publish hook (default for production) ---
 
 function publishQueryToRelay(query: Query): void {
-  import("./nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
+  import("../nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
     if (!isNostrEnabled()) return;
-    const { buildQueryRequestEvent } = await import("./nostr/events");
-    const { generateEphemeralIdentity } = await import("./nostr/identity");
+    const { buildQueryRequestEvent } = await import("../nostr/events");
+    const { generateEphemeralIdentity } = await import("../nostr/identity");
 
     const identity = generateEphemeralIdentity();
     const event = buildQueryRequestEvent(identity, query.id, {

@@ -31,7 +31,7 @@ import {
 } from "../nostr/client";
 import { createPreimageStore, type PreimageStore } from "./preimage-store";
 import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../types";
+import type { Query, QueryResult } from "../domain/types";
 
 export interface OracleNostrServiceConfig {
   /** Oracle's persistent Nostr identity (loaded from secret key). */

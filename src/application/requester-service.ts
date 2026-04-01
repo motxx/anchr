@@ -14,8 +14,8 @@
 import type { Proof } from "@cashu/cashu-ts";
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "./nostr/identity";
-import { generateEphemeralIdentity } from "./nostr/identity";
+import type { NostrIdentity } from "../nostr/identity";
+import { generateEphemeralIdentity } from "../nostr/identity";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -24,14 +24,14 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./nostr/events";
-import { publishEvent, subscribeToFeedback, subscribeToResponses } from "./nostr/client";
+} from "../nostr/events";
+import { publishEvent, subscribeToFeedback, subscribeToResponses } from "../nostr/client";
 import {
   createHtlcToken,
   swapHtlcBindWorker,
   type EscrowToken,
-} from "./cashu/escrow";
-import type { HtlcInfo, QuoteInfo, TlsnEncryptedContext } from "./types";
+} from "../cashu/escrow";
+import type { HtlcInfo, QuoteInfo, TlsnEncryptedContext } from "../domain/types";
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */

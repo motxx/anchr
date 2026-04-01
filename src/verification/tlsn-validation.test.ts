@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest } from "./tlsn-validation";
-import type { TlsnAttestation, TlsnRequirement } from "../types";
+import type { TlsnAttestation, TlsnRequirement } from "../domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

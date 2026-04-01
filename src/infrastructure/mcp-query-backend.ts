@@ -12,8 +12,8 @@ import {
   getQuery,
   listOpenQueries,
   submitQueryResult,
-} from "./query-service";
-import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "./types";
+} from "../application/query-service";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types";
 
 const runtimeConfig = getRuntimeConfig();
 const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;

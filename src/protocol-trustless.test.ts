@@ -17,8 +17,8 @@ import { getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "./oracle/registry";
 import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store";
 import type { Oracle, OracleAttestation } from "./oracle/types";
-import { createQueryService, createQueryStore } from "./query-service";
-import type { Query, QueryResult } from "./types";
+import { createQueryService, createQueryStore } from "./application/query-service";
+import type { Query, QueryResult } from "./domain/types";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,

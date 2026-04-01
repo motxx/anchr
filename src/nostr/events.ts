@@ -16,7 +16,7 @@
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { TlsnEncryptedContext, VerificationFactor } from "../types";
+import type { TlsnEncryptedContext, VerificationFactor } from "../domain/types";
 import type { NostrIdentity } from "./identity";
 import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
 

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQuery, getQuery } from "./query-service";
-import { storeIntegrity } from "./verification/integrity-store";
+import { isBlossomEnabled, getBlossomConfig } from "../blossom/client";
+import { createQuery, getQuery } from "../application/query-service";
+import { storeIntegrity } from "../verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 
 function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {

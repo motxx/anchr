@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import {
   createOracleRegistry,
-} from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "./oracle/types";
+} from "../oracle/registry";
+import type { Oracle, OracleAttestation } from "../oracle/types";
 import {
   createQueryService,
   createQueryStore,
 } from "./query-service";
-import type { Query, QueryResult } from "./types";
-import { createIntegrityStore } from "./verification/integrity-store";
+import type { Query, QueryResult } from "../domain/types";
+import { createIntegrityStore } from "../verification/integrity-store";
 
 /** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {
@@ -561,8 +561,8 @@ describe("submitHtlcResult", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const oracle = opts?.mockOracle ?? makeMockOracle("test-oracle");
     registry.register(oracle);
-    const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
-    const { createWalletStore } = require("./cashu/wallet-store") as typeof import("./cashu/wallet-store");
+    const { createPreimageStore } = require("../oracle/preimage-store") as typeof import("../oracle/preimage-store");
+    const { createWalletStore } = require("../cashu/wallet-store") as typeof import("../cashu/wallet-store");
     const preimageStore = createPreimageStore();
     const walletStore = createWalletStore();
     return {
@@ -580,7 +580,7 @@ describe("submitHtlcResult", () => {
   }
 
   /** Create htlcInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("./oracle/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../oracle/preimage-store").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
       htlcInfo: {
@@ -759,8 +759,8 @@ describe("verifyWithQuorum", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("oracle-a", () => true));
     registry.register(makeMockOracle("oracle-b", () => true));
-    const { createPreimageStore } = require("./oracle/preimage-store") as typeof import("./oracle/preimage-store");
-    const { createWalletStore } = require("./cashu/wallet-store") as typeof import("./cashu/wallet-store");
+    const { createPreimageStore } = require("../oracle/preimage-store") as typeof import("../oracle/preimage-store");
+    const { createWalletStore } = require("../cashu/wallet-store") as typeof import("../cashu/wallet-store");
     const preimageStore = createPreimageStore();
     const walletStore = createWalletStore();
     const service = createQueryService({ store, oracleRegistry: registry, preimageStore, walletStore });

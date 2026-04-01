@@ -9,9 +9,9 @@
  * never leaves their device.
  */
 
-import { stripExif } from "../exif-strip";
+import { stripExif } from "../infrastructure/exif-strip";
 import { generateEphemeralIdentity } from "../nostr/identity";
-import type { AttachmentRef } from "../types";
+import type { AttachmentRef } from "../domain/types";
 import { getBlossomConfig, uploadToBlossom, type BlossomUploadResult } from "./client";
 
 export interface WorkerUploadOptions {

@@ -45,8 +45,8 @@ test("mcp tools expose query status and attachment metadata", async () => {
   // Bootstrap: create query + submit result inside the MCP subprocess so
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
-    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(import.meta.dir, "query-service.ts"))});`,
-    `const { storeIntegrity } = await import(${JSON.stringify(join(import.meta.dir, "verification/integrity-store.ts"))});`,
+    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(import.meta.dir, "../application/query-service.ts"))});`,
+    `const { storeIntegrity } = await import(${JSON.stringify(join(import.meta.dir, "../verification/integrity-store.ts"))});`,
     `const query = createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,

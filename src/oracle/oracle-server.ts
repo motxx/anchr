@@ -14,7 +14,7 @@ import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../types";
+import type { Query, QueryResult } from "../domain/types";
 import type { OracleAttestation } from "./types";
 import { createPreimageStore, type PreimageStore } from "./preimage-store";
 

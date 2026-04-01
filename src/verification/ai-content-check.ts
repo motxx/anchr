@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readStoredAttachmentBuffer } from "../attachments";
-import { getRuntimeConfig } from "../config";
-import type { AttachmentRef, BlossomKeyMap, Query, QueryResult } from "../types";
+import { readStoredAttachmentBuffer } from "../infrastructure/attachments";
+import { getRuntimeConfig } from "../infrastructure/config";
+import type { AttachmentRef, BlossomKeyMap, Query, QueryResult } from "../domain/types";
 
 export interface ContentCheckResult {
   passed: boolean;

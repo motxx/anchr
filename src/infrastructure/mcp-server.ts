@@ -2,11 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { getMcpQueryBackend } from "./mcp-query-backend";
-import { isNostrEnabled } from "./nostr/client";
-import { isCashuEnabled } from "./cashu/wallet";
-import type { QueryInput, QueryResult } from "./query-service";
-import type { RequesterMeta } from "./types";
-import { VERIFICATION_FACTORS } from "./types";
+import { isNostrEnabled } from "../nostr/client";
+import { isCashuEnabled } from "../cashu/wallet";
+import type { QueryInput, QueryResult } from "../application/query-service";
+import type { RequesterMeta } from "../domain/types";
+import { VERIFICATION_FACTORS } from "../domain/types";
 
 function buildRequesterMeta(): RequesterMeta {
   return {

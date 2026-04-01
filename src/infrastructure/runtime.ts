@@ -1,7 +1,7 @@
 import { getRuntimeConfig } from "./config";
-import { purgeExpiredQueries } from "./data-purge";
+import { purgeExpiredQueries } from "../application/data-purge";
 import { startMcpServer } from "./mcp-server";
-import { expireQueries } from "./query-service";
+import { expireQueries } from "../application/query-service";
 import { startReferenceApp } from "./reference-app";
 
 export interface ReferenceRuntime {
