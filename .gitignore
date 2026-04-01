@@ -59,3 +59,13 @@ mobile/node_modules/
 crates/*/target/
 crates/*/Cargo.lock
 test-results
+
+# direnv
+.direnv/
+.envrc
+
+# claude code
+.claude/
+
+# example apps
+example/bounty-board/node_modules/
