@@ -17,16 +17,15 @@
  *   CASHU_MINT_URL=http://localhost:3338 \
  *   NOSTR_RELAYS=ws://localhost:7777 \
  *   BLOSSOM_SERVERS=http://localhost:3333 \
- *   bun test e2e/regtest-cashu.test.ts
+ *   deno test e2e/regtest-cashu.test.ts --allow-all --no-check
  */
 
-import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../src/worker-api";
-import { clearQueryStore } from "../src/query-service";
-import { closePool } from "../src/nostr/client";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
+import { createQueryService, clearQueryStore } from "../src/application/query-service";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;
@@ -83,44 +82,41 @@ async function mintCashuToken(amountSats: number): Promise<{ token: string; proo
   return { token, proofs };
 }
 
-describe("e2e: regtest Cashu bounty lifecycle", () => {
-  let mintReachable = false;
-  let lndReachable = false;
+const [mintReachable, lndReachable] = await Promise.all([
+  isCashuMintReachable(),
+  isLndUserReachable(),
+]);
+const INFRA_READY = mintReachable && lndReachable;
 
-  beforeAll(async () => {
-    [mintReachable, lndReachable] = await Promise.all([
-      isCashuMintReachable(),
-      isLndUserReachable(),
-    ]);
-    if (!mintReachable) {
-      console.warn(`[e2e] Cashu mint not reachable at ${MINT_URL} – skipping.`);
-      console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
-    }
-    if (!lndReachable) {
-      console.warn("[e2e] lnd-user not reachable – skipping.");
-    }
+if (!INFRA_READY) {
+  if (!mintReachable) {
+    console.warn(`[e2e] Cashu mint not reachable at ${MINT_URL} – tests will be ignored.`);
+    console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
+  }
+  if (!lndReachable) {
+    console.warn("[e2e] lnd-user not reachable – tests will be ignored.");
+  }
+}
+
+const suite = INFRA_READY ? describe : describe.ignore;
+
+// Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
+const testService = createQueryService({ hooks: {} });
+
+suite("e2e: regtest Cashu bounty lifecycle", () => {
+  const app = buildWorkerApiApp({ queryService: testService });
+
+  beforeAll(() => {
     clearQueryStore();
   });
 
-  afterAll(() => {
-    closePool();
-  });
-
   test("cashu mint is reachable", async () => {
-    if (!mintReachable) {
-      console.warn("[e2e] SKIPPED – cashu mint not reachable");
-      return;
-    }
     const res = await fetch(`${MINT_URL}/v1/info`);
     const info = (await res.json()) as { name: string };
     expect(info.name).toBe("Cashu mint");
   });
 
   test("lnd-user has channel balance", async () => {
-    if (!lndReachable) {
-      console.warn("[e2e] SKIPPED – lnd-user not reachable");
-      return;
-    }
     const proc = spawn([
       "docker", "compose", "exec", "-T", "lnd-user",
       "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
@@ -133,11 +129,6 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
   });
 
   test("mint Cashu token via regtest Lightning", async () => {
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] SKIPPED – infrastructure not ready");
-      return;
-    }
-
     const { token, proofs } = await mintCashuToken(BOUNTY_SATS);
     expect(token).toMatch(/^cashuB/);
     expect(proofs.length).toBeGreaterThan(0);
@@ -147,13 +138,6 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
   }, 30_000);
 
   test("full bounty lifecycle: mint → create query → submit → release", async () => {
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] SKIPPED – infrastructure not ready");
-      return;
-    }
-
-    const app = buildWorkerApiApp();
-
     // 1. Mint Cashu token
     const { token } = await mintCashuToken(BOUNTY_SATS);
     expect(token).toMatch(/^cashuB/);
@@ -238,13 +222,6 @@ describe("e2e: regtest Cashu bounty lifecycle", () => {
   }, 60_000);
 
   test("bounty token is redeemable at cashu mint", async () => {
-    if (!mintReachable || !lndReachable) {
-      console.warn("[e2e] SKIPPED – infrastructure not ready");
-      return;
-    }
-
-    const app = buildWorkerApiApp();
-
     // Create bounty query and submit to get token back
     const { token } = await mintCashuToken(BOUNTY_SATS);
     const createRes = await app.request("http://localhost/queries", {

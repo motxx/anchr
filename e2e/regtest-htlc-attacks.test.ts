@@ -18,7 +18,7 @@
  *   bun test e2e/regtest-htlc-attacks.test.ts
  */
 
-import { beforeAll, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
 import {
@@ -258,7 +258,7 @@ async function attemptRedeemWithCustomWitness(
   }
 }
 
-// --- Infrastructure readiness (top-level await for test.skipIf) ---
+// --- Infrastructure readiness ---
 
 const [MINT_REACHABLE, LND_REACHABLE] = await Promise.all([
   isCashuMintReachable(),
@@ -267,23 +267,25 @@ const [MINT_REACHABLE, LND_REACHABLE] = await Promise.all([
 const INFRA_READY = MINT_REACHABLE && LND_REACHABLE;
 
 if (!INFRA_READY) {
-  console.warn("[e2e] Infrastructure not ready – tests will be skipped.");
+  console.warn("[e2e] Infrastructure not ready – tests will be ignored.");
   console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
 }
+
+const suite = INFRA_READY ? describe : describe.ignore;
+
+// Create wallet at module level before describes register.
+// This ensures loadMint() fetch responses are fully consumed
+// before any test scope begins (avoids Deno sanitizer false positives).
+const sharedWallet = INFRA_READY ? await createWallet() : undefined;
 
 // =============================================================================
 // E2E Attack Category 1: Proof Manipulation
 // =============================================================================
 
-describe("e2e: Proof Manipulation Attacks", () => {
-  let wallet: Wallet;
+suite("e2e: Proof Manipulation Attacks", () => {
+  const wallet = sharedWallet!;
 
-  beforeAll(async () => {
-    if (!INFRA_READY) return;
-    wallet = await createWallet();
-  });
-
-  test.skipIf(!INFRA_READY)("ATTACK: Modified proof amount — Mint rejects (blind sig mismatch)", async () => {
+  test("ATTACK: Modified proof amount — Mint rejects (blind sig mismatch)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -305,7 +307,7 @@ describe("e2e: Proof Manipulation Attacks", () => {
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for modified amount
   }, 60_000);
 
-  test.skipIf(!INFRA_READY)("ATTACK: Swapped proof secrets between proof sets — Mint rejects", async () => {
+  test("ATTACK: Swapped proof secrets between proof sets — Mint rejects", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -336,7 +338,7 @@ describe("e2e: Proof Manipulation Attacks", () => {
     expect(result).toBeNull(); // Mint MUST reject — secret/C mismatch
   }, 60_000);
 
-  test.skipIf(!INFRA_READY)("ATTACK: Proof with empty secret — Mint rejects", async () => {
+  test("ATTACK: Proof with empty secret — Mint rejects", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -363,15 +365,10 @@ describe("e2e: Proof Manipulation Attacks", () => {
 // E2E Attack Category 2: Redemption Timing
 // =============================================================================
 
-describe("e2e: Redemption Timing Attacks", () => {
-  let wallet: Wallet;
+suite("e2e: Redemption Timing Attacks", () => {
+  const wallet = sharedWallet!;
 
-  beforeAll(async () => {
-    if (!INFRA_READY) return;
-    wallet = await createWallet();
-  });
-
-  test.skipIf(!INFRA_READY)("ATTACK: Redeem with both preimage AND refund key simultaneously", async () => {
+  test("ATTACK: Redeem with both preimage AND refund key simultaneously", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -398,7 +395,7 @@ describe("e2e: Redemption Timing Attacks", () => {
     expect(result).toBeNull();
   }, 60_000);
 
-  test.skipIf(!INFRA_READY)("Worker redeems with expired locktime — succeeds (locktime only affects refund path)", async () => {
+  test("Worker redeems with expired locktime — succeeds (locktime only affects refund path)", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
@@ -436,15 +433,10 @@ describe("e2e: Redemption Timing Attacks", () => {
 // E2E Attack Category 3: Multi-Party Attacks
 // =============================================================================
 
-describe("e2e: Multi-Party Attacks", () => {
-  let wallet: Wallet;
+suite("e2e: Multi-Party Attacks", () => {
+  const wallet = sharedWallet!;
 
-  beforeAll(async () => {
-    if (!INFRA_READY) return;
-    wallet = await createWallet();
-  });
-
-  test.skipIf(!INFRA_READY)("ATTACK: Two workers race to redeem same proofs — second fails (double-spend)", async () => {
+  test("ATTACK: Two workers race to redeem same proofs — second fails (double-spend)", async () => {
     const worker1 = generateKeypair();
     const worker2 = generateKeypair();
     const requester = generateKeypair();
@@ -478,7 +470,7 @@ describe("e2e: Multi-Party Attacks", () => {
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
   }, 60_000);
 
-  test.skipIf(!INFRA_READY)("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
+  test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
     const { hash, preimage } = createHTLCHash();
