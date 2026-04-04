@@ -22,6 +22,9 @@ import { deriveConversationKey, decryptNip44 } from "./encryption";
 export const ANCHR_QUERY_REQUEST = 5300;   // DVM Job Request
 export const ANCHR_QUERY_RESPONSE = 6300;  // DVM Job Result
 export const ANCHR_QUERY_FEEDBACK = 7000;  // DVM Job Feedback (quotes, selection, settlement)
+
+// Marketplace listing (NIP-33 parameterized replaceable, Routstr-compatible).
+export const ANCHR_MARKETPLACE_LISTING = 38421;
 /** @deprecated Use ANCHR_QUERY_FEEDBACK */
 export const ANCHR_QUERY_SETTLEMENT = ANCHR_QUERY_FEEDBACK;
 

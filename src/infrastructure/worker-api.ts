@@ -18,11 +18,14 @@ import {
   registerHtlcRoutes,
   registerLogRoutes,
 } from "./worker-api-routes";
+import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes";
+import { createListingStore, type ListingStore } from "./marketplace/listing-store";
 
 export interface WorkerApiDeps {
   queryService?: QueryService;
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
+  listingStore?: ListingStore;
 }
 
 // --- Auth Middleware ---
@@ -143,6 +146,10 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   registerAttachmentRoutes(app, routeCtx);
   registerHtlcRoutes(app, routeCtx);
   registerLogRoutes(app);
+
+  // --- Marketplace routes ---
+  const listingStore = deps?.listingStore ?? createListingStore();
+  registerMarketplaceRoutes(app, { listingStore, preimageStore: pStore, writeAuth, rateLimit });
 
   return app;
 }

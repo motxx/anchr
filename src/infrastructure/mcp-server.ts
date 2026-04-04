@@ -15,6 +15,11 @@ import {
   handleGetQueryAttachment,
   handleGetQueryAttachmentPreview,
 } from "./mcp-tool-handlers";
+import {
+  handleMarketplaceListData,
+  handleMarketplaceBuyData,
+  handleMarketplaceSearchListings,
+} from "./mcp-marketplace-handlers";
 
 export async function startMcpServer() {
   const server = new McpServer({
@@ -119,6 +124,45 @@ export async function startMcpServer() {
     },
     async ({ query_id, attachment_index, max_dimension }: { query_id: string; attachment_index?: number; max_dimension?: number }) => {
       return handleGetQueryAttachmentPreview(backend, query_id, attachment_index ?? 0, max_dimension);
+    },
+  );
+
+  // --- Marketplace tools ---
+
+  server.tool(
+    "marketplace_list_data",
+    "List available verified data listings on the Anchr marketplace. " +
+    "Each listing provides TLSNotary-proven API data that can be purchased with Cashu ecash.",
+    {
+      active_only: z.boolean().optional().describe("Only show active listings (default true)"),
+    },
+    async (args: { active_only?: boolean }) => {
+      return handleMarketplaceListData(backend, args.active_only ?? true);
+    },
+  );
+
+  server.tool(
+    "marketplace_buy_data",
+    "Purchase verified data from the Anchr marketplace. " +
+    "Pays with Cashu ecash token (X-Cashu direct mode). " +
+    "Returns the data along with TLSNotary proof of authenticity.",
+    {
+      listing_id: z.string().describe("Listing ID to purchase"),
+      cashu_token: z.string().describe("Cashu ecash token for payment"),
+    },
+    async (args: { listing_id: string; cashu_token: string }) => {
+      return handleMarketplaceBuyData(backend, args.listing_id, args.cashu_token);
+    },
+  );
+
+  server.tool(
+    "marketplace_search_listings",
+    "Search marketplace listings by keyword in name or description.",
+    {
+      query: z.string().describe("Search keyword"),
+    },
+    async (args: { query: string }) => {
+      return handleMarketplaceSearchListings(backend, args.query);
     },
   );
 
