@@ -26,14 +26,6 @@ function makeConfig(overrides?: Partial<OracleNostrServiceConfig>): OracleNostrS
   };
 }
 
-
-// --- Teardown ---
-
-afterEach(() => {
-  _setPublishEventForTest(null);
-  _setVerifyForTest(null);
-});
-
 // --- generateHash ---
 
 describe("generateHash", () => {
@@ -65,6 +57,11 @@ describe("generateHash", () => {
 // --- verifyAndDeliver ---
 
 describe("verifyAndDeliver", () => {
+  afterEach(() => {
+    _setPublishEventForTest(null);
+    _setVerifyForTest(null);
+  });
+
   test("publishes preimage DM on verification pass", async () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });

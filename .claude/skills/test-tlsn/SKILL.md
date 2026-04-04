@@ -41,11 +41,11 @@ cd "$PROJECT_ROOT"
 ```bash
 cd crates/tlsn-prover && cargo build && cd ../tlsn-verifier && cargo build --release && cd "$PROJECT_ROOT"
 docker compose up tlsn-verifier -d
-bun run src/index.ts &
+deno task dev &
 until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
-bun test e2e/tlsn.test.ts
+deno test e2e/tlsn.test.ts --allow-all --no-check
 docker compose down tlsn-verifier
-pkill -f "bun.*src/index.ts"
+pkill -f "deno.*server.ts"
 ```
 
 ---
@@ -84,7 +84,7 @@ crates/tlsn-server/target/debug/tlsn-server --tcp-port 7047 --ws-port 7048 &
 
 ### Start Anchr server
 ```bash
-bun run src/index.ts &
+deno task dev &
 until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
 ```
 
@@ -99,16 +99,18 @@ curl -s http://localhost:3000/health   # Anchr server
 
 ## Phase 3: CLI Worker — TCP mode (`tcp`)
 
+Uses bitFlyer public API (ECDSA cert — fast MPC-TLS, no rate limits).
+
 ```bash
 crates/tlsn-prover/target/debug/tlsn-prove \
   --verifier localhost:7047 \
-  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+  "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY" \
   -o /tmp/btc-tcp.presentation.tlsn
 
 crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc-tcp.presentation.tlsn | jq '{valid, server_name, revealed_body}'
 ```
 
-**Expected:** `valid: true`, `server_name: "api.coingecko.com"`, `revealed_body: {"bitcoin":{"usd":XXXXX}}`
+**Expected:** `valid: true`, `server_name: "api.bitflyer.com"`, `revealed_body` contains `BTC_JPY`
 
 ---
 
@@ -119,7 +121,7 @@ Requires local Verifier (Option B from Phase 2).
 ```bash
 crates/tlsn-prover/target/debug/tlsn-prove \
   --verifier ws://localhost:7048 \
-  "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd" \
+  "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY" \
   -o /tmp/btc-ws.presentation.tlsn
 
 crates/tlsn-verifier/target/release/tlsn-verifier verify /tmp/btc-ws.presentation.tlsn | jq '{valid, server_name, revealed_body}'
@@ -213,7 +215,7 @@ Endpoints:
 ### 5c. Automated test
 
 ```bash
-bun test e2e/tlsn-browser.test.ts
+deno test e2e/tlsn-browser.test.ts --allow-all --no-check
 ```
 
 This launches Chrome for Testing with the built extension, opens DevConsole,
@@ -266,11 +268,25 @@ PRESENTATION_B64=$(base64 -i /tmp/btc-tcp.presentation.tlsn | tr -d '\n')
 
 QID=$(curl -s -X POST http://localhost:3000/queries \
   -H "Content-Type: application/json" \
-  -d '{"description":"BTC price","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd","conditions":[{"type":"jsonpath","expression":"bitcoin.usd","description":"BTC price exists"}]},"bounty":{"amount_sats":21},"ttl_seconds":600}' | jq -r '.query_id')
+  -d '{
+    "description":"BTC/JPY price",
+    "verification_requirements":["tlsn"],
+    "tlsn_requirements":{
+      "target_url":"https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY",
+      "conditions":[{"type":"jsonpath","expression":"product_code","description":"Product code exists"}]
+    },
+    "bounty":{"amount_sats":21},
+    "ttl_seconds":600
+  }' | jq -r '.query_id')
 
-python3 -c "import json; print(json.dumps({'tlsn_presentation': open('/dev/stdin').read().strip()}))" <<< "$PRESENTATION_B64" > /tmp/submit.json
+# Submit via /result endpoint (not /submit which is deprecated)
+python3 -c "
+import json, sys
+p = open('/dev/stdin').read().strip()
+print(json.dumps({'worker_pubkey': 'cli_worker', 'tlsn_presentation': p}))
+" <<< "$PRESENTATION_B64" > /tmp/submit.json
 
-curl -s -X POST "http://localhost:3000/queries/${QID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QID}/result" \
   -H "Content-Type: application/json" \
   -d @/tmp/submit.json | jq '{ok, verification}'
 ```
@@ -282,7 +298,7 @@ curl -s -X POST "http://localhost:3000/queries/${QID}/submit" \
 ## Phase 7: Teardown (`teardown`)
 
 ```bash
-pkill -f "bun.*src/index.ts" 2>/dev/null || true
+pkill -f "deno.*server.ts" 2>/dev/null || true
 pkill -f "tlsn-server" 2>/dev/null || true
 docker compose down tlsn-verifier 2>/dev/null || true
 ```
@@ -318,7 +334,16 @@ curl -s https://anchr-tlsn-verifier.fly.dev/health
 # Create query on production
 QID=$(curl -s -X POST https://anchr-app.fly.dev/queries \
   -H "Content-Type: application/json" \
-  -d '{"description":"BTC price","verification_requirements":["tlsn"],"tlsn_requirements":{"target_url":"https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd","conditions":[{"type":"jsonpath","expression":"bitcoin.usd"}]},"bounty":{"amount_sats":21},"ttl_seconds":600}' | jq -r '.query_id')
+  -d '{
+    "description":"BTC/JPY price",
+    "verification_requirements":["tlsn"],
+    "tlsn_requirements":{
+      "target_url":"https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY",
+      "conditions":[{"type":"jsonpath","expression":"product_code"}]
+    },
+    "bounty":{"amount_sats":21},
+    "ttl_seconds":600
+  }' | jq -r '.query_id')
 echo "Created: $QID"
 
 # Check query status (Auto-Worker should fulfill it)
@@ -337,9 +362,16 @@ curl -s "https://anchr-app.fly.dev/queries/$QID" | jq '{status, verification_req
 ## Automated Tests
 
 ```bash
-bun test src/verification/tlsn-validation.test.ts   # 18 unit tests
-bun test e2e/tlsn.test.ts                           # 4 E2E tests (requires infra)
+deno task test:unit                                  # unit tests (includes tlsn-validation)
+deno test e2e/tlsn.test.ts --allow-all --no-check   # 5 E2E tests (requires infra)
 ```
+
+### Target API: bitFlyer
+
+E2E tests use `api.bitflyer.com` (BTC/JPY ticker) instead of CoinGecko because:
+- **ECDSA certificate** — MPC-TLS completes in ~2s (CoinGecko RSA would take ~30s+)
+- **No rate limits** for public read endpoints
+- **Stable response format** — `{"product_code":"BTC_JPY","state":"RUNNING",...}`
 
 ---
 
@@ -390,3 +422,4 @@ bun test e2e/tlsn.test.ts                           # 4 E2E tests (requires infr
 | Chunked body condition fail | Update `tlsn-verifier` (chunked decoding added) |
 | WS session "error" | Check server logs for MPC failure details |
 | Browser extension "proxy error" | Ensure `/proxy` endpoint is accessible on WS port |
+| CoinGecko 429 rate limit | Switched to bitFlyer — no rate limits for public API |

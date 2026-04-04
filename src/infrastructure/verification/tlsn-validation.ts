@@ -55,8 +55,8 @@ function findTlsnVerifier(): string | null {
 
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
-    join(moduleDir(import.meta), "../../crates/tlsn-verifier/target/release/tlsn-verifier"),
-    join(moduleDir(import.meta), "../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
+    join(moduleDir(import.meta), "../../../crates/tlsn-verifier/target/release/tlsn-verifier"),
+    join(moduleDir(import.meta), "../../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
   ];
   for (const p of localPaths) {
     try {

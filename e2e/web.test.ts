@@ -32,6 +32,7 @@ async function browse(...args: string[]): Promise<string> {
 async function isWebAppReachable(): Promise<boolean> {
   try {
     const res = await fetch(WEB_URL, { signal: AbortSignal.timeout(5000) });
+    await res.body?.cancel();
     return res.ok;
   } catch {
     return false;
@@ -41,6 +42,7 @@ async function isWebAppReachable(): Promise<boolean> {
 async function isServerReachable(): Promise<boolean> {
   try {
     const res = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    await res.body?.cancel();
     return res.ok;
   } catch {
     return false;
@@ -211,11 +213,12 @@ describe("e2e: Anchr Worker Web app", () => {
   test("submit text result via API and verify web reflects status", async () => {
     if (skip() || !testQueryId) return;
 
-    // Submit via API
-    const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/submit`, {
+    // Submit via API (use /result endpoint — /submit is deprecated 410)
+    const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        worker_pubkey: "e2e_web_test_worker",
         gps: { lat: 35.6595, lon: 139.7004 },
         notes: "E2E web test — 混雑してます",
       }),
