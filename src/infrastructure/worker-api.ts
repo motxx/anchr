@@ -33,7 +33,6 @@ import {
 } from "../application/query-service";
 import { VERIFICATION_FACTORS } from "../domain/types";
 import type { AttachmentRef, BlossomKeyMap, GpsCoord, HtlcInfo, Query, QuorumConfig, QuoteInfo, TlsnAttestation } from "../domain/types";
-import { getRuntimeConfig as getConfig } from "./config";
 import { haversineKm } from "./verification/exif-validation";
 import { validateAttachmentUri } from "./url-validation";
 
@@ -229,7 +228,7 @@ function buildCreatedQueryPayload(query: Query, requestUrl: string) {
 }
 
 function queryDetail(query: Query, requestUrl: string) {
-  const config = getConfig();
+  const config = getRuntimeConfig();
   const hasTlsn = query.verification_requirements.includes("tlsn");
   return {
     ...querySummary(query),
