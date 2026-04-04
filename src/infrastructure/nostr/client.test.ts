@@ -3,24 +3,7 @@ import { expect } from "@std/expect";
 import { getNostrConfig, isNostrEnabled, closePool, publishEvent } from "./client";
 import { generateEphemeralIdentity } from "./identity";
 import { buildQueryRequestEvent } from "./events";
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => void | Promise<void>) {
-  const saved: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  const restore = () => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  };
-  const result = fn();
-  if (result instanceof Promise) return result.finally(restore);
-  restore();
-}
+import { withEnv } from "../../testing/helpers";
 
 afterEach(() => {
   closePool();

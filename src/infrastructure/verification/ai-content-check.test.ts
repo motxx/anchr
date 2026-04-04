@@ -2,37 +2,19 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { checkAttachmentContent } from "./ai-content-check";
 import type { Query, QueryResult } from "../../domain/types";
+import { withEnv } from "../../testing/helpers";
+import { makeQuery as makeBaseQuery } from "../../testing/factories";
 
-const makeQuery = (opts?: Partial<Query>): Query => ({
+const makeQuery = (opts?: Partial<Query>): Query => makeBaseQuery({
   id: "q1",
-  status: "pending",
   description: "Photo of Tokyo Tower",
   challenge_nonce: "ABC123",
   challenge_rule: "test",
   verification_requirements: ["ai_check"],
-  created_at: Date.now(),
   expires_at: Date.now() + 60_000,
   payment_status: "none",
   ...opts,
-} as Query);
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
-  const saved: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  const restore = () => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  };
-  const result = fn();
-  if (result instanceof Promise) return result.finally(restore);
-  restore();
-}
+});
 
 describe("checkAttachmentContent", () => {
   test("returns null when AI_CONTENT_CHECK is not enabled", async () => {

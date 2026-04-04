@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { withEnv } from "../../testing/helpers";
 import {
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
@@ -25,23 +26,6 @@ function makeConfig(overrides?: Partial<OracleNostrServiceConfig>): OracleNostrS
   };
 }
 
-function withEnv(overrides: Record<string, string | undefined>, fn: () => void | Promise<void>) {
-  const saved: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  const restore = () => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  };
-  const result = fn();
-  if (result instanceof Promise) return result.finally(restore);
-  restore();
-}
 
 // --- Teardown ---
 

@@ -5,27 +5,11 @@ import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
 import { createQueryService, createQuery, getQuery } from "../application/query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
+import { withEnvThunk as withEnv } from "../testing/helpers";
 
 // QueryService without relay hooks — avoids fire-and-forget WebSocket leaks
 // that trip Deno's resource sanitizer.
 const testService = createQueryService({ hooks: {} });
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
-  return async () => {
-    const saved: Record<string, string | undefined> = {};
-    for (const key of Object.keys(overrides)) {
-      saved[key] = process.env[key];
-      if (overrides[key] === undefined) delete process.env[key];
-      else process.env[key] = overrides[key];
-    }
-    try { await fn(); } finally {
-      for (const key of Object.keys(saved)) {
-        if (saved[key] === undefined) delete process.env[key];
-        else process.env[key] = saved[key];
-      }
-    }
-  };
-}
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",

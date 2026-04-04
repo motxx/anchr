@@ -1,29 +1,7 @@
 import { describe, test, afterEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getRuntimeConfig } from "./config";
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => void) {
-  const saved: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-  try {
-    fn();
-  } finally {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
-  }
-}
+import { withEnv } from "../testing/helpers";
 
 describe("getRuntimeConfig", () => {
   // Save and clear env vars that affect config
