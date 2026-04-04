@@ -4,6 +4,18 @@ import { verify, _setValidateTlsnForTest } from "./verifier";
 import { storeIntegrity, clearIntegrityStore } from "./integrity-store";
 import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../../domain/types";
 import type { TlsnValidationResult } from "./tlsn-validation";
+import { makeQuery as makeBaseQuery } from "../../testing/factories";
+
+function makeQuery(overrides: Partial<Query>): Query {
+  return makeBaseQuery({
+    id: "query_test",
+    challenge_nonce: "K7P4",
+    challenge_rule: "include nonce",
+    verification_requirements: ["nonce", "gps", "ai_check"],
+    expires_at: Date.now() + 60_000,
+    ...overrides,
+  });
+}
 
 beforeEach(() => {
   clearIntegrityStore();
@@ -37,20 +49,6 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
   });
 }
 
-function makeQuery(overrides: Partial<Query>): Query {
-  return {
-    id: "query_test",
-    status: "pending",
-    description: "Test query",
-    challenge_nonce: "K7P4",
-    challenge_rule: "include nonce",
-    verification_requirements: ["nonce", "gps", "ai_check"],
-    created_at: Date.now(),
-    expires_at: Date.now() + 60_000,
-    payment_status: "locked",
-    ...overrides,
-  };
-}
 
 test("rejects empty submission when GPS/nonce required", async () => {
   const query = makeQuery({});

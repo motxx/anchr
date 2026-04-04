@@ -3,21 +3,19 @@ import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server";
 import { createHttpOracle } from "./http-oracle";
 import type { Query, QueryResult } from "../../domain/types";
+import { makeQuery as makeBaseQuery } from "../../testing/factories";
 
 const TEST_ORACLE_ID = "test-http-oracle";
 const TEST_API_KEY = "test-secret";
 const TEST_PORT = 14000 + Math.floor(Math.random() * 1000);
 
-const makeQuery = (id: string): Query => ({
+const makeQuery = (id: string): Query => makeBaseQuery({
   id,
-  status: "pending",
   description: "Test Store status check",
   challenge_nonce: "nonce",
   challenge_rule: "rule",
   verification_requirements: ["ai_check"],
-  created_at: Date.now(),
   expires_at: Date.now() + 60_000,
-  payment_status: "locked",
 });
 
 const baseUrl = `http://localhost:${TEST_PORT}`;

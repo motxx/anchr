@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server";
 import { createPreimageStore } from "../cashu/preimage-store";
 import type { Query, QueryResult } from "../../domain/types";
+import { makeQuery as makeBaseQuery } from "../../testing/factories";
 
 const TEST_PORT = 14200 + Math.floor(Math.random() * 100);
 const API_KEY = "oracle-test-key";
@@ -10,15 +11,11 @@ const baseUrl = `http://localhost:${TEST_PORT}`;
 
 const preimageStore = createPreimageStore();
 
-const makeQuery = (id: string): Query => ({
+const makeQuery = (id: string): Query => makeBaseQuery({
   id,
-  status: "pending",
-  description: "Test query",
   verification_requirements: ["ai_check"],
-  created_at: Date.now(),
   expires_at: Date.now() + 60_000,
-  payment_status: "locked",
-}) as Query;
+});
 
 describe("oracle-server HTLC endpoints", () => {
   let server: Deno.HttpServer;

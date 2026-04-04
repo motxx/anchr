@@ -1,5 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { makeQuery } from "../testing/factories";
 import {
   createQueryAggregate,
   submitResult,
@@ -58,18 +59,6 @@ function makeHtlcOptions(overrides?: Partial<HtlcInfo>): CreateQueryAggregateOpt
   };
 }
 
-function makeQuery(overrides?: Partial<Query>): Query {
-  return {
-    id: "test_query_1",
-    status: "pending",
-    description: "Test",
-    verification_requirements: ["gps", "ai_check"],
-    created_at: Date.now(),
-    expires_at: Date.now() + 600_000,
-    payment_status: "locked",
-    ...overrides,
-  };
-}
 
 function makeHtlcQuery(overrides?: Partial<Query>): Query {
   return makeQuery({
