@@ -1,0 +1,32 @@
+module.exports = {
+  content: ["./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  presets: [require("nativewind/preset")],
+  theme: {
+    extend: {
+      colors: {
+        background: "#09090b",
+        surface: "#18181b",
+        "surface-raised": "#27272a",
+        foreground: "#fafafa",
+        muted: "#3f3f46",
+        "muted-foreground": "#a1a1aa",
+        subtle: "#52525b",
+        border: "#27272a",
+        "border-subtle": "#3f3f46",
+        primary: "#10b981",
+        "primary-hover": "#059669",
+        "primary-foreground": "#ffffff",
+        destructive: "#ef4444",
+        warning: "#f59e0b",
+        info: "#3b82f6",
+        success: "#10b981",
+        "status-pending": "#3b82f6",
+        "status-processing": "#f59e0b",
+        "status-approved": "#10b981",
+        "status-rejected": "#ef4444",
+        "status-expired": "#52525b",
+      },
+    },
+  },
+  plugins: [],
+};

@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Anchr Bounty Board",
+    "slug": "anchr-bounty-board",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "anchr-bounty",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#09090b"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.anchr.bountyboard",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take photos for bounty proof submissions",
+        "NSLocationWhenInUseUsageDescription": "Find bounties near your location",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Get notified when bounties appear near you",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#09090b"
+      },
+      "package": "com.anchr.bountyboard",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Get notified when bounties appear near you",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#10b981"
+        }
+      ]
+    ]
+  }
+}

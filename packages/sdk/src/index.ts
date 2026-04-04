@@ -270,11 +270,14 @@ export class Anchr {
   /**
    * Submit a TLSNotary presentation for a query (Worker API).
    */
-  async submitPresentation(queryId: string, presentationBase64: string): Promise<SubmitResponse> {
-    const res = await this.fetch(`/queries/${queryId}/submit`, {
+  async submitPresentation(queryId: string, presentationBase64: string, workerPubkey = "sdk-worker"): Promise<SubmitResponse> {
+    const res = await this.fetch(`/queries/${queryId}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tlsn_presentation: presentationBase64 }),
+      body: JSON.stringify({
+        worker_pubkey: workerPubkey,
+        tlsn_presentation: presentationBase64,
+      }),
     });
     if (!res.ok && res.status >= 500) throw new AnchrError("Submit failed", "API_ERROR");
     return res.json();

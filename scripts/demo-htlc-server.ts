@@ -1,15 +1,12 @@
-#!/usr/bin/env bun
 /**
  * Anchr HTLC Demo — Web UI server.
  *
  * Serves the split-screen 3-actor demo and runs the HTLC lifecycle
  * over WebSocket, emitting DemoEvent JSON for each step.
  *
- *   bun run demo:htlc:web
+ *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-
-import demoHtml from "../src/ui/demo/index.html";
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/nostr/identity";
+import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -24,18 +21,18 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/nostr/events";
-import { buildPreimageDM, parseOracleDM } from "../src/nostr/dm";
-import { publishEvent, closePool } from "../src/nostr/client";
-import { deriveConversationKey, encryptNip44 } from "../src/nostr/encryption";
-import { createPreimageStore } from "../src/oracle/preimage-store";
-import { createBountyToken } from "../src/cashu/wallet";
+} from "../src/infrastructure/nostr/events";
+import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
+import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
+import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
+import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
+import { createBountyToken } from "../src/infrastructure/cashu/wallet";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,
   inspectEscrowToken,
-} from "../src/cashu/escrow";
-import { workerUpload } from "../src/blossom/worker-upload";
+} from "../src/infrastructure/cashu/escrow";
+import { workerUpload } from "../src/infrastructure/blossom/worker-upload";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
@@ -72,7 +69,7 @@ async function checkRelay(): Promise<boolean> {
       });
       if (ok) return true;
     } catch { /* retry */ }
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
@@ -165,7 +162,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
 
   const preimageStore = createPreimageStore();
   const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const preimageEntry = preimageStore.create(queryId);
+  const preimageEntry = preimageStore.create();
 
   emitOk("oracle", "Preimage generated", { hash: preimageEntry.hash.slice(0, 16) + "..." });
   emitInfo("oracle", "Preimage stored secretly (never exposed to Requester)");
@@ -208,7 +205,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
     return;
   }
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   // 6. Worker discovers query
   emitStep("worker", "Discovering query on relay, verifying Oracle pubkey...");
@@ -264,7 +261,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   // 8. Requester receives quote
   emitStep("requester", "Receiving and decrypting Worker quote...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const feedbackEvents = await readRelayEvents({ kinds: [7000], "#e": [matchingEvent.id], since });
   const quoteEvents = feedbackEvents.filter((e) => {
@@ -330,7 +327,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   // 11. Worker receives selection
   emitStep("worker", "Receiving selection, confirming own pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const selFeedbackEvents = await readRelayEvents({ kinds: [7000], "#e": [matchingEvent.id], since });
 
@@ -418,7 +415,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   // 14. Requester receives result
   emitStep("requester", "Receiving result, decrypting K_R, accessing blob...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const responseEvents = await readRelayEvents({ kinds: [6300], "#e": [matchingEvent.id], since });
 
@@ -454,7 +451,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   emitOk("oracle", "Decrypted oracle_payload from kind 6300 tags");
   emitOk("oracle", "C2PA verification passed (stub)");
 
-  const preimage = preimageStore.getPreimage(queryId);
+  const preimage = preimageStore.getPreimage(preimageEntry.hash);
   if (!preimage) {
     emitFail("oracle", "Lost preimage");
     return;
@@ -473,7 +470,7 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
   // 16. Worker receives preimage
   emitStep("worker", "Receiving preimage via DM, verifying Oracle pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const dmEvents = await readRelayEvents({ kinds: [4], "#p": [worker.publicKey], since });
 
@@ -532,49 +529,40 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
 
 const PORT = Number(process.env.PORT) || 3456;
 
-const server = Bun.serve({
-  port: PORT,
-  routes: {
-    "/": demoHtml,
-  },
-  websocket: {
-    open(ws) {
-      console.log("[demo-server] WebSocket connected, starting HTLC demo...");
+Deno.serve({ port: PORT }, (req) => {
+  const url = new URL(req.url);
+
+  if (url.pathname === "/ws") {
+    const { socket, response } = Deno.upgradeWebSocket(req);
+    console.log("[demo-server] WebSocket connected, starting HTLC demo...");
+    socket.onopen = () => {
       runHtlcDemo((event) => {
-        try { ws.send(JSON.stringify(event)); } catch { /* client gone */ }
+        try { socket.send(JSON.stringify(event)); } catch { /* client gone */ }
       })
         .catch((e) => {
           const errEvent: DemoEvent = {
-            actor: "system",
-            step: 0,
-            type: "fail",
+            actor: "system", step: 0, type: "fail",
             message: `Fatal: ${e instanceof Error ? e.message : String(e)}`,
             timestamp: Date.now(),
           };
-          try { ws.send(JSON.stringify(errEvent)); } catch { /* client gone */ }
+          try { socket.send(JSON.stringify(errEvent)); } catch { /* client gone */ }
         })
         .finally(() => {
           closePool();
-          try { ws.close(); } catch { /* already closed */ }
+          try { socket.close(); } catch { /* already closed */ }
         });
-    },
-    message() { /* client doesn't send messages */ },
-    close() {
-      console.log("[demo-server] WebSocket disconnected");
-    },
-  },
-  fetch(req, server) {
-    const url = new URL(req.url);
-    if (url.pathname === "/ws") {
-      if (server.upgrade(req)) return;
-      return new Response("WebSocket upgrade failed", { status: 400 });
-    }
-    return new Response("Not Found", { status: 404 });
-  },
-  development: {
-    hmr: true,
-    console: true,
-  },
+    };
+    return response;
+  }
+
+  if (url.pathname === "/") {
+    // Serve the demo HTML file
+    return Deno.readFile("./src/ui/demo/index.html").then(
+      (data) => new Response(data, { headers: { "content-type": "text/html; charset=utf-8" } })
+    );
+  }
+
+  return new Response("Not Found", { status: 404 });
 });
 
-console.log(`[demo-server] Anchr HTLC Demo UI running at http://localhost:${server.port}`);
+console.log(`[demo-server] Anchr HTLC Demo UI running at http://localhost:${PORT}`);

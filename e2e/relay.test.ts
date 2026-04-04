@@ -5,20 +5,18 @@
  *   docker compose up -d
  *
  * Run:
- *   NOSTR_RELAYS=ws://localhost:7777 bun test e2e/relay.test.ts
- *   or: bun run test:e2e
- *
- * For production the only change is NOSTR_RELAYS pointing to real relays.
+ *   NOSTR_RELAYS=ws://localhost:7777 deno test e2e/relay.test.ts --allow-all
  */
 
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../src/worker-api";
-import { clearQueryStore } from "../src/query-service";
-import { closePool } from "../src/nostr/client";
-import { ANCHR_QUERY_REQUEST } from "../src/nostr/events";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
+import { clearQueryStore } from "../src/application/query-service.ts";
+import { closePool } from "../src/infrastructure/nostr/client.ts";
+import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events.ts";
 
 const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ?? "ws://localhost:7777";
 
@@ -58,32 +56,29 @@ async function waitForRelayEvent(
   });
 }
 
-describe("e2e: full query lifecycle with Nostr relay", () => {
-  let reachable = false;
+// --- Infrastructure readiness (top-level await for describe.ignore) ---
 
-  beforeAll(async () => {
-    reachable = await isRelayReachable();
-    if (!reachable) {
-      console.warn(`[e2e] Relay not reachable at ${RELAY_URL} – skipping. Run: docker compose up -d`);
-    }
-    clearQueryStore();
-  });
+const RELAY_REACHABLE = await isRelayReachable();
 
+if (!RELAY_REACHABLE) {
+  console.warn(`[e2e] Relay not reachable at ${RELAY_URL} – tests will be skipped. Run: docker compose up -d`);
+}
+
+const suite = RELAY_REACHABLE ? describe : describe.ignore;
+
+// Relay tests need actual relay hooks (fire-and-forget WebSocket publishes),
+// so we disable Deno's resource/ops sanitizers and clean up via closePool().
+suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, sanitizeResources: false }, () => {
   afterAll(() => {
+    clearQueryStore();
     closePool();
   });
 
   test("relay is reachable", () => {
-    if (!reachable) {
-      console.warn("[e2e] SKIPPED – relay not reachable");
-      return;
-    }
-    expect(reachable).toBe(true);
+    expect(RELAY_REACHABLE).toBe(true);
   });
 
   test("create query via HTTP and verify relay publication", async () => {
-    if (!reachable) return;
-
     const app = buildWorkerApiApp();
 
     const createRes = await app.request("http://localhost/queries", {
@@ -104,12 +99,12 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
       challenge_nonce: string | null;
       reference_app_url: string;
     };
-    expect(createJson.query_id).toStartWith("query_");
+    expect(createJson.query_id).toMatch(/^query_/);
     expect(createJson.description).toBe("E2E Ramen Shop の営業状況");
     expect(createJson.status).toBe("pending");
 
     // Wait for fire-and-forget relay publish to complete
-    await Bun.sleep(1500);
+    await new Promise(r => setTimeout(r, 1500));
 
     // Verify the event appeared on the relay
     const events = await waitForRelayEvent(RELAY_URL, {
@@ -135,8 +130,6 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
   });
 
   test("full lifecycle: create → list → submit → verify status", async () => {
-    if (!reachable) return;
-
     const app = buildWorkerApiApp();
 
     // 1. Create query
@@ -170,10 +163,11 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     expect(detail.challenge_nonce).toBe(challenge_nonce);
 
     // 4. Submit result
-    const submitRes = await app.request(`http://localhost/queries/${query_id}/submit`, {
+    const submitRes = await app.request(`http://localhost/queries/${query_id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        worker_pubkey: "e2e-test-worker",
         attachments: [],
         notes: `E2E test observation${challenge_nonce ? ` ${challenge_nonce}` : ""}`,
       }),
@@ -197,8 +191,6 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
   });
 
   test("cancel query flow", async () => {
-    if (!reachable) return;
-
     const app = buildWorkerApiApp();
 
     const createRes = await app.request("http://localhost/queries", {
@@ -222,8 +214,6 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
   });
 
   test("multiple queries appear on relay", async () => {
-    if (!reachable) return;
-
     const app = buildWorkerApiApp();
     const since = Math.floor(Date.now() / 1000) - 5;
 
@@ -240,7 +230,7 @@ describe("e2e: full query lifecycle with Nostr relay", () => {
     );
 
     // Wait for relay publish
-    await Bun.sleep(2000);
+    await new Promise(r => setTimeout(r, 2000));
 
     const events = await waitForRelayEvent(RELAY_URL, {
       kinds: [ANCHR_QUERY_REQUEST],

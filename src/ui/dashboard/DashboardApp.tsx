@@ -72,7 +72,7 @@ const FLOW_STEPS: FlowStep[] = [
 
 function deriveCurrentStep(queries: QuerySummary[]): number {
   if (queries.length === 0) return -1;
-  const latest = queries[0]; // sorted by created_at DESC
+  const latest = queries[0]!; // sorted by created_at DESC
   switch (latest.status) {
     case "awaiting_quotes": return 0;
     case "worker_selected":
@@ -204,10 +204,10 @@ function BalancePanel({
     blue: { text: "text-blue-400", bg: "bg-blue-950/30", border: "border-blue-400/20" },
     emerald: { text: "text-emerald-400", bg: "bg-emerald-950/30", border: "border-emerald-400/20" },
   };
-  const c = colorMap[color] ?? colorMap.blue;
+  const c = colorMap[color] ?? colorMap.blue!;
 
   return (
-    <div className={`rounded-lg border ${c.border} ${c.bg} p-3`}>
+    <div className={`rounded-lg border ${c!.border} ${c!.bg} p-3`}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           {label}
@@ -217,7 +217,7 @@ function BalancePanel({
         )}
       </div>
       <div className="flex items-baseline gap-2">
-        <span className={`text-2xl font-bold ${c.text} tabular-nums`}>
+        <span className={`text-2xl font-bold ${c!.text} tabular-nums`}>
           {isLoading ? "..." : (balance?.balance_sats ?? 0)}
         </span>
         <span className="text-xs text-muted-foreground">sats</span>
@@ -236,7 +236,7 @@ function QueryPanel({ queries, label, color }: { queries: QuerySummary[]; label:
     blue: { border: "border-blue-400/20", bg: "bg-blue-950/20" },
     emerald: { border: "border-emerald-400/20", bg: "bg-emerald-950/20" },
   };
-  const c = colorMap[color] ?? colorMap.blue;
+  const c = colorMap[color] ?? colorMap.blue!;
 
   const statusBadge = (status: string) => {
     const map: Record<string, { bg: string; text: string }> = {
@@ -255,7 +255,7 @@ function QueryPanel({ queries, label, color }: { queries: QuerySummary[]; label:
   };
 
   return (
-    <div className={`rounded-lg border ${c.border} ${c.bg} p-3`}>
+    <div className={`rounded-lg border ${c!.border} ${c!.bg} p-3`}>
       <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
         {label} Queries
       </div>
@@ -396,11 +396,11 @@ function ActivityTimeline({ events }: { events: ActivityEvent[] }) {
           </p>
         ) : (
           events.map((evt, i) => {
-            const actor = actorLabel[evt.actor] ?? actorLabel.system;
+            const actor = actorLabel[evt.actor] ?? actorLabel.system!;
             return (
               <div key={i} className="flex items-start gap-2">
-                <span className={`${actor.color} text-background text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5`}>
-                  {actor.emoji}
+                <span className={`${actor!.color} text-background text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5`}>
+                  {actor!.emoji}
                 </span>
                 <div className="min-w-0 flex-1">
                   <span className={`text-xs ${typeColor[evt.type]}`}>{evt.message}</span>
@@ -516,7 +516,7 @@ export function DashboardApp() {
       {currentStep >= 0 && currentStep < FLOW_STEPS.length && (
         <div className="border-b border-border px-6 py-2 bg-muted/30">
           <span className="text-xs text-muted-foreground">
-            Current: <span className="text-foreground font-medium">{FLOW_STEPS[currentStep].description}</span>
+            Current: <span className="text-foreground font-medium">{FLOW_STEPS[currentStep]!.description}</span>
           </span>
         </div>
       )}

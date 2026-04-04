@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 /**
  * Anchr HTLC Demo — Full 3-actor lifecycle (Requester → Worker → Oracle).
  *
@@ -9,11 +8,10 @@
  *
  * Run:
  *   docker compose up -d && sleep 3
- *   NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 bun run scripts/demo-htlc.ts
- *   or: bun run demo:htlc
+ *   NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 deno run --allow-all --env scripts/demo-htlc.ts
  */
 
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/nostr/identity";
+import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -28,18 +26,18 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/nostr/events";
-import { buildPreimageDM, parseOracleDM } from "../src/nostr/dm";
-import { publishEvent, closePool } from "../src/nostr/client";
-import { deriveConversationKey, encryptNip44 } from "../src/nostr/encryption";
-import { createPreimageStore } from "../src/oracle/preimage-store";
-import { createBountyToken } from "../src/cashu/wallet";
+} from "../src/infrastructure/nostr/events";
+import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
+import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
+import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
+import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
+import { createBountyToken } from "../src/infrastructure/cashu/wallet";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,
   inspectEscrowToken,
-} from "../src/cashu/escrow";
-import { workerUpload } from "../src/blossom/worker-upload";
+} from "../src/infrastructure/cashu/escrow";
+import { workerUpload } from "../src/infrastructure/blossom/worker-upload";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
@@ -117,7 +115,7 @@ async function checkRelay(): Promise<boolean> {
       });
       if (ok) return true;
     } catch { /* retry */ }
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
@@ -197,7 +195,7 @@ async function runDemo() {
 
   const preimageStore = createPreimageStore();
   const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const preimageEntry = preimageStore.create(queryId);
+  const preimageEntry = preimageStore.create();
 
   ok(`Hash: ${preimageEntry.hash.slice(0, 16)}...`);
   info(`Preimage stored secretly by Oracle (never exposed to Requester)`);
@@ -244,7 +242,7 @@ async function runDemo() {
     return;
   }
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   // ============================================================
   // Step 4 (README): Worker discovers query, verifies Oracle pubkey
@@ -313,7 +311,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives and decrypts Worker quote...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const feedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -397,7 +395,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives selection, confirms own pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const selFeedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -506,7 +504,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives result, decrypts K_R, accesses blob...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const responseEvents = await readRelayEvents({
     kinds: [6300],
@@ -559,7 +557,7 @@ async function runDemo() {
   ok(`C2PA verification passed (stub)`);
 
   // Deliver preimage via NIP-44 DM (kind 4)
-  const preimage = preimageStore.getPreimage(queryId);
+  const preimage = preimageStore.getPreimage(preimageEntry.hash);
   if (!preimage) {
     fail("Oracle lost preimage");
     return;
@@ -580,7 +578,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives preimage via DM, verifies Oracle pubkey...");
 
-  await Bun.sleep(500);
+  await new Promise(r => setTimeout(r, 500));
 
   const dmEvents = await readRelayEvents({
     kinds: [4],

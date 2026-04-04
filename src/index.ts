@@ -1,4 +1,4 @@
-export { queryTemplates } from "./query-templates";
+export { queryTemplates } from "./domain/query-templates";
 export {
   cancelQuery,
   clearQueryStore,
@@ -9,7 +9,7 @@ export {
   getQuery,
   listOpenQueries,
   submitQueryResult,
-} from "./query-service";
+} from "./application/query-service";
 export type {
   AttachmentRef,
   AttachmentStorageKind,
@@ -30,31 +30,42 @@ export type {
   QuerySubmissionMeta,
   QueryVerification,
   SubmitQueryOutcome,
-} from "./query-service";
-export type { HtlcInfo, QuoteInfo } from "./types";
-export { startMcpServer as startMcpAdapter } from "./mcp-server";
-export { startReferenceApp } from "./reference-app";
-export { startReferenceRuntime } from "./runtime";
-export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./worker-api";
-export { verify as verifyQueryResult } from "./verification/verifier";
-export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./oracle";
-export type { Oracle, OracleInfo, OracleAttestation, OracleRegistry, HttpOracleConfig } from "./oracle";
-export { stripExif } from "./exif-strip";
-export { purgeExpiredQueries } from "./data-purge";
-export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./cashu/wallet";
+} from "./application/query-service";
+export type { HtlcInfo, QuoteInfo } from "./domain/types";
+export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./domain/query-transitions";
+export {
+  validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
+} from "./domain/value-objects";
+export {
+  createQueryAggregate, submitResult, expireQuery, cancelQuery as cancelQueryAggregate,
+  addQuote, selectWorker as selectWorkerAggregate, recordResult, completeVerification,
+} from "./domain/query-aggregate";
+export type { TransitionResult, CreateQueryAggregateOptions } from "./domain/query-aggregate";
+export { createInMemoryQueryRepository, toRepository } from "./domain/query-repository";
+export type { QueryRepository } from "./domain/query-repository";
+export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server";
+export { startReferenceApp } from "./infrastructure/reference-app";
+export { startReferenceRuntime } from "./infrastructure/runtime";
+export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./infrastructure/worker-api";
+export { verify as verifyQueryResult } from "./infrastructure/verification/verifier";
+export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./infrastructure/oracle";
+export type { Oracle, OracleInfo, OracleAttestation, OracleRegistry, HttpOracleConfig } from "./infrastructure/oracle";
+export { stripExif } from "./infrastructure/exif-strip";
+export { purgeExpiredQueries } from "./application/data-purge";
+export { isCashuEnabled, getCashuConfig, verifyToken, encodeToken } from "./infrastructure/cashu/wallet";
 export {
   buildEscrowP2PKOptions, calculateOracleFee, createEscrowToken, executeEscrowSwap, inspectEscrowToken,
   buildHtlcInitialOptions, buildHtlcFinalOptions, createHtlcToken, swapHtlcBindWorker, redeemHtlcToken,
-} from "./cashu/escrow";
-export type { EscrowParams, EscrowToken, SwapResult, HtlcInitialLockParams, HtlcWorkerBindParams } from "./cashu/escrow";
-export { createPreimageStore } from "./oracle/preimage-store";
-export type { PreimageStore, PreimageEntry } from "./oracle/preimage-store";
-export * as nostr from "./nostr/index";
-export * as blossom from "./blossom/client";
-export { workerUpload } from "./blossom/worker-upload";
-export type { WorkerUploadResult } from "./blossom/worker-upload";
-export { fetchBlossomAttachment } from "./blossom/fetch-attachment";
-export * as verification from "./verification/index";
+} from "./infrastructure/cashu/escrow";
+export type { EscrowParams, EscrowToken, SwapResult, HtlcInitialLockParams, HtlcWorkerBindParams } from "./infrastructure/cashu/escrow";
+export { createPreimageStore } from "./infrastructure/cashu/preimage-store";
+export type { PreimageStore, PreimageEntry } from "./infrastructure/cashu/preimage-store";
+export * as nostr from "./infrastructure/nostr/index";
+export * as blossom from "./infrastructure/blossom/client";
+export { workerUpload } from "./infrastructure/blossom/worker-upload";
+export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload";
+export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment";
+export * as verification from "./infrastructure/verification/index";
 export {
   discoverQueries,
   submitQuote,
@@ -62,18 +73,18 @@ export {
   encryptAndUpload,
   publishResult,
   waitForPreimage,
-} from "./worker-service";
-export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./worker-service";
+} from "./application/worker-service";
+export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./application/worker-service";
 export {
   requestOracleHash,
   createHtlcQuery,
   subscribeToQuotes,
   selectWorker,
-} from "./requester-service";
-export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./requester-service";
-export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./oracle/oracle-nostr-service";
-export type { OracleNostrServiceConfig, OracleNostrService } from "./oracle/oracle-nostr-service";
+} from "./application/requester-service";
+export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./application/requester-service";
+export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/oracle-nostr-service";
+export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/oracle-nostr-service";
 
 if (import.meta.main) {
-  await import("./server");
+  await import("./infrastructure/server");
 }

@@ -5,7 +5,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const SERVER_URL = "http://localhost:3000";
-const VERIFIER_HOST = "localhost:7047";
+const VERIFIER_HOST = "localhost:7046";
 const PROVER_BIN = join(import.meta.dir, "../../../crates/tlsn-prover/target/debug/tlsn-prove");
 
 async function isReady(): Promise<boolean> {
@@ -14,7 +14,7 @@ async function isReady(): Promise<boolean> {
     if (!res.ok) return false;
     // Check verifier
     const conn = await Bun.connect({
-      hostname: "localhost", port: 7047,
+      hostname: "localhost", port: 7046,
       socket: { data() {}, open(s) { s.end(); }, error() {} },
     });
     return existsSync(PROVER_BIN);

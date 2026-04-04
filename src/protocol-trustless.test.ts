@@ -12,19 +12,19 @@
  *   7. Preimage is only revealed on verification pass
  */
 
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createOracleRegistry } from "./oracle/registry";
-import { createPreimageStore, type PreimageStore } from "./oracle/preimage-store";
-import type { Oracle, OracleAttestation } from "./oracle/types";
-import { createQueryService, createQueryStore } from "./query-service";
-import type { Query, QueryResult } from "./types";
+import { createOracleRegistry } from "./infrastructure/oracle/registry";
+import { createPreimageStore, type PreimageStore } from "./infrastructure/cashu/preimage-store";
+import type { Oracle, OracleAttestation } from "./domain/oracle-types";
+import { createQueryService, createQueryStore } from "./application/query-service";
+import type { Query, QueryResult } from "./domain/types";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
   buildEscrowP2PKOptions,
-} from "./cashu/escrow";
-import { createWalletStore, type WalletStore } from "./cashu/wallet-store";
+} from "./infrastructure/cashu/escrow";
 
 // --- Test helpers ---
 
@@ -58,18 +58,15 @@ function makeServiceWithPreimage(opts?: { mockOracle?: Oracle }) {
   const oracle = opts?.mockOracle ?? makeMockOracle("test-oracle");
   registry.register(oracle);
   const preimageStore = createPreimageStore();
-  const walletStore = createWalletStore();
   return {
     service: createQueryService({
       store,
       oracleRegistry: registry,
       preimageStore,
-      walletStore,
     }),
     store,
     registry,
     preimageStore,
-    walletStore,
   };
 }
 
@@ -90,21 +87,15 @@ function makeHtlcInfo(preimageStore: PreimageStore) {
 async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
-  walletStore?: WalletStore,
-  opts?: { workerPubkey?: string; bountyAmount?: number },
+  opts?: { workerPubkey?: string; bountyAmount?: number; oracleIds?: string[] },
 ) {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
+  const oracleIds = opts?.oracleIds ?? ["test-oracle"];
   const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
-  // Seed wallet so lockForQuery succeeds
-  if (walletStore) {
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: bounty, id: "k_drive", secret: `s_drive_${Date.now()}`, C: `C_drive_${Date.now()}` },
-    ]);
-  }
   const query = service.createQuery(
     { description: "Trustless test" },
-    { htlc: htlcInfo, bounty: { amount_sats: bounty } },
+    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds },
   );
   service.recordQuote(query.id, {
     worker_pubkey: workerPub,
@@ -156,8 +147,8 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
   });
 
   test("preimage is NOT returned to Oracle — only to Worker via submitHtlcResult", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     // Oracle's verification returns preimage to the caller (Worker endpoint)
     const outcome = await service.submitHtlcResult(
@@ -183,10 +174,10 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
 
 describe("NUT-14: Worker cannot redeem without valid proof", () => {
   test("preimage is NOT returned when verification fails", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage({
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -238,67 +229,10 @@ describe("NUT-14: Worker cannot redeem without valid proof", () => {
 // =============================================================================
 
 describe("NUT-07: Requester cannot revoke payment", () => {
-  test("bounty is locked in wallet when HTLC query is created", () => {
-    const { service, walletStore, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
-
-    // Seed requester wallet
-    const fakeProofs = [
-      { amount: 50, id: "k1", secret: "s1", C: "C1" },
-      { amount: 50, id: "k2", secret: "s2", C: "C2" },
-    ];
-    walletStore.addProofs("requester", "requester_pub", fakeProofs);
-    const balanceBefore = walletStore.getBalance("requester", "requester_pub");
-    expect(balanceBefore.balance_sats).toBe(100);
-
-    // Create query with bounty — locks proofs
-    service.createQuery(
-      { description: "Lock test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
-    );
-
-    const balanceAfter = walletStore.getBalance("requester", "requester_pub");
-    expect(balanceAfter.balance_sats).toBe(0);
-    expect(balanceAfter.pending_sats).toBe(100);
-  });
-
-  test("Requester cannot double-spend locked proofs", () => {
-    const { service, walletStore, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo: htlcInfo1 } = makeHtlcInfo(preimageStore);
-    const { htlcInfo: htlcInfo2 } = makeHtlcInfo(preimageStore);
-
-    // Seed with only 100 sats
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s1", C: "C1" },
-    ]);
-
-    // First query locks 100 sats
-    service.createQuery(
-      { description: "Query 1" },
-      { htlc: htlcInfo1, bounty: { amount_sats: 100 } },
-    );
-
-    // Second query — insufficient funds (already locked) → throws
-    expect(() => {
-      service.createQuery(
-        { description: "Query 2" },
-        { htlc: htlcInfo2, bounty: { amount_sats: 100 } },
-      );
-    }).toThrow("Insufficient balance");
-
-    // Balance should still show 0 available, 100 pending (first lock only)
-    const balance = walletStore.getBalance("requester", "requester_pub");
-    expect(balance.balance_sats).toBe(0);
-    expect(balance.pending_sats).toBe(100);
-  });
-
   test("escrow token amount is verified at worker selection", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { service, preimageStore } = makeServiceWithPreimage();
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_escrow1", C: "C_escrow1" },
-    ]);
     const query = service.createQuery(
       { description: "Escrow verify test" },
       { htlc: htlcInfo, bounty: { amount_sats: 100 } },
@@ -322,12 +256,9 @@ describe("NUT-07: Requester cannot revoke payment", () => {
   });
 
   test("invalid escrow token is rejected at worker selection", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
+    const { service, preimageStore } = makeServiceWithPreimage();
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s_invalid1", C: "C_invalid1" },
-    ]);
     const query = service.createQuery(
       { description: "Invalid token test" },
       { htlc: htlcInfo, bounty: { amount_sats: 100 } },
@@ -369,7 +300,7 @@ describe("NUT-11: Timeout refund", () => {
     // cancelQuery only works on "pending" status (non-HTLC queries).
     // HTLC queries start as "awaiting_quotes" and are refunded via
     // rejected verification or timeout. This tests the non-HTLC refund path.
-    const { service, walletStore } = makeServiceWithPreimage();
+    const { service } = makeServiceWithPreimage();
 
     // For HTLC, refund happens via submitHtlcResult rejection (tested below).
     // Here we test the basic cancel → refund for non-HTLC queries.
@@ -385,19 +316,15 @@ describe("NUT-11: Timeout refund", () => {
     expect(service.getQuery(query.id)?.payment_status).toBe("cancelled");
   });
 
-  test("rejected verification refunds proofs to Requester", async () => {
-    const { service, walletStore, preimageStore } = makeServiceWithPreimage({
+  test("rejected verification sets payment_status to cancelled", async () => {
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s1", C: "C1" },
-    ]);
-
     const query = service.createQuery(
       { description: "Reject refund test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -416,10 +343,6 @@ describe("NUT-11: Timeout refund", () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.payment_status).toBe("cancelled");
-
-    // Proofs refunded
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(0);
   });
 });
 
@@ -429,8 +352,8 @@ describe("NUT-11: Timeout refund", () => {
 
 describe("Worker impersonation prevention", () => {
   test("wrong Worker cannot submit result for selected Worker", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -476,8 +399,8 @@ describe("Worker impersonation prevention", () => {
 describe("Oracle + Requester collusion limits", () => {
   test("Oracle withholding preimage: Worker loses but Oracle cannot profit", async () => {
     // Simulate: Oracle verifies valid proof but preimage store has been cleared
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     // Oracle "withholds" by deleting preimage before result submission
     preimageStore.delete(entry.hash);
@@ -498,17 +421,13 @@ describe("Oracle + Requester collusion limits", () => {
     // BTC is stuck until timeout → refunds to Requester
   });
 
-  test("approved query transfers proofs to Worker wallet (honest Oracle)", async () => {
-    const { service, walletStore, preimageStore } = makeServiceWithPreimage();
+  test("approved query reveals preimage (honest Oracle)", async () => {
+    const { service, preimageStore } = makeServiceWithPreimage();
     const { htlcInfo } = makeHtlcInfo(preimageStore);
-
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s1", C: "C1" },
-    ]);
 
     const query = service.createQuery(
       { description: "Settlement test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -526,26 +445,19 @@ describe("Oracle + Requester collusion limits", () => {
 
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeTruthy();
-
-    // Proofs transferred: Requester → Worker
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(0);
-    expect(walletStore.getBalance("requester", "requester_pub").pending_sats).toBe(0);
-    expect(walletStore.getBalance("worker", "w1").balance_sats).toBe(100);
+    expect(outcome.query?.status).toBe("approved");
+    expect(outcome.query?.payment_status).toBe("released");
   });
 
-  test("rejected query refunds proofs to Requester (no proofs to Worker)", async () => {
-    const { service, walletStore, preimageStore } = makeServiceWithPreimage({
+  test("rejected query does not reveal preimage", async () => {
+    const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
     const { htlcInfo } = makeHtlcInfo(preimageStore);
 
-    walletStore.addProofs("requester", "requester_pub", [
-      { amount: 100, id: "k1", secret: "s1", C: "C1" },
-    ]);
-
     const query = service.createQuery(
       { description: "Reject test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -554,16 +466,17 @@ describe("Oracle + Requester collusion limits", () => {
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
 
-    await service.submitHtlcResult(
+    const outcome = await service.submitHtlcResult(
       query.id,
       { attachments: [] },
       "w1",
       "strict-oracle",
     );
 
-    // Requester got refund, Worker got nothing
-    expect(walletStore.getBalance("requester", "requester_pub").balance_sats).toBe(100);
-    expect(walletStore.getBalance("worker", "w1").balance_sats).toBe(0);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.preimage).toBeUndefined();
+    expect(outcome.query?.status).toBe("rejected");
+    expect(outcome.query?.payment_status).toBe("cancelled");
   });
 });
 
@@ -575,7 +488,7 @@ describe("Preimage reveal conditions", () => {
   test("preimage returned ONLY when verification passes", async () => {
     // Pass case
     const pass = makeServiceWithPreimage();
-    const passCtx = await driveToProcessing(pass.service, pass.preimageStore, pass.walletStore);
+    const passCtx = await driveToProcessing(pass.service, pass.preimageStore);
     const passOutcome = await pass.service.submitHtlcResult(
       passCtx.query.id,
       { attachments: [] },
@@ -588,7 +501,7 @@ describe("Preimage reveal conditions", () => {
     const fail = makeServiceWithPreimage({
       mockOracle: makeMockOracle("fail-oracle", () => false),
     });
-    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, fail.walletStore);
+    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, { oracleIds: ["fail-oracle"] });
     const failOutcome = await fail.service.submitHtlcResult(
       failCtx.query.id,
       { attachments: [] },
@@ -665,8 +578,8 @@ describe("HTLC state machine — invalid transitions blocked", () => {
   });
 
   test("cannot submit result twice", async () => {
-    const { service, preimageStore, walletStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore, walletStore);
+    const { service, preimageStore } = makeServiceWithPreimage();
+    const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
     const first = await service.submitHtlcResult(
       query.id,

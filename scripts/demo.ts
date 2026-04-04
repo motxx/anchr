@@ -1,18 +1,16 @@
-#!/usr/bin/env bun
 /**
  * Anchr Demo — full query lifecycle with local Nostr relay.
  *
- *   bun run demo            # docker compose up + demo
- *   bun run scripts/demo.ts # relay already running
+ *   deno run --allow-all --env scripts/demo.ts
  */
 
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../src/worker-api";
-import { clearQueryStore } from "../src/query-service";
-import { closePool } from "../src/nostr/client";
-import { ANCHR_QUERY_REQUEST } from "../src/nostr/events";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
+import { clearQueryStore } from "../src/application/query-service";
+import { closePool } from "../src/infrastructure/nostr/client";
+import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events";
 
 // --- Formatting ---
 
@@ -76,7 +74,7 @@ async function waitForRelay(maxRetries = 5): Promise<boolean> {
       });
       if (reachable) return true;
     } catch { /* retry */ }
-    await Bun.sleep(1000);
+    await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
@@ -184,7 +182,7 @@ async function runDemo() {
 
   // Step 6: Verify Nostr relay events
   step(6, "Reading events from Nostr relay...");
-  await Bun.sleep(1500);
+  await new Promise(r => setTimeout(r, 1500));
   const events = await readRelayEvents({
     kinds: [ANCHR_QUERY_REQUEST],
     "#t": ["anchr"],

@@ -33,7 +33,7 @@ import {
 } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { cn } from "./lib/utils";
-import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../types";
+import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../domain/types";
 
 // ---- Types ----
 
