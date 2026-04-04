@@ -64,12 +64,20 @@ export async function mintProofs(wallet: Wallet, amountSats: number): Promise<Pr
   return wallet.mintProofs(amountSats, mintQuote.quote);
 }
 
+/** Global throttle for all Cashu mint operations (mint, swap, send). */
+let lastMintOpTime = 0;
+const MINT_OP_INTERVAL_MS = 1500;
+
+/** Wait until the minimum interval has elapsed since the last mint operation. */
+export async function throttleMintOp(): Promise<void> {
+  const elapsed = Date.now() - lastMintOpTime;
+  if (elapsed < MINT_OP_INTERVAL_MS) await new Promise(r => setTimeout(r, MINT_OP_INTERVAL_MS - elapsed));
+  lastMintOpTime = Date.now();
+}
+
 /** Rate-limited wrapper around mintProofs to avoid hitting Nutshell's rate limiter. */
-let lastMintTime = 0;
 export async function throttledMintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
-  const elapsed = Date.now() - lastMintTime;
-  if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
-  lastMintTime = Date.now();
+  await throttleMintOp();
   return mintProofs(wallet, amountSats);
 }
 

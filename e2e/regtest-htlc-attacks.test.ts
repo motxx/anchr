@@ -32,7 +32,8 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   checkInfraReady,
   createWallet as createRegtestWallet,
-  mintProofs,
+  throttledMintProofs,
+  throttleMintOp,
   generateKeypair,
 } from "./helpers/regtest";
 
@@ -65,6 +66,7 @@ async function createHtlcProofs(
   const sendAmount = amountSats - fee;
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
+  await throttleMintOp();
   const { send } = await wallet.ops
     .send(sendAmount, sourceProofs)
     .asP2PK(p2pkOptions)
@@ -102,6 +104,7 @@ async function attemptRedeem(
   privateKey: string | undefined,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: preimage
@@ -157,6 +160,7 @@ async function attemptRedeemWithCustomWitness(
   witnessObj: Record<string, unknown>,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify(witnessObj),
@@ -223,7 +227,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -246,14 +250,14 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     // Create two separate HTLC proof sets
     const { hash: hash1, preimage: preimage1 } = createHTLCHash();
-    const source1 = await mintProofs(wallet, AMOUNT_SATS);
+    const source1 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs1 = await createHtlcProofs(
       wallet, source1, AMOUNT_SATS,
       hash1, worker.publicKey, requester.publicKey, locktime,
     );
 
     const { hash: hash2, preimage: preimage2 } = createHTLCHash();
-    const source2 = await mintProofs(wallet, AMOUNT_SATS);
+    const source2 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs2 = await createHtlcProofs(
       wallet, source2, AMOUNT_SATS,
       hash2, worker.publicKey, requester.publicKey, locktime,
@@ -276,7 +280,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -306,7 +310,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -334,7 +338,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     // Locktime in the past: already expired
     const locktime = Math.floor(Date.now() / 1000) - 60;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -349,6 +353,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
+    await throttleMintOp();
 
     const { send: result } = await wallet.ops
       .send(totalSats - fee, proofsWithPreimage)
@@ -376,7 +381,7 @@ suite("e2e: Multi-Party Attacks", () => {
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
     // Lock proofs to worker1's key
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker1.publicKey, requester.publicKey, locktime,
@@ -409,7 +414,7 @@ suite("e2e: Multi-Party Attacks", () => {
     // Locktime 1 hour in the future — refund path is NOT available
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,

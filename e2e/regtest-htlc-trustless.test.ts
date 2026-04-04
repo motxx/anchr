@@ -39,6 +39,7 @@ import {
   checkInfraReady,
   createWallet as createRegtestWallet,
   throttledMintProofs,
+  throttleMintOp,
   generateKeypair,
 } from "./helpers/regtest";
 
@@ -75,6 +76,7 @@ async function createHtlcProofs(
   const sendAmount = amountSats - fee;
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
+  await throttleMintOp();
   const { send } = await wallet.ops
     .send(sendAmount, sourceProofs)
     .asP2PK(p2pkOptions)
@@ -118,6 +120,7 @@ async function attemptRedeem(
   privateKey: string | undefined,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     // 1. Build witness
     // - With preimage: receiver path (preimage + signatures)
     // - With key but no preimage: refund path (signatures only)
@@ -279,6 +282,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
+    await throttleMintOp();
     const { send: result } = await wallet.ops
       .send(totalSats - fee, proofsWithPreimage)
       .privkey(worker.secretKey)
@@ -311,6 +315,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
+    await throttleMintOp();
     const { send: first } = await wallet.ops
       .send(totalSats - fee, proofsWithPreimage)
       .privkey(worker.secretKey)
@@ -414,6 +419,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsForRefund.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsForRefund);
+    await throttleMintOp();
     const { send: result } = await wallet.ops
       .send(totalSats - fee, proofsForRefund)
       .privkey(requester.secretKey)

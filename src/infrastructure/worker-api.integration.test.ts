@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQueryService, createQuery, getQuery } from "../application/query-service";
+import { createQueryService, createQuery } from "../application/query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 import { withEnvThunk as withEnv } from "../testing/helpers";
@@ -26,6 +26,7 @@ async function isBlossomReachable(): Promise<boolean> {
   if (!isBlossomEnabled()) return false;
   try {
     const res = await fetch(getBlossomConfig()!.serverUrls[0]!, { signal: AbortSignal.timeout(1000) });
+    await res.body?.cancel();
     return res.ok || res.status < 500;
   } catch { return false; }
 }
@@ -122,6 +123,7 @@ describe("worker api photo proof (Blossom)", () => {
 
     // Blossom attachments redirect to encrypted blob URL
     const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
+    await viewResponse.body?.cancel();
     expect(viewResponse.status).toBe(302);
     expect(viewResponse.headers.get("location")).toBeTruthy();
 
@@ -132,7 +134,7 @@ describe("worker api photo proof (Blossom)", () => {
 
 test("worker api creates queries over HTTP and enforces write API keys",
   withEnv({ HTTP_API_KEY: "secret-write-key", HTTP_API_KEYS: undefined }, async () => {
-  const app = buildWorkerApiApp();
+  const app = buildWorkerApiApp({ queryService: testService });
 
   const unauthorizedResponse = await app.request("http://localhost/queries", {
     method: "POST",
@@ -141,6 +143,7 @@ test("worker api creates queries over HTTP and enforces write API keys",
       description: "Unauthorized Test Store",
     }),
   });
+  await unauthorizedResponse.body?.cancel();
   expect(unauthorizedResponse.status).toBe(401);
 
   const createResponse = await app.request("http://localhost/queries", {
@@ -181,7 +184,7 @@ test("worker api creates queries over HTTP and enforces write API keys",
   expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
   expect(createJson.query_api_url).toContain(`/queries/${createJson.query_id}`);
 
-  const storedQuery = getQuery(createJson.query_id);
+  const storedQuery = testService.getQuery(createJson.query_id);
   expect(storedQuery?.requester_meta?.requester_type).toBe("app");
   expect(storedQuery?.requester_meta?.client_name).toBe("worker-api.integration.test");
 }));
@@ -192,7 +195,7 @@ describe("writeAuth middleware", () => {
   const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined };
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const form = new FormData();
     form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
@@ -201,7 +204,7 @@ describe("writeAuth middleware", () => {
   }));
 
   test("rejects unauthenticated submit", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
@@ -212,7 +215,7 @@ describe("writeAuth middleware", () => {
   }));
 
   test("rejects unauthenticated cancel", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
     expect(res.status).toBe(401);
@@ -229,7 +232,7 @@ describe("writeAuth middleware", () => {
   }));
 
   test("accepts X-API-Key header on cancel", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const query = createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
       method: "POST",
