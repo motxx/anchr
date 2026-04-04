@@ -40,6 +40,7 @@ import {
   createWallet as createRegtestWallet,
   throttledMintProofs,
   throttleMintOp,
+  retryOnRateLimit,
   generateKeypair,
 } from "./helpers/regtest";
 
@@ -77,10 +78,9 @@ async function createHtlcProofs(
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
   await throttleMintOp();
-  const { send } = await wallet.ops
-    .send(sendAmount, sourceProofs)
-    .asP2PK(p2pkOptions)
-    .run();
+  const { send } = await retryOnRateLimit(() =>
+    wallet.ops.send(sendAmount, sourceProofs).asP2PK(p2pkOptions).run()
+  );
 
   return send;
 }
@@ -283,10 +283,9 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
     await throttleMintOp();
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
@@ -316,10 +315,9 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
     await throttleMintOp();
-    const { send: first } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    const { send: first } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
     expect(first).not.toBeNull();
 
     // Second redemption with same proofs via direct Mint call: MUST reject
@@ -420,10 +418,9 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const totalSats = proofsForRefund.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsForRefund);
     await throttleMintOp();
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsForRefund)
-      .privkey(requester.secretKey)
-      .run();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsForRefund).privkey(requester.secretKey).run()
+    );
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);

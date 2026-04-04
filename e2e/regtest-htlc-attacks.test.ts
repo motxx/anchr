@@ -34,6 +34,7 @@ import {
   createWallet as createRegtestWallet,
   throttledMintProofs,
   throttleMintOp,
+  retryOnRateLimit,
   generateKeypair,
 } from "./helpers/regtest";
 
@@ -67,10 +68,9 @@ async function createHtlcProofs(
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
   await throttleMintOp();
-  const { send } = await wallet.ops
-    .send(sendAmount, sourceProofs)
-    .asP2PK(p2pkOptions)
-    .run();
+  const { send } = await retryOnRateLimit(() =>
+    wallet.ops.send(sendAmount, sourceProofs).asP2PK(p2pkOptions).run()
+  );
 
   return send;
 }
@@ -354,11 +354,9 @@ suite("e2e: Redemption Timing Attacks", () => {
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
     await throttleMintOp();
-
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
 
     // Worker SHOULD succeed — preimage path is independent of locktime
     expect(result).not.toBeNull();
@@ -394,10 +392,10 @@ suite("e2e: Multi-Party Attacks", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
-    const { send: first } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker1.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: first } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker1.secretKey).run()
+    );
     expect(first).not.toBeNull();
     expect(first.length).toBeGreaterThan(0);
 

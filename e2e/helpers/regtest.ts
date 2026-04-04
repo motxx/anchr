@@ -66,7 +66,7 @@ export async function mintProofs(wallet: Wallet, amountSats: number): Promise<Pr
 
 /** Global throttle for all Cashu mint operations (mint, swap, send). */
 let lastMintOpTime = 0;
-const MINT_OP_INTERVAL_MS = 1500;
+const MINT_OP_INTERVAL_MS = 500;
 
 /** Wait until the minimum interval has elapsed since the last mint operation. */
 export async function throttleMintOp(): Promise<void> {
@@ -75,10 +75,25 @@ export async function throttleMintOp(): Promise<void> {
   lastMintOpTime = Date.now();
 }
 
+/** Retry an async operation on "Rate limit exceeded" with exponential backoff. */
+export async function retryOnRateLimit<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt >= maxRetries || !msg.includes("Rate limit")) throw err;
+      const delay = 2000 * 2 ** attempt; // 2s, 4s, 8s
+      console.warn(`[regtest] Rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 /** Rate-limited wrapper around mintProofs to avoid hitting Nutshell's rate limiter. */
 export async function throttledMintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
   await throttleMintOp();
-  return mintProofs(wallet, amountSats);
+  return retryOnRateLimit(() => mintProofs(wallet, amountSats));
 }
 
 /** Generate a nostr keypair (hex secretKey + publicKey). */

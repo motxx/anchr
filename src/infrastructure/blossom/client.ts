@@ -163,6 +163,7 @@ export async function uploadToBlossom(
         body: encrypted.buffer as ArrayBuffer,
       });
 
+      await response.body?.cancel();
       if (response.ok) {
         successUrls.push(`${serverUrl}/${hash}`);
       } else {

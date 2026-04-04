@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQueryService, createQuery } from "../application/query-service";
+import { createQueryService } from "../application/query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 import { withEnvThunk as withEnv } from "../testing/helpers";
@@ -196,7 +196,7 @@ describe("writeAuth middleware", () => {
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp({ queryService: testService });
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const form = new FormData();
     form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
     const res = await app.request(`http://localhost/queries/${query.id}/upload`, { method: "POST", body: form });
@@ -205,7 +205,7 @@ describe("writeAuth middleware", () => {
 
   test("rejects unauthenticated submit", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp({ queryService: testService });
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -216,7 +216,7 @@ describe("writeAuth middleware", () => {
 
   test("rejects unauthenticated cancel", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp({ queryService: testService });
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
     expect(res.status).toBe(401);
   }));
@@ -233,7 +233,7 @@ describe("writeAuth middleware", () => {
 
   test("accepts X-API-Key header on cancel", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp({ queryService: testService });
-    const query = createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
+    const query = testService.createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
       method: "POST",
       headers: { "x-api-key": "test-key" },
