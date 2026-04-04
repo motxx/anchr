@@ -1,0 +1,14 @@
+{
+  "tasks": {
+    "demo": "deno run --allow-all src/demo.ts"
+  },
+  "imports": {
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1",
+    "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
+    "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
+    "nostr-tools": "npm:nostr-tools@^2",
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3"
+  }
+}
