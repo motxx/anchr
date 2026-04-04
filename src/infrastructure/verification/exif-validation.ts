@@ -164,6 +164,63 @@ function findApp1ExifSegment(data: Buffer): { tiffBase: number; tiffData: Buffer
   return null;
 }
 
+function entryAsciiOffset(ifdOffset: number, entries: IfdEntry[], entry: IfdEntry): number {
+  return entry.count <= 4
+    ? ifdOffset + 2 + entries.indexOf(entry) * 12 + 8
+    : entry.valueOffset;
+}
+
+function parseExifIfd(buf: Buffer, tiffBase: number, entry: IfdEntry, le: boolean): string | undefined {
+  const exifIfdOffset = getEntryLong(entry, le, buf, tiffBase);
+  const exifEntries = readIfdEntries(buf, tiffBase, exifIfdOffset, le);
+  for (const exifEntry of exifEntries) {
+    if (exifEntry.tag === TAG_DATETIME_ORIGINAL) {
+      return readAscii(buf, tiffBase, entryAsciiOffset(exifIfdOffset, exifEntries, exifEntry), exifEntry.count);
+    }
+  }
+  return undefined;
+}
+
+function parseGpsIfd(buf: Buffer, tiffBase: number, entry: IfdEntry, le: boolean): { lat: number; lon: number } | undefined {
+  const gpsIfdOffset = getEntryLong(entry, le, buf, tiffBase);
+  const gpsEntries = readIfdEntries(buf, tiffBase, gpsIfdOffset, le);
+  let latRef = "N";
+  let lonRef = "E";
+  let lat = 0;
+  let lon = 0;
+  let hasLat = false;
+  let hasLon = false;
+  for (const gpsEntry of gpsEntries) {
+    switch (gpsEntry.tag) {
+      case TAG_GPS_LAT_REF:
+        latRef = readAscii(buf, tiffBase, entryAsciiOffset(gpsIfdOffset, gpsEntries, gpsEntry), gpsEntry.count);
+        break;
+      case TAG_GPS_LAT:
+        if (gpsEntry.type === TYPE_RATIONAL && gpsEntry.count === 3) {
+          lat = readGpsCoord(buf, tiffBase, gpsEntry.valueOffset, le);
+          hasLat = true;
+        }
+        break;
+      case TAG_GPS_LON_REF:
+        lonRef = readAscii(buf, tiffBase, entryAsciiOffset(gpsIfdOffset, gpsEntries, gpsEntry), gpsEntry.count);
+        break;
+      case TAG_GPS_LON:
+        if (gpsEntry.type === TYPE_RATIONAL && gpsEntry.count === 3) {
+          lon = readGpsCoord(buf, tiffBase, gpsEntry.valueOffset, le);
+          hasLon = true;
+        }
+        break;
+    }
+  }
+  if (hasLat && hasLon) {
+    return {
+      lat: latRef.startsWith("S") ? -lat : lat,
+      lon: lonRef.startsWith("W") ? -lon : lon,
+    };
+  }
+  return undefined;
+}
+
 export function extractExifMetadata(data: Buffer): ExifMetadata {
   const exifSeg = findApp1ExifSegment(data);
   if (!exifSeg) return {};
@@ -172,8 +229,8 @@ export function extractExifMetadata(data: Buffer): ExifMetadata {
   if (tiffData.length < 8) return {};
 
   const byteOrder = tiffData.readUInt16BE(0);
-  const le = byteOrder === 0x4949; // "II" = little-endian
-  if (!le && byteOrder !== 0x4d4d) return {}; // "MM" = big-endian
+  const le = byteOrder === 0x4949;
+  if (!le && byteOrder !== 0x4d4d) return {};
 
   const magic = readU16(tiffData, 2, le);
   if (magic !== 42) return {};
@@ -187,63 +244,20 @@ export function extractExifMetadata(data: Buffer): ExifMetadata {
   for (const entry of entries) {
     switch (entry.tag) {
       case TAG_MAKE:
-        metadata.make = readAscii(buf, tiffBase, entry.count <= 4 ? ifd0Offset + 2 + entries.indexOf(entry) * 12 + 8 : entry.valueOffset, entry.count);
+        metadata.make = readAscii(buf, tiffBase, entryAsciiOffset(ifd0Offset, entries, entry), entry.count);
         break;
       case TAG_MODEL:
-        metadata.model = readAscii(buf, tiffBase, entry.count <= 4 ? ifd0Offset + 2 + entries.indexOf(entry) * 12 + 8 : entry.valueOffset, entry.count);
+        metadata.model = readAscii(buf, tiffBase, entryAsciiOffset(ifd0Offset, entries, entry), entry.count);
         break;
       case TAG_DATETIME:
-        metadata.dateTime = readAscii(buf, tiffBase, entry.count <= 4 ? ifd0Offset + 2 + entries.indexOf(entry) * 12 + 8 : entry.valueOffset, entry.count);
+        metadata.dateTime = readAscii(buf, tiffBase, entryAsciiOffset(ifd0Offset, entries, entry), entry.count);
         break;
-      case TAG_EXIF_IFD: {
-        const exifIfdOffset = getEntryLong(entry, le, buf, tiffBase);
-        const exifEntries = readIfdEntries(buf, tiffBase, exifIfdOffset, le);
-        for (const exifEntry of exifEntries) {
-          if (exifEntry.tag === TAG_DATETIME_ORIGINAL) {
-            metadata.dateTimeOriginal = readAscii(buf, tiffBase, exifEntry.count <= 4 ? exifIfdOffset + 2 + exifEntries.indexOf(exifEntry) * 12 + 8 : exifEntry.valueOffset, exifEntry.count);
-          }
-        }
+      case TAG_EXIF_IFD:
+        metadata.dateTimeOriginal = parseExifIfd(buf, tiffBase, entry, le);
         break;
-      }
-      case TAG_GPS_IFD: {
-        const gpsIfdOffset = getEntryLong(entry, le, buf, tiffBase);
-        const gpsEntries = readIfdEntries(buf, tiffBase, gpsIfdOffset, le);
-        let latRef = "N";
-        let lonRef = "E";
-        let lat = 0;
-        let lon = 0;
-        let hasLat = false;
-        let hasLon = false;
-        for (const gpsEntry of gpsEntries) {
-          switch (gpsEntry.tag) {
-            case TAG_GPS_LAT_REF:
-              latRef = readAscii(buf, tiffBase, gpsEntry.count <= 4 ? gpsIfdOffset + 2 + gpsEntries.indexOf(gpsEntry) * 12 + 8 : gpsEntry.valueOffset, gpsEntry.count);
-              break;
-            case TAG_GPS_LAT:
-              if (gpsEntry.type === TYPE_RATIONAL && gpsEntry.count === 3) {
-                lat = readGpsCoord(buf, tiffBase, gpsEntry.valueOffset, le);
-                hasLat = true;
-              }
-              break;
-            case TAG_GPS_LON_REF:
-              lonRef = readAscii(buf, tiffBase, gpsEntry.count <= 4 ? gpsIfdOffset + 2 + gpsEntries.indexOf(gpsEntry) * 12 + 8 : gpsEntry.valueOffset, gpsEntry.count);
-              break;
-            case TAG_GPS_LON:
-              if (gpsEntry.type === TYPE_RATIONAL && gpsEntry.count === 3) {
-                lon = readGpsCoord(buf, tiffBase, gpsEntry.valueOffset, le);
-                hasLon = true;
-              }
-              break;
-          }
-        }
-        if (hasLat && hasLon) {
-          metadata.gps = {
-            lat: latRef.startsWith("S") ? -lat : lat,
-            lon: lonRef.startsWith("W") ? -lon : lon,
-          };
-        }
+      case TAG_GPS_IFD:
+        metadata.gps = parseGpsIfd(buf, tiffBase, entry, le);
         break;
-      }
     }
   }
 
@@ -271,6 +285,74 @@ export interface ExifValidationOptions {
   referenceTime?: number;
 }
 
+function validateCameraModel(
+  metadata: ExifMetadata,
+  checks: string[],
+  failures: string[],
+): boolean {
+  const hasCameraModel = !!(metadata.make || metadata.model);
+  if (hasCameraModel) {
+    checks.push(`camera: ${[metadata.make, metadata.model].filter(Boolean).join(" ")}`);
+  } else {
+    failures.push("no camera make/model in EXIF (possible AI-generated or screenshot)");
+  }
+  return hasCameraModel;
+}
+
+function validateTimestamp(
+  metadata: ExifMetadata,
+  options: ExifValidationOptions | undefined,
+  checks: string[],
+  failures: string[],
+): { hasTimestamp: boolean; timestampRecent: boolean } {
+  const dtStr = metadata.dateTimeOriginal || metadata.dateTime;
+  if (!dtStr) {
+    failures.push("no timestamp in EXIF");
+    return { hasTimestamp: false, timestampRecent: false };
+  }
+
+  const dt = parseExifDateTime(dtStr);
+  if (!dt) {
+    failures.push(`unparseable EXIF timestamp: ${dtStr}`);
+    return { hasTimestamp: true, timestampRecent: false };
+  }
+
+  const refTime = options?.referenceTime ?? Date.now();
+  const maxAge = options?.maxAgeMs ?? 3_600_000;
+  const ageMs = refTime - dt.getTime();
+  const timestampRecent = ageMs >= 0 && ageMs <= maxAge;
+  if (timestampRecent) {
+    checks.push(`timestamp recent: ${dtStr}`);
+  } else {
+    failures.push(`timestamp not recent: ${dtStr} (age: ${Math.round(ageMs / 60_000)}min)`);
+  }
+  return { hasTimestamp: true, timestampRecent };
+}
+
+function validateGps(
+  metadata: ExifMetadata,
+  options: ExifValidationOptions | undefined,
+  checks: string[],
+  failures: string[],
+): { hasGps: boolean; gpsNearHint: boolean | null } {
+  if (!metadata.gps) return { hasGps: false, gpsNearHint: null };
+
+  checks.push(`GPS: ${metadata.gps.lat.toFixed(4)}, ${metadata.gps.lon.toFixed(4)}`);
+  let gpsNearHint: boolean | null = null;
+
+  if (options?.expectedGps) {
+    const dist = haversineKm(metadata.gps.lat, metadata.gps.lon, options.expectedGps.lat, options.expectedGps.lon);
+    const maxDist = options.maxDistanceKm ?? 50;
+    gpsNearHint = dist <= maxDist;
+    if (gpsNearHint) {
+      checks.push(`GPS within ${maxDist}km of hint (${dist.toFixed(1)}km)`);
+    } else {
+      failures.push(`GPS ${dist.toFixed(1)}km from hint (max ${maxDist}km)`);
+    }
+  }
+  return { hasGps: true, gpsNearHint };
+}
+
 export function validateExif(data: Buffer, options?: ExifValidationOptions): ExifValidationResult {
   const checks: string[] = [];
   const failures: string[] = [];
@@ -284,50 +366,9 @@ export function validateExif(data: Buffer, options?: ExifValidationOptions): Exi
   }
   checks.push("EXIF metadata present");
 
-  const hasCameraModel = !!(metadata.make || metadata.model);
-  if (hasCameraModel) {
-    checks.push(`camera: ${[metadata.make, metadata.model].filter(Boolean).join(" ")}`);
-  } else {
-    failures.push("no camera make/model in EXIF (possible AI-generated or screenshot)");
-  }
-
-  const dtStr = metadata.dateTimeOriginal || metadata.dateTime;
-  const hasTimestamp = !!dtStr;
-  let timestampRecent = false;
-  if (dtStr) {
-    const dt = parseExifDateTime(dtStr);
-    if (dt) {
-      const refTime = options?.referenceTime ?? Date.now();
-      const maxAge = options?.maxAgeMs ?? 3_600_000;
-      const ageMs = refTime - dt.getTime();
-      timestampRecent = ageMs >= 0 && ageMs <= maxAge;
-      if (timestampRecent) {
-        checks.push(`timestamp recent: ${dtStr}`);
-      } else {
-        failures.push(`timestamp not recent: ${dtStr} (age: ${Math.round(ageMs / 60_000)}min)`);
-      }
-    } else {
-      failures.push(`unparseable EXIF timestamp: ${dtStr}`);
-    }
-  } else {
-    failures.push("no timestamp in EXIF");
-  }
-
-  const hasGps = !!metadata.gps;
-  let gpsNearHint: boolean | null = null;
-  if (hasGps && metadata.gps) {
-    checks.push(`GPS: ${metadata.gps.lat.toFixed(4)}, ${metadata.gps.lon.toFixed(4)}`);
-    if (options?.expectedGps) {
-      const dist = haversineKm(metadata.gps.lat, metadata.gps.lon, options.expectedGps.lat, options.expectedGps.lon);
-      const maxDist = options.maxDistanceKm ?? 50;
-      gpsNearHint = dist <= maxDist;
-      if (gpsNearHint) {
-        checks.push(`GPS within ${maxDist}km of hint (${dist.toFixed(1)}km)`);
-      } else {
-        failures.push(`GPS ${dist.toFixed(1)}km from hint (max ${maxDist}km)`);
-      }
-    }
-  }
+  const hasCameraModel = validateCameraModel(metadata, checks, failures);
+  const { hasTimestamp, timestampRecent } = validateTimestamp(metadata, options, checks, failures);
+  const { hasGps, gpsNearHint } = validateGps(metadata, options, checks, failures);
 
   return { hasExif, hasCameraModel, hasTimestamp, hasGps, timestampRecent, gpsNearHint, metadata, checks, failures };
 }

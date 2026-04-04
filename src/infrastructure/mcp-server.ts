@@ -4,28 +4,17 @@ import { z } from "zod";
 import { getMcpQueryBackend } from "./mcp-query-backend";
 import { isNostrEnabled } from "./nostr/client";
 import { isCashuEnabled } from "./cashu/wallet";
-import type { QueryInput, QueryResult } from "../application/query-service";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../domain/types";
+import type { VerificationFactor, TlsnCondition } from "../domain/types";
 import { VERIFICATION_FACTORS } from "../domain/types";
-
-/** Args for the create_query MCP tool. */
-interface CreateQueryArgs {
-  description: string;
-  location_hint?: string;
-  ttl_seconds?: number;
-  oracle_ids?: string[];
-  verification_requirements?: VerificationFactor[];
-  target_url?: string;
-  target_method?: "GET" | "POST";
-  conditions?: TlsnCondition[];
-}
-
-function buildRequesterMeta(): RequesterMeta {
-  return {
-    requester_type: "agent",
-    client_name: process.env.REMOTE_QUERY_API_BASE_URL ? "mcp-remote" : "mcp",
-  };
-}
+import {
+  handleCreateQuery,
+  handleGetQueryStatus,
+  handleCancelQuery,
+  handleListAvailableQueries,
+  handleSubmitQueryResult,
+  handleGetQueryAttachment,
+  handleGetQueryAttachmentPreview,
+} from "./mcp-tool-handlers";
 
 export async function startMcpServer() {
   const server = new McpServer({
@@ -59,21 +48,8 @@ export async function startMcpServer() {
         description: z.string().optional().describe("Human-readable description of what this checks"),
       })).optional().describe("Conditions to verify against the proven response body."),
     },
-    async ({ description, location_hint, ttl_seconds, oracle_ids, verification_requirements, target_url, target_method, conditions }: CreateQueryArgs) => {
-      const input: QueryInput = {
-        description,
-        location_hint,
-        verification_requirements,
-        tlsn_requirements: target_url ? {
-          target_url,
-          method: target_method,
-          conditions,
-        } : undefined,
-      };
-      const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+    async (args: { description: string; location_hint?: string; ttl_seconds?: number; oracle_ids?: string[]; verification_requirements?: VerificationFactor[]; target_url?: string; target_method?: "GET" | "POST"; conditions?: TlsnCondition[] }) => {
+      return handleCreateQuery(backend, args);
     },
   );
 
@@ -84,10 +60,7 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID returned from create_query"),
     },
     async ({ query_id }: { query_id: string }) => {
-      const payload = await backend.getQueryStatus(query_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleGetQueryStatus(backend, query_id);
     },
   );
 
@@ -98,10 +71,7 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID to cancel"),
     },
     async ({ query_id }: { query_id: string }) => {
-      const payload = await backend.cancelQuery(query_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleCancelQuery(backend, query_id);
     },
   );
 
@@ -110,10 +80,7 @@ export async function startMcpServer() {
     "List currently available Anchr queries waiting for a reporter.",
     {},
     async () => {
-      const payload = await backend.listAvailableQueries();
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleListAvailableQueries(backend);
     },
   );
 
@@ -126,10 +93,7 @@ export async function startMcpServer() {
       oracle_id: z.string().optional().describe("Oracle ID to use for verification. Omit to use default."),
     },
     async ({ query_id, result, oracle_id }: { query_id: string; result: Record<string, unknown>; oracle_id?: string }) => {
-      const payload = await backend.submitQueryResult(query_id, result as unknown as QueryResult, oracle_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleSubmitQueryResult(backend, query_id, result, oracle_id);
     },
   );
 
@@ -141,10 +105,7 @@ export async function startMcpServer() {
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
     },
     async ({ query_id, attachment_index }: { query_id: string; attachment_index?: number }) => {
-      const payload = await backend.getQueryAttachment(query_id, attachment_index ?? 0);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleGetQueryAttachment(backend, query_id, attachment_index ?? 0);
     },
   );
 
@@ -157,23 +118,7 @@ export async function startMcpServer() {
       max_dimension: z.number().int().min(64).max(2048).optional().describe("Maximum width or height of the preview image. Defaults to PREVIEW_MAX_DIMENSION."),
     },
     async ({ query_id, attachment_index, max_dimension }: { query_id: string; attachment_index?: number; max_dimension?: number }) => {
-      const preview = await backend.getQueryAttachmentPreview(query_id, attachment_index ?? 0, max_dimension);
-      const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
-        {
-          type: "text",
-          text: JSON.stringify(preview.payload, null, 2),
-        },
-      ];
-
-      if (preview.image) {
-        content.push({
-          type: "image",
-          data: preview.image.data,
-          mimeType: preview.image.mimeType,
-        });
-      }
-
-      return { content };
+      return handleGetQueryAttachmentPreview(backend, query_id, attachment_index ?? 0, max_dimension);
     },
   );
 

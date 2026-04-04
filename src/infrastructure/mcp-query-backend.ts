@@ -21,7 +21,7 @@ const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
 
 // --- Shared types for MCP tool responses ---
 
-interface McpQueryBackend {
+export interface McpQueryBackend {
   createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta, oracleIds?: string[]): Promise<unknown>;
   getQueryStatus(queryId: string): Promise<unknown>;
   listAvailableQueries(): Promise<unknown>;
@@ -200,6 +200,53 @@ function createDefaultBackend(): McpQueryBackend {
 
 // --- Remote backend (MCP proxy to external server) ---
 
+function enrichQueryStatusWithAttachments(data: Record<string, unknown>, remoteBaseUrl: string): void {
+  const result = data.result as QueryResult | undefined;
+  if (!result?.attachments?.length) return;
+  const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
+    buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
+  );
+  data.attachment_count = attachments.length;
+  data.attachments = attachments;
+  data.attachment_access = attachments.length > 0
+    ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
+    : null;
+}
+
+async function fetchRemotePreview(
+  previewUrl: URL,
+  remoteApiKey: string,
+  queryId: string,
+  attachmentIndex: number,
+  attachment: AttachmentHandle["attachment"],
+  access: AttachmentHandle["access"],
+  metaData: Record<string, unknown>,
+  maxDimension?: number,
+): Promise<{ payload: unknown; image?: { data: string; mimeType: string } }> {
+  const headers = new Headers();
+  if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
+  const response = await fetch(previewUrl, { headers });
+  if (!response.ok) {
+    return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment, access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs." } };
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const mimeType = response.headers.get("content-type") ?? "image/jpeg";
+  return {
+    payload: {
+      query_id: queryId,
+      attachment_index: attachmentIndex,
+      attachment,
+      access: { ...access, preview_url: previewUrl.toString() },
+      original_size_bytes: metaData.size_bytes ?? null,
+      preview_size_bytes: bytes.length,
+      preview_mime_type: mimeType,
+      max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
+    },
+    image: { data: bytes.toString("base64"), mimeType },
+  };
+}
+
 function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
   async function fetchJson(path: string, init?: RequestInit) {
     const headers = new Headers(init?.headers);
@@ -225,17 +272,7 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       if (response.status === 404) return { error: "Query not found" };
       if (!response.ok) throw new Error(`Remote query lookup failed: ${response.status}`);
       const data = json as Record<string, unknown>;
-      const result = data.result as QueryResult | undefined;
-      if (result?.attachments?.length) {
-        const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
-          buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
-        );
-        data.attachment_count = attachments.length;
-        data.attachments = attachments;
-        data.attachment_access = attachments.length > 0
-          ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
-          : null;
-      }
+      enrichQueryStatusWithAttachments(data, remoteBaseUrl);
       return data;
     },
     async listAvailableQueries() {
@@ -281,28 +318,7 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       );
       if (maxDimension) previewUrl.searchParams.set("max_dimension", String(maxDimension));
 
-      const headers = new Headers();
-      if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
-      const response = await fetch(previewUrl, { headers });
-      if (!response.ok) {
-        return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment, access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs." } };
-      }
-
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const mimeType = response.headers.get("content-type") ?? "image/jpeg";
-      return {
-        payload: {
-          query_id: queryId,
-          attachment_index: attachmentIndex,
-          attachment,
-          access: { ...access, preview_url: previewUrl.toString() },
-          original_size_bytes: metaData.size_bytes ?? null,
-          preview_size_bytes: bytes.length,
-          preview_mime_type: mimeType,
-          max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
-        },
-        image: { data: bytes.toString("base64"), mimeType },
-      };
+      return fetchRemotePreview(previewUrl, remoteApiKey, queryId, attachmentIndex, attachment, access, metaData, maxDimension);
     },
   };
 }

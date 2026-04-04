@@ -15,10 +15,8 @@
  *   status=success/error     → Completion feedback
  */
 
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { TlsnEncryptedContext, VerificationFactor } from "../../domain/types";
-import type { NostrIdentity } from "./identity";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
+import { deriveConversationKey, decryptNip44 } from "./encryption";
 
 // NIP-90 DVM event kinds for Anchr.
 export const ANCHR_QUERY_REQUEST = 5300;   // DVM Job Request
@@ -122,60 +120,6 @@ export interface RejectionDMPayload {
 
 export type OracleDMPayload = PreimageDMPayload | RejectionDMPayload;
 
-// --- Event builders ---
-
-/**
- * Build a QueryRequest event (NIP-90 DVM Job Request, kind 5300).
- */
-export function buildQueryRequestEvent(
-  identity: NostrIdentity,
-  queryId: string,
-  payload: QueryRequestPayload,
-  regionCode?: string,
-): VerifiedEvent {
-  const tags: string[][] = [
-    ["i", payload.description, "text"],
-    ["output", "application/json"],
-    ["encrypted"],
-    ["d", queryId],
-    ["t", "anchr"],
-    ["expiration", String(Math.floor(payload.expires_at / 1000))],
-  ];
-
-  if (payload.nonce) {
-    tags.push(["param", "nonce", payload.nonce]);
-  }
-
-  if (payload.verification_requirements?.length) {
-    tags.push(["param", "verification", payload.verification_requirements.join(",")]);
-  }
-
-  if (payload.bounty?.token) {
-    tags.push(["bid", payload.bounty.token]);
-  }
-
-  if (payload.oracle_pubkey) {
-    tags.push(["p", payload.oracle_pubkey, "", "oracle"]);
-  }
-
-  if (regionCode) {
-    tags.push(["region", regionCode.toUpperCase()]);
-  }
-
-  const template: EventTemplate = {
-    kind: ANCHR_QUERY_REQUEST,
-    created_at: Math.floor(Date.now() / 1000),
-    tags,
-    content: JSON.stringify(payload),
-  };
-
-  return finalizeEvent(template, identity.secretKey);
-}
-
-/**
- * Build a QueryResponse event (NIP-90 DVM Job Result, kind 6300).
- * Content is NIP-44 encrypted to the requester.
- */
 /**
  * Oracle-accessible payload embedded in kind 6300 tags.
  * Encrypted to Oracle via NIP-44 so only Oracle can read it.
@@ -192,159 +136,15 @@ export interface OracleResponsePayload {
   notes?: string;
 }
 
-export function buildQueryResponseEvent(
-  identity: NostrIdentity,
-  queryEventId: string,
-  requesterPubKey: string,
-  payload: QueryResponsePayload,
-  oraclePubKey?: string,
-): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, requesterPubKey);
-  const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
+// --- Event builders (delegated to event-builders.ts) ---
 
-  const tags: string[][] = [
-    ["e", queryEventId],
-    ["p", requesterPubKey],
-  ];
-
-  // Add Oracle-accessible data when Oracle pubkey is provided
-  if (oraclePubKey && payload.attachments?.length) {
-    tags.push(["p", oraclePubKey, "", "oracle"]);
-
-    // Blossom URLs and blob hash are not secret (blob is AES-256-GCM encrypted)
-    for (const att of payload.attachments) {
-      tags.push(["x", att.blossom_hash]);
-      for (const url of att.blossom_urls) {
-        tags.push(["blossom", url]);
-      }
-    }
-
-    // Oracle payload: NIP-44 encrypted to Oracle
-    const oraclePayload: OracleResponsePayload = {
-      nonce_echo: payload.nonce_echo,
-      attachments: payload.attachments
-        .filter((a) => a.decrypt_key_oracle)
-        .map((a) => ({
-          blossom_hash: a.blossom_hash,
-          blossom_urls: a.blossom_urls,
-          decrypt_key_oracle: a.decrypt_key_oracle!,
-          decrypt_iv: a.decrypt_iv,
-          mime: a.mime,
-        })),
-      notes: payload.notes,
-    };
-
-    const oracleConvKey = deriveConversationKey(identity.secretKey, oraclePubKey);
-    const oracleEncrypted = encryptNip44(JSON.stringify(oraclePayload), oracleConvKey);
-    tags.push(["oracle_payload", oracleEncrypted]);
-  }
-
-  const template: EventTemplate = {
-    kind: ANCHR_QUERY_RESPONSE,
-    created_at: Math.floor(Date.now() / 1000),
-    tags,
-    content: encrypted,
-  };
-
-  return finalizeEvent(template, identity.secretKey);
-}
-
-/**
- * Parse the Oracle-specific payload from a kind 6300 event's tags.
- */
-export function parseOracleResponsePayload(
-  event: { tags: string[][]; pubkey: string },
-  oracleSecretKey: Uint8Array,
-): OracleResponsePayload | null {
-  const oracleTag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
-  if (!oracleTag) return null;
-
-  const conversationKey = deriveConversationKey(oracleSecretKey, event.pubkey);
-  const decrypted = decryptNip44(oracleTag[1]!, conversationKey);
-  return JSON.parse(decrypted) as OracleResponsePayload;
-}
-
-/**
- * Build a Worker quote event (kind 7000, status=payment-required).
- * Content is NIP-44 encrypted to the requester.
- */
-export function buildQuoteFeedbackEvent(
-  identity: NostrIdentity,
-  queryEventId: string,
-  requesterPubKey: string,
-  payload: QuoteFeedbackPayload,
-): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, requesterPubKey);
-  const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
-
-  const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["e", queryEventId],
-      ["p", requesterPubKey],
-      ["status", "payment-required"],
-    ],
-    content: encrypted,
-  };
-
-  return finalizeEvent(template, identity.secretKey);
-}
-
-/**
- * Build a selection announcement event (kind 7000, status=processing).
- * Content is NIP-44 encrypted to the selected worker.
- */
-export function buildSelectionFeedbackEvent(
-  identity: NostrIdentity,
-  queryEventId: string,
-  workerPubKey: string,
-  payload: SelectionFeedbackPayload,
-): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, workerPubKey);
-  const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
-
-  const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["e", queryEventId],
-      ["p", workerPubKey],
-      ["status", "processing"],
-    ],
-    content: encrypted,
-  };
-
-  return finalizeEvent(template, identity.secretKey);
-}
-
-/**
- * Build a QuerySettlement event (kind 7000, legacy completion feedback).
- * Content is NIP-44 encrypted to the worker.
- */
-export function buildQuerySettlementEvent(
-  identity: NostrIdentity,
-  queryEventId: string,
-  responseEventId: string,
-  workerPubKey: string,
-  payload: QuerySettlementPayload,
-): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, workerPubKey);
-  const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
-
-  const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["e", queryEventId],
-      ["e", responseEventId],
-      ["p", workerPubKey],
-    ],
-    content: encrypted,
-  };
-
-  return finalizeEvent(template, identity.secretKey);
-}
+export {
+  buildQueryRequestEvent,
+  buildQueryResponseEvent,
+  buildQuoteFeedbackEvent,
+  buildSelectionFeedbackEvent,
+  buildQuerySettlementEvent,
+} from "./event-builders";
 
 // --- Parsers ---
 
@@ -360,6 +160,18 @@ export function parseQueryResponsePayload(
   const conversationKey = deriveConversationKey(secretKey, senderPubKey);
   const decrypted = decryptNip44(content, conversationKey);
   return JSON.parse(decrypted) as QueryResponsePayload;
+}
+
+export function parseOracleResponsePayload(
+  event: { tags: string[][]; pubkey: string },
+  oracleSecretKey: Uint8Array,
+): OracleResponsePayload | null {
+  const oracleTag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
+  if (!oracleTag) return null;
+
+  const conversationKey = deriveConversationKey(oracleSecretKey, event.pubkey);
+  const decrypted = decryptNip44(oracleTag[1]!, conversationKey);
+  return JSON.parse(decrypted) as OracleResponsePayload;
 }
 
 export function parseQuerySettlementPayload(

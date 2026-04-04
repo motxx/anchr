@@ -25,14 +25,19 @@ import {
   P2PKBuilder,
   type Proof,
   type P2PKOptions,
-  getEncodedToken,
   getDecodedToken,
   verifyHTLCSpendingConditions,
   isHTLCSpendAuthorised,
   signP2PKProofs,
   verifyHTLCHash,
 } from "@cashu/cashu-ts";
-import { getCashuWallet, getCashuConfig } from "./wallet";
+import {
+  getWalletAndConfig,
+  sumProofAmounts,
+  encodeProofs,
+  loadAndSend,
+  computeNetAmount,
+} from "./escrow-helpers";
 
 // --- Legacy P2PK escrow (retained for backward compatibility) ---
 
@@ -91,22 +96,15 @@ export async function createEscrowToken(
   params: EscrowParams,
   sourceProofs: Proof[],
 ): Promise<EscrowToken | null> {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
-  if (!wallet || !config) return null;
+  const ctx = getWalletAndConfig();
+  if (!ctx) return null;
 
   const p2pkOptions = buildEscrowP2PKOptions(params);
 
   try {
-    await wallet.loadMint();
-    const { send } = await wallet.ops
-      .send(amountSats, sourceProofs)
-      .asP2PK(p2pkOptions)
-      .run();
-
-    const token = getEncodedToken({ mint: config.mintUrl, proofs: send });
+    const send = await loadAndSend(ctx.wallet, amountSats, sourceProofs, p2pkOptions);
     return {
-      token,
+      token: encodeProofs(ctx.config.mintUrl, send),
       proofs: send,
       p2pkOptions,
       amountSats,
@@ -126,11 +124,10 @@ export async function executeEscrowSwap(
   oraclePubkey: string,
   feeSats: number,
 ): Promise<SwapResult | null> {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
-  if (!wallet || !config) return null;
+  const ctx = getWalletAndConfig();
+  if (!ctx) return null;
 
-  const totalSats = signedProofs.reduce((sum, p) => sum + p.amount, 0);
+  const totalSats = sumProofAmounts(signedProofs);
   const workerSats = totalSats - feeSats;
 
   if (workerSats <= 0) {
@@ -139,15 +136,10 @@ export async function executeEscrowSwap(
   }
 
   try {
-    await wallet.loadMint();
-
     const workerP2PK = new P2PKBuilder().addLockPubkey(workerPubkey).toOptions();
     const oracleP2PK = new P2PKBuilder().addLockPubkey(oraclePubkey).toOptions();
 
-    const { send: workerProofs } = await wallet.ops
-      .send(workerSats, signedProofs)
-      .asP2PK(workerP2PK)
-      .run();
+    const workerProofs = await loadAndSend(ctx.wallet, workerSats, signedProofs, workerP2PK);
 
     const remainingProofs = signedProofs.filter(
       (p) => !workerProofs.some((wp) => wp.C === p.C),
@@ -155,19 +147,15 @@ export async function executeEscrowSwap(
 
     let oracleProofs: Proof[];
     if (remainingProofs.length > 0) {
-      const { send } = await wallet.ops
-        .send(feeSats, remainingProofs)
-        .asP2PK(oracleP2PK)
-        .run();
-      oracleProofs = send;
+      oracleProofs = await loadAndSend(ctx.wallet, feeSats, remainingProofs, oracleP2PK);
     } else {
       oracleProofs = [];
     }
 
     return {
-      workerToken: getEncodedToken({ mint: config.mintUrl, proofs: workerProofs }),
+      workerToken: encodeProofs(ctx.config.mintUrl, workerProofs),
       oracleToken: oracleProofs.length > 0
-        ? getEncodedToken({ mint: config.mintUrl, proofs: oracleProofs })
+        ? encodeProofs(ctx.config.mintUrl, oracleProofs)
         : "",
       workerAmountSats: workerSats,
       oracleFeeSats: feeSats,
@@ -249,19 +237,12 @@ export async function createHtlcToken(
   params: HtlcInitialLockParams,
   sourceProofs: Proof[],
 ): Promise<EscrowToken | null> {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
-  if (!wallet || !config) return null;
+  const ctx = getWalletAndConfig();
+  if (!ctx) return null;
 
   try {
-    await wallet.loadMint();
-    // Phase 1: plain proofs, no spending conditions
-    const { send } = await wallet.ops
-      .send(amountSats, sourceProofs)
-      .run();
-
-    const token = getEncodedToken({ mint: config.mintUrl, proofs: send });
-    return { token, proofs: send, p2pkOptions: null, amountSats };
+    const send = await loadAndSend(ctx.wallet, amountSats, sourceProofs);
+    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions: null, amountSats };
   } catch (error) {
     console.error("[cashu-htlc] Failed to create initial hold token:", error instanceof Error ? error.message : error);
     return null;
@@ -278,29 +259,20 @@ export async function swapHtlcBindWorker(
   initialProofs: Proof[],
   params: HtlcWorkerBindParams,
 ): Promise<EscrowToken | null> {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
-  if (!wallet || !config) return null;
+  const ctx = getWalletAndConfig();
+  if (!ctx) return null;
 
   const p2pkOptions = buildHtlcFinalOptions(params);
 
   try {
-    await wallet.loadMint();
-    const totalSats = initialProofs.reduce((sum, p) => sum + p.amount, 0);
-    const fee = wallet.getFeesForProofs(initialProofs);
-    const amountSats = totalSats - fee;
-    if (amountSats <= 0) {
+    const amountSats = computeNetAmount(ctx.wallet, initialProofs);
+    if (amountSats === null) {
       console.error("[cashu-htlc] Fee exceeds total amount");
       return null;
     }
 
-    const { send } = await wallet.ops
-      .send(amountSats, initialProofs)
-      .asP2PK(p2pkOptions)
-      .run();
-
-    const token = getEncodedToken({ mint: config.mintUrl, proofs: send });
-    return { token, proofs: send, p2pkOptions, amountSats };
+    const send = await loadAndSend(ctx.wallet, amountSats, initialProofs, p2pkOptions);
+    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions, amountSats };
   } catch (error) {
     console.error("[cashu-htlc] Failed to swap HTLC for worker binding:", error instanceof Error ? error.message : error);
     return null;
@@ -328,51 +300,45 @@ export async function redeemHtlcToken(
   preimage: string,
   workerPrivateKey: string,
 ): Promise<{ token: string; proofs: Proof[]; amountSats: number } | null> {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
-  if (!wallet || !config) return null;
+  const ctx = getWalletAndConfig();
+  if (!ctx) return null;
 
   try {
-    await wallet.loadMint();
+    const signedProofs = prepareHtlcWitness(htlcProofs, preimage, workerPrivateKey);
+    const verifyError = verifyHtlcSpendAuth(signedProofs);
+    if (verifyError) return null;
 
-    // 1. Set HTLC preimage witness on each proof
-    const proofsWithPreimage = htlcProofs.map((p) => ({
-      ...p,
-      witness: JSON.stringify({ preimage, signatures: [] }),
-    }));
-
-    // 2. Sign proofs with Worker's private key
-    const signedProofs = signP2PKProofs(proofsWithPreimage, workerPrivateKey);
-
-    // 3. Server-side HTLC verification (defense against Mint enforcement gap)
-    for (const proof of signedProofs) {
-      if (!isHTLCSpendAuthorised(proof)) {
-        const detail = verifyHTLCSpendingConditions(proof);
-        console.error("[cashu-htlc] HTLC spending condition NOT met:", detail);
-        return null;
-      }
-    }
-
-    const totalSats = signedProofs.reduce((sum, p) => sum + p.amount, 0);
-    const fee = wallet.getFeesForProofs(signedProofs);
-    const amountSats = totalSats - fee;
-    if (amountSats <= 0) {
+    const amountSats = computeNetAmount(ctx.wallet, signedProofs);
+    if (amountSats === null) {
       console.error("[cashu-htlc] Fee exceeds total amount");
       return null;
     }
 
-    // 4. Swap verified proofs on the Mint
-    const { send } = await wallet.ops
-      .send(amountSats, signedProofs)
-      .privkey(workerPrivateKey)
-      .run();
-
-    const token = getEncodedToken({ mint: config.mintUrl, proofs: send });
-    return { token, proofs: send, amountSats };
+    const send = await loadAndSend(ctx.wallet, amountSats, signedProofs, undefined, workerPrivateKey);
+    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, amountSats };
   } catch (error) {
     console.error("[cashu-htlc] Failed to redeem HTLC token:", error instanceof Error ? error.message : error);
     return null;
   }
+}
+
+function prepareHtlcWitness(proofs: Proof[], preimage: string, workerPrivateKey: string): Proof[] {
+  const proofsWithPreimage = proofs.map((p) => ({
+    ...p,
+    witness: JSON.stringify({ preimage, signatures: [] }),
+  }));
+  return signP2PKProofs(proofsWithPreimage, workerPrivateKey);
+}
+
+function verifyHtlcSpendAuth(signedProofs: Proof[]): string | null {
+  for (const proof of signedProofs) {
+    if (!isHTLCSpendAuthorised(proof)) {
+      const detail = verifyHTLCSpendingConditions(proof);
+      console.error("[cashu-htlc] HTLC spending condition NOT met:", detail);
+      return "HTLC spending condition not met";
+    }
+  }
+  return null;
 }
 
 /**
@@ -390,35 +356,36 @@ export function verifyHtlcProofs(
   expectedHash: string,
   preimage: string,
 ): string | null {
-  // 1. Verify preimage matches expected hash
   if (!verifyHTLCHash(preimage, expectedHash)) {
     return `Preimage does not match expected hash (hash=${expectedHash})`;
   }
 
-  // 2. Verify each proof's HTLC secret and spending authorization
   for (let i = 0; i < htlcProofs.length; i++) {
     const proof = htlcProofs[i]!;
-    try {
-      const secret = JSON.parse(proof.secret);
-      if (!Array.isArray(secret) || secret[0] !== "HTLC") {
-        return `Proof ${i}: not an HTLC proof`;
-      }
-      const data = secret[1]?.data;
-      if (data !== expectedHash) {
-        return `Proof ${i}: hashlock mismatch (expected=${expectedHash}, got=${data})`;
-      }
-    } catch {
-      return `Proof ${i}: invalid secret format`;
-    }
+    const secretError = validateHtlcSecret(proof, i, expectedHash);
+    if (secretError) return secretError;
 
-    // 3. If proof has witness, verify P2PK + HTLC spending authorization
-    if (proof.witness) {
-      if (!isHTLCSpendAuthorised(proof)) {
-        return `Proof ${i}: HTLC spending conditions not met`;
-      }
+    if (proof.witness && !isHTLCSpendAuthorised(proof)) {
+      return `Proof ${i}: HTLC spending conditions not met`;
     }
   }
 
+  return null;
+}
+
+function validateHtlcSecret(proof: Proof, index: number, expectedHash: string): string | null {
+  try {
+    const secret = JSON.parse(proof.secret);
+    if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+      return `Proof ${index}: not an HTLC proof`;
+    }
+    const data = secret[1]?.data;
+    if (data !== expectedHash) {
+      return `Proof ${index}: hashlock mismatch (expected=${expectedHash}, got=${data})`;
+    }
+  } catch {
+    return `Proof ${index}: invalid secret format`;
+  }
   return null;
 }
 
@@ -439,7 +406,7 @@ export function inspectEscrowToken(token: string): {
 } | null {
   try {
     const decoded = getDecodedToken(token);
-    const amountSats = decoded.proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
+    const amountSats = sumProofAmounts(decoded.proofs);
     return {
       amountSats,
       proofCount: decoded.proofs.length,

@@ -7,6 +7,12 @@ import { storeIntegrity } from "./verification/integrity-store";
 import type { ProofModeIntegrity } from "./verification/integrity-store";
 import { parseProofModeZip } from "./verification/proofmode-validation";
 import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types";
+import {
+  detectZip,
+  inferMimeType,
+  extractProofModeIntegrity,
+  logIntegrity,
+} from "./attachment-store-helpers";
 
 export interface UploadResult {
   attachment: AttachmentRef;
@@ -31,65 +37,23 @@ export async function uploadAttachment(queryId: string, file: File, options?: Up
   }
 
   const rawBuffer = Buffer.from(await file.arrayBuffer());
-  const isZip = file.name.endsWith(".zip") || (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);
+  const { photoBuffer, photoFilename, proofmode } = await extractPhotoData(rawBuffer, file.name);
 
-  let photoBuffer: Buffer;
-  let photoFilename: string;
-  let proofmode: ProofModeIntegrity | undefined;
-
-  if (isZip) {
-    // ProofMode zip bundle
-    const pmData = await parseProofModeZip(rawBuffer);
-    if (!pmData) {
-      throw new Error("Invalid zip: no photo found in archive");
-    }
-    photoBuffer = pmData.photo;
-    photoFilename = pmData.photoFilename;
-    proofmode = {
-      proof: pmData.proof,
-      hashValid: pmData.hashValid,
-      pgpValid: pmData.pgpValid,
-      hasOts: pmData.hasOts,
-      hasDeviceCheck: pmData.hasDeviceCheck,
-      checks: pmData.checks,
-      failures: pmData.failures,
-    };
-  } else {
-    photoBuffer = rawBuffer;
-    photoFilename = file.name;
-  }
-
-  // 1. Validate integrity on raw photo data (before any modification)
   const [exifResult, c2paResult] = await Promise.all([
     Promise.resolve(validateExif(photoBuffer, { expectedGps: options?.expectedGps })),
     validateC2pa(photoBuffer, photoFilename),
   ]);
 
-  // 2. Upload to Blossom (handles EXIF strip + encrypt internally)
-  const mimeType = photoFilename.match(/\.(png)$/i) ? "image/png"
-    : photoFilename.match(/\.(heic)$/i) ? "image/heic"
-    : photoFilename.match(/\.(webp)$/i) ? "image/webp"
-    : "image/jpeg";
-
   const result = await workerUpload(
     new Uint8Array(photoBuffer),
     photoFilename,
-    mimeType,
+    inferMimeType(photoFilename),
   );
   if (!result) {
     throw new Error(`Blossom upload failed for query ${queryId}`);
   }
 
-  const attachment: AttachmentRef = {
-    id: result.attachment.id,
-    uri: result.attachment.uri,
-    mime_type: result.attachment.mime_type,
-    storage_kind: "blossom",
-    filename: result.attachment.filename,
-    size_bytes: result.attachment.size_bytes,
-    blossom_hash: result.blossom.hash,
-    blossom_servers: result.blossom.urls.map((u) => u.replace(`/${result.blossom.hash}`, "")),
-  };
+  const attachment = buildAttachmentRef(result);
 
   storeIntegrity({
     attachmentId: attachment.id,
@@ -110,22 +74,35 @@ export async function uploadAttachment(queryId: string, file: File, options?: Up
   };
 }
 
-function logIntegrity(
-  queryId: string,
-  exifResult: { checks: string[]; failures: string[] },
-  c2paResult: { checks: string[]; failures: string[] },
-  proofmode?: ProofModeIntegrity,
-) {
-  const checks = [...exifResult.checks, ...c2paResult.checks];
-  const failures = [...exifResult.failures, ...c2paResult.failures];
-  if (proofmode) {
-    checks.push(...proofmode.checks);
-    failures.push(...proofmode.failures);
+async function extractPhotoData(
+  rawBuffer: Buffer,
+  filename: string,
+): Promise<{ photoBuffer: Buffer; photoFilename: string; proofmode?: ProofModeIntegrity }> {
+  if (!detectZip(rawBuffer, filename)) {
+    return { photoBuffer: rawBuffer, photoFilename: filename };
   }
-  if (checks.length > 0) {
-    console.error(`[integrity] ${queryId}: ${checks.join("; ")}`);
+
+  const pmData = await parseProofModeZip(rawBuffer);
+  if (!pmData) {
+    throw new Error("Invalid zip: no photo found in archive");
   }
-  if (failures.length > 0) {
-    console.error(`[integrity] ${queryId} warnings: ${failures.join("; ")}`);
-  }
+
+  return {
+    photoBuffer: pmData.photo,
+    photoFilename: pmData.photoFilename,
+    proofmode: extractProofModeIntegrity(pmData),
+  };
+}
+
+function buildAttachmentRef(result: NonNullable<Awaited<ReturnType<typeof workerUpload>>>): AttachmentRef {
+  return {
+    id: result.attachment.id,
+    uri: result.attachment.uri,
+    mime_type: result.attachment.mime_type,
+    storage_kind: "blossom",
+    filename: result.attachment.filename,
+    size_bytes: result.attachment.size_bytes,
+    blossom_hash: result.blossom.hash,
+    blossom_servers: result.blossom.urls.map((u) => u.replace(`/${result.blossom.hash}`, "")),
+  };
 }

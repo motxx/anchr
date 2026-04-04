@@ -6,52 +6,18 @@
  */
 
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuWallet, getCashuConfig } from "./wallet";
+import { getCashuConfig } from "./wallet";
+import {
+  type WalletRole,
+  type WalletData,
+  type WalletBalance,
+  makeKey,
+  selectProofs,
+  computeBalance,
+  pruneSpentProofs,
+} from "./wallet-store-helpers";
 
-export type WalletRole = "requester" | "worker";
-
-export interface WalletBalance {
-  balance_sats: number;
-  pending_sats: number;
-  mint_url: string | null;
-}
-
-interface WalletData {
-  confirmed: Proof[];
-  /** Proofs locked per query ID (escrow). */
-  pending: Map<string, Proof[]>;
-}
-
-function makeKey(role: string, pubkey: string): string {
-  return `${role}:${pubkey}`;
-}
-
-function sumProofs(proofs: Proof[]): number {
-  return proofs.reduce((sum, p) => sum + p.amount, 0);
-}
-
-/**
- * Select proofs that sum to at least targetSats (greedy, largest-first).
- * Returns null if confirmed proofs are insufficient.
- */
-function selectProofs(
-  proofs: Proof[],
-  targetSats: number,
-): { selected: Proof[]; remaining: Proof[] } | null {
-  const sorted = [...proofs].sort((a, b) => b.amount - a.amount);
-  const selected: Proof[] = [];
-  let total = 0;
-  for (const p of sorted) {
-    selected.push(p);
-    total += p.amount;
-    if (total >= targetSats) {
-      const selectedSecrets = new Set(selected.map((s) => s.secret));
-      const remaining = proofs.filter((p) => !selectedSecrets.has(p.secret));
-      return { selected, remaining };
-    }
-  }
-  return null;
-}
+export type { WalletRole, WalletBalance };
 
 export interface WalletStore {
   /** Add proofs to the wallet's confirmed balance. */
@@ -98,7 +64,6 @@ export function createWalletStore(): WalletStore {
     return data;
   }
 
-  /** Acquire a per-wallet mutex to serialize state mutations. */
   async function withLock<T>(role: WalletRole, pubkey: string, fn: () => T | Promise<T>): Promise<T> {
     const key = makeKey(role, pubkey);
     const prev = locks.get(key) ?? Promise.resolve();
@@ -113,26 +78,12 @@ export function createWalletStore(): WalletStore {
     }
   }
 
-  function computeBalance(data: WalletData): WalletBalance {
-    const pendingSats = [...data.pending.values()].reduce(
-      (sum, proofs) => sum + sumProofs(proofs),
-      0,
-    );
-    return {
-      balance_sats: sumProofs(data.confirmed),
-      pending_sats: pendingSats,
-      mint_url: mintUrl,
-    };
-  }
-
   return {
     addProofs(role, pubkey, proofs) {
       getData(role, pubkey).confirmed.push(...proofs);
     },
 
     lockForQuery(role, pubkey, queryId, amountSats) {
-      // Synchronous path — callers that need atomicity should use the async
-      // withLock wrapper at the service layer. This remains sync for compat.
       const data = getData(role, pubkey);
       const result = selectProofs(data.confirmed, amountSats);
       if (!result) return null;
@@ -158,7 +109,7 @@ export function createWalletStore(): WalletStore {
     },
 
     getBalance(role, pubkey) {
-      return computeBalance(getData(role, pubkey));
+      return computeBalance(getData(role, pubkey), mintUrl);
     },
 
     getLockedProofs(role, pubkey, queryId) {
@@ -169,31 +120,8 @@ export function createWalletStore(): WalletStore {
 
     async getVerifiedBalance(role, pubkey) {
       const data = getData(role, pubkey);
-      const wallet = getCashuWallet();
-
-      if (wallet && data.confirmed.length > 0) {
-        try {
-          await wallet.loadMint();
-          const states = await wallet.checkProofsStates(data.confirmed);
-          const unspent = data.confirmed.filter(
-            (_, i) => states[i]?.state === "UNSPENT",
-          );
-          if (unspent.length < data.confirmed.length) {
-            const removed = data.confirmed.length - unspent.length;
-            console.error(
-              `[wallet] Pruned ${removed} spent proof(s) from ${role}:${pubkey}`,
-            );
-            data.confirmed = unspent;
-          }
-        } catch (err) {
-          console.error(
-            `[wallet] Mint verification failed for ${role}:${pubkey}:`,
-            err instanceof Error ? err.message : err,
-          );
-        }
-      }
-
-      return computeBalance(data);
+      await pruneSpentProofs(data, role, pubkey);
+      return computeBalance(data, mintUrl);
     },
   };
 }

@@ -1,207 +1,76 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import type { DemoEvent } from "./DemoApp";
-
-// --- Story step definitions ---
+import { StoryCard } from "./StoryCard";
+import type { StoryStepDef } from "./StoryCard";
 
 type Actor = "requester" | "worker" | "oracle" | "system";
 
-interface StoryStepDef {
-  step: number;
-  phase: string;
-  phaseColor: string;
-  icon: string;
-  actor: Actor;
-  target?: Actor;
-  title: string;
-  desc: string;
-}
-
 const ACTOR_INFO: Record<Actor, { label: string; emoji: string; color: string }> = {
-  requester: { label: "依頼者", emoji: "\uD83D\uDC64", color: "blue" },
-  worker: { label: "ワーカー", emoji: "\uD83D\uDCF7", color: "emerald" },
-  oracle: { label: "審判", emoji: "\u2696\uFE0F", color: "purple" },
-  system: { label: "システム", emoji: "\u26A1", color: "muted" },
+  requester: { label: "\u4F9D\u983C\u8005", emoji: "\uD83D\uDC64", color: "blue" },
+  worker: { label: "\u30EF\u30FC\u30AB\u30FC", emoji: "\uD83D\uDCF7", color: "emerald" },
+  oracle: { label: "\u5BE9\u5224", emoji: "\u2696\uFE0F", color: "purple" },
+  system: { label: "\u30B7\u30B9\u30C6\u30E0", emoji: "\u26A1", color: "muted" },
 };
 
 const STEPS: StoryStepDef[] = [
-  {
-    step: 1, phase: "準備", phaseColor: "text-muted-foreground",
-    icon: "\u26A1", actor: "system", title: "接続確認",
-    desc: "Nostrリレー・Blossom・Cashu Mintへの接続を確認",
-  },
-  {
-    step: 2, phase: "準備", phaseColor: "text-muted-foreground",
-    icon: "\uD83D\uDC65", actor: "system", title: "参加者の登場",
-    desc: "依頼者・ワーカー・審判がそれぞれ暗号鍵ペアを生成",
-  },
-  {
-    step: 3, phase: "依頼", phaseColor: "text-purple-400",
-    icon: "\uD83D\uDD10", actor: "oracle", target: "requester",
-    title: "審判が「金庫の番号」を共有",
-    desc: "審判が秘密の合鍵(プリイメージ)を生成し、そのハッシュを依頼者に渡す。このハッシュが報酬ロックの鍵穴になる",
-  },
-  {
-    step: 4, phase: "依頼", phaseColor: "text-blue-400",
-    icon: "\uD83D\uDCB0", actor: "requester",
-    title: "報酬を準備 (21 sats)",
-    desc: "依頼者がCashu Mintからecashトークンを発行。まだ誰にも渡さず手元に持つ",
-  },
-  {
-    step: 5, phase: "依頼", phaseColor: "text-blue-400",
-    icon: "\uD83D\uDCCB", actor: "requester",
-    title: "リクエストを掲示板に投稿",
-    desc: "「渋谷スクランブル交差点の写真が欲しい」というリクエストをNostr掲示板に公開投稿",
-  },
-  {
-    step: 6, phase: "マッチング", phaseColor: "text-emerald-400",
-    icon: "\uD83D\uDD0D", actor: "worker",
-    title: "リクエストを発見",
-    desc: "ワーカーが掲示板でリクエストを見つけ、指定された審判が信頼できるか確認",
-  },
-  {
-    step: 7, phase: "マッチング", phaseColor: "text-emerald-400",
-    icon: "\uD83D\uDE4B", actor: "worker", target: "requester",
-    title: "「21 satsでやります」",
-    desc: "ワーカーが依頼者に暗号化メッセージで見積もりを送信",
-  },
-  {
-    step: 8, phase: "マッチング", phaseColor: "text-blue-400",
-    icon: "\uD83D\uDC40", actor: "requester",
-    title: "見積もりを確認",
-    desc: "依頼者がワーカーの見積もりを復号して確認",
-  },
-  {
-    step: 9, phase: "エスクロー", phaseColor: "text-amber-400",
-    icon: "\uD83D\uDD12", actor: "requester",
-    title: "報酬をエスクロー(金庫)にロック",
-    desc: "報酬トークンにHTLC条件を追加: ワーカーが「合鍵」を持っていないと引き出せない。期限切れなら依頼者に返金",
-  },
-  {
-    step: 10, phase: "エスクロー", phaseColor: "text-blue-400",
-    icon: "\uD83E\uDD1D", actor: "requester", target: "worker",
-    title: "ワーカーを選定・金庫の鍵を渡す",
-    desc: "依頼者がワーカーを正式に選び、ロック済みトークンを暗号化メッセージで送付",
-  },
-  {
-    step: 11, phase: "エスクロー", phaseColor: "text-emerald-400",
-    icon: "\u2705", actor: "worker",
-    title: "選定を確認",
-    desc: "ワーカーが選定通知を復号し、自分の公開鍵が含まれていることを確認",
-  },
-  {
-    step: 12, phase: "納品", phaseColor: "text-emerald-400",
-    icon: "\uD83D\uDCF7", actor: "worker", target: "requester",
-    title: "撮影 → 暗号化 → 提出",
-    desc: "ワーカーが写真を撮影、AES-256-GCMで暗号化してBlossomにアップロード。復号鍵は依頼者用(K_R)と審判用(K_O)に分けてNIP-44で暗号化",
-  },
-  {
-    step: 13, phase: "納品", phaseColor: "text-emerald-400",
-    icon: "\uD83D\uDCE4", actor: "worker",
-    title: "成果物をNostrに公開",
-    desc: "暗号化された写真のリンクと復号鍵をNostrイベント(kind 6300)として公開",
-  },
-  {
-    step: 14, phase: "納品", phaseColor: "text-blue-400",
-    icon: "\uD83D\uDC41\uFE0F", actor: "requester",
-    title: "成果物を受信・復号",
-    desc: "依頼者がイベントを復号し、K_Rを使って写真にアクセス",
-  },
-  {
-    step: 15, phase: "決済", phaseColor: "text-purple-400",
-    icon: "\u2696\uFE0F", actor: "oracle", target: "worker",
-    title: "検証OK → 合鍵をワーカーに送信",
-    desc: "審判がK_Oで写真を復号・C2PA検証し、問題なければ秘密の合鍵(プリイメージ)をNIP-44 DMでワーカーに送信",
-  },
-  {
-    step: 16, phase: "決済", phaseColor: "text-emerald-400",
-    icon: "\uD83D\uDD11", actor: "worker",
-    title: "合鍵を受信・検証",
-    desc: "ワーカーが合鍵を受信し、hash(合鍵) が元のハッシュと一致することを確認",
-  },
-  {
-    step: 17, phase: "決済", phaseColor: "text-amber-400",
-    icon: "\uD83D\uDCB0", actor: "worker",
-    title: "金庫を開けて報酬GET!",
-    desc: "ワーカーが合鍵 + 自分の秘密鍵でHTLCトークンをMintに提示し、新しいecashトークンと交換",
-  },
+  { step: 1, phase: "\u6E96\u5099", phaseColor: "text-muted-foreground", icon: "\u26A1", actor: "system", title: "\u63A5\u7D9A\u78BA\u8A8D", desc: "Nostr\u30EA\u30EC\u30FC\u30FBBlossom\u30FBCashu Mint\u3078\u306E\u63A5\u7D9A\u3092\u78BA\u8A8D" },
+  { step: 2, phase: "\u6E96\u5099", phaseColor: "text-muted-foreground", icon: "\uD83D\uDC65", actor: "system", title: "\u53C2\u52A0\u8005\u306E\u767B\u5834", desc: "\u4F9D\u983C\u8005\u30FB\u30EF\u30FC\u30AB\u30FC\u30FB\u5BE9\u5224\u304C\u305D\u308C\u305E\u308C\u6697\u53F7\u9375\u30DA\u30A2\u3092\u751F\u6210" },
+  { step: 3, phase: "\u4F9D\u983C", phaseColor: "text-purple-400", icon: "\uD83D\uDD10", actor: "oracle", target: "requester", title: "\u5BE9\u5224\u304C\u300C\u91D1\u5EAB\u306E\u756A\u53F7\u300D\u3092\u5171\u6709", desc: "\u5BE9\u5224\u304C\u79D8\u5BC6\u306E\u5408\u9375\uFF08\u30D7\u30EA\u30A4\u30E1\u30FC\u30B8\uFF09\u3092\u751F\u6210\u3057\u3001\u305D\u306E\u30CF\u30C3\u30B7\u30E5\u3092\u4F9D\u983C\u8005\u306B\u6E21\u3059\u3002\u3053\u306E\u30CF\u30C3\u30B7\u30E5\u304C\u5831\u916C\u30ED\u30C3\u30AF\u306E\u9375\u7A74\u306B\u306A\u308B" },
+  { step: 4, phase: "\u4F9D\u983C", phaseColor: "text-blue-400", icon: "\uD83D\uDCB0", actor: "requester", title: "\u5831\u916C\u3092\u6E96\u5099 (21 sats)", desc: "\u4F9D\u983C\u8005\u304CCashu Mint\u304B\u3089ecash\u30C8\u30FC\u30AF\u30F3\u3092\u767A\u884C\u3002\u307E\u3060\u8AB0\u306B\u3082\u6E21\u3055\u305A\u624B\u5143\u306B\u6301\u3064" },
+  { step: 5, phase: "\u4F9D\u983C", phaseColor: "text-blue-400", icon: "\uD83D\uDCCB", actor: "requester", title: "\u30EA\u30AF\u30A8\u30B9\u30C8\u3092\u63B2\u793A\u677F\u306B\u6295\u7A3F", desc: "\u300C\u6E0B\u8C37\u30B9\u30AF\u30E9\u30F3\u30D6\u30EB\u4EA4\u5DEE\u70B9\u306E\u5199\u771F\u304C\u6B32\u3057\u3044\u300D\u3068\u3044\u3046\u30EA\u30AF\u30A8\u30B9\u30C8\u3092Nostr\u63B2\u793A\u677F\u306B\u516C\u958B\u6295\u7A3F" },
+  { step: 6, phase: "\u30DE\u30C3\u30C1\u30F3\u30B0", phaseColor: "text-emerald-400", icon: "\uD83D\uDD0D", actor: "worker", title: "\u30EA\u30AF\u30A8\u30B9\u30C8\u3092\u767A\u898B", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u63B2\u793A\u677F\u3067\u30EA\u30AF\u30A8\u30B9\u30C8\u3092\u898B\u3064\u3051\u3001\u6307\u5B9A\u3055\u308C\u305F\u5BE9\u5224\u304C\u4FE1\u983C\u3067\u304D\u308B\u304B\u78BA\u8A8D" },
+  { step: 7, phase: "\u30DE\u30C3\u30C1\u30F3\u30B0", phaseColor: "text-emerald-400", icon: "\uD83D\uDE4B", actor: "worker", target: "requester", title: "\u300C21 sats\u3067\u3084\u308A\u307E\u3059\u300D", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u4F9D\u983C\u8005\u306B\u6697\u53F7\u5316\u30E1\u30C3\u30BB\u30FC\u30B8\u3067\u898B\u7A4D\u3082\u308A\u3092\u9001\u4FE1" },
+  { step: 8, phase: "\u30DE\u30C3\u30C1\u30F3\u30B0", phaseColor: "text-blue-400", icon: "\uD83D\uDC40", actor: "requester", title: "\u898B\u7A4D\u3082\u308A\u3092\u78BA\u8A8D", desc: "\u4F9D\u983C\u8005\u304C\u30EF\u30FC\u30AB\u30FC\u306E\u898B\u7A4D\u3082\u308A\u3092\u5FA9\u53F7\u3057\u3066\u78BA\u8A8D" },
+  { step: 9, phase: "\u30A8\u30B9\u30AF\u30ED\u30FC", phaseColor: "text-amber-400", icon: "\uD83D\uDD12", actor: "requester", title: "\u5831\u916C\u3092\u30A8\u30B9\u30AF\u30ED\u30FC\uFF08\u91D1\u5EAB\uFF09\u306B\u30ED\u30C3\u30AF", desc: "\u5831\u916C\u30C8\u30FC\u30AF\u30F3\u306BHTLC\u6761\u4EF6\u3092\u8FFD\u52A0: \u30EF\u30FC\u30AB\u30FC\u304C\u300C\u5408\u9375\u300D\u3092\u6301\u3063\u3066\u3044\u306A\u3044\u3068\u5F15\u304D\u51FA\u305B\u306A\u3044\u3002\u671F\u9650\u5207\u308C\u306A\u3089\u4F9D\u983C\u8005\u306B\u8FD4\u91D1" },
+  { step: 10, phase: "\u30A8\u30B9\u30AF\u30ED\u30FC", phaseColor: "text-blue-400", icon: "\uD83E\uDD1D", actor: "requester", target: "worker", title: "\u30EF\u30FC\u30AB\u30FC\u3092\u9078\u5B9A\u30FB\u91D1\u5EAB\u306E\u9375\u3092\u6E21\u3059", desc: "\u4F9D\u983C\u8005\u304C\u30EF\u30FC\u30AB\u30FC\u3092\u6B63\u5F0F\u306B\u9078\u3073\u3001\u30ED\u30C3\u30AF\u6E08\u307F\u30C8\u30FC\u30AF\u30F3\u3092\u6697\u53F7\u5316\u30E1\u30C3\u30BB\u30FC\u30B8\u3067\u9001\u4ED8" },
+  { step: 11, phase: "\u30A8\u30B9\u30AF\u30ED\u30FC", phaseColor: "text-emerald-400", icon: "\u2705", actor: "worker", title: "\u9078\u5B9A\u3092\u78BA\u8A8D", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u9078\u5B9A\u901A\u77E5\u3092\u5FA9\u53F7\u3057\u3001\u81EA\u5206\u306E\u516C\u958B\u9375\u304C\u542B\u307E\u308C\u3066\u3044\u308B\u3053\u3068\u3092\u78BA\u8A8D" },
+  { step: 12, phase: "\u7D0D\u54C1", phaseColor: "text-emerald-400", icon: "\uD83D\uDCF7", actor: "worker", target: "requester", title: "\u64AE\u5F71 \u2192 \u6697\u53F7\u5316 \u2192 \u63D0\u51FA", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u5199\u771F\u3092\u64AE\u5F71\u3001AES-256-GCM\u3067\u6697\u53F7\u5316\u3057\u3066Blossom\u306B\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\u3002\u5FA9\u53F7\u9375\u306F\u4F9D\u983C\u8005\u7528(K_R)\u3068\u5BE9\u5224\u7528(K_O)\u306B\u5206\u3051\u3066NIP-44\u3067\u6697\u53F7\u5316" },
+  { step: 13, phase: "\u7D0D\u54C1", phaseColor: "text-emerald-400", icon: "\uD83D\uDCE4", actor: "worker", title: "\u6210\u679C\u7269\u3092Nostr\u306B\u516C\u958B", desc: "\u6697\u53F7\u5316\u3055\u308C\u305F\u5199\u771F\u306E\u30EA\u30F3\u30AF\u3068\u5FA9\u53F7\u9375\u3092Nostr\u30A4\u30D9\u30F3\u30C8(kind 6300)\u3068\u3057\u3066\u516C\u958B" },
+  { step: 14, phase: "\u7D0D\u54C1", phaseColor: "text-blue-400", icon: "\uD83D\uDC41\uFE0F", actor: "requester", title: "\u6210\u679C\u7269\u3092\u53D7\u4FE1\u30FB\u5FA9\u53F7", desc: "\u4F9D\u983C\u8005\u304C\u30A4\u30D9\u30F3\u30C8\u3092\u5FA9\u53F7\u3057\u3001K_R\u3092\u4F7F\u3063\u3066\u5199\u771F\u306B\u30A2\u30AF\u30BB\u30B9" },
+  { step: 15, phase: "\u6C7A\u6E08", phaseColor: "text-purple-400", icon: "\u2696\uFE0F", actor: "oracle", target: "worker", title: "\u691C\u8A3COK \u2192 \u5408\u9375\u3092\u30EF\u30FC\u30AB\u30FC\u306B\u9001\u4FE1", desc: "\u5BE9\u5224\u304CK_O\u3067\u5199\u771F\u3092\u5FA9\u53F7\u30FBC2PA\u691C\u8A3C\u3057\u3001\u554F\u984C\u306A\u3051\u308C\u3070\u79D8\u5BC6\u306E\u5408\u9375\uFF08\u30D7\u30EA\u30A4\u30E1\u30FC\u30B8\uFF09\u3092NIP-44 DM\u3067\u30EF\u30FC\u30AB\u30FC\u306B\u9001\u4FE1" },
+  { step: 16, phase: "\u6C7A\u6E08", phaseColor: "text-emerald-400", icon: "\uD83D\uDD11", actor: "worker", title: "\u5408\u9375\u3092\u53D7\u4FE1\u30FB\u691C\u8A3C", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u5408\u9375\u3092\u53D7\u4FE1\u3057\u3001hash(\u5408\u9375) \u304C\u5143\u306E\u30CF\u30C3\u30B7\u30E5\u3068\u4E00\u81F4\u3059\u308B\u3053\u3068\u3092\u78BA\u8A8D" },
+  { step: 17, phase: "\u6C7A\u6E08", phaseColor: "text-amber-400", icon: "\uD83D\uDCB0", actor: "worker", title: "\u91D1\u5EAB\u3092\u958B\u3051\u3066\u5831\u916CGET!", desc: "\u30EF\u30FC\u30AB\u30FC\u304C\u5408\u9375 + \u81EA\u5206\u306E\u79D8\u5BC6\u9375\u3067HTLC\u30C8\u30FC\u30AF\u30F3\u3092Mint\u306B\u63D0\u793A\u3057\u3001\u65B0\u3057\u3044ecash\u30C8\u30FC\u30AF\u30F3\u3068\u4EA4\u63DB" },
 ];
-
-// --- Component ---
 
 interface Props {
   events: DemoEvent[];
   finished: boolean;
 }
 
-function FlowIndicator({ actor, target }: { actor: Actor; target?: Actor }) {
-  if (!target || actor === "system") return null;
-  const from = ACTOR_INFO[actor];
-  const to = ACTOR_INFO[target];
-  return (
-    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-2">
-      <span>{from.emoji} {from.label}</span>
-      <span className="text-muted-foreground/50">{"\u2192"}</span>
-      <span>{to.emoji} {to.label}</span>
-    </div>
-  );
-}
-
-function StoryCard({ def, active, completed }: { def: StoryStepDef; active: boolean; completed: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-  const actorInfo = ACTOR_INFO[def.actor];
-
-  const bgColor: Record<string, string> = {
-    blue: "border-blue-400/20 bg-blue-950/20",
-    emerald: "border-emerald-400/20 bg-emerald-950/20",
-    purple: "border-purple-400/20 bg-purple-950/20",
-    muted: "border-border bg-muted/10",
-  };
-
-  const activeBg: Record<string, string> = {
-    blue: "border-blue-400/50 bg-blue-950/40 shadow-lg shadow-blue-400/5",
-    emerald: "border-emerald-400/50 bg-emerald-950/40 shadow-lg shadow-emerald-400/5",
-    purple: "border-purple-400/50 bg-purple-950/40 shadow-lg shadow-purple-400/5",
-    muted: "border-border bg-muted/20",
-  };
+function ActorBar({ currentStep, finished }: { currentStep: number; finished: boolean }) {
+  function actorStatus(actor: Actor): "idle" | "active" | "done" {
+    if (finished) return "done";
+    const activeStep = STEPS.find((s) => s.step === currentStep);
+    if (activeStep?.actor === actor) return "active";
+    return "idle";
+  }
 
   return (
-    <div
-      className={`
-        relative rounded-xl border p-4 transition-all duration-500 cursor-pointer
-        ${active ? activeBg[actorInfo.color] ?? "" : completed ? `${bgColor[actorInfo.color] ?? ""} opacity-70` : "border-border/30 bg-card/30 opacity-30"}
-        ${active ? "animate-slide-in scale-[1.01]" : ""}
-      `}
-      onClick={() => setExpanded((e) => !e)}
-    >
-      {/* Phase + Step */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`text-[10px] uppercase tracking-widest font-semibold ${def.phaseColor}`}>
-          {def.phase}
-        </span>
-        <span className="text-[10px] text-muted-foreground/50">Step {def.step}</span>
-        {active && (
-          <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        )}
-        {completed && !active && (
-          <span className="ml-auto text-[10px] text-emerald-400">{"\u2713"}</span>
-        )}
-      </div>
-
-      {/* Title with icon */}
-      <div className="flex items-start gap-3">
-        <span className="text-2xl leading-none mt-0.5 shrink-0">{def.icon}</span>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-foreground leading-snug">
-            {def.title}
-          </h3>
-          {(active || expanded) && (
-            <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-              {def.desc}
-            </p>
-          )}
-          <FlowIndicator actor={def.actor} target={def.target} />
-        </div>
-      </div>
+    <div className="border-b border-border px-6 py-4 flex items-center justify-center gap-8">
+      {(["requester", "worker", "oracle"] as const).map((id) => {
+        const info = ACTOR_INFO[id];
+        const status = actorStatus(id);
+        return (
+          <div key={id} className="flex items-center gap-2.5">
+            <div className={`
+              w-10 h-10 rounded-full flex items-center justify-center text-lg
+              transition-all duration-300
+              ${status === "active" ? "ring-2 ring-offset-2 ring-offset-background scale-110" : ""}
+              ${id === "requester" ? "bg-blue-950 ring-blue-400" : ""}
+              ${id === "worker" ? "bg-emerald-950 ring-emerald-400" : ""}
+              ${id === "oracle" ? "bg-purple-950 ring-purple-400" : ""}
+            `}>
+              {info.emoji}
+            </div>
+            <div>
+              <div className="text-sm font-medium">{info.label}</div>
+              <div className={`text-[10px] ${status === "active" ? "text-emerald-400" : "text-muted-foreground"}`}>
+                {status === "active" ? "\u5B9F\u884C\u4E2D..." : status === "done" ? "\u5B8C\u4E86" : "\u5F85\u6A5F\u4E2D"}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -218,53 +87,17 @@ export function StoryView({ events, finished }: Props) {
     activeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [currentStep]);
 
-  // Actor status
-  const actorStatus = (actor: Actor): "idle" | "active" | "done" => {
-    if (finished) return "done";
-    const activeStep = STEPS.find((s) => s.step === currentStep);
-    if (activeStep?.actor === actor) return "active";
-    return "idle";
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground">
-      {/* Header */}
       <header className="border-b border-border px-6 py-5">
         <h1 className="text-xl font-bold tracking-tight">Anchr HTLC Demo</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          写真撮影依頼から報酬の自動決済までの流れ
+          {"\u5199\u771F\u64AE\u5F71\u4F9D\u983C\u304B\u3089\u5831\u916C\u306E\u81EA\u52D5\u6C7A\u6E08\u307E\u3067\u306E\u6D41\u308C"}
         </p>
       </header>
 
-      {/* Actor bar */}
-      <div className="border-b border-border px-6 py-4 flex items-center justify-center gap-8">
-        {(["requester", "worker", "oracle"] as const).map((id) => {
-          const info = ACTOR_INFO[id];
-          const status = actorStatus(id);
-          return (
-            <div key={id} className="flex items-center gap-2.5">
-              <div className={`
-                w-10 h-10 rounded-full flex items-center justify-center text-lg
-                transition-all duration-300
-                ${status === "active" ? "ring-2 ring-offset-2 ring-offset-background scale-110" : ""}
-                ${id === "requester" ? "bg-blue-950 ring-blue-400" : ""}
-                ${id === "worker" ? "bg-emerald-950 ring-emerald-400" : ""}
-                ${id === "oracle" ? "bg-purple-950 ring-purple-400" : ""}
-              `}>
-                {info.emoji}
-              </div>
-              <div>
-                <div className="text-sm font-medium">{info.label}</div>
-                <div className={`text-[10px] ${status === "active" ? "text-emerald-400" : "text-muted-foreground"}`}>
-                  {status === "active" ? "実行中..." : status === "done" ? "完了" : "待機中"}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      <ActorBar currentStep={currentStep} finished={finished} />
 
-      {/* Progress */}
       <div className="h-1 bg-muted">
         <div
           className="h-full bg-blue-400 transition-all duration-700"
@@ -272,7 +105,6 @@ export function StoryView({ events, finished }: Props) {
         />
       </div>
 
-      {/* Timeline */}
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-3">
         {STEPS.map((def) => {
           const isActive = def.step === currentStep && !finished;
@@ -284,13 +116,12 @@ export function StoryView({ events, finished }: Props) {
           );
         })}
 
-        {/* Done card */}
         {finished && (
           <div className="rounded-xl border border-emerald-400/30 bg-emerald-950/20 p-6 text-center animate-slide-in">
             <span className="text-4xl">{"\uD83C\uDF89"}</span>
-            <h3 className="text-lg font-bold text-emerald-400 mt-3">完了!</h3>
+            <h3 className="text-lg font-bold text-emerald-400 mt-3">{"\u5B8C\u4E86!"}</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              全てのステップが正常に完了しました。ワーカーは合鍵でエスクローを解除し、報酬を受け取りました。
+              {"\u5168\u3066\u306E\u30B9\u30C6\u30C3\u30D7\u304C\u6B63\u5E38\u306B\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002\u30EF\u30FC\u30AB\u30FC\u306F\u5408\u9375\u3067\u30A8\u30B9\u30AF\u30ED\u30FC\u3092\u89E3\u9664\u3057\u3001\u5831\u916C\u3092\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\u3002"}
             </p>
           </div>
         )}

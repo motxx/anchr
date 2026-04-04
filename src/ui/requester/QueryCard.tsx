@@ -4,33 +4,21 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Globe,
   ImageIcon,
   Loader2,
-  Lock,
   XCircle,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { apiFetch } from "../api-config";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
 import { cn } from "../lib/utils";
+import { DecryptedImage } from "./DecryptedImage";
+import { TlsnProofPanel } from "./TlsnProofPanel";
 
-interface Bounty {
-  amount_sats: number;
-}
-
-interface HtlcSummary {
-  hash: string;
-  oracle_pubkey: string;
-  worker_pubkey: string | null;
-  locktime: number;
-}
-
-interface BlossomKeyMaterial {
-  encrypt_key: string;
-  encrypt_iv: string;
-}
+interface Bounty { amount_sats: number }
+interface HtlcSummary { hash: string; oracle_pubkey: string; worker_pubkey: string | null; locktime: number }
+interface BlossomKeyMaterial { encrypt_key: string; encrypt_iv: string }
 
 interface QuerySummary {
   id: string;
@@ -53,19 +41,6 @@ interface AttachmentInfo {
   storage_kind?: string;
 }
 
-interface TlsnCondition {
-  type: string;
-  expression: string;
-  expected?: string;
-  description?: string;
-}
-
-interface TlsnRequirement {
-  target_url: string;
-  method?: string;
-  conditions?: TlsnCondition[];
-}
-
 interface TlsnVerifiedData {
   server_name: string;
   revealed_body: string;
@@ -73,14 +48,17 @@ interface TlsnVerifiedData {
   session_timestamp: number;
 }
 
+interface TlsnRequirement {
+  target_url: string;
+  method?: string;
+  conditions?: { type: string; expression: string; expected?: string; description?: string }[];
+}
+
 interface QueryDetail extends QuerySummary {
   created_at: number;
   submitted_at?: number;
   payment_status: string;
-  result?: {
-    attachments: AttachmentInfo[];
-    notes?: string;
-  };
+  result?: { attachments: AttachmentInfo[]; notes?: string };
   verification?: {
     passed: boolean;
     checks: string[];
@@ -91,127 +69,33 @@ interface QueryDetail extends QuerySummary {
   tlsn_requirements?: TlsnRequirement | null;
 }
 
-// --- AES-256-GCM decryption (Web Crypto API) ---
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-async function decryptBlob(
-  encrypted: ArrayBuffer,
-  keyHex: string,
-  ivHex: string,
-): Promise<ArrayBuffer> {
-  const keyBytes = hexToBytes(keyHex);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBytes.buffer as ArrayBuffer,
-    { name: "AES-GCM" },
-    false,
-    ["decrypt"],
-  );
-  const ivBytes = hexToBytes(ivHex);
-  return crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: ivBytes.buffer as ArrayBuffer },
-    key,
-    encrypted,
-  );
-}
-
-// --- Decrypted image component ---
-
-function DecryptedImage({
-  attachment,
-  keyMaterial,
-}: {
-  attachment: AttachmentInfo;
-  keyMaterial: BlossomKeyMaterial;
-}) {
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let revoked = false;
-    (async () => {
-      try {
-        const res = await fetch(attachment.uri);
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-        const encrypted = await res.arrayBuffer();
-        const decrypted = await decryptBlob(encrypted, keyMaterial.encrypt_key, keyMaterial.encrypt_iv);
-        if (revoked) return;
-        const blob = new Blob([decrypted], { type: attachment.mime_type });
-        setObjectUrl(URL.createObjectURL(blob));
-      } catch (e) {
-        if (!revoked) setError((e as Error).message);
-      } finally {
-        if (!revoked) setLoading(false);
-      }
-    })();
-    return () => {
-      revoked = true;
-      setObjectUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
-    };
-  }, [attachment.uri, keyMaterial.encrypt_key, keyMaterial.encrypt_iv]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48 rounded-md border bg-muted/20">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 p-3 rounded-md border bg-red-50 text-xs text-red-400">
-        <XCircle className="w-4 h-4 shrink-0" />
-        {error}
-      </div>
-    );
-  }
-
-  if (!objectUrl) return null;
-
-  const isVideo = attachment.mime_type.startsWith("video/");
-  return isVideo ? (
-    <video src={objectUrl} controls muted className="w-full rounded-md border" />
-  ) : (
-    <img src={objectUrl} alt="decrypted" className="w-full rounded-md border" />
-  );
-}
-
-// --- Status config ---
+// ---- Helpers ----
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "受付中", variant: "secondary" },
-  awaiting_quotes: { label: "見積待ち", variant: "secondary" },
-  worker_selected: { label: "ワーカー決定", variant: "default" },
-  processing: { label: "処理中", variant: "default" },
-  verifying: { label: "検証中", variant: "default" },
-  submitted: { label: "提出済み", variant: "default" },
-  approved: { label: "承認", variant: "default" },
-  rejected: { label: "却下", variant: "destructive" },
-  expired: { label: "期限切れ", variant: "outline" },
+  pending: { label: "\u53D7\u4ED8\u4E2D", variant: "secondary" },
+  awaiting_quotes: { label: "\u898B\u7A4D\u5F85\u3061", variant: "secondary" },
+  worker_selected: { label: "\u30EF\u30FC\u30AB\u30FC\u6C7A\u5B9A", variant: "default" },
+  processing: { label: "\u51E6\u7406\u4E2D", variant: "default" },
+  verifying: { label: "\u691C\u8A3C\u4E2D", variant: "default" },
+  submitted: { label: "\u63D0\u51FA\u6E08\u307F", variant: "default" },
+  approved: { label: "\u627F\u8A8D", variant: "default" },
+  rejected: { label: "\u5374\u4E0B", variant: "destructive" },
+  expired: { label: "\u671F\u9650\u5207\u308C", variant: "outline" },
 };
 
 function timeAgo(ts: number): string {
   const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return `${s}秒前`;
-  if (s < 3600) return `${Math.floor(s / 60)}分前`;
-  if (s < 86400) return `${Math.floor(s / 3600)}時間前`;
-  return `${Math.floor(s / 86400)}日前`;
+  if (s < 60) return `${s}\u79D2\u524D`;
+  if (s < 3600) return `${Math.floor(s / 60)}\u5206\u524D`;
+  if (s < 86400) return `${Math.floor(s / 3600)}\u6642\u9593\u524D`;
+  return `${Math.floor(s / 86400)}\u65E5\u524D`;
 }
 
 function timeLeft(expiresAt: number): string {
   const s = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-  if (s === 0) return "期限切れ";
-  if (s < 60) return `残り${s}秒`;
-  return `残り${Math.floor(s / 60)}分`;
+  if (s === 0) return "\u671F\u9650\u5207\u308C";
+  if (s < 60) return `\u6B8B\u308A${s}\u79D2`;
+  return `\u6B8B\u308A${Math.floor(s / 60)}\u5206`;
 }
 
 function StatusIcon({ status }: { status: string }) {
@@ -230,80 +114,110 @@ function StatusIcon({ status }: { status: string }) {
   }
 }
 
-// --- TLSNotary Proof Panel ---
+// ---- Sub-components ----
 
-function TlsnProofPanel({
-  verified,
-  requirement,
-}: {
-  verified: TlsnVerifiedData;
-  requirement?: TlsnRequirement | null;
-}) {
-  const [showBody, setShowBody] = useState(false);
-
-  let bodyDisplay: string;
-  let isJson = false;
-  try {
-    bodyDisplay = JSON.stringify(JSON.parse(verified.revealed_body), null, 2);
-    isJson = true;
-  } catch {
-    bodyDisplay = verified.revealed_body;
-  }
-
-  const ts = new Date(verified.session_timestamp * 1000).toLocaleString();
-
+function QueryMeta({ detail, query, isActive }: { detail?: QueryDetail; query: QuerySummary; isActive: boolean }) {
   return (
-    <div className="rounded-lg border bg-card px-3 py-3 space-y-3">
-      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
-        <Lock className="w-3 h-3" /> TLSNotary Proof (cryptographically verified)
-      </p>
-
-      {/* Server */}
-      <div className="flex items-center gap-1.5">
-        <Globe className="w-3.5 h-3.5 text-emerald-500" />
-        <span className="text-sm font-medium text-foreground">{verified.server_name}</span>
-      </div>
-
-      {/* Conditions */}
-      {requirement?.conditions && requirement.conditions.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Conditions</p>
-          {requirement.conditions.map((cond, i) => (
-            <div key={i} className="flex items-start gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" />
-              <span className="text-xs text-muted-foreground">
-                {cond.description ?? `${cond.type}: ${cond.expression}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Server Response (collapsible) */}
-      <button
-        type="button"
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        onClick={() => setShowBody((v) => !v)}
-      >
-        {showBody ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        <span className="font-medium">Server Response</span>
-        {isJson && (
-          <span className="bg-blue-500/20 text-blue-400 text-[9px] font-medium rounded px-1.5 py-0.5">JSON</span>
-        )}
-      </button>
-      {showBody && (
-        <pre className="bg-black/60 rounded-md p-3 text-xs text-emerald-300 font-mono overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap">
-          {bodyDisplay}
-        </pre>
-      )}
-
-      {/* Timestamp */}
-      <span className="text-[10px] text-muted-foreground">{ts}</span>
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <span>{timeAgo(detail?.created_at ?? Date.now())}</span>
+      {query.location_hint && <span>{query.location_hint}</span>}
+      {isActive && <span className="text-amber-500">{timeLeft(query.expires_at)}</span>}
+      {query.quotes_count > 0 && <span>{query.quotes_count}{"\u4EF6\u306E\u898B\u7A4D\u3082\u308A"}</span>}
     </div>
   );
 }
 
-// --- QueryCard ---
+function ChallengeNonce({ nonce, rule }: { nonce: string | null; rule: string | null }) {
+  if (!nonce) return null;
+  return (
+    <div className="rounded-lg border bg-muted/30 px-3 py-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">Challenge Nonce</p>
+      <p className="font-mono text-3xl font-black tracking-[0.3em] leading-none mb-2">{nonce}</p>
+      <p className="text-xs text-muted-foreground leading-relaxed">{rule}</p>
+    </div>
+  );
+}
+
+function HtlcInfo({ htlc }: { htlc: HtlcSummary }) {
+  return (
+    <div className="rounded-xl border border-blue-950 bg-blue-950/30 px-3 py-3 space-y-1">
+      <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">HTLC Escrow</p>
+      <p className="text-xs text-muted-foreground font-mono truncate">Hash: {htlc.hash}</p>
+      {htlc.worker_pubkey && (
+        <p className="text-xs text-muted-foreground font-mono truncate">Worker: {htlc.worker_pubkey}</p>
+      )}
+    </div>
+  );
+}
+
+function VerificationResult({ verification }: { verification: QueryDetail["verification"] }) {
+  if (!verification) return null;
+  return (
+    <div className={cn(
+      "rounded-xl border px-3 py-3",
+      verification.passed ? "bg-emerald-950/30 border-emerald-800" : "bg-red-950/30 border-red-900",
+    )}>
+      <div className="flex items-center gap-2 mb-1">
+        {verification.passed
+          ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          : <XCircle className="w-4 h-4 text-red-400" />}
+        <span className={cn("text-sm font-semibold", verification.passed ? "text-emerald-400" : "text-red-400")}>
+          {verification.passed ? "\u691C\u8A3COK" : "\u691C\u8A3CNG"}
+        </span>
+      </div>
+      {verification.checks.length > 0 && (
+        <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+          {verification.checks.map((c, i) => (
+            <li key={i}>{verification.passed ? "\u2713" : ""} {c}</li>
+          ))}
+        </ul>
+      )}
+      {verification.failures.length > 0 && (
+        <ul className="text-xs text-red-400 mt-1 space-y-0.5">
+          {verification.failures.map((f, i) => <li key={i}>{f}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function AttachmentList({
+  attachments,
+  blossomKeys,
+  notes,
+}: {
+  attachments: AttachmentInfo[];
+  blossomKeys?: Record<string, BlossomKeyMaterial> | null;
+  notes?: string;
+}) {
+  if (attachments.length === 0) return null;
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+        <ImageIcon className="w-3.5 h-3.5" />
+        {"\u6DFB\u4ED8\u30D5\u30A1\u30A4\u30EB"} ({attachments.length})
+      </p>
+      {attachments.map((att) => {
+        const km = blossomKeys?.[att.id];
+        if (km) return <DecryptedImage key={att.id} attachment={att} keyMaterial={km} />;
+        return (
+          <a
+            key={att.id}
+            href={att.uri}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground hover:border-ring transition-colors truncate"
+          >
+            {att.mime_type}
+          </a>
+        );
+      })}
+      {notes && <p className="text-xs text-muted-foreground">{notes}</p>}
+    </div>
+  );
+}
+
+// ---- Main QueryCard ----
 
 export function QueryCard({ query }: { query: QuerySummary }) {
   const [open, setOpen] = useState(false);
@@ -316,8 +230,6 @@ export function QueryCard({ query }: { query: QuerySummary }) {
     enabled: open,
     refetchInterval: open && isActive ? 3000 : false,
   });
-
-  const blossomKeys = detail?.blossom_keys;
 
   return (
     <Card className={cn("overflow-hidden py-0 gap-0 transition-shadow rounded-2xl", open && "shadow-sm")}>
@@ -338,136 +250,37 @@ export function QueryCard({ query }: { query: QuerySummary }) {
                 {query.bounty.amount_sats} sats
               </span>
             )}
-            <Badge variant={config.variant} className="text-[10px]">
-              {config.label}
-            </Badge>
-            {open ? (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            )}
+            <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>
+            {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
           </div>
         </div>
       </CardHeader>
 
       {open && (
         <CardContent className="px-4 pb-4 pt-3 border-t space-y-4">
-          {/* Meta */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>{timeAgo(detail?.created_at ?? Date.now())}</span>
-            {query.location_hint && <span>{query.location_hint}</span>}
-            {isActive && <span className="text-amber-500">{timeLeft(query.expires_at)}</span>}
-            {query.quotes_count > 0 && (
-              <span>{query.quotes_count}件の見積もり</span>
-            )}
-          </div>
+          <QueryMeta detail={detail} query={query} isActive={isActive} />
+          <ChallengeNonce nonce={query.challenge_nonce} rule={query.challenge_rule} />
+          {query.htlc && <HtlcInfo htlc={query.htlc} />}
 
-          {/* Challenge (only when nonce is present) */}
-          {query.challenge_nonce && (
-            <div className="rounded-lg border bg-muted/30 px-3 py-3">
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1.5">
-                Challenge Nonce
-              </p>
-              <p className="font-mono text-3xl font-black tracking-[0.3em] leading-none mb-2">
-                {query.challenge_nonce}
-              </p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {query.challenge_rule}
-              </p>
-            </div>
-          )}
-
-          {/* HTLC info */}
-          {query.htlc && (
-            <div className="rounded-xl border border-blue-950 bg-blue-950/30 px-3 py-3 space-y-1">
-              <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">HTLC Escrow</p>
-              <p className="text-xs text-muted-foreground font-mono truncate">Hash: {query.htlc.hash}</p>
-              {query.htlc.worker_pubkey && (
-                <p className="text-xs text-muted-foreground font-mono truncate">Worker: {query.htlc.worker_pubkey}</p>
-              )}
-            </div>
-          )}
-
-          {/* Payment status */}
           {detail?.payment_status && detail.payment_status !== "none" && (
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">支払い:</span>
-              <Badge variant="outline" className="text-[10px]">
-                {detail.payment_status}
-              </Badge>
+              <span className="text-muted-foreground">{"\u652F\u6255\u3044:"}</span>
+              <Badge variant="outline" className="text-[10px]">{detail.payment_status}</Badge>
             </div>
           )}
 
-          {/* Verification result */}
-          {detail?.verification && (
-            <div className={cn(
-              "rounded-xl border px-3 py-3",
-              detail.verification.passed
-                ? "bg-emerald-950/30 border-emerald-800"
-                : "bg-red-950/30 border-red-900",
-            )}>
-              <div className="flex items-center gap-2 mb-1">
-                {detail.verification.passed
-                  ? <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  : <XCircle className="w-4 h-4 text-red-400" />
-                }
-                <span className={cn("text-sm font-semibold", detail.verification.passed ? "text-emerald-400" : "text-red-400")}>
-                  {detail.verification.passed ? "検証OK" : "検証NG"}
-                </span>
-              </div>
-              {detail.verification.checks.length > 0 && (
-                <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                  {detail.verification.checks.map((c, i) => (
-                    <li key={i}>{detail.verification!.passed ? "\u2713" : ""} {c}</li>
-                  ))}
-                </ul>
-              )}
-              {detail.verification.failures.length > 0 && (
-                <ul className="text-xs text-red-400 mt-1 space-y-0.5">
-                  {detail.verification.failures.map((f, i) => (
-                    <li key={i}>{f}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          <VerificationResult verification={detail?.verification} />
 
-          {/* TLSNotary Proof (from cryptographically verified data) */}
           {detail?.verification?.tlsn_verified && (
-            <TlsnProofPanel
-              verified={detail.verification.tlsn_verified}
-              requirement={detail.tlsn_requirements}
-            />
+            <TlsnProofPanel verified={detail.verification.tlsn_verified} requirement={detail.tlsn_requirements} />
           )}
 
-          {/* Decrypted attachments */}
           {detail?.result?.attachments && detail.result.attachments.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5" />
-                添付ファイル ({detail.result.attachments.length})
-              </p>
-              {detail.result.attachments.map((att) => {
-                const km = blossomKeys?.[att.id];
-                if (km) {
-                  return <DecryptedImage key={att.id} attachment={att} keyMaterial={km} />;
-                }
-                return (
-                  <a
-                    key={att.id}
-                    href={att.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block rounded-md border bg-muted/20 p-2 text-xs text-muted-foreground hover:border-ring transition-colors truncate"
-                  >
-                    {att.mime_type}
-                  </a>
-                );
-              })}
-              {detail.result.notes && (
-                <p className="text-xs text-muted-foreground">{detail.result.notes}</p>
-              )}
-            </div>
+            <AttachmentList
+              attachments={detail.result.attachments}
+              blossomKeys={detail.blossom_keys}
+              notes={detail.result.notes}
+            />
           )}
         </CardContent>
       )}

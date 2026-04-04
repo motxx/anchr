@@ -78,89 +78,99 @@ function parseProofJson(raw: string): ProofModeMetadata | null {
   }
 }
 
-/**
- * Extract photo + proof data from a ProofMode zip buffer.
- */
-export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeData | null> {
-  const { unzipSync } = await import("node:zlib");
+function findPhotoEntry(entries: Record<string, Buffer>): [string, Buffer] | null {
+  const found = Object.entries(entries).find(([name]) =>
+    /\.(jpg|jpeg|png|heic|webp)$/i.test(name) && !name.startsWith("__MACOSX"),
+  );
+  return found ?? null;
+}
 
-  // Use Bun's built-in zip support
+function validateProofJson(
+  entries: Record<string, Buffer>,
+  photoBuffer: Buffer,
+  checks: string[],
+  failures: string[],
+): { proof: ProofModeMetadata | null; hashValid: boolean } {
+  const proofJsonEntry = Object.entries(entries).find(([name]) =>
+    name.endsWith(".proof.json"),
+  );
+
+  if (!proofJsonEntry) {
+    checks.push("ProofMode: no proof.json (partial bundle)");
+    return { proof: null, hashValid: false };
+  }
+
+  const proof = parseProofJson(proofJsonEntry[1].toString("utf-8"));
+  if (!proof) return { proof: null, hashValid: false };
+
+  checks.push(`ProofMode: proof.json parsed (${proof.manufacturer} ${proof.hardware})`);
+
+  const actualHash = bytesToHex(sha256(new Uint8Array(photoBuffer)));
+  const hashValid = actualHash === proof.fileHashSha256;
+  if (hashValid) {
+    checks.push("ProofMode: SHA256 hash matches");
+  } else {
+    failures.push(`ProofMode: SHA256 mismatch (expected ${proof.fileHashSha256.slice(0, 16)}..., got ${actualHash.slice(0, 16)}...)`);
+  }
+
+  if (proof.locationProvider && proof.locationLatitude !== 0) {
+    const accuracy = proof.locationAccuracy.split(",")[0] || proof.locationAccuracy;
+    checks.push(`ProofMode: GPS via ${proof.locationProvider} (accuracy: ${parseFloat(accuracy).toFixed(1)}m)`);
+  }
+
+  return { proof, hashValid };
+}
+
+async function validatePgp(
+  entries: Record<string, Buffer>,
+  photoFilename: string,
+  photoBuffer: Buffer,
+  checks: string[],
+  failures: string[],
+): Promise<boolean | null> {
+  const hasAsc = Object.keys(entries).some((name) =>
+    name.endsWith(".asc") && !name.includes("proof") && !name.includes("pubkey"),
+  );
+  const hasPubkey = Object.keys(entries).some((name) => name === "pubkey.asc");
+  if (!hasAsc || !hasPubkey) return null;
+
+  const pgpValid = await verifyPgpSignature(entries, photoFilename, photoBuffer);
+  if (pgpValid === true) {
+    checks.push("ProofMode: PGP signature valid");
+  } else if (pgpValid === false) {
+    failures.push("ProofMode: PGP signature invalid");
+  } else {
+    checks.push("ProofMode: PGP signature present (gpg not available for verification)");
+  }
+  return pgpValid;
+}
+
+function checkAncillaryProofs(entries: Record<string, Buffer>, checks: string[]): { hasOts: boolean; hasDeviceCheck: boolean } {
+  const hasOts = Object.keys(entries).some((name) => name.endsWith(".ots"));
+  if (hasOts) checks.push("ProofMode: OpenTimestamps proof present (Bitcoin anchored)");
+
+  const hasDeviceCheck = Object.keys(entries).some((name) => name.endsWith(".devicecheck"));
+  if (hasDeviceCheck) checks.push("ProofMode: Apple DeviceCheck attestation present");
+
+  return { hasOts, hasDeviceCheck };
+}
+
+export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeData | null> {
   const entries = await extractZipEntries(zipBuffer);
   if (!entries) return null;
 
   const checks: string[] = [];
   const failures: string[] = [];
 
-  // Find the photo file
-  const photoEntry = Object.entries(entries).find(([name]) =>
-    /\.(jpg|jpeg|png|heic|webp)$/i.test(name) && !name.startsWith("__MACOSX"),
-  );
-  if (!photoEntry) {
-    return null; // No photo found in zip
-  }
+  const photoEntry = findPhotoEntry(entries);
+  if (!photoEntry) return null;
+
   const [photoFilename, photoBuffer] = photoEntry;
   checks.push(`ProofMode: photo found (${photoFilename})`);
 
-  // Find proof.json
-  const proofJsonEntry = Object.entries(entries).find(([name]) =>
-    name.endsWith(".proof.json"),
-  );
-  let proof: ProofModeMetadata | null = null;
-  let hashValid = false;
-
-  if (proofJsonEntry) {
-    proof = parseProofJson(proofJsonEntry[1].toString("utf-8"));
-    if (proof) {
-      checks.push(`ProofMode: proof.json parsed (${proof.manufacturer} ${proof.hardware})`);
-
-      // Verify SHA256 hash
-      const actualHash = bytesToHex(sha256(new Uint8Array(photoBuffer)));
-      hashValid = actualHash === proof.fileHashSha256;
-      if (hashValid) {
-        checks.push("ProofMode: SHA256 hash matches");
-      } else {
-        failures.push(`ProofMode: SHA256 mismatch (expected ${proof.fileHashSha256.slice(0, 16)}..., got ${actualHash.slice(0, 16)}...)`);
-      }
-
-      // GPS accuracy info
-      if (proof.locationProvider && proof.locationLatitude !== 0) {
-        const accuracy = proof.locationAccuracy.split(",")[0] || proof.locationAccuracy;
-        checks.push(`ProofMode: GPS via ${proof.locationProvider} (accuracy: ${parseFloat(accuracy).toFixed(1)}m)`);
-      }
-    }
-  } else {
-    checks.push("ProofMode: no proof.json (partial bundle)");
-  }
-
-  // Check for PGP signature + key
-  const hasAsc = Object.keys(entries).some((name) =>
-    name.endsWith(".asc") && !name.includes("proof") && !name.includes("pubkey"),
-  );
-  const hasPubkey = Object.keys(entries).some((name) => name === "pubkey.asc");
-  let pgpValid: boolean | null = null;
-
-  if (hasAsc && hasPubkey) {
-    pgpValid = await verifyPgpSignature(entries, photoFilename, photoBuffer);
-    if (pgpValid === true) {
-      checks.push("ProofMode: PGP signature valid");
-    } else if (pgpValid === false) {
-      failures.push("ProofMode: PGP signature invalid");
-    } else {
-      checks.push("ProofMode: PGP signature present (gpg not available for verification)");
-    }
-  }
-
-  // Check for OpenTimestamps
-  const hasOts = Object.keys(entries).some((name) => name.endsWith(".ots"));
-  if (hasOts) {
-    checks.push("ProofMode: OpenTimestamps proof present (Bitcoin anchored)");
-  }
-
-  // Check for DeviceCheck
-  const hasDeviceCheck = Object.keys(entries).some((name) => name.endsWith(".devicecheck"));
-  if (hasDeviceCheck) {
-    checks.push("ProofMode: Apple DeviceCheck attestation present");
-  }
+  const { proof, hashValid } = validateProofJson(entries, photoBuffer, checks, failures);
+  const pgpValid = await validatePgp(entries, photoFilename, photoBuffer, checks, failures);
+  const { hasOts, hasDeviceCheck } = checkAncillaryProofs(entries, checks);
 
   return {
     photo: photoBuffer,

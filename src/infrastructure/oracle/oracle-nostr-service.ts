@@ -12,17 +12,8 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../nostr/identity";
 import { restoreIdentity } from "../nostr/identity";
-import {
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_RESPONSE,
-  parseOracleResponsePayload,
-  parseFeedbackPayload,
-  type QuoteFeedbackPayload,
-  type OracleResponsePayload,
-} from "../nostr/events";
 import { buildPreimageDM, buildRejectionDM } from "../nostr/dm";
 import {
   publishEvent,
@@ -32,6 +23,13 @@ import {
 import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
+import {
+  type WatchedQuery,
+  buildQueryFromPayload,
+  buildResultFromPayload,
+  handleFeedbackEvent,
+  parseResponsePayload,
+} from "./oracle-nostr-handlers";
 
 /** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */
 let _publishEventFn: typeof publishEvent = publishEvent;
@@ -73,93 +71,30 @@ export interface OracleNostrService {
   stop(): void;
 }
 
-interface WatchedQuery {
-  queryId: string;
-  queryEventId: string;
-  requesterPubkey: string;
-  selectedWorkerPubkey?: string;
-  quotedWorkers: Set<string>;
-  subs: SubCloser[];
-}
-
 export function createOracleNostrService(config: OracleNostrServiceConfig): OracleNostrService {
   const preimageStore = config.preimageStore ?? createPreimageStore();
   const watched = new Map<string, WatchedQuery>();
-  // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
-
-  function handleFeedbackEvent(queryId: string, event: Event) {
-    const entry = watched.get(queryId);
-    if (!entry) return;
-
-    try {
-      const payload = parseFeedbackPayload(
-        event.content,
-        config.identity.secretKey,
-        event.pubkey,
-      );
-
-      if (payload.status === "payment-required") {
-        const quote = payload as QuoteFeedbackPayload;
-        entry.quotedWorkers.add(quote.worker_pubkey);
-        config.onQuote?.(queryId, quote.worker_pubkey, quote.amount_sats);
-      }
-    } catch {
-      // Cannot decrypt — event not for us, ignore
-    }
-  }
 
   async function handleResponseEvent(queryId: string, event: Event) {
     const entry = watched.get(queryId);
     if (!entry) return;
 
-    // Verify the sender is the selected Worker
     if (entry.selectedWorkerPubkey && event.pubkey !== entry.selectedWorkerPubkey) {
       console.error(`[oracle-nostr] Ignoring result from non-selected Worker ${event.pubkey}`);
       return;
     }
 
     try {
-      // Parse Oracle-specific payload from tags (NIP-44 encrypted to Oracle)
-      const oraclePayload = parseOracleResponsePayload(event, config.identity.secretKey);
+      const oraclePayload = parseResponsePayload(config.identity, event);
       if (!oraclePayload) {
         console.error(`[oracle-nostr] No oracle_payload tag in result for ${queryId}`);
         return;
       }
 
-      // Build a minimal Query and QueryResult for verification
-      const query: Query = {
-        id: queryId,
-        status: "processing",
-        description: "",
-        challenge_nonce: oraclePayload.nonce_echo,
-        challenge_rule: "",
-        verification_requirements: ["gps", "ai_check"],
-        created_at: 0,
-        expires_at: Date.now() + 600_000,
-        payment_status: "htlc_swapped",
-      };
-
-      // Map Oracle payload attachments to QueryResult attachments
-      const result: QueryResult = {
-        attachments: (oraclePayload.attachments ?? []).map((a) => ({
-          id: a.blossom_hash,
-          uri: a.blossom_urls[0] ?? "",
-          mime_type: a.mime,
-          storage_kind: "blossom" as const,
-          blossom_hash: a.blossom_hash,
-          blossom_servers: a.blossom_urls,
-        })),
-        notes: oraclePayload.notes,
-      };
-
-      const passed = await verifyAndDeliverInternal(
-        queryId,
-        query,
-        result,
-        event.pubkey,
-      );
-
+      const query = buildQueryFromPayload(queryId, oraclePayload);
+      const result = buildResultFromPayload(oraclePayload);
+      const passed = await verifyAndDeliverInternal(queryId, query, result, event.pubkey);
       config.onVerification?.(queryId, passed, event.pubkey);
     } catch (error) {
       console.error(`[oracle-nostr] Failed to process result for ${queryId}:`, error);
@@ -177,7 +112,6 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     const preimage = hash ? preimageStore.getPreimage(hash) : null;
 
     if (detail.passed && preimage && hash) {
-      // C2PA valid → deliver preimage via NIP-44 DM
       const dm = buildPreimageDM(config.identity, workerPubkey, queryId, preimage);
       const publishResult = await _publishEventFn(dm, config.relayUrls);
       if (publishResult.successes.length > 0) {
@@ -187,7 +121,6 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       queryHashMap.delete(queryId);
       return true;
     } else {
-      // C2PA invalid → deliver rejection
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
       await _publishEventFn(dm, config.relayUrls);
@@ -212,15 +145,13 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
         subs: [],
       };
 
-      // Subscribe to kind 7000 feedback (quotes, selection)
       const feedbackSub = subscribeToFeedback(
         queryEventId,
-        (event) => handleFeedbackEvent(queryId, event),
+        (event) => handleFeedbackEvent(config.identity, watched, queryId, event, config.onQuote),
         config.relayUrls,
       );
       entry.subs.push(feedbackSub);
 
-      // Subscribe to kind 6300 results
       const responseSub = subscribeToResponses(
         queryEventId,
         (event) => handleResponseEvent(queryId, event),
