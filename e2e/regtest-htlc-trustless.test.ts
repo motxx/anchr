@@ -104,6 +104,16 @@ async function mintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> 
   return wallet.mintProofs(amountSats, mintQuote.quote);
 }
 
+// Rate-limit mintProofs calls to avoid hitting the Nutshell mint's built-in
+// rate limiter (18+ tests each calling 3+ Cashu API calls).
+let lastMintTime = 0;
+async function throttledMintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
+  const elapsed = Date.now() - lastMintTime;
+  if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
+  lastMintTime = Date.now();
+  return mintProofs(wallet, amountSats);
+}
+
 /**
  * Create HTLC-locked proofs on the real Cashu Mint.
  *
@@ -267,7 +277,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
     // Mint fresh proofs and lock with HTLC
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -289,7 +299,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -312,7 +322,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -334,7 +344,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -366,7 +376,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -401,7 +411,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { preimage: wrongPreimage } = createHTLCHash(); // different preimage
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -423,7 +433,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -446,7 +456,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     // Locktime 1 hour from now — lock is ACTIVE
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -469,7 +479,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     // Locktime clearly expired (60 seconds in the past)
     const locktime = Math.floor(Date.now() / 1000) - 60;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -501,7 +511,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -535,7 +545,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const { preimage: wrongPreimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -553,7 +563,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const { hash: differentHash } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -571,7 +581,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -590,7 +600,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     process.env.CASHU_MINT_URL = MINT_URL;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -610,7 +620,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     process.env.CASHU_MINT_URL = MINT_URL;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -629,7 +639,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     process.env.CASHU_MINT_URL = MINT_URL;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -649,7 +659,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     process.env.CASHU_MINT_URL = MINT_URL;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -668,7 +678,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     process.env.CASHU_MINT_URL = MINT_URL;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,

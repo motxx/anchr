@@ -68,6 +68,11 @@ async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
 }
 
 async function mintCashuToken(amountSats: number): Promise<{ token: string; proofs: Proof[] }> {
+  // Rate-limit to avoid hitting the Nutshell mint's built-in rate limiter.
+  const elapsed = Date.now() - lastMintTime;
+  if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
+  lastMintTime = Date.now();
+
   const wallet = new Wallet(MINT_URL, { unit: "sat" });
   await wallet.loadMint();
 
@@ -81,6 +86,8 @@ async function mintCashuToken(amountSats: number): Promise<{ token: string; proo
   const token = getEncodedToken({ mint: MINT_URL, proofs });
   return { token, proofs };
 }
+
+let lastMintTime = 0;
 
 const [mintReachable, lndReachable] = await Promise.all([
   isCashuMintReachable(),

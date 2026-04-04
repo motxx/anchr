@@ -2,9 +2,13 @@ import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQuery, getQuery } from "../application/query-service";
+import { createQueryService, createQuery, getQuery } from "../application/query-service";
 import { storeIntegrity } from "./verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
+
+// QueryService without relay hooks — avoids fire-and-forget WebSocket leaks
+// that trip Deno's resource sanitizer.
+const testService = createQueryService({ hooks: {} });
 
 function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
   return async () => {
@@ -43,178 +47,160 @@ async function isBlossomReachable(): Promise<boolean> {
 }
 
 describe("worker api photo proof (Blossom)", () => {
-  test("supports photo upload, submission, and attachment metadata", async () => {
+  test("supports photo upload, submission, and attachment metadata",
+    withEnv({ HTTP_API_KEY: undefined, HTTP_API_KEYS: undefined }, async () => {
     if (!(await isBlossomReachable())) {
       console.log("[blossom-test] SKIPPED — Blossom server not reachable");
       return;
     }
 
-    const previousHttpApiKey = process.env.HTTP_API_KEY;
-    const previousHttpApiKeys = process.env.HTTP_API_KEYS;
-    delete process.env.HTTP_API_KEY;
-    delete process.env.HTTP_API_KEYS;
+    const app = buildWorkerApiApp({ queryService: testService });
+    const query = testService.createQuery({ description: "Worker API integration test" }, { ttlSeconds: 300 });
 
-    const app = buildWorkerApiApp();
-    const query = createQuery({ description: "Worker API integration test" }, { ttlSeconds: 300 });
+    const form = new FormData();
+    form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
 
-    try {
-      const form = new FormData();
-      form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
+    const uploadResponse = await app.request(`http://localhost/queries/${query.id}/upload`, {
+      method: "POST",
+      body: form,
+    });
+    expect(uploadResponse.status).toBe(200);
 
-      const uploadResponse = await app.request(`http://localhost/queries/${query.id}/upload`, {
-        method: "POST",
-        body: form,
-      });
-      expect(uploadResponse.status).toBe(200);
-
-      const uploadJson = await uploadResponse.json() as {
-        attachment: {
-          id: string;
-          uri: string;
-          mime_type: string;
-          storage_kind: string;
-        };
-        encryption: { encrypt_key: string; encrypt_iv: string };
-      };
-      expect(uploadJson.attachment.storage_kind).toBe("blossom");
-      expect(uploadJson.encryption).toBeDefined();
-      expect(typeof uploadJson.encryption.encrypt_key).toBe("string");
-      expect(typeof uploadJson.encryption.encrypt_iv).toBe("string");
-
-      // Override integrity record with valid C2PA for test
-      storeIntegrity({
-        attachmentId: uploadJson.attachment.id,
-        queryId: query.id,
-        capturedAt: Date.now(),
-        exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
-        c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
-      });
-
-      const encryptionKeys = { [uploadJson.attachment.id]: uploadJson.encryption };
-
-      const submitResponse = await app.request(`http://localhost/queries/${query.id}/result`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "integration-test-worker",
-          attachments: [uploadJson.attachment],
-          notes: "worker api integration",
-          encryption_keys: encryptionKeys,
-        }),
-      });
-      expect(submitResponse.status).toBe(200);
-
-      const submitJson = await submitResponse.json() as {
-        ok: boolean;
-        payment_status: string;
-        verification?: { passed: boolean };
-      };
-      expect(submitJson.ok).toBe(true);
-      expect(submitJson.payment_status).toBe("released");
-      expect(submitJson.verification?.passed).toBe(true);
-
-      const detailResponse = await app.request(`http://localhost/queries/${query.id}`);
-      expect(detailResponse.status).toBe(200);
-      const detailJson = await detailResponse.json() as {
-        status: string;
-        result?: { attachments: Array<{ uri: string }> };
-      };
-      expect(detailJson.status).toBe("approved");
-      expect(detailJson.result?.attachments).toHaveLength(1);
-
-      const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
-      expect(metaResponse.status).toBe(200);
-      const metaJson = await metaResponse.json() as {
-        query_id: string;
-        attachment: { storage_kind: string };
-        access: { original_url: string; preview_url: string; view_url: string; meta_url: string };
+    const uploadJson = await uploadResponse.json() as {
+      attachment: {
+        id: string;
+        uri: string;
         mime_type: string;
+        storage_kind: string;
       };
-      expect(metaJson.query_id).toBe(query.id);
-      expect(metaJson.attachment.storage_kind).toBe("blossom");
-      expect(metaJson.access.preview_url).toContain(`/queries/${query.id}/attachments/0/preview`);
-      expect(metaJson.access.view_url).toContain(`/queries/${query.id}/attachments/0`);
-      expect(metaJson.access.meta_url).toContain(`/queries/${query.id}/attachments/0/meta`);
-      expect(metaJson.mime_type).toBe("image/png");
+      encryption: { encrypt_key: string; encrypt_iv: string };
+    };
+    expect(uploadJson.attachment.storage_kind).toBe("blossom");
+    expect(uploadJson.encryption).toBeDefined();
+    expect(typeof uploadJson.encryption.encrypt_key).toBe("string");
+    expect(typeof uploadJson.encryption.encrypt_iv).toBe("string");
 
-      // Blossom attachments redirect to encrypted blob URL
-      const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
-      expect(viewResponse.status).toBe(302);
-      expect(viewResponse.headers.get("location")).toBeTruthy();
+    // Override integrity record with valid C2PA for test
+    storeIntegrity({
+      attachmentId: uploadJson.attachment.id,
+      queryId: query.id,
+      capturedAt: Date.now(),
+      exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
+      c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "proof.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+    });
 
-      const storedQuery = getQuery(query.id);
-      expect(storedQuery?.status).toBe("approved");
-    } finally {
-      process.env.HTTP_API_KEY = previousHttpApiKey;
-      process.env.HTTP_API_KEYS = previousHttpApiKeys;
-    }
-  });
-});
+    const encryptionKeys = { [uploadJson.attachment.id]: uploadJson.encryption };
 
-test("worker api creates queries over HTTP and enforces write API keys", async () => {
-  const previousHttpApiKey = process.env.HTTP_API_KEY;
-  const previousHttpApiKeys = process.env.HTTP_API_KEYS;
-  process.env.HTTP_API_KEY = "secret-write-key";
-  delete process.env.HTTP_API_KEYS;
-
-  const app = buildWorkerApiApp();
-
-  try {
-    const unauthorizedResponse = await app.request("http://localhost/queries", {
+    const submitResponse = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        description: "Unauthorized Test Store",
+        worker_pubkey: "integration-test-worker",
+        attachments: [uploadJson.attachment],
+        notes: "worker api integration",
+        encryption_keys: encryptionKeys,
       }),
     });
-    expect(unauthorizedResponse.status).toBe(401);
+    expect(submitResponse.status).toBe(200);
 
-    const createResponse = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": "secret-write-key",
-      },
-      body: JSON.stringify({
-        description: "Check if Authorized Test Store is open",
-        location_hint: "Near Tokyo Station",
-        ttl_seconds: 180,
-        requester: {
-          requester_type: "app",
-          requester_id: "integration-test-client",
-          client_name: "worker-api.integration.test",
-        },
-      }),
-    });
-    expect(createResponse.status).toBe(201);
-
-    const createJson = await createResponse.json() as {
-      query_id: string;
-      description: string;
-      status: string;
-      requester_meta: {
-        requester_type: string;
-        requester_id?: string;
-        client_name?: string;
-      } | null;
-      query_api_url: string;
+    const submitJson = await submitResponse.json() as {
+      ok: boolean;
+      payment_status: string;
+      verification?: { passed: boolean };
     };
+    expect(submitJson.ok).toBe(true);
+    expect(submitJson.payment_status).toBe("released");
+    expect(submitJson.verification?.passed).toBe(true);
 
-    expect(createJson.query_id).toMatch(/^query_/);
-    expect(createJson.description).toBe("Check if Authorized Test Store is open");
-    expect(createJson.status).toBe("pending");
-    expect(createJson.requester_meta?.requester_type).toBe("app");
-    expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
-    expect(createJson.query_api_url).toContain(`/queries/${createJson.query_id}`);
+    const detailResponse = await app.request(`http://localhost/queries/${query.id}`);
+    expect(detailResponse.status).toBe(200);
+    const detailJson = await detailResponse.json() as {
+      status: string;
+      result?: { attachments: Array<{ uri: string }> };
+    };
+    expect(detailJson.status).toBe("approved");
+    expect(detailJson.result?.attachments).toHaveLength(1);
 
-    const storedQuery = getQuery(createJson.query_id);
-    expect(storedQuery?.requester_meta?.requester_type).toBe("app");
-    expect(storedQuery?.requester_meta?.client_name).toBe("worker-api.integration.test");
-  } finally {
-    process.env.HTTP_API_KEY = previousHttpApiKey;
-    process.env.HTTP_API_KEYS = previousHttpApiKeys;
-  }
+    const metaResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0/meta`);
+    expect(metaResponse.status).toBe(200);
+    const metaJson = await metaResponse.json() as {
+      query_id: string;
+      attachment: { storage_kind: string };
+      access: { original_url: string; preview_url: string; view_url: string; meta_url: string };
+      mime_type: string;
+    };
+    expect(metaJson.query_id).toBe(query.id);
+    expect(metaJson.attachment.storage_kind).toBe("blossom");
+    expect(metaJson.access.preview_url).toContain(`/queries/${query.id}/attachments/0/preview`);
+    expect(metaJson.access.view_url).toContain(`/queries/${query.id}/attachments/0`);
+    expect(metaJson.access.meta_url).toContain(`/queries/${query.id}/attachments/0/meta`);
+    expect(metaJson.mime_type).toBe("image/png");
+
+    // Blossom attachments redirect to encrypted blob URL
+    const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
+    expect(viewResponse.status).toBe(302);
+    expect(viewResponse.headers.get("location")).toBeTruthy();
+
+    const storedQuery = testService.getQuery(query.id);
+    expect(storedQuery?.status).toBe("approved");
+  }));
 });
+
+test("worker api creates queries over HTTP and enforces write API keys",
+  withEnv({ HTTP_API_KEY: "secret-write-key", HTTP_API_KEYS: undefined }, async () => {
+  const app = buildWorkerApiApp();
+
+  const unauthorizedResponse = await app.request("http://localhost/queries", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      description: "Unauthorized Test Store",
+    }),
+  });
+  expect(unauthorizedResponse.status).toBe(401);
+
+  const createResponse = await app.request("http://localhost/queries", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": "secret-write-key",
+    },
+    body: JSON.stringify({
+      description: "Check if Authorized Test Store is open",
+      location_hint: "Near Tokyo Station",
+      ttl_seconds: 180,
+      requester: {
+        requester_type: "app",
+        requester_id: "integration-test-client",
+        client_name: "worker-api.integration.test",
+      },
+    }),
+  });
+  expect(createResponse.status).toBe(201);
+
+  const createJson = await createResponse.json() as {
+    query_id: string;
+    description: string;
+    status: string;
+    requester_meta: {
+      requester_type: string;
+      requester_id?: string;
+      client_name?: string;
+    } | null;
+    query_api_url: string;
+  };
+
+  expect(createJson.query_id).toMatch(/^query_/);
+  expect(createJson.description).toBe("Check if Authorized Test Store is open");
+  expect(createJson.status).toBe("pending");
+  expect(createJson.requester_meta?.requester_type).toBe("app");
+  expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
+  expect(createJson.query_api_url).toContain(`/queries/${createJson.query_id}`);
+
+  const storedQuery = getQuery(createJson.query_id);
+  expect(storedQuery?.requester_meta?.requester_type).toBe("app");
+  expect(storedQuery?.requester_meta?.client_name).toBe("worker-api.integration.test");
+}));
 
 // --- writeAuth middleware covers all write endpoints ---
 
@@ -249,7 +235,7 @@ describe("writeAuth middleware", () => {
   }));
 
   test("accepts Authorization: Bearer header", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer test-key" },
@@ -273,7 +259,7 @@ describe("writeAuth middleware", () => {
   test("supports multiple API keys via HTTP_API_KEYS", withEnv(
     { HTTP_API_KEY: undefined as string | undefined, HTTP_API_KEYS: "alpha,bravo,charlie" },
     async () => {
-      const app = buildWorkerApiApp();
+      const app = buildWorkerApiApp({ queryService: testService });
       const reject = await app.request("http://localhost/queries", {
         method: "POST",
         headers: { "content-type": "application/json", "x-api-key": "wrong" },
@@ -297,7 +283,7 @@ describe("POST /queries validation", () => {
   const openEnv = { HTTP_API_KEY: undefined as string | undefined, HTTP_API_KEYS: undefined as string | undefined };
 
   test("rejects missing description field", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -310,7 +296,7 @@ describe("POST /queries validation", () => {
   }));
 
   test("rejects ttl_seconds out of range", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const tooLow = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -327,7 +313,7 @@ describe("POST /queries validation", () => {
   }));
 
   test("creates query successfully", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -343,7 +329,7 @@ describe("POST /queries validation", () => {
   }));
 
   test("rejects non-JSON body", withEnv(openEnv, async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: testService });
     const res = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
