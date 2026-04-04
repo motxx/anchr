@@ -24,7 +24,7 @@ describe("MCP query backend — default backend", () => {
     const backend = getMcpQueryBackend();
 
     const result = await backend.createQuery(
-      { description: "Test MCP query", verification_requirements: ["exif"] },
+      { description: "Test MCP query", verification_requirements: ["gps"] },
       600,
       { requester_type: "agent", client_name: "test" },
     ) as Record<string, unknown>;

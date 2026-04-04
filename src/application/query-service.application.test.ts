@@ -17,9 +17,10 @@ function makeMockOracle(opts?: {
   const id = opts?.id ?? "built-in";
   const pass = opts?.pass ?? true;
   return {
-    info: { id, name: `Mock ${id}`, version: "1.0" },
+    info: { id, name: `Mock ${id}`, fee_ppm: 0 },
     verify: async (_query: Query, _result: QueryResult, _keys?: BlossomKeyMap): Promise<OracleAttestation> => ({
       oracle_id: id,
+      query_id: _query.id,
       passed: pass,
       checks: opts?.checks ?? (pass ? ["Mock check passed"] : []),
       failures: opts?.failures ?? (pass ? [] : ["Mock check failed"]),

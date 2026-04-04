@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { encryptBlob, decryptBlob, isBlossomEnabled, getBlossomConfig } from "./client";

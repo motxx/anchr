@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { timingSafeEqual, createHash } from "node:crypto";
 import { join } from "node:path";
 import { spawn, fileExists, fileLastModified, moduleDir } from "../runtime/mod.ts";
@@ -412,9 +413,9 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
           issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         }, 400);
       }
-    }),
+    }) as unknown as MiddlewareHandler,
     (c) => {
-      const payload = c.req.valid("json");
+      const payload = c.req.valid("json" as never) as z.infer<typeof createQuerySchema>;
 
       const input: QueryInput = {
         description: payload.description,

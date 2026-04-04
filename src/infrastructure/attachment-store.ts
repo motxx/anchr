@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { isBlossomEnabled } from "./blossom/client";
 import { workerUpload } from "./blossom/worker-upload";
 import { validateC2pa } from "./verification/c2pa-validation";

@@ -5,6 +5,9 @@
  * to detect AI-generated images (which lack real EXIF data).
  */
 
+import { Buffer } from "node:buffer";
+import { haversineKm } from "../../domain/geo";
+
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
 

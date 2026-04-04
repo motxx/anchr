@@ -135,7 +135,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
 
     const totalAmount = proofs.reduce((sum, p) => sum + p.amount, 0);
     expect(totalAmount).toBe(BOUNTY_SATS);
-  }, 30_000);
+  });
 
   test("full bounty lifecycle: mint → create query → submit → release", async () => {
     // 1. Mint Cashu token
@@ -219,7 +219,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     };
     expect(detail.status).toBe("approved");
     expect(detail.payment_status).toBe("released");
-  }, 60_000);
+  });
 
   test("bounty token is redeemable at cashu mint", async () => {
     // Create bounty query and submit to get token back
@@ -260,5 +260,5 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     const detailRes = await app.request(`http://localhost/queries/${query_id}`);
     const detail = (await detailRes.json()) as { bounty: { amount_sats: number } };
     expect(detail.bounty.amount_sats).toBe(BOUNTY_SATS);
-  }, 60_000);
+  });
 });

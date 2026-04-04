@@ -61,7 +61,7 @@ describe("checkAttachmentContent", () => {
   });
 
   test("returns null when attachments is undefined", async () => {
-    const result = await checkAttachmentContent(makeQuery(), {});
+    const result = await checkAttachmentContent(makeQuery(), { attachments: [] });
     expect(result).toBeNull();
   });
 

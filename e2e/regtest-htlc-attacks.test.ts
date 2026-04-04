@@ -305,7 +305,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for modified amount
-  }, 60_000);
+  });
 
   test("ATTACK: Swapped proof secrets between proof sets — Mint rejects", async () => {
     const worker = generateKeypair();
@@ -336,7 +336,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
     // Try to redeem with preimage1 (matching hash1, but secrets from set 2)
     const result = await attemptRedeem(wallet, swappedProofs, preimage1, worker.secretKey);
     expect(result).toBeNull(); // Mint MUST reject — secret/C mismatch
-  }, 60_000);
+  });
 
   test("ATTACK: Proof with empty secret — Mint rejects", async () => {
     const worker = generateKeypair();
@@ -358,7 +358,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
     expect(result).toBeNull(); // Mint MUST reject — empty secret is invalid
-  }, 60_000);
+  });
 });
 
 // =============================================================================
@@ -393,7 +393,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     // or reject. Either way, no double-spend should be possible.
     // Since this has the preimage but no valid worker signature, it should reject.
     expect(result).toBeNull();
-  }, 60_000);
+  });
 
   test("Worker redeems with expired locktime — succeeds (locktime only affects refund path)", async () => {
     const worker = generateKeypair();
@@ -426,7 +426,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     // Worker SHOULD succeed — preimage path is independent of locktime
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
-  }, 60_000);
+  });
 });
 
 // =============================================================================
@@ -468,7 +468,7 @@ suite("e2e: Multi-Party Attacks", () => {
     // Even if Worker 2 had the preimage, proofs are already spent
     const second = await attemptRedeem(wallet, htlcProofs, preimage, worker2.secretKey);
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
-  }, 60_000);
+  });
 
   test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
     const worker = generateKeypair();
@@ -488,5 +488,5 @@ suite("e2e: Multi-Party Attacks", () => {
     // The hashlock path requires the WORKER's key, not the requester's.
     const result = await attemptRedeem(wallet, htlcProofs, preimage, requester.secretKey);
     expect(result).toBeNull(); // Mint MUST reject — requester key is not the lock key
-  }, 60_000);
+  });
 });

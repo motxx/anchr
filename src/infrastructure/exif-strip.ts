@@ -6,6 +6,7 @@
  * For non-JPEG formats, uses sips/magick if available.
  */
 
+import { Buffer } from "node:buffer";
 import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
 
 const JPEG_SOI = 0xffd8;

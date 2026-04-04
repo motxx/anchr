@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { validateC2pa, isC2paAvailable } from "./c2pa-validation.ts";

@@ -277,7 +277,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, preimage, oracle.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — Oracle's key ≠ Worker's key
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 2. Worker tries to redeem without preimage
@@ -299,7 +299,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, undefined, worker.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — no preimage
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 3. Wrong Worker tries to redeem with correct preimage
@@ -322,7 +322,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, preimage, impostor.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — impostor's key ≠ Worker's key
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 4. Worker redeems with correct preimage + correct sig → SUCCESS
@@ -354,7 +354,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 5. Double-spend: reuse same HTLC proofs after redemption
@@ -388,7 +388,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     // Second redemption with same proofs via direct Mint call: MUST reject
     const second = await attemptRedeem(wallet, htlcProofs, preimage, worker.secretKey);
     expect(second).toBeNull();
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 6. Wrong preimage with correct Worker key
@@ -411,7 +411,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, wrongPreimage, worker.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — wrong preimage
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 7. No witness at all
@@ -433,7 +433,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, undefined, undefined);
 
     expect(result).toBeNull(); // Mint MUST reject — no witness
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 8. Refund path BEFORE locktime (Requester tries early refund)
@@ -456,7 +456,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, htlcProofs, undefined, requester.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — locktime not expired
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 9. Refund path AFTER locktime (legitimate timeout refund)
@@ -489,7 +489,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
-  }, 60_000);
+  });
 
   // ---------------------------------------------------------------------------
   // 10. Tampered proof secret (altered hash in secret)
@@ -518,7 +518,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
 
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for tampered secret
-  }, 60_000);
+  });
 });
 
 // =============================================================================
@@ -544,7 +544,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const error = verifyHtlcProofs(htlcProofs, hash, wrongPreimage);
     expect(error).not.toBeNull();
     expect(error).toContain("Preimage does not match");
-  }, 60_000);
+  });
 
   test("verifyHtlcProofs rejects mismatched hash in proofs", async () => {
     const worker = generateKeypair();
@@ -563,7 +563,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const error = verifyHtlcProofs(htlcProofs, differentHash, preimage);
     expect(error).not.toBeNull();
     // Either preimage doesn't match differentHash, or proof hashlock mismatch
-  }, 60_000);
+  });
 
   test("verifyHtlcProofs accepts correct preimage + matching proofs", async () => {
     const worker = generateKeypair();
@@ -579,7 +579,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
 
     const error = verifyHtlcProofs(htlcProofs, hash, preimage);
     expect(error).toBeNull(); // All good
-  }, 60_000);
+  });
 
   test("redeemHtlcToken rejects Oracle's key (server-side P2PK check)", async () => {
     const worker = generateKeypair();
@@ -599,7 +599,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     // Oracle tries to redeem — server-side isHTLCSpendAuthorised MUST reject
     const result = await redeemHtlcToken(htlcProofs, preimage, oracle.secretKey);
     expect(result).toBeNull();
-  }, 60_000);
+  });
 
   test("redeemHtlcToken rejects wrong Worker's key (server-side P2PK check)", async () => {
     const worker = generateKeypair();
@@ -619,7 +619,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     // Impostor tries to redeem with correct preimage but wrong key
     const result = await redeemHtlcToken(htlcProofs, preimage, impostor.secretKey);
     expect(result).toBeNull();
-  }, 60_000);
+  });
 
   test("redeemHtlcToken rejects missing preimage (server-side hashlock check)", async () => {
     const worker = generateKeypair();
@@ -638,7 +638,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     // Worker has correct key but no preimage — empty string as preimage
     const result = await redeemHtlcToken(htlcProofs, "", worker.secretKey);
     expect(result).toBeNull();
-  }, 60_000);
+  });
 
   test("redeemHtlcToken rejects wrong preimage (server-side hashlock check)", async () => {
     const worker = generateKeypair();
@@ -658,7 +658,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     // Worker has correct key but wrong preimage
     const result = await redeemHtlcToken(htlcProofs, wrongPreimage, worker.secretKey);
     expect(result).toBeNull();
-  }, 60_000);
+  });
 
   test("redeemHtlcToken accepts correct Worker key + preimage", async () => {
     const worker = generateKeypair();
@@ -678,5 +678,5 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     const result = await redeemHtlcToken(htlcProofs, preimage, worker.secretKey);
     expect(result).not.toBeNull();
     expect(result!.amountSats).toBeGreaterThan(0);
-  }, 60_000);
+  });
 });

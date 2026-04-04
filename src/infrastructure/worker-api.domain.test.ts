@@ -11,9 +11,10 @@ import type { Query, QueryResult, BlossomKeyMap } from "../domain/types";
 
 function makeMockOracle(pass = true, id = "built-in"): Oracle {
   return {
-    info: { id, name: `Mock ${id}`, version: "1.0" },
+    info: { id, name: `Mock ${id}`, fee_ppm: 0 },
     verify: async (_q: Query, _r: QueryResult, _k?: BlossomKeyMap): Promise<OracleAttestation> => ({
       oracle_id: id,
+      query_id: _q.id,
       passed: pass,
       checks: pass ? ["Check passed"] : [],
       failures: pass ? [] : ["Check failed"],

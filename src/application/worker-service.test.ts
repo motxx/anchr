@@ -84,7 +84,7 @@ describe("Worker service — payload parsing and filtering", () => {
   });
 
   test("parseQueryRequestPayload handles minimal payload", () => {
-    const minimal = JSON.stringify({ description: "test", nonce: "X" });
+    const minimal = JSON.stringify({ description: "test", nonce: "X", expires_at: Date.now() + 600_000 });
     const parsed = parseQueryRequestPayload(minimal);
     expect(parsed.description).toBe("test");
     expect(parsed.oracle_pubkey).toBeUndefined();

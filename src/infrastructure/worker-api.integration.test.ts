@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
@@ -77,8 +78,8 @@ describe("worker api photo proof (Blossom)", () => {
       };
       expect(uploadJson.attachment.storage_kind).toBe("blossom");
       expect(uploadJson.encryption).toBeDefined();
-      expect(uploadJson.encryption.encrypt_key).toBeString();
-      expect(uploadJson.encryption.encrypt_iv).toBeString();
+      expect(typeof uploadJson.encryption.encrypt_key).toBe("string");
+      expect(typeof uploadJson.encryption.encrypt_iv).toBe("string");
 
       // Override integrity record with valid C2PA for test
       storeIntegrity({

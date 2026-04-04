@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";

@@ -103,6 +103,7 @@ describe("publishEvent", () => {
       const event = buildQueryRequestEvent(identity, "q1", {
         description: "test",
         nonce: "X",
+        expires_at: Date.now() + 60_000,
       });
       const result = await publishEvent(event);
       expect(result.successes).toEqual([]);
@@ -115,6 +116,7 @@ describe("publishEvent", () => {
     const event = buildQueryRequestEvent(identity, "q1", {
       description: "test",
       nonce: "X",
+      expires_at: Date.now() + 60_000,
     });
     // publishEvent should not throw even with bad relay URLs
     const result = await publishEvent(event, ["ws://localhost:1"]);

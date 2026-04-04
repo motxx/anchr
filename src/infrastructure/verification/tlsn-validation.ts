@@ -8,6 +8,7 @@
  * When the binary is not available, verification FAILS (no fake structural fallback).
  */
 
+import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest } from "./tlsn-validation";

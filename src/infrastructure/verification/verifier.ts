@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { checkAttachmentContent } from "./ai-content-check";
 import { validateC2pa } from "./c2pa-validation";
 import { haversineKm } from "./exif-validation";

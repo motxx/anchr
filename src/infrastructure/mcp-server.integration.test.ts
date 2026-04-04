@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { join } from "node:path";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -140,8 +141,8 @@ Deno.test({ name: "mcp tools expose query status and attachment metadata", sanit
 
   try {
     const tools = await client.listTools();
-    expect(tools.tools.some((tool) => tool.name === "get_query_attachment")).toBe(true);
-    expect(tools.tools.some((tool) => tool.name === "get_query_attachment_preview")).toBe(true);
+    expect(tools.tools.some((tool: { name: string }) => tool.name === "get_query_attachment")).toBe(true);
+    expect(tools.tools.some((tool: { name: string }) => tool.name === "get_query_attachment_preview")).toBe(true);
 
     // Create a query via MCP tool to verify creation works
     const created = await client.callTool({

@@ -6,6 +6,7 @@
  * EXIF validation + handwritten nonce provide coverage without C2PA.
  */
 
+import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

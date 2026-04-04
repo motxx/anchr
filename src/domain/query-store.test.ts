@@ -8,7 +8,7 @@ function fakeQuery(id: string): Query {
     id,
     status: "pending",
     description: `Query ${id}`,
-    verification_requirements: ["exif"],
+    verification_requirements: ["gps"],
     created_at: Date.now(),
     expires_at: Date.now() + 600_000,
     payment_status: "none",

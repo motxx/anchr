@@ -47,7 +47,7 @@ jobs:
         run: deno check src/**/*.ts
 
       - name: Unit tests (no Docker needed)
-        run: deno test src/ --allow-env --allow-read --allow-net --allow-run --allow-sys --no-check --ignore=src/**/*.integration.test.ts
+        run: deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'
 
       - name: Start infrastructure (relay + Blossom + regtest Lightning)
         if: ${{ !cancelled() }}
@@ -55,7 +55,7 @@ jobs:
 
       - name: Integration & E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: deno test src/infrastructure/worker-api.integration.test.ts src/infrastructure/mcp-server.integration.test.ts e2e/relay.test.ts --allow-all --no-check
+        run: deno test src/infrastructure/worker-api.integration.test.ts src/infrastructure/mcp-server.integration.test.ts e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
@@ -82,7 +82,7 @@ jobs:
 
       - name: Regtest E2E tests (HTLC + Cashu)
         if: ${{ !cancelled() }}
-        run: deno test e2e/regtest-htlc-trustless.test.ts e2e/regtest-cashu.test.ts --allow-all --no-check
+        run: deno test e2e/regtest-htlc-trustless.test.ts e2e/regtest-cashu.test.ts --allow-env --allow-read --allow-net --allow-run
         env:
           CASHU_MINT_URL: http://localhost:3338
           NOSTR_RELAYS: ws://localhost:7777
