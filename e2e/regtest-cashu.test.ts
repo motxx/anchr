@@ -36,14 +36,18 @@ import {
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;
 
+const INFRA_READY = await checkInfraReady(MINT_URL);
+
+// Create wallet at module level before describes register.
+// This ensures loadMint() fetch responses are fully consumed
+// before any test scope begins (avoids Deno sanitizer false positives).
+const sharedWallet = INFRA_READY ? await createWallet(MINT_URL) : undefined;
+
 async function mintCashuToken(amountSats: number): Promise<{ token: string; proofs: Proof[] }> {
-  const wallet = await createWallet(MINT_URL);
-  const proofs = await throttledMintProofs(wallet, amountSats);
+  const proofs = await throttledMintProofs(sharedWallet!, amountSats);
   const token = getEncodedToken({ mint: MINT_URL, proofs });
   return { token, proofs };
 }
-
-const INFRA_READY = await checkInfraReady(MINT_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 

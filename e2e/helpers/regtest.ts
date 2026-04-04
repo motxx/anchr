@@ -11,6 +11,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 export async function isCashuMintReachable(mintUrl: string): Promise<boolean> {
   try {
     const res = await fetch(`${mintUrl}/v1/info`, { signal: AbortSignal.timeout(3000) });
+    await res.body?.cancel(); // Consume response body to avoid Deno sanitizer leak
     return res.ok;
   } catch {
     return false;

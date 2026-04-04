@@ -6,10 +6,11 @@ import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { getCashuWallet, getCashuConfig } from "./wallet";
 
-export function getWalletAndConfig() {
+export async function getWalletAndConfig() {
   const wallet = getCashuWallet();
   const config = getCashuConfig();
   if (!wallet || !config) return null;
+  await wallet.loadMint();
   return { wallet, config };
 }
 
@@ -28,6 +29,8 @@ export async function loadAndSend(
   p2pkOptions?: import("@cashu/cashu-ts").P2PKOptions,
   privkey?: string,
 ): Promise<Proof[]> {
+  // loadMint() must complete before accessing wallet.ops — cashu-ts v3
+  // requires keyset/keychain data to be loaded before building operations.
   await wallet.loadMint();
   let builder = wallet.ops.send(amountSats, proofs);
   if (p2pkOptions) {

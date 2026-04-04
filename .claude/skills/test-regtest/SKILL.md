@@ -21,8 +21,8 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 # 1. Start infra + init Lightning
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh && docker compose restart cashu-mint && sleep 5
 
-# 2. Run E2E tests
-bun run test:regtest
+# 2. Run E2E tests (30 tests: Cashu bounty lifecycle + HTLC trustless + HTLC attacks)
+deno task test:regtest
 ```
 
 **Full runbook (includes mobile app on iOS simulator):**
@@ -32,12 +32,12 @@ Use `/test-regtest full` and follow all phases below.
 
 Phases: `full` (default) | `auto` | `infra` | `server` | `bounty` | `mobile` | `submit` | `teardown`
 
-- `auto` — Start infra, run `bun run test:regtest`, teardown. No mobile UI.
+- `auto` — Start infra, run `deno task test:regtest`, teardown. No mobile UI.
 - `full` — Run all phases 1-6 in order including mobile.
 - Individual phase names run only that phase.
 
 If `$ARGUMENTS` is empty or `full`, run all phases 1-6 in order.
-If `$ARGUMENTS` is `auto`, run infra → `bun run test:regtest` → teardown.
+If `$ARGUMENTS` is `auto`, run infra → `deno task test:regtest` → teardown.
 
 ---
 
@@ -83,12 +83,12 @@ Start the Anchr server with local infrastructure endpoints.
 cd "$PROJECT_ROOT"
 
 # Kill any existing server process first
-pkill -f "bun.*src/server.ts" 2>/dev/null || true
+pkill -f "deno.*server.ts" 2>/dev/null || true
 
 NOSTR_RELAYS=ws://localhost:7777 \
 BLOSSOM_SERVERS=http://localhost:3333 \
 CASHU_MINT_URL=http://localhost:3338 \
-bun run dev &
+deno task dev &
 ```
 
 **Verification checks:**
@@ -108,10 +108,10 @@ Mint Cashu tokens via regtest Lightning and create test queries with bounty.
 cd "$PROJECT_ROOT"
 
 # Photo-required query (default — GPS verification enabled)
-CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts
+CASHU_MINT_URL=http://localhost:3338 deno run --allow-all scripts/create-bounty-query.ts
 
 # Text-only query (for API submit testing — no photo required)
-CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts --text-only
+CASHU_MINT_URL=http://localhost:3338 deno run --allow-all scripts/create-bounty-query.ts --text-only
 ```
 
 ### Custom queries via API (with per-query GPS distance)
@@ -310,7 +310,7 @@ import json,sys; print(f'{len(json.load(sys.stdin))} queries')
 cd "$PROJECT_ROOT"
 
 # Stop the Anchr server
-pkill -f "bun.*src/server.ts" || true
+pkill -f "deno.*server.ts" || true
 
 # Stop Docker services
 docker compose down
@@ -318,6 +318,45 @@ docker compose down
 # Reset simulator location (optional)
 xcrun simctl location booted clear
 ```
+
+---
+
+## E2E Test Architecture
+
+The automated E2E tests (`deno task test:regtest`) cover 3 test suites with 30 total test steps:
+
+### Test files
+
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `e2e/regtest-cashu.test.ts` | 5 | Cashu bounty lifecycle: mint → create query → submit → release → redeem |
+| `e2e/regtest-htlc-trustless.test.ts` | 18 | HTLC trustless properties: 10 Mint-level attacks + 8 server-side enforcement |
+| `e2e/regtest-htlc-attacks.test.ts` | 7 | Advanced attacks: proof manipulation, timing, multi-party |
+
+### Test patterns
+
+- **Infrastructure gating**: Tests use `describe.ignore` when Docker infra is not reachable (NOT `test.skipIf` — Deno BDD doesn't support it)
+- **Wallet sharing**: `Wallet.loadMint()` runs at module level (top-level await) before describes register, to avoid Deno sanitizer false positives from fetch response body lifecycle
+- **No relay side effects**: `regtest-cashu.test.ts` injects `createQueryService({ hooks: {} })` to prevent fire-and-forget WebSocket connections from `publishQueryToRelay`
+- **Real Cashu Mint**: All HTLC tests run against the real Nutshell mint — not mocked. Attacks are verified at the protocol level
+
+### Running individual suites
+
+```bash
+# Cashu bounty lifecycle only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-cashu.test.ts --allow-all --no-check
+
+# HTLC trustless properties only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-htlc-trustless.test.ts --allow-all --no-check
+
+# HTLC attack vectors only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-htlc-attacks.test.ts --allow-all --no-check
+```
+
+Expected: ~1m12s total, 6 passed (30 steps), 0 failed, 0 leaks.
 
 ---
 
@@ -333,6 +372,8 @@ These are non-obvious facts discovered through actual testing. The agent WILL ge
 - **tsconfig picks up mobile/**: Without `"exclude": ["mobile"]` in the root tsconfig, `tsc --noEmit` fails because mobile's deps (expo, react-native) aren't in the root node_modules. CI will fail on typecheck.
 - **Docker context bloat**: Without `.dockerignore` entries for `mobile/`, `e2e/`, `scripts/`, the build context is ~275MB instead of ~800KB. First deploy will timeout.
 - **testnut.cashu.space is FakeWallet**: All Lightning invoices auto-paid, tokens are worthless test ecash. Not real Bitcoin testnet sats.
+- **Deno sanitizer and external libs**: `@cashu/cashu-ts` `Wallet.loadMint()` creates fetch responses that Deno tracks across scopes. Creating the wallet at module level (before describes) avoids false positive leak detection.
+- **Fire-and-forget relay publish**: `defaultQueryService` has an `onCreated` hook that publishes to Nostr relays via `publishQueryToRelay()` — this is fire-and-forget and leaks WebSocket connections in tests. Inject `createQueryService({ hooks: {} })` to avoid.
 
 ## Troubleshooting
 
@@ -342,6 +383,7 @@ These are non-obvious facts discovered through actual testing. The agent WILL ge
 | `createwallet` error -4 "Database already exists" | Script auto-falls back to `loadwallet`. If still failing, `docker compose down -v` to wipe volumes |
 | `lnd-mint` keeps restarting | Wait longer before init-regtest.sh (increase sleep to 30-40s) |
 | Invoice payment fails | Verify channel is active: `docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009 listchannels` |
+| Deno sanitizer leak errors | Ensure wallet is created at module level, not in `beforeAll`. Ensure `buildWorkerApiApp` uses `createQueryService({ hooks: {} })` |
 | iOS build fails with "duplicate symbol" | Remove `react-native-worklets` from mobile/package.json (conflicts with reanimated 3.17+) |
 | iOS build fails with "undefined_arch" | Use `npx expo run:ios` instead of raw `xcodebuild` |
 | Mobile app can't reach server | Use Mac's IP instead of localhost (e.g., `http://192.168.x.x:3000`) |

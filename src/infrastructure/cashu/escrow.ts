@@ -96,7 +96,7 @@ export async function createEscrowToken(
   params: EscrowParams,
   sourceProofs: Proof[],
 ): Promise<EscrowToken | null> {
-  const ctx = getWalletAndConfig();
+  const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
   const p2pkOptions = buildEscrowP2PKOptions(params);
@@ -124,7 +124,7 @@ export async function executeEscrowSwap(
   oraclePubkey: string,
   feeSats: number,
 ): Promise<SwapResult | null> {
-  const ctx = getWalletAndConfig();
+  const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
   const totalSats = sumProofAmounts(signedProofs);
@@ -237,7 +237,7 @@ export async function createHtlcToken(
   params: HtlcInitialLockParams,
   sourceProofs: Proof[],
 ): Promise<EscrowToken | null> {
-  const ctx = getWalletAndConfig();
+  const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
   try {
@@ -259,7 +259,7 @@ export async function swapHtlcBindWorker(
   initialProofs: Proof[],
   params: HtlcWorkerBindParams,
 ): Promise<EscrowToken | null> {
-  const ctx = getWalletAndConfig();
+  const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
   const p2pkOptions = buildHtlcFinalOptions(params);
@@ -300,7 +300,7 @@ export async function redeemHtlcToken(
   preimage: string,
   workerPrivateKey: string,
 ): Promise<{ token: string; proofs: Proof[]; amountSats: number } | null> {
-  const ctx = getWalletAndConfig();
+  const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
   try {
