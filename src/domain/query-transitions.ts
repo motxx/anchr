@@ -41,3 +41,8 @@ export function isExpirable(status: QueryStatus): boolean {
 export function isTerminal(status: QueryStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
+
+/** Check if the given status is an open (active, non-terminal) status. */
+export function isOpenStatus(status: QueryStatus): boolean {
+  return CANCELLABLE_STATUSES.includes(status);
+}

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { createQueryStore } from "../domain/query-store";
+import { isCancellable, isExpirable, isOpenStatus } from "../domain/query-transitions";
 import type { QueryStore } from "../domain/query-store";
 import { normalizeQueryResult } from "../infrastructure/attachments";
 import { getDecodedToken } from "@cashu/cashu-ts";
@@ -151,6 +152,17 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const preimageStore = deps?.preimageStore;
   const hooks = deps?.hooks;
 
+  function toRecord(a: OracleAttestation): OracleAttestationRecord {
+    return {
+      oracle_id: a.oracle_id,
+      passed: a.passed,
+      checks: a.checks,
+      failures: a.failures,
+      attested_at: a.attested_at,
+      tlsn_verified: a.tlsn_verified,
+    };
+  }
+
   function doResolveOracle(oracleId: string | undefined, acceptableIds: string[] | undefined) {
     return registry
       ? registry.resolve(oracleId, acceptableIds)
@@ -203,14 +215,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
         };
       }
       const att = await oracle.verify(query, result, blossomKeys);
-      const record: OracleAttestationRecord = {
-        oracle_id: att.oracle_id,
-        passed: att.passed,
-        checks: att.checks,
-        failures: att.failures,
-        attested_at: att.attested_at,
-        tlsn_verified: att.tlsn_verified,
-      };
+      const record = toRecord(att);
       return {
         passed: att.passed,
         attestations: [record],
@@ -243,14 +248,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     }
 
     const rawAtts = await Promise.all(oracles.map((o) => o.verify(query, result, blossomKeys)));
-    const records: OracleAttestationRecord[] = rawAtts.map((a) => ({
-      oracle_id: a.oracle_id,
-      passed: a.passed,
-      checks: a.checks,
-      failures: a.failures,
-      attested_at: a.attested_at,
-      tlsn_verified: a.tlsn_verified,
-    }));
+    const records: OracleAttestationRecord[] = rawAtts.map(toRecord);
 
     const passCount = records.filter((a) => a.passed).length;
     const passed = passCount >= query.quorum.min_approvals;
@@ -324,8 +322,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
     listOpenQueries(): Query[] {
       const now = Date.now();
-      const openStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
-      return store.values().filter((q) => openStatuses.includes(q.status) && q.expires_at > now);
+      return store.values().filter((q) => isOpenStatus(q.status) && q.expires_at > now);
     },
 
     listAllQueries(): Query[] {
@@ -384,8 +381,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     cancelQuery(id: string): CancelQueryOutcome {
       const query = store.get(id);
       if (!query) return { ok: false, message: "Query not found" };
-      const cancellableStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
-      if (!cancellableStatuses.includes(query.status)) {
+      if (!isCancellable(query.status)) {
         return { ok: false, message: `Query is already ${query.status}` };
       }
       store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
@@ -395,9 +391,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     expireQueries(): number {
       const now = Date.now();
       let count = 0;
-      const expirableStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
       for (const query of store.values()) {
-        if (expirableStatuses.includes(query.status) && query.expires_at < now) {
+        if (isExpirable(query.status) && query.expires_at < now) {
           store.set(query.id, { ...query, status: "expired", payment_status: "cancelled" });
           count++;
         }
