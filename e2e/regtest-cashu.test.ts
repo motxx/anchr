@@ -23,87 +23,27 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
-import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
 import { createQueryService, clearQueryStore } from "../src/application/query-service";
+import {
+  checkInfraReady,
+  payInvoiceViaLndUser,
+  throttledMintProofs,
+  createWallet,
+} from "./helpers/regtest";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;
 
-async function isCashuMintReachable(): Promise<boolean> {
-  try {
-    const res = await fetch(`${MINT_URL}/v1/info`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function isLndUserReachable(): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "getinfo",
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "payinvoice", "--force", bolt11,
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
 async function mintCashuToken(amountSats: number): Promise<{ token: string; proofs: Proof[] }> {
-  // Rate-limit to avoid hitting the Nutshell mint's built-in rate limiter.
-  const elapsed = Date.now() - lastMintTime;
-  if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
-  lastMintTime = Date.now();
-
-  const wallet = new Wallet(MINT_URL, { unit: "sat" });
-  await wallet.loadMint();
-
-  const mintQuote = await wallet.createMintQuote(amountSats);
-  const paid = await payInvoiceViaLndUser(mintQuote.request);
-  if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-
-  await new Promise(r => setTimeout(r, 2000));
-
-  const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
+  const wallet = await createWallet(MINT_URL);
+  const proofs = await throttledMintProofs(wallet, amountSats);
   const token = getEncodedToken({ mint: MINT_URL, proofs });
   return { token, proofs };
 }
 
-let lastMintTime = 0;
-
-const [mintReachable, lndReachable] = await Promise.all([
-  isCashuMintReachable(),
-  isLndUserReachable(),
-]);
-const INFRA_READY = mintReachable && lndReachable;
-
-if (!INFRA_READY) {
-  if (!mintReachable) {
-    console.warn(`[e2e] Cashu mint not reachable at ${MINT_URL} – tests will be ignored.`);
-    console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
-  }
-  if (!lndReachable) {
-    console.warn("[e2e] lnd-user not reachable – tests will be ignored.");
-  }
-}
+const INFRA_READY = await checkInfraReady(MINT_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
