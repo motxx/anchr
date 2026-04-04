@@ -68,7 +68,6 @@ test-results
 .claude/
 
 # deno
-deno.lock
 
 # example apps
 example/bounty-board/node_modules/
