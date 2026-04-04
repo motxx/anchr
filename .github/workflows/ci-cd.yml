@@ -46,6 +46,10 @@ jobs:
       - name: Architecture lint
         run: deno task lint:arch
 
+      - name: Refactor lint
+        run: deno task lint:refactor
+        continue-on-error: true
+
       - name: Typecheck
         run: deno check src/**/*.ts
 
