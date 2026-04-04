@@ -62,6 +62,22 @@ Run the server:
 deno task build:ui && deno task build:css && deno task dev
 ```
 
+## Architecture Lint
+
+`deno task lint:arch` enforces Clean Architecture layer dependencies:
+
+| Rule | Layer | Must NOT import from |
+|------|-------|---------------------|
+| E001 | `domain/` | application, infrastructure, ui, runtime |
+| E002 | `runtime/` | domain, application, infrastructure, ui |
+| E003 | `ui/` | infrastructure, application |
+| E004 | Any | `express`, `dotenv`, `ws` (banned packages) |
+| W001 | Any | npm: when JSR equivalent exists |
+
+- Runs automatically on every Edit/Write via Claude Code hook (PostToolUse)
+- Runs in CI before typecheck
+- Errors (E*) cause non-zero exit; warnings (W*) are informational
+
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.
 All font choices, colors, spacing, and aesthetic direction are defined there.

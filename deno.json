@@ -51,6 +51,7 @@
     "test:unit": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts --allow-env --allow-read --allow-net --allow-run",
     "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
     "build:css": "deno run --allow-all scripts/build-css.ts"
   },

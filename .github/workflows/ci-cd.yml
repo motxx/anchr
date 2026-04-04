@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies (lockfile integrity check)
         run: deno install --frozen
 
+      - name: Architecture lint
+        run: deno task lint:arch
+
       - name: Typecheck
         run: deno check src/**/*.ts
 
