@@ -103,18 +103,18 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
     }
   });
 
-  test("MPC-TLS proof via browser extension — httpbin.org", async () => {
+  test("MPC-TLS proof via browser extension — bitflyer ECDSA", async () => {
     if (!ready) { console.error("[e2e] SKIPPED"); return; }
 
     // Inject plugin code into CodeMirror editor (triggers React setCode via onChange)
     const pluginCode = `\
 export const config = {
   name: 'Anchr E2E',
-  description: 'httpbin.org proof via MPC-TLS',
+  description: 'bitFlyer BTC/JPY ticker via MPC-TLS (ECDSA)',
   requests: [{
     method: 'GET',
-    host: 'httpbin.org',
-    pathname: '/get',
+    host: 'api.bitflyer.com',
+    pathname: '/v1/ticker',
     verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
   }],
 };
@@ -124,13 +124,13 @@ export const onClick = async () => {};
 export const main = async () => {
   const resp = await prove(
     {
-      url: 'https://httpbin.org/get',
+      url: 'https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY',
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     },
     {
       verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
-      proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=httpbin.org',
+      proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=api.bitflyer.com',
       maxRecvData: 4096,
       maxSentData: 1024,
       handlers: [
@@ -210,8 +210,12 @@ export const main = async () => {
 
     await page.screenshot({ path: "/tmp/tlsn-browser-e2e-result.png" });
 
-    // Assertions
+    // Assertions — verify MPC-TLS proof completed with valid transcript.
+    // Response is 400 because WASM hyper doesn't auto-insert Host header with origin-form URI.
+    // This is an upstream tlsn-extension bug (PR #268 switched to origin-form but didn't add Host).
+    // The proof itself is cryptographically valid — the transcript is correct.
     expect(resultText).toContain("completed in");
     expect(resultText).toContain("results");
+    expect(resultText).toContain("START_LINE");
   }, 30_000);
 });
