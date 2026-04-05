@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies (lockfile integrity check)
+        run: deno install --frozen
+
+      - name: Architecture lint
+        run: deno task lint:arch
+
+      - name: Refactor lint
+        run: deno task lint:refactor
+        continue-on-error: true
+
+      - name: Typecheck
+        run: deno check src/**/*.ts
+
+      - name: Unit tests (no Docker needed)
+        run: deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'
+
+      - name: Start infrastructure (relay + Blossom + regtest Lightning)
+        if: ${{ !cancelled() }}
+        run: docker compose up -d relay blossom bitcoind lnd-mint lnd-user && sleep 5
+
+      - name: Integration & E2E tests (relay + Blossom)
+        if: ${{ !cancelled() }}
+        run: deno test src/infrastructure/worker-api.integration.test.ts src/infrastructure/mcp-server.integration.test.ts e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
+        env:
+          NOSTR_RELAYS: ws://localhost:7777
+          BLOSSOM_SERVERS: http://localhost:3333
+
+      - name: Initialize regtest (wait for LND + fund + open channel)
+        if: ${{ !cancelled() }}
+        run: ./scripts/init-regtest.sh
+
+      - name: Start Cashu mint (with restart for LND cert refresh)
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d cashu-mint
+          sleep 5
+          docker compose restart cashu-mint
+          echo "Waiting for Cashu mint to be ready (up to 60s)..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3338/v1/info > /dev/null 2>&1; then
+              echo "Cashu mint is ready."
+              break
+            fi
+            echo "  Waiting... ($i/20)"
+            sleep 3
+          done
+
+      - name: Regtest E2E tests (HTLC + Cashu)
+        if: ${{ !cancelled() }}
+        run: deno test e2e/regtest-htlc-trustless.test.ts e2e/regtest-cashu.test.ts --allow-env --allow-read --allow-net --allow-run
+        env:
+          CASHU_MINT_URL: http://localhost:3338
+          NOSTR_RELAYS: ws://localhost:7777
+          BLOSSOM_SERVERS: http://localhost:3333
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
+
+      - name: Build deploy image
+        run: docker build -t anchr:${{ github.sha }} .

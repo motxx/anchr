@@ -1,0 +1,108 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy-infra:
+    name: Deploy ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success'
+      }}
+    concurrency:
+      group: fly-${{ matrix.app }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: relay
+            config: fly.relay.toml
+            workdir: "."
+            token_secret: FLY_API_TOKEN_RELAY
+          - app: blossom
+            config: fly.blossom.toml
+            workdir: "."
+            token_secret: FLY_API_TOKEN_BLOSSOM
+          - app: tlsn-verifier
+            config: fly.toml
+            workdir: crates/tlsn-server
+            token_secret: FLY_API_TOKEN_VERIFIER
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@63da3ecc5e2793b98a3f2519b3d75d4f4c11cec2 # master
+
+      - name: Deploy ${{ matrix.app }}
+        working-directory: ${{ matrix.workdir }}
+        run: flyctl deploy --remote-only --config ${{ matrix.config }}
+        env:
+          FLY_API_TOKEN: ${{ secrets[matrix.token_secret] }}
+
+  deploy-app:
+    name: Deploy Anchr App
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: fly-app
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@63da3ecc5e2793b98a3f2519b3d75d4f4c11cec2 # master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --config fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_APP }}
+
+  deploy-worker:
+    name: Deploy Auto-Worker
+    needs: deploy-app
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: fly-worker
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@63da3ecc5e2793b98a3f2519b3d75d4f4c11cec2 # master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --config fly.worker.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_WORKER }}
