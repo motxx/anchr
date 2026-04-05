@@ -12,10 +12,9 @@ Stripe テスト決済を TLSNotary で証明し、Anchr 経由で BTC と trust
 ### 0-1. TLSNotary Extension をダウンロード
 
 ```bash
-curl -L -o /tmp/tlsn-extension.zip \
-  https://github.com/tlsnotary/tlsn-extension/releases/download/0.1.0.1403/extension-0.1.0.1403.zip
-mkdir -p /tmp/tlsn-extension
-unzip -o /tmp/tlsn-extension.zip -d /tmp/tlsn-extension
+git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension
+cd /tmp/tlsn-extension && npm install && npm run build
+# Build output: /tmp/tlsn-extension/packages/extension/build
 ```
 
 ### 0-2. Playwright の Chrome for Testing をインストール

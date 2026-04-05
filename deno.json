@@ -55,7 +55,8 @@
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
-    "build:css": "deno run --allow-all scripts/build-css.ts"
+    "build:css": "deno run --allow-all scripts/build-css.ts",
+    "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": ["mobile", "node_modules", "example"],
   "nodeModulesDir": "auto"

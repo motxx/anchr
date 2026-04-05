@@ -441,8 +441,9 @@ async fn handle_proxy_ws_raw(
         }
     };
 
-    // Message-based relay (same approach as official tlsn-extension verifier)
-    // WS Binary messages <-> raw TCP bytes
+    // Message-based relay: WS Binary messages <-> raw TCP bytes.
+    // Connection: close header ensures the server sends close_notify immediately
+    // after the response, so all data is forwarded before the browser closes WS.
     let (mut ws_sink, mut ws_stream) = ws.split();
     let (mut tcp_read, mut tcp_write) = tokio::io::split(tcp);
 
@@ -462,6 +463,7 @@ async fn handle_proxy_ws_raw(
                     }
                     async_tungstenite::tungstenite::Message::Close(reason) => {
                         eprintln!("[proxy] WS close: {:?}", reason);
+                        let _ = tcp_write.shutdown().await;
                         break;
                     }
                     other => {
@@ -479,7 +481,6 @@ async fn handle_proxy_ws_raw(
             }
         }
         eprintln!("[proxy] WS→TCP {} bytes for {}", total, host1);
-        let _ = tcp_write.shutdown().await;
     });
 
     let host2 = host.clone();
@@ -496,7 +497,16 @@ async fn handle_proxy_ws_raw(
                     total += n as u64;
                     eprintln!("[proxy] TCP→WS: {} bytes (total {})", n, total);
                     if ws_sink.send(async_tungstenite::tungstenite::Message::Binary(buf[..n].to_vec())).await.is_err() {
-                        eprintln!("[proxy] TCP→WS send error");
+                        eprintln!("[proxy] TCP→WS send error, draining TCP...");
+                        loop {
+                            match tcp_read.read(&mut buf).await {
+                                Ok(0) | Err(_) => break,
+                                Ok(m) => {
+                                    total += m as u64;
+                                    eprintln!("[proxy] TCP→WS: drained {} bytes (total {})", m, total);
+                                }
+                            }
+                        }
                         break;
                     }
                 }

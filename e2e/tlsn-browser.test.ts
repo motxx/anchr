@@ -131,8 +131,8 @@ export const main = async () => {
     {
       verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
       proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=api.bitflyer.com',
-      maxRecvData: 4096,
-      maxSentData: 1024,
+      maxRecvData: 16384,
+      maxSentData: 4096,
       handlers: [
         { type: 'RECV', part: 'START_LINE', action: 'REVEAL' },
         { type: 'RECV', part: 'HEADERS', action: 'REVEAL', params: { key: 'content-type' } },
@@ -193,9 +193,17 @@ export const main = async () => {
         }
     });
 
-    // Poll DevConsole console output for completion
+    // Capture browser console messages for debugging
+    page.on("console", (msg) => {
+      const text = msg.text();
+      if (text.includes("[ProveManager]") || text.includes("WASM") || text.includes("error") || text.includes("Error")) {
+        console.error("[browser]", text);
+      }
+    });
+
+    // Poll DevConsole console output for completion (up to 45s for MPC)
     let resultText = "";
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 45; i++) {
       await sleep(1000);
       resultText = await page.evaluate(() => document.body?.innerText || "");
       if (resultText.includes("completed in") || resultText.includes("Error after")) break;
@@ -210,11 +218,10 @@ export const main = async () => {
 
     await page.screenshot({ path: "/tmp/tlsn-browser-e2e-result.png" });
 
-    // Assertions — proof transcript is valid. Server returns 400 because
-    // tlsn-wasm sends origin-form URI without Host header (upstream WASM bug).
-    // CLI prover (e2e/tlsn.test.ts) adds Host explicitly and gets 200.
+    // Assertions — proof transcript with 200 OK response
     expect(resultText).toContain("completed in");
     expect(resultText).toContain("results");
+    expect(resultText).toContain("200");
     expect(resultText).toContain("START_LINE");
-  }, 30_000);
+  }, 90_000);
 });

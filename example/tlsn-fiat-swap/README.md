@@ -142,7 +142,7 @@ For actual TLSNotary proof generation, you need:
    docker run -p 7047:7047 ghcr.io/tlsnotary/tlsn-verifier:latest
    ```
 
-2. **TLSNotary Browser Extension** — [TLSN Extension](https://github.com/tlsnotary/tlsn-extension) for capturing proofs
+2. **TLSNotary Browser Extension** — [TLSN Extension](https://github.com/motxx/tlsn-extension) for capturing proofs
 
 3. **Anchr Worker** — Automates proof generation
    ```bash

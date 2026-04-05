@@ -82,8 +82,15 @@ const flowBrowser = await pw.chromium.launch({
 });
 const flowPage = await flowBrowser.newPage();
 await flowPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+// Navigate to a real URL first, then inject the HTML via script to ensure JS executes
+await flowPage.goto("about:blank");
 await flowPage.setContent(flowHtml);
-await flowPage.waitForFunction(() => typeof (window as any).flowUpdate === 'function');
+// Poll for JS readiness instead of waitForFunction (avoids headed-mode timeout)
+for (let i = 0; i < 30; i++) {
+  const ready = await flowPage.evaluate(() => typeof (window as any).flowUpdate === 'function');
+  if (ready) break;
+  await new Promise(r => setTimeout(r, 200));
+}
 await flowPage.evaluate((ts) => (window as any).flowSetStart(ts), startTime);
 
 console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Square: bottom-left | Flow: bottom-right`);
