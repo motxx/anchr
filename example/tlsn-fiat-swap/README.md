@@ -149,6 +149,39 @@ For actual TLSNotary proof generation, you need:
    bun run src/auto-worker.ts
    ```
 
+## MPC-TLS Performance: RSA vs ECDSA
+
+Stripe (`api.stripe.com`) uses **RSA certificates**. RSA signature verification inside the MPC-TLS circuit is significantly slower than ECDSA:
+
+| Target | Certificate | Proof Time | Buffer |
+|--------|------------|------------|--------|
+| api.bitflyer.com (ECDSA) | ECDSA P-256 | ~4s | 4096 recv |
+| api.stripe.com (RSA) | RSA 2048 | **2–5 min** | 4096 recv |
+
+The E2E scripts use the CLI prover (`tlsn-prove`) for Stripe proofs. Browser extension proofs are even slower due to WASM overhead.
+
+For production use, consider:
+- Caching MPC setup parameters
+- Using ECDSA-only CDN endpoints if available
+- Running the prover in release mode (`cargo build --release`)
+
+## E2E Test Scripts
+
+Full automated tests (Stripe Payment Link → payment → TLSNotary proof → HTLC settlement):
+
+```bash
+# Full E2E with UI visualization (requires all infrastructure)
+STRIPE_SECRET_KEY=sk_test_... ./scripts/run-e2e-stripe.sh
+
+# Or run directly (infrastructure must be already running)
+STRIPE_SECRET_KEY=sk_test_... deno run --allow-all --env scripts/e2e-stripe-full.ts
+
+# Payment + proof only (no Anchr server needed)
+STRIPE_SECRET_KEY=sk_test_... deno run --allow-all --env scripts/e2e-stripe-payment-link.ts
+```
+
+Square equivalents are also available (`e2e-square-full.ts`, `run-e2e-square.sh`).
+
 ## Files
 
 - **seller.ts** — BTC seller SDK demo: creates a Stripe Payment Link order with Cashu HTLC escrow and TLSNotary conditions
