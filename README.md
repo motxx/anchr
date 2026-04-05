@@ -1,6 +1,6 @@
 # Anchr
 
-[![CI](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml)
+[![CI](https://github.com/motxx/anchr/actions/workflows/ci.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci.yml)
 
 Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
 
