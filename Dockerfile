@@ -33,13 +33,16 @@ COPY . .
 
 # Build frontend
 RUN deno task build:ui
-# Tailwind CSS v4: @import "tailwindcss" needs the package resolvable.
-# Install in /tmp to avoid conflicts with Deno's node_modules, then
-# run the CLI directly.
-RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null \
+# Tailwind CSS v4: @import "tailwindcss" resolves from the input file's
+# directory. Symlink node_modules into /app so the CSS resolver finds it.
+RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null; \
+  ln -sf /tmp/node_modules /app/src/ui/node_modules \
+  && ln -sf /tmp/node_modules /app/src/ui/requester/node_modules \
+  && ln -sf /tmp/node_modules /app/src/ui/dashboard/node_modules \
   && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/globals.css -o /app/dist/ui/generated.css \
   && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/requester/globals.css -o /app/dist/ui/requester/generated.css \
   && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/dashboard/globals.css -o /app/dist/ui/dashboard/generated.css \
+  && rm -f /app/src/ui/node_modules /app/src/ui/requester/node_modules /app/src/ui/dashboard/node_modules \
   && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
 
 ENV NODE_ENV=production
