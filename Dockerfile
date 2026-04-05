@@ -26,13 +26,13 @@ RUN apt-get update \
 COPY --from=rust-builder /build/crates/tlsn-verifier/target/release/tlsn-verifier /usr/local/bin/
 COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /usr/local/bin/
 
-COPY deno.json ./
+COPY deno.json deno.lock ./
 RUN deno install
 
 COPY . .
 
-# Build frontend
-RUN deno task build:ui && deno task build:css
+# Build frontend (tailwindcss needed for @import "tailwindcss" in CSS)
+RUN npm install tailwindcss @tailwindcss/cli && deno task build:ui && deno task build:css
 
 ENV NODE_ENV=production
 ENV REFERENCE_APP_PORT=8080
