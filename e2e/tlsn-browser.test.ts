@@ -195,7 +195,7 @@ export const main = async () => {
 
     // Poll DevConsole console output for completion
     let resultText = "";
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 15; i++) {
       await sleep(1000);
       resultText = await page.evaluate(() => document.body?.innerText || "");
       if (resultText.includes("completed in") || resultText.includes("Error after")) break;
@@ -210,10 +210,9 @@ export const main = async () => {
 
     await page.screenshot({ path: "/tmp/tlsn-browser-e2e-result.png" });
 
-    // Assertions — verify MPC-TLS proof completed with valid transcript.
-    // Response is 400 because WASM hyper doesn't auto-insert Host header with origin-form URI.
-    // This is an upstream tlsn-extension bug (PR #268 switched to origin-form but didn't add Host).
-    // The proof itself is cryptographically valid — the transcript is correct.
+    // Assertions — proof transcript is valid. Server returns 400 because
+    // tlsn-wasm sends origin-form URI without Host header (upstream WASM bug).
+    // CLI prover (e2e/tlsn.test.ts) adds Host explicitly and gets 200.
     expect(resultText).toContain("completed in");
     expect(resultText).toContain("results");
     expect(resultText).toContain("START_LINE");
