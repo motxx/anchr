@@ -71,6 +71,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # Upload SARIF
+      id-token: write # Sigstore signing for publish_results
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2
