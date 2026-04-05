@@ -41,7 +41,8 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     "/listings",
     rateLimit,
     writeAuth,
-    zValidator("json", createListingSchema, (result, c) => {
+    // deno-lint-ignore no-explicit-any -- Zod v4 ZodObject is not assignable to @hono/zod-validator's ZodSchema (Zod v3 type)
+    zValidator("json", createListingSchema as any, (result, c) => {
       if (!result.success) {
         return c.json({
           error: "Invalid listing payload",
