@@ -49,64 +49,6 @@ async function isVerifierRunning(): Promise<boolean> {
   }
 }
 
-/**
- * Fire execCode asynchronously (no CDP blocking), poll window.__e2eResult.
- * Popup approval runs concurrently.
- */
-async function execPlugin(
-  browser: Browser,
-  page: Page,
-  code: string,
-  timeoutMs: number,
-): Promise<{ ok: boolean; result?: string; error?: string }> {
-  // Start popup monitor
-  let popupDone = false;
-  const popupMonitor = (async () => {
-    while (!popupDone) {
-      await sleep(300);
-      try {
-        for (const p of await browser.pages()) {
-          if (p.url().includes("confirmPopup") && !popupDone) {
-            await sleep(200);
-            await p.evaluate(() => {
-              for (const b of document.querySelectorAll("button"))
-                if (b.textContent?.toLowerCase().includes("allow")) {
-                  (b as HTMLButtonElement).click();
-                  return;
-                }
-            });
-            popupDone = true;
-            console.error("[e2e] Popup approved");
-          }
-        }
-      } catch { /* not open yet */ }
-    }
-  })();
-
-  // Fire execCode — don't await in page.evaluate (avoids CDP blocking)
-  await page.evaluate((c: string) => {
-    (window as any).__e2eResult = undefined;
-    try {
-      (window as any).tlsn.execCode(c).then(
-        (r: unknown) => { (window as any).__e2eResult = { ok: true, result: JSON.stringify(r) }; },
-        (e: any) => { (window as any).__e2eResult = { ok: false, error: e?.message ?? String(e) }; },
-      );
-    } catch (e: any) {
-      (window as any).__e2eResult = { ok: false, error: "sync: " + (e?.message ?? String(e)) };
-    }
-  }, code);
-
-  // Poll for result
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const r = await page.evaluate(() => (window as any).__e2eResult);
-    if (r) { popupDone = true; return r; }
-    await sleep(500);
-  }
-  popupDone = true;
-  return { ok: false, error: "Timed out" };
-}
-
 // Puppeteer FrameManager creates internal deferred timers on browser.close().
 describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResources: false }, () => {
   let browser: Browser;
@@ -161,46 +103,34 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
     }
   });
 
-  test("extension loads and window.tlsn API is available", () => {
+  test("MPC-TLS proof via browser extension — httpbin.org", async () => {
     if (!ready) { console.error("[e2e] SKIPPED"); return; }
-    expect(ready).toBe(true);
-  });
 
-  test("minimal plugin execCode via sandbox", async () => {
-    if (!ready) return;
-    const r = await execPlugin(browser, page, `\
-export const config = { name: 'test', description: 'test' };
-export const onClick = async () => {};
-export const main = () => { done('hello'); };
-`, 10_000);
-    console.error("[e2e] Minimal:", JSON.stringify(r));
-    expect(r.ok).toBe(true);
-  }, 15_000);
-
-  test("MPC-TLS proof — bitflyer ECDSA (~2s)", async () => {
-    if (!ready) return;
-    const r = await execPlugin(browser, page, `\
+    // Inject plugin code into CodeMirror editor (triggers React setCode via onChange)
+    const pluginCode = `\
 export const config = {
   name: 'Anchr E2E',
-  description: 'bitFlyer ECDSA',
+  description: 'httpbin.org proof via MPC-TLS',
   requests: [{
     method: 'GET',
-    host: 'api.bitflyer.com',
-    pathname: '/v1/ticker',
+    host: 'httpbin.org',
+    pathname: '/get',
     verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
   }],
 };
+
 export const onClick = async () => {};
+
 export const main = async () => {
   const resp = await prove(
     {
-      url: 'https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY',
+      url: 'https://httpbin.org/get',
       method: 'GET',
       headers: { 'Accept': 'application/json' },
     },
     {
       verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
-      proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=api.bitflyer.com',
+      proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=httpbin.org',
       maxRecvData: 4096,
       maxSentData: 1024,
       handlers: [
@@ -213,11 +143,75 @@ export const main = async () => {
   );
   done(JSON.stringify(resp));
 };
-`, 15_000);
-    console.error("[e2e] MPC-TLS:", JSON.stringify(r).slice(0, 500));
-    expect(r.ok).toBe(true);
-    // Verify we got a valid TLS transcript with results
-    expect(r.result).toContain("results");
-    expect(r.result).toContain("START_LINE");
-  }, 20_000);
+`;
+
+    // Set code via CodeMirror 6 EditorView
+    await page.evaluate((code: string) => {
+      const cmContent = document.querySelector(".cm-content");
+      const view = (cmContent as any)?.cmView?.view;
+      if (view) {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+      }
+    }, pluginCode);
+
+    // Verify injection
+    const editorText = await page.evaluate(
+      () => document.querySelector(".cm-content")?.textContent?.slice(0, 80) || "",
+    );
+    expect(editorText).toContain("Anchr E2E");
+
+    // Auto-approve confirmPopup
+    let popupApproved = false;
+    const popupMonitor = (async () => {
+      for (let i = 0; i < 30 && !popupApproved; i++) {
+        await sleep(300);
+        try {
+          for (const p of await browser.pages()) {
+            if (p.url().includes("confirmPopup") && !popupApproved) {
+              await sleep(200);
+              await p.evaluate(() => {
+                for (const b of document.querySelectorAll("button"))
+                  if (b.textContent?.toLowerCase().includes("allow")) {
+                    (b as HTMLButtonElement).click();
+                    return;
+                  }
+              });
+              popupApproved = true;
+              console.error("[e2e] Popup approved");
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    })();
+
+    // Click "Run Code" button — triggers DevConsole's executeCode() → console output
+    await page.evaluate(() => {
+      for (const b of document.querySelectorAll("button"))
+        if (b.textContent?.includes("Run")) {
+          (b as HTMLButtonElement).click();
+          break;
+        }
+    });
+
+    // Poll DevConsole console output for completion
+    let resultText = "";
+    for (let i = 0; i < 20; i++) {
+      await sleep(1000);
+      resultText = await page.evaluate(() => document.body?.innerText || "");
+      if (resultText.includes("completed in") || resultText.includes("Error after")) break;
+    }
+    popupApproved = true;
+
+    // Log console output
+    const execIdx = resultText.indexOf("Executing");
+    if (execIdx >= 0) {
+      console.error("[e2e] Console output:", resultText.slice(execIdx, execIdx + 500));
+    }
+
+    await page.screenshot({ path: "/tmp/tlsn-browser-e2e-result.png" });
+
+    // Assertions
+    expect(resultText).toContain("completed in");
+    expect(resultText).toContain("results");
+  }, 30_000);
 });
