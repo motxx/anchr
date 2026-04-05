@@ -86,10 +86,14 @@ async function execPlugin(
   // Fire execCode — don't await in page.evaluate (avoids CDP blocking)
   await page.evaluate((c: string) => {
     (window as any).__e2eResult = undefined;
-    (window as any).tlsn.execCode(c).then(
-      (r: unknown) => { (window as any).__e2eResult = { ok: true, result: JSON.stringify(r) }; },
-      (e: Error) => { (window as any).__e2eResult = { ok: false, error: e.message }; },
-    );
+    try {
+      (window as any).tlsn.execCode(c).then(
+        (r: unknown) => { (window as any).__e2eResult = { ok: true, result: JSON.stringify(r) }; },
+        (e: any) => { (window as any).__e2eResult = { ok: false, error: e?.message ?? String(e) }; },
+      );
+    } catch (e: any) {
+      (window as any).__e2eResult = { ok: false, error: "sync: " + (e?.message ?? String(e)) };
+    }
   }, code);
 
   // Poll for result
@@ -196,6 +200,7 @@ export const main = async () => {
     },
     {
       verifierUrl: 'ws://localhost:${VERIFIER_WS_PORT}',
+      proxyUrl: 'ws://localhost:${VERIFIER_WS_PORT}/proxy?token=api.bitflyer.com',
       maxRecvData: 4096,
       maxSentData: 1024,
       handlers: [
@@ -210,12 +215,9 @@ export const main = async () => {
 };
 `, 15_000);
     console.error("[e2e] MPC-TLS:", JSON.stringify(r).slice(0, 500));
-    if (!r.ok && r.error === "Timed out") {
-      // Extension's background→offscreen message chain drops during prove().
-      // MPC-TLS itself works via CLI (e2e/tlsn.test.ts). This is an extension issue.
-      console.error("[e2e] KNOWN ISSUE: extension message channel drops during prove() — needs extension-side fix");
-      return;
-    }
     expect(r.ok).toBe(true);
+    // Verify we got a valid TLS transcript with results
+    expect(r.result).toContain("results");
+    expect(r.result).toContain("START_LINE");
   }, 20_000);
 });
