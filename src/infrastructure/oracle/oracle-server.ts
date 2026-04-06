@@ -16,7 +16,7 @@ import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import type { OracleAttestation } from "../../domain/oracle-types";
-import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store";
+import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../cashu/preimage-store";
 
 /** Constant-time string comparison to prevent timing attacks (including length). */
 function safeCompare(a: string, b: string): boolean {
@@ -175,7 +175,20 @@ export function buildOracleApp(
 
 // Run as standalone server when executed directly
 if (import.meta.main) {
-  const app = buildOracleApp(ORACLE_ID, ORACLE_API_KEY);
+  const preimageDbPath = process.env.ORACLE_PREIMAGE_DB?.trim();
+  const preimageStore = preimageDbPath
+    ? createPersistentPreimageStore(preimageDbPath)
+    : undefined;
+
+  const app = buildOracleApp({
+    oracleId: ORACLE_ID,
+    apiKey: ORACLE_API_KEY,
+    preimageStore,
+  });
+
+  if (preimageDbPath) {
+    console.log(`[oracle-server] Preimage store persisted to ${preimageDbPath}`);
+  }
   console.log(`[oracle-server] Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
 
   Deno.serve({ port: ORACLE_PORT }, app.fetch);
