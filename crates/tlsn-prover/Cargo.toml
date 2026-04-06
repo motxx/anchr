@@ -13,7 +13,7 @@ tlsn-formats = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-alpha.
 spansy = { git = "https://github.com/tlsnotary/tlsn-utils", rev = "6f1a934", features = ["serde"] }
 
 k256 = { version = "0.13", features = ["ecdsa"] }
-bincode = "1.3"
+bincode = "3.0"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "net", "io-std", "io-util", "fs"] }
 tokio-util = { version = "0.7", features = ["compat"] }
 hyper = { version = "1", features = ["client", "http1"] }
