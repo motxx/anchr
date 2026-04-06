@@ -201,7 +201,7 @@ async fn run_with_ws_verifier(
         "maxSentData": max_sent_data,
         "sessionData": {}
     });
-    session_ws.send(Message::Text(register_msg.to_string())).await?;
+    session_ws.send(Message::Text(register_msg.to_string().into())).await?;
 
     // Receive session_registered response
     let resp = session_ws.next().await
