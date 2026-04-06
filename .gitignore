@@ -67,7 +67,11 @@ test-results
 # claude code
 .claude/
 
+# generated reports
+docs/chaos-*.md
+
 # deno
 
 # example apps
 example/bounty-board/node_modules/
+example/bounty-board/.expo/
