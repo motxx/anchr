@@ -83,6 +83,9 @@ export function isTlsnVerifierAvailable(): boolean {
 /** Default max attestation age: 5 minutes. */
 const DEFAULT_MAX_AGE_SECONDS = 300;
 
+/** Timeout for the TLSNotary verifier subprocess (seconds). */
+const VERIFIER_TIMEOUT_SECONDS = 60;
+
 function extractHostname(url: string): string | null {
   try {
     return new URL(url).hostname;
@@ -284,7 +287,24 @@ async function runVerifierBinary(
       stdout: "pipe",
       stderr: "pipe",
     });
-    await proc.exited;
+
+    const timeoutMs = VERIFIER_TIMEOUT_SECONDS * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+    const timedOut = await Promise.race([
+      proc.exited.then(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(true), timeoutMs);
+      }),
+    ]);
+    clearTimeout(timer!);
+
+    if (timedOut) {
+      proc.kill();
+      return {
+        signatureValid: false,
+        error: `verifier timed out after ${VERIFIER_TIMEOUT_SECONDS}s`,
+      };
+    }
 
     if (proc.exitCode !== 0) {
       const stderr = await new Response(proc.stderr).text();
