@@ -167,6 +167,11 @@ export function buildOracleApp(
       return c.json({ error: "No preimage found for this query" }, 404);
     }
 
+    // Delete from all stores before responding to prevent replay (R-004)
+    preimageStore.delete(hash);
+    queryHashMap.delete(body.query_id);
+    verifiedQueries.delete(body.query_id);
+
     return c.json({ query_id: body.query_id, preimage });
   });
 
