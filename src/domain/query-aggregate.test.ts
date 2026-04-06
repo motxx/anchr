@@ -361,9 +361,10 @@ describe("expireQuery", () => {
     expect(expireQuery(query, 2000).ok).toBe(false);
   });
 
-  test("rejects verifying query", () => {
+  test("expires verifying query", () => {
     const query = makeHtlcQuery({ status: "verifying", expires_at: 1000 });
-    expect(expireQuery(query, 2000).ok).toBe(false);
+    const expired = expectOk(expireQuery(query, 2000));
+    expect(expired.status).toBe("expired");
   });
 });
 
@@ -694,9 +695,10 @@ describe("HTLC full lifecycle", () => {
     expectOk(expireQuery(q, 2000));
   });
 
-  test("cannot expire at verifying", () => {
+  test("can expire at verifying", () => {
     const q = makeHtlcQuery({ status: "verifying", expires_at: 1000 });
-    expect(expireQuery(q, 2000).ok).toBe(false);
+    const expired = expectOk(expireQuery(q, 2000));
+    expect(expired.status).toBe("expired");
   });
 
   test("can cancel at awaiting_quotes", () => {
