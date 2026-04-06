@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@source "./main.tsx";
+@source "./MarketApp.tsx";
+@source "./components/*.tsx";
+@source "../components/**/*.tsx";
+@source "../lib/**/*.ts";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-yes: hsl(var(--yes));
+  --color-yes-foreground: hsl(var(--yes-foreground));
+  --color-no: hsl(var(--no));
+  --color-no-foreground: hsl(var(--no-foreground));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+}
+
+:root {
+  /* Nostr-inspired dark theme — deep black + purple
+   * Palette defined in DESIGN.md Section 2.
+   * Background: #0A0910, Card: #13111C, Primary: #8B5CF6 */
+  --background: 260 15% 4%;
+  --foreground: 255 25% 93%;
+  --card: 260 12% 8%;
+  --card-foreground: 255 25% 93%;
+  --popover: 260 12% 8%;
+  --popover-foreground: 255 25% 93%;
+  --primary: 258 90% 66%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 260 14% 15%;
+  --secondary-foreground: 255 10% 66%;
+  --muted: 260 12% 11%;
+  --muted-foreground: 260 10% 46%;
+  --accent: 263 30% 20%;
+  --accent-foreground: 258 60% 75%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 260 14% 15%;
+  --input: 260 12% 11%;
+  --ring: 258 90% 66%;
+  /* Prediction market YES/NO — DESIGN.md Section 2 */
+  --yes: 142 71% 45%;
+  --yes-foreground: 142 64% 24%;
+  --no: 0 84% 60%;
+  --no-foreground: 0 63% 31%;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --background: 260 15% 4%;
+  --foreground: 255 25% 93%;
+  --card: 260 12% 8%;
+  --card-foreground: 255 25% 93%;
+  --popover: 260 12% 8%;
+  --popover-foreground: 255 25% 93%;
+  --primary: 258 90% 66%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 260 14% 15%;
+  --secondary-foreground: 255 10% 66%;
+  --muted: 260 12% 11%;
+  --muted-foreground: 260 10% 46%;
+  --accent: 263 30% 20%;
+  --accent-foreground: 258 60% 75%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 260 14% 15%;
+  --input: 260 12% 11%;
+  --ring: 258 90% 66%;
+  --yes: 142 71% 45%;
+  --yes-foreground: 142 64% 24%;
+  --no: 0 84% 60%;
+  --no-foreground: 0 63% 31%;
+}
+
+/* Mono font for numbers */
+.font-mono {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}

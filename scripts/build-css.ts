@@ -30,6 +30,11 @@ const BUILDS: CssBuild[] = [
     input: join(PROJECT_ROOT, "src/ui/dashboard/globals.css"),
     output: join(PROJECT_ROOT, "src/ui/dashboard/generated.css"),
   },
+  {
+    label: "market",
+    input: join(PROJECT_ROOT, "src/ui/market/globals.css"),
+    output: join(PROJECT_ROOT, "src/ui/market/generated.css"),
+  },
 ];
 
 async function buildCss(build: CssBuild) {

@@ -27,6 +27,7 @@ const ENTRIES: EntryPoint[] = [
   { name: "worker", dir: ".", entryTsx: "main.tsx", html: "index.html" },
   { name: "requester", dir: "requester", entryTsx: "main.tsx", html: "index.html" },
   { name: "dashboard", dir: "dashboard", entryTsx: "main.tsx", html: "index.html" },
+  { name: "market", dir: "market", entryTsx: "main.tsx", html: "index.html" },
 ];
 
 async function buildEntry(entry: EntryPoint) {

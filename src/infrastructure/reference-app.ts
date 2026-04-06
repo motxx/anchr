@@ -33,6 +33,11 @@ export async function startReferenceApp() {
   app.get("/dashboard/generated.css", serveStatic({ path: "./dist/ui/dashboard/generated.css" }));
   app.get("/dashboard/", serveStatic({ path: "./dist/ui/dashboard/index.html" }));
   app.get("/dashboard", (c) => c.redirect("/dashboard/"));
+  app.get("/market/main.js", serveStatic({ path: "./dist/ui/market/main.js" }));
+  app.get("/market/main.js.map", serveStatic({ path: "./dist/ui/market/main.js.map" }));
+  app.get("/market/generated.css", serveStatic({ path: "./dist/ui/market/generated.css" }));
+  app.get("/market/", serveStatic({ path: "./dist/ui/market/index.html" }));
+  app.get("/market", (c) => c.redirect("/market/"));
   app.get("/main.js", serveStatic({ path: "./dist/ui/main.js" }));
   app.get("/main.js.map", serveStatic({ path: "./dist/ui/main.js.map" }));
   app.get("/generated.css", serveStatic({ path: "./dist/ui/generated.css" }));
@@ -43,4 +48,5 @@ export async function startReferenceApp() {
   console.error(`[reference-app] Worker    → http://localhost:${port}`);
   console.error(`[reference-app] Requester → http://localhost:${port}/requester`);
   console.error(`[reference-app] Dashboard → http://localhost:${port}/dashboard`);
+  console.error(`[reference-app] Market    → http://localhost:${port}/market`);
 }
