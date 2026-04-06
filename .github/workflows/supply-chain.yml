@@ -67,7 +67,7 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !github.event.repository.private
     permissions:
       contents: read
       security-events: write # Upload SARIF
