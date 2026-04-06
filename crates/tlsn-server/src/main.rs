@@ -212,7 +212,7 @@ async fn handle_session_ws_raw(
 
     // Send session_registered
     let resp = serde_json::json!({ "type": "session_registered", "sessionId": session_id });
-    if ws.send(Message::Text(resp.to_string())).await.is_err() { return; }
+    if ws.send(Message::Text(resp.to_string().into())).await.is_err() { return; }
     eprintln!("[tlsn-server] WS session registered: {}", &session_id[..8]);
 
     // Wait for MPC verification result
@@ -220,7 +220,7 @@ async fn handle_session_ws_raw(
         Ok(Ok(r)) => r,
         _ => {
             let resp = serde_json::json!({ "type": "error", "message": "Verification timed out" });
-            let _ = ws.send(Message::Text(resp.to_string())).await;
+            let _ = ws.send(Message::Text(resp.to_string().into())).await;
             return;
         }
     };
@@ -308,7 +308,7 @@ async fn handle_session_ws_raw(
         "serverEphemeralKey": base64_encode(&result.server_ephemeral_key),
         "transcriptCommitments": base64_encode(&result.transcript_commitments),
     });
-    let _ = ws.send(Message::Text(resp.to_string())).await;
+    let _ = ws.send(Message::Text(resp.to_string().into())).await;
     eprintln!("[tlsn-server] WS session {} completed with {} results", &session_id[..8], results.len());
 }
 
@@ -496,7 +496,7 @@ async fn handle_proxy_ws_raw(
                 Ok(n) => {
                     total += n as u64;
                     eprintln!("[proxy] TCP→WS: {} bytes (total {})", n, total);
-                    if ws_sink.send(async_tungstenite::tungstenite::Message::Binary(buf[..n].to_vec())).await.is_err() {
+                    if ws_sink.send(async_tungstenite::tungstenite::Message::Binary(buf[..n].to_vec().into())).await.is_err() {
                         eprintln!("[proxy] TCP→WS send error, draining TCP...");
                         loop {
                             match tcp_read.read(&mut buf).await {
