@@ -9,7 +9,7 @@ const SIMPLE_TRANSITIONS: Record<string, QueryStatus[]> = {
 const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
   awaiting_quotes: ["processing", "expired"],
   processing: ["verifying", "expired"],
-  verifying: ["approved", "rejected"],
+  verifying: ["approved", "rejected", "expired"],
 };
 
 /** Terminal states — no further transitions allowed. */
@@ -19,7 +19,7 @@ const TERMINAL_STATUSES: QueryStatus[] = ["approved", "rejected", "expired"];
 const CANCELLABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
 
 /** Statuses that can be expired (same as cancellable). */
-const EXPIRABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+const EXPIRABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing", "verifying"];
 
 /** Check if a state transition is valid. */
 export function isValidTransition(from: QueryStatus, to: QueryStatus, isHtlc: boolean): boolean {
