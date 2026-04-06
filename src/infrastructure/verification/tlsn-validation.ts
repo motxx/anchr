@@ -289,10 +289,14 @@ async function runVerifierBinary(
     });
 
     const timeoutMs = VERIFIER_TIMEOUT_SECONDS * 1000;
+    let timer: ReturnType<typeof setTimeout>;
     const timedOut = await Promise.race([
       proc.exited.then(() => false),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(true), timeoutMs)),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(true), timeoutMs);
+      }),
     ]);
+    clearTimeout(timer!);
 
     if (timedOut) {
       proc.kill();
