@@ -7,7 +7,7 @@
  *   bunx anchr-worker --server http://localhost:3000 --verifier localhost:7047
  */
 
-import { AnchrWorker } from "./worker";
+import { AnchrWorker } from "./worker.ts";
 
 function parseArgs(): Record<string, string> {
   const args: Record<string, string> = {};

@@ -79,7 +79,7 @@ try {
   process.exit(1);
 }
 
-const photoBlob = new File([photoBytes], PHOTO_PATH.split("/").pop() ?? "photo.jpg", {
+const photoBlob = new File([photoBytes as BlobPart], PHOTO_PATH.split("/").pop() ?? "photo.jpg", {
   type: "image/jpeg",
 });
 

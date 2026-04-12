@@ -92,7 +92,7 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
       await sleep(200);
     }
     ready = true;
-  }, 15_000);
+  });
 
   afterAll(async () => {
     if (browser) {
@@ -103,7 +103,7 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
     }
   });
 
-  test("MPC-TLS proof via browser extension — bitflyer ECDSA", async () => {
+  test("MPC-TLS proof via browser extension — bitflyer ECDSA", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!ready) { console.error("[e2e] SKIPPED"); return; }
 
     // Inject plugin code into CodeMirror editor (triggers React setCode via onChange)
@@ -223,5 +223,5 @@ export const main = async () => {
     expect(resultText).toContain("results");
     expect(resultText).toContain("200");
     expect(resultText).toContain("START_LINE");
-  }, 90_000);
+  });
 });

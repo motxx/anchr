@@ -1,6 +1,6 @@
 import { test, expect, describe, beforeAll } from "bun:test";
-import { Anchr, QueryTimeoutError } from "./index";
-import { AnchrWorker } from "./worker";
+import { Anchr, QueryTimeoutError } from "./index.ts";
+import { AnchrWorker } from "./worker.ts";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

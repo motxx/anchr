@@ -118,7 +118,7 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(testQueryId).toMatch(/^query_/);
   });
 
-  test("web app loads and shows queries", async () => {
+  test("web app loads and shows queries", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("goto", WEB_URL);
@@ -132,7 +132,7 @@ describe("e2e: Anchr Worker Web app", () => {
     // Our test query should be visible
     expect(text).toContain("E2E Web");
     expect(text).toContain("渋谷");
-  }, 30_000);
+  });
 
   test("query card shows bounty and location", async () => {
     if (skip()) return;
@@ -143,7 +143,7 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("渋谷");
   });
 
-  test("navigate to query detail view", async () => {
+  test("navigate to query detail view", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip() || !testQueryId) return;
 
     // Navigate directly to the detail URL (expo-router web routing)
@@ -158,9 +158,9 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("Camera");
     expect(text).toContain("Import");
     expect(text).toContain("10 sats");
-  }, 15_000);
+  });
 
-  test("navigate to Wallet tab", async () => {
+  test("navigate to Wallet tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     // Go back to tabs first
@@ -179,9 +179,9 @@ describe("e2e: Anchr Worker Web app", () => {
     const text = await browse("text");
     expect(text).toContain("Balance");
     expect(text).toContain("sats");
-  }, 15_000);
+  });
 
-  test("navigate to Settings tab", async () => {
+  test("navigate to Settings tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("js", `
@@ -194,9 +194,9 @@ describe("e2e: Anchr Worker Web app", () => {
     const text = await browse("text");
     expect(text).toContain("Settings");
     expect(text).toContain("Server URL");
-  }, 15_000);
+  });
 
-  test("navigate to Map tab", async () => {
+  test("navigate to Map tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("js", `
@@ -208,9 +208,9 @@ describe("e2e: Anchr Worker Web app", () => {
 
     const text = await browse("text");
     expect(text).toContain("Map");
-  }, 15_000);
+  });
 
-  test("submit text result via API and verify web reflects status", async () => {
+  test("submit text result via API and verify web reflects status", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip() || !testQueryId) return;
 
     // Submit via API (use /result endpoint — /submit is deprecated 410)
@@ -245,5 +245,5 @@ describe("e2e: Anchr Worker Web app", () => {
 
     // Clean up — mark as handled
     testQueryId = null;
-  }, 30_000);
+  });
 });

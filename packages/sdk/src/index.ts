@@ -427,7 +427,12 @@ interface QuerySummary {
   description: string;
   bounty?: { amount_sats: number };
   expires_at: number;
-  tlsn_requirements?: { target_url: string };
+  tlsn_requirements?: {
+    target_url: string;
+    domain_hint?: string;
+    conditions?: Array<{ type: string; expression: string; expected?: string; description?: string }>;
+    max_attestation_age_seconds?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -443,7 +448,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 // Re-export worker
-export { AnchrWorker, type AnchrWorkerConfig, type FulfilledEvent } from "./worker";
+export { AnchrWorker, type AnchrWorkerConfig, type FulfilledEvent } from "./worker.ts";
 
 // Default export
 export default Anchr;

@@ -22,7 +22,7 @@
  * ```
  */
 
-import { Anchr, type QueryCondition } from "./index";
+import { Anchr, type QueryCondition } from "./index.ts";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
 

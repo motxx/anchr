@@ -59,7 +59,7 @@
     "test:e2e:relay": "NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts --allow-env --allow-read --allow-net --allow-run",
     "test:ci": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'",
-    "test": "deno test src/ e2e/ --no-check --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
 
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",

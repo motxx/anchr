@@ -121,5 +121,5 @@ while (Date.now() - startTime < TIMEOUT_MS) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   process.stdout.write(`\r  Status: ${status.status} (${elapsed}s elapsed)`);
 
-  await Bun.sleep(POLL_INTERVAL_MS);
+  await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 }

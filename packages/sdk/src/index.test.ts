@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { Anchr, AnchrError, QueryTimeoutError, VerificationFailedError } from "./index";
+import { Anchr, AnchrError, QueryTimeoutError, VerificationFailedError } from "./index.ts";
 
 describe("Anchr SDK", () => {
   test("constructor accepts config", () => {

@@ -99,7 +99,7 @@ describe("TLSNotary E2E", () => {
     }
   });
 
-  test("generates and verifies a real TLSNotary presentation", async () => {
+  test("generates and verifies a real TLSNotary presentation", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
@@ -115,9 +115,9 @@ describe("TLSNotary E2E", () => {
     expect(result.server_name).toBe(TARGET_SERVER);
     expect(typeof result.revealed_body).toBe("string");
     expect((result.revealed_body as string)).toContain(TARGET_BODY_MARKER);
-  }, 60_000);
+  });
 
-  test("full Anchr API flow: create query → submit presentation → verify", async () => {
+  test("full Anchr API flow: create query → submit presentation → verify", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
@@ -170,7 +170,7 @@ describe("TLSNotary E2E", () => {
     const verified = outcome.query?.verification?.tlsn_verified;
     expect(verified?.server_name).toBe(TARGET_SERVER);
     expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
-  }, 120_000);
+  });
 
   test("rejects submission without presentation", async () => {
     const store = createQueryStore();
@@ -192,7 +192,7 @@ describe("TLSNotary E2E", () => {
     expect(outcome.query?.verification?.failures.some(f => f.includes("no attestation"))).toBe(true);
   });
 
-  test("extension result with CLI-generated presentation verifies via HTTP API", async () => {
+  test("extension result with CLI-generated presentation verifies via HTTP API", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
@@ -239,9 +239,9 @@ describe("TLSNotary E2E", () => {
     const verified = (submitData.verification as Record<string, unknown>)?.tlsn_verified as Record<string, unknown>;
     expect(verified?.server_name).toBe(TARGET_SERVER);
     expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
-  }, 120_000);
+  });
 
-  test("HTTP API accepts tlsn_presentation field", async () => {
+  test("HTTP API accepts tlsn_presentation field", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
@@ -282,5 +282,5 @@ describe("TLSNotary E2E", () => {
     const submitData = await submitRes.json() as Record<string, unknown>;
     expect(submitData.ok).toBe(true);
     expect((submitData.verification as Record<string, unknown>)?.passed).toBe(true);
-  }, 120_000);
+  });
 });
