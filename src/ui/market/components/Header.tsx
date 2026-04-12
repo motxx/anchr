@@ -1,26 +1,24 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { fetchBalance, requestFaucet } from "../api";
+import { getUserPubkey, truncatePubkey } from "../keypair";
 
-const DEMO_PUBKEY = "demo_user_" + Math.random().toString(36).slice(2, 10);
-
-// Share pubkey across components
-export function getDemoPubkey(): string {
-  return DEMO_PUBKEY;
-}
+/** Re-export for other components that need the user's pubkey. */
+export { getUserPubkey } from "../keypair";
 
 export function Header() {
+  const pubkey = getUserPubkey();
   const [balance, setBalance] = useState<number | null>(null);
   const [faucetLoading, setFaucetLoading] = useState(false);
   const [faucetMsg, setFaucetMsg] = useState<string | null>(null);
 
   const loadBalance = useCallback(async () => {
     try {
-      const data = await fetchBalance(DEMO_PUBKEY);
+      const data = await fetchBalance(pubkey);
       setBalance(data.balance_sats);
     } catch {
       setBalance(null);
     }
-  }, []);
+  }, [pubkey]);
 
   useEffect(() => {
     loadBalance();
@@ -32,7 +30,7 @@ export function Header() {
     setFaucetLoading(true);
     setFaucetMsg(null);
     try {
-      const result = await requestFaucet(DEMO_PUBKEY, 1000);
+      const result = await requestFaucet(pubkey, 1000);
       setBalance(result.balance_sats);
       setFaucetMsg(`+${result.funded_sats} sats`);
       setTimeout(() => setFaucetMsg(null), 3000);
@@ -58,6 +56,14 @@ export function Header() {
           <span className="text-xs text-primary font-medium bg-primary/10 rounded-full px-2 py-0.5">Markets</span>
         </div>
         <div className="flex items-center gap-3">
+          {/* Pubkey */}
+          <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted px-2.5 h-8" title={pubkey}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+              <path d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
+            </svg>
+            <span className="text-xs font-mono text-muted-foreground">{truncatePubkey(pubkey)}</span>
+          </div>
+
           {/* Balance */}
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 h-8">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">

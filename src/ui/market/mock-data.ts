@@ -29,6 +29,8 @@ export interface Market {
   volume_sats: number;
   num_bettors: number;
   created_at: number;
+  /** Winning preimage — only present after resolution. */
+  resolved_preimage?: string;
 }
 
 const now = Math.floor(Date.now() / 1000);

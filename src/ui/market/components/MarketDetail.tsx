@@ -1,11 +1,8 @@
 import React, { useState, useCallback } from "react";
 import type { Market } from "../mock-data";
-import { placeBet } from "../api";
+import { placeBet, redeemWinnings, type RedeemResult } from "../api";
 import { cn } from "../../lib/utils";
-
-/** Demo bettor pubkey — in production this would come from a Nostr wallet */
-import { getDemoPubkey } from "./Header";
-const DEMO_BETTOR_PUBKEY = getDemoPubkey();
+import { getUserPubkey } from "../keypair";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;
@@ -39,10 +36,13 @@ interface MarketDetailProps {
 type BetStatus = "idle" | "submitting" | "success" | "error";
 
 export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps) {
+  const userPubkey = getUserPubkey();
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("");
   const [betStatus, setBetStatus] = useState<BetStatus>("idle");
   const [betMessage, setBetMessage] = useState<string | null>(null);
+  const [redeemStatus, setRedeemStatus] = useState<"idle" | "redeeming" | "success" | "error">("idle");
+  const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
 
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesPercent = total > 0 ? Math.round((market.yes_pool_sats / total) * 100) : 50;
@@ -65,7 +65,7 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
     setBetMessage(null);
 
     try {
-      const result = await placeBet(market.id, side, amountNum, DEMO_BETTOR_PUBKEY);
+      const result = await placeBet(market.id, side, amountNum, userPubkey);
       const matchCount = result.matches?.length ?? 0;
       setBetStatus("success");
       setBetMessage(`Bet placed! ${amountNum} sats on ${side.toUpperCase()}${matchCount > 0 ? ` — ${matchCount} match(es)` : ""}`);
@@ -81,6 +81,25 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
     setBetStatus("idle");
     setBetMessage(null);
   }, []);
+
+  const handleRedeem = useCallback(async () => {
+    if (redeemStatus === "redeeming") return;
+    setRedeemStatus("redeeming");
+    setRedeemMessage(null);
+    try {
+      const result: RedeemResult = await redeemWinnings(market.id, userPubkey);
+      const totalSats = result.pairs.reduce((sum, p) => sum + p.amount_sats, 0);
+      setRedeemStatus("success");
+      setRedeemMessage(
+        result.pairs.length > 0
+          ? `Redeemed ${totalSats.toLocaleString()} sats from ${result.pairs.length} pair(s). Use preimage to verify at mint.`
+          : "No winning pairs found for your pubkey."
+      );
+    } catch (err) {
+      setRedeemStatus("error");
+      setRedeemMessage(err instanceof Error ? err.message : "Redemption failed");
+    }
+  }, [market.id, userPubkey, redeemStatus]);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -345,6 +364,50 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                   </span>
                   <p className="text-xs text-muted-foreground mt-2">
                     Verified by TLSNotary oracle proof
+                  </p>
+                </div>
+              )}
+
+              {/* Redeem winnings */}
+              {isResolved && (
+                <div className="mt-4 space-y-3">
+                  {redeemMessage && (
+                    <div className={cn(
+                      "rounded-lg p-3 text-sm",
+                      redeemStatus === "success" && "bg-yes/10 text-yes border border-yes/20",
+                      redeemStatus === "error" && "bg-destructive/10 text-destructive border border-destructive/20",
+                    )}>
+                      {redeemMessage}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleRedeem}
+                    disabled={redeemStatus === "redeeming" || redeemStatus === "success"}
+                    className={cn(
+                      "w-full h-10 rounded-lg font-semibold text-sm transition-all duration-200",
+                      "disabled:opacity-40 disabled:cursor-not-allowed",
+                      "bg-primary text-primary-foreground hover:bg-primary/90",
+                    )}
+                  >
+                    {redeemStatus === "redeeming"
+                      ? "Redeeming..."
+                      : redeemStatus === "success"
+                        ? "Redeemed"
+                        : "Redeem Winnings"}
+                  </button>
+                  <p className="text-[11px] text-muted-foreground text-center">
+                    Verify the preimage and redeem your HTLC tokens at the Cashu mint.
+                  </p>
+                </div>
+              )}
+
+              {/* Preimage display */}
+              {isResolved && market.resolved_preimage && (
+                <div className="mt-4 rounded-lg bg-muted p-3">
+                  <span className="text-xs text-muted-foreground block mb-1">Winning Preimage</span>
+                  <code className="text-xs font-mono text-primary break-all">{market.resolved_preimage}</code>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Use this preimage to independently verify and redeem HTLC tokens at the mint.
                   </p>
                 </div>
               )}

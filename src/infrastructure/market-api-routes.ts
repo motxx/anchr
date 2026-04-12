@@ -18,7 +18,7 @@ import type {
   MarketStatus,
 } from "../../example/prediction-market/src/market-types.ts";
 import { createOrderBook, type OrderBook } from "../../example/prediction-market/src/order-book.ts";
-import { createSwapPairTokens } from "./conditional-swap/cross-htlc.ts";
+import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "./conditional-swap/cross-htlc.ts";
 import { resolveMarket } from "../../example/prediction-market/src/resolution.ts";
 import {
   createDualPreimageStore,
@@ -46,6 +46,8 @@ const dualPreimageStore: DualPreimageStore = createDualPreimageStore();
 const orderBook: OrderBook = createOrderBook();
 /** Map orderId → { pubkey, proofs } for cross-HTLC execution */
 const orderProofs = new Map<string, { pubkey: string; proofs: Proof[] }>();
+/** Map marketId → winning preimage (stored after resolution for client-side redemption) */
+const resolvedPreimages = new Map<string, string>();
 
 // Cashu wallet — initialized lazily when CASHU_MINT_URL is set
 let cashuWallet: Wallet | null = null;
@@ -192,6 +194,7 @@ function generateId(prefix: string): string {
 
 function marketSummary(m: PredictionMarket) {
   const orders = Array.from(matchedPairsStore.values()).filter((p) => p.market_id === m.id);
+  const preimage = resolvedPreimages.get(m.id);
   return {
     id: m.id,
     title: m.title,
@@ -214,6 +217,7 @@ function marketSummary(m: PredictionMarket) {
     volume_sats: m.yes_pool_sats + m.no_pool_sats,
     num_bettors: orders.length * 2,
     created_at: Math.floor(Date.now() / 1000),
+    ...(preimage ? { resolved_preimage: preimage } : {}),
   };
 }
 
@@ -312,6 +316,29 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const openOrders = orderBook.getOpenOrders(id);
     const matchedPairs = Array.from(matchedPairsStore.values()).filter((b) => b.market_id === id);
 
+    // If a pubkey is provided, include that user's matched pairs with win status
+    const queryPubkey = c.req.query("pubkey");
+    const userPairs = queryPubkey
+      ? matchedPairs
+          .filter((p) => p.yes_pubkey === queryPubkey || p.no_pubkey === queryPubkey)
+          .map((p) => {
+            const userSide = p.yes_pubkey === queryPubkey ? "yes" : "no";
+            const won =
+              (market.status === "resolved_yes" && userSide === "yes") ||
+              (market.status === "resolved_no" && userSide === "no");
+            return {
+              pair_id: p.pair_id,
+              side: userSide,
+              amount_sats: p.amount_sats,
+              status: p.status,
+              won,
+              token: won
+                ? (userSide === "yes" ? p.token_no_to_yes : p.token_yes_to_no)
+                : undefined,
+            };
+          })
+      : undefined;
+
     return c.json({
       ...marketSummary(market),
       resolution_url: market.resolution_url,
@@ -320,6 +347,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       creator_pubkey: market.creator_pubkey,
       open_orders: openOrders.length,
       matched_pairs: matchedPairs.length,
+      ...(userPairs ? { user_pairs: userPairs } : {}),
     });
   });
 
@@ -520,21 +548,45 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       const yesEntry = orderProofs.get(proposal.yes_order_id);
       const noEntry = orderProofs.get(proposal.no_order_id);
 
-      // If both sides have real Cashu proofs, create cross-HTLC tokens
+      // If both sides have real Cashu proofs, lock them with cross-HTLC conditions.
+      // The proofs from debitUser are already fresh (not yet HTLC-locked).
+      // We re-send them through the mint with P2PK+hashlock conditions applied.
       if (yesEntry && noEntry && yesEntry.proofs.length > 0 && noEntry.proofs.length > 0) {
         try {
-          const swapDef: ConditionalSwapDef = {
-            swap_id: id,
-            hash_a: market.htlc_hash_yes,
-            hash_b: market.htlc_hash_no,
-            locktime: market.resolution_deadline,
-          };
-          const tokens = await createSwapPairTokens(
-            yesEntry.proofs, noEntry.proofs,
-            proposal.amount_sats, swapDef,
-            yesEntry.pubkey, noEntry.pubkey,
-          );
-          if (tokens) {
+          const wallet = await getCashuWallet();
+          if (wallet) {
+            await wallet.loadMint();
+
+            const optionsAtoB = buildCrossHtlcForPartyA({
+              hash_b: market.htlc_hash_no,
+              counterpartyPubkey: noEntry.pubkey,
+              refundPubkey: yesEntry.pubkey,
+              locktime: market.resolution_deadline,
+            });
+            const optionsBtoA = buildCrossHtlcForPartyB({
+              hash_a: market.htlc_hash_yes,
+              counterpartyPubkey: yesEntry.pubkey,
+              refundPubkey: noEntry.pubkey,
+              locktime: market.resolution_deadline,
+            });
+
+            // Lock YES→NO: A's proofs locked to hash_no + B's pubkey
+            // Proofs from debitUser are fresh plain proofs. We send them with P2PK conditions.
+            // Use net amount after fees to avoid "Not enough funds" error.
+            const yesTotal = yesEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
+            const yesFee = wallet.getFeesForProofs(yesEntry.proofs);
+            const yesNet = yesTotal - yesFee;
+            const { send: sendA, keep: keepA } = await wallet.ops.send(Math.min(proposal.amount_sats, yesNet), yesEntry.proofs).asP2PK(optionsAtoB).run();
+            if (keepA.length > 0) creditUser(yesEntry.pubkey, keepA);
+
+            // Lock NO→YES: B's proofs locked to hash_yes + A's pubkey
+            const noTotal = noEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
+            const noFee = wallet.getFeesForProofs(noEntry.proofs);
+            const noNet = noTotal - noFee;
+            const { send: sendB, keep: keepB } = await wallet.ops.send(Math.min(proposal.amount_sats, noNet), noEntry.proofs).asP2PK(optionsBtoA).run();
+            if (keepB.length > 0) creditUser(noEntry.pubkey, keepB);
+
+            const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? "";
             const pairId = generateId("pair");
             const pair: MatchedBetPair = {
               pair_id: pairId,
@@ -542,8 +594,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
               yes_pubkey: yesEntry.pubkey,
               no_pubkey: noEntry.pubkey,
               amount_sats: proposal.amount_sats,
-              token_yes_to_no: tokens.tokenAtoB.token,
-              token_no_to_yes: tokens.tokenBtoA.token,
+              token_yes_to_no: getEncodedToken({ mint: mintUrl, proofs: sendA }),
+              token_no_to_yes: getEncodedToken({ mint: mintUrl, proofs: sendB }),
               status: "locked",
             };
             matchedPairsStore.set(pairId, pair);
@@ -627,81 +679,29 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
     market.status = newStatus;
 
-    // Redeem HTLC tokens and credit winners.
-    // YES wins → winner gets token_no_to_yes (locked to hash_a), redeemable with preimage_a
-    // NO wins  → winner gets token_yes_to_no (locked to hash_b), redeemable with preimage_b
-    const wallet = await getCashuWallet();
-    const redemptions: Array<{
+    // Store the winning preimage so clients can fetch it and redeem independently.
+    // This is the trustless part: the preimage is public after resolution, and
+    // anyone holding the HTLC token can redeem at the mint without server involvement.
+    resolvedPreimages.set(id, result.preimage);
+
+    // Mark matched pairs as settled (but do NOT auto-redeem server-side).
+    // Clients call POST /markets/:id/redeem to get their tokens + preimage.
+    const settledPairs: Array<{
       pair_id: string;
       winner_pubkey: string;
-      redeemed_sats: number;
-      error?: string;
+      amount_sats: number;
     }> = [];
 
     for (const pair of matchedPairsStore.values()) {
       if (pair.market_id !== id || pair.status !== "locked") continue;
       pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
 
-      // Determine winner and the token they can redeem
       const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
-      const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
-
-      if (!redeemableToken || !wallet) continue;
-
-      // Attempt HTLC redemption: decode token, attach preimage witness,
-      // sign with server-held key (custodial demo), swap on mint
-      try {
-        const decoded = getDecodedToken(redeemableToken);
-        const htlcProofs = decoded.proofs;
-        if (htlcProofs.length === 0) continue;
-
-        // Attach preimage as HTLC witness
-        const proofsWithPreimage = htlcProofs.map((p) => ({
-          ...p,
-          witness: JSON.stringify({ preimage: result.preimage, signatures: [] }),
-        }));
-
-        // In this custodial demo, the server holds the winner's key.
-        // We use wallet.ops.send() which handles SIG_ALL signing internally
-        // when a privkey is provided. For the server-side custodial demo,
-        // we swap without P2PK signing (the mint processes the HTLC preimage).
-        await wallet.loadMint();
-        const totalSats = proofsWithPreimage.reduce((s, p) => s + p.amount, 0);
-        const fee = wallet.getFeesForProofs(proofsWithPreimage);
-        const netSats = totalSats - fee;
-
-        if (netSats <= 0) {
-          redemptions.push({
-            pair_id: pair.pair_id,
-            winner_pubkey: winnerPubkey,
-            redeemed_sats: 0,
-            error: "Fee exceeds token amount",
-          });
-          continue;
-        }
-
-        const { send: redeemed } = await wallet.ops
-          .send(netSats, proofsWithPreimage)
-          .run();
-
-        // Credit redeemed proofs to winner's server-side balance
-        creditUser(winnerPubkey, redeemed);
-        const redeemedSats = redeemed.reduce((s, p) => s + p.amount, 0);
-        redemptions.push({
-          pair_id: pair.pair_id,
-          winner_pubkey: winnerPubkey,
-          redeemed_sats: redeemedSats,
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[market-resolve] HTLC redemption failed for pair ${pair.pair_id}:`, msg);
-        redemptions.push({
-          pair_id: pair.pair_id,
-          winner_pubkey: winnerPubkey,
-          redeemed_sats: 0,
-          error: msg,
-        });
-      }
+      settledPairs.push({
+        pair_id: pair.pair_id,
+        winner_pubkey: winnerPubkey,
+        amount_sats: pair.amount_sats,
+      });
     }
 
     return c.json({
@@ -711,8 +711,71 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       status: newStatus,
       yes_pool_sats: market.yes_pool_sats,
       no_pool_sats: market.no_pool_sats,
-      redemptions,
+      settled_pairs: settledPairs,
     });
+  });
+
+  // -----------------------------------------------------------------------
+  // POST /markets/:id/redeem — client-side redemption of winning HTLC tokens
+  // -----------------------------------------------------------------------
+
+  mkt.post("/:id/redeem", rateLimit, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Market id is required" }, 400);
+
+    const market = markets.get(id);
+    if (!market) return c.json({ error: "Market not found" }, 404);
+
+    const isResolved = market.status === "resolved_yes" || market.status === "resolved_no";
+    if (!isResolved) {
+      return c.json({ error: `Market is not resolved (status: ${market.status})` }, 409);
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
+    if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
+
+    const preimage = resolvedPreimages.get(id);
+    if (!preimage) {
+      return c.json({ error: "Preimage not found — market may not be fully resolved" }, 500);
+    }
+
+    const outcome = market.status === "resolved_yes" ? "yes" : "no";
+
+    // Find all matched pairs where this pubkey is the winner
+    const winningPairs: Array<{
+      pair_id: string;
+      token: string;
+      preimage: string;
+      amount_sats: number;
+    }> = [];
+
+    for (const pair of matchedPairsStore.values()) {
+      if (pair.market_id !== id) continue;
+
+      const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
+      if (winnerPubkey !== pubkey) continue;
+
+      // The winner's redeemable token:
+      // YES wins → winner gets token_no_to_yes (locked to hash_a)
+      // NO wins  → winner gets token_yes_to_no (locked to hash_b)
+      const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+
+      winningPairs.push({
+        pair_id: pair.pair_id,
+        token: redeemableToken,
+        preimage,
+        amount_sats: pair.amount_sats,
+      });
+    }
+
+    return c.json({ pairs: winningPairs });
   });
 
   // -----------------------------------------------------------------------
@@ -753,4 +816,5 @@ export function _clearMarketStoresForTest(): void {
   matchedPairsStore.clear();
   orderProofs.clear();
   userProofs.clear();
+  resolvedPreimages.clear();
 }

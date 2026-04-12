@@ -109,6 +109,40 @@ export async function requestFaucet(pubkey: string, amount_sats = 1000): Promise
   return res.json();
 }
 
+// --- Redemption ---
+
+export interface RedeemPair {
+  pair_id: string;
+  token: string;
+  preimage: string;
+  amount_sats: number;
+}
+
+export interface RedeemResult {
+  pairs: RedeemPair[];
+}
+
+export async function redeemWinnings(marketId: string, pubkey: string): Promise<RedeemResult> {
+  const res = await apiFetch(`${API_BASE}/${marketId}/redeem`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pubkey }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    let message = `Redeem failed: ${res.status}`;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed.error) message = parsed.error;
+      if (parsed.message) message = parsed.message;
+    } catch {
+      if (body) message = body;
+    }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 // --- Markets ---
 
 export async function createMarket(
