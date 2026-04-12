@@ -1,6 +1,49 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { fetchBalance, requestFaucet } from "../api";
+
+const DEMO_PUBKEY = "demo_user_" + Math.random().toString(36).slice(2, 10);
+
+// Share pubkey across components
+export function getDemoPubkey(): string {
+  return DEMO_PUBKEY;
+}
 
 export function Header() {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [faucetMsg, setFaucetMsg] = useState<string | null>(null);
+
+  const loadBalance = useCallback(async () => {
+    try {
+      const data = await fetchBalance(DEMO_PUBKEY);
+      setBalance(data.balance_sats);
+    } catch {
+      setBalance(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBalance();
+    const interval = setInterval(loadBalance, 5000);
+    return () => clearInterval(interval);
+  }, [loadBalance]);
+
+  const handleFaucet = async () => {
+    setFaucetLoading(true);
+    setFaucetMsg(null);
+    try {
+      const result = await requestFaucet(DEMO_PUBKEY, 1000);
+      setBalance(result.balance_sats);
+      setFaucetMsg(`+${result.funded_sats} sats`);
+      setTimeout(() => setFaucetMsg(null), 3000);
+    } catch (err) {
+      setFaucetMsg(err instanceof Error ? err.message : "Faucet error");
+      setTimeout(() => setFaucetMsg(null), 5000);
+    } finally {
+      setFaucetLoading(false);
+    }
+  };
+
   return (
     <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
@@ -14,14 +57,32 @@ export function Header() {
           <span className="font-bold text-foreground tracking-tight">Anchr</span>
           <span className="text-xs text-primary font-medium bg-primary/10 rounded-full px-2 py-0.5">Markets</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Balance */}
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted px-3 h-8">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+              <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2.5" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+            </svg>
+            <span className="text-xs font-mono text-foreground">
+              {balance !== null ? `${balance.toLocaleString()} sats` : "---"}
+            </span>
+          </div>
+
+          {/* Faucet */}
+          <button
+            onClick={handleFaucet}
+            disabled={faucetLoading}
+            className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {faucetLoading ? "..." : faucetMsg ?? "Get 1K sats"}
+          </button>
+
+          {/* Status */}
           <div className="text-xs text-muted-foreground flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-yes animate-pulse" />
-            Nostr Connected
+            regtest
           </div>
-          <button className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
-            Connect Wallet
-          </button>
         </div>
       </div>
     </header>

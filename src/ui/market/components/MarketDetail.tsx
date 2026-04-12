@@ -4,7 +4,8 @@ import { placeBet } from "../api";
 import { cn } from "../../lib/utils";
 
 /** Demo bettor pubkey — in production this would come from a Nostr wallet */
-const DEMO_BETTOR_PUBKEY = "npub1demo_bettor_" + Math.random().toString(36).slice(2, 10);
+import { getDemoPubkey } from "./Header";
+const DEMO_BETTOR_PUBKEY = getDemoPubkey();
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;

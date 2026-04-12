@@ -72,6 +72,34 @@ export async function placeBet(
   return res.json();
 }
 
+// --- Wallet ---
+
+export interface WalletBalance {
+  pubkey: string;
+  balance_sats: number;
+}
+
+export async function fetchBalance(pubkey: string): Promise<WalletBalance> {
+  const res = await apiFetch(`${API_BASE}/wallet/balance?pubkey=${encodeURIComponent(pubkey)}`);
+  if (!res.ok) throw new Error("Failed to fetch balance");
+  return res.json();
+}
+
+export async function requestFaucet(pubkey: string, amount_sats = 1000): Promise<WalletBalance & { funded_sats: number }> {
+  const res = await apiFetch(`${API_BASE}/wallet/faucet`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pubkey, amount_sats }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: "Faucet failed" }));
+    throw new Error(body.error || "Faucet failed");
+  }
+  return res.json();
+}
+
+// --- Markets ---
+
 export async function createMarket(
   params: CreateMarketParams,
 ): Promise<Market> {

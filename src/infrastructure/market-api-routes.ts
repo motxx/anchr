@@ -9,7 +9,7 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import type {
   PredictionMarket,
   OpenOrder,
@@ -25,6 +25,7 @@ import {
   type DualPreimageStore,
 } from "./conditional-swap/dual-preimage-store.ts";
 import type { ConditionalSwapDef } from "../domain/conditional-swap-types.ts";
+import { spawn } from "../runtime/mod.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,6 +60,126 @@ async function getCashuWallet(): Promise<Wallet | null> {
   } catch {
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Per-user proof storage (pubkey → Proof[])
+// ---------------------------------------------------------------------------
+
+const userProofs = new Map<string, Proof[]>();
+
+/** Get user balance from stored proofs. */
+function getUserBalance(pubkey: string): number {
+  const proofs = userProofs.get(pubkey) ?? [];
+  return proofs.reduce((sum, p) => sum + p.amount, 0);
+}
+
+/** Append proofs to a user's balance. */
+function creditUser(pubkey: string, proofs: Proof[]): void {
+  const existing = userProofs.get(pubkey) ?? [];
+  userProofs.set(pubkey, [...existing, ...proofs]);
+}
+
+/**
+ * Deduct proofs from a user's balance. Uses wallet.send() to split
+ * proofs to exact amount when an exact match is not available.
+ * Returns the exact-amount proofs on success, or null on failure.
+ */
+async function debitUser(
+  pubkey: string,
+  amountSats: number,
+  wallet: Wallet,
+): Promise<Proof[] | null> {
+  const proofs = userProofs.get(pubkey) ?? [];
+  const balance = proofs.reduce((sum, p) => sum + p.amount, 0);
+  if (balance < amountSats) return null;
+
+  // Try exact combination first (greedy largest-first)
+  const sorted = [...proofs].sort((a, b) => b.amount - a.amount);
+  const selected: Proof[] = [];
+  let selectedTotal = 0;
+  for (const p of sorted) {
+    if (selectedTotal >= amountSats) break;
+    selected.push(p);
+    selectedTotal += p.amount;
+  }
+
+  if (selectedTotal < amountSats) return null;
+
+  if (selectedTotal === amountSats) {
+    // Exact match — remove selected from user's store
+    const remaining = proofs.filter(
+      (p) => !selected.some((s) => s.C === p.C),
+    );
+    userProofs.set(pubkey, remaining);
+    return selected;
+  }
+
+  // Need to split via mint — send exact amount, keep change
+  try {
+    await wallet.loadMint();
+    const { send, keep } = await wallet.ops.send(amountSats, selected).run();
+    // Remove the selected proofs and add back the change
+    const remaining = proofs.filter(
+      (p) => !selected.some((s) => s.C === p.C),
+    );
+    userProofs.set(pubkey, [...remaining, ...keep]);
+    return send;
+  } catch (err) {
+    console.error(
+      "[market-wallet] Failed to split proofs:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
+/** Check if the Cashu mint is reachable at the given URL. */
+async function isMintReachable(mintUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${mintUrl}/v1/info`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    await res.body?.cancel();
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Pay a Lightning invoice via lnd-user docker container. */
+async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
+  try {
+    const proc = spawn(
+      [
+        "docker", "compose", "exec", "-T", "lnd-user",
+        "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
+        "payinvoice", "--force", bolt11,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    await proc.exited;
+    return proc.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mint fresh Cashu proofs via regtest Lightning.
+ * Creates a mint quote, pays the Lightning invoice via lnd-user, then
+ * claims the proofs from the mint.
+ */
+async function mintProofsFromRegtest(
+  wallet: Wallet,
+  amountSats: number,
+): Promise<Proof[]> {
+  const mintQuote = await wallet.createMintQuote(amountSats);
+  const paid = await payInvoiceViaLndUser(mintQuote.request);
+  if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
+  // Brief pause for mint to register the payment
+  await new Promise((r) => setTimeout(r, 2000));
+  return wallet.mintProofs(amountSats, mintQuote.quote);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +236,66 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       list = list.filter((m) => m.category === category);
     }
     return c.json(list.map(marketSummary));
+  });
+
+  // -----------------------------------------------------------------------
+  // GET /markets/wallet/balance — user balance from server-side proofs
+  // -----------------------------------------------------------------------
+
+  mkt.get("/wallet/balance", (c) => {
+    const pubkey = c.req.query("pubkey");
+    if (!pubkey) return c.json({ error: "pubkey query param is required" }, 400);
+    return c.json({ pubkey, balance_sats: getUserBalance(pubkey) });
+  });
+
+  // -----------------------------------------------------------------------
+  // POST /markets/wallet/faucet — mint tokens from regtest Lightning
+  // -----------------------------------------------------------------------
+
+  mkt.post("/wallet/faucet", rateLimit, async (c) => {
+    const wallet = await getCashuWallet();
+    if (!wallet) {
+      return c.json(
+        { error: "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d" },
+        503,
+      );
+    }
+
+    const mintUrl = Deno.env.get("CASHU_MINT_URL")!;
+    const reachable = await isMintReachable(mintUrl);
+    if (!reachable) {
+      return c.json(
+        { error: "Cashu mint not reachable — ensure docker compose is running" },
+        503,
+      );
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
+    const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 1000;
+
+    if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
+    if (amount_sats <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
+
+    try {
+      const proofs = await mintProofsFromRegtest(wallet, amount_sats);
+      creditUser(pubkey, proofs);
+      return c.json({
+        pubkey,
+        funded_sats: amount_sats,
+        balance_sats: getUserBalance(pubkey),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[market-faucet] Mint failed:", msg);
+      return c.json({ error: `Faucet mint failed: ${msg}` }, 500);
+    }
   });
 
   // -----------------------------------------------------------------------
@@ -265,20 +446,34 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       return c.json({ error: `Maximum bet is ${market.max_bet_sats} sats` }, 400);
     }
 
-    // Parse Cashu proofs from token (if provided)
+    // Resolve Cashu proofs: explicit token > server-side balance > demo mode
     let proofs: Proof[] = [];
+    let proofSource: "token" | "balance" | "none" = "none";
+
     if (cashu_token) {
+      // Path 1: Explicit Cashu token in request
       try {
-        const { getDecodedToken } = await import("@cashu/cashu-ts");
         const decoded = getDecodedToken(cashu_token);
         proofs = decoded.proofs;
         const total = proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
         if (total < amount_sats) {
           return c.json({ error: `Cashu token has ${total} sats, need ${amount_sats}` }, 400);
         }
+        proofSource = "token";
       } catch {
         return c.json({ error: "Invalid cashu_token" }, 400);
       }
+    } else {
+      // Path 2: Deduct from server-side user balance
+      const wallet = await getCashuWallet();
+      if (wallet && getUserBalance(bettor_pubkey) >= amount_sats) {
+        const debited = await debitUser(bettor_pubkey, amount_sats, wallet);
+        if (debited) {
+          proofs = debited;
+          proofSource = "balance";
+        }
+      }
+      // Path 3: No proofs — demo mode (no Cashu), handled by fallback below
     }
 
     // Add order to the book
@@ -314,32 +509,36 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
       // If both sides have real Cashu proofs, create cross-HTLC tokens
       if (yesEntry && noEntry && yesEntry.proofs.length > 0 && noEntry.proofs.length > 0) {
-        const swapDef: ConditionalSwapDef = {
-          swap_id: id,
-          hash_a: market.htlc_hash_yes,
-          hash_b: market.htlc_hash_no,
-          locktime: market.resolution_deadline,
-        };
-        const tokens = await createSwapPairTokens(
-          yesEntry.proofs, noEntry.proofs,
-          proposal.amount_sats, swapDef,
-          yesEntry.pubkey, noEntry.pubkey,
-        );
-        if (tokens) {
-          const pairId = generateId("pair");
-          const pair: MatchedBetPair = {
-            pair_id: pairId,
-            market_id: id,
-            yes_pubkey: yesEntry.pubkey,
-            no_pubkey: noEntry.pubkey,
-            amount_sats: proposal.amount_sats,
-            token_yes_to_no: tokens.tokenAtoB.token,
-            token_no_to_yes: tokens.tokenBtoA.token,
-            status: "locked",
+        try {
+          const swapDef: ConditionalSwapDef = {
+            swap_id: id,
+            hash_a: market.htlc_hash_yes,
+            hash_b: market.htlc_hash_no,
+            locktime: market.resolution_deadline,
           };
-          matchedPairsStore.set(pairId, pair);
-          newPairs.push(pair);
-          continue;
+          const tokens = await createSwapPairTokens(
+            yesEntry.proofs, noEntry.proofs,
+            proposal.amount_sats, swapDef,
+            yesEntry.pubkey, noEntry.pubkey,
+          );
+          if (tokens) {
+            const pairId = generateId("pair");
+            const pair: MatchedBetPair = {
+              pair_id: pairId,
+              market_id: id,
+              yes_pubkey: yesEntry.pubkey,
+              no_pubkey: noEntry.pubkey,
+              amount_sats: proposal.amount_sats,
+              token_yes_to_no: tokens.tokenAtoB.token,
+              token_no_to_yes: tokens.tokenBtoA.token,
+              status: "locked",
+            };
+            matchedPairsStore.set(pairId, pair);
+            newPairs.push(pair);
+            continue;
+          }
+        } catch (err) {
+          console.error(`[market] Cross-HTLC creation failed, falling back to demo mode:`, err);
         }
       }
 
@@ -364,6 +563,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       side,
       amount_sats,
       cashu_locked: proofs.length > 0,
+      proof_source: proofSource,
       matches: newPairs.map((p) => ({
         pair_id: p.pair_id,
         amount_sats: p.amount_sats,
@@ -414,10 +614,80 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
     market.status = newStatus;
 
-    // Update matched pairs
+    // Redeem HTLC tokens and credit winners.
+    // YES wins → winner gets token_no_to_yes (locked to hash_a), redeemable with preimage_a
+    // NO wins  → winner gets token_yes_to_no (locked to hash_b), redeemable with preimage_b
+    const wallet = await getCashuWallet();
+    const redemptions: Array<{
+      pair_id: string;
+      winner_pubkey: string;
+      redeemed_sats: number;
+      error?: string;
+    }> = [];
+
     for (const pair of matchedPairsStore.values()) {
-      if (pair.market_id === id && pair.status === "locked") {
-        pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
+      if (pair.market_id !== id || pair.status !== "locked") continue;
+      pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
+
+      // Determine winner and the token they can redeem
+      const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
+      const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+
+      if (!redeemableToken || !wallet) continue;
+
+      // Attempt HTLC redemption: decode token, attach preimage witness,
+      // sign with server-held key (custodial demo), swap on mint
+      try {
+        const decoded = getDecodedToken(redeemableToken);
+        const htlcProofs = decoded.proofs;
+        if (htlcProofs.length === 0) continue;
+
+        // Attach preimage as HTLC witness
+        const proofsWithPreimage = htlcProofs.map((p) => ({
+          ...p,
+          witness: JSON.stringify({ preimage: result.preimage, signatures: [] }),
+        }));
+
+        // In this custodial demo, the server holds the winner's key.
+        // We use wallet.ops.send() which handles SIG_ALL signing internally
+        // when a privkey is provided. For the server-side custodial demo,
+        // we swap without P2PK signing (the mint processes the HTLC preimage).
+        await wallet.loadMint();
+        const totalSats = proofsWithPreimage.reduce((s, p) => s + p.amount, 0);
+        const fee = wallet.getFeesForProofs(proofsWithPreimage);
+        const netSats = totalSats - fee;
+
+        if (netSats <= 0) {
+          redemptions.push({
+            pair_id: pair.pair_id,
+            winner_pubkey: winnerPubkey,
+            redeemed_sats: 0,
+            error: "Fee exceeds token amount",
+          });
+          continue;
+        }
+
+        const { send: redeemed } = await wallet.ops
+          .send(netSats, proofsWithPreimage)
+          .run();
+
+        // Credit redeemed proofs to winner's server-side balance
+        creditUser(winnerPubkey, redeemed);
+        const redeemedSats = redeemed.reduce((s, p) => s + p.amount, 0);
+        redemptions.push({
+          pair_id: pair.pair_id,
+          winner_pubkey: winnerPubkey,
+          redeemed_sats: redeemedSats,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[market-resolve] HTLC redemption failed for pair ${pair.pair_id}:`, msg);
+        redemptions.push({
+          pair_id: pair.pair_id,
+          winner_pubkey: winnerPubkey,
+          redeemed_sats: 0,
+          error: msg,
+        });
       }
     }
 
@@ -428,6 +698,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       status: newStatus,
       yes_pool_sats: market.yes_pool_sats,
       no_pool_sats: market.no_pool_sats,
+      redemptions,
     });
   });
 
@@ -468,4 +739,5 @@ export function _clearMarketStoresForTest(): void {
   markets.clear();
   matchedPairsStore.clear();
   orderProofs.clear();
+  userProofs.clear();
 }
