@@ -14,14 +14,16 @@
  *   deno run --allow-all example/prediction-market/src/demo.ts
  */
 
-import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
+import { schnorr } from "@noble/curves/secp256k1";
 import { createDualPreimageStore } from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
 import {
-  buildCrossHtlcForPartyA,
-  buildCrossHtlcForPartyB,
-} from "../../../src/infrastructure/conditional-swap/cross-htlc.ts";
+  buildFrostSwapForPartyA,
+  buildFrostSwapForPartyB,
+  createDualKeyStore,
+} from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
 import { createOrderBook } from "./order-book.ts";
-import { resolveMarket as resolveMarketDual } from "./resolution.ts";
+import { resolveMarket as resolveMarketDual, resolveMarketFrost } from "./resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,
   evaluateCondition,
@@ -46,24 +48,29 @@ const ORACLE_FEE_PPM = 5_000;  // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
 
 console.log("=== Bitcoin-Native Prediction Market Demo (N:M Conditional Swap) ===\n");
-console.log("Powered by Anchr: Cross-HTLC Dual-Preimage + Nostr + TLSNotary\n");
+console.log("Powered by Anchr: FROST P2PK Conditional Swap + Nostr + TLSNotary\n");
 console.log("\u2501".repeat(60));
 
 // ============================================================
 // Step 1: Oracle creates dual-preimage pair
 // ============================================================
 
-console.log("\n--- Step 1: Oracle creates dual-preimage pair ---\n");
+console.log("\n--- Step 1: Oracle creates FROST keypairs (demo: single Schnorr keys) ---\n");
 
 const dualStore = createDualPreimageStore();
+const keyStore = createDualKeyStore();
 const marketId = bytesToHex(randomBytes(16));
 const { hash_a: hashYes, hash_b: hashNo } = dualStore.create(marketId);
+const frostKeys = keyStore.create(marketId);
 
-console.log(`  Market ID:      ${marketId}`);
-console.log(`  Hash YES (A):   ${hashYes.slice(0, 16)}...`);
-console.log(`  Hash NO  (B):   ${hashNo.slice(0, 16)}...`);
-console.log(`  Two preimages generated — one for each outcome.`);
-console.log(`  Oracle reveals only the winner's preimage; loser's is deleted forever.`);
+console.log(`  Market ID:         ${marketId}`);
+console.log(`  Group PK YES (A):  ${frostKeys.pubkey_a.slice(0, 16)}...`);
+console.log(`  Group PK NO  (B):  ${frostKeys.pubkey_b.slice(0, 16)}...`);
+console.log(`  Hash YES (legacy): ${hashYes.slice(0, 16)}...`);
+console.log(`  Hash NO  (legacy): ${hashNo.slice(0, 16)}...`);
+console.log(`  Two keypairs generated -- one for each outcome.`);
+console.log(`  In production: FROST t-of-n DKG group keys.`);
+console.log(`  Oracle signs with winning key; loser's secret is deleted forever.`);
 
 // Simulated keypairs
 const creatorPubkey = bytesToHex(randomBytes(32));
@@ -105,14 +112,16 @@ const market: PredictionMarket = {
   oracle_pubkey: oraclePubkey,
   htlc_hash_yes: hashYes,
   htlc_hash_no: hashNo,
+  group_pubkey_yes: frostKeys.pubkey_a,
+  group_pubkey_no: frostKeys.pubkey_b,
 
   nostr_event_id: bytesToHex(randomBytes(32)),
   status: "open",
 };
 
 console.log(`  Title:          ${market.title}`);
-console.log(`  Hash YES:       ${hashYes.slice(0, 16)}...`);
-console.log(`  Hash NO:        ${hashNo.slice(0, 16)}...`);
+console.log(`  Group PK YES:   ${frostKeys.pubkey_a.slice(0, 16)}...`);
+console.log(`  Group PK NO:    ${frostKeys.pubkey_b.slice(0, 16)}...`);
 console.log(`  Deadline:       ${new Date(RESOLUTION_DEADLINE * 1000).toISOString()}`);
 
 // ============================================================
@@ -154,7 +163,7 @@ console.log(`  Open orders: ${orderBook.getOpenOrders(marketId).length}`);
 // Step 4: Order book matches → Cross-HTLC
 // ============================================================
 
-console.log("\n--- Step 4: Order book matching + Cross-HTLC ---\n");
+console.log("\n--- Step 4: Order book matching + FROST P2PK ---\n");
 
 const matches = orderBook.matchOrders(marketId);
 console.log(`  Matches found: ${matches.length}`);
@@ -163,31 +172,31 @@ for (const m of matches) {
   console.log(`  Match: YES(${m.yes_order_id.slice(0, 8)}...) <-> NO(${m.no_order_id.slice(0, 8)}...) = ${m.amount_sats} sats`);
 }
 
-// Build cross-HTLC P2PK options (simulated — real version calls createSwapPairTokens)
-console.log("\n  Cross-HTLC token structure:");
+// Build FROST P2PK options (simulated -- real version calls createFrostSwapPairTokens)
+console.log("\n  FROST P2PK token structure:");
 
-const optionsAtoB = buildCrossHtlcForPartyA({
-  hash_b: hashNo,
+const optionsAtoB = buildFrostSwapForPartyA({
+  group_pubkey_b: frostKeys.pubkey_b,
   counterpartyPubkey: bobPubkey,
   refundPubkey: alicePubkey,
   locktime: RESOLUTION_DEADLINE,
 });
 
-const optionsBtoA = buildCrossHtlcForPartyB({
-  hash_a: hashYes,
+const optionsBtoA = buildFrostSwapForPartyB({
+  group_pubkey_a: frostKeys.pubkey_a,
   counterpartyPubkey: alicePubkey,
   refundPubkey: bobPubkey,
   locktime: RESOLUTION_DEADLINE,
 });
 
 console.log(`  token_yes_to_no (Alice's sats):`);
-console.log(`    hashlock:  hash_no  → Bob redeems if NO wins`);
-console.log(`    P2PK:      Bob's pubkey`);
+console.log(`    P2PK:      [group_pubkey_no, Bob's pubkey], n_sigs=2`);
 console.log(`    refund:    Alice (after locktime)`);
+console.log(`    Redeem:    Oracle signs with group_key_no + Bob signs`);
 console.log(`  token_no_to_yes (Bob's sats):`);
-console.log(`    hashlock:  hash_yes → Alice redeems if YES wins`);
-console.log(`    P2PK:      Alice's pubkey`);
+console.log(`    P2PK:      [group_pubkey_yes, Alice's pubkey], n_sigs=2`);
 console.log(`    refund:    Bob (after locktime)`);
+console.log(`    Redeem:    Oracle signs with group_key_yes + Alice signs`);
 
 market.yes_pool_sats = 100;
 market.no_pool_sats = 100;
@@ -245,19 +254,34 @@ const outcome = conditionMet ? "yes" : "no";
 console.log(`\n  Condition: best_bid > 11,000,000 → ${conditionMet ? "MET" : "NOT MET"}`);
 console.log(`  Outcome:   ${outcome.toUpperCase()}`);
 
-// Dual-preimage reveal — the core of N:M conditional swap
-console.log("\n  Dual-preimage reveal:");
+// FROST P2PK signing — the core of N:M conditional swap
+console.log("\n  FROST P2PK resolution (Oracle signs with winning key):");
 
-const resolution = resolveMarketDual(marketId, outcome as "yes" | "no", dualStore);
-if (resolution) {
-  console.log(`  Winning preimage (${resolution.outcome.toUpperCase()}): ${resolution.preimage.slice(0, 16)}...`);
-  console.log(`  Losing preimage: PERMANENTLY DELETED`);
+const frostResolution = resolveMarketFrost(marketId, outcome as "yes" | "no", keyStore);
+if (frostResolution) {
+  console.log(`  Oracle signature (${frostResolution.outcome.toUpperCase()}): ${frostResolution.oracle_signature.slice(0, 32)}...`);
+  console.log(`  Losing secret key: PERMANENTLY DELETED`);
 
-  // Verify the losing preimage is gone
-  const tryRevealAgain = dualStore.reveal(marketId, outcome === "yes" ? "a" : "b");
-  console.log(`  Second reveal attempt: ${tryRevealAgain === null ? "null (correctly rejected)" : "ERROR: should be null"}`);
+  // Verify the signature
+  const signMessage = new TextEncoder().encode(`${marketId}:${outcome}`);
+  const winningPubkey = outcome === "yes" ? frostKeys.pubkey_a : frostKeys.pubkey_b;
+  const sigValid = schnorr.verify(hexToBytes(frostResolution.oracle_signature), signMessage, hexToBytes(winningPubkey));
+  console.log(`  Signature valid: ${sigValid}`);
+
+  // Verify the losing key cannot be used
+  const trySignAgain = keyStore.sign(marketId, outcome === "yes" ? "b" : "a", signMessage);
+  console.log(`  Second sign attempt: ${trySignAgain === null ? "null (correctly rejected)" : "ERROR: should be null"}`);
 } else {
-  console.log("  ERROR: Resolution failed");
+  console.log("  ERROR: FROST resolution failed");
+}
+
+// Also demonstrate HTLC preimage reveal (backward compat)
+console.log("\n  HTLC preimage reveal (backward compat):");
+const htlcResolution = resolveMarketDual(marketId, outcome as "yes" | "no", dualStore);
+if (htlcResolution) {
+  console.log(`  Winning preimage (${htlcResolution.outcome.toUpperCase()}): ${htlcResolution.preimage.slice(0, 16)}...`);
+} else {
+  console.log("  HTLC preimage revealed (or already consumed)");
 }
 
 // ============================================================
@@ -284,11 +308,11 @@ const payouts = calculatePayouts(market, outcome as "yes" | "no", allBets, ORACL
 
 console.log();
 if (outcome === "yes") {
-  console.log("  YES wins! Alice redeems Bob's cross-HTLC tokens with preimage_yes.");
-  console.log("  Flow: Alice calls redeemHtlcToken(bobsProofs, preimage_yes, alicePrivKey)");
+  console.log("  YES wins! Alice redeems Bob's tokens with oracle_sig + alice_sig.");
+  console.log("  Flow: Alice presents oracle_signature + signs with her key (2-of-2 P2PK)");
 } else {
-  console.log("  NO wins! Bob redeems Alice's cross-HTLC tokens with preimage_no.");
-  console.log("  Flow: Bob calls redeemHtlcToken(alicesProofs, preimage_no, bobPrivKey)");
+  console.log("  NO wins! Bob redeems Alice's tokens with oracle_sig + bob_sig.");
+  console.log("  Flow: Bob presents oracle_signature + signs with his key (2-of-2 P2PK)");
 }
 
 console.log("\n  Payouts:");
@@ -309,8 +333,9 @@ console.log(`  BTC/JPY:      \u00a5${parsed.best_bid.toLocaleString()}`);
 console.log(`  Outcome:      ${outcome.toUpperCase()}`);
 console.log();
 console.log("  Protocol layer (N:M Conditional Swap):");
-console.log("    - DualPreimageStore: 2 preimages per swap, winner revealed, loser deleted");
-console.log("    - Cross-HTLC: dual-direction hashlock, opposite-side redemption");
+console.log("    - FROST P2PK: 2-of-2 multisig (group_pubkey + counterparty)");
+console.log("    - DualKeyStore: 2 keypairs per swap, winner signs, loser deleted");
+console.log("    - In production: FROST t-of-n DKG for threshold oracle");
 console.log("    - Order book: FIFO matching with partial fills");
 console.log("    - 1:1 atomic swap is the N=1, M=1 special case");
 console.log();

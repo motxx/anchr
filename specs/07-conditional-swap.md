@@ -124,6 +124,75 @@ For each `MatchProposal`, the Coordinator:
 
 Both parties can verify match fairness by checking that their locked amount matches the proposal and that escrow conditions reference the correct hashes and pubkeys.
 
+## FROST P2PK Mode
+
+An alternative to HTLC preimage-based conditional swaps that uses FROST threshold signatures for Oracle attestation. Preferred when the Oracle is a threshold group (t-of-n signers).
+
+### Motivation
+
+The HTLC preimage pattern requires the Oracle to hold and reveal a secret preimage. With FROST P2PK, the Oracle instead holds keypairs and produces Schnorr signatures -- a more natural fit for threshold Oracle groups where no single party holds the full secret.
+
+### Key Generation
+
+The Oracle generates two keypairs for the two mutually exclusive outcomes:
+
+| Outcome | Secret Key | Public Key |
+|---------|-----------|------------|
+| A (e.g., YES) | `sk_a` (FROST group secret) | `group_pubkey_a` |
+| B (e.g., NO) | `sk_b` (FROST group secret) | `group_pubkey_b` |
+
+In production: these are FROST DKG-generated threshold keys requiring t-of-n signers to produce a signature.
+In demo mode: single Schnorr keypairs with a compatible interface.
+
+Both public keys are published at market creation. The Oracle signs with exactly one key at resolution.
+
+### FrostConditionalSwapDef
+
+| Field | Description |
+|-------|-------------|
+| `swap_id` | Unique swap identifier |
+| `group_pubkey_a` | FROST group pubkey for outcome A |
+| `group_pubkey_b` | FROST group pubkey for outcome B |
+| `locktime` | Unix timestamp; after this, both sides refund |
+
+### Token Locking (FROST P2PK)
+
+Each party locks a Cashu token to the *opposite* outcome's group pubkey plus the counterparty's personal key:
+
+- Party A locks `token_a_to_b` with `P2PK([group_pubkey_b, Party B's pubkey], n_sigs=2)`
+- Party B locks `token_b_to_a` with `P2PK([group_pubkey_a, Party A's pubkey], n_sigs=2)`
+
+This ensures:
+- If outcome A wins: Oracle signs with `sk_a`. Party A redeems `token_b_to_a` using `oracle_signature + Party A's signature`.
+- If outcome B wins: Oracle signs with `sk_b`. Party B redeems `token_a_to_b` using `oracle_signature + Party B's signature`.
+- If timeout: Both tokens refund to their original owners.
+
+### Resolution (FROST P2PK)
+
+1. The Oracle fetches verifiable data (e.g., TLSNotary proof of a price feed).
+2. The Oracle evaluates the outcome condition against the verified data.
+3. The Oracle signs a message with the winning outcome's group key.
+4. The losing side's secret key is permanently deleted.
+5. Winners attach the Oracle's signature + their own signature to redeem at the mint.
+
+### Security Property
+
+Without t-of-n Oracle agreement, neither group signature can be produced. This means:
+- A single compromised signer cannot unlock tokens unilaterally.
+- The locktime refund is the fallback if the Oracle group cannot reach threshold.
+- The NUT-11 P2PK token on the Mint side is standard -- no Mint changes required.
+
+### DualKeyStore Interface
+
+```
+create(swap_id) -> { pubkey_a, pubkey_b }
+sign(swap_id, outcome, message) -> signature | null
+getPubkeys(swap_id) -> { pubkey_a, pubkey_b } | null
+has(swap_id) -> boolean
+```
+
+`sign()` is a one-time operation: the losing side's secret is permanently deleted, same irreversibility guarantee as HTLC preimage reveal.
+
 ## Relationship to Core Protocol
 
 The 1:1 bounty query (Specs 00-06) is the special case where N=1, M=1. The conditional swap extends this to N:M by:

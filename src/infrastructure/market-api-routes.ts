@@ -19,13 +19,20 @@ import type {
 } from "../../example/prediction-market/src/market-types.ts";
 import { createOrderBook, type OrderBook } from "../../example/prediction-market/src/order-book.ts";
 import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "./conditional-swap/cross-htlc.ts";
+import {
+  buildFrostSwapForPartyA,
+  buildFrostSwapForPartyB,
+  createDualKeyStore,
+  type DualKeyStore,
+} from "./conditional-swap/frost-conditional-swap.ts";
 import { resolveMarket } from "../../example/prediction-market/src/resolution.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
 } from "./conditional-swap/dual-preimage-store.ts";
-import type { ConditionalSwapDef } from "../domain/conditional-swap-types.ts";
+import type { ConditionalSwapDef, FrostConditionalSwapDef } from "../domain/conditional-swap-types.ts";
 import { spawn } from "../runtime/mod.ts";
+import { hexToBytes } from "@noble/hashes/utils.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,11 +50,14 @@ export interface MarketRouteContext {
 const markets = new Map<string, PredictionMarket>();
 const matchedPairsStore = new Map<string, MatchedBetPair>();
 const dualPreimageStore: DualPreimageStore = createDualPreimageStore();
+const dualKeyStore: DualKeyStore = createDualKeyStore();
 const orderBook: OrderBook = createOrderBook();
 /** Map orderId → { pubkey, proofs } for cross-HTLC execution */
 const orderProofs = new Map<string, { pubkey: string; proofs: Proof[] }>();
-/** Map marketId → winning preimage (stored after resolution for client-side redemption) */
+/** Map marketId → winning preimage (stored after resolution for client-side redemption, HTLC mode) */
 const resolvedPreimages = new Map<string, string>();
+/** Map marketId → oracle signature (stored after resolution, FROST P2PK mode) */
+const resolvedSignatures = new Map<string, string>();
 
 // Cashu wallet — initialized lazily when CASHU_MINT_URL is set
 let cashuWallet: Wallet | null = null;
@@ -195,6 +205,7 @@ function generateId(prefix: string): string {
 function marketSummary(m: PredictionMarket) {
   const orders = Array.from(matchedPairsStore.values()).filter((p) => p.market_id === m.id);
   const preimage = resolvedPreimages.get(m.id);
+  const oracleSignature = resolvedSignatures.get(m.id);
   return {
     id: m.id,
     title: m.title,
@@ -214,10 +225,13 @@ function marketSummary(m: PredictionMarket) {
     htlc_hash: m.htlc_hash_yes,
     htlc_hash_yes: m.htlc_hash_yes,
     htlc_hash_no: m.htlc_hash_no,
+    group_pubkey_yes: m.group_pubkey_yes,
+    group_pubkey_no: m.group_pubkey_no,
     volume_sats: m.yes_pool_sats + m.no_pool_sats,
     num_bettors: orders.length * 2,
     created_at: Math.floor(Date.now() / 1000),
     ...(preimage ? { resolved_preimage: preimage } : {}),
+    ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
   };
 }
 
@@ -417,9 +431,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       return c.json({ error: `resolution_condition.expected_text is required for type "${ct}"` }, 400);
     }
 
-    // Generate market ID and dual preimage pair
+    // Generate market ID, dual preimage pair (HTLC fallback), and FROST keypairs
     const id = generateId("mkt");
     const hashes = dualPreimageStore.create(id);
+    const frostKeys = dualKeyStore.create(id);
 
     const market: PredictionMarket = {
       id,
@@ -436,8 +451,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       max_bet_sats,
       fee_ppm,
       oracle_pubkey,
-      htlc_hash_yes: hashes.hash_a, // outcome A = YES
-      htlc_hash_no: hashes.hash_b,  // outcome B = NO
+      htlc_hash_yes: hashes.hash_a, // outcome A = YES (HTLC fallback)
+      htlc_hash_no: hashes.hash_b,  // outcome B = NO  (HTLC fallback)
+      group_pubkey_yes: frostKeys.pubkey_a, // FROST P2PK: outcome A = YES
+      group_pubkey_no: frostKeys.pubkey_b,  // FROST P2PK: outcome B = NO
       nostr_event_id: "", // not published to Nostr in API mode
       status: "open",
     };
@@ -548,29 +565,50 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       const yesEntry = orderProofs.get(proposal.yes_order_id);
       const noEntry = orderProofs.get(proposal.no_order_id);
 
-      // If both sides have real Cashu proofs, lock them with cross-HTLC conditions.
-      // The proofs from debitUser are already fresh (not yet HTLC-locked).
-      // We re-send them through the mint with P2PK+hashlock conditions applied.
+      // If both sides have real Cashu proofs, lock them with P2PK conditions.
+      // FROST P2PK is preferred (2-of-2 multisig: group_pubkey + counterparty).
+      // Falls back to HTLC hashlock if FROST keys are unavailable.
       if (yesEntry && noEntry && yesEntry.proofs.length > 0 && noEntry.proofs.length > 0) {
         try {
           const wallet = await getCashuWallet();
           if (wallet) {
             await wallet.loadMint();
 
-            const optionsAtoB = buildCrossHtlcForPartyA({
-              hash_b: market.htlc_hash_no,
-              counterpartyPubkey: noEntry.pubkey,
-              refundPubkey: yesEntry.pubkey,
-              locktime: market.resolution_deadline,
-            });
-            const optionsBtoA = buildCrossHtlcForPartyB({
-              hash_a: market.htlc_hash_yes,
-              counterpartyPubkey: yesEntry.pubkey,
-              refundPubkey: noEntry.pubkey,
-              locktime: market.resolution_deadline,
-            });
+            // Use FROST P2PK if group pubkeys are available, otherwise fall back to HTLC
+            const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no;
 
-            // Lock YES→NO: A's proofs locked to hash_no + B's pubkey
+            let optionsAtoB, optionsBtoA;
+            if (useFrost) {
+              // FROST P2PK: lock to [group_pubkey, counterparty], n_sigs=2
+              optionsAtoB = buildFrostSwapForPartyA({
+                group_pubkey_b: market.group_pubkey_no!,
+                counterpartyPubkey: noEntry.pubkey,
+                refundPubkey: yesEntry.pubkey,
+                locktime: market.resolution_deadline,
+              });
+              optionsBtoA = buildFrostSwapForPartyB({
+                group_pubkey_a: market.group_pubkey_yes!,
+                counterpartyPubkey: yesEntry.pubkey,
+                refundPubkey: noEntry.pubkey,
+                locktime: market.resolution_deadline,
+              });
+            } else {
+              // HTLC fallback: hashlock + P2PK(counterparty)
+              optionsAtoB = buildCrossHtlcForPartyA({
+                hash_b: market.htlc_hash_no,
+                counterpartyPubkey: noEntry.pubkey,
+                refundPubkey: yesEntry.pubkey,
+                locktime: market.resolution_deadline,
+              });
+              optionsBtoA = buildCrossHtlcForPartyB({
+                hash_a: market.htlc_hash_yes,
+                counterpartyPubkey: yesEntry.pubkey,
+                refundPubkey: noEntry.pubkey,
+                locktime: market.resolution_deadline,
+              });
+            }
+
+            // Lock YES->NO: A's proofs locked with P2PK conditions
             // Proofs from debitUser are fresh plain proofs. We send them with P2PK conditions.
             // Use net amount after fees to avoid "Not enough funds" error.
             const yesTotal = yesEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
@@ -579,7 +617,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
             const { send: sendA, keep: keepA } = await wallet.ops.send(Math.min(proposal.amount_sats, yesNet), yesEntry.proofs).asP2PK(optionsAtoB).run();
             if (keepA.length > 0) creditUser(yesEntry.pubkey, keepA);
 
-            // Lock NO→YES: B's proofs locked to hash_yes + A's pubkey
+            // Lock NO->YES: B's proofs locked with P2PK conditions
             const noTotal = noEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
             const noFee = wallet.getFeesForProofs(noEntry.proofs);
             const noNet = noTotal - noFee;
@@ -603,7 +641,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
             continue;
           }
         } catch (err) {
-          console.error(`[market] Cross-HTLC creation failed, falling back to demo mode:`, err);
+          console.error(`[market] P2PK token creation failed, falling back to demo mode:`, err);
         }
       }
 
@@ -669,23 +707,42 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       return c.json({ error: 'outcome must be "yes" or "no"' }, 400);
     }
 
-    // Resolve via dual preimage store
-    const result = resolveMarket(id, outcome, dualPreimageStore);
-    if (!result) {
-      return c.json({ error: "Resolution failed — preimage not found or already revealed" }, 500);
+    // Determine resolution mode: FROST P2PK (preferred) or HTLC preimage (fallback)
+    const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no && dualKeyStore.has(id);
+
+    let resolvedPreimage: string | undefined;
+    let oracleSignature: string | undefined;
+
+    if (useFrost) {
+      // FROST P2PK mode: Oracle signs a message with the winning outcome's key.
+      // The message is the market ID + outcome, used as attestation.
+      const signMessage = new TextEncoder().encode(`${id}:${outcome}`);
+      const swapOutcome = outcome === "yes" ? "a" : "b";
+      const sig = dualKeyStore.sign(id, swapOutcome, signMessage);
+      if (!sig) {
+        return c.json({ error: "Resolution failed — FROST signing failed or already signed" }, 500);
+      }
+      oracleSignature = sig;
+      resolvedSignatures.set(id, sig);
+
+      // Also resolve HTLC side for backward compatibility
+      resolveMarket(id, outcome, dualPreimageStore);
+    } else {
+      // HTLC preimage mode (fallback)
+      const result = resolveMarket(id, outcome, dualPreimageStore);
+      if (!result) {
+        return c.json({ error: "Resolution failed — preimage not found or already revealed" }, 500);
+      }
+      resolvedPreimage = result.preimage;
+      resolvedPreimages.set(id, result.preimage);
     }
 
     // Update market status
     const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
     market.status = newStatus;
 
-    // Store the winning preimage so clients can fetch it and redeem independently.
-    // This is the trustless part: the preimage is public after resolution, and
-    // anyone holding the HTLC token can redeem at the mint without server involvement.
-    resolvedPreimages.set(id, result.preimage);
-
     // Mark matched pairs as settled (but do NOT auto-redeem server-side).
-    // Clients call POST /markets/:id/redeem to get their tokens + preimage.
+    // Clients call POST /markets/:id/redeem to get their tokens + attestation.
     const settledPairs: Array<{
       pair_id: string;
       winner_pubkey: string;
@@ -706,8 +763,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
     return c.json({
       market_id: id,
-      outcome: result.outcome,
-      preimage: result.preimage,
+      outcome,
+      // FROST P2PK mode returns oracle_signature; HTLC mode returns preimage
+      ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
+      ...(resolvedPreimage ? { preimage: resolvedPreimage } : {}),
+      mode: useFrost ? "frost_p2pk" : "htlc",
       status: newStatus,
       yes_pool_sats: market.yes_pool_sats,
       no_pool_sats: market.no_pool_sats,
@@ -742,8 +802,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
 
     const preimage = resolvedPreimages.get(id);
-    if (!preimage) {
-      return c.json({ error: "Preimage not found — market may not be fully resolved" }, 500);
+    const oracleSignature = resolvedSignatures.get(id);
+
+    if (!preimage && !oracleSignature) {
+      return c.json({ error: "Resolution attestation not found — market may not be fully resolved" }, 500);
     }
 
     const outcome = market.status === "resolved_yes" ? "yes" : "no";
@@ -752,8 +814,13 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const winningPairs: Array<{
       pair_id: string;
       token: string;
-      preimage: string;
       amount_sats: number;
+      /** HTLC mode: preimage for redemption. */
+      preimage?: string;
+      /** FROST P2PK mode: Oracle's Schnorr signature for redemption. */
+      oracle_signature?: string;
+      /** Which group pubkey the signature corresponds to. */
+      oracle_pubkey?: string;
     }> = [];
 
     for (const pair of matchedPairsStore.values()) {
@@ -763,15 +830,19 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       if (winnerPubkey !== pubkey) continue;
 
       // The winner's redeemable token:
-      // YES wins → winner gets token_no_to_yes (locked to hash_a)
-      // NO wins  → winner gets token_yes_to_no (locked to hash_b)
+      // YES wins -> winner gets token_no_to_yes (locked to group_pubkey_a / hash_a)
+      // NO wins  -> winner gets token_yes_to_no (locked to group_pubkey_b / hash_b)
       const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+
+      // For FROST P2PK: include the oracle pubkey so client knows which key signed
+      const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
 
       winningPairs.push({
         pair_id: pair.pair_id,
         token: redeemableToken,
-        preimage,
         amount_sats: pair.amount_sats,
+        ...(preimage ? { preimage } : {}),
+        ...(oracleSignature ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
       });
     }
 
@@ -817,4 +888,5 @@ export function _clearMarketStoresForTest(): void {
   orderProofs.clear();
   userProofs.clear();
   resolvedPreimages.clear();
+  resolvedSignatures.clear();
 }

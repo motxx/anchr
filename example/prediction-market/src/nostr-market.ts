@@ -79,21 +79,33 @@ export function buildMarketEvent(
     oracle_pubkey: market.oracle_pubkey,
     htlc_hash_yes: market.htlc_hash_yes,
     htlc_hash_no: market.htlc_hash_no,
+    group_pubkey_yes: market.group_pubkey_yes,
+    group_pubkey_no: market.group_pubkey_no,
   };
+
+  const tags: string[][] = [
+    ["d", market.id],
+    ["t", "anchr-prediction-market"],
+    ["t", `anchr-pm-${market.category}`],
+    ["p", market.oracle_pubkey, "", "oracle"],
+    ["expiration", String(market.resolution_deadline)],
+    ["htlc_hash_yes", market.htlc_hash_yes],
+    ["htlc_hash_no", market.htlc_hash_no],
+    ["title", market.title],
+  ];
+
+  // Include FROST group pubkeys when available
+  if (market.group_pubkey_yes) {
+    tags.push(["group_pubkey_yes", market.group_pubkey_yes]);
+  }
+  if (market.group_pubkey_no) {
+    tags.push(["group_pubkey_no", market.group_pubkey_no]);
+  }
 
   const template: EventTemplate = {
     kind: MARKET_EVENT_KIND,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [
-      ["d", market.id],
-      ["t", "anchr-prediction-market"],
-      ["t", `anchr-pm-${market.category}`],
-      ["p", market.oracle_pubkey, "", "oracle"],
-      ["expiration", String(market.resolution_deadline)],
-      ["htlc_hash_yes", market.htlc_hash_yes],
-      ["htlc_hash_no", market.htlc_hash_no],
-      ["title", market.title],
-    ],
+    tags,
     content: JSON.stringify(content),
   };
 

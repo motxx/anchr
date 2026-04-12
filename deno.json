@@ -23,6 +23,7 @@
     "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
     "nostr-tools/nip44": "npm:nostr-tools@^2/nip44",
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "@noble/curves/secp256k1": "npm:@noble/curves@^2/secp256k1.js",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
     "@modelcontextprotocol/sdk/client/index.js": "npm:@modelcontextprotocol/sdk@^1/client/index.js",
     "@modelcontextprotocol/sdk/client/stdio.js": "npm:@modelcontextprotocol/sdk@^1/client/stdio.js",

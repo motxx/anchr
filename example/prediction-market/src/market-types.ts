@@ -45,15 +45,19 @@ export interface PredictionMarket {
 
   /** Nostr pubkey (hex) of the oracle that will resolve this market. */
   oracle_pubkey: string;
-  /** SHA-256 hash of the YES preimage. Oracle reveals if YES wins. */
+  /** SHA-256 hash of the YES preimage. Oracle reveals if YES wins. (HTLC mode) */
   htlc_hash_yes: string;
-  /** SHA-256 hash of the NO preimage. Oracle reveals if NO wins. */
+  /** SHA-256 hash of the NO preimage. Oracle reveals if NO wins. (HTLC mode) */
   htlc_hash_no: string;
   /**
    * @deprecated Use htlc_hash_yes. Retained for backward compat.
    * When set, treated as alias for htlc_hash_yes.
    */
   htlc_hash?: string;
+  /** FROST group pubkey for YES outcome (BIP-340 x-only hex). (FROST P2PK mode) */
+  group_pubkey_yes?: string;
+  /** FROST group pubkey for NO outcome (BIP-340 x-only hex). (FROST P2PK mode) */
+  group_pubkey_no?: string;
 
   // --- Nostr ---
 
@@ -183,8 +187,10 @@ export interface MarketResolution {
     /** Unix timestamp (seconds) of the TLSNotary session. */
     timestamp: number;
   };
-  /** SHA-256 preimage — revealed only if outcome is YES. */
+  /** HTLC mode: SHA-256 preimage — revealed only if outcome is YES. */
   preimage?: string;
+  /** FROST P2PK mode: Oracle's Schnorr signature for the winning outcome. */
+  oracle_signature?: string;
 }
 
 // --- Nostr event kind for prediction markets ---
@@ -213,6 +219,10 @@ export interface MarketEventContent {
   oracle_pubkey: string;
   htlc_hash_yes: string;
   htlc_hash_no: string;
+  /** FROST group pubkey for YES outcome. Present when using FROST P2PK mode. */
+  group_pubkey_yes?: string;
+  /** FROST group pubkey for NO outcome. Present when using FROST P2PK mode. */
+  group_pubkey_no?: string;
 }
 
 /**
@@ -233,7 +243,10 @@ export interface ResolutionEventContent {
   outcome: "yes" | "no";
   tlsn_proof: string;
   verified_data: MarketResolution["verified_data"];
+  /** HTLC mode: preimage for the winning outcome. */
   preimage?: string;
+  /** FROST P2PK mode: Oracle's Schnorr signature for the winning outcome. */
+  oracle_signature?: string;
 }
 
 // --- Oracle HTLC keypair ---

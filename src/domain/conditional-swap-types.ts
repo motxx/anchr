@@ -22,6 +22,28 @@ export interface ConditionalSwapDef {
   locktime: number;
 }
 
+/**
+ * FROST P2PK-based conditional swap — replaces HTLC preimage for threshold Oracle.
+ *
+ * Instead of hashlock + preimage reveal, the Oracle holds FROST group keypairs
+ * for each outcome. Tokens are locked with P2PK([group_pubkey, winner_pubkey],
+ * n_sigs=2). Oracle signs with the winning side's key; winner redeems with
+ * oracle_sig + own_sig.
+ *
+ * Security: without t-of-n Oracle agreement, neither signature can be produced,
+ * so tokens refund after locktime.
+ */
+export interface FrostConditionalSwapDef {
+  /** Unique swap identifier. */
+  swap_id: string;
+  /** FROST group pubkey for outcome A (e.g., YES). */
+  group_pubkey_a: string;
+  /** FROST group pubkey for outcome B (e.g., NO). */
+  group_pubkey_b: string;
+  /** Locktime as unix timestamp. */
+  locktime: number;
+}
+
 /** A matched pair within a conditional swap. */
 export interface SwapPair {
   /** Unique pair identifier. */
