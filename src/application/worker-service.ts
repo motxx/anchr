@@ -280,3 +280,59 @@ export function waitForPreimage(
     relayUrls,
   );
 }
+
+/** Settlement callback union for both HTLC (preimage) and FROST (group signature). */
+export interface SettlementResult {
+  type: "preimage" | "frost_signature";
+  /** HTLC preimage (when type === "preimage"). */
+  preimage?: string;
+  /** FROST group signature hex (when type === "frost_signature"). */
+  group_signature?: string;
+  /** FROST group pubkey for verification (when type === "frost_signature"). */
+  group_pubkey?: string;
+}
+
+/**
+ * Step 9 (generalized): Wait for settlement from Oracle — handles both
+ * HTLC preimage and FROST group signature delivery.
+ */
+export function waitForSettlement(
+  identity: NostrIdentity,
+  oraclePubkey: string,
+  queryId: string,
+  onSettlement: (result: SettlementResult) => void,
+  onRejection: (reason: string) => void,
+  relayUrls?: string[],
+): SubCloser {
+  return subscribeToDMs(
+    identity.publicKey,
+    (event: Event) => {
+      if (event.pubkey !== oraclePubkey) return;
+
+      try {
+        const payload: OracleDMPayload = parseOracleDM(
+          event.content,
+          identity.secretKey,
+          event.pubkey,
+        );
+
+        if (payload.query_id !== queryId) return;
+
+        if (payload.type === "preimage") {
+          onSettlement({ type: "preimage", preimage: payload.preimage });
+        } else if (payload.type === "frost_signature") {
+          onSettlement({
+            type: "frost_signature",
+            group_signature: payload.group_signature,
+            group_pubkey: payload.group_pubkey,
+          });
+        } else if (payload.type === "rejection") {
+          onRejection(payload.reason);
+        }
+      } catch {
+        // Cannot decrypt, not for us
+      }
+    },
+    relayUrls,
+  );
+}

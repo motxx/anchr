@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import type { QueryStore } from "../domain/query-store";
 import { normalizeQueryResult } from "../infrastructure/attachments";
 import { buildChallengeRule, generateNonce } from "../domain/challenge";
-import type { PreimageStore } from "../infrastructure/cashu/preimage-store";
+import type { PreimageStore } from "../infrastructure/preimage/preimage-store";
+import type { EscrowProvider } from "./escrow-port";
 import { verifyWithQuorum } from "./query-verification";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification";
 import {
@@ -41,6 +42,7 @@ export interface ServiceDeps {
   oracleResolver: OracleResolver;
   multiOracleResolver?: MultiOracleResolver;
   preimageStore?: PreimageStore;
+  escrowProvider?: EscrowProvider;
   proofDelivery?: ProofDelivery;
 }
 

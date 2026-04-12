@@ -3,7 +3,8 @@ import { isOpenStatus } from "../domain/query-transitions";
 import type { QueryStore } from "../domain/query-store";
 import { resolveOracle } from "../infrastructure/oracle";
 import type { OracleRegistry } from "../infrastructure/oracle/registry";
-import type { PreimageStore } from "../infrastructure/cashu/preimage-store";
+import type { PreimageStore } from "../infrastructure/preimage/preimage-store";
+import type { EscrowProvider } from "./escrow-port";
 import type { ProofDelivery } from "./proof-delivery";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
 import {
@@ -93,6 +94,7 @@ export interface QueryServiceDeps {
   store?: QueryStore;
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
+  escrowProvider?: EscrowProvider;
   hooks?: QueryHooks;
   proofDelivery?: ProofDelivery;
 }
@@ -143,6 +145,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const store = deps?.store ?? createQueryStore();
   const registry = deps?.oracleRegistry;
   const preimageStore = deps?.preimageStore;
+  const escrowProvider = deps?.escrowProvider;
   const hooks = deps?.hooks;
   const proofDelivery = deps?.proofDelivery;
 
@@ -151,7 +154,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     registry ? registry.resolve(oracleId, acceptableIds) : resolveOracle(oracleId, acceptableIds);
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);
 
-  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, proofDelivery };
+  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, proofDelivery };
 
   return {
     createQuery: (input, options) => doCreateQuery(svcDeps, input, options, hooks),

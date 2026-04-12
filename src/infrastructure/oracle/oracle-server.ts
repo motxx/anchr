@@ -16,7 +16,9 @@ import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import type { OracleAttestation } from "../../domain/oracle-types";
-import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../cashu/preimage-store";
+import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../preimage/preimage-store";
+import { createFrostCoordinator, type FrostCoordinator } from "../frost/coordinator";
+import type { ThresholdOracleConfig } from "../../domain/oracle-types";
 
 // Timing-safe API key comparison following Cloudflare's recommended pattern.
 // When lengths differ, compare the input against itself to maintain constant time
@@ -40,6 +42,10 @@ export interface OracleAppOptions {
   oracleId?: string;
   apiKey?: string;
   preimageStore?: PreimageStore;
+  /** FROST coordinator for threshold signing. */
+  frostCoordinator?: FrostCoordinator;
+  /** FROST threshold oracle config. */
+  frostConfig?: ThresholdOracleConfig;
 }
 
 export function buildOracleApp(
@@ -53,6 +59,8 @@ export function buildOracleApp(
   const oracleId = opts.oracleId ?? ORACLE_ID;
   const resolvedApiKey = opts.apiKey ?? apiKey;
   const preimageStore = opts.preimageStore ?? createPreimageStore();
+  const frostCoordinator = opts.frostCoordinator ?? createFrostCoordinator();
+  const frostConfig = opts.frostConfig;
 
   // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
@@ -179,6 +187,187 @@ export function buildOracleApp(
     verifiedQueries.delete(body.query_id);
 
     return c.json({ query_id: body.query_id, preimage });
+  });
+
+  // --- FROST Threshold Signing API ---
+
+  /**
+   * POST /frost/dkg/init — Start a new DKG session.
+   */
+  app.post("/frost/dkg/init", authMiddleware, async (c) => {
+    const body = await c.req.json<{ threshold: number; total: number }>().catch(() => null);
+    if (!body?.threshold || !body?.total) {
+      return c.json({ error: "Missing threshold or total" }, 400);
+    }
+    if (body.threshold > body.total) {
+      return c.json({ error: "threshold cannot exceed total" }, 400);
+    }
+
+    const session = frostCoordinator.initDkg({ threshold: body.threshold, total: body.total });
+    return c.json({
+      session_id: session.session_id,
+      threshold: session.threshold,
+      total_signers: session.total_signers,
+      current_round: session.current_round,
+    }, 201);
+  });
+
+  /**
+   * POST /frost/dkg/:sessionId/round/:n — Submit DKG round package.
+   */
+  app.post("/frost/dkg/:sessionId/round/:n", authMiddleware, async (c) => {
+    const sessionId = c.req.param("sessionId");
+    const round = Number(c.req.param("n")) as 1 | 2 | 3;
+    if (![1, 2, 3].includes(round)) {
+      return c.json({ error: "Round must be 1, 2, or 3" }, 400);
+    }
+
+    const body = await c.req.json<{
+      signer_index: number;
+      package: string;
+      secret_package?: string;
+    }>().catch(() => null);
+    if (!body?.signer_index || !body?.package) {
+      return c.json({ error: "Missing signer_index or package" }, 400);
+    }
+
+    const result = await frostCoordinator.submitDkgPackage(
+      sessionId,
+      round,
+      body.signer_index,
+      body.package,
+      body.secret_package,
+    );
+
+    if (!result) {
+      return c.json({ error: "DKG session not found" }, 404);
+    }
+    return c.json(result);
+  });
+
+  /**
+   * GET /frost/dkg/:sessionId — Get DKG session state.
+   */
+  app.get("/frost/dkg/:sessionId", authMiddleware, (c) => {
+    const session = frostCoordinator.getDkgSession(c.req.param("sessionId"));
+    if (!session) return c.json({ error: "Session not found" }, 404);
+    return c.json({
+      session_id: session.session_id,
+      threshold: session.threshold,
+      total_signers: session.total_signers,
+      current_round: session.current_round,
+      group_pubkey: session.group_pubkey,
+      round1_count: session.round1_packages.size,
+      round2_count: session.round2_packages.size,
+      key_packages_count: session.key_packages.size,
+    });
+  });
+
+  /**
+   * POST /frost/sign/:queryId — Start a FROST signing session.
+   */
+  app.post("/frost/sign/:queryId", authMiddleware, async (c) => {
+    const queryId = c.req.param("queryId");
+    const body = await c.req.json<{ message: string }>().catch(() => null);
+    if (!body?.message) {
+      return c.json({ error: "Missing message" }, 400);
+    }
+
+    if (!frostConfig) {
+      return c.json({ error: "FROST not configured" }, 503);
+    }
+
+    const session = frostCoordinator.startSigning(queryId, body.message, frostConfig);
+    return c.json({
+      session_id: session.session_id,
+      query_id: session.query_id,
+      message: session.message,
+      threshold: session.config.threshold,
+    }, 201);
+  });
+
+  /**
+   * POST /frost/sign/:queryId/commitments — Submit nonce commitment.
+   */
+  app.post("/frost/sign/:queryId/commitments", authMiddleware, async (c) => {
+    const body = await c.req.json<{
+      session_id: string;
+      signer_pubkey: string;
+      commitment: string;
+    }>().catch(() => null);
+    if (!body?.session_id || !body?.signer_pubkey || !body?.commitment) {
+      return c.json({ error: "Missing session_id, signer_pubkey, or commitment" }, 400);
+    }
+
+    frostCoordinator.submitNonceCommitment(body.session_id, body.signer_pubkey, body.commitment);
+    const session = frostCoordinator.getSigningSession(body.session_id);
+    return c.json({
+      commitments_count: session?.nonce_commitments.size ?? 0,
+      threshold: session?.config.threshold ?? 0,
+    });
+  });
+
+  /**
+   * POST /frost/sign/:queryId/shares — Submit signature share.
+   */
+  app.post("/frost/sign/:queryId/shares", authMiddleware, async (c) => {
+    const body = await c.req.json<{
+      session_id: string;
+      signer_pubkey: string;
+      share: string;
+    }>().catch(() => null);
+    if (!body?.session_id || !body?.signer_pubkey || !body?.share) {
+      return c.json({ error: "Missing session_id, signer_pubkey, or share" }, 400);
+    }
+
+    frostCoordinator.submitSignatureShare(body.session_id, body.signer_pubkey, body.share);
+    const session = frostCoordinator.getSigningSession(body.session_id);
+
+    // Auto-aggregate if threshold reached
+    if (session && session.signature_shares.size >= session.config.threshold) {
+      const aggResult = await frostCoordinator.tryAggregate(body.session_id);
+      if (aggResult) {
+        return c.json({
+          shares_count: session.signature_shares.size,
+          threshold: session.config.threshold,
+          finalized: true,
+          signature: aggResult.signature,
+        });
+      }
+    }
+
+    return c.json({
+      shares_count: session?.signature_shares.size ?? 0,
+      threshold: session?.config.threshold ?? 0,
+      finalized: false,
+    });
+  });
+
+  /**
+   * GET /frost/sign/:queryId — Get signing session state.
+   */
+  app.get("/frost/sign/:queryId", authMiddleware, (c) => {
+    const queryId = c.req.param("queryId");
+    // Find session by queryId
+    // Note: In a full impl, we'd have a reverse map. For now, iterate.
+    let found: ReturnType<typeof frostCoordinator.getSigningSession>;
+    // Try direct session ID lookup first, then search
+    found = frostCoordinator.getSigningSession(queryId);
+
+    if (!found) {
+      return c.json({ error: "Signing session not found" }, 404);
+    }
+
+    return c.json({
+      session_id: found.session_id,
+      query_id: found.query_id,
+      message: found.message,
+      threshold: found.config.threshold,
+      commitments_count: found.nonce_commitments.size,
+      shares_count: found.signature_shares.size,
+      finalized: found.finalized,
+      signature: found.group_signature,
+    });
   });
 
   return app;

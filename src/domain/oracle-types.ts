@@ -33,3 +33,15 @@ export interface OracleVerificationDetail extends VerificationDetail {
   oracle_id: string;
   attested_at: number;
 }
+
+/** Configuration for a FROST threshold oracle group. */
+export interface ThresholdOracleConfig {
+  /** Minimum signers required (t in t-of-n). */
+  threshold: number;
+  /** Total signers in the group. */
+  total_signers: number;
+  /** Each signer's Nostr pubkey (hex). */
+  signer_pubkeys: string[];
+  /** FROST DKG-generated group public key (BIP-340 x-only hex). */
+  group_pubkey: string;
+}

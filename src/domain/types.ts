@@ -162,7 +162,32 @@ export interface BountyInfo {
   cashu_token?: string;
 }
 
-/** HTLC escrow information for trustless payment. */
+/** Escrow mechanism type. */
+export type EscrowType = "cashu_htlc" | "cashu_p2pk_frost";
+
+/** Generalized escrow information — supports both HTLC and P2PK+FROST. */
+export interface EscrowInfo {
+  /** Escrow mechanism type. */
+  type: EscrowType;
+  /** SHA-256 hash of the preimage — HTLC only (empty for P2PK+FROST). */
+  hash: string;
+  /** Oracle pubkeys (single for HTLC, FROST group_pubkey for threshold). */
+  oracle_pubkeys: string[];
+  /** Requester's Nostr pubkey (hex) — used for refund. */
+  requester_pubkey: string;
+  /** Worker's Nostr pubkey (hex) — set after worker selection. */
+  worker_pubkey?: string;
+  /** Locktime as unix timestamp (seconds). */
+  locktime: number;
+  /** Encoded Cashu token (held by Requester until swap). */
+  escrow_token?: string;
+  /** Server-verified escrow amount in sats. */
+  verified_escrow_sats?: number;
+  /** Opaque reference for EscrowProvider tracking. */
+  escrow_ref?: string;
+}
+
+/** HTLC escrow information for trustless payment (backward-compat alias). */
 export interface HtlcInfo {
   /** SHA-256 hash of the preimage — known to all parties. */
   hash: string;
@@ -240,6 +265,8 @@ export interface Query {
   payment_status: PaymentStatus;
   /** HTLC escrow details (present when Cashu payment is used). */
   htlc?: HtlcInfo;
+  /** Generalized escrow info (superset of htlc — present for all escrow types). */
+  escrow?: EscrowInfo;
   /** Worker quotes received for this query. */
   quotes?: QuoteInfo[];
   /** Nostr event ID of the kind 5300 Job Request. */

@@ -14,13 +14,16 @@
 import type { Event } from "nostr-tools";
 import type { NostrIdentity } from "../nostr/identity";
 import { restoreIdentity } from "../nostr/identity";
-import { buildPreimageDM, buildRejectionDM } from "../nostr/dm";
+import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
 } from "../nostr/client";
-import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store";
+import { createPreimageStore, type PreimageStore } from "../preimage/preimage-store";
+import type { ThresholdOracleConfig } from "../../domain/oracle-types";
+import type { FrostCoordinator } from "../frost/coordinator";
+import type { FrostSigningSession } from "../frost/types";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import {
@@ -52,6 +55,10 @@ export interface OracleNostrServiceConfig {
   relayUrls?: string[];
   /** Preimage store instance (default: in-memory). */
   preimageStore?: PreimageStore;
+  /** FROST coordinator for threshold signing (optional — enables P2PK+FROST flow). */
+  frostCoordinator?: FrostCoordinator;
+  /** FROST threshold oracle config (required when frostCoordinator is set). */
+  frostConfig?: ThresholdOracleConfig;
   /** Callback when a Worker submits a quote. */
   onQuote?: (queryId: string, workerPubkey: string, amountSats?: number) => void;
   /** Callback when verification completes. */
@@ -67,6 +74,8 @@ export interface OracleNostrService {
   recordSelectedWorker(queryId: string, workerPubkey: string): void;
   /** Verify a result and deliver preimage or rejection. */
   verifyAndDeliver(queryId: string, query: Query, result: QueryResult, workerPubkey: string): Promise<boolean>;
+  /** Verify and deliver using FROST signing (P2PK+FROST flow). */
+  verifyAndDeliverFrost(queryId: string, query: Query, result: QueryResult, workerPubkey: string): Promise<boolean>;
   /** Stop watching all queries. */
   stop(): void;
 }
@@ -171,6 +180,52 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
 
     async verifyAndDeliver(queryId, query, result, workerPubkey) {
       return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+    },
+
+    async verifyAndDeliverFrost(queryId, query, result, workerPubkey) {
+      if (!config.frostCoordinator || !config.frostConfig) {
+        console.error(`[oracle-nostr] FROST not configured, falling back to HTLC`);
+        return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+      }
+
+      const detail = await _verifyFn(query, result);
+
+      if (detail.passed) {
+        // Start FROST signing session
+        // The message is the SIG_ALL hash of the Cashu proofs that need to be signed
+        const message = queryId; // Placeholder — real impl uses proof serialization
+        const session = config.frostCoordinator.startSigning(queryId, message, config.frostConfig);
+
+        // In a full implementation, the coordinator would wait for threshold signers
+        // to submit nonce commitments and signature shares via the /frost/sign/* API.
+        // For now, we check if the session already has enough signatures.
+        const aggResult = await config.frostCoordinator.tryAggregate(session.session_id);
+
+        if (aggResult?.signature) {
+          const dm = buildFrostSignatureDM(
+            config.identity,
+            workerPubkey,
+            queryId,
+            aggResult.signature,
+            config.frostConfig.group_pubkey,
+          );
+          const publishResult = await _publishEventFn(dm, config.relayUrls);
+          if (publishResult.successes.length > 0) {
+            console.error(`[oracle-nostr] FROST signature delivered to Worker for ${queryId}`);
+          }
+          return true;
+        }
+
+        // Session started but awaiting signer participation
+        console.error(`[oracle-nostr] FROST signing session started for ${queryId}, awaiting signers`);
+        return true;
+      } else {
+        const reason = detail.failures.join(", ") || "Verification failed";
+        const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
+        await _publishEventFn(dm, config.relayUrls);
+        console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
+        return false;
+      }
     },
 
     stop() {

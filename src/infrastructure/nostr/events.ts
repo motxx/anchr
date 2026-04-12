@@ -121,7 +121,17 @@ export interface RejectionDMPayload {
   reason: string;
 }
 
-export type OracleDMPayload = PreimageDMPayload | RejectionDMPayload;
+/** FROST group signature delivery via NIP-44 DM (kind 4). */
+export interface FrostSignatureDMPayload {
+  type: "frost_signature";
+  query_id: string;
+  /** BIP-340 Schnorr signature hex (from FROST threshold signing). */
+  group_signature: string;
+  /** FROST group public key for verification. */
+  group_pubkey: string;
+}
+
+export type OracleDMPayload = PreimageDMPayload | RejectionDMPayload | FrostSignatureDMPayload;
 
 /**
  * Oracle-accessible payload embedded in kind 6300 tags.
