@@ -9,7 +9,7 @@ export const requesterMetaSchema = z.object({
 
 export const bountySchema = z.object({
   amount_sats: z.number().int().min(1),
-  cashu_token: z.string().min(1).optional(),
+  escrow_token: z.string().min(1).optional(),
 });
 
 export const oracleIdsSchema = z.array(z.string().min(1)).optional();

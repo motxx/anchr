@@ -132,7 +132,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       worker.publicKey,
       {
         status: "accepted",
-        cashu_token: "cashuAbc123...",
+        escrow_token: "cashuAbc123...",
       },
     );
 
@@ -151,7 +151,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       requester.publicKey,
     );
     expect(parsed.status).toBe("accepted");
-    expect(parsed.cashu_token).toBe("cashuAbc123...");
+    expect(parsed.escrow_token).toBe("cashuAbc123...");
   });
 
   test("QueryResponse includes oracle_payload when oraclePubKey provided", () => {

@@ -1,5 +1,4 @@
-import { getDecodedToken } from "@cashu/cashu-ts";
-import { verifyToken } from "../infrastructure/cashu/wallet";
+import type { EscrowProvider } from "./escrow-port";
 import type { Query, QueryStatus } from "../domain/types";
 
 export interface HtlcTokenLockResult {
@@ -8,57 +7,29 @@ export interface HtlcTokenLockResult {
 }
 
 /**
- * CTF-2: Verify HTLC token P2PK lock target and hashlock.
+ * CTF-2: Verify escrow lock conditions via EscrowProvider.
  *
  * Without this, a requester could submit a token locked to their own key
  * instead of the worker's, then redeem after preimage is revealed.
  *
- * Returns `{ ok: true }` when the token passes all checks (or has no
- * HTLC-tagged proofs). A failure returns `{ ok: false, message }`.
+ * Returns `{ ok: true }` when the token passes all checks.
+ * A failure returns `{ ok: false, message }`.
  */
-export function verifyHtlcTokenLock(
-  tokenStr: string,
-  htlcHash: string,
+export async function verifyEscrowLock(
+  escrowProvider: EscrowProvider,
+  escrowRef: string,
+  paymentHash: string,
   workerPubkey: string,
-): HtlcTokenLockResult {
-  try {
-    const decoded = getDecodedToken(tokenStr);
-    for (const proof of decoded.proofs) {
-      let secret: unknown;
-      try { secret = JSON.parse(proof.secret); } catch { continue; }
-      if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
-
-      // Verify hashlock matches query hash
-      if (secret[1]?.data !== htlcHash) {
-        return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
-      }
-
-      // Verify P2PK lock includes worker pubkey
-      const tags: string[][] | undefined = secret[1]?.tags;
-      const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
-      if (pubkeyTag) {
-        const lockedKeys = pubkeyTag.slice(1);
-        // Accept both compressed (02/03-prefixed) and raw hex
-        const workerHex = workerPubkey.startsWith("02") || workerPubkey.startsWith("03")
-          ? workerPubkey
-          : `02${workerPubkey}`;
-        if (!lockedKeys.includes(workerPubkey) && !lockedKeys.includes(workerHex)) {
-          return { ok: false, message: "HTLC token not locked to selected worker" };
-        }
-      }
-    }
-  } catch {
-    // Token decode failed — non-fatal, amount check already passed
-  }
-  return { ok: true };
+): Promise<HtlcTokenLockResult> {
+  return escrowProvider.verifyLock(escrowRef, paymentHash, workerPubkey);
 }
 
 /** Minimum HTLC locktime in seconds (10 minutes). */
 export const MIN_HTLC_LOCKTIME_SECS = 600;
 
-// --- HTLC state machine helpers ---
+// --- Escrow state machine helpers ---
 
-/** Valid state transitions for HTLC queries. */
+/** Valid state transitions for escrow (HTLC) queries. */
 export const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
   awaiting_quotes: ["processing"],
   processing: ["verifying"],
@@ -70,7 +41,7 @@ export function validateHtlcTransition(from: QueryStatus, to: QueryStatus): bool
 }
 
 export function isHtlcQuery(query: Query): boolean {
-  return query.htlc !== undefined;
+  return query.htlc !== undefined || query.escrow !== undefined;
 }
 
 export interface EscrowAmountResult {
@@ -80,17 +51,18 @@ export interface EscrowAmountResult {
 }
 
 /**
- * Verify that the escrow token carries at least the expected amount.
- * Wraps the infrastructure `verifyToken` call.
+ * Verify that the escrow carries at least the expected amount.
+ * Delegates to EscrowProvider.verify().
  */
 export async function verifyEscrowAmount(
-  token: string,
+  escrowProvider: EscrowProvider,
+  escrowRef: string,
   expectedSats: number,
 ): Promise<EscrowAmountResult> {
-  const check = await verifyToken(token, expectedSats);
+  const check = await escrowProvider.verify(escrowRef, expectedSats);
   return {
     valid: check.valid,
-    amountSats: check.amountSats,
+    amountSats: check.amount_sats,
     error: check.error,
   };
 }

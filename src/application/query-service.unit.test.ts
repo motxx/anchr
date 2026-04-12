@@ -11,6 +11,7 @@ import {
   createQueryStore,
 } from "./query-service";
 import type { Query, QueryResult } from "../domain/types";
+import type { EscrowProvider } from "./escrow-port";
 import { createIntegrityStore } from "../infrastructure/verification/integrity-store";
 
 /** Create a fake encoded Cashu token with the given total sats. */
@@ -353,6 +354,31 @@ describe("createQueryService", () => {
 });
 
 describe("HTLC lifecycle", () => {
+  /** Mock EscrowProvider that decodes Cashu tokens for amount verification. */
+  function createMockEscrowProvider(): EscrowProvider {
+    return {
+      async createHold() { return { escrow_ref: "mock_ref" }; },
+      async bindWorker(_ref, _wp) { return { escrow_ref: "mock_ref_bound" }; },
+      async verify(_ref, expected_sats) {
+        // Decode the ref as a Cashu token to extract amount (ref = token in tests)
+        try {
+          const { getDecodedToken } = await import("@cashu/cashu-ts");
+          const decoded = getDecodedToken(_ref);
+          const total = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+          if (total < expected_sats) {
+            return { valid: false, amount_sats: total, error: `Insufficient amount: got ${total}, expected ${expected_sats}` };
+          }
+          return { valid: true, amount_sats: total };
+        } catch {
+          return { valid: false, error: "Invalid token" };
+        }
+      },
+      async verifyLock() { return { ok: true }; },
+      async settle() { return { settled: true }; },
+      async cancel() { return { cancelled: true }; },
+    };
+  }
+
   function makeIsolatedService() {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
@@ -364,7 +390,7 @@ describe("HTLC lifecycle", () => {
     };
     registry.register(oracle);
     return {
-      service: createQueryService({ store, oracleRegistry: registry }),
+      service: createQueryService({ store, oracleRegistry: registry, escrowProvider: createMockEscrowProvider() }),
       store,
     };
   }

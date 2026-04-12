@@ -5,8 +5,8 @@
  */
 
 import type { EscrowProvider } from "../../application/escrow-port";
-import { verifyEscrowAmount, verifyHtlcTokenLock } from "../../application/query-htlc-validation";
 import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "./escrow";
+import { verifyToken } from "./wallet";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
 export interface CashuEscrowProviderConfig {
@@ -17,15 +17,11 @@ export interface CashuEscrowProviderConfig {
 export function createCashuEscrowProvider(
   config?: CashuEscrowProviderConfig,
 ): EscrowProvider {
-  // Track token strings by escrow_ref for lookup
   const tokenMap = new Map<string, { token: string; escrowToken: EscrowToken }>();
   let refCounter = 0;
 
   return {
     async createHold(params) {
-      // CashuEscrowProvider needs source proofs to create a hold.
-      // In practice, the Requester calls createHtlcToken directly with proofs.
-      // This adapter supports the case where proofs are provided via resolver.
       if (!config?.sourceProofsResolver) {
         return null;
       }
@@ -48,7 +44,6 @@ export function createCashuEscrowProvider(
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return null;
 
-      // Decode to get requester pubkey from existing token
       const decoded = getDecodedToken(entry.token);
       const firstProof = decoded.proofs[0];
       let requesterPubkey = "";
@@ -59,7 +54,6 @@ export function createCashuEscrowProvider(
         requesterPubkey = refundTag?.[1] ?? "";
       } catch { /* plain proof, no refund key */ }
 
-      // Get locktime from escrow token
       let locktime = Math.floor(Date.now() / 1000) + 3600;
       try {
         const secret = JSON.parse(firstProof?.secret ?? "[]");
@@ -94,7 +88,7 @@ export function createCashuEscrowProvider(
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { valid: false, error: "Unknown escrow reference" };
 
-      const result = await verifyEscrowAmount(entry.token, expected_sats);
+      const result = await verifyToken(entry.token, expected_sats);
       return {
         valid: result.valid,
         amount_sats: result.amountSats,
@@ -106,13 +100,36 @@ export function createCashuEscrowProvider(
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
-      const result = verifyHtlcTokenLock(entry.token, payment_hash, worker_pubkey);
-      return result;
+      try {
+        const decoded = getDecodedToken(entry.token);
+        for (const proof of decoded.proofs) {
+          let secret: unknown;
+          try { secret = JSON.parse(proof.secret); } catch { continue; }
+          if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+
+          if (secret[1]?.data !== payment_hash) {
+            return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+          }
+
+          const tags: string[][] | undefined = secret[1]?.tags;
+          const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
+          if (pubkeyTag) {
+            const lockedKeys = pubkeyTag.slice(1);
+            const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
+              ? worker_pubkey
+              : `02${worker_pubkey}`;
+            if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
+              return { ok: false, message: "HTLC token not locked to selected worker" };
+            }
+          }
+        }
+      } catch {
+        // Token decode failed — non-fatal
+      }
+      return { ok: true };
     },
 
     async settle(_escrow_ref, _preimage) {
-      // Settlement happens client-side (Worker calls redeemHtlcToken directly).
-      // This is a no-op on the server/coordinator side.
       return { settled: true };
     },
 

@@ -90,13 +90,13 @@ export interface SelectionFeedbackPayload {
 export interface CompletionFeedbackPayload {
   status: "success" | "error";
   reason?: string;
-  cashu_token?: string;
+  escrow_token?: string;
 }
 
 /** Legacy settlement payload (backward compat). */
 export interface QuerySettlementPayload {
   status: "accepted" | "rejected";
-  cashu_token?: string;
+  escrow_token?: string;
   reason?: string;
 }
 

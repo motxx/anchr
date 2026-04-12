@@ -4,12 +4,62 @@
  * Used by protocol-attacks.test.ts, protocol-trustless.test.ts, protocol-exploits.test.ts.
  */
 
-import { getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "../infrastructure/oracle/registry";
 import { createPreimageStore, type PreimageStore } from "../infrastructure/cashu/preimage-store";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types";
+import type { EscrowProvider } from "../application/escrow-port";
 import { createQueryService, createQueryStore } from "../application/query-service";
 import type { Query, QueryResult } from "../domain/types";
+
+/** Mock EscrowProvider that decodes Cashu tokens for amount verification in tests. */
+export function createMockEscrowProvider(): EscrowProvider {
+  return {
+    async createHold() { return { escrow_ref: "mock_ref" }; },
+    async bindWorker() { return { escrow_ref: "mock_ref_bound" }; },
+    async verify(ref, expected_sats) {
+      try {
+        const decoded = getDecodedToken(ref);
+        const total = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
+        if (total < expected_sats) {
+          return { valid: false, amount_sats: total, error: `Insufficient amount: got ${total}, expected ${expected_sats}` };
+        }
+        return { valid: true, amount_sats: total };
+      } catch {
+        return { valid: false, error: "Invalid token" };
+      }
+    },
+    async verifyLock(ref, payment_hash, worker_pubkey) {
+      try {
+        const decoded = getDecodedToken(ref);
+        for (const proof of decoded.proofs) {
+          let secret: unknown;
+          try { secret = JSON.parse(proof.secret); } catch { continue; }
+          if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+
+          if (secret[1]?.data !== payment_hash) {
+            return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+          }
+          const tags: string[][] | undefined = secret[1]?.tags;
+          const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
+          if (pubkeyTag) {
+            const lockedKeys = pubkeyTag.slice(1);
+            const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
+              ? worker_pubkey : `02${worker_pubkey}`;
+            if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
+              return { ok: false, message: "HTLC token not locked to selected worker" };
+            }
+          }
+        }
+        return { ok: true };
+      } catch {
+        return { ok: true }; // Non-decodable tokens pass (backward compat)
+      }
+    },
+    async settle() { return { settled: true }; },
+    async cancel() { return { cancelled: true }; },
+  };
+}
 
 /** Create a fake Cashu token string with the given amount. */
 export function makeFakeToken(amountSats: number): string {
@@ -51,11 +101,13 @@ export function makeServiceWithPreimage(opts?: { mockOracle?: Oracle; mockOracle
     registry.register(oracle);
   }
   const preimageStore = createPreimageStore();
+  const escrowProvider = createMockEscrowProvider();
   return {
     service: createQueryService({
       store,
       oracleRegistry: registry,
       preimageStore,
+      escrowProvider,
     }),
     store,
     registry,
@@ -116,8 +168,9 @@ export function makeQuorumService(opts: {
     registry.register(makeMockOracle(id, passFn));
   }
   const preimageStore = createPreimageStore();
+  const escrowProvider = createMockEscrowProvider();
   return {
-    service: createQueryService({ store, oracleRegistry: registry, preimageStore }),
+    service: createQueryService({ store, oracleRegistry: registry, preimageStore, escrowProvider }),
     store,
     registry,
     preimageStore,

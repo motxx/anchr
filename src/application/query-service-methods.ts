@@ -11,7 +11,7 @@ import {
   MIN_HTLC_LOCKTIME_SECS,
   validateHtlcTransition,
   verifyEscrowAmount,
-  verifyHtlcTokenLock,
+  verifyEscrowLock,
 } from "./query-htlc-validation";
 import type {
   BlossomKeyMap,
@@ -280,21 +280,22 @@ export async function doSelectWorker(
   if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
   if (!validateHtlcTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
-  // Verify HTLC token amount matches bounty — queries Cashu mint for proof state
-  const tokenToVerify = htlcToken ?? query.htlc!.escrow_token;
+  // Verify escrow amount matches bounty
+  const escrowRef = query.escrow?.escrow_ref ?? query.htlc?.escrow_token ?? htlcToken;
   const expectedSats = query.bounty?.amount_sats;
   let verifiedEscrowSats: number | undefined;
-  if (tokenToVerify && expectedSats) {
-    const check = await verifyEscrowAmount(tokenToVerify, expectedSats);
+  if (escrowRef && expectedSats && deps.escrowProvider) {
+    const check = await verifyEscrowAmount(deps.escrowProvider, escrowRef, expectedSats);
     if (!check.valid) {
       return { ok: false, message: `Escrow token verification failed: ${check.error}` };
     }
     verifiedEscrowSats = check.amountSats;
   }
 
-  // CTF-2: Verify HTLC token P2PK lock target and hashlock.
-  if (tokenToVerify && query.htlc?.hash) {
-    const lockCheck = verifyHtlcTokenLock(tokenToVerify, query.htlc.hash, workerPubkey);
+  // CTF-2: Verify escrow lock conditions (hashlock + P2PK).
+  const paymentHash = query.escrow?.hash ?? query.htlc?.hash;
+  if (escrowRef && paymentHash && deps.escrowProvider) {
+    const lockCheck = await verifyEscrowLock(deps.escrowProvider, escrowRef, paymentHash, workerPubkey);
     if (!lockCheck.ok) {
       return { ok: false, message: lockCheck.message! };
     }
@@ -303,7 +304,7 @@ export async function doSelectWorker(
   const htlc: HtlcInfo = {
     ...query.htlc!,
     worker_pubkey: workerPubkey,
-    escrow_token: tokenToVerify,
+    escrow_token: htlcToken ?? query.htlc?.escrow_token,
     verified_escrow_sats: verifiedEscrowSats,
   };
 

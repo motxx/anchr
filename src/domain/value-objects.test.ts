@@ -70,7 +70,7 @@ describe("validateBountyInfo", () => {
     expect(validateBountyInfo({ amount_sats: 100 })).toBeNull();
   });
   test("valid amount with token", () => {
-    expect(validateBountyInfo({ amount_sats: 1, cashu_token: "tok" })).toBeNull();
+    expect(validateBountyInfo({ amount_sats: 1, escrow_token: "tok" })).toBeNull();
   });
   test("zero", () => {
     expect(validateBountyInfo({ amount_sats: 0 })).toContain("positive");

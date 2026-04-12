@@ -1,17 +1,16 @@
 /**
- * Requester service — orchestrates the Requester's side of the HTLC flow.
+ * Requester service — orchestrates the Requester's side of the escrow flow.
  *
  * Per README:
  *   1. Request hash(preimage) from Oracle
- *   2. Lock Cashu HTLC token (Worker TBD)
+ *   2. Lock escrow token (Worker TBD)
  *   3. Publish DVM Job Request (kind 5300) with Oracle pubkey
  *   4. Listen for Worker quotes (kind 7000 status=payment-required)
- *   5. Select Worker, swap HTLC to add Worker pubkey
+ *   5. Select Worker, swap escrow to add Worker pubkey
  *   6. Announce selection (kind 7000 status=processing)
  *   7. Receive result (kind 6300), download blob, decrypt K_R
  */
 
-import type { Proof } from "@cashu/cashu-ts";
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../infrastructure/nostr/identity";
@@ -20,18 +19,13 @@ import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
   parseFeedbackPayload,
-  parseQueryResponsePayload,
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "../infrastructure/nostr/events";
-import { publishEvent, subscribeToFeedback, subscribeToResponses } from "../infrastructure/nostr/client";
-import {
-  createHtlcToken,
-  swapHtlcBindWorker,
-  type EscrowToken,
-} from "../infrastructure/cashu/escrow";
-import type { HtlcInfo, QuoteInfo, TlsnEncryptedContext } from "../domain/types";
+import { publishEvent, subscribeToFeedback } from "../infrastructure/nostr/client";
+import type { EscrowProvider } from "./escrow-port";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../domain/types";
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */
@@ -42,6 +36,8 @@ export interface RequesterConfig {
   oraclePubkey: string;
   /** Relay URLs. */
   relayUrls?: string[];
+  /** Escrow provider for creating and managing escrow holds. */
+  escrowProvider: EscrowProvider;
 }
 
 export interface CreateQueryRequest {
@@ -49,8 +45,6 @@ export interface CreateQueryRequest {
   locationHint?: string;
   ttlSeconds?: number;
   amountSats: number;
-  /** Source Cashu proofs for the bounty. */
-  sourceProofs: Proof[];
   /** Locktime in seconds from now. */
   locktimeSeconds?: number;
 }
@@ -58,12 +52,12 @@ export interface CreateQueryRequest {
 export interface RequesterQueryState {
   queryId: string;
   identity: NostrIdentity;
-  htlc: HtlcInfo;
-  initialToken: EscrowToken;
+  escrow: EscrowInfo;
+  escrowRef: string;
   nostrEventId: string;
   quotes: QuoteInfo[];
   selectedWorkerPubkey?: string;
-  finalToken?: EscrowToken;
+  finalEscrowRef?: string;
 }
 
 /**
@@ -92,7 +86,7 @@ export async function requestOracleHash(
 }
 
 /**
- * Steps 1-3: Create a query with HTLC escrow and publish to Nostr.
+ * Steps 1-3: Create a query with escrow and publish to Nostr.
  */
 export async function createHtlcQuery(
   config: RequesterConfig,
@@ -112,17 +106,14 @@ export async function createHtlcQuery(
     throw new Error("Oracle endpoint is required for HTLC flow");
   }
 
-  // Step 2: Lock HTLC token (Worker TBD)
-  const initialToken = await createHtlcToken(
-    request.amountSats,
-    {
-      hash,
-      requesterPubkey: identity.publicKey,
-      locktimeSeconds: locktime,
-    },
-    request.sourceProofs,
-  );
-  if (!initialToken) return null;
+  // Step 2: Lock escrow token (Worker TBD) via EscrowProvider
+  const hold = await config.escrowProvider.createHold({
+    amount_sats: request.amountSats,
+    payment_hash: hash,
+    expiry: locktime,
+    requester_pubkey: identity.publicKey,
+  });
+  if (!hold) return null;
 
   // Step 3: Publish DVM Job Request (kind 5300)
   const payload: QueryRequestPayload = {
@@ -132,7 +123,7 @@ export async function createHtlcQuery(
     requester_pubkey: identity.publicKey,
     bounty: {
       mint: process.env.CASHU_MINT_URL ?? "",
-      token: initialToken.token,
+      token: hold.escrow_ref,
     },
     expires_at: Date.now() + (request.ttlSeconds ?? 600) * 1000,
   };
@@ -149,19 +140,20 @@ export async function createHtlcQuery(
     console.error("[requester] Failed to publish query to any relay");
   }
 
-  const htlc: HtlcInfo = {
+  const escrow: EscrowInfo = {
+    type: "htlc",
     hash,
-    oracle_pubkey: config.oraclePubkey,
+    oracle_pubkeys: [config.oraclePubkey],
     requester_pubkey: identity.publicKey,
     locktime,
-    escrow_token: initialToken.token,
+    escrow_ref: hold.escrow_ref,
   };
 
   return {
     queryId,
     identity,
-    htlc,
-    initialToken,
+    escrow,
+    escrowRef: hold.escrow_ref,
     nostrEventId: event.id,
     quotes: [],
   };
@@ -207,33 +199,26 @@ export function subscribeToQuotes(
  * Steps 5-6: Select a Worker and announce selection.
  */
 export async function selectWorker(
+  config: RequesterConfig,
   state: RequesterQueryState,
   workerPubkey: string,
   relayUrls?: string[],
   encryptedContext?: TlsnEncryptedContext,
-): Promise<EscrowToken | null> {
-  // Step 5: Swap HTLC to bind Worker
-  const finalToken = await swapHtlcBindWorker(
-    state.initialToken.proofs,
-    {
-      hash: state.htlc.hash,
-      workerPubkey,
-      requesterRefundPubkey: state.htlc.requester_pubkey,
-      locktimeSeconds: state.htlc.locktime,
-    },
-  );
-  if (!finalToken) return null;
+): Promise<string | null> {
+  // Step 5: Swap escrow to bind Worker via EscrowProvider
+  const bound = await config.escrowProvider.bindWorker(state.escrowRef, workerPubkey);
+  if (!bound) return null;
 
   state.selectedWorkerPubkey = workerPubkey;
-  state.finalToken = finalToken;
-  state.htlc.worker_pubkey = workerPubkey;
-  state.htlc.escrow_token = finalToken.token;
+  state.finalEscrowRef = bound.escrow_ref;
+  state.escrow.worker_pubkey = workerPubkey;
+  state.escrow.escrow_ref = bound.escrow_ref;
 
   // Step 6: Announce selection (kind 7000 status=processing)
   const selectionPayload: SelectionFeedbackPayload = {
     status: "processing",
     selected_worker_pubkey: workerPubkey,
-    htlc_token: finalToken.token,
+    htlc_token: bound.escrow_ref,
     encrypted_context: encryptedContext,
   };
 
@@ -245,5 +230,5 @@ export async function selectWorker(
   );
 
   await publishEvent(event, relayUrls);
-  return finalToken;
+  return bound.escrow_ref;
 }
