@@ -68,16 +68,23 @@ console.log();
 
 console.log("Step 2: Uploading C2PA-signed photo...\n");
 
-const photoFile = Bun.file(PHOTO_PATH);
-if (!(await photoFile.exists())) {
+// Read the photo file (works in Deno and Bun)
+let photoBytes: Uint8Array;
+try {
+  photoBytes = await Deno.readFile(PHOTO_PATH);
+} catch {
   console.error(`Photo not found: ${PHOTO_PATH}`);
   console.error("Provide a C2PA-signed photo as the first argument.");
   console.error("You can create one with: c2patool test-photo.jpg -m manifest.json -o signed-photo.jpg");
   process.exit(1);
 }
 
+const photoBlob = new File([photoBytes], PHOTO_PATH.split("/").pop() ?? "photo.jpg", {
+  type: "image/jpeg",
+});
+
 const formData = new FormData();
-formData.append("photo", photoFile);
+formData.append("photo", photoBlob);
 
 const uploadRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/upload`, {
   method: "POST",
@@ -103,11 +110,13 @@ console.log();
 
 console.log("Step 3: Submitting for verification...\n");
 
-// Submit with the attachment ref and optional encryption keys for oracle verification
-const submitRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/submit`, {
+// Submit with the attachment ref and optional encryption keys for oracle verification.
+// Uses POST /queries/:id/result (the /submit endpoint is deprecated).
+const submitRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/result`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
+    worker_pubkey: "example-journalist",
     notes: "Photo taken at Shibuya crossing, C2PA signed by camera",
     attachments: [uploadResult.attachment],
     ...(uploadResult.encryption && {
