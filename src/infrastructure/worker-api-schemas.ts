@@ -53,8 +53,8 @@ export const quorumSchema = z.object({
 export const proofVisibilitySchema = z.enum(["public", "requester_only"]).optional();
 
 export const createQuerySchema = z.object({
-  description: z.string().min(1),
-  location_hint: z.string().min(1).optional(),
+  description: z.string().min(1).max(5000),
+  location_hint: z.string().min(1).max(500).optional(),
   expected_gps: gpsSchema.optional(),
   max_gps_distance_km: z.number().min(0.01).max(1000).optional(),
   ttl_seconds: z.number().int().min(60).max(86_400).optional(),

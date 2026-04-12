@@ -125,10 +125,14 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   const RATE_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX) || 60;
   const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
+  // Rate limiting: use Fly-Client-IP (Fly.io) > X-Real-IP (nginx) > socket address.
+  // X-Forwarded-For is NOT used because it is attacker-controlled without a trusted proxy.
+  // https://developers.cloudflare.com/workers/examples/protect-against-timing-attacks/
   const rateLimit: MiddlewareHandler = async (c, next) => {
-    const xff = c.req.header("x-forwarded-for");
-    const xffParts = xff?.split(",").map((s) => s.trim()).filter(Boolean);
-    const ip = xffParts?.length ? xffParts[xffParts.length - 1]! : "unknown";
+    const ip = c.req.header("fly-client-ip")
+      ?? c.req.header("x-real-ip")
+      ?? (c.env?.remoteAddr as { hostname?: string })?.hostname
+      ?? "unknown";
     const now = Date.now();
     let bucket = rateBuckets.get(ip);
     if (!bucket || now > bucket.resetAt) {

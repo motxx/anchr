@@ -12,6 +12,7 @@ import { zValidator } from "@hono/zod-validator";
 import { createListingSchema } from "./marketplace-schemas";
 import { createPaymentMiddleware } from "./xcashu-middleware";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher";
+import { validateAttachmentUri } from "../url-validation";
 import { announceListingOnNostr } from "./nostr-announce";
 import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types";
 
@@ -25,8 +26,15 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
 
   // --- Listings CRUD ---
 
+  // Public listing response — omit source_url to prevent leaking internal URLs.
+  // deno-lint-ignore no-explicit-any
+  function publicListing(listing: any) {
+    const { source_url: _url, ...rest } = listing;
+    return rest;
+  }
+
   mkt.get("/listings", (c) => {
-    return c.json(listingStore.listActive());
+    return c.json(listingStore.listActive().map(publicListing));
   });
 
   mkt.get("/listings/:id", (c) => {
@@ -34,7 +42,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     if (!id) return c.json({ error: "Listing id is required" }, 400);
     const listing = listingStore.get(id);
     if (!listing) return c.json({ error: "Listing not found" }, 404);
-    return c.json(listing);
+    return c.json(publicListing(listing));
   });
 
   mkt.post(
@@ -52,6 +60,13 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     }) as unknown as MiddlewareHandler,
     (c) => {
       const payload = c.req.valid("json" as never) as ReturnType<typeof createListingSchema.parse>;
+      // Validate source_url at creation time (not just at fetch time) to prevent
+      // storing SSRF targets and leaking them via GET /marketplace/listings.
+      const urlError = validateAttachmentUri(payload.source_url);
+      if (urlError) {
+        return c.json({ error: `source_url rejected: ${urlError}` }, 400);
+      }
+
       const id = `listing_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
       listingStore.set(id, {
         id,
@@ -66,7 +81,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
         created_at: Date.now(),
         provider_pubkey: payload.provider_pubkey,
       });
-      return c.json(listingStore.get(id), 201);
+      return c.json(publicListing(listingStore.get(id)), 201);
     },
   );
 
