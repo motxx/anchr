@@ -10,6 +10,7 @@ import { generateEphemeralIdentity } from "../nostr/identity";
 import { createPreimageStore } from "../preimage/preimage-store";
 import { createFrostCoordinator } from "../frost/coordinator";
 import type { ThresholdOracleConfig } from "../../domain/oracle-types";
+import type { FrostNodeConfig } from "../frost/config.ts";
 import type { AttachmentRef } from "../../domain/types";
 import type { VerifiedEvent } from "nostr-tools";
 
@@ -23,6 +24,21 @@ const frostConfig: ThresholdOracleConfig = {
   total_signers: 3,
   signer_pubkeys: ["pub1", "pub2", "pub3"],
   group_pubkey: "aabb".repeat(16),
+};
+
+/** Minimal FrostNodeConfig for tests (no real key material). */
+const frostNodeConfig: FrostNodeConfig = {
+  signer_index: 1,
+  total_signers: 3,
+  threshold: 2,
+  key_package: {},
+  pubkey_package: {},
+  group_pubkey: "aabb".repeat(16),
+  peers: [
+    { signer_index: 1, endpoint: "http://localhost:14301", api_key: "test" },
+    { signer_index: 2, endpoint: "http://localhost:14302", api_key: "test" },
+    { signer_index: 3, endpoint: "http://localhost:14303", api_key: "test" },
+  ],
 };
 
 function makeConfig(
@@ -58,10 +74,9 @@ describe("verifyAndDeliverFrost", () => {
     _setVerifyForTest(null);
   });
 
-  test("falls back to HTLC when frost not configured", async () => {
+  test("falls back to HTLC when frostNodeConfig not set", async () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });
-    // No frostCoordinator or frostConfig
     const service = createOracleNostrService(config);
     service.generateHash("q1");
 
@@ -76,24 +91,16 @@ describe("verifyAndDeliverFrost", () => {
       failures: [],
     }));
 
-    const query = makeQuery("q1");
-    const passed = await service.verifyAndDeliverFrost(
-      "q1",
-      query,
-      makeResult(),
-      workerPubkey,
-    );
-    // Falls back to HTLC flow (verifyAndDeliver internal), should succeed
+    const passed = await service.verifyAndDeliverFrost("q1", makeQuery("q1"), makeResult(), workerPubkey);
     expect(passed).toBe(true);
-    // Preimage DM should be published (HTLC fallback)
-    expect(published.length).toBe(1);
+    expect(published.length).toBe(1); // Preimage DM (HTLC fallback)
   });
 
   test("sends rejection DM on verification failure", async () => {
-    const coordinator = createFrostCoordinator();
     const config = makeConfig({
-      frostCoordinator: coordinator,
+      frostCoordinator: createFrostCoordinator(),
       frostConfig,
+      frostNodeConfig,
     });
     const service = createOracleNostrService(config);
 
@@ -108,90 +115,35 @@ describe("verifyAndDeliverFrost", () => {
       failures: ["C2PA invalid"],
     }));
 
-    const query = makeQuery("q-rej");
-    const passed = await service.verifyAndDeliverFrost(
-      "q-rej",
-      query,
-      makeResult(),
-      workerPubkey,
-    );
+    const passed = await service.verifyAndDeliverFrost("q-rej", makeQuery("q-rej"), makeResult(), workerPubkey);
     expect(passed).toBe(false);
-    // Rejection DM should be published
+    expect(published.length).toBe(1); // Rejection DM
+  });
+
+  test("sends rejection when FROST signing fails (threshold not met)", async () => {
+    const config = makeConfig({
+      frostCoordinator: createFrostCoordinator(),
+      frostConfig,
+      frostNodeConfig,
+    });
+    const service = createOracleNostrService(config);
+
+    const published: VerifiedEvent[] = [];
+    _setPublishEventForTest(async (event: VerifiedEvent) => {
+      published.push(event);
+      return { successes: ["relay1"], failures: [] };
+    });
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    // Verification passes but coordinateSigning will fail (no real key material, no peers running)
+    const passed = await service.verifyAndDeliverFrost("q-nopeer", makeQuery("q-nopeer"), makeResult(), workerPubkey);
+    // Should return false because signing fails (peers unreachable, threshold not met)
+    expect(passed).toBe(false);
+    // Rejection DM about threshold not met
     expect(published.length).toBe(1);
-  });
-
-  test("starts signing session on verification pass", async () => {
-    const coordinator = createFrostCoordinator();
-    const config = makeConfig({
-      frostCoordinator: coordinator,
-      frostConfig,
-    });
-    const service = createOracleNostrService(config);
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
-
-    const query = makeQuery("q-sign");
-    const passed = await service.verifyAndDeliverFrost(
-      "q-sign",
-      query,
-      makeResult(),
-      workerPubkey,
-    );
-    // Verification passes, signing session started
-    expect(passed).toBe(true);
-    // tryAggregate returns null (no shares submitted yet), so no DM is published
-    // The session is started and waiting for signer participation
-    expect(published.length).toBe(0);
-  });
-
-  test("delivers FROST signature DM when aggregation succeeds", async () => {
-    const coordinator = createFrostCoordinator();
-    const config = makeConfig({
-      frostCoordinator: coordinator,
-      frostConfig,
-    });
-    const service = createOracleNostrService(config);
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
-
-    // Pre-populate a signing session with enough shares via coordinator
-    // The verifyAndDeliverFrost flow calls startSigning then tryAggregate.
-    // We need tryAggregate to succeed, which means we need to pre-submit shares
-    // before the service calls it. Since we cannot intercept the timing,
-    // we test the fallback path (session started, awaiting signers) and verify
-    // that the coordinator session was properly created.
-    const query = makeQuery("q-agg");
-    const passed = await service.verifyAndDeliverFrost(
-      "q-agg",
-      query,
-      makeResult(),
-      workerPubkey,
-    );
-    expect(passed).toBe(true);
-
-    // Verify a signing session was created on the coordinator
-    // The session_id is based on queryId as a lookup
-    // Since we cannot know the exact session_id (it's generated internally),
-    // we verify that the service returned true (session started)
-    // and that no signature DM was published (aggregation needs real shares)
-    expect(published.length).toBe(0);
   });
 });

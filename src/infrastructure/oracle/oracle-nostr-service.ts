@@ -23,7 +23,8 @@ import {
 import { createPreimageStore, type PreimageStore } from "../preimage/preimage-store";
 import type { ThresholdOracleConfig } from "../../domain/oracle-types";
 import type { FrostCoordinator } from "../frost/coordinator";
-import type { FrostSigningSession } from "../frost/types";
+import type { FrostNodeConfig } from "../frost/config.ts";
+import { coordinateSigning } from "../frost/signing-coordinator.ts";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import {
@@ -59,6 +60,8 @@ export interface OracleNostrServiceConfig {
   frostCoordinator?: FrostCoordinator;
   /** FROST threshold oracle config (required when frostCoordinator is set). */
   frostConfig?: ThresholdOracleConfig;
+  /** Per-node FROST config with key material and peer endpoints. */
+  frostNodeConfig?: FrostNodeConfig;
   /** Callback when a Worker submits a quote. */
   onQuote?: (queryId: string, workerPubkey: string, amountSats?: number) => void;
   /** Callback when verification completes. */
@@ -187,49 +190,53 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     },
 
     async verifyAndDeliverFrost(queryId, query, result, workerPubkey) {
-      if (!config.frostCoordinator || !config.frostConfig) {
-        console.error(`[oracle-nostr] FROST not configured, falling back to HTLC`);
+      if (!config.frostNodeConfig) {
+        console.error(`[oracle-nostr] FROST node config not available, falling back to HTLC`);
         return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
       }
 
+      // Step 1: This node verifies independently
       const detail = await _verifyFn(query, result);
-
-      if (detail.passed) {
-        // Start FROST signing session
-        // The message is the SIG_ALL hash of the Cashu proofs that need to be signed
-        const message = queryId; // Placeholder — real impl uses proof serialization
-        const session = config.frostCoordinator.startSigning(queryId, message, config.frostConfig);
-
-        // In a full implementation, the coordinator would wait for threshold signers
-        // to submit nonce commitments and signature shares via the /frost/sign/* API.
-        // For now, we check if the session already has enough signatures.
-        const aggResult = await config.frostCoordinator.tryAggregate(session.session_id);
-
-        if (aggResult?.signature) {
-          const dm = buildFrostSignatureDM(
-            config.identity,
-            workerPubkey,
-            queryId,
-            aggResult.signature,
-            config.frostConfig.group_pubkey,
-          );
-          const publishResult = await _publishEventFn(dm, config.relayUrls);
-          if (publishResult.successes.length > 0) {
-            console.error(`[oracle-nostr] FROST signature delivered to Worker for ${queryId}`);
-          }
-          return true;
-        }
-
-        // Session started but awaiting signer participation
-        console.error(`[oracle-nostr] FROST signing session started for ${queryId}, awaiting signers`);
-        return true;
-      } else {
+      if (!detail.passed) {
         const reason = detail.failures.join(", ") || "Verification failed";
         const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
         await _publishEventFn(dm, config.relayUrls);
         console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
         return false;
       }
+
+      // Step 2: Coordinate FROST signing with peer Oracle nodes.
+      // Each peer's /frost/signer/round1 endpoint independently verifies before signing.
+      // Peers that fail verification will refuse to participate → below threshold = no signature.
+      const { sha256 } = await import("@noble/hashes/sha2.js");
+      const { bytesToHex } = await import("@noble/hashes/utils.js");
+      const messageHex = bytesToHex(sha256(new TextEncoder().encode(`anchr:sign:${queryId}`)));
+
+      const sigResult = await coordinateSigning(
+        { nodeConfig: config.frostNodeConfig, query, result },
+        messageHex,
+      );
+
+      if (!sigResult) {
+        console.error(`[oracle-nostr] FROST signing failed for ${queryId} — threshold not met`);
+        const dm = buildRejectionDM(config.identity, workerPubkey, queryId, "FROST threshold not met — insufficient Oracle approvals");
+        await _publishEventFn(dm, config.relayUrls);
+        return false;
+      }
+
+      // Step 3: Deliver FROST group signature to Worker
+      const dm = buildFrostSignatureDM(
+        config.identity,
+        workerPubkey,
+        queryId,
+        sigResult.signature,
+        config.frostNodeConfig.group_pubkey,
+      );
+      const publishResult = await _publishEventFn(dm, config.relayUrls);
+      if (publishResult.successes.length > 0) {
+        console.error(`[oracle-nostr] FROST signature delivered to Worker for ${queryId} (signers: ${sigResult.signers_participated.join(",")})`);
+      }
+      return true;
     },
 
     stop() {

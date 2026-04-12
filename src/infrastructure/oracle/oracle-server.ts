@@ -196,11 +196,28 @@ export function buildOracleApp(
 
   // --- FROST Signer endpoints (called by peer Oracle nodes during signing) ---
 
-  /** POST /frost/signer/round1 — Generate nonce commitments for a signing session. */
+  /**
+   * POST /frost/signer/round1 — Independent verification + nonce commitment.
+   *
+   * Each peer Oracle node independently verifies the query result before
+   * producing nonce commitments. If verification fails, the peer refuses
+   * to participate → the coordinator cannot reach threshold.
+   */
   app.post("/frost/signer/round1", authMiddleware, async (c) => {
-    const body = await c.req.json<{ message: string }>().catch(() => null);
+    const body = await c.req.json<{ message: string; query?: Query; result?: QueryResult }>().catch(() => null);
     if (!body?.message) return c.json({ error: "Missing message" }, 400);
     if (!frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
+
+    // Independent verification: if query+result provided, verify before signing
+    if (body.query && body.result) {
+      const detail = await verify(body.query, body.result);
+      if (!detail.passed) {
+        return c.json({
+          error: "Verification failed",
+          failures: detail.failures,
+        }, 403);
+      }
+    }
 
     const { signRound1 } = await import("../frost/frost-cli.ts");
     const keyPackageJson = JSON.stringify(frostNodeConfig.key_package);

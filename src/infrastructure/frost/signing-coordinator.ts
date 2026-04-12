@@ -13,6 +13,9 @@ export interface SigningCoordinatorConfig {
   nodeConfig: FrostNodeConfig;
   /** Timeout for HTTP calls to peers (ms). */
   peerTimeoutMs?: number;
+  /** Query and result for peer independent verification. */
+  query?: unknown;
+  result?: unknown;
 }
 
 export interface SigningCoordinatorResult {
@@ -65,7 +68,11 @@ export async function coordinateSigning(
         {
           method: "POST",
           headers: buildHeaders(peer.api_key),
-          body: JSON.stringify({ message: messageHex }),
+          body: JSON.stringify({
+            message: messageHex,
+            query: config.query,
+            result: config.result,
+          }),
         },
         timeoutMs,
       );
