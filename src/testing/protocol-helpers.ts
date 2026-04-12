@@ -150,6 +150,7 @@ export async function driveToProcessing(
   });
   const token = makeFakeToken(bounty);
   await service.selectWorker(query.id, workerPub, token);
+  service.beginWork(query.id);
   return { query, entry, workerPub, htlcInfo };
 }
 
@@ -193,5 +194,6 @@ export async function driveQuorumToProcessing(
   );
   service.recordQuote(query.id, { worker_pubkey: workerPub, quote_event_id: "evt_1", received_at: Date.now() });
   await service.selectWorker(query.id, workerPub, makeFakeToken(bounty));
+  service.beginWork(query.id);
   return { query, entry, workerPub, htlcInfo };
 }

@@ -349,6 +349,13 @@ export function registerHtlcRoutes(app: Hono, ctx: RouteContext) {
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
+  app.post("/queries/:id/begin", writeAuth, (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Query id is required" }, 400);
+    const outcome = svc.beginWork(id);
+    return c.json(outcome, outcome.ok ? 200 : 400);
+  });
+
   app.post("/queries/:id/result", rateLimit, writeAuth, (c) => handleSubmitResult(c, svc));
 }
 

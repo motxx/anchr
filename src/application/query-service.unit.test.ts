@@ -437,14 +437,14 @@ describe("HTLC lifecycle", () => {
     expect(outcome.message).toContain("Not an HTLC query");
   });
 
-  test("selectWorker transitions awaiting_quotes → processing", async () => {
+  test("selectWorker transitions awaiting_quotes → worker_selected", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     service.recordQuote(query.id, { worker_pubkey: "worker_pub_1", quote_event_id: "evt_1", received_at: Date.now() });
     const outcome = await service.selectWorker(query.id, "worker_pub_1", "htlc_token_123");
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
-    expect(updated.status).toBe("processing");
+    expect(updated.status).toBe("worker_selected");
     expect(updated.htlc?.worker_pubkey).toBe("worker_pub_1");
     expect(updated.payment_status).toBe("htlc_swapped");
   });
@@ -514,6 +514,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     await service.selectWorker(query.id, "worker_pub_1");
+    service.beginWork(query.id);
     const outcome = service.recordResult(query.id, { attachments: [], notes: "done" }, "worker_pub_1");
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("verifying");
@@ -523,6 +524,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     await service.selectWorker(query.id, "worker_pub_1");
+    service.beginWork(query.id);
     const outcome = service.recordResult(query.id, { attachments: [] }, "wrong_worker");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
@@ -532,6 +534,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     await service.selectWorker(query.id, "worker_pub_1");
+    service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
     const outcome = service.completeVerification(query.id, true, "test-oracle");
     expect(outcome.ok).toBe(true);
@@ -545,6 +548,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     await service.selectWorker(query.id, "worker_pub_1");
+    service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
     const outcome = service.completeVerification(query.id, false);
     expect(outcome.ok).toBe(true);
@@ -570,8 +574,9 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.quotes).toHaveLength(2);
 
     await service.selectWorker(query.id, "w1", "final_htlc_token");
-    expect(service.getQuery(query.id)?.status).toBe("processing");
+    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
 
+    service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [], notes: "photo taken" }, "w1");
     expect(service.getQuery(query.id)?.status).toBe("verifying");
 
@@ -621,6 +626,7 @@ describe("submitHtlcResult", () => {
     const { htlcInfo, entry } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
       query.id,
       { attachments: [], notes: "done" },
@@ -640,6 +646,7 @@ describe("submitHtlcResult", () => {
     const { htlcInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["strict-oracle"] });
     await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
       query.id,
       { attachments: [] },
@@ -670,6 +677,7 @@ describe("submitHtlcResult", () => {
     const { htlcInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
     await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
       query.id,
       { attachments: [] },
@@ -801,6 +809,7 @@ describe("verifyWithQuorum", () => {
       },
     );
     await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
 
     const outcome = await service.submitHtlcResult(
       query.id,

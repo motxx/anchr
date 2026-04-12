@@ -278,7 +278,7 @@ export async function doSelectWorker(
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
   if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
-  if (!validateHtlcTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
+  if (!validateHtlcTransition(query.status, "worker_selected")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
   // Verify escrow amount matches bounty
   const escrowRef = query.escrow?.escrow_ref ?? query.htlc?.escrow_token ?? htlcToken;
@@ -310,11 +310,23 @@ export async function doSelectWorker(
 
   store.set(queryId, {
     ...query,
-    status: "processing",
+    status: "worker_selected",
     htlc,
     payment_status: htlcToken ? "htlc_swapped" : query.payment_status,
   });
   return { ok: true, message: "Worker selected" };
+}
+
+export function doBeginWork(
+  store: QueryStore,
+  queryId: string,
+): HtlcOutcome {
+  const query = store.get(queryId);
+  if (!query) return { ok: false, message: "Query not found" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!validateHtlcTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not worker_selected` };
+  store.set(queryId, { ...query, status: "processing" });
+  return { ok: true, message: "Work begun" };
 }
 
 export function doRecordResult(

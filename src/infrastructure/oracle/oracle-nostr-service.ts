@@ -125,12 +125,30 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
 
     if (detail.passed && preimage && hash) {
       const dm = buildPreimageDM(config.identity, workerPubkey, queryId, preimage);
-      const publishResult = await _publishEventFn(dm, config.relayUrls);
-      if (publishResult.successes.length > 0) {
-        console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId}`);
+
+      // Retry delivery with exponential backoff — do NOT delete preimage until confirmed
+      const MAX_RETRIES = 3;
+      let delivered = false;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const publishResult = await _publishEventFn(dm, config.relayUrls);
+        if (publishResult.successes.length > 0) {
+          console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId} (${publishResult.successes.length} relay(s))`);
+          delivered = true;
+          break;
+        }
+        if (attempt < MAX_RETRIES) {
+          const delaySec = attempt * 2;
+          console.error(`[oracle-nostr] Preimage delivery failed for ${queryId} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
+          await new Promise((r) => setTimeout(r, delaySec * 1000));
+        }
       }
-      preimageStore.delete(hash);
-      queryHashMap.delete(queryId);
+
+      if (delivered) {
+        preimageStore.delete(hash);
+        queryHashMap.delete(queryId);
+      } else {
+        console.error(`[oracle-nostr] Preimage delivery failed for ${queryId} after ${MAX_RETRIES} attempts — preimage retained for HTTP fallback`);
+      }
       return true;
     } else {
       const reason = detail.failures.join(", ") || "Verification failed";

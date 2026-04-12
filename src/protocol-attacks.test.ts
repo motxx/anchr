@@ -45,6 +45,7 @@ describe("Attack: Preimage Isolation", () => {
     );
     service.recordQuote(q1.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    service.beginWork(q1.id);
 
     // First query reveals preimage (deletes from store)
     const outcome1 = await service.submitHtlcResult(q1.id, { attachments: [] }, "w1", "test-oracle");
@@ -69,6 +70,7 @@ describe("Attack: Preimage Isolation", () => {
     );
     service.recordQuote(q2.id, { worker_pubkey: "w2", quote_event_id: "e2", received_at: Date.now() });
     await service.selectWorker(q2.id, "w2", makeFakeToken(100));
+    service.beginWork(q2.id);
 
     // Second query verification passes but preimage was already deleted
     const outcome2 = await service.submitHtlcResult(q2.id, { attachments: [] }, "w2", "test-oracle");
@@ -128,6 +130,7 @@ describe("Attack: Race Conditions & Timing", () => {
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
 
     // Query is now "processing" — requester cancels
     const cancel = service.cancelQuery(query.id);
@@ -153,6 +156,7 @@ describe("Attack: Race Conditions & Timing", () => {
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
 
     // Wait a tick to ensure expiry
     await new Promise(r => setTimeout(r, 5));
@@ -182,6 +186,7 @@ describe("Attack: Race Conditions & Timing", () => {
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
 
     await new Promise(r => setTimeout(r, 5));
     service.expireQueries();
@@ -246,6 +251,7 @@ describe("Attack: Oracle Manipulation", () => {
     );
     service.recordQuote(q1.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    service.beginWork(q1.id);
 
     const outcome1 = await service.submitHtlcResult(q1.id, { attachments: [] }, "w1", "flip-oracle");
     expect(outcome1.ok).toBe(false);
@@ -261,6 +267,7 @@ describe("Attack: Oracle Manipulation", () => {
     );
     service2.recordQuote(q2.id, { worker_pubkey: "w2", quote_event_id: "e2", received_at: Date.now() });
     await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
+    service2.beginWork(q2.id);
 
     const outcome2 = await service2.submitHtlcResult(q2.id, { attachments: [] }, "w2", "test-oracle");
     expect(outcome2.ok).toBe(true);
@@ -290,6 +297,7 @@ describe("Attack: Oracle Manipulation", () => {
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
 
     const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "oracle-pass");
     // 1 pass out of 3, need 2 — rejected
@@ -319,6 +327,7 @@ describe("Attack: Oracle Manipulation", () => {
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
 
     // Pass a nonexistent oracle ID
     const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "nonexistent-oracle");
@@ -407,6 +416,7 @@ describe("Attack: Cross-Query", () => {
     );
     service.recordQuote(qA.id, { worker_pubkey: "worker_a", quote_event_id: "eA", received_at: Date.now() });
     await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
+    service.beginWork(qA.id);
 
     // Create query B with worker_b
     const { htlcInfo: htlcInfoB, entry: entryB } = makeHtlcInfo(preimageStore);
@@ -416,6 +426,7 @@ describe("Attack: Cross-Query", () => {
     );
     service.recordQuote(qB.id, { worker_pubkey: "worker_b", quote_event_id: "eB", received_at: Date.now() });
     await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));
+    service.beginWork(qB.id);
 
     // Worker A tries to submit result on query B
     const outcome = await service.submitHtlcResult(qB.id, { attachments: [] }, "worker_a", "test-oracle");

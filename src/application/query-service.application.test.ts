@@ -192,6 +192,7 @@ describe("Application Service — HTLC lifecycle", () => {
 
     // Select worker (no token verification in mock)
     const selectOutcome = await svc.selectWorker(query.id, "worker1");
+    svc.beginWork(query.id);
     expect(selectOutcome.ok).toBe(true);
     expect(svc.getQuery(query.id)?.status).toBe("processing");
 
@@ -214,6 +215,7 @@ describe("Application Service — HTLC lifecycle", () => {
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
@@ -225,6 +227,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     const recordOutcome = svc.recordResult(query.id, defaultResult, "w1");
     expect(recordOutcome.ok).toBe(true);
@@ -240,6 +243,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
     svc.recordResult(query.id, defaultResult, "w1");
 
     const outcome = svc.completeVerification(query.id, false);
@@ -260,6 +264,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, { ...htlcOptions(), ttlMs: 1 });
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     await new Promise((r) => setTimeout(r, 5));
     const expired = svc.expireQueries();
@@ -280,6 +285,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     const outcome = await svc.submitHtlcResult(query.id, defaultResult, "wrong_worker");
     expect(outcome.ok).toBe(false);

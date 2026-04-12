@@ -31,7 +31,8 @@ export const MIN_HTLC_LOCKTIME_SECS = 600;
 
 /** Valid state transitions for escrow (HTLC) queries. */
 export const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_quotes: ["processing"],
+  awaiting_quotes: ["worker_selected"],
+  worker_selected: ["processing"],
   processing: ["verifying"],
   verifying: ["approved", "rejected"],
 };

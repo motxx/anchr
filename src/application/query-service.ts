@@ -8,6 +8,7 @@ import type { EscrowProvider } from "./escrow-port";
 import type { ProofDelivery } from "./proof-delivery";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
 import {
+  doBeginWork,
   doCancelQuery,
   doCompleteVerification,
   doCreateQuery,
@@ -125,8 +126,10 @@ export interface QueryService {
 
   /** Record a Worker quote for an HTLC query. */
   recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
-  /** Select a Worker and transition to worker_selected/processing. */
+  /** Select a Worker and transition to worker_selected. */
   selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<HtlcOutcome>;
+  /** Worker acknowledges selection and begins work (worker_selected → processing). */
+  beginWork(queryId: string): HtlcOutcome;
   /** Record a Worker's result submission (transition to verifying). */
   recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
   /** Complete Oracle verification (transition to approved/rejected). */
@@ -171,6 +174,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     clearQueryStore: () => store.clear(),
     recordQuote: (queryId, quote) => doRecordQuote(store, queryId, quote),
     selectWorker: (queryId, wp, ht) => doSelectWorker(svcDeps, queryId, wp, ht),
+    beginWork: (queryId) => doBeginWork(store, queryId),
     recordResult: (queryId, result, wp, bk) => doRecordResult(store, queryId, result, wp, bk),
     completeVerification: (queryId, passed, oId) => doCompleteVerification(store, queryId, passed, oId),
     submitHtlcResult: (queryId, result, wp, oId, bk) => doSubmitHtlcResult(svcDeps, queryId, result, wp, oId, bk),

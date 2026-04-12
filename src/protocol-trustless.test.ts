@@ -175,6 +175,7 @@ describe("NUT-07: Requester cannot revoke payment", () => {
     const validToken = makeFakeToken(100);
     const accepted = await service.selectWorker(query.id, "w1", validToken);
     expect(accepted.ok).toBe(true);
+    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
   });
 
   test("invalid escrow token is rejected at worker selection", async () => {
@@ -254,6 +255,8 @@ describe("NUT-11: Timeout refund", () => {
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
+    service.beginWork(query.id);
 
     // Submit invalid proof → rejected
     const outcome = await service.submitHtlcResult(
@@ -310,6 +313,7 @@ describe("Worker impersonation prevention", () => {
     const outcome = await service.selectWorker(query.id, "other_worker");
     expect(outcome.ok).toBe(true);
     // But HTLC token is now locked to other_worker ��� legit_worker can't redeem
+    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
     expect(service.getQuery(query.id)?.htlc?.worker_pubkey).toBe("other_worker");
   });
 });
@@ -357,6 +361,8 @@ describe("Oracle + Requester collusion limits", () => {
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
+    service.beginWork(query.id);
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -387,6 +393,8 @@ describe("Oracle + Requester collusion limits", () => {
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    service.beginWork(query.id);
+    service.beginWork(query.id);
 
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -493,6 +501,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     });
 
     await service.selectWorker(query.id, "w1");
+    // second selectWorker should fail on worker_selected state
     const second = await service.selectWorker(query.id, "w2");
 
     expect(second.ok).toBe(false);

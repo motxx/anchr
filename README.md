@@ -308,7 +308,8 @@ curl -X POST localhost:3000/queries \
 | `GET` | `/queries/all` | List all queries (any status) |
 | `GET` | `/queries/:id` | Query detail |
 | `POST` | `/queries/:id/quotes` | Worker submits quote |
-| `POST` | `/queries/:id/select` | Select Worker + verify escrow |
+| `POST` | `/queries/:id/select` | Select Worker + verify escrow (→ worker_selected) |
+| `POST` | `/queries/:id/begin` | Worker acknowledges selection (→ processing) |
 | `POST` | `/queries/:id/result` | Submit proof (verification + settlement) |
 | `POST` | `/queries/:id/upload` | Upload photo (multipart) |
 | `POST` | `/queries/:id/cancel` | Cancel query |
