@@ -57,7 +57,7 @@
     "test:e2e": "deno test e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:frost": "deno test e2e/frost-threshold.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:relay": "NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts e2e/core-flow.test.ts --allow-env --allow-read --allow-net --allow-run",
+    "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts e2e/core-flow.test.ts e2e/conditional-swap.test.ts --allow-env --allow-read --allow-net --allow-run",
     "test:ci": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'",
     "test:example": "deno test --allow-all example/",
     "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
