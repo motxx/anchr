@@ -19,6 +19,7 @@ import type { OracleAttestation } from "../../domain/oracle-types";
 import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../preimage/preimage-store";
 import { createFrostCoordinator, type FrostCoordinator } from "../frost/coordinator";
 import type { ThresholdOracleConfig } from "../../domain/oracle-types";
+import type { FrostNodeConfig } from "../frost/config.ts";
 
 // Timing-safe API key comparison following Cloudflare's recommended pattern.
 // When lengths differ, compare the input against itself to maintain constant time
@@ -46,6 +47,8 @@ export interface OracleAppOptions {
   frostCoordinator?: FrostCoordinator;
   /** FROST threshold oracle config. */
   frostConfig?: ThresholdOracleConfig;
+  /** Per-node FROST config (loaded from DKG-generated JSON). */
+  frostNodeConfig?: FrostNodeConfig;
 }
 
 export function buildOracleApp(
@@ -61,6 +64,8 @@ export function buildOracleApp(
   const preimageStore = opts.preimageStore ?? createPreimageStore();
   const frostCoordinator = opts.frostCoordinator ?? createFrostCoordinator();
   const frostConfig = opts.frostConfig;
+  const frostNodeConfig = opts.frostNodeConfig;
+  const pendingNonces = new Map<string, string>();
 
   // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
@@ -187,6 +192,43 @@ export function buildOracleApp(
     verifiedQueries.delete(body.query_id);
 
     return c.json({ query_id: body.query_id, preimage });
+  });
+
+  // --- FROST Signer endpoints (called by peer Oracle nodes during signing) ---
+
+  /** POST /frost/signer/round1 — Generate nonce commitments for a signing session. */
+  app.post("/frost/signer/round1", authMiddleware, async (c) => {
+    const body = await c.req.json<{ message: string }>().catch(() => null);
+    if (!body?.message) return c.json({ error: "Missing message" }, 400);
+    if (!frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
+
+    const { signRound1 } = await import("../frost/frost-cli.ts");
+    const keyPackageJson = JSON.stringify(frostNodeConfig.key_package);
+    const result = await signRound1(keyPackageJson);
+    if (!result.ok) return c.json({ error: result.error }, 500);
+
+    // Store nonces for round 2 (keyed by message to handle concurrent sessions)
+    pendingNonces.set(body.message, JSON.stringify(result.data!.nonces));
+
+    return c.json({ commitments: result.data!.commitments });
+  });
+
+  /** POST /frost/signer/round2 — Produce signature share using stored nonces. */
+  app.post("/frost/signer/round2", authMiddleware, async (c) => {
+    const body = await c.req.json<{ commitments: string; message: string }>().catch(() => null);
+    if (!body?.commitments || !body?.message) return c.json({ error: "Missing commitments or message" }, 400);
+    if (!frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
+
+    const nonces = pendingNonces.get(body.message);
+    if (!nonces) return c.json({ error: "No pending nonces for this message" }, 409);
+
+    const { signRound2 } = await import("../frost/frost-cli.ts");
+    const keyPackageJson = JSON.stringify(frostNodeConfig.key_package);
+    const result = await signRound2(keyPackageJson, nonces, body.commitments, body.message);
+    pendingNonces.delete(body.message); // consume nonces
+
+    if (!result.ok) return c.json({ error: result.error }, 500);
+    return c.json({ signature_share: result.data!.signature_share });
   });
 
   // --- FROST Threshold Signing API ---
@@ -380,10 +422,28 @@ if (import.meta.main) {
     ? createPersistentPreimageStore(preimageDbPath)
     : undefined;
 
+  // Load FROST config if available
+  let frostNodeConfig: FrostNodeConfig | undefined;
+  let frostConfig: ThresholdOracleConfig | undefined;
+  const frostConfigPath = process.env.FROST_CONFIG_PATH?.trim();
+  if (frostConfigPath) {
+    try {
+      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../frost/config.ts");
+      frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
+      frostConfig = toThresholdOracleConfig(frostNodeConfig);
+      console.log(`[oracle-server] FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
+    } catch (e) {
+      console.error(`[oracle-server] Failed to load FROST config from ${frostConfigPath}:`, e);
+    }
+  }
+
   const app = buildOracleApp({
     oracleId: ORACLE_ID,
     apiKey: ORACLE_API_KEY,
     preimageStore,
+    frostCoordinator: frostConfig ? createFrostCoordinator() : undefined,
+    frostConfig,
+    frostNodeConfig,
   });
 
   if (preimageDbPath) {

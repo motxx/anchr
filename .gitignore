@@ -55,6 +55,9 @@ mobile/android/
 mobile/node_modules/
 .gstack/
 
+# frost DKG key material
+.frost/
+
 # rust
 crates/*/target/
 test-results
