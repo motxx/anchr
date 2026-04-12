@@ -34,17 +34,22 @@ result.proof;       // TLSNotary presentation (independently verifiable)
 
 Anchr separates concerns into pluggable layers. Each layer has a current implementation, but the protocol does not depend on it.
 
-| Layer | Role | Current Implementation | Swappable? |
-|-------|------|----------------------|------------|
-| **Payment** | Escrow + atomic settlement | Cashu (NUT-11 P2PK, NUT-14 HTLC) | Yes — any escrow with hashlock or multisig |
-| **Oracle** | Verify proofs, release payment | TLSNotary (web), C2PA (photos) | Yes — any deterministic verification |
-| **Messaging** | Broadcast queries, deliver results | Nostr (NIP-90 DVM) | Yes — any pub/sub with encryption |
-| **Storage** | Store encrypted blobs | Blossom | Yes — any content-addressed storage |
-| **Threshold Signing** | Multi-Oracle consensus | FROST (BIP-340 Schnorr) | Yes — any threshold signature scheme |
+| Layer | Role | Current | Future candidates |
+|-------|------|---------|-------------------|
+| **Payment** | Escrow + atomic settlement | Cashu (NUT-11 P2PK, NUT-14 HTLC) | Fedimint, Lightning PTLC, DLC (Bitcoin L1) |
+| **Web Verification** | Prove HTTPS responses | TLSNotary (MPC-TLS) | Reclaim Protocol, zkPass, Opacity, DECO |
+| **Photo Verification** | Prove real-world captures | C2PA + GPS | TEE attestations, ProofMode |
+| **Messaging** | Broadcast queries, deliver results | Nostr (NIP-90 DVM) | HTTP-only mode, libp2p |
+| **Storage** | Store encrypted blobs | Blossom | IPFS, Arweave |
+| **Threshold Signing** | Multi-Oracle consensus | FROST (BIP-340 Schnorr) | MuSig2, ROAST |
 
 ### Why Agnostic?
 
-Payment rails change. Verification methods evolve. Communication protocols come and go. Anchr's security guarantees come from the protocol structure (escrow + verification + atomic settlement), not from any specific technology choice. Binding to one stack would limit adoption and create single points of failure.
+Anchr's security comes from the protocol structure (escrow + verification + atomic settlement), not from any specific technology. The `EscrowProvider` interface abstracts the payment layer. The `verify()` interface abstracts the proof system. Swapping Cashu for Fedimint, or TLSNotary for another zkTLS provider, requires implementing an adapter — not changing the protocol.
+
+**Payment agnosticism** matters because escrow needs differ by context. Cashu is fast and private but trusts the Mint. DLC removes Mint trust entirely by locking BTC on L1. Lightning PTLC replaces hash-preimage with Schnorr adaptor signatures, which maps naturally to FROST group signatures. Fedimint adds federation-level trust distribution. Each has tradeoffs. The protocol should not prescribe the choice.
+
+**zkTLS agnosticism** matters because web proof technology is evolving rapidly. TLSNotary uses MPC-TLS where a Verifier co-signs the session. Other approaches (Reclaim, zkPass, Opacity) use different techniques — TEEs, ZK circuits, proxy architectures — but all produce the same fundamental output: a proof that a specific server returned specific data. Anchr's Oracle layer accepts any proof format that satisfies the `verify()` interface.
 
 ## Security Model
 
@@ -212,9 +217,16 @@ awaiting_quotes → processing → verifying → approved  (payment released)
 
 ## Verification Modes
 
-### Web Data — TLSNotary
+### Web Data — zkTLS
 
-Prove what any HTTPS server returned. Workers fetch the URL through a Multi-Party Computation TLS session. The Verifier Server co-signs the session without seeing the plaintext. The Worker cannot alter the response.
+Prove what any HTTPS server returned. The current implementation uses TLSNotary (MPC-TLS), where a Verifier co-signs the TLS session without seeing the plaintext. The protocol is designed to support other zkTLS providers (Reclaim, zkPass, Opacity, DECO) through the same `verify()` interface.
+
+| Provider | Technique | Status |
+|----------|-----------|--------|
+| TLSNotary | MPC-TLS (Verifier holds independent key share) | Implemented |
+| Reclaim Protocol | HTTPS proxy + ZK proofs | Planned |
+| zkPass | TEE + ZK circuits | Planned |
+| Opacity Network | MPC-TLS (alternative implementation) | Planned |
 
 ### Real-World Photos — C2PA
 
@@ -222,9 +234,9 @@ Prove what a location looks like right now. Workers photograph with a C2PA-signe
 
 | Use Case | Verification | Example |
 |----------|-------------|---------|
-| Price oracle (DeFi) | TLSNotary | BTC/ETH price from CoinGecko, Binance |
-| Flight status (insurance) | TLSNotary | Flight delay proof for parametric claims |
-| API response proof | TLSNotary | Any HTTPS API returned specific data |
+| Price oracle (DeFi) | zkTLS | BTC/ETH price from CoinGecko, Binance |
+| Flight status (insurance) | zkTLS | Flight delay proof for parametric claims |
+| API response proof | zkTLS | Any HTTPS API returned specific data |
 | Location check | C2PA + GPS | Photograph a store, intersection, event |
 | Combined proof | Both | Photo of a price tag + API price verification |
 
@@ -407,25 +419,31 @@ deno task test            # everything
 
 ## Roadmap
 
-Anchr's agnostic design enables expansion across all protocol layers.
+Each adapter implements an existing interface (`EscrowProvider`, `verify()`, etc.). No protocol changes required.
 
-| Layer | Current | Planned |
-|-------|---------|---------|
-| **Payment** | Cashu HTLC | DLC (Discreet Log Contracts) on Bitcoin L1, Lightning HODL invoices |
-| **Oracle** | TLSNotary, C2PA | zkTLS, TEE attestations, zkProofs |
-| **Messaging** | Nostr | HTTP-only mode, libp2p |
-| **Threshold** | FROST (BIP-340) | MuSig2, ROAST |
-| **Storage** | Blossom | IPFS, Arweave |
+### Payment Layer
 
-### DLC Integration
+| Adapter | Technique | What it enables | Interface |
+|---------|-----------|----------------|-----------|
+| **Cashu** | Chaumian eCash HTLC | Fast, private, Lightning-backed (current) | `EscrowProvider` |
+| **Fedimint** | Federated eCash | Distributed Mint trust across a federation | `EscrowProvider` |
+| **Lightning PTLC** | Schnorr adaptor signatures | Native LN settlement. FROST group signature = adaptor secret | `EscrowProvider` |
+| **DLC** | Bitcoin L1 scripts | No Mint trust. Oracle attestation unlocks on-chain output | `EscrowProvider` |
 
-Anchr Oracles already produce deterministic attestations — the same structure DLC contracts consume. A DLC adapter would allow:
+**DLC** is particularly interesting: Anchr Oracles already produce deterministic attestations — the same structure DLC contracts consume. A `DlcEscrowProvider` would lock BTC in a DLC output. Oracle attestation directly unlocks the contract on Bitcoin L1, removing the Cashu Mint as a trust assumption entirely.
 
-- **Bitcoin L1 escrow**: Lock BTC in a DLC output instead of Cashu. Oracle attestation directly unlocks the contract.
-- **No Mint trust**: Removes the Cashu Mint as a trust assumption entirely.
-- **Composability**: Anchr attestations become reusable DLC oracle feeds for any contract.
+**Lightning PTLC** maps naturally to FROST: the group signature serves as the adaptor secret that completes the PTLC. This enables atomic settlement over Lightning without a preimage intermediary.
 
-The Oracle's `verify()` → attestation pipeline is already DLC-compatible. The missing piece is a `DlcEscrowProvider` that implements the `EscrowProvider` interface using DLC outputs instead of Cashu tokens.
+### zkTLS Providers
+
+| Provider | Technique | Status |
+|----------|-----------|--------|
+| **TLSNotary** | MPC-TLS (Verifier holds independent key share) | Implemented |
+| **Reclaim Protocol** | HTTPS proxy + ZK proofs | Planned |
+| **zkPass** | TEE + ZK circuits | Planned |
+| **Opacity Network** | MPC-TLS (alternative implementation) | Planned |
+
+All produce the same fundamental output: a proof that a specific server returned specific data. Anchr's `verify()` interface accepts any proof format — adding a new provider means implementing a verifier adapter, not changing the protocol.
 
 ## Configuration
 
