@@ -179,6 +179,7 @@ export function doCreateQuery(
     tlsn_requirements: input.tlsn_requirements,
     quorum: options?.quorum,
     visibility: input.visibility,
+    oracle_mode: options?.oracleMode,
   };
 
   deps.store.set(query.id, query);

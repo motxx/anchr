@@ -15,7 +15,7 @@
  *   status=success/error     → Completion feedback
  */
 
-import type { TlsnEncryptedContext, VerificationFactor } from "../../domain/types";
+import type { OracleMode, TlsnEncryptedContext, VerificationFactor } from "../../domain/types";
 import { deriveConversationKey, decryptNip44 } from "./encryption";
 
 // NIP-90 DVM event kinds for Anchr.
@@ -44,6 +44,8 @@ export interface QueryRequestPayload {
   oracle_ids?: string[];
   /** Verification factors requested by the Requester. */
   verification_requirements?: readonly VerificationFactor[];
+  /** Oracle verification mode: "anchr_solo" (default) or "frost_2of3". */
+  oracle_mode?: OracleMode;
   expires_at: number;
 }
 
