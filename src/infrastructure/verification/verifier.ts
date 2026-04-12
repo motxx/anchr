@@ -38,6 +38,7 @@ const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
 interface CheckAccumulator {
   checks: string[];
   failures: string[];
+  warnings: string[];
 }
 
 function verifyEmptySubmission(
@@ -140,12 +141,13 @@ function applyAiContentResult(
   if (aiResult.passed) {
     acc.checks.push(`AI content check passed: ${aiResult.reason}`);
   } else {
-    acc.failures.push(`AI content check failed: ${aiResult.reason}`);
+    // AI check is advisory (non-deterministic) — route to warnings, not failures
+    acc.warnings.push(`AI content check failed: ${aiResult.reason}`);
   }
 }
 
 export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
-  const acc: CheckAccumulator = { checks: [], failures: [] };
+  const acc: CheckAccumulator = { checks: [], failures: [], warnings: [] };
   let tlsnVerifiedData: TlsnVerifiedData | undefined;
   const maxGpsDist = query.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
 
@@ -175,6 +177,7 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
     passed: acc.failures.length === 0,
     checks: acc.checks,
     failures: acc.failures,
+    warnings: acc.warnings.length > 0 ? acc.warnings : undefined,
     tlsn_verified: tlsnVerifiedData,
   };
 }

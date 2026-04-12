@@ -8,6 +8,7 @@ import {
   cancelQuery,
   addQuote,
   selectWorker,
+  beginWork,
   recordResult,
   completeVerification,
   MIN_HTLC_LOCKTIME_SECS,
@@ -482,10 +483,10 @@ describe("addQuote", () => {
 // --- HTLC: selectWorker ---
 
 describe("selectWorker", () => {
-  test("transitions awaiting_quotes → processing", () => {
+  test("transitions awaiting_quotes → worker_selected", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", {}));
-    expect(q.status).toBe("processing");
+    expect(q.status).toBe("worker_selected");
     expect(q.htlc?.worker_pubkey).toBe("worker_pub");
   });
 
@@ -655,7 +656,7 @@ describe("completeVerification", () => {
 // --- Full HTLC lifecycle ---
 
 describe("HTLC full lifecycle", () => {
-  test("awaiting_quotes → processing → verifying → approved", () => {
+  test("awaiting_quotes → worker_selected → processing → verifying → approved", () => {
     const q0 = makeHtlcQuery();
     expect(q0.status).toBe("awaiting_quotes");
 
@@ -666,9 +667,12 @@ describe("HTLC full lifecycle", () => {
     }));
 
     const q2 = expectOk(selectWorker(q1, "w1", {}));
-    expect(q2.status).toBe("processing");
+    expect(q2.status).toBe("worker_selected");
 
-    const q3 = expectOk(recordResult(q2, defaultResult, "w1"));
+    const q2b = expectOk(beginWork(q2));
+    expect(q2b.status).toBe("processing");
+
+    const q3 = expectOk(recordResult(q2b, defaultResult, "w1"));
     expect(q3.status).toBe("verifying");
 
     const q4 = expectOk(completeVerification(q3, true, passedVerification, "oracle1"));
@@ -676,11 +680,12 @@ describe("HTLC full lifecycle", () => {
     expect(q4.payment_status).toBe("released");
   });
 
-  test("awaiting_quotes → processing → verifying → rejected", () => {
+  test("awaiting_quotes → worker_selected → processing → verifying → rejected", () => {
     const q0 = makeHtlcQuery();
     const q1 = expectOk(addQuote(q0, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() }));
     const q2 = expectOk(selectWorker(q1, "w1", {}));
-    const q3 = expectOk(recordResult(q2, defaultResult, "w1"));
+    const q2b = expectOk(beginWork(q2));
+    const q3 = expectOk(recordResult(q2b, defaultResult, "w1"));
     const q4 = expectOk(completeVerification(q3, false, failedVerification));
     expect(q4.status).toBe("rejected");
     expect(q4.payment_status).toBe("cancelled");

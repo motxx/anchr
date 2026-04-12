@@ -177,7 +177,7 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
   return { ok: true, query: { ...query, quotes } };
 }
 
-/** Select a worker and transition awaiting_quotes → processing. */
+/** Select a worker and transition awaiting_quotes → worker_selected. */
 export function selectWorker(
   query: Query,
   workerPubkey: string,
@@ -186,7 +186,7 @@ export function selectWorker(
   if (query.htlc === undefined) {
     return { ok: false, error: "Not an HTLC query" };
   }
-  if (!isValidTransition(query.status, "processing", true)) {
+  if (!isValidTransition(query.status, "worker_selected", true)) {
     return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
   }
 
@@ -200,10 +200,24 @@ export function selectWorker(
     ok: true,
     query: {
       ...query,
-      status: "processing",
+      status: "worker_selected",
       htlc,
       payment_status: htlcUpdates.escrow_token ? "htlc_swapped" : query.payment_status,
     },
+  };
+}
+
+/** Worker acknowledges selection and begins work (worker_selected → processing). */
+export function beginWork(query: Query): TransitionResult {
+  if (query.htlc === undefined) {
+    return { ok: false, error: "Not an HTLC query" };
+  }
+  if (!isValidTransition(query.status, "processing", true)) {
+    return { ok: false, error: `Query is ${query.status}, not worker_selected` };
+  }
+  return {
+    ok: true,
+    query: { ...query, status: "processing" },
   };
 }
 

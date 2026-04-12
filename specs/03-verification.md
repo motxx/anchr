@@ -28,6 +28,8 @@ Oracle
 
 A Requester specifies which factors to verify:
 
+### Cryptographic Factors (deterministic)
+
 | Factor | Description |
 |--------|-------------|
 | `tlsn` | TLSNotary web proof |
@@ -35,7 +37,16 @@ A Requester specifies which factors to verify:
 | `nonce` | Challenge nonce visible in photo |
 | `timestamp` | Timestamp freshness |
 | `oracle` | Oracle-level attestation |
-| `ai_check` | AI-based content analysis |
+
+These factors are deterministic: given the same proof and conditions, any honest Oracle produces the same result. Failures in these factors gate payment (cause `passed = false`).
+
+### Advisory Factors (non-deterministic)
+
+| Factor | Description |
+|--------|-------------|
+| `ai_check` | AI-based content analysis (LLM) |
+
+Advisory factors are inherently non-deterministic. Different Oracles may produce different results for the same input. Advisory failures produce `warnings` rather than `failures` — they do not gate payment release. This ensures that threshold Oracle consensus is not broken by LLM non-determinism.
 
 Default: `["gps", "ai_check"]` (for photo queries).
 
@@ -111,13 +122,13 @@ Before publishing, the following are enforced:
 
 ## zkTLS Agnosticism
 
-TLSNotary is the current implementation. The protocol supports any zkTLS provider that produces a proof of "server X returned data Y":
+The Oracle's `verify()` interface accepts any proof format that demonstrates "server X returned data Y." TLSNotary is the only implemented provider. Other approaches are known but have no adapter in the current codebase.
 
-| Provider | Technique |
-|----------|-----------|
-| TLSNotary | MPC-TLS (Verifier holds independent key share) |
-| Reclaim Protocol | HTTPS proxy + ZK proofs |
-| zkPass | TEE + ZK circuits |
-| Opacity Network | MPC-TLS (alternative implementation) |
+| Provider | Technique | Status |
+|----------|-----------|--------|
+| TLSNotary | MPC-TLS (Verifier holds independent key share) | Implemented |
+| Reclaim Protocol | HTTPS proxy + ZK proofs | No adapter yet |
+| zkPass | TEE + ZK circuits | No adapter yet |
+| Opacity Network | MPC-TLS (alternative implementation) | No adapter yet |
 
-Adding a new provider means implementing a verifier adapter for the `verify()` interface.
+Adding a new provider means implementing a verifier adapter for the `verify()` interface. The protocol itself does not change.

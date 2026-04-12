@@ -7,7 +7,8 @@ const SIMPLE_TRANSITIONS: Record<string, QueryStatus[]> = {
 
 /** Valid state transitions for HTLC queries. */
 const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_quotes: ["processing", "expired"],
+  awaiting_quotes: ["worker_selected", "expired"],
+  worker_selected: ["processing", "expired"],
   processing: ["verifying", "expired"],
   verifying: ["approved", "rejected", "expired"],
 };

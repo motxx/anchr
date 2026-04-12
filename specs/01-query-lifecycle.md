@@ -9,7 +9,8 @@ A query represents a request for verified data. This spec defines the query stat
 | State | Description |
 |-------|-------------|
 | `awaiting_quotes` | Query posted, waiting for Worker quotes |
-| `processing` | Worker selected, proof production in progress |
+| `worker_selected` | Requester selected a Worker, escrow bound, awaiting Worker acknowledgment |
+| `processing` | Worker acknowledged, proof production in progress |
 | `verifying` | Proof submitted, Oracle verification in progress |
 | `approved` | Verification passed, payment released (terminal) |
 | `rejected` | Verification failed (terminal) |
@@ -22,19 +23,21 @@ For simple (non-escrow) queries, an additional `pending` state exists with direc
 ### HTLC Queries (escrow-backed)
 
 ```
-awaiting_quotes --> processing --> verifying --> approved
-                        |              |
-                        v              v
-                     expired        rejected
-                                      |
-                                      v
-                                   expired
+awaiting_quotes --> worker_selected --> processing --> verifying --> approved
+        |                  |                |              |
+        v                  v                v              v
+     expired            expired          expired        rejected
+                                                          |
+                                                          v
+                                                       expired
 ```
 
 | From | To | Trigger |
 |------|----|---------|
-| `awaiting_quotes` | `processing` | Requester selects a Worker |
+| `awaiting_quotes` | `worker_selected` | Requester selects a Worker, binds escrow |
 | `awaiting_quotes` | `expired` | Locktime reached |
+| `worker_selected` | `processing` | Worker acknowledges selection and begins work |
+| `worker_selected` | `expired` | Locktime reached |
 | `processing` | `verifying` | Worker submits proof |
 | `processing` | `expired` | Locktime reached |
 | `verifying` | `approved` | Oracle verification passes |

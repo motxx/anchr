@@ -38,7 +38,7 @@ Adding a new provider (e.g., replacing Cashu with Fedimint, or TLSNotary with an
 1. **Atomicity**: Proof and payment are exchanged in a single atomic step. Either both succeed or neither does.
 2. **Non-repudiation**: Once the Worker produces a valid proof, the Oracle cannot deny it (especially with proof publication — see Spec 03).
 3. **Timeout safety**: If no valid proof is submitted before locktime, escrow refunds to the Requester automatically.
-4. **Verification determinism**: Given the same proof and conditions, any honest Oracle produces the same result.
+4. **Cryptographic determinism**: Given the same proof and conditions, any honest Oracle produces the same result for cryptographic checks (`tlsn`, `gps`, `nonce`, `timestamp`, `oracle`). Advisory factors (`ai_check`) are non-deterministic and produce warnings rather than hard failures — see Spec 03.
 
 ## Protocol Flow (Summary)
 

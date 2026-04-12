@@ -143,6 +143,8 @@ export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
+  /** Advisory warnings (e.g., ai_check) — informational, do not gate payment. */
+  warnings?: string[];
   /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
   tlsn_verified?: TlsnVerifiedData;
 }

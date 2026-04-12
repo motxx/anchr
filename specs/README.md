@@ -16,6 +16,7 @@ These specifications define the protocol behavior. Anyone may implement them.
 | [05](05-messaging.md) | Messaging | Nostr DVM (NIP-90), event kinds, payloads |
 | [06](06-storage.md) | Storage | Blossom, E2E encryption, blob lifecycle |
 | [07](07-conditional-swap.md) | Conditional Swap | N:M primitive, binary outcomes, prediction markets |
+| [08](08-oracle-registry.md) | Oracle Registry | Nostr-based discovery, announcements, capabilities |
 
 ## License
 

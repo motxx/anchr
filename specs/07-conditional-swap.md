@@ -74,6 +74,56 @@ pending --> locked --> settled_a  (outcome A won)
                   --> expired    (locktime reached)
 ```
 
+## Matching Layer
+
+### Coordinator
+
+A Coordinator maintains an order book and proposes matches. The Coordinator can be a market maker, a relay operator, or a self-hosted service.
+
+The Coordinator is NOT trusted with funds. It cannot steal tokens because escrow conditions are bound to hash preimages that only the Oracle controls. The Coordinator is a convenience layer for pairing participants.
+
+### Order Book
+
+The order book collects open orders from participants:
+
+| Field | Description |
+|-------|-------------|
+| `id` | Unique order identifier |
+| `market_id` | Which swap/market this order belongs to |
+| `side` | `yes` (outcome A) or `no` (outcome B) |
+| `pubkey` | Participant's public key |
+| `amount_sats` | Total amount to bet |
+| `remaining_sats` | Amount not yet matched |
+| `timestamp` | Order creation time |
+
+Operations:
+- `addOrder(order)` — add to the book
+- `cancelOrder(id)` — remove before matching
+- `getOpenOrders(market_id, side?)` — list open orders
+- `matchOrders(market_id)` — run matching algorithm
+
+### Matching Algorithm
+
+The default algorithm is greedy FIFO: earliest orders are matched first. For each YES/NO pair:
+
+1. Take the earliest unmatched YES order and earliest unmatched NO order.
+2. Match amount = `min(yes.remaining_sats, no.remaining_sats)`.
+3. Produce a `MatchProposal { yes_order_id, no_order_id, amount_sats }`.
+4. Reduce `remaining_sats` on both orders.
+5. Orders with `remaining_sats > 0` stay in the book (partial fill).
+
+Other algorithms (pro-rata, CLOB) are permitted — the protocol does not prescribe the matching strategy.
+
+### Match Execution
+
+For each `MatchProposal`, the Coordinator:
+
+1. Collects Cashu proofs from both parties.
+2. Creates cross-HTLC tokens via `createSwapPairTokens` (see Token Locking above).
+3. Returns the locked `SwapPair` to both parties.
+
+Both parties can verify match fairness by checking that their locked amount matches the proposal and that escrow conditions reference the correct hashes and pubkeys.
+
 ## Relationship to Core Protocol
 
 The 1:1 bounty query (Specs 00-06) is the special case where N=1, M=1. The conditional swap extends this to N:M by:

@@ -132,6 +132,29 @@ After Oracle verification:
 
 All sensitive payloads are encrypted using NIP-44 (versioned encryption). Point-to-point messages (e.g., preimage delivery, FROST shares) use NIP-44 direct messages between specific pubkeys.
 
+## Preimage Delivery Reliability
+
+The preimage is the most critical message in the protocol. If the Worker completed valid work but never receives the preimage, they cannot redeem escrow. The following delivery strategy MUST be implemented:
+
+### Three-Tier Delivery
+
+1. **Primary**: Oracle sends preimage via NIP-44 DM to the Worker, published to multiple relays. The message MUST succeed on at least one relay before the preimage is deleted from the Oracle's store.
+
+2. **Retry**: If zero relays confirm, retry with exponential backoff (3 attempts: 2s, 4s, 8s). The Oracle MUST NOT delete the preimage until at least one delivery is confirmed.
+
+3. **Fallback (HTTP)**: The Oracle exposes an HTTP endpoint (`GET /oracle/preimage/:queryId`) where the Worker can poll for the preimage. The endpoint MUST authenticate the request by verifying the caller is the selected Worker (e.g., Nostr signature). The preimage is served only if the query is approved.
+
+### Worker-Side Behavior
+
+The Worker subscribes to NIP-44 DMs from the Oracle. If no preimage arrives within a configurable timeout (e.g., 30 seconds after proof submission), the Worker SHOULD poll the HTTP fallback endpoint.
+
+### Deletion Policy
+
+The Oracle MUST retain the preimage until at least one of the following is confirmed:
+- Relay delivery success (at least 1 relay acknowledged)
+- HTTP fetch by the Worker
+- Escrow redemption observed on the Cashu mint
+
 ## Transport Agnosticism
 
 Nostr is the current transport. The protocol design permits alternative transports (HTTP-only mode, libp2p) by implementing the same message lifecycle over a different medium.
