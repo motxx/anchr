@@ -125,6 +125,7 @@ describe("validateQueryInput", () => {
       expected_gps: { lat: 35.6, lon: 139.7 },
       max_gps_distance_km: 10,
       tlsn_requirements: { target_url: "https://example.com/api" },
+      visibility: "public",
     })).toBeNull();
   });
   test("empty description", () => {
@@ -179,7 +180,14 @@ describe("validateQueryInput", () => {
     expect(validateQueryInput({
       description: "Photo",
       tlsn_requirements: { target_url: "https://api.example.com/data" },
+      visibility: "requester_only",
     })).toBeNull();
+  });
+  test("tlsn_requirements without visibility", () => {
+    expect(validateQueryInput({
+      description: "Photo",
+      tlsn_requirements: { target_url: "https://api.example.com/data" },
+    })).toContain("visibility");
   });
 });
 

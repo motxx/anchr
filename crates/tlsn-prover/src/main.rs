@@ -70,6 +70,13 @@ struct Cli {
     /// Smaller values reduce MPC computation time. Set close to expected response size.
     #[arg(long, default_value_t = 4096)]
     max_recv_data: usize,
+
+    /// Header names to redact from the sent HTTP request (selective disclosure).
+    /// Values of these headers will not be revealed in the presentation.
+    /// Can be specified multiple times. Case-insensitive.
+    /// Example: --redact-sent-header authorization --redact-sent-header cookie
+    #[arg(long = "redact-sent-header")]
+    redact_sent_headers: Vec<String>,
 }
 
 async fn connect_target(host: &str, port: u16, socks_proxy: Option<&str>) -> Result<tokio::net::TcpStream> {
@@ -131,8 +138,8 @@ async fn main() -> Result<()> {
         run_with_local_verifier(&host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
     };
 
-    // Build presentation with full disclosure
-    let presentation = build_presentation(attestation, secrets)?;
+    // Build presentation (with optional selective disclosure)
+    let presentation = build_presentation(attestation, secrets, &cli.redact_sent_headers)?;
 
     // Save
     let bytes = bincode::serialize(&presentation)?;
@@ -993,15 +1000,103 @@ async fn run_verifier<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     Ok(())
 }
 
-fn build_presentation(attestation: Attestation, secrets: Secrets) -> Result<Presentation> {
+/// Parse the sent HTTP request to find byte ranges of header values that should be redacted.
+/// Returns a list of (start, end) byte ranges to EXCLUDE from reveal.
+fn find_header_value_ranges(sent_bytes: &[u8], redact_names: &[String]) -> Vec<std::ops::Range<usize>> {
+    if redact_names.is_empty() {
+        return vec![];
+    }
+
+    let sent_str = String::from_utf8_lossy(sent_bytes);
+    let mut redact_ranges = Vec::new();
+
+    // Headers are between the first \r\n (after request line) and \r\n\r\n
+    let header_start = match sent_str.find("\r\n") {
+        Some(pos) => pos + 2,
+        None => return vec![],
+    };
+    let header_end = match sent_str.find("\r\n\r\n") {
+        Some(pos) => pos,
+        None => sent_bytes.len(),
+    };
+
+    let header_section = &sent_str[header_start..header_end];
+    let mut offset = header_start;
+
+    for line in header_section.split("\r\n") {
+        if let Some(colon_pos) = line.find(':') {
+            let name = line[..colon_pos].trim();
+            let value_start_in_line = colon_pos + 1;
+            // Find where the actual value starts (skip leading space)
+            let value_with_space = &line[value_start_in_line..];
+            let trimmed_start = value_with_space.len() - value_with_space.trim_start().len();
+            let value_byte_start = offset + value_start_in_line + trimmed_start;
+            let value_byte_end = offset + line.len();
+
+            if redact_names.iter().any(|r| r.eq_ignore_ascii_case(name)) {
+                if value_byte_start < value_byte_end {
+                    redact_ranges.push(value_byte_start..value_byte_end);
+                    eprintln!("[tlsn-prove] Redacting header: {} (bytes {}..{})", name, value_byte_start, value_byte_end);
+                }
+            }
+        }
+        offset += line.len() + 2; // +2 for \r\n
+    }
+
+    redact_ranges
+}
+
+/// Compute reveal ranges by subtracting redact ranges from [0..total_len].
+fn subtract_ranges(total_len: usize, redact: &[std::ops::Range<usize>]) -> Vec<std::ops::Range<usize>> {
+    if redact.is_empty() {
+        return vec![0..total_len];
+    }
+
+    let mut sorted = redact.to_vec();
+    sorted.sort_by_key(|r| r.start);
+
+    let mut result = Vec::new();
+    let mut cursor = 0;
+
+    for range in &sorted {
+        if cursor < range.start {
+            result.push(cursor..range.start);
+        }
+        cursor = range.end.max(cursor);
+    }
+
+    if cursor < total_len {
+        result.push(cursor..total_len);
+    }
+
+    result
+}
+
+fn build_presentation(
+    attestation: Attestation,
+    secrets: Secrets,
+    redact_sent_headers: &[String],
+) -> Result<Presentation> {
     let transcript = secrets.transcript();
-    let sent_len = transcript.sent().len();
+    let sent_bytes = transcript.sent();
+    let sent_len = sent_bytes.len();
     let recv_len = transcript.received().len();
 
     let mut builder = secrets.transcript_proof_builder();
 
-    // Reveal all sent and received data
-    builder.reveal_sent(&(0..sent_len))?;
+    // Selective disclosure: redact specified header values from sent data
+    let redact_ranges = find_header_value_ranges(sent_bytes, redact_sent_headers);
+    if redact_ranges.is_empty() {
+        builder.reveal_sent(&(0..sent_len))?;
+    } else {
+        let reveal_ranges = subtract_ranges(sent_len, &redact_ranges);
+        for range in &reveal_ranges {
+            builder.reveal_sent(range)?;
+        }
+        eprintln!("[tlsn-prove] Selective disclosure: {} byte range(s) redacted from sent data", redact_ranges.len());
+    }
+
+    // Reveal all received data (response headers + body are public)
     builder.reveal_recv(&(0..recv_len))?;
 
     let transcript_proof = builder.build()?;

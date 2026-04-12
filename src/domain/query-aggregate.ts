@@ -85,6 +85,7 @@ export function createQueryAggregate(
     max_gps_distance_km: input.max_gps_distance_km,
     tlsn_requirements: input.tlsn_requirements,
     quorum: options.quorum,
+    visibility: input.visibility,
   };
 
   return { ok: true, query };

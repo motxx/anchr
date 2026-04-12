@@ -70,6 +70,7 @@ function handleCreateQuery(c: Context<any>, svc: QueryService, getUrl: () => str
     max_gps_distance_km: payload.max_gps_distance_km,
     verification_requirements: payload.verification_requirements,
     tlsn_requirements: payload.tlsn_requirements,
+    visibility: payload.visibility,
   };
 
   const query = svc.createQuery(input, {
@@ -88,7 +89,7 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
   const { svc, writeAuth, rateLimit } = ctx;
 
   app.get("/queries", (c) => handleListQueries(c, svc));
-  app.get("/queries/all", (c) => c.json(svc.listAllQueries().map(querySummary)));
+  app.get("/queries/all", writeAuth, (c) => c.json(svc.listAllQueries().map(querySummary)));
 
   app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
@@ -384,8 +385,8 @@ async function streamDockerLogs(
   return dockerProc;
 }
 
-export function registerLogRoutes(app: Hono) {
-  app.get("/logs/stream", (c) => {
+export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
+  app.get("/logs/stream", writeAuth, (c) => {
     let dockerProc: ReturnType<typeof spawn> | null = null;
     let unsubscribe: (() => void) | null = null;
     const encoder = new TextEncoder();

@@ -16,6 +16,7 @@ import type {
   BlossomKeyMap,
   HtlcInfo,
   HtlcSubmitOutcome,
+  OracleAttestationRecord,
   PaymentStatus,
   Query,
   QueryInput,
@@ -25,6 +26,7 @@ import type {
   QuoteInfo,
 } from "../domain/types";
 import { DEFAULT_VERIFICATION_FACTORS } from "../domain/types";
+import type { ProofDelivery } from "./proof-delivery";
 import { isCancellable, isExpirable } from "../domain/query-transitions";
 import type {
   CancelQueryOutcome,
@@ -39,6 +41,7 @@ export interface ServiceDeps {
   oracleResolver: OracleResolver;
   multiOracleResolver?: MultiOracleResolver;
   preimageStore?: PreimageStore;
+  proofDelivery?: ProofDelivery;
 }
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
@@ -54,6 +57,33 @@ function generateQueryId(): string {
   return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
 }
 
+/**
+ * Publish attestations to Nostr relays in parallel (best-effort).
+ * Awaited so published_proofs IDs can be stored, but failures
+ * do not affect the verification outcome.
+ */
+async function publishAttestations(
+  query: Query,
+  attestations: OracleAttestationRecord[],
+  proofDelivery: ProofDelivery,
+): Promise<string[]> {
+  if (query.visibility !== "public") return [];
+
+  const results = await Promise.allSettled(
+    attestations.map((att) => proofDelivery.publish(query, att, "public")),
+  );
+
+  const eventIds: string[] = [];
+  for (const r of results) {
+    if (r.status === "fulfilled" && r.value) {
+      eventIds.push(r.value.event_id);
+    } else if (r.status === "rejected") {
+      console.error(`[proof-publish] Attestation publish failed:`, r.reason);
+    }
+  }
+  return eventIds;
+}
+
 /** Shared: run oracle verification and build the finalized query record. */
 async function verifyAndFinalize(
   query: Query,
@@ -67,6 +97,17 @@ async function verifyAndFinalize(
   );
   const newStatus: QueryStatus = passed ? "approved" : "rejected";
   const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
+
+  // Publish attestations for public visibility queries (best-effort)
+  let publishedProofs: string[] | undefined;
+  if (deps.proofDelivery && query.visibility === "public" && attestations.length > 0) {
+    publishedProofs = await publishAttestations(query, attestations, deps.proofDelivery)
+      .catch((err) => {
+        console.error(`[proof-publish] Failed to publish attestations:`, err);
+        return undefined;
+      });
+  }
+
   const updated: Query = {
     ...query,
     status: newStatus,
@@ -74,6 +115,7 @@ async function verifyAndFinalize(
     verification,
     assigned_oracle_id: attestations[0]?.oracle_id,
     attestations: query.quorum ? attestations : undefined,
+    published_proofs: publishedProofs?.length ? publishedProofs : undefined,
   };
   return { passed, attestations, verification, updated };
 }
@@ -134,6 +176,7 @@ export function doCreateQuery(
     max_gps_distance_km: input.max_gps_distance_km,
     tlsn_requirements: input.tlsn_requirements,
     quorum: options?.quorum,
+    visibility: input.visibility,
   };
 
   deps.store.set(query.id, query);

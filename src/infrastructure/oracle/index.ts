@@ -5,3 +5,5 @@ export { buildOracleApp } from "./oracle-server";
 export { createOracleRegistry, getOracle, listOracles, registerOracle, resolveOracle } from "./registry";
 export type { OracleRegistry } from "./registry";
 export type { Oracle, OracleAttestation, OracleInfo, OracleVerificationDetail } from "./types";
+export { loadOraclesFromEnv, parseOracleRegistry } from "./config-loader";
+export type { OracleConfigEntry } from "./config-loader";

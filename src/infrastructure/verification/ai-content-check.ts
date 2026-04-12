@@ -87,25 +87,27 @@ function buildPrompt(query: Query): string {
   const nonce = query.challenge_nonce;
   if (nonce) {
     return [
-      `You are verifying a photo/video submission for the following query:`,
-      `"${query.description}"`,
-      ``,
-      `Check TWO things:`,
-      `1. Does the image show content relevant to this query?`,
+      `You are verifying a photo/video submission. Check TWO things:`,
+      `1. Does the image show content relevant to the query description below?`,
       `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
       ``,
       `Both must be true to pass. Answer in the following JSON format only:`,
       `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
+      ``,
+      `<query_description>`,
+      query.description,
+      `</query_description>`,
     ].join("\n");
   }
   return [
-    `You are verifying a photo/video submission for the following query:`,
-    `"${query.description}"`,
-    ``,
-    `Check whether the image shows content relevant to this query.`,
+    `You are verifying a photo/video submission. Check whether the image shows content relevant to the query description below.`,
     ``,
     `Answer in the following JSON format only:`,
     `{"relevant": true or false, "reason": "brief explanation in the language of the query description"}`,
+    ``,
+    `<query_description>`,
+    query.description,
+    `</query_description>`,
   ].join("\n");
 }
 

@@ -4,6 +4,7 @@ import type { QueryStore } from "../domain/query-store";
 import { resolveOracle } from "../infrastructure/oracle";
 import type { OracleRegistry } from "../infrastructure/oracle/registry";
 import type { PreimageStore } from "../infrastructure/cashu/preimage-store";
+import type { ProofDelivery } from "./proof-delivery";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
 import {
   doCancelQuery,
@@ -93,6 +94,7 @@ export interface QueryServiceDeps {
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
   hooks?: QueryHooks;
+  proofDelivery?: ProofDelivery;
 }
 
 export interface HtlcOutcome {
@@ -142,13 +144,14 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const registry = deps?.oracleRegistry;
   const preimageStore = deps?.preimageStore;
   const hooks = deps?.hooks;
+  const proofDelivery = deps?.proofDelivery;
 
   // Oracle resolver callbacks — passed to extracted methods so they don't close over registry.
   const oracleResolver = (oracleId: string | undefined, acceptableIds: string[] | undefined) =>
     registry ? registry.resolve(oracleId, acceptableIds) : resolveOracle(oracleId, acceptableIds);
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);
 
-  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore };
+  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, proofDelivery };
 
   return {
     createQuery: (input, options) => doCreateQuery(svcDeps, input, options, hooks),

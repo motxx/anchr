@@ -21,6 +21,9 @@ export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
 export type AttachmentStorageKind = "blossom" | "external";
 
+/** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
+export type ProofVisibility = "public" | "requester_only";
+
 export interface GpsCoord {
   lat: number;
   lon: number;
@@ -86,6 +89,8 @@ export interface QueryInput {
   max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
   tlsn_requirements?: TlsnRequirement;
+  /** Proof visibility — required when tlsn_requirements is set. */
+  visibility?: ProofVisibility;
 }
 
 export interface AttachmentRef {
@@ -251,4 +256,8 @@ export interface Query {
   quorum?: QuorumConfig;
   /** Individual oracle attestations collected during quorum verification. */
   attestations?: OracleAttestationRecord[];
+  /** Proof visibility — controls whether TLSNotary proof is published to relays. */
+  visibility?: ProofVisibility;
+  /** Nostr event IDs of published attestation events. */
+  published_proofs?: string[];
 }

@@ -10,6 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=builder /build/target/release/tlsn-server /usr/local/bin/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+RUN adduser --disabled-password --gecos "" tlsn
+USER tlsn
+
 EXPOSE 7046 7047
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["tlsn-server", "--tcp-port", "7046", "--ws-port", "7047"]

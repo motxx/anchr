@@ -9,6 +9,7 @@
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { NostrIdentity } from "./identity";
 import type { OracleAttestation } from "../../domain/oracle-types";
+import type { TlsnVerifiedData } from "../../domain/types";
 
 export const ANCHR_ORACLE_ATTESTATION = 30103;
 
@@ -19,6 +20,8 @@ export interface OracleAttestationPayload {
   checks: string[];
   failures: string[];
   attested_at: number;
+  /** Redacted TLSNotary verified data (included only for public attestations). */
+  tlsn_verified?: TlsnVerifiedData;
 }
 
 /**
@@ -39,6 +42,7 @@ export function buildOracleAttestationEvent(
     checks: attestation.checks,
     failures: attestation.failures,
     attested_at: attestation.attested_at,
+    tlsn_verified: attestation.tlsn_verified,
   };
 
   const template: EventTemplate = {

@@ -177,8 +177,10 @@ describe("createQueryAggregate", () => {
     const q = expectOk(createQueryAggregate({
       ...defaultInput,
       tlsn_requirements: { target_url: "https://example.com/api" },
+      visibility: "public",
     }, defaultOptions));
     expect(q.tlsn_requirements?.target_url).toBe("https://example.com/api");
+    expect(q.visibility).toBe("public");
   });
 
   test("generates nonce when nonce is in verification_requirements", () => {

@@ -23,6 +23,8 @@
  */
 
 import { Anchr, type QueryCondition } from "./index";
+import { execFile } from "node:child_process";
+import { unlink } from "node:fs/promises";
 
 // --- Types ---
 
@@ -238,27 +240,42 @@ export class AnchrWorker {
         args.push("-H", `${key}: ${value}`);
       }
     }
+    // Selective disclosure: redact sensitive header values from the presentation.
+    // Redacted headers are committed to (proving they existed) but their values
+    // are not revealed — this is a TLSNotary protocol-level feature, not tampering.
+    // Keep in sync with SENSITIVE_HEADER_NAMES in src/infrastructure/verification/proof-redaction.ts
+    const sensitiveHeaders = [
+      "authorization", "cookie", "set-cookie", "x-api-key",
+      "x-auth-token", "proxy-authorization", "x-csrf-token", "x-xsrf-token",
+    ];
+    if (headers) {
+      for (const name of Object.keys(headers)) {
+        if (sensitiveHeaders.some((s) => s === name.toLowerCase())) {
+          args.push("--redact-sent-header", name);
+        }
+      }
+    }
     const socksProxy = process.env.TLSN_SOCKS_PROXY;
     if (socksProxy) args.push("--socks-proxy", socksProxy);
 
-    const proc = Bun.spawn(args, {
-      stdout: "pipe",
-      stderr: "pipe",
+    const { stdout, stderr, exitCode } = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
+      const [cmd, ...rest] = args;
+      execFile(cmd!, rest, { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
+        if (err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+          return reject(new Error(`tlsn-prove binary not found: ${cmd}`));
+        }
+        resolve({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: err?.code ? 1 : 0 });
+      });
     });
 
-    await proc.exited;
-
-    if (proc.exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`tlsn-prove failed (exit ${proc.exitCode}): ${stderr.slice(0, 1000)}`);
+    if (exitCode !== 0) {
+      throw new Error(`tlsn-prove failed (exit ${exitCode}): ${stderr.slice(0, 1000)}`);
     }
 
-    // stdout contains base64 presentation
-    const stdout = await new Response(proc.stdout).text();
     const b64 = stdout.trim();
 
     // Clean up temp file
-    try { await Bun.write(tmpFile, ""); } catch { /* ignore */ }
+    try { await unlink(tmpFile); } catch { /* ignore */ }
 
     if (!b64 || b64.length < 100) {
       throw new Error("tlsn-prove produced empty or invalid output");

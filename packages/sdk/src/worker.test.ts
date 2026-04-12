@@ -2,21 +2,32 @@ import { test, expect, describe, beforeAll } from "bun:test";
 import { Anchr, QueryTimeoutError } from "./index";
 import { AnchrWorker } from "./worker";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createConnection } from "node:net";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = "http://localhost:3000";
 const VERIFIER_HOST = "localhost:7046";
-const PROVER_BIN = join(import.meta.dir, "../../../crates/tlsn-prover/target/debug/tlsn-prove");
+const PROVER_BIN = join(__dirname, "../../../crates/tlsn-prover/target/debug/tlsn-prove");
+
+function checkTcp(host: string, port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const conn = createConnection({ host, port }, () => {
+      conn.end();
+      resolve(true);
+    });
+    conn.on("error", () => resolve(false));
+    conn.setTimeout(2000, () => { conn.destroy(); resolve(false); });
+  });
+}
 
 async function isReady(): Promise<boolean> {
   try {
     const res = await fetch(`${SERVER_URL}/health`);
     if (!res.ok) return false;
-    // Check verifier
-    const conn = await Bun.connect({
-      hostname: "localhost", port: 7046,
-      socket: { data() {}, open(s) { s.end(); }, error() {} },
-    });
+    const tcpOk = await checkTcp("localhost", 7046);
+    if (!tcpOk) return false;
     return existsSync(PROVER_BIN);
   } catch { return false; }
 }

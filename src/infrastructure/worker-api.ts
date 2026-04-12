@@ -51,6 +51,7 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
     if (process.env.NODE_ENV === "production") {
       return c.json({ error: "Server misconfigured: no API keys set" }, 503);
     }
+    console.error("[security] WARNING: No API keys configured — write endpoints are unauthenticated");
     return next();
   }
 
@@ -145,7 +146,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   registerQueryRoutes(app, routeCtx);
   registerAttachmentRoutes(app, routeCtx);
   registerHtlcRoutes(app, routeCtx);
-  registerLogRoutes(app);
+  registerLogRoutes(app, writeAuth);
 
   // --- Marketplace routes ---
   const listingStore = deps?.listingStore ?? createListingStore();

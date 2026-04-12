@@ -7,6 +7,7 @@
 
 import type { TlsnRequirement, TlsnAttestation } from "../../domain/types";
 import { validateTlsn, type TlsnValidationResult } from "../verification/tlsn-validation";
+import { validateAttachmentUri } from "../url-validation";
 
 export interface FetchedData {
   /** The upstream response body. */
@@ -41,6 +42,12 @@ export async function fetchWithProof(
   const cached = cache.get(listingId);
   if (cached && Date.now() < cached.expires_at) {
     return cached.data;
+  }
+
+  // SSRF protection: validate source URL before fetching
+  const urlError = validateAttachmentUri(sourceUrl);
+  if (urlError) {
+    throw new Error(`Source URL rejected: ${urlError}`);
   }
 
   // Fetch upstream

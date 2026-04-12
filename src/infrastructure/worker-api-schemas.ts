@@ -50,6 +50,8 @@ export const quorumSchema = z.object({
   min_approvals: z.number().int().min(1),
 });
 
+export const proofVisibilitySchema = z.enum(["public", "requester_only"]).optional();
+
 export const createQuerySchema = z.object({
   description: z.string().min(1),
   location_hint: z.string().min(1).optional(),
@@ -63,6 +65,7 @@ export const createQuerySchema = z.object({
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
   quorum: quorumSchema.optional(),
+  visibility: proofVisibilitySchema,
 });
 
 export const attachmentRefSchema = z.object({
