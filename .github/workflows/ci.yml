@@ -60,6 +60,9 @@ jobs:
       - name: Unit tests (no Docker needed)
         run: deno task test:unit
 
+      - name: Example tests (prediction market)
+        run: deno task test:example
+
       - name: Protocol tests (security properties)
         run: deno task test:protocol
 
