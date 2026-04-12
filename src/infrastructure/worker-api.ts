@@ -1,4 +1,4 @@
-import { timingSafeEqual, createHash } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { spawn, fileExists, fileLastModified, moduleDir } from "../runtime/mod.ts";
 import { Hono } from "hono";
@@ -30,12 +30,18 @@ export interface WorkerApiDeps {
 
 // --- Auth Middleware ---
 
-// API key comparison — SHA-256 is used to normalize lengths for timingSafeEqual,
-// NOT as a password hash. API keys are high-entropy random tokens, not passwords.
-function safeCompare(a: string, b: string): boolean { // codeql[js/insufficient-password-hash]
-  const hashA = createHash("sha256").update(a).digest();
-  const hashB = createHash("sha256").update(b).digest();
-  return timingSafeEqual(hashA, hashB) && a.length === b.length;
+// Timing-safe API key comparison following Cloudflare's recommended pattern.
+// When lengths differ, compare the input against itself to maintain constant time
+// without leaking the secret's length via response timing.
+// https://developers.cloudflare.com/workers/examples/protect-against-timing-attacks/
+const encoder = new TextEncoder();
+function safeCompare(a: string, b: string): boolean {
+  const userValue = encoder.encode(a);
+  const secretValue = encoder.encode(b);
+  const lengthsMatch = userValue.byteLength === secretValue.byteLength;
+  return lengthsMatch
+    ? timingSafeEqual(userValue, secretValue)
+    : !timingSafeEqual(userValue, userValue);
 }
 
 function extractApiKey(c: Context): string | null {
