@@ -238,13 +238,14 @@ describe("HTLC endpoints", () => {
     expect(res.status).toBe(200);
     const json = await res.json() as { ok: boolean };
     expect(json.ok).toBe(true);
-    expect(queryService.getQuery(query.id)?.status).toBe("processing");
+    expect(queryService.getQuery(query.id)?.status).toBe("worker_selected");
   }));
 
   test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
+    queryService.beginWork(query.id);
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
@@ -299,6 +300,12 @@ describe("HTLC endpoints", () => {
       body: JSON.stringify({ worker_pubkey: "w1", htlc_token: "final_token" }),
     });
     expect((await selectRes.json() as { ok: boolean }).ok).toBe(true);
+
+    // Begin work (worker_selected → processing)
+    const beginRes = await app.request(`http://localhost/queries/${query_id}/begin`, {
+      method: "POST",
+    });
+    expect((await beginRes.json() as { ok: boolean }).ok).toBe(true);
 
     // Submit result — now does inline verification for HTLC queries
     const resultRes = await app.request(`http://localhost/queries/${query_id}/result`, {
@@ -368,6 +375,7 @@ describe("HTLC inline verification with preimage", () => {
     };
     const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
+    queryService.beginWork(query.id);
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",

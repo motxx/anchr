@@ -9,6 +9,7 @@ import {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
   ANCHR_QUERY_FEEDBACK,
+  ANCHR_ORACLE_ANNOUNCEMENT,
   type QueryRequestPayload,
   type QueryResponsePayload,
   type QuoteFeedbackPayload,
@@ -16,6 +17,7 @@ import {
   type QuerySettlementPayload,
   type OracleResponsePayload,
 } from "./events";
+import type { OracleInfo } from "../../domain/oracle-types";
 
 function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
@@ -197,5 +199,56 @@ export function buildQuerySettlementEvent(
     ],
     content: encryptPayload(identity, workerPubKey, payload),
   };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+/**
+ * Build an Oracle Announcement event (kind 30088).
+ *
+ * Parametrized replaceable event per Spec 08 — Oracles publish their
+ * capabilities, fees, and endpoints so Requesters can discover them.
+ */
+export function buildOracleAnnouncementEvent(
+  identity: NostrIdentity,
+  oracleInfo: OracleInfo,
+  relayUrls?: string[],
+): VerifiedEvent {
+  const tags: string[][] = [
+    ["d", oracleInfo.id],
+    ["t", "anchr-oracle"],
+  ];
+
+  // Add capability tags: anchr-oracle-<factor>
+  if (oracleInfo.supported_factors?.length) {
+    for (const factor of oracleInfo.supported_factors) {
+      tags.push(["t", `anchr-oracle-${factor}`]);
+    }
+  }
+
+  // Add relay hints
+  if (relayUrls?.length) {
+    for (const url of relayUrls) {
+      tags.push(["relay", url]);
+    }
+  }
+
+  const content = JSON.stringify({
+    name: oracleInfo.name,
+    ...(oracleInfo.endpoint !== undefined && { endpoint: oracleInfo.endpoint }),
+    fee_ppm: oracleInfo.fee_ppm,
+    supported_factors: oracleInfo.supported_factors ?? [],
+    supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
+    ...(oracleInfo.min_bounty_sats !== undefined && { min_bounty_sats: oracleInfo.min_bounty_sats }),
+    ...(oracleInfo.max_bounty_sats !== undefined && { max_bounty_sats: oracleInfo.max_bounty_sats }),
+    ...(oracleInfo.description !== undefined && { description: oracleInfo.description }),
+  });
+
+  const template: EventTemplate = {
+    kind: ANCHR_ORACLE_ANNOUNCEMENT,
+    created_at: nowUnix(),
+    tags,
+    content,
+  };
+
   return finalizeEvent(template, identity.secretKey);
 }

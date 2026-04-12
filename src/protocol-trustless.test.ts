@@ -256,7 +256,6 @@ describe("NUT-11: Timeout refund", () => {
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
-    service.beginWork(query.id);
 
     // Submit invalid proof → rejected
     const outcome = await service.submitHtlcResult(

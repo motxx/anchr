@@ -70,8 +70,8 @@ export function buildOracleApp(
   // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
 
-  // Map queryId → verified status (true only after POST /verify returns passed:true)
-  const verifiedQueries = new Map<string, boolean>();
+  // Map queryId → worker pubkey (set only after POST /verify returns passed:true)
+  const verifiedQueries = new Map<string, string>();
 
   const app = new Hono();
 
@@ -136,7 +136,7 @@ export function buildOracleApp(
    * POST /verify — Run C2PA verification and return attestation.
    */
   app.post("/verify", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query: Query; result: QueryResult }>();
+    const body = await c.req.json<{ query: Query; result: QueryResult; worker_pubkey?: string }>();
     if (!body.query || !body.result) {
       return c.json({ error: "Missing query or result in request body" }, 400);
     }
@@ -151,9 +151,10 @@ export function buildOracleApp(
       attested_at: Date.now(),
     };
 
-    // Record verification result for preimage gating
+    // Record verification result + worker pubkey for preimage gating
     if (detail.passed) {
-      verifiedQueries.set(body.query.id, true);
+      const workerPubkey = body.worker_pubkey ?? body.query.htlc?.worker_pubkey ?? "";
+      verifiedQueries.set(body.query.id, workerPubkey);
     }
 
     return c.json(attestation);
@@ -166,14 +167,20 @@ export function buildOracleApp(
    * In the Nostr-native flow, this is done via NIP-44 DM instead.
    */
   app.post("/preimage", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query_id: string }>().catch(() => null);
+    const body = await c.req.json<{ query_id: string; worker_pubkey?: string }>().catch(() => null);
     if (!body?.query_id) {
       return c.json({ error: "Missing query_id" }, 400);
     }
 
     // Only release preimage if verification passed
-    if (!verifiedQueries.get(body.query_id)) {
+    const verifiedWorker = verifiedQueries.get(body.query_id);
+    if (!verifiedWorker && verifiedWorker !== "") {
       return c.json({ error: "Verification has not passed for this query" }, 403);
+    }
+
+    // Verify caller is the selected Worker for this query (Spec 05)
+    if (verifiedWorker && body.worker_pubkey && body.worker_pubkey !== verifiedWorker) {
+      return c.json({ error: "Worker pubkey does not match selected worker" }, 403);
     }
 
     const hash = queryHashMap.get(body.query_id);

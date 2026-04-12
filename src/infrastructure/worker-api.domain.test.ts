@@ -377,6 +377,7 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       // Quote + select via service (these are service-level operations)
       svc.recordQuote(id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
       await svc.selectWorker(id, "w1");
+      svc.beginWork(id);
 
       // Submit result via HTTP
       const submitRes = await submitResultViaHttp(app, id, {
