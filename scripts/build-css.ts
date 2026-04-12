@@ -39,8 +39,8 @@ const BUILDS: CssBuild[] = [
 
 async function buildCss(build: CssBuild) {
   console.log(`[build-css:${build.label}] ${build.input} → ${build.output}`);
-  const cmd = new Deno.Command("npx", {
-    args: ["@tailwindcss/cli", "-i", build.input, "-o", build.output],
+  const cmd = new Deno.Command("deno", {
+    args: ["run", "-A", "npm:@tailwindcss/cli", "-i", build.input, "-o", build.output],
     stdout: "inherit",
     stderr: "inherit",
   });
