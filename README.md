@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/motxx/anchr/actions/workflows/ci.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci.yml)
 
-A trustless protocol for exchanging payments and secret data.
+Atomic swap of verifiable data and Bitcoin — without a trusted third party.
 
-Anchr verifies that data is authentic before releasing payment — no trusted intermediary required. The protocol is designed to be agnostic to the payment layer, oracle type, and messaging transport. Today it runs on Cashu, TLSNotary/C2PA, and Nostr. Tomorrow it could run on anything.
+Anchr is a protocol that atomically exchanges cryptographic proofs for payment. Data is not released until verified. Payment is not released until proof is accepted. No single party can cheat. The protocol is agnostic to the payment layer (Cashu, Lightning PTLC, DLC, Fedimint), verification method (TLSNotary, C2PA, any zkTLS), and messaging transport (Nostr, HTTP, libp2p).
 
 ## What It Does
 
