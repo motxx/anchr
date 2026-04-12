@@ -181,6 +181,7 @@ function buildBody(mode: QueryMode, refs: FormRefs): Record<string, unknown> {
       tlsn.conditions = [cond];
     }
     body.tlsn_requirements = tlsn;
+    body.visibility = "requester_only";
   } else {
     const location = refs.location.current?.value?.trim();
     if (location) body.location_hint = location;
