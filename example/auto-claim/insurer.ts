@@ -13,7 +13,7 @@
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "../../packages/sdk/src/index";
+import { Anchr } from "../../packages/sdk/src/index.ts";
 
 const SERVER_URL = Deno.env.get("ANCHR_URL") ?? "http://localhost:3000";
 const AIRLINE_URL = Deno.env.get("AIRLINE_URL") ?? "http://localhost:4000";

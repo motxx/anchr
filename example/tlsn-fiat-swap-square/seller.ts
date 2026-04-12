@@ -20,7 +20,7 @@
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "../../packages/sdk/src/index";
+import { Anchr } from "../../packages/sdk/src/index.ts";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
