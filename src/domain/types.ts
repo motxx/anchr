@@ -24,12 +24,6 @@ export type AttachmentStorageKind = "blossom" | "external";
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
 export type ProofVisibility = "public" | "requester_only";
 
-/**
- * Oracle verification mode.
- *   - "anchr_solo": Anchr Official Oracle verifies alone (default, existing HTLC flow).
- *   - "frost_2of3": Requester / Worker / Anchr as 2-of-3 FROST threshold signers.
- */
-export type OracleMode = "anchr_solo" | "frost_2of3";
 
 export interface GpsCoord {
   lat: number;
@@ -292,8 +286,6 @@ export interface Query {
   attestations?: OracleAttestationRecord[];
   /** Proof visibility — controls whether TLSNotary proof is published to relays. */
   visibility?: ProofVisibility;
-  /** Oracle verification mode (default: "anchr_solo"). */
-  oracle_mode?: OracleMode;
   /** Nostr event IDs of published attestation events. */
   published_proofs?: string[];
 }

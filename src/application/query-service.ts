@@ -26,7 +26,6 @@ import type {
   ExecutorType,
   HtlcInfo,
   HtlcSubmitOutcome,
-  OracleMode,
   Query,
   QueryInput,
   QueryResult,
@@ -64,10 +63,8 @@ export interface CreateQueryOptions {
   htlc?: HtlcInfo;
   /** Nostr event ID of the kind 5300 Job Request. */
   nostrEventId?: string;
-  /** Multi-oracle quorum config. */
+  /** Multi-oracle quorum config. When set with FROST, oracle_ids become FROST signers. */
   quorum?: QuorumConfig;
-  /** Oracle verification mode (default: "anchr_solo"). */
-  oracleMode?: OracleMode;
 }
 
 export interface SubmitQueryOutcome {
@@ -195,7 +192,6 @@ function publishQueryToRelay(query: Query): void {
       expires_at: query.expires_at,
       oracle_ids: query.oracle_ids,
       verification_requirements: query.verification_requirements,
-      oracle_mode: query.oracle_mode,
       bounty: query.bounty?.cashu_token
         ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.cashu_token }
         : undefined,

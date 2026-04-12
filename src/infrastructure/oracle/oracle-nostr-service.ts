@@ -179,8 +179,8 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     },
 
     async verifyAndDeliver(queryId, query, result, workerPubkey) {
-      // Auto-dispatch based on oracle_mode
-      if (query.oracle_mode === "frost_2of3" && config.frostCoordinator && config.frostConfig) {
+      // Auto-dispatch: quorum + FROST configured → threshold signing; otherwise → single Oracle HTLC
+      if (query.quorum && config.frostCoordinator && config.frostConfig) {
         return this.verifyAndDeliverFrost(queryId, query, result, workerPubkey);
       }
       return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
