@@ -81,7 +81,7 @@ export function makeHtlcInfo(preimageStore: PreimageStore) {
 export async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
-  opts?: { workerPubkey?: string; bountyAmount?: number; oracleIds?: string[] },
+  opts?: { workerPubkey?: string; bountyAmount?: number; oracleIds?: string[]; quorum?: { min_approvals: number } },
 ) {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
@@ -89,7 +89,7 @@ export async function driveToProcessing(
   const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
   const query = service.createQuery(
     { description: "Protocol test" },
-    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds },
+    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: opts?.quorum },
   );
   service.recordQuote(query.id, {
     worker_pubkey: workerPub,
@@ -98,5 +98,47 @@ export async function driveToProcessing(
   });
   const token = makeFakeToken(bounty);
   await service.selectWorker(query.id, workerPub, token);
+  return { query, entry, workerPub, htlcInfo };
+}
+
+/**
+ * Create a QueryService with multiple independent Oracle operators and quorum support.
+ * This models the FROST threshold Oracle architecture where t-of-n neutral Oracles verify.
+ */
+export function makeQuorumService(opts: {
+  oracleIds: string[];
+  passFns?: Record<string, (q: Query, r: QueryResult) => boolean>;
+}) {
+  const store = createQueryStore();
+  const registry = createOracleRegistry({ skipBuiltIn: true });
+  for (const id of opts.oracleIds) {
+    const passFn = opts.passFns?.[id];
+    registry.register(makeMockOracle(id, passFn));
+  }
+  const preimageStore = createPreimageStore();
+  return {
+    service: createQueryService({ store, oracleRegistry: registry, preimageStore }),
+    store,
+    registry,
+    preimageStore,
+  };
+}
+
+/** Drive a quorum query through to processing. */
+export async function driveQuorumToProcessing(
+  service: ReturnType<typeof createQueryService>,
+  preimageStore: PreimageStore,
+  oracleIds: string[],
+  minApprovals: number,
+) {
+  const workerPub = "worker_pub";
+  const bounty = 100;
+  const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
+  const query = service.createQuery(
+    { description: "Quorum protocol test" },
+    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: { min_approvals: minApprovals } },
+  );
+  service.recordQuote(query.id, { worker_pubkey: workerPub, quote_event_id: "evt_1", received_at: Date.now() });
+  await service.selectWorker(query.id, workerPub, makeFakeToken(bounty));
   return { query, entry, workerPub, htlcInfo };
 }
