@@ -49,9 +49,18 @@
   "tasks": {
     "start": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run --allow-sys --env src/infrastructure/server.ts",
     "dev": "deno run --watch --allow-all --env src/infrastructure/server.ts",
-    "test:unit": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+
+    "test:unit": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts,src/protocol-*.test.ts'",
+    "test:protocol": "deno test src/protocol-trustless.test.ts src/protocol-attacks.test.ts src/protocol-exploits.test.ts src/protocol-quorum.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:frost": "deno test src/infrastructure/frost/ src/infrastructure/nostr/frost-dm.test.ts src/infrastructure/oracle/oracle-server-frost.test.ts src/infrastructure/oracle/oracle-nostr-frost.test.ts e2e/frost-threshold.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:integration": "deno test src/infrastructure/worker-api.integration.test.ts src/infrastructure/mcp-server.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e": "deno test e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e:frost": "deno test e2e/frost-threshold.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e:relay": "NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts --allow-env --allow-read --allow-net --allow-run",
-    "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:ci": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'",
+    "test": "deno test src/ e2e/ --no-check --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",

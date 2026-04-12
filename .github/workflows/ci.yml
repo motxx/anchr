@@ -44,6 +44,9 @@ jobs:
       - name: Install dependencies (lockfile integrity check)
         run: deno install --frozen
 
+      - name: Setup Rust (for frost-signer)
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Architecture lint
         run: deno task lint:arch
 
@@ -55,7 +58,16 @@ jobs:
         run: deno check src/**/*.ts
 
       - name: Unit tests (no Docker needed)
-        run: deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'
+        run: deno task test:unit
+
+      - name: Protocol tests (security properties)
+        run: deno task test:protocol
+
+      - name: Build frost-signer
+        run: cd crates/frost-signer && cargo build --release
+
+      - name: FROST threshold tests (no Docker needed)
+        run: deno task test:frost
 
       - name: Start infrastructure (relay + Blossom + regtest Lightning)
         if: ${{ !cancelled() }}
