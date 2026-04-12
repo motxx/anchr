@@ -149,12 +149,14 @@ async function main() {
     Deno.exit(1);
   }
 
-  // === Save config files ===
+  // === Save config files (restrictive permissions — contains secret key shares) ===
   console.log("\n=== Saving configs ===");
   for (const config of nodeConfigs) {
     const path = join(OUTPUT_DIR, `signer-${config.signer_index}.json`);
     Deno.writeTextFileSync(path, JSON.stringify(config, null, 2));
-    console.log(`  ${path}`);
+    // Set 0600 — only owner can read/write. key_package contains FROST secret shares.
+    try { Deno.chmodSync(path, 0o600); } catch { /* Windows or restricted fs */ }
+    console.log(`  ${path} (mode 0600)`);
   }
 
   console.log(`\nDKG complete. Group pubkey: ${gps[0]}`);

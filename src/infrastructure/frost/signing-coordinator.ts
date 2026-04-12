@@ -56,9 +56,9 @@ export async function coordinateSigning(
   commitments[localIdentifier] = localR1.data.commitments;
   const localNonces = JSON.stringify(localR1.data.nonces);
 
-  const participatingPeers: PeerConfig[] = [];
+  const participatingPeers: Array<PeerConfig & { nonce_id: string }> = [];
 
-  // Call peers for round 1
+  // Call peers for round 1 — each peer independently verifies query+result
   for (const peer of nodeConfig.peers) {
     if (peer.signer_index === nodeConfig.signer_index) continue;
 
@@ -85,7 +85,7 @@ export async function coordinateSigning(
       const data = await res.json();
       const peerId = identifierFromIndex(peer.signer_index);
       commitments[peerId] = data.commitments;
-      participatingPeers.push(peer);
+      participatingPeers.push({ ...peer, nonce_id: data.nonce_id });
     } catch (err) {
       console.error(`[frost-coord] Peer ${peer.signer_index} round1 error:`, err instanceof Error ? err.message : err);
     }
@@ -113,7 +113,7 @@ export async function coordinateSigning(
   }
   shares[localIdentifier] = localR2.data.signature_share;
 
-  // Call participating peers for round 2
+  // Call participating peers for round 2 (using nonce_id from round 1)
   for (const peer of participatingPeers) {
     try {
       const res = await fetchWithTimeout(
@@ -124,6 +124,7 @@ export async function coordinateSigning(
           body: JSON.stringify({
             commitments: commitmentsJson,
             message: messageHex,
+            nonce_id: peer.nonce_id,
           }),
         },
         timeoutMs,

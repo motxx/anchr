@@ -204,19 +204,17 @@ export function buildOracleApp(
    * to participate → the coordinator cannot reach threshold.
    */
   app.post("/frost/signer/round1", authMiddleware, async (c) => {
-    const body = await c.req.json<{ message: string; query?: Query; result?: QueryResult }>().catch(() => null);
-    if (!body?.message) return c.json({ error: "Missing message" }, 400);
+    const body = await c.req.json<{ message: string; query: Query; result: QueryResult }>().catch(() => null);
+    if (!body?.message || !body?.query || !body?.result) {
+      return c.json({ error: "Missing message, query, or result" }, 400);
+    }
     if (!frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
 
-    // Independent verification: if query+result provided, verify before signing
-    if (body.query && body.result) {
-      const detail = await verify(body.query, body.result);
-      if (!detail.passed) {
-        return c.json({
-          error: "Verification failed",
-          failures: detail.failures,
-        }, 403);
-      }
+    // Mandatory independent verification — this is the security guarantee of threshold signing.
+    // Without this check, a malicious coordinator could produce group signatures for garbage.
+    const detail = await verify(body.query, body.result);
+    if (!detail.passed) {
+      return c.json({ error: "Verification failed", failures: detail.failures }, 403);
     }
 
     const { signRound1 } = await import("../frost/frost-cli.ts");
@@ -224,25 +222,29 @@ export function buildOracleApp(
     const result = await signRound1(keyPackageJson);
     if (!result.ok) return c.json({ error: result.error }, 500);
 
-    // Store nonces for round 2 (keyed by message to handle concurrent sessions)
-    pendingNonces.set(body.message, JSON.stringify(result.data!.nonces));
+    // Store nonces keyed by a random session ID (not message) to prevent nonce reuse.
+    // Nonce reuse in Schnorr signing leaks the signer's secret key share.
+    const nonceId = crypto.randomUUID();
+    pendingNonces.set(nonceId, JSON.stringify(result.data!.nonces));
 
-    return c.json({ commitments: result.data!.commitments });
+    return c.json({ commitments: result.data!.commitments, nonce_id: nonceId });
   });
 
   /** POST /frost/signer/round2 — Produce signature share using stored nonces. */
   app.post("/frost/signer/round2", authMiddleware, async (c) => {
-    const body = await c.req.json<{ commitments: string; message: string }>().catch(() => null);
-    if (!body?.commitments || !body?.message) return c.json({ error: "Missing commitments or message" }, 400);
+    const body = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
+    if (!body?.commitments || !body?.message || !body?.nonce_id) {
+      return c.json({ error: "Missing commitments, message, or nonce_id" }, 400);
+    }
     if (!frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
 
-    const nonces = pendingNonces.get(body.message);
-    if (!nonces) return c.json({ error: "No pending nonces for this message" }, 409);
+    const nonces = pendingNonces.get(body.nonce_id);
+    if (!nonces) return c.json({ error: "Unknown or expired nonce_id" }, 409);
+    pendingNonces.delete(body.nonce_id); // consume immediately — single use
 
     const { signRound2 } = await import("../frost/frost-cli.ts");
     const keyPackageJson = JSON.stringify(frostNodeConfig.key_package);
     const result = await signRound2(keyPackageJson, nonces, body.commitments, body.message);
-    pendingNonces.delete(body.message); // consume nonces
 
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });
