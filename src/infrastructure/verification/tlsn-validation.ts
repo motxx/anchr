@@ -9,12 +9,22 @@
  */
 
 import { Buffer } from "node:buffer";
+import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleDir, which, writeFile, spawn } from "../../runtime/mod.ts";
 import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../domain/types";
+
+// --- Proof replay protection ---
+// Stores SHA-256 hashes of previously accepted presentations to prevent reuse.
+const seenPresentations = new Set<string>();
+
+/** Visible for testing — clear the replay detection set. */
+export function _clearSeenPresentationsForTest(): void {
+  seenPresentations.clear();
+}
 
 /**
  * Detect regex patterns likely to cause catastrophic backtracking (ReDoS).
@@ -167,6 +177,21 @@ export async function validateTlsn(
   const failures: string[] = [];
   const maxAgeSeconds = requirement.max_attestation_age_seconds ?? DEFAULT_MAX_AGE_SECONDS;
 
+  // --- Proof replay protection ---
+  const presentationHash = createHash("sha256").update(attestation.presentation).digest("hex");
+  if (seenPresentations.has(presentationHash)) {
+    failures.push("TLSNotary: presentation already used — proof replay rejected");
+    return {
+      available: true,
+      signatureValid: false,
+      serverIdentityValid: false,
+      conditionResults: [],
+      attestationFresh: false,
+      checks,
+      failures,
+    };
+  }
+
   const verifierPath = findTlsnVerifier();
 
   // --- Binary required ---
@@ -243,6 +268,9 @@ export async function validateTlsn(
       }
     }
   }
+
+  // Mark presentation as used (prevents replay of the same proof)
+  seenPresentations.add(presentationHash);
 
   return {
     available: true,

@@ -73,16 +73,20 @@ function handleCreateQuery(c: Context<any>, svc: QueryService, getUrl: () => str
     visibility: payload.visibility,
   };
 
-  const query = svc.createQuery(input, {
-    ttlSeconds: payload.ttl_seconds,
-    requesterMeta: payload.requester,
-    bounty: payload.bounty,
-    oracleIds: payload.oracle_ids,
-    htlc: payload.htlc as HtlcInfo | undefined,
-    quorum: payload.quorum as QuorumConfig | undefined,
-  });
+  try {
+    const query = svc.createQuery(input, {
+      ttlSeconds: payload.ttl_seconds,
+      requesterMeta: payload.requester,
+      bounty: payload.bounty,
+      oracleIds: payload.oracle_ids,
+      htlc: payload.htlc as HtlcInfo | undefined,
+      quorum: payload.quorum as QuorumConfig | undefined,
+    });
 
-  return c.json(buildCreatedQueryPayload(query, getUrl()), 201);
+    return c.json(buildCreatedQueryPayload(query, getUrl()), 201);
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
 }
 
 export function registerQueryRoutes(app: Hono, ctx: RouteContext) {

@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
-import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { evaluateCondition, validateTlsn, _setVerifierPathForTest } from "./tlsn-validation";
+import { evaluateCondition, validateTlsn, _setVerifierPathForTest, _clearSeenPresentationsForTest } from "./tlsn-validation";
 import { verify } from "./verifier";
 import type { TlsnAttestation, TlsnRequirement } from "../../domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
@@ -119,6 +119,8 @@ describe("validateTlsn without binary", () => {
 // --- validateTlsn with mock binary ---
 
 describe("validateTlsn with mock binary", () => {
+  beforeEach(() => _clearSeenPresentationsForTest());
+
   test("valid presentation passes all checks", async () => {
     writeMockVerifier({
       valid: true,
@@ -214,7 +216,7 @@ describe("validateTlsn with mock binary", () => {
 // --- Integration: verify() with tlsn ---
 
 describe("verify() integration with tlsn", () => {
-  // verify is imported at the top of this file
+  beforeEach(() => _clearSeenPresentationsForTest());
 
   test("tlsn query with missing attestation fails", async () => {
     _setVerifierPathForTest(null);
