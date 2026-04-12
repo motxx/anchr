@@ -458,6 +458,11 @@ All produce the same fundamental output: a proof that a specific server returned
 | `ORACLE_PORT` | Oracle server port (default: 4000) |
 | `ORACLE_API_KEY` | Oracle server API key |
 
+## Specifications
+
+Protocol specifications are in [`specs/`](specs/). Anyone may implement them.
+
 ## License
 
-[MIT](LICENSE)
+Code: [MIT](LICENSE)
+Specifications: [CC0 1.0](specs/LICENSE)
