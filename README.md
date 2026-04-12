@@ -36,7 +36,7 @@ Anchr separates concerns into pluggable layers. Each layer has a current impleme
 
 | Layer | Role | Current | Future candidates |
 |-------|------|---------|-------------------|
-| **Payment** | Escrow + atomic settlement | Cashu (NUT-11 P2PK, NUT-14 HTLC) | Fedimint, Lightning PTLC, DLC (Bitcoin L1) |
+| **Payment** | Escrow + atomic settlement | Cashu (NUT-11 P2PK, NUT-14 HTLC, multi-unit: sat/USD/EUR) | Fedimint, Lightning PTLC, DLC (Bitcoin L1) |
 | **Web Verification** | Prove HTTPS responses | TLSNotary (MPC-TLS) | Reclaim Protocol, zkPass, Opacity, DECO |
 | **Photo Verification** | Prove real-world captures | C2PA + GPS | TEE attestations, ProofMode |
 | **Messaging** | Broadcast queries, deliver results | Nostr (NIP-90 DVM) | HTTP-only mode, libp2p |
@@ -47,7 +47,7 @@ Anchr separates concerns into pluggable layers. Each layer has a current impleme
 
 Anchr's security comes from the protocol structure (escrow + verification + atomic settlement), not from any specific technology. The `EscrowProvider` interface abstracts the payment layer. The `verify()` interface abstracts the proof system. Swapping Cashu for Fedimint, or TLSNotary for another zkTLS provider, requires implementing an adapter — not changing the protocol.
 
-**Payment agnosticism** matters because escrow needs differ by context. Cashu is fast and private but trusts the Mint. DLC removes Mint trust entirely by locking BTC on L1. Lightning PTLC replaces hash-preimage with Schnorr adaptor signatures, which maps naturally to FROST group signatures. Fedimint adds federation-level trust distribution. Each has tradeoffs. The protocol should not prescribe the choice.
+**Payment agnosticism** means two things: the escrow mechanism is swappable, and the denomination is irrelevant. Cashu mints already support multiple units (sat, USD, EUR) — the `EscrowProvider` does not care what the unit is. At a higher level, Cashu itself is replaceable: DLC removes Mint trust by locking BTC on L1, Lightning PTLC uses Schnorr adaptor signatures that map naturally to FROST, and Fedimint adds federation-level trust distribution. Each has tradeoffs. The protocol does not prescribe the choice.
 
 **zkTLS agnosticism** matters because web proof technology is evolving rapidly. TLSNotary uses MPC-TLS where a Verifier co-signs the session. Other approaches (Reclaim, zkPass, Opacity) use different techniques — TEEs, ZK circuits, proxy architectures — but all produce the same fundamental output: a proof that a specific server returned specific data. Anchr's Oracle layer accepts any proof format that satisfies the `verify()` interface.
 
