@@ -1,6 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import type { Market } from "../mock-data";
+import { placeBet } from "../api";
 import { cn } from "../../lib/utils";
+
+/** Demo bettor pubkey — in production this would come from a Nostr wallet */
+const DEMO_BETTOR_PUBKEY = "npub1demo_bettor_" + Math.random().toString(36).slice(2, 10);
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;
@@ -28,11 +32,17 @@ function formatTimeLeft(deadline: number): string {
 interface MarketDetailProps {
   market: Market;
   onBack: () => void;
+  onBetPlaced?: () => void;
 }
 
-export function MarketDetail({ market, onBack }: MarketDetailProps) {
+type BetStatus = "idle" | "submitting" | "success" | "error";
+
+export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps) {
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("");
+  const [betStatus, setBetStatus] = useState<BetStatus>("idle");
+  const [betMessage, setBetMessage] = useState<string | null>(null);
+
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesPercent = total > 0 ? Math.round((market.yes_pool_sats / total) * 100) : 50;
   const noPercent = 100 - yesPercent;
@@ -45,6 +55,31 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
       ? Math.floor((amountNum / (market.yes_pool_sats + amountNum)) * (total + amountNum) * (1 - market.fee_ppm / 1_000_000))
       : Math.floor((amountNum / (market.no_pool_sats + amountNum)) * (total + amountNum) * (1 - market.fee_ppm / 1_000_000))
     : 0;
+
+  const handlePlaceBet = useCallback(async () => {
+    if (amountNum < market.min_bet_sats) return;
+    if (betStatus === "submitting") return;
+
+    setBetStatus("submitting");
+    setBetMessage(null);
+
+    try {
+      const result = await placeBet(market.id, side, amountNum, DEMO_BETTOR_PUBKEY);
+      const matchCount = result.matches?.length ?? 0;
+      setBetStatus("success");
+      setBetMessage(`Bet placed! ${amountNum} sats on ${side.toUpperCase()}${matchCount > 0 ? ` — ${matchCount} match(es)` : ""}`);
+      setAmount("");
+      if (onBetPlaced) onBetPlaced();
+    } catch (err) {
+      setBetStatus("error");
+      setBetMessage(err instanceof Error ? err.message : "Network error — please try again");
+    }
+  }, [amountNum, market.id, market.min_bet_sats, side, betStatus, onBetPlaced]);
+
+  const clearBetStatus = useCallback(() => {
+    setBetStatus("idle");
+    setBetMessage(null);
+  }, []);
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -164,6 +199,27 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
             <div className="rounded-xl border border-border bg-card p-6 sticky top-6">
               <h2 className="text-sm font-medium text-foreground mb-4">Place a Bet</h2>
 
+              {/* Bet status feedback */}
+              {betMessage && (
+                <div
+                  className={cn(
+                    "rounded-lg p-3 mb-4 text-sm",
+                    betStatus === "success" && "bg-yes/10 text-yes border border-yes/20",
+                    betStatus === "error" && "bg-destructive/10 text-destructive border border-destructive/20",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span>{betMessage}</span>
+                    <button
+                      onClick={clearBetStatus}
+                      className="shrink-0 text-xs opacity-60 hover:opacity-100"
+                    >
+                      x
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Side selector */}
               <div className="grid grid-cols-2 gap-2 mb-5">
                 <button
@@ -201,7 +257,8 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
                     placeholder={`Min ${market.min_bet_sats}`}
                     min={market.min_bet_sats}
                     max={market.max_bet_sats || undefined}
-                    className="w-full h-11 rounded-lg border border-border bg-muted px-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                    disabled={betStatus === "submitting"}
+                    className="w-full h-11 rounded-lg border border-border bg-muted px-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 disabled:opacity-50"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">sats</span>
                 </div>
@@ -213,7 +270,8 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
                   <button
                     key={v}
                     onClick={() => setAmount(String(v))}
-                    className="h-8 rounded-md border border-border text-xs font-mono text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+                    disabled={betStatus === "submitting"}
+                    className="h-8 rounded-md border border-border text-xs font-mono text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors disabled:opacity-50"
                   >
                     {v >= 1000 ? `${v / 1000}K` : v}
                   </button>
@@ -230,7 +288,7 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Return</span>
                     <span className={cn("font-mono", potentialPayout > amountNum ? "text-yes" : "text-no")}>
-                      {amountNum > 0 ? `${((potentialPayout / amountNum - 1) * 100).toFixed(0)}%` : "—"}
+                      {amountNum > 0 ? `${((potentialPayout / amountNum - 1) * 100).toFixed(0)}%` : "--"}
                     </span>
                   </div>
                 </div>
@@ -238,7 +296,8 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
 
               {/* Submit */}
               <button
-                disabled={amountNum < market.min_bet_sats}
+                onClick={handlePlaceBet}
+                disabled={amountNum < market.min_bet_sats || betStatus === "submitting"}
                 className={cn(
                   "w-full h-12 rounded-lg font-semibold text-sm transition-all duration-200",
                   "disabled:opacity-40 disabled:cursor-not-allowed",
@@ -247,9 +306,11 @@ export function MarketDetail({ market, onBack }: MarketDetailProps) {
                     : "bg-no text-no-foreground hover:brightness-110",
                 )}
               >
-                {amountNum < market.min_bet_sats
-                  ? `Enter amount (min ${market.min_bet_sats} sats)`
-                  : `Bet ${side.toUpperCase()} — ${formatSats(amountNum)} sats`}
+                {betStatus === "submitting"
+                  ? "Placing bet..."
+                  : amountNum < market.min_bet_sats
+                    ? `Enter amount (min ${market.min_bet_sats} sats)`
+                    : `Bet ${side.toUpperCase()} -- ${formatSats(amountNum)} sats`}
               </button>
 
               <p className="text-[11px] text-muted-foreground text-center mt-3">
