@@ -59,6 +59,7 @@
     "test:e2e:relay": "NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest-cashu.test.ts e2e/regtest-htlc-trustless.test.ts e2e/regtest-htlc-attacks.test.ts --allow-env --allow-read --allow-net --allow-run",
     "test:ci": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'",
+    "test:example": "deno test --allow-all example/",
     "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
 
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
@@ -67,6 +68,6 @@
     "build:css": "deno run --allow-all scripts/build-css.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
-  "exclude": ["mobile", "node_modules", "example"],
+  "exclude": ["mobile", "node_modules", "example/prediction-market/src/demo.ts", "example/prediction-market/src/nostr-market.ts"],
   "nodeModulesDir": "auto"
 }

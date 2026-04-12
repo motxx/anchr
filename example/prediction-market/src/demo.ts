@@ -1,35 +1,39 @@
 /**
- * Prediction Market Demo
+ * Prediction Market Demo — N:M Conditional Swap
  *
- * Simulates the full lifecycle of a Bitcoin-native prediction market:
+ * Demonstrates the full lifecycle using the protocol layer:
  *
- *   1. Market creation: "Will BTC/JPY be above 11,000,000 on resolution date?"
- *   2. Resolution URL: https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY
- *   3. Two bettors: Alice bets YES (100 sats), Bob bets NO (100 sats)
- *   4. HTLC escrow mechanics for both sides
- *   5. Oracle resolves via TLSNotary proof of bitFlyer API
- *   6. Payout distribution
+ *   1. Oracle creates dual-preimage pair (hash_yes / hash_no)
+ *   2. Alice places YES order, Bob places NO order
+ *   3. Order book matches them (FIFO, partial match support)
+ *   4. Cross-HTLC tokens created for the matched pair
+ *   5. Oracle resolves via TLSNotary → reveals winning preimage
+ *   6. Winner redeems loser's tokens with the preimage
  *
  * Usage:
  *   deno run --allow-all example/prediction-market/src/demo.ts
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import { createDualPreimageStore } from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
 import {
-  createMarketHtlc,
-  resolveMarket,
+  buildCrossHtlcForPartyA,
+  buildCrossHtlcForPartyB,
+} from "../../../src/infrastructure/conditional-swap/cross-htlc.ts";
+import { createOrderBook } from "./order-book.ts";
+import { resolveMarket as resolveMarketDual } from "./resolution.ts";
+import {
+  resolveMarket as resolveMarketOracle,
   evaluateCondition,
   extractJsonValue,
   calculatePayouts,
   calculateOracleFee,
-  verifyPreimage,
 } from "./market-oracle.ts";
 import type {
   PredictionMarket,
   Bet,
-  MarketResolution,
   ResolutionCondition,
+  OpenOrder,
 } from "./market-types.ts";
 
 // ============================================================
@@ -41,32 +45,37 @@ const RESOLUTION_DEADLINE = Math.floor(Date.now() / 1000) + 86400; // 24h from n
 const ORACLE_FEE_PPM = 5_000;  // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
 
+console.log("=== Bitcoin-Native Prediction Market Demo (N:M Conditional Swap) ===\n");
+console.log("Powered by Anchr: Cross-HTLC Dual-Preimage + Nostr + TLSNotary\n");
+console.log("\u2501".repeat(60));
+
 // ============================================================
-// Step 1: Oracle generates HTLC keypair
+// Step 1: Oracle creates dual-preimage pair
 // ============================================================
 
-console.log("=== Bitcoin-Native Prediction Market Demo ===\n");
-console.log("Powered by Anchr: Cashu HTLC + Nostr + TLSNotary\n");
-console.log("━".repeat(60));
+console.log("\n--- Step 1: Oracle creates dual-preimage pair ---\n");
 
-console.log("\n--- Step 1: Oracle generates HTLC keypair ---\n");
+const dualStore = createDualPreimageStore();
+const marketId = bytesToHex(randomBytes(16));
+const { hash_a: hashYes, hash_b: hashNo } = dualStore.create(marketId);
 
-const htlc = createMarketHtlc();
-console.log(`  Preimage (secret):  ${htlc.preimage.slice(0, 16)}...`);
-console.log(`  Hash (public):      ${htlc.hash.slice(0, 16)}...`);
-console.log(`  Preimage verified:  ${verifyPreimage(htlc.preimage, htlc.hash)}`);
+console.log(`  Market ID:      ${marketId}`);
+console.log(`  Hash YES (A):   ${hashYes.slice(0, 16)}...`);
+console.log(`  Hash NO  (B):   ${hashNo.slice(0, 16)}...`);
+console.log(`  Two preimages generated — one for each outcome.`);
+console.log(`  Oracle reveals only the winner's preimage; loser's is deleted forever.`);
 
-// Simulated keypairs (in production, derived from Nostr identities)
+// Simulated keypairs
 const creatorPubkey = bytesToHex(randomBytes(32));
 const oraclePubkey = bytesToHex(randomBytes(32));
 const alicePubkey = bytesToHex(randomBytes(32));
 const bobPubkey = bytesToHex(randomBytes(32));
 
 // ============================================================
-// Step 2: Market creator publishes market
+// Step 2: Market creation with dual hashes
 // ============================================================
 
-console.log("\n--- Step 2: Market creator publishes market ---\n");
+console.log("\n--- Step 2: Market creation with dual hashes ---\n");
 
 const resolutionCondition: ResolutionCondition = {
   type: "jsonpath_gt",
@@ -77,13 +86,9 @@ const resolutionCondition: ResolutionCondition = {
 };
 
 const market: PredictionMarket = {
-  id: bytesToHex(randomBytes(16)),
+  id: marketId,
   title: "Will BTC/JPY be above \u00a511,000,000 on resolution date?",
-  description: [
-    "Resolves YES if the BTC/JPY best bid price on bitFlyer is above",
-    "\u00a511,000,000 at the time of resolution. Resolved by TLSNotary proof",
-    "of the bitFlyer public ticker API. No registration required.",
-  ].join(" "),
+  description: "Resolves YES if BTC/JPY best bid > \u00a511M on bitFlyer. TLSNotary verified.",
   category: "crypto",
   creator_pubkey: creatorPubkey,
 
@@ -98,105 +103,122 @@ const market: PredictionMarket = {
   fee_ppm: CREATOR_FEE_PPM,
 
   oracle_pubkey: oraclePubkey,
-  htlc_hash: htlc.hash,
+  htlc_hash_yes: hashYes,
+  htlc_hash_no: hashNo,
 
   nostr_event_id: bytesToHex(randomBytes(32)),
   status: "open",
 };
 
-console.log(`  Market ID:     ${market.id}`);
-console.log(`  Title:         ${market.title}`);
-console.log(`  Category:      ${market.category}`);
-console.log(`  Resolution:    ${market.resolution_url}`);
-console.log(`  Condition:     ${resolutionCondition.description}`);
-console.log(`  Deadline:      ${new Date(RESOLUTION_DEADLINE * 1000).toISOString()}`);
-console.log(`  Min bet:       ${market.min_bet_sats} sat`);
-console.log(`  Creator fee:   ${CREATOR_FEE_PPM / 10_000}%`);
-console.log(`  Oracle fee:    ${ORACLE_FEE_PPM / 10_000}%`);
-console.log();
-console.log("  [Nostr] Published as kind 30078 event to relays");
-console.log("  [Nostr] Tags: #t=anchr-prediction-market, #t=anchr-pm-crypto");
+console.log(`  Title:          ${market.title}`);
+console.log(`  Hash YES:       ${hashYes.slice(0, 16)}...`);
+console.log(`  Hash NO:        ${hashNo.slice(0, 16)}...`);
+console.log(`  Deadline:       ${new Date(RESOLUTION_DEADLINE * 1000).toISOString()}`);
 
 // ============================================================
-// Step 3: Bettors place bets via HTLC escrow
+// Step 3: Bettors place orders via order book
 // ============================================================
 
-console.log("\n--- Step 3: Bettors place bets ---\n");
+console.log("\n--- Step 3: Bettors place orders via order book ---\n");
 
-// Alice bets YES (100 sats)
-const aliceBet: Bet = {
+const orderBook = createOrderBook();
+
+const aliceOrder: OpenOrder = {
   id: bytesToHex(randomBytes(16)),
-  market_id: market.id,
+  market_id: marketId,
   bettor_pubkey: alicePubkey,
   side: "yes",
   amount_sats: 100,
-  cashu_token: "cashuA...(HTLC-locked-token)...",
+  remaining_sats: 100,
   timestamp: Math.floor(Date.now() / 1000),
 };
 
-// Bob bets NO (100 sats)
-const bobBet: Bet = {
+const bobOrder: OpenOrder = {
   id: bytesToHex(randomBytes(16)),
-  market_id: market.id,
+  market_id: marketId,
   bettor_pubkey: bobPubkey,
   side: "no",
   amount_sats: 100,
-  cashu_token: "cashuA...(HTLC-locked-token)...",
+  remaining_sats: 100,
   timestamp: Math.floor(Date.now() / 1000),
 };
 
-// Update pools
-market.yes_pool_sats += aliceBet.amount_sats;
-market.no_pool_sats += bobBet.amount_sats;
+orderBook.addOrder(aliceOrder);
+orderBook.addOrder(bobOrder);
 
-console.log("  Alice (YES bettor):");
-console.log(`    Pubkey:  ${alicePubkey.slice(0, 16)}...`);
-console.log(`    Side:    YES`);
-console.log(`    Amount:  ${aliceBet.amount_sats} sats`);
-console.log(`    HTLC:    hashlock(${htlc.hash.slice(0, 16)}...) + P2PK(Alice)`);
-console.log(`    Escrow:  Cashu token locked — redeemable with preimage + Alice signature`);
-console.log();
-console.log("  Bob (NO bettor):");
-console.log(`    Pubkey:  ${bobPubkey.slice(0, 16)}...`);
-console.log(`    Side:    NO`);
-console.log(`    Amount:  ${bobBet.amount_sats} sats`);
-console.log(`    HTLC:    hashlock(${htlc.hash.slice(0, 16)}...) + locktime(${new Date(RESOLUTION_DEADLINE * 1000).toISOString()})`);
-console.log(`    Escrow:  Cashu token locked — refundable after locktime if NO wins`);
-console.log();
-console.log("  Pool totals:");
-console.log(`    YES pool: ${market.yes_pool_sats} sats`);
-console.log(`    NO pool:  ${market.no_pool_sats} sats`);
-console.log(`    Total:    ${market.yes_pool_sats + market.no_pool_sats} sats`);
+console.log("  Alice (YES): 100 sats");
+console.log("  Bob   (NO):  100 sats");
+console.log(`  Open orders: ${orderBook.getOpenOrders(marketId).length}`);
 
 // ============================================================
-// Step 4: HTLC escrow mechanics explained
+// Step 4: Order book matches → Cross-HTLC
 // ============================================================
 
-console.log("\n--- Step 4: HTLC escrow mechanics ---\n");
+console.log("\n--- Step 4: Order book matching + Cross-HTLC ---\n");
 
-console.log("  YES bets use HTLC with Oracle's hash:");
-console.log("    Spending condition: preimage + bettor_signature");
-console.log("    If YES wins -> Oracle reveals preimage -> YES bettors redeem");
-console.log("    If NO wins  -> HTLC locktime expires -> tokens refund to NO payout pool");
-console.log();
-console.log("  NO bets use time-locked HTLC:");
-console.log("    Spending condition: locktime_expired OR (preimage + bettor_signature)");
-console.log("    If NO wins  -> Locktime expires -> NO bettors claim proportional share");
-console.log("    If YES wins -> Tokens redistributed to YES winners via preimage reveal");
-console.log();
-console.log("  This design uses Anchr's existing NUT-14 HTLC infrastructure:");
-console.log("    - Phase 1: Plain proofs held by market contract (before bettor known)");
-console.log("    - Phase 2: hashlock(hash) + P2PK(bettor) + locktime + refund(market)");
-console.log("    - Redemption: bettor provides preimage + signature to mint");
+const matches = orderBook.matchOrders(marketId);
+console.log(`  Matches found: ${matches.length}`);
+
+for (const m of matches) {
+  console.log(`  Match: YES(${m.yes_order_id.slice(0, 8)}...) <-> NO(${m.no_order_id.slice(0, 8)}...) = ${m.amount_sats} sats`);
+}
+
+// Build cross-HTLC P2PK options (simulated — real version calls createSwapPairTokens)
+console.log("\n  Cross-HTLC token structure:");
+
+const optionsAtoB = buildCrossHtlcForPartyA({
+  hash_b: hashNo,
+  counterpartyPubkey: bobPubkey,
+  refundPubkey: alicePubkey,
+  locktime: RESOLUTION_DEADLINE,
+});
+
+const optionsBtoA = buildCrossHtlcForPartyB({
+  hash_a: hashYes,
+  counterpartyPubkey: alicePubkey,
+  refundPubkey: bobPubkey,
+  locktime: RESOLUTION_DEADLINE,
+});
+
+console.log(`  token_yes_to_no (Alice's sats):`);
+console.log(`    hashlock:  hash_no  → Bob redeems if NO wins`);
+console.log(`    P2PK:      Bob's pubkey`);
+console.log(`    refund:    Alice (after locktime)`);
+console.log(`  token_no_to_yes (Bob's sats):`);
+console.log(`    hashlock:  hash_yes → Alice redeems if YES wins`);
+console.log(`    P2PK:      Alice's pubkey`);
+console.log(`    refund:    Bob (after locktime)`);
+
+market.yes_pool_sats = 100;
+market.no_pool_sats = 100;
+
+// Create simulated bets for payout calculation
+const aliceBet: Bet = {
+  id: aliceOrder.id,
+  market_id: marketId,
+  bettor_pubkey: alicePubkey,
+  side: "yes",
+  amount_sats: 100,
+  escrow_token: "(cross-htlc-token)",
+  timestamp: aliceOrder.timestamp,
+};
+
+const bobBet: Bet = {
+  id: bobOrder.id,
+  market_id: marketId,
+  bettor_pubkey: bobPubkey,
+  side: "no",
+  amount_sats: 100,
+  escrow_token: "(cross-htlc-token)",
+  timestamp: bobOrder.timestamp,
+};
 
 // ============================================================
-// Step 5: Oracle resolution via TLSNotary
+// Step 5: Oracle resolves via TLSNotary + dual-preimage
 // ============================================================
 
-console.log("\n--- Step 5: Oracle resolves market via TLSNotary ---\n");
+console.log("\n--- Step 5: Oracle resolves market ---\n");
 
-// Simulate the bitFlyer API response
-// Real response format: https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY
 const mockBitflyerResponse = JSON.stringify({
   product_code: "BTC_JPY",
   state: "RUNNING",
@@ -208,59 +230,38 @@ const mockBitflyerResponse = JSON.stringify({
   best_ask_size: 0.3,
   total_bid_depth: 1250.5,
   total_ask_depth: 980.3,
-  market_bid_size: 0,
-  market_ask_size: 0,
   ltp: 14_852_000,
   volume: 3456.78,
   volume_by_product: 3456.78,
 });
 
-console.log("  Oracle fetches bitFlyer API via TLSNotary MPC-TLS session...");
-console.log(`  URL: ${BITFLYER_API_URL}`);
-console.log();
-console.log("  TLSNotary proof captures:");
-console.log(`    Server name: api.bitflyer.com (from TLS certificate)`);
-console.log(`    Response body (selective disclosure):`);
-
 const parsed = JSON.parse(mockBitflyerResponse);
-console.log(`      product_code: "${parsed.product_code}"`);
-console.log(`      best_bid:     ${parsed.best_bid.toLocaleString()}`);
-console.log(`      best_ask:     ${parsed.best_ask.toLocaleString()}`);
-console.log(`      ltp:          ${parsed.ltp.toLocaleString()}`);
-console.log(`      timestamp:    ${parsed.timestamp}`);
-
-// Evaluate the condition
-console.log();
-console.log("  Evaluating resolution condition:");
-console.log(`    Condition: best_bid > 11,000,000`);
-
-const extractedValue = extractJsonValue(mockBitflyerResponse, "best_bid");
-console.log(`    Extracted: best_bid = ${extractedValue}`);
+console.log("  TLSNotary proof captures:");
+console.log(`    best_bid: ${parsed.best_bid.toLocaleString()}`);
+console.log(`    ltp:      ${parsed.ltp.toLocaleString()}`);
 
 const conditionMet = evaluateCondition(resolutionCondition, mockBitflyerResponse);
-console.log(`    Result:    ${conditionMet ? "YES (condition met)" : "NO (condition not met)"}`);
+const outcome = conditionMet ? "yes" : "no";
+console.log(`\n  Condition: best_bid > 11,000,000 → ${conditionMet ? "MET" : "NOT MET"}`);
+console.log(`  Outcome:   ${outcome.toUpperCase()}`);
 
-// Perform resolution
-const mockTlsnProof = btoa("mock-tlsn-presentation-" + Date.now());
-const now = Math.floor(Date.now() / 1000);
+// Dual-preimage reveal — the core of N:M conditional swap
+console.log("\n  Dual-preimage reveal:");
 
-const resolution: MarketResolution = resolveMarket(
-  market,
-  mockTlsnProof,
-  "api.bitflyer.com",
-  mockBitflyerResponse,
-  now,
-  htlc.preimage,
-);
+const resolution = resolveMarketDual(marketId, outcome as "yes" | "no", dualStore);
+if (resolution) {
+  console.log(`  Winning preimage (${resolution.outcome.toUpperCase()}): ${resolution.preimage.slice(0, 16)}...`);
+  console.log(`  Losing preimage: PERMANENTLY DELETED`);
 
-console.log();
-console.log(`  Resolution outcome: ${resolution.outcome.toUpperCase()}`);
-if (resolution.preimage) {
-  console.log(`  Preimage revealed:  ${resolution.preimage.slice(0, 16)}...`);
+  // Verify the losing preimage is gone
+  const tryRevealAgain = dualStore.reveal(marketId, outcome === "yes" ? "a" : "b");
+  console.log(`  Second reveal attempt: ${tryRevealAgain === null ? "null (correctly rejected)" : "ERROR: should be null"}`);
+} else {
+  console.log("  ERROR: Resolution failed");
 }
 
 // ============================================================
-// Step 6: Payout distribution
+// Step 6: Winner redeems via preimage
 // ============================================================
 
 console.log("\n--- Step 6: Payout distribution ---\n");
@@ -270,76 +271,51 @@ const oracleFee = calculateOracleFee(totalPool, ORACLE_FEE_PPM);
 const creatorFee = calculateOracleFee(totalPool, CREATOR_FEE_PPM);
 
 console.log(`  Total pool:    ${totalPool} sats`);
-console.log(`  Oracle fee:    ${oracleFee} sats (${ORACLE_FEE_PPM / 10_000}%)`);
-console.log(`  Creator fee:   ${creatorFee} sats (${CREATOR_FEE_PPM / 10_000}%)`);
+console.log(`  Oracle fee:    ${oracleFee} sats`);
+console.log(`  Creator fee:   ${creatorFee} sats`);
 console.log(`  Payable pool:  ${totalPool - oracleFee - creatorFee} sats`);
-console.log();
 
 const allBets = [
   { side: aliceBet.side, amount_sats: aliceBet.amount_sats, bettor_pubkey: aliceBet.bettor_pubkey },
   { side: bobBet.side, amount_sats: bobBet.amount_sats, bettor_pubkey: bobBet.bettor_pubkey },
 ];
 
-const payouts = calculatePayouts(market, resolution.outcome, allBets, ORACLE_FEE_PPM);
-
-if (resolution.outcome === "yes") {
-  console.log("  YES wins! Oracle reveals preimage -> YES bettors redeem HTLC tokens.");
-  console.log();
-  console.log("  Redemption flow:");
-  console.log("    1. Oracle publishes preimage to Nostr (kind 30078 resolution event)");
-  console.log("    2. Alice sees preimage in the resolution event");
-  console.log("    3. Alice provides preimage + her signature to the Cashu mint");
-  console.log("    4. Mint verifies HTLC spending conditions (NUT-14)");
-  console.log("    5. Mint swaps HTLC proofs for fresh, unlocked proofs");
-  console.log();
-  console.log("  Bob's NO tokens:");
-  console.log("    - HTLC locktime has not expired yet (deadline not reached)");
-  console.log("    - But with preimage now public, market contract can redistribute");
-  console.log("    - Bob's tokens are swept into the YES winner payout pool");
-} else {
-  console.log("  NO wins! HTLC locktime expires -> NO bettors claim from refund pool.");
-  console.log();
-  console.log("  Redemption flow:");
-  console.log("    1. Oracle publishes resolution (no preimage) to Nostr");
-  console.log("    2. Resolution deadline passes, HTLC locktime expires");
-  console.log("    3. Bob's NO tokens become refundable from the locktime expiry");
-  console.log("    4. Alice's YES tokens also expire (no preimage to redeem)");
-  console.log("    5. Market contract redistributes all expired tokens to NO bettors");
-}
+const payouts = calculatePayouts(market, outcome as "yes" | "no", allBets, ORACLE_FEE_PPM);
 
 console.log();
-console.log("  Payouts:");
-for (const payout of payouts) {
-  const name = payout.bettor_pubkey === alicePubkey ? "Alice" : "Bob";
-  console.log(`    ${name}: ${payout.payout_sats} sats`);
+if (outcome === "yes") {
+  console.log("  YES wins! Alice redeems Bob's cross-HTLC tokens with preimage_yes.");
+  console.log("  Flow: Alice calls redeemHtlcToken(bobsProofs, preimage_yes, alicePrivKey)");
+} else {
+  console.log("  NO wins! Bob redeems Alice's cross-HTLC tokens with preimage_no.");
+  console.log("  Flow: Bob calls redeemHtlcToken(alicesProofs, preimage_no, bobPrivKey)");
 }
-if (payouts.length === 0) {
-  console.log("    (No winning bets)");
+
+console.log("\n  Payouts:");
+for (const p of payouts) {
+  const name = p.bettor_pubkey === alicePubkey ? "Alice" : "Bob";
+  console.log(`    ${name}: ${p.payout_sats} sats`);
 }
 
 // ============================================================
-// Step 7: Summary
+// Summary
 // ============================================================
 
-console.log("\n" + "━".repeat(60));
+console.log("\n" + "\u2501".repeat(60));
 console.log("\n--- Summary ---\n");
 
-console.log("  Market:     " + market.title);
-console.log("  Source:     bitFlyer API (TLSNotary verified)");
-console.log(`  BTC/JPY:    \u00a5${parsed.best_bid.toLocaleString()}`);
-console.log(`  Threshold:  \u00a5${resolutionCondition.threshold?.toLocaleString()}`);
-console.log(`  Outcome:    ${resolution.outcome.toUpperCase()}`);
+console.log(`  Market:       ${market.title}`);
+console.log(`  BTC/JPY:      \u00a5${parsed.best_bid.toLocaleString()}`);
+console.log(`  Outcome:      ${outcome.toUpperCase()}`);
 console.log();
-console.log("  Technology stack:");
-console.log("    Escrow:     Cashu HTLC (NUT-14) on Lightning");
-console.log("    Discovery:  Nostr kind 30078 events");
-console.log("    Oracle:     TLSNotary proof from api.bitflyer.com");
-console.log("    Settlement: Preimage reveal for YES / locktime expiry for NO");
+console.log("  Protocol layer (N:M Conditional Swap):");
+console.log("    - DualPreimageStore: 2 preimages per swap, winner revealed, loser deleted");
+console.log("    - Cross-HTLC: dual-direction hashlock, opposite-side redemption");
+console.log("    - Order book: FIFO matching with partial fills");
+console.log("    - 1:1 atomic swap is the N=1, M=1 special case");
 console.log();
 console.log("  Why this beats Polymarket:");
 console.log("    - No Polygon. No USDC. No bridges. Just sats.");
 console.log("    - No KYC. No CFTC. No geoblocking. Just Nostr keys.");
 console.log("    - No UMA token voters. No 48h dispute window. Just math.");
 console.log("    - 1 sat minimum bet. Casual markets Polymarket can't touch.");
-console.log();
-console.log("  Learn more: https://github.com/motxx/anchr");

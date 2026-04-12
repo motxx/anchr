@@ -59,7 +59,8 @@ export interface MarketIdentity {
  *   t           — "anchr-pm-{category}" (for category filtering)
  *   p           — Oracle pubkey
  *   expiration  — Resolution deadline (NIP-40)
- *   htlc_hash   — HTLC hash for YES redemption
+ *   htlc_hash_yes — HTLC hash for YES redemption
+ *   htlc_hash_no  — HTLC hash for NO redemption
  */
 export function buildMarketEvent(
   identity: MarketIdentity,
@@ -76,7 +77,8 @@ export function buildMarketEvent(
     max_bet_sats: market.max_bet_sats,
     fee_ppm: market.fee_ppm,
     oracle_pubkey: market.oracle_pubkey,
-    htlc_hash: market.htlc_hash,
+    htlc_hash_yes: market.htlc_hash_yes,
+    htlc_hash_no: market.htlc_hash_no,
   };
 
   const template: EventTemplate = {
@@ -88,7 +90,8 @@ export function buildMarketEvent(
       ["t", `anchr-pm-${market.category}`],
       ["p", market.oracle_pubkey, "", "oracle"],
       ["expiration", String(market.resolution_deadline)],
-      ["htlc_hash", market.htlc_hash],
+      ["htlc_hash_yes", market.htlc_hash_yes],
+      ["htlc_hash_no", market.htlc_hash_no],
       ["title", market.title],
     ],
     content: JSON.stringify(content),

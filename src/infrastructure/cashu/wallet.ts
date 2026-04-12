@@ -20,7 +20,7 @@ export interface CashuConfig {
 }
 
 export function getCashuConfig(): CashuConfig | null {
-  const mintUrl = process.env.CASHU_MINT_URL?.trim();
+  const mintUrl = Deno.env.get("CASHU_MINT_URL")?.trim();
   if (!mintUrl) return null;
   return { mintUrl };
 }

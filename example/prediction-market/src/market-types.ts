@@ -45,8 +45,15 @@ export interface PredictionMarket {
 
   /** Nostr pubkey (hex) of the oracle that will resolve this market. */
   oracle_pubkey: string;
-  /** SHA-256 hash of the preimage the oracle reveals if YES wins. */
-  htlc_hash: string;
+  /** SHA-256 hash of the YES preimage. Oracle reveals if YES wins. */
+  htlc_hash_yes: string;
+  /** SHA-256 hash of the NO preimage. Oracle reveals if NO wins. */
+  htlc_hash_no: string;
+  /**
+   * @deprecated Use htlc_hash_yes. Retained for backward compat.
+   * When set, treated as alias for htlc_hash_yes.
+   */
+  htlc_hash?: string;
 
   // --- Nostr ---
 
@@ -100,10 +107,62 @@ export interface Bet {
   side: "yes" | "no";
   /** Amount wagered in sats. */
   amount_sats: number;
-  /** Cashu token locked in HTLC escrow. */
-  cashu_token: string;
+  /** Escrow token locked in cross-HTLC. */
+  escrow_token: string;
   /** Unix timestamp (seconds) when the bet was placed. */
   timestamp: number;
+}
+
+// --- Matched pairs (N:M conditional swap specialization) ---
+
+/** A matched bet pair — ConditionalSwap's SwapPair specialized for prediction markets. */
+export interface MatchedBetPair {
+  /** Unique pair identifier. */
+  pair_id: string;
+  /** Market this pair belongs to. */
+  market_id: string;
+  /** YES bettor's public key (hex). */
+  yes_pubkey: string;
+  /** NO bettor's public key (hex). */
+  no_pubkey: string;
+  /** Amount matched in sats. */
+  amount_sats: number;
+  /** Escrow token: YES bettor -> NO bettor (redeemable by NO if NO wins). */
+  token_yes_to_no: string;
+  /** Escrow token: NO bettor -> YES bettor (redeemable by YES if YES wins). */
+  token_no_to_yes: string;
+  /** Current status. */
+  status: "pending" | "locked" | "settled_yes" | "settled_no" | "expired";
+}
+
+// --- Open orders ---
+
+/** An open order waiting to be matched in the order book. */
+export interface OpenOrder {
+  /** Unique order identifier. */
+  id: string;
+  /** Market this order is for. */
+  market_id: string;
+  /** Bettor's public key (hex). */
+  bettor_pubkey: string;
+  /** Which side. */
+  side: "yes" | "no";
+  /** Total order amount in sats. */
+  amount_sats: number;
+  /** Remaining unmatched amount in sats. */
+  remaining_sats: number;
+  /** Unix timestamp (seconds) when the order was placed. */
+  timestamp: number;
+}
+
+/** A match proposal from the order book. */
+export interface MatchProposal {
+  /** YES order being matched. */
+  yes_order_id: string;
+  /** NO order being matched. */
+  no_order_id: string;
+  /** Amount to match in sats. */
+  amount_sats: number;
 }
 
 // --- Resolution ---
@@ -152,7 +211,8 @@ export interface MarketEventContent {
   max_bet_sats: number;
   fee_ppm: number;
   oracle_pubkey: string;
-  htlc_hash: string;
+  htlc_hash_yes: string;
+  htlc_hash_no: string;
 }
 
 /**
@@ -162,7 +222,7 @@ export interface BetEventContent {
   market_id: string;
   side: "yes" | "no";
   amount_sats: number;
-  cashu_token: string;
+  escrow_token: string;
 }
 
 /**

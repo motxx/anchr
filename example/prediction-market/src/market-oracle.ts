@@ -87,7 +87,8 @@ export function resolveMarket(
   }
 
   // 3. Verify the preimage matches the market's HTLC hash
-  if (!verifyPreimage(oraclePreimage, market.htlc_hash)) {
+  const expectedHash = market.htlc_hash_yes ?? market.htlc_hash;
+  if (!expectedHash || !verifyPreimage(oraclePreimage, expectedHash)) {
     throw new OracleError("Preimage does not match market HTLC hash");
   }
 
