@@ -1,15 +1,16 @@
 /**
- * E2E tests: FROST 2-of-3 threshold oracle signing.
+ * E2E tests: FROST t-of-n threshold oracle signing with independent Oracles.
  *
- * Three signers (Requester Oracle, Worker Oracle, Anchr Official Oracle)
- * run a full FROST DKG + signing lifecycle through the frost-signer CLI.
+ * Three INDEPENDENT Oracle operators (Anchr, CommunityOracle-A, CommunityOracle-B)
+ * run a full FROST DKG + signing lifecycle. Requester and Worker are NOT signers —
+ * only neutral verifiers participate in threshold signing.
  *
  * Test matrix:
- *   - DKG: all 3 signers derive the same group pubkey
- *   - Signing 2-of-3: any 2 signers produce a valid BIP-340 Schnorr signature
- *   - Signing 1-of-3: below threshold → aggregation fails
+ *   - DKG: all n signers derive the same group pubkey
+ *   - Signing t-of-n: any t signers produce a valid BIP-340 Schnorr signature
+ *   - Signing (t-1)-of-n: below threshold → aggregation fails
  *   - Verification: correct message → true, wrong message → false
- *   - All 3 pairwise combinations produce valid, distinct signatures
+ *   - All pairwise combinations produce valid, distinct signatures
  *
  * Prerequisites:
  *   cd crates/frost-signer && cargo build --release
@@ -21,7 +22,6 @@
 import { describe, test, beforeAll } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  findFrostSigner,
   isFrostSignerAvailable,
   dkgRound1,
   dkgRound2,
@@ -33,16 +33,16 @@ import {
 } from "../src/infrastructure/frost/frost-cli";
 
 // ---------------------------------------------------------------------------
-// Signer names for clarity
+// Oracle operators — all independent, no Requester/Worker
 // ---------------------------------------------------------------------------
-const SIGNERS = ["Requester", "Worker", "Anchr"] as const;
+const ORACLES = ["Anchr", "CommunityOracle-A", "CommunityOracle-B"] as const;
 const THRESHOLD = 2;
 const TOTAL = 3;
 
 // ---------------------------------------------------------------------------
 // DKG state — populated in beforeAll
 // ---------------------------------------------------------------------------
-interface SignerDkgState {
+interface OracleDkgState {
   name: string;
   index: number;
   identifier: string;
@@ -55,7 +55,7 @@ interface SignerDkgState {
   groupPubkey: string;
 }
 
-let signers: SignerDkgState[];
+let oracles: OracleDkgState[];
 let groupPubkey: string;
 let pubkeyPackage: string;
 
@@ -71,18 +71,18 @@ if (!FROST_AVAILABLE) {
 }
 
 // ---------------------------------------------------------------------------
-// E2E: FROST 2-of-3 threshold oracle
+// E2E: FROST t-of-n independent Oracle threshold
 // ---------------------------------------------------------------------------
 
-suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
+suite("e2e: FROST 2-of-3 independent Oracle threshold (Anchr / CommunityOracle-A / CommunityOracle-B)", () => {
   // =========================================================================
   // DKG — run once for all tests
   // =========================================================================
 
   beforeAll(async () => {
-    signers = [];
+    oracles = [];
 
-    // --- Round 1: each signer generates their package ---
+    // --- Round 1 ---
     const round1Results: Array<{
       name: string;
       index: number;
@@ -101,7 +101,7 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
       const identifier = (r.data!.secret_package as Record<string, unknown>).identifier as string;
 
       round1Results.push({
-        name: SIGNERS[i]!,
+        name: ORACLES[i]!,
         index: i + 1,
         secretPackage: secretPkg,
         package: pkg,
@@ -109,24 +109,20 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
       });
     }
 
-    // --- Round 2: each signer processes others' round 1 packages ---
+    // --- Round 2 ---
     const round2Results: Array<{
       secretPackage: string;
       packages: Record<string, string>;
     }> = [];
 
     for (let i = 0; i < TOTAL; i++) {
-      // Build map of OTHER signers' round1 packages
       const othersMap: Record<string, unknown> = {};
       for (let j = 0; j < TOTAL; j++) {
         if (j === i) continue;
         othersMap[round1Results[j]!.identifier] = JSON.parse(round1Results[j]!.package);
       }
 
-      const r = await dkgRound2(
-        round1Results[i]!.secretPackage,
-        JSON.stringify(othersMap),
-      );
+      const r = await dkgRound2(round1Results[i]!.secretPackage, JSON.stringify(othersMap));
       expect(r.ok).toBe(true);
       expect(r.data).toBeDefined();
 
@@ -136,18 +132,15 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
       });
     }
 
-    // --- Round 3: finalize key generation ---
+    // --- Round 3 ---
     for (let i = 0; i < TOTAL; i++) {
-      // Collect round2 packages addressed TO signer i from each other signer
       const round2ForMe: Record<string, unknown> = {};
       for (let j = 0; j < TOTAL; j++) {
         if (j === i) continue;
         const pkgsFromJ = round2Results[j]!.packages as Record<string, unknown>;
-        const myId = round1Results[i]!.identifier;
-        round2ForMe[round1Results[j]!.identifier] = pkgsFromJ[myId];
+        round2ForMe[round1Results[j]!.identifier] = pkgsFromJ[round1Results[i]!.identifier];
       }
 
-      // Build round1 others map (same as round 2 input)
       const othersR1Map: Record<string, unknown> = {};
       for (let j = 0; j < TOTAL; j++) {
         if (j === i) continue;
@@ -162,7 +155,7 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
       expect(r.ok).toBe(true);
       expect(r.data).toBeDefined();
 
-      signers.push({
+      oracles.push({
         name: round1Results[i]!.name,
         index: round1Results[i]!.index,
         identifier: round1Results[i]!.identifier,
@@ -176,63 +169,56 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
       });
     }
 
-    // All signers must agree on the group pubkey
-    groupPubkey = signers[0]!.groupPubkey;
-    pubkeyPackage = signers[0]!.pubkeyPackage;
+    groupPubkey = oracles[0]!.groupPubkey;
+    pubkeyPackage = oracles[0]!.pubkeyPackage;
   });
 
   // =========================================================================
   // DKG verification
   // =========================================================================
 
-  test("DKG: all 3 signers derive the same group pubkey", () => {
-    expect(signers).toHaveLength(3);
-    expect(signers[0]!.groupPubkey).toBe(signers[1]!.groupPubkey);
-    expect(signers[1]!.groupPubkey).toBe(signers[2]!.groupPubkey);
-    expect(groupPubkey).toHaveLength(64); // 32-byte x-only hex
+  test("DKG: all 3 Oracle operators derive the same group pubkey", () => {
+    expect(oracles).toHaveLength(3);
+    expect(oracles[0]!.groupPubkey).toBe(oracles[1]!.groupPubkey);
+    expect(oracles[1]!.groupPubkey).toBe(oracles[2]!.groupPubkey);
+    expect(groupPubkey).toHaveLength(64);
   });
 
-  test("DKG: each signer has a unique key package", () => {
-    const kps = signers.map((s) => s.keyPackage);
+  test("DKG: each Oracle has a unique key package", () => {
+    const kps = oracles.map((s) => s.keyPackage);
     expect(new Set(kps).size).toBe(3);
   });
 
   // =========================================================================
-  // 2-of-3 signing — helper
+  // t-of-n signing — helper
   // =========================================================================
 
   async function signWithPair(
-    signerA: SignerDkgState,
-    signerB: SignerDkgState,
+    oracleA: OracleDkgState,
+    oracleB: OracleDkgState,
     messageHex: string,
   ): Promise<{ signature: string }> {
-    // Round 1: generate nonce commitments
-    const r1a = await signRound1(signerA.keyPackage);
+    const r1a = await signRound1(oracleA.keyPackage);
     expect(r1a.ok).toBe(true);
-    const r1b = await signRound1(signerB.keyPackage);
+    const r1b = await signRound1(oracleB.keyPackage);
     expect(r1b.ok).toBe(true);
 
     const noncesA = JSON.stringify(r1a.data!.nonces);
     const noncesB = JSON.stringify(r1b.data!.nonces);
-    const commitA = r1a.data!.commitments;
-    const commitB = r1b.data!.commitments;
 
-    // Build commitments map
     const commitments: Record<string, unknown> = {};
-    commitments[signerA.identifier] = commitA;
-    commitments[signerB.identifier] = commitB;
+    commitments[oracleA.identifier] = r1a.data!.commitments;
+    commitments[oracleB.identifier] = r1b.data!.commitments;
     const commitmentsJson = JSON.stringify(commitments);
 
-    // Round 2: produce signature shares
-    const r2a = await signRound2(signerA.keyPackage, noncesA, commitmentsJson, messageHex);
+    const r2a = await signRound2(oracleA.keyPackage, noncesA, commitmentsJson, messageHex);
     expect(r2a.ok).toBe(true);
-    const r2b = await signRound2(signerB.keyPackage, noncesB, commitmentsJson, messageHex);
+    const r2b = await signRound2(oracleB.keyPackage, noncesB, commitmentsJson, messageHex);
     expect(r2b.ok).toBe(true);
 
-    // Aggregate
     const shares: Record<string, unknown> = {};
-    shares[signerA.identifier] = r2a.data!.signature_share;
-    shares[signerB.identifier] = r2b.data!.signature_share;
+    shares[oracleA.identifier] = r2a.data!.signature_share;
+    shares[oracleB.identifier] = r2b.data!.signature_share;
 
     const agg = await aggregateSignatures(
       groupPubkey,
@@ -248,50 +234,45 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
   }
 
   // =========================================================================
-  // Signing tests
+  // Signing tests — all combinations of independent Oracles
   // =========================================================================
 
-  test("Sign 2-of-3: Requester + Anchr → valid BIP-340 signature", async () => {
-    const message = "cafebabe01";
-    const { signature } = await signWithPair(signers[0]!, signers[2]!, message);
-    expect(signature).toHaveLength(128); // 64-byte Schnorr sig
+  test("Sign 2-of-3: Anchr + CommunityOracle-A → valid BIP-340 signature", async () => {
+    const { signature } = await signWithPair(oracles[0]!, oracles[1]!, "cafebabe01");
+    expect(signature).toHaveLength(128);
 
-    const ver = await verifySignature(groupPubkey, signature, message);
+    const ver = await verifySignature(groupPubkey, signature, "cafebabe01");
     expect(ver.ok).toBe(true);
     expect(ver.data!.valid).toBe(true);
   });
 
-  test("Sign 2-of-3: Worker + Anchr → valid BIP-340 signature", async () => {
-    const message = "deadbeef02";
-    const { signature } = await signWithPair(signers[1]!, signers[2]!, message);
+  test("Sign 2-of-3: Anchr + CommunityOracle-B → valid BIP-340 signature", async () => {
+    const { signature } = await signWithPair(oracles[0]!, oracles[2]!, "deadbeef02");
 
-    const ver = await verifySignature(groupPubkey, signature, message);
+    const ver = await verifySignature(groupPubkey, signature, "deadbeef02");
     expect(ver.ok).toBe(true);
     expect(ver.data!.valid).toBe(true);
   });
 
-  test("Sign 2-of-3: Requester + Worker → valid BIP-340 signature", async () => {
-    const message = "aabbccdd03";
-    const { signature } = await signWithPair(signers[0]!, signers[1]!, message);
+  test("Sign 2-of-3: CommunityOracle-A + CommunityOracle-B (no Anchr) → valid", async () => {
+    const { signature } = await signWithPair(oracles[1]!, oracles[2]!, "aabbccdd03");
 
-    const ver = await verifySignature(groupPubkey, signature, message);
+    const ver = await verifySignature(groupPubkey, signature, "aabbccdd03");
     expect(ver.ok).toBe(true);
     expect(ver.data!.valid).toBe(true);
   });
 
-  test("different signer pairs on same message produce distinct signatures", async () => {
+  test("all Oracle pairs on same message produce distinct, valid signatures", async () => {
     const message = "11223344";
-    const { signature: sig1 } = await signWithPair(signers[0]!, signers[1]!, message);
-    const { signature: sig2 } = await signWithPair(signers[0]!, signers[2]!, message);
-    const { signature: sig3 } = await signWithPair(signers[1]!, signers[2]!, message);
+    const { signature: sig1 } = await signWithPair(oracles[0]!, oracles[1]!, message);
+    const { signature: sig2 } = await signWithPair(oracles[0]!, oracles[2]!, message);
+    const { signature: sig3 } = await signWithPair(oracles[1]!, oracles[2]!, message);
 
-    // All valid
     for (const sig of [sig1, sig2, sig3]) {
       const ver = await verifySignature(groupPubkey, sig, message);
       expect(ver.data!.valid).toBe(true);
     }
 
-    // All distinct (nonces differ per session)
     expect(new Set([sig1, sig2, sig3]).size).toBe(3);
   });
 
@@ -300,19 +281,16 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
   // =========================================================================
 
   test("wrong message → verification fails", async () => {
-    const { signature } = await signWithPair(signers[0]!, signers[1]!, "aabb");
-
+    const { signature } = await signWithPair(oracles[0]!, oracles[1]!, "aabb");
     const ver = await verifySignature(groupPubkey, signature, "ccdd");
     expect(ver.ok).toBe(true);
     expect(ver.data!.valid).toBe(false);
   });
 
   test("wrong group pubkey → verification fails", async () => {
-    const { signature } = await signWithPair(signers[0]!, signers[1]!, "eeff");
+    const { signature } = await signWithPair(oracles[0]!, oracles[1]!, "eeff");
     const fakePubkey = "0000000000000000000000000000000000000000000000000000000000000001";
-
     const ver = await verifySignature(fakePubkey, signature, "eeff");
-    // Either returns valid:false or an error — both acceptable
     if (ver.ok) {
       expect(ver.data!.valid).toBe(false);
     }
@@ -323,82 +301,194 @@ suite("e2e: FROST 2-of-3 threshold oracle (Requester / Worker / Anchr)", () => {
   // =========================================================================
 
   test("ATTACK: 1-of-3 (below threshold) → aggregation fails", async () => {
-    const signer = signers[0]!;
-    const message = "50505050"; // hex
+    const oracle = oracles[0]!;
+    const message = "50505050";
 
-    const r1 = await signRound1(signer.keyPackage);
+    const r1 = await signRound1(oracle.keyPackage);
     expect(r1.ok).toBe(true);
 
     const commitments: Record<string, unknown> = {};
-    commitments[signer.identifier] = r1.data!.commitments;
+    commitments[oracle.identifier] = r1.data!.commitments;
     const commitmentsJson = JSON.stringify(commitments);
 
     const nonces = JSON.stringify(r1.data!.nonces);
-    const r2 = await signRound2(signer.keyPackage, nonces, commitmentsJson, message);
-    // Round 2 may succeed (signing share is produced) — aggregation should fail
-    if (!r2.ok) {
-      // CLI rejected at round 2 (also acceptable)
-      return;
-    }
+    const r2 = await signRound2(oracle.keyPackage, nonces, commitmentsJson, message);
+    if (!r2.ok) return; // CLI rejected at round 2 (acceptable)
 
     const shares: Record<string, unknown> = {};
-    shares[signer.identifier] = r2.data!.signature_share;
+    shares[oracle.identifier] = r2.data!.signature_share;
 
     const agg = await aggregateSignatures(
-      groupPubkey,
-      commitmentsJson,
-      message,
-      JSON.stringify(shares),
-      pubkeyPackage,
+      groupPubkey, commitmentsJson, message, JSON.stringify(shares), pubkeyPackage,
     );
 
-    // Aggregation MUST fail — only 1 share but threshold is 2
     expect(agg.ok).toBe(false);
   });
 
   // =========================================================================
-  // Full 3-of-3 signing (all participate)
+  // Full n-of-n signing (all participate)
   // =========================================================================
 
-  test("Sign 3-of-3: all signers participate → valid signature", async () => {
-    const message = "aabbccddee00ff11"; // hex
+  test("Sign 3-of-3: all Oracle operators participate → valid signature", async () => {
+    const message = "aabbccddee00ff11";
 
-    // Round 1
-    const r1s = await Promise.all(signers.map((s) => signRound1(s.keyPackage)));
+    const r1s = await Promise.all(oracles.map((o) => signRound1(o.keyPackage)));
     for (const r of r1s) expect(r.ok).toBe(true);
 
     const commitments: Record<string, unknown> = {};
     for (let i = 0; i < TOTAL; i++) {
-      commitments[signers[i]!.identifier] = r1s[i]!.data!.commitments;
+      commitments[oracles[i]!.identifier] = r1s[i]!.data!.commitments;
     }
     const commitmentsJson = JSON.stringify(commitments);
 
-    // Round 2
     const r2s = await Promise.all(
-      signers.map((s, i) =>
-        signRound2(s.keyPackage, JSON.stringify(r1s[i]!.data!.nonces), commitmentsJson, message)
+      oracles.map((o, i) =>
+        signRound2(o.keyPackage, JSON.stringify(r1s[i]!.data!.nonces), commitmentsJson, message)
       ),
     );
     for (const r of r2s) expect(r.ok).toBe(true);
 
     const shares: Record<string, unknown> = {};
     for (let i = 0; i < TOTAL; i++) {
-      shares[signers[i]!.identifier] = r2s[i]!.data!.signature_share;
+      shares[oracles[i]!.identifier] = r2s[i]!.data!.signature_share;
     }
 
-    // Aggregate
     const agg = await aggregateSignatures(
-      groupPubkey,
-      commitmentsJson,
-      message,
-      JSON.stringify(shares),
-      pubkeyPackage,
+      groupPubkey, commitmentsJson, message, JSON.stringify(shares), pubkeyPackage,
     );
     expect(agg.ok).toBe(true);
 
-    const sig = agg.data!.signature as string;
-    const ver = await verifySignature(groupPubkey, sig, message);
+    const ver = await verifySignature(groupPubkey, agg.data!.signature as string, message);
     expect(ver.ok).toBe(true);
     expect(ver.data!.valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// HTTP integration: Oracle server signer endpoints
+// ---------------------------------------------------------------------------
+
+suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verification)", () => {
+  const API_KEY = "frost-e2e-key";
+
+  test("/frost/signer/round1 rejects missing query+result (400)", async () => {
+    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    const app = buildOracleApp({
+      oracleId: "test",
+      apiKey: API_KEY,
+      frostNodeConfig: {
+        signer_index: 1,
+        total_signers: 3,
+        threshold: 2,
+        key_package: {},
+        pubkey_package: {},
+        group_pubkey: "aa".repeat(32),
+        peers: [],
+      },
+    });
+
+    // Missing query and result → must be rejected
+    const res = await app.request("/frost/signer/round1", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": API_KEY },
+      body: JSON.stringify({ message: "deadbeef" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("Missing");
+  });
+
+  test("/frost/signer/round1 rejects failed verification (403)", async () => {
+    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    const app = buildOracleApp({
+      oracleId: "test",
+      apiKey: API_KEY,
+      frostNodeConfig: {
+        signer_index: 1,
+        total_signers: 3,
+        threshold: 2,
+        key_package: {},
+        pubkey_package: {},
+        group_pubkey: "aa".repeat(32),
+        peers: [],
+      },
+    });
+
+    // Provide query+result that will fail verification (no attachments, requires GPS)
+    const res = await app.request("/frost/signer/round1", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": API_KEY },
+      body: JSON.stringify({
+        message: "deadbeef",
+        query: {
+          id: "q1",
+          status: "verifying",
+          description: "test",
+          verification_requirements: ["gps"],
+          created_at: Date.now(),
+          expires_at: Date.now() + 60_000,
+          payment_status: "locked",
+        },
+        result: { attachments: [] },
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("Verification failed");
+  });
+
+  test("/frost/signer/round2 requires nonce_id (400)", async () => {
+    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    const app = buildOracleApp({
+      oracleId: "test",
+      apiKey: API_KEY,
+      frostNodeConfig: {
+        signer_index: 1,
+        total_signers: 3,
+        threshold: 2,
+        key_package: {},
+        pubkey_package: {},
+        group_pubkey: "aa".repeat(32),
+        peers: [],
+      },
+    });
+
+    // Missing nonce_id
+    const res = await app.request("/frost/signer/round2", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": API_KEY },
+      body: JSON.stringify({ commitments: "{}", message: "deadbeef" }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain("nonce_id");
+  });
+
+  test("/frost/signer/round2 rejects unknown nonce_id (409)", async () => {
+    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    const app = buildOracleApp({
+      oracleId: "test",
+      apiKey: API_KEY,
+      frostNodeConfig: {
+        signer_index: 1,
+        total_signers: 3,
+        threshold: 2,
+        key_package: {},
+        pubkey_package: {},
+        group_pubkey: "aa".repeat(32),
+        peers: [],
+      },
+    });
+
+    const res = await app.request("/frost/signer/round2", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": API_KEY },
+      body: JSON.stringify({ commitments: "{}", message: "deadbeef", nonce_id: "nonexistent-id" }),
+    });
+
+    expect(res.status).toBe(409);
   });
 });
