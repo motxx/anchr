@@ -64,6 +64,7 @@ export function querySummary(query: Query) {
     max_gps_distance_km: query.max_gps_distance_km ?? null,
     tlsn_requirements: query.tlsn_requirements ?? null,
     quorum: query.quorum ?? null,
+    visibility: query.visibility ?? null,
   };
 }
 
@@ -99,6 +100,7 @@ export function queryDetail(query: Query, requestUrl: string) {
     payment_status: query.payment_status,
     blossom_keys: query.blossom_keys ?? null,
     attestations: query.attestations ?? null,
+    published_proofs: query.published_proofs ?? null,
     ...(hasTlsn && {
       tlsn_verifier_url: config.tlsnVerifierUrl ?? null,
       tlsn_proxy_url: config.tlsnProxyUrl ?? null,
