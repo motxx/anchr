@@ -17,10 +17,10 @@ import { chromium } from "playwright";
 import { spawn } from "../src/runtime/mod.ts";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
-const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!SQUARE_ACCESS_TOKEN) {
-  console.error("SANDBOX_ACCESS_TOKEN required");
+  console.error("SQUARE_ACCESS_TOKEN required");
   process.exit(1);
 }
 

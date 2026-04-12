@@ -7,7 +7,7 @@
  *   3. Verify — Anchr verifies the proof independently
  *
  * Usage:
- *   SANDBOX_ACCESS_TOKEN=xxx deno run --allow-all --env scripts/demo-payment-proof.ts
+ *   SQUARE_ACCESS_TOKEN=xxx deno run --allow-all --env scripts/demo-payment-proof.ts
  *
  * Prerequisites:
  *   - Anchr server running (deno run --allow-all --env src/reference-app.ts)
@@ -18,10 +18,10 @@
 import { spawn } from "../src/runtime/mod.ts";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
-const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!SQUARE_ACCESS_TOKEN) {
-  console.error("SANDBOX_ACCESS_TOKEN required");
+  console.error("SQUARE_ACCESS_TOKEN required");
   process.exit(1);
 }
 

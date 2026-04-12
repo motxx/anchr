@@ -5,7 +5,7 @@
 #   ./scripts/run-e2e-square.sh
 #
 # Prerequisites:
-#   - SANDBOX_ACCESS_TOKEN in .env (or exported)
+#   - SQUARE_ACCESS_TOKEN in .env (or exported)
 #   - crates/tlsn-prover/target/release/tlsn-prove built
 #   - Docker running
 set -euo pipefail
@@ -44,8 +44,8 @@ if [ -f .env ]; then
   set -a; source .env; set +a
 fi
 
-if [ -z "${SANDBOX_ACCESS_TOKEN:-}" ]; then
-  echo "[error] SANDBOX_ACCESS_TOKEN not set (check .env)"
+if [ -z "${SQUARE_ACCESS_TOKEN:-}" ]; then
+  echo "[error] SQUARE_ACCESS_TOKEN not set (check .env)"
   exit 1
 fi
 

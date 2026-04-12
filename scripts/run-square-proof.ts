@@ -1,8 +1,8 @@
 import { chromium } from "playwright";
 
-const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 if (!SQUARE_ACCESS_TOKEN) {
-  console.error("SANDBOX_ACCESS_TOKEN is required in .env or environment");
+  console.error("SQUARE_ACCESS_TOKEN is required in .env or environment");
   process.exit(1);
 }
 
