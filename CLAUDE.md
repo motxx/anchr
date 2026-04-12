@@ -14,6 +14,17 @@ Default to using Deno instead of Node.js.
 - Use `npx <package> <command>` for CLI tools not yet on JSR
 - Deno auto-loads `.env` via `--env` flag in task definitions. Don't use dotenv.
 
+## Task completion (execute, then prove)
+
+Follow the user's instructions to the end. A task is done when the requested work is actually performed and verified—not when it sounds done in prose.
+
+- **Tests:** Run the tests (or checks) the task calls for. If you report that tests pass, include the relevant terminal output so the result is verifiable.
+- **Browser / mobile / UI:** If verification requires a desktop browser, mobile web (responsive or device viewport), or a native/simulator flow (for example iOS Simulator, Android emulator, or physical device), do that verification and report with concrete evidence—screenshots, short screen recordings, simulator/device logs, or described observable state—not a generic "verified" or "works on mobile" claim.
+- **Parallel work:** Wait for agents, subtasks, or CI-style checks to finish before writing a closing summary. Summarize outcomes after everything relevant has completed.
+- **Tools and failures:** If a command or tool fails, returns an error, or yields an unexpected result, say so in the same turn and continue from the real state—do not imply success or skip over it.
+
+Prefer running commands and using tools over telling the user what they could run. If something is blocked or out of scope, say that explicitly instead of marking the task complete.
+
 ## Import Map (deno.json)
 
 JSR packages (supply-chain safe, no npm):
