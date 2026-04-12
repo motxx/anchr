@@ -14,11 +14,22 @@ export interface BetResult {
   error?: string;
 }
 
+export type ConditionType = "jsonpath_gt" | "jsonpath_lt" | "jsonpath_equals" | "contains_text" | "price_above" | "price_below";
+
+export interface ResolutionCondition {
+  type: ConditionType;
+  jsonpath?: string;
+  threshold?: number;
+  expected_text?: string;
+  description: string;
+}
+
 export interface CreateMarketParams {
   title: string;
   description: string;
   category: MarketCategory;
   resolution_url: string;
+  resolution_condition: ResolutionCondition;
   resolution_deadline: number;
   min_bet_sats: number;
   max_bet_sats?: number;

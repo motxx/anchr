@@ -201,6 +201,7 @@ function marketSummary(m: PredictionMarket) {
     yes_pool_sats: m.yes_pool_sats,
     no_pool_sats: m.no_pool_sats,
     resolution_url: m.resolution_url,
+    resolution_condition: m.resolution_condition,
     resolution_deadline: m.resolution_deadline,
     min_bet_sats: m.min_bet_sats,
     max_bet_sats: m.max_bet_sats,
@@ -375,6 +376,18 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
           target_url: resolution_url,
           description: title,
         };
+
+    // Validate resolution condition
+    const ct = resolution_condition.type;
+    if ((ct === "jsonpath_gt" || ct === "jsonpath_lt" || ct === "price_above" || ct === "price_below") && resolution_condition.threshold === undefined) {
+      return c.json({ error: `resolution_condition.threshold is required for type "${ct}"` }, 400);
+    }
+    if ((ct === "jsonpath_gt" || ct === "jsonpath_lt" || ct === "jsonpath_equals") && !resolution_condition.jsonpath) {
+      return c.json({ error: `resolution_condition.jsonpath is required for type "${ct}"` }, 400);
+    }
+    if ((ct === "contains_text" || ct === "jsonpath_equals") && !resolution_condition.expected_text) {
+      return c.json({ error: `resolution_condition.expected_text is required for type "${ct}"` }, 400);
+    }
 
     // Generate market ID and dual preimage pair
     const id = generateId("mkt");

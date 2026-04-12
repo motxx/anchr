@@ -159,6 +159,17 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                 <span className="text-xs text-muted-foreground block mb-1">Data Source (TLSNotary Verified)</span>
                 <code className="text-xs font-mono text-primary bg-primary/10 px-2 py-1 rounded break-all">{market.resolution_url}</code>
               </div>
+              {market.resolution_condition && (
+                <div>
+                  <span className="text-xs text-muted-foreground block mb-1">Condition (YES if...)</span>
+                  <code className="text-xs font-mono text-foreground bg-muted px-2 py-1 rounded">
+                    {market.resolution_condition.jsonpath && `${market.resolution_condition.jsonpath} `}
+                    {market.resolution_condition.type.replace("jsonpath_", "").replace("price_", "")}
+                    {market.resolution_condition.threshold !== undefined && ` ${market.resolution_condition.threshold.toLocaleString()}`}
+                    {market.resolution_condition.expected_text && ` "${market.resolution_condition.expected_text}"`}
+                  </code>
+                </div>
+              )}
               <div>
                 <span className="text-xs text-muted-foreground block mb-1">Oracle Pubkey</span>
                 <code className="text-xs font-mono text-muted-foreground">{market.oracle_pubkey}</code>

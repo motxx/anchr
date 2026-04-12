@@ -1,12 +1,21 @@
 export type MarketCategory = "crypto" | "sports" | "politics" | "economics" | "custom";
 export type MarketStatus = "open" | "closed" | "resolving" | "resolved_yes" | "resolved_no" | "expired";
 
+export interface ResolutionCondition {
+  type: string;
+  jsonpath?: string;
+  threshold?: number;
+  expected_text?: string;
+  description?: string;
+}
+
 export interface Market {
   id: string;
   title: string;
   description: string;
   category: MarketCategory;
   resolution_url: string;
+  resolution_condition?: ResolutionCondition;
   resolution_deadline: number;
   yes_pool_sats: number;
   no_pool_sats: number;

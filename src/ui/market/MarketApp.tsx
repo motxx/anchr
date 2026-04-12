@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { CATEGORIES, type Market, type MarketCategory } from "./mock-data";
-import { fetchMarkets, createMarket, type CreateMarketParams } from "./api";
+import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api";
 import { Header } from "./components/Header";
 import { StatsBar } from "./components/StatsBar";
 import { MarketCard } from "./components/MarketCard";
@@ -235,9 +235,17 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
   const [categoryVal, setCategoryVal] = useState<MarketCategory>("crypto");
   const [resolutionUrl, setResolutionUrl] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
+  const [conditionType, setConditionType] = useState<ConditionType>("jsonpath_gt");
+  const [jsonpath, setJsonpath] = useState("");
+  const [threshold, setThreshold] = useState("");
+  const [expectedText, setExpectedText] = useState("");
   const [minBetSats, setMinBetSats] = useState("100");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const needsJsonpath = ["jsonpath_gt", "jsonpath_lt", "jsonpath_equals", "price_above", "price_below"].includes(conditionType);
+  const needsThreshold = ["jsonpath_gt", "jsonpath_lt", "price_above", "price_below"].includes(conditionType);
+  const needsExpectedText = ["jsonpath_equals", "contains_text"].includes(conditionType);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,6 +259,13 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
       description: description.trim(),
       category: categoryVal,
       resolution_url: resolutionUrl.trim(),
+      resolution_condition: {
+        type: conditionType,
+        ...(needsJsonpath && jsonpath.trim() ? { jsonpath: jsonpath.trim() } : {}),
+        ...(needsThreshold && threshold ? { threshold: parseFloat(threshold) } : {}),
+        ...(needsExpectedText && expectedText.trim() ? { expected_text: expectedText.trim() } : {}),
+        description: title.trim(),
+      },
       resolution_deadline: Math.floor(new Date(deadlineDate).getTime() / 1000),
       min_bet_sats: parseInt(minBetSats) || 100,
     };
@@ -323,6 +338,68 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
               required
               className="w-full h-9 rounded-lg border border-border bg-muted px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
             />
+          </div>
+
+          {/* Resolution Condition */}
+          <div className="sm:col-span-2 rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+            <label className="text-xs text-muted-foreground block font-medium uppercase tracking-wider">Resolution Condition (YES if...)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground block mb-1">Type</label>
+                <select
+                  value={conditionType}
+                  onChange={(e) => setConditionType(e.target.value as ConditionType)}
+                  className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
+                >
+                  <option value="jsonpath_gt">JSON value &gt; threshold</option>
+                  <option value="jsonpath_lt">JSON value &lt; threshold</option>
+                  <option value="jsonpath_equals">JSON value = expected</option>
+                  <option value="contains_text">Body contains text</option>
+                  <option value="price_above">Price above</option>
+                  <option value="price_below">Price below</option>
+                </select>
+              </div>
+              {needsJsonpath && (
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">JSON Path</label>
+                  <input
+                    type="text"
+                    value={jsonpath}
+                    onChange={(e) => setJsonpath(e.target.value)}
+                    placeholder="best_bid, data.price, etc."
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+              {needsThreshold && (
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Threshold</label>
+                  <input
+                    type="number"
+                    value={threshold}
+                    onChange={(e) => setThreshold(e.target.value)}
+                    placeholder="15000000"
+                    step="any"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+              {needsExpectedText && (
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Expected Text</label>
+                  <input
+                    type="text"
+                    value={expectedText}
+                    onChange={(e) => setExpectedText(e.target.value)}
+                    placeholder="Expected string or value"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Oracle fetches the Resolution URL via TLSNotary, then evaluates this condition against the response.
+            </p>
           </div>
 
           {/* Deadline */}
