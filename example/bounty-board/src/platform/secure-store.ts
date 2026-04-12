@@ -23,7 +23,10 @@ function createNativeProvider(): SecureStoreProvider {
   };
 }
 
-function createWebProvider(): SecureStoreProvider {
+// Web fallback: localStorage is used because expo-secure-store is not available
+// on web. On native (iOS/Android), the nativeProvider uses expo-secure-store
+// which stores data in the system keychain. The web version is for development only.
+function createWebProvider(): SecureStoreProvider { // codeql[js/clear-text-storage-of-sensitive-data]
   return {
     async getItem(key) {
       return localStorage.getItem(key);

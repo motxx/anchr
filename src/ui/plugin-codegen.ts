@@ -32,7 +32,7 @@ const PROXY_URL = '${proxyUrl}';
 export default {
   config: {
     name: 'Anchr: ${hostname}',
-    description: '${query.description.replace(/'/g, "\\'")}',
+    description: '${query.description.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}',
     requests: [{
       method: 'GET',
       host: '${hostname}',

@@ -18,9 +18,9 @@ import type { Query, QueryResult } from "../../domain/types";
 import type { OracleAttestation } from "../../domain/oracle-types";
 import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../cashu/preimage-store";
 
-/** Constant-time string comparison to prevent timing attacks (including length). */
-function safeCompare(a: string, b: string): boolean {
-  // Hash both inputs to fixed-length digests to prevent length leakage.
+// API key comparison — SHA-256 normalizes lengths for timingSafeEqual,
+// NOT used as a password hash. API keys are high-entropy random tokens.
+function safeCompare(a: string, b: string): boolean { // codeql[js/insufficient-password-hash]
   const hashA = createHash("sha256").update(a).digest();
   const hashB = createHash("sha256").update(b).digest();
   return timingSafeEqual(hashA, hashB) && a.length === b.length;

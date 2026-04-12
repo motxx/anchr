@@ -46,10 +46,13 @@ function FileSelector({
             : "border-border hover:border-ring/50 bg-muted/20 hover:bg-muted/40 py-8"
         )}
       >
+        {/* preview is always a blob: URL from URL.createObjectURL(file) — safe to use as src */}
         {preview ? (
           isVideo ? (
+            // codeql[js/xss-through-dom] — preview is a blob URL from URL.createObjectURL, not user-controlled HTML
             <video src={preview} controls muted className="w-full max-h-64 object-contain rounded-md" />
           ) : (
+            // codeql[js/xss-through-dom] — preview is a blob URL from URL.createObjectURL, not user-controlled HTML
             <img src={preview} alt="preview" className="w-full max-h-64 object-contain rounded-md" />
           )
         ) : (

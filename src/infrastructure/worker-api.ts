@@ -30,7 +30,9 @@ export interface WorkerApiDeps {
 
 // --- Auth Middleware ---
 
-function safeCompare(a: string, b: string): boolean {
+// API key comparison — SHA-256 is used to normalize lengths for timingSafeEqual,
+// NOT as a password hash. API keys are high-entropy random tokens, not passwords.
+function safeCompare(a: string, b: string): boolean { // codeql[js/insufficient-password-hash]
   const hashA = createHash("sha256").update(a).digest();
   const hashB = createHash("sha256").update(b).digest();
   return timingSafeEqual(hashA, hashB) && a.length === b.length;
