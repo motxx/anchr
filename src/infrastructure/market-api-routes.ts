@@ -4,6 +4,9 @@
  * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
  * pattern from worker-api-routes.ts. In-memory market store + order book +
  * dual preimage store, wired into Hono.
+ *
+ * State is injectable via `MarketState` for testing. When no state is
+ * provided, default singletons are created (backward compatible).
  */
 
 import { randomUUID } from "node:crypto";
@@ -14,7 +17,6 @@ import type {
   PredictionMarket,
   OpenOrder,
   MatchedBetPair,
-  MatchProposal,
   MarketStatus,
 } from "../../example/prediction-market/src/market-types.ts";
 import { createOrderBook, type OrderBook } from "../../example/prediction-market/src/order-book.ts";
@@ -35,9 +37,13 @@ import {
   createDualPreimageStore,
   type DualPreimageStore,
 } from "./conditional-swap/dual-preimage-store.ts";
-import type { ConditionalSwapDef, FrostConditionalSwapDef } from "../domain/conditional-swap-types.ts";
-import { spawn } from "../runtime/mod.ts";
-import { hexToBytes } from "@noble/hashes/utils.js";
+import {
+  getUserBalance,
+  creditUser,
+  debitUser,
+  isMintReachable,
+  mintProofsFromRegtest,
+} from "./market-wallet.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,170 +55,85 @@ export interface MarketRouteContext {
 }
 
 // ---------------------------------------------------------------------------
-// In-memory stores (created once, shared across requests)
+// MarketState — injectable for testing
 // ---------------------------------------------------------------------------
 
-const markets = new Map<string, PredictionMarket>();
-const matchedPairsStore = new Map<string, MatchedBetPair>();
-const dualPreimageStore: DualPreimageStore = createDualPreimageStore();
+/** All mutable state for the prediction market API. */
+export interface MarketState {
+  markets: Map<string, PredictionMarket>;
+  matchedPairs: Map<string, MatchedBetPair>;
+  orderProofs: Map<string, { pubkey: string; proofs: Proof[] }>;
+  resolvedPreimages: Map<string, string>;
+  resolvedSignatures: Map<string, string>;
+  userProofs: Map<string, Proof[]>;
+  dualPreimageStore: DualPreimageStore;
+  dualKeyStore: DualKeyStore;
+  orderBook: OrderBook;
+  frostMode: "frost" | "single-key";
+  frostConfig?: MarketFrostNodeConfig;
+  /** Override for getCashuWallet — tests can inject a mock. */
+  getCashuWallet?: () => Promise<Wallet | null>;
+}
 
-// Load FROST market config if available (for multi-Oracle threshold signing)
-let marketFrostConfig: MarketFrostNodeConfig | undefined;
-try {
-  const configPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
-  if (configPath) {
-    marketFrostConfig = loadMarketFrostNodeConfig(configPath);
-    console.log(`[market] FROST market config loaded from ${configPath}`);
-    console.log(`[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`);
-    console.log(`[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
-    console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_no.slice(0, 16)}...`);
-  }
-} catch { /* FROST not configured — single-key mode */ }
+/** Create a fresh MarketState. Used for tests and as default state. */
+export function createMarketState(opts?: {
+  frostConfig?: MarketFrostNodeConfig;
+}): MarketState {
+  const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
+  return {
+    markets: new Map(),
+    matchedPairs: new Map(),
+    orderProofs: new Map(),
+    resolvedPreimages: new Map(),
+    resolvedSignatures: new Map(),
+    userProofs: new Map(),
+    dualPreimageStore: createDualPreimageStore(),
+    dualKeyStore,
+    orderBook: createOrderBook(),
+    frostMode,
+    frostConfig: opts?.frostConfig,
+  };
+}
 
-const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(marketFrostConfig);
-console.log(`[market] Resolution mode: ${frostMode}`);
+// ---------------------------------------------------------------------------
+// Default singleton state (backward compat for production)
+// ---------------------------------------------------------------------------
 
-const orderBook: OrderBook = createOrderBook();
-/** Map orderId → { pubkey, proofs } for cross-HTLC execution */
-const orderProofs = new Map<string, { pubkey: string; proofs: Proof[] }>();
-/** Map marketId → winning preimage (stored after resolution for client-side redemption, HTLC mode) */
-const resolvedPreimages = new Map<string, string>();
-/** Map marketId → oracle signature (stored after resolution, FROST P2PK mode) */
-const resolvedSignatures = new Map<string, string>();
+let _defaultState: MarketState | null = null;
+
+function getDefaultState(): MarketState {
+  if (_defaultState) return _defaultState;
+
+  let marketFrostConfig: MarketFrostNodeConfig | undefined;
+  try {
+    const configPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
+    if (configPath) {
+      marketFrostConfig = loadMarketFrostNodeConfig(configPath);
+      console.log(`[market] FROST market config loaded from ${configPath}`);
+      console.log(`[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`);
+      console.log(`[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
+      console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_no.slice(0, 16)}...`);
+    }
+  } catch { /* FROST not configured — single-key mode */ }
+
+  _defaultState = createMarketState({ frostConfig: marketFrostConfig });
+  console.log(`[market] Resolution mode: ${_defaultState.frostMode}`);
+  return _defaultState;
+}
 
 // Cashu wallet — initialized lazily when CASHU_MINT_URL is set
-let cashuWallet: Wallet | null = null;
-async function getCashuWallet(): Promise<Wallet | null> {
+let _cashuWallet: Wallet | null = null;
+async function getCashuWalletDefault(): Promise<Wallet | null> {
   const mintUrl = Deno.env.get("CASHU_MINT_URL");
   if (!mintUrl) return null;
-  if (cashuWallet) return cashuWallet;
+  if (_cashuWallet) return _cashuWallet;
   try {
-    cashuWallet = new Wallet(mintUrl, { unit: "sat" });
-    await cashuWallet.loadMint();
-    return cashuWallet;
+    _cashuWallet = new Wallet(mintUrl, { unit: "sat" });
+    await _cashuWallet.loadMint();
+    return _cashuWallet;
   } catch {
     return null;
   }
-}
-
-// ---------------------------------------------------------------------------
-// Per-user proof storage (pubkey → Proof[])
-// ---------------------------------------------------------------------------
-
-const userProofs = new Map<string, Proof[]>();
-
-/** Get user balance from stored proofs. */
-function getUserBalance(pubkey: string): number {
-  const proofs = userProofs.get(pubkey) ?? [];
-  return proofs.reduce((sum, p) => sum + p.amount, 0);
-}
-
-/** Append proofs to a user's balance. */
-function creditUser(pubkey: string, proofs: Proof[]): void {
-  const existing = userProofs.get(pubkey) ?? [];
-  userProofs.set(pubkey, [...existing, ...proofs]);
-}
-
-/**
- * Deduct proofs from a user's balance. Uses wallet.send() to split
- * proofs to exact amount when an exact match is not available.
- * Returns the exact-amount proofs on success, or null on failure.
- */
-async function debitUser(
-  pubkey: string,
-  amountSats: number,
-  wallet: Wallet,
-): Promise<Proof[] | null> {
-  const proofs = userProofs.get(pubkey) ?? [];
-  const balance = proofs.reduce((sum, p) => sum + p.amount, 0);
-  if (balance < amountSats) return null;
-
-  // Try exact combination first (greedy largest-first)
-  const sorted = [...proofs].sort((a, b) => b.amount - a.amount);
-  const selected: Proof[] = [];
-  let selectedTotal = 0;
-  for (const p of sorted) {
-    if (selectedTotal >= amountSats) break;
-    selected.push(p);
-    selectedTotal += p.amount;
-  }
-
-  if (selectedTotal < amountSats) return null;
-
-  if (selectedTotal === amountSats) {
-    // Exact match — remove selected from user's store
-    const remaining = proofs.filter(
-      (p) => !selected.some((s) => s.C === p.C),
-    );
-    userProofs.set(pubkey, remaining);
-    return selected;
-  }
-
-  // Need to split via mint — send exact amount, keep change
-  try {
-    await wallet.loadMint();
-    const { send, keep } = await wallet.ops.send(amountSats, selected).run();
-    // Remove the selected proofs and add back the change
-    const remaining = proofs.filter(
-      (p) => !selected.some((s) => s.C === p.C),
-    );
-    userProofs.set(pubkey, [...remaining, ...keep]);
-    return send;
-  } catch (err) {
-    console.error(
-      "[market-wallet] Failed to split proofs:",
-      err instanceof Error ? err.message : err,
-    );
-    return null;
-  }
-}
-
-/** Check if the Cashu mint is reachable at the given URL. */
-async function isMintReachable(mintUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${mintUrl}/v1/info`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    await res.body?.cancel();
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Pay a Lightning invoice via lnd-user docker container. */
-async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
-  try {
-    const proc = spawn(
-      [
-        "docker", "compose", "exec", "-T", "lnd-user",
-        "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-        "payinvoice", "--force", bolt11,
-      ],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Mint fresh Cashu proofs via regtest Lightning.
- * Creates a mint quote, pays the Lightning invoice via lnd-user, then
- * claims the proofs from the mint.
- */
-async function mintProofsFromRegtest(
-  wallet: Wallet,
-  amountSats: number,
-): Promise<Proof[]> {
-  const mintQuote = await wallet.createMintQuote(amountSats);
-  const paid = await payInvoiceViaLndUser(mintQuote.request);
-  if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-  // Brief pause for mint to register the payment
-  await new Promise((r) => setTimeout(r, 2000));
-  return wallet.mintProofs(amountSats, mintQuote.quote);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,10 +144,10 @@ function generateId(prefix: string): string {
   return `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
-function marketSummary(m: PredictionMarket) {
-  const orders = Array.from(matchedPairsStore.values()).filter((p) => p.market_id === m.id);
-  const preimage = resolvedPreimages.get(m.id);
-  const oracleSignature = resolvedSignatures.get(m.id);
+function marketSummary(m: PredictionMarket, state: MarketState) {
+  const orders = Array.from(state.matchedPairs.values()).filter((p) => p.market_id === m.id);
+  const preimage = state.resolvedPreimages.get(m.id);
+  const oracleSignature = state.resolvedSignatures.get(m.id);
   return {
     id: m.id,
     title: m.title,
@@ -261,8 +182,10 @@ function marketSummary(m: PredictionMarket) {
 // ---------------------------------------------------------------------------
 
 // deno-lint-ignore no-explicit-any
-export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): void {
+export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, injectedState?: MarketState): void {
   const { writeAuth, rateLimit } = ctx;
+  const s = injectedState ?? getDefaultState();
+  const getWallet = s.getCashuWallet ?? getCashuWalletDefault;
   const mkt = new Hono();
 
   // -----------------------------------------------------------------------
@@ -271,11 +194,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
   mkt.get("/", (c) => {
     const category = c.req.query("category");
-    let list = Array.from(markets.values());
+    let list = Array.from(s.markets.values());
     if (category) {
       list = list.filter((m) => m.category === category);
     }
-    return c.json(list.map(marketSummary));
+    return c.json(list.map((m) => marketSummary(m, s)));
   });
 
   // -----------------------------------------------------------------------
@@ -285,7 +208,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
   mkt.get("/wallet/balance", (c) => {
     const pubkey = c.req.query("pubkey");
     if (!pubkey) return c.json({ error: "pubkey query param is required" }, 400);
-    return c.json({ pubkey, balance_sats: getUserBalance(pubkey) });
+    return c.json({ pubkey, balance_sats: getUserBalance(s.userProofs, pubkey) });
   });
 
   // -----------------------------------------------------------------------
@@ -293,7 +216,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
   // -----------------------------------------------------------------------
 
   mkt.post("/wallet/faucet", rateLimit, async (c) => {
-    const wallet = await getCashuWallet();
+    const wallet = await getWallet();
     if (!wallet) {
       return c.json(
         { error: "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d" },
@@ -325,11 +248,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
     try {
       const proofs = await mintProofsFromRegtest(wallet, amount_sats);
-      creditUser(pubkey, proofs);
+      creditUser(s.userProofs, pubkey, proofs);
       return c.json({
         pubkey,
         funded_sats: amount_sats,
-        balance_sats: getUserBalance(pubkey),
+        balance_sats: getUserBalance(s.userProofs, pubkey),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -345,11 +268,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
   mkt.get("/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
-    const market = markets.get(id);
+    const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
-    const openOrders = orderBook.getOpenOrders(id);
-    const matchedPairs = Array.from(matchedPairsStore.values()).filter((b) => b.market_id === id);
+    const openOrders = s.orderBook.getOpenOrders(id);
+    const matchedPairs = Array.from(s.matchedPairs.values()).filter((b) => b.market_id === id);
 
     // If a pubkey is provided, include that user's matched pairs with win status
     const queryPubkey = c.req.query("pubkey");
@@ -375,7 +298,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       : undefined;
 
     return c.json({
-      ...marketSummary(market),
+      ...marketSummary(market, s),
       resolution_url: market.resolution_url,
       resolution_condition: market.resolution_condition,
       oracle_pubkey: market.oracle_pubkey,
@@ -454,8 +377,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
     // Generate market ID, dual preimage pair (HTLC fallback), and FROST keypairs
     const id = generateId("mkt");
-    const hashes = dualPreimageStore.create(id);
-    const frostKeys = dualKeyStore.create(id);
+    const hashes = s.dualPreimageStore.create(id);
+    const frostKeys = s.dualKeyStore.create(id);
 
     const market: PredictionMarket = {
       id,
@@ -480,9 +403,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       status: "open",
     };
 
-    markets.set(id, market);
+    s.markets.set(id, market);
 
-    return c.json(marketSummary(market), 201);
+    return c.json(marketSummary(market, s), 201);
   });
 
   // -----------------------------------------------------------------------
@@ -493,7 +416,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
-    const market = markets.get(id);
+    const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
     if (market.status !== "open") {
       return c.json({ error: `Market is not open (status: ${market.status})` }, 409);
@@ -544,9 +467,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       }
     } else {
       // Path 2: Deduct from server-side user balance
-      const wallet = await getCashuWallet();
-      if (wallet && getUserBalance(bettor_pubkey) >= amount_sats) {
-        const debited = await debitUser(bettor_pubkey, amount_sats, wallet);
+      const wallet = await getWallet();
+      if (wallet && getUserBalance(s.userProofs, bettor_pubkey) >= amount_sats) {
+        const debited = await debitUser(s.userProofs, bettor_pubkey, amount_sats, wallet);
         if (debited) {
           proofs = debited;
           proofSource = "balance";
@@ -566,9 +489,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       remaining_sats: amount_sats,
       timestamp: Math.floor(Date.now() / 1000),
     };
-    orderBook.addOrder(order);
+    s.orderBook.addOrder(order);
     if (proofs.length > 0) {
-      orderProofs.set(orderId, { pubkey: bettor_pubkey, proofs });
+      s.orderProofs.set(orderId, { pubkey: bettor_pubkey, proofs });
     }
 
     // Update market pool totals
@@ -579,19 +502,19 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     }
 
     // Run matching
-    const proposals = orderBook.matchOrders(id);
+    const proposals = s.orderBook.matchOrders(id);
     const newPairs: MatchedBetPair[] = [];
 
     for (const proposal of proposals) {
-      const yesEntry = orderProofs.get(proposal.yes_order_id);
-      const noEntry = orderProofs.get(proposal.no_order_id);
+      const yesEntry = s.orderProofs.get(proposal.yes_order_id);
+      const noEntry = s.orderProofs.get(proposal.no_order_id);
 
       // If both sides have real Cashu proofs, lock them with P2PK conditions.
       // FROST P2PK is preferred (2-of-2 multisig: group_pubkey + counterparty).
       // Falls back to HTLC hashlock if FROST keys are unavailable.
       if (yesEntry && noEntry && yesEntry.proofs.length > 0 && noEntry.proofs.length > 0) {
         try {
-          const wallet = await getCashuWallet();
+          const wallet = await getWallet();
           if (wallet) {
             await wallet.loadMint();
 
@@ -632,18 +555,18 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
             // Lock YES->NO: A's proofs locked with P2PK conditions
             // Proofs from debitUser are fresh plain proofs. We send them with P2PK conditions.
             // Use net amount after fees to avoid "Not enough funds" error.
-            const yesTotal = yesEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
+            const yesTotal = yesEntry.proofs.reduce((acc: number, p: Proof) => acc + p.amount, 0);
             const yesFee = wallet.getFeesForProofs(yesEntry.proofs);
             const yesNet = yesTotal - yesFee;
             const { send: sendA, keep: keepA } = await wallet.ops.send(Math.min(proposal.amount_sats, yesNet), yesEntry.proofs).asP2PK(optionsAtoB).run();
-            if (keepA.length > 0) creditUser(yesEntry.pubkey, keepA);
+            if (keepA.length > 0) creditUser(s.userProofs, yesEntry.pubkey, keepA);
 
             // Lock NO->YES: B's proofs locked with P2PK conditions
-            const noTotal = noEntry.proofs.reduce((s: number, p: Proof) => s + p.amount, 0);
+            const noTotal = noEntry.proofs.reduce((acc: number, p: Proof) => acc + p.amount, 0);
             const noFee = wallet.getFeesForProofs(noEntry.proofs);
             const noNet = noTotal - noFee;
             const { send: sendB, keep: keepB } = await wallet.ops.send(Math.min(proposal.amount_sats, noNet), noEntry.proofs).asP2PK(optionsBtoA).run();
-            if (keepB.length > 0) creditUser(noEntry.pubkey, keepB);
+            if (keepB.length > 0) creditUser(s.userProofs, noEntry.pubkey, keepB);
 
             const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? "";
             const pairId = generateId("pair");
@@ -657,7 +580,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
               token_no_to_yes: getEncodedToken({ mint: mintUrl, proofs: sendB }),
               status: "locked",
             };
-            matchedPairsStore.set(pairId, pair);
+            s.matchedPairs.set(pairId, pair);
             newPairs.push(pair);
             continue;
           }
@@ -678,7 +601,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
         token_no_to_yes: "",
         status: "locked",
       };
-      matchedPairsStore.set(pairId, pair);
+      s.matchedPairs.set(pairId, pair);
       newPairs.push(pair);
     }
 
@@ -709,7 +632,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
-    const market = markets.get(id);
+    const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
     if (market.status !== "open" && market.status !== "closed") {
@@ -729,7 +652,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     }
 
     // Determine resolution mode: FROST P2PK (preferred) or HTLC preimage (fallback)
-    const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no && dualKeyStore.has(id);
+    const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no && s.dualKeyStore.has(id);
 
     let resolvedPreimage: string | undefined;
     let oracleSignature: string | undefined;
@@ -741,11 +664,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
       let sig: string | null = null;
 
-      if (frostMode === "frost" && marketFrostConfig) {
+      if (s.frostMode === "frost" && s.frostConfig) {
         // Multi-Oracle threshold signing via peer coordination
         const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
         sig = await frostDualKeySignAsync(
-          marketFrostConfig,
+          s.frostConfig,
           swapOutcome,
           signMessage,
           verifiedBody ? {
@@ -756,25 +679,25 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
         );
       } else {
         // Single-key signing (demo mode)
-        sig = dualKeyStore.sign(id, swapOutcome, signMessage);
+        sig = s.dualKeyStore.sign(id, swapOutcome, signMessage);
       }
 
       if (!sig) {
-        return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: frostMode }, 503);
+        return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
       }
       oracleSignature = sig;
-      resolvedSignatures.set(id, sig);
+      s.resolvedSignatures.set(id, sig);
 
       // Also resolve HTLC side for backward compatibility
-      resolveMarket(id, outcome, dualPreimageStore);
+      resolveMarket(id, outcome, s.dualPreimageStore);
     } else {
       // HTLC preimage mode (fallback)
-      const result = resolveMarket(id, outcome, dualPreimageStore);
+      const result = resolveMarket(id, outcome, s.dualPreimageStore);
       if (!result) {
         return c.json({ error: "Resolution failed — preimage not found or already revealed" }, 500);
       }
       resolvedPreimage = result.preimage;
-      resolvedPreimages.set(id, result.preimage);
+      s.resolvedPreimages.set(id, result.preimage);
     }
 
     // Update market status
@@ -789,7 +712,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       amount_sats: number;
     }> = [];
 
-    for (const pair of matchedPairsStore.values()) {
+    for (const pair of s.matchedPairs.values()) {
       if (pair.market_id !== id || pair.status !== "locked") continue;
       pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
 
@@ -823,7 +746,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
-    const market = markets.get(id);
+    const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
     const isResolved = market.status === "resolved_yes" || market.status === "resolved_no";
@@ -841,8 +764,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
     if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
 
-    const preimage = resolvedPreimages.get(id);
-    const oracleSignature = resolvedSignatures.get(id);
+    const preimage = s.resolvedPreimages.get(id);
+    const oracleSignature = s.resolvedSignatures.get(id);
 
     if (!preimage && !oracleSignature) {
       return c.json({ error: "Resolution attestation not found — market may not be fully resolved" }, 500);
@@ -863,7 +786,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       oracle_pubkey?: string;
     }> = [];
 
-    for (const pair of matchedPairsStore.values()) {
+    for (const pair of s.matchedPairs.values()) {
       if (pair.market_id !== id) continue;
 
       const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
@@ -897,10 +820,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
-    if (!markets.has(id)) return c.json({ error: "Market not found" }, 404);
+    if (!s.markets.has(id)) return c.json({ error: "Market not found" }, 404);
 
     const side = c.req.query("side") as "yes" | "no" | undefined;
-    const orders = orderBook.getOpenOrders(id, side);
+    const orders = s.orderBook.getOpenOrders(id, side);
 
     return c.json(
       orders.map((o) => ({
@@ -919,7 +842,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
   // --- FROST signer endpoints for market resolution (peer-to-peer signing) ---
   // signing-coordinator.ts calls /frost/signer/round1,2 on peer nodes.
 
-  if (frostMode === "frost" && marketFrostConfig) {
+  if (s.frostMode === "frost" && s.frostConfig) {
+    const frostCfg = s.frostConfig;
     const pendingMarketNonces = new Map<string, { nonces: string; outcomeKey: "a" | "b" }>();
 
     app.post("/frost/signer/round1", writeAuth, async (c) => {
@@ -928,7 +852,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
         query?: { id: string; resolution_url?: string };
         result?: { verified_body: string };
       }>().catch(() => null);
-      if (!reqBody?.message || !marketFrostConfig) {
+      if (!reqBody?.message || !frostCfg) {
         return c.json({ error: "Missing message or FROST not configured" }, 400);
       }
 
@@ -942,7 +866,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
       // Independent condition evaluation (the security guarantee)
       if (reqBody.result?.verified_body) {
-        const mkt = markets.get(marketId);
+        const mkt = s.markets.get(marketId);
         if (mkt?.resolution_condition) {
           const condMet = evaluateCondition(mkt.resolution_condition, reqBody.result.verified_body);
           if ((condMet ? "yes" : "no") !== sigOutcome) {
@@ -952,7 +876,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
       }
 
       const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
-      const keyPkg = outcomeKey === "a" ? marketFrostConfig.key_package : marketFrostConfig.key_package_no;
+      const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
       const { signRound1 } = await import("./frost/frost-cli.ts");
       const r1 = await signRound1(JSON.stringify(keyPkg));
       if (!r1.ok) return c.json({ error: r1.error }, 500);
@@ -964,14 +888,14 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 
     app.post("/frost/signer/round2", writeAuth, async (c) => {
       const reqBody = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
-      if (!reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id || !marketFrostConfig) {
+      if (!reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id || !frostCfg) {
         return c.json({ error: "Missing fields" }, 400);
       }
       const stored = pendingMarketNonces.get(reqBody.nonce_id);
       if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
       pendingMarketNonces.delete(reqBody.nonce_id);
 
-      const keyPkg = stored.outcomeKey === "a" ? marketFrostConfig.key_package : marketFrostConfig.key_package_no;
+      const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
       const { signRound2 } = await import("./frost/frost-cli.ts");
       const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
       if (!r2.ok) return c.json({ error: r2.error }, 500);
@@ -986,12 +910,20 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/** Clear all in-memory stores. Visible for testing. */
+/**
+ * Clear all in-memory stores. Visible for testing.
+ *
+ * @deprecated Prefer injecting a fresh `createMarketState()` into
+ *   `registerMarketRoutes()` for fully isolated tests.
+ */
 export function _clearMarketStoresForTest(): void {
-  markets.clear();
-  matchedPairsStore.clear();
-  orderProofs.clear();
-  userProofs.clear();
-  resolvedPreimages.clear();
-  resolvedSignatures.clear();
+  if (!_defaultState) return;
+  _defaultState.markets.clear();
+  _defaultState.matchedPairs.clear();
+  _defaultState.orderProofs.clear();
+  _defaultState.userProofs.clear();
+  _defaultState.resolvedPreimages.clear();
+  _defaultState.resolvedSignatures.clear();
+  // Reset singleton so next call creates fresh state
+  _defaultState = null;
 }
