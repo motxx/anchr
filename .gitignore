@@ -67,7 +67,8 @@ test-results
 .envrc
 
 # claude code
-.claude/
+.claude/*
+!.claude/settings.json
 
 # generated reports
 docs/chaos-*.md

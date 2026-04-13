@@ -1,0 +1,5 @@
+#!/bin/sh
+# Architecture lint pre-commit backstop.
+# Enable with: deno task setup:hooks
+# (which runs `git config core.hooksPath scripts/git-hooks`)
+exec deno task lint:arch --errors-only
