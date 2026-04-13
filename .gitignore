@@ -77,3 +77,4 @@ docs/chaos-*.md
 # example apps
 example/bounty-board/node_modules/
 example/bounty-board/.expo/
+.frost-market/
