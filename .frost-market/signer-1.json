@@ -1,0 +1,70 @@
+{
+  "signer_index": 1,
+  "total_signers": 3,
+  "threshold": 2,
+  "peers": [
+    {
+      "signer_index": 1,
+      "endpoint": "http://localhost:4001",
+      "api_key": "frost-market-key"
+    },
+    {
+      "signer_index": 2,
+      "endpoint": "http://localhost:4002",
+      "api_key": "frost-market-key"
+    },
+    {
+      "signer_index": 3,
+      "endpoint": "http://localhost:4003",
+      "api_key": "frost-market-key"
+    }
+  ],
+  "key_package": {
+    "header": {
+      "ciphersuite": "FROST-secp256k1-SHA256-TR-v1",
+      "version": 0
+    },
+    "identifier": "0000000000000000000000000000000000000000000000000000000000000001",
+    "min_signers": 2,
+    "signing_share": "51a193e93b09d76acb20129e8aacfd1fa706b74d6aecb3b1eea3735c8f65c640",
+    "verifying_key": "02d24d48db8d5694ca309acfa8be87d70ccb1235d6e08f76deb5561fdce19c4c8e",
+    "verifying_share": "023b2deb611e1be2fc6bd373780cda1c87fa440eb6a158c3bd617f4e8a66ca6ede"
+  },
+  "pubkey_package": {
+    "header": {
+      "ciphersuite": "FROST-secp256k1-SHA256-TR-v1",
+      "version": 0
+    },
+    "verifying_key": "02d24d48db8d5694ca309acfa8be87d70ccb1235d6e08f76deb5561fdce19c4c8e",
+    "verifying_shares": {
+      "0000000000000000000000000000000000000000000000000000000000000001": "023b2deb611e1be2fc6bd373780cda1c87fa440eb6a158c3bd617f4e8a66ca6ede",
+      "0000000000000000000000000000000000000000000000000000000000000002": "024b9a54ab9087374d6748c026347e7795e748b446ae9a3fa900db4984d047e601",
+      "0000000000000000000000000000000000000000000000000000000000000003": "03ea44e7c758f81ec628f3f7e1825e1f653f876587020c084b2042beae779c9aab"
+    }
+  },
+  "group_pubkey": "d24d48db8d5694ca309acfa8be87d70ccb1235d6e08f76deb5561fdce19c4c8e",
+  "key_package_no": {
+    "header": {
+      "ciphersuite": "FROST-secp256k1-SHA256-TR-v1",
+      "version": 0
+    },
+    "identifier": "0000000000000000000000000000000000000000000000000000000000000001",
+    "min_signers": 2,
+    "signing_share": "9bf05e81842251857dab72a9c26cc12dbc5b4636ed0aea7ac6504d08dc201604",
+    "verifying_key": "03246f0427d06dc9d5b3d558d0ebc7469bf0b06036bdbe4e535cc1ded3bfe32b19",
+    "verifying_share": "0296bc9b3f0e4fa3bc0cc65bc41804449ff4613dc8c0a84582d97f0a23f5f0ff80"
+  },
+  "pubkey_package_no": {
+    "header": {
+      "ciphersuite": "FROST-secp256k1-SHA256-TR-v1",
+      "version": 0
+    },
+    "verifying_key": "03246f0427d06dc9d5b3d558d0ebc7469bf0b06036bdbe4e535cc1ded3bfe32b19",
+    "verifying_shares": {
+      "0000000000000000000000000000000000000000000000000000000000000001": "0296bc9b3f0e4fa3bc0cc65bc41804449ff4613dc8c0a84582d97f0a23f5f0ff80",
+      "0000000000000000000000000000000000000000000000000000000000000002": "02d59dfee20e3d7a4abc22c90251a7d5fc917de7d30c63e5e98b612878c087c992",
+      "0000000000000000000000000000000000000000000000000000000000000003": "02aaedd605188e30ed3122c0af163ed0d0c57c10b9e47c52a6e7a46da45b13207c"
+    }
+  },
+  "group_pubkey_no": "246f0427d06dc9d5b3d558d0ebc7469bf0b06036bdbe4e535cc1ded3bfe32b19"
+}

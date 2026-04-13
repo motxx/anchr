@@ -396,6 +396,68 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     return c.json({ signature_share: result.data!.signature_share });
   });
 
+  // --- Compatibility: signing-coordinator.ts calls /frost/signer/round1,2 ---
+  // Map these to the market-specific handlers that include condition evaluation.
+
+  app.post("/frost/signer/round1", authMiddleware, async (c) => {
+    const body = await c.req.json<{
+      message: string;
+      query?: { id: string; type: string; resolution_url: string };
+      result?: { verified_body: string };
+    }>().catch(() => null);
+
+    if (!body?.message || !state.frostConfig) {
+      return c.json({ error: "Missing message or FROST not configured" }, 400);
+    }
+
+    // Extract market ID and outcome from the signing message: "{marketId}:{outcome}"
+    const msgBytes = new Uint8Array(body.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+    const msgText = new TextDecoder().decode(msgBytes);
+    const [marketId, outcome] = msgText.split(":");
+
+    if (!marketId || !outcome || (outcome !== "yes" && outcome !== "no")) {
+      return c.json({ error: `Cannot parse market message: ${msgText}` }, 400);
+    }
+
+    // Independent condition evaluation if verified_body is provided
+    if (body.result?.verified_body) {
+      const market = state.markets.get(marketId);
+      if (market) {
+        const conditionMet = evaluateCondition(market.resolution_condition, body.result.verified_body);
+        const localOutcome = conditionMet ? "yes" : "no";
+        if (localOutcome !== outcome) {
+          return c.json({ error: "Condition evaluation disagrees", local_outcome: localOutcome }, 403);
+        }
+      }
+    }
+
+    const outcomeKey = outcome === "yes" ? "a" : "b";
+    const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
+    const { signRound1 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const result = await signRound1(JSON.stringify(keyPackage));
+    if (!result.ok) return c.json({ error: result.error }, 500);
+
+    const nonceId = crypto.randomUUID();
+    pendingMarketNonces.set(nonceId, { nonces: JSON.stringify(result.data!.nonces), outcomeKey });
+    return c.json({ commitments: result.data!.commitments, nonce_id: nonceId });
+  });
+
+  app.post("/frost/signer/round2", authMiddleware, async (c) => {
+    const body = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
+    if (!body?.commitments || !body?.message || !body?.nonce_id || !state.frostConfig) {
+      return c.json({ error: "Missing fields or FROST not configured" }, 400);
+    }
+    const stored = pendingMarketNonces.get(body.nonce_id);
+    if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
+    pendingMarketNonces.delete(body.nonce_id);
+
+    const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
+    const { signRound2 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const result = await signRound2(JSON.stringify(keyPackage), stored.nonces, body.commitments, body.message);
+    if (!result.ok) return c.json({ error: result.error }, 500);
+    return c.json({ signature_share: result.data!.signature_share });
+  });
+
   return { app, state };
 }
 
