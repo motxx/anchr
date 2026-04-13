@@ -22,10 +22,15 @@ import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "./conditional-
 import {
   buildFrostSwapForPartyA,
   buildFrostSwapForPartyB,
-  createDualKeyStore,
   type DualKeyStore,
 } from "./conditional-swap/frost-conditional-swap.ts";
+import {
+  createAdaptiveDualKeyStore,
+  frostDualKeySignAsync,
+} from "./conditional-swap/frost-dual-key-store.ts";
+import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "./frost/market-frost-config.ts";
 import { resolveMarket } from "../../example/prediction-market/src/resolution.ts";
+import { evaluateCondition } from "../../example/prediction-market/src/market-oracle.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
@@ -50,7 +55,23 @@ export interface MarketRouteContext {
 const markets = new Map<string, PredictionMarket>();
 const matchedPairsStore = new Map<string, MatchedBetPair>();
 const dualPreimageStore: DualPreimageStore = createDualPreimageStore();
-const dualKeyStore: DualKeyStore = createDualKeyStore();
+
+// Load FROST market config if available (for multi-Oracle threshold signing)
+let marketFrostConfig: MarketFrostNodeConfig | undefined;
+try {
+  const configPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
+  if (configPath) {
+    marketFrostConfig = loadMarketFrostNodeConfig(configPath);
+    console.log(`[market] FROST market config loaded from ${configPath}`);
+    console.log(`[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`);
+    console.log(`[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
+    console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_no.slice(0, 16)}...`);
+  }
+} catch { /* FROST not configured — single-key mode */ }
+
+const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(marketFrostConfig);
+console.log(`[market] Resolution mode: ${frostMode}`);
+
 const orderBook: OrderBook = createOrderBook();
 /** Map orderId → { pubkey, proofs } for cross-HTLC execution */
 const orderProofs = new Map<string, { pubkey: string; proofs: Proof[] }>();
@@ -714,13 +735,32 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
     let oracleSignature: string | undefined;
 
     if (useFrost) {
-      // FROST P2PK mode: Oracle signs a message with the winning outcome's key.
-      // The message is the market ID + outcome, used as attestation.
+      // FROST P2PK mode: Oracle signs with the winning outcome's key.
       const signMessage = new TextEncoder().encode(`${id}:${outcome}`);
       const swapOutcome = outcome === "yes" ? "a" : "b";
-      const sig = dualKeyStore.sign(id, swapOutcome, signMessage);
+
+      let sig: string | null = null;
+
+      if (frostMode === "frost" && marketFrostConfig) {
+        // Multi-Oracle threshold signing via peer coordination
+        const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
+        sig = await frostDualKeySignAsync(
+          marketFrostConfig,
+          swapOutcome,
+          signMessage,
+          verifiedBody ? {
+            market_id: id,
+            resolution_url: market.resolution_url,
+            verified_body: verifiedBody,
+          } : undefined,
+        );
+      } else {
+        // Single-key signing (demo mode)
+        sig = dualKeyStore.sign(id, swapOutcome, signMessage);
+      }
+
       if (!sig) {
-        return c.json({ error: "Resolution failed — FROST signing failed or already signed" }, 500);
+        return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: frostMode }, 503);
       }
       oracleSignature = sig;
       resolvedSignatures.set(id, sig);
@@ -875,6 +915,71 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext): v
   });
 
   app.route("/markets", mkt);
+
+  // --- FROST signer endpoints for market resolution (peer-to-peer signing) ---
+  // signing-coordinator.ts calls /frost/signer/round1,2 on peer nodes.
+
+  if (frostMode === "frost" && marketFrostConfig) {
+    const pendingMarketNonces = new Map<string, { nonces: string; outcomeKey: "a" | "b" }>();
+
+    app.post("/frost/signer/round1", writeAuth, async (c) => {
+      const reqBody = await c.req.json<{
+        message: string;
+        query?: { id: string; resolution_url?: string };
+        result?: { verified_body: string };
+      }>().catch(() => null);
+      if (!reqBody?.message || !marketFrostConfig) {
+        return c.json({ error: "Missing message or FROST not configured" }, 400);
+      }
+
+      // Parse "{marketId}:{outcome}" from the signing message
+      const msgBytes = new Uint8Array(reqBody.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+      const msgText = new TextDecoder().decode(msgBytes);
+      const [marketId, sigOutcome] = msgText.split(":");
+      if (!marketId || (sigOutcome !== "yes" && sigOutcome !== "no")) {
+        return c.json({ error: `Cannot parse message: ${msgText}` }, 400);
+      }
+
+      // Independent condition evaluation (the security guarantee)
+      if (reqBody.result?.verified_body) {
+        const mkt = markets.get(marketId);
+        if (mkt?.resolution_condition) {
+          const condMet = evaluateCondition(mkt.resolution_condition, reqBody.result.verified_body);
+          if ((condMet ? "yes" : "no") !== sigOutcome) {
+            return c.json({ error: "Condition evaluation disagrees" }, 403);
+          }
+        }
+      }
+
+      const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
+      const keyPkg = outcomeKey === "a" ? marketFrostConfig.key_package : marketFrostConfig.key_package_no;
+      const { signRound1 } = await import("./frost/frost-cli.ts");
+      const r1 = await signRound1(JSON.stringify(keyPkg));
+      if (!r1.ok) return c.json({ error: r1.error }, 500);
+
+      const nonceId = crypto.randomUUID();
+      pendingMarketNonces.set(nonceId, { nonces: JSON.stringify(r1.data!.nonces), outcomeKey });
+      return c.json({ commitments: r1.data!.commitments, nonce_id: nonceId });
+    });
+
+    app.post("/frost/signer/round2", writeAuth, async (c) => {
+      const reqBody = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
+      if (!reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id || !marketFrostConfig) {
+        return c.json({ error: "Missing fields" }, 400);
+      }
+      const stored = pendingMarketNonces.get(reqBody.nonce_id);
+      if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
+      pendingMarketNonces.delete(reqBody.nonce_id);
+
+      const keyPkg = stored.outcomeKey === "a" ? marketFrostConfig.key_package : marketFrostConfig.key_package_no;
+      const { signRound2 } = await import("./frost/frost-cli.ts");
+      const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
+      if (!r2.ok) return c.json({ error: r2.error }, 500);
+      return c.json({ signature_share: r2.data!.signature_share });
+    });
+
+    console.log("[market] FROST signer endpoints registered (/frost/signer/round1,2)");
+  }
 }
 
 // ---------------------------------------------------------------------------
