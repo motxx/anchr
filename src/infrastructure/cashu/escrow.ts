@@ -292,8 +292,9 @@ export async function swapHtlcBindWorker(
  *   3. **Server-side verification** of HTLC conditions (hashlock + P2PK)
  *   4. Swap signed proofs for fresh, unlocked proofs on the mint
  *
- * Step 3 is critical: Nutshell 0.19.2 does NOT enforce NUT-14 spending
- * conditions on /v1/swap, so we verify locally before sending to the Mint.
+ * Step 3 provides defense-in-depth: the Mint enforces NUT-14 spending
+ * conditions on /v1/swap (verified: Nutshell 0.19.2 rejects missing witness),
+ * but we also verify locally to fail fast before the network round-trip.
  */
 export async function redeemHtlcToken(
   htlcProofs: Proof[],
@@ -346,8 +347,8 @@ function verifyHtlcSpendAuth(signedProofs: Proof[]): string | null {
  *
  * Used by the Oracle/server to verify that a set of HTLC proofs
  * have valid witness (preimage + signature) BEFORE revealing the preimage
- * or accepting the swap. This compensates for Mints that don't enforce
- * NUT-14 spending conditions.
+ * or accepting the swap. Provides defense-in-depth alongside the Mint's
+ * own NUT-14 enforcement (fail fast before network round-trip).
  *
  * @returns null if all proofs pass, or an error message describing the failure.
  */

@@ -307,9 +307,9 @@ suite("e2e: FROST P2PK + real Cashu mint — trustless prediction market flow", 
   //   Alice's proofs are locked with P2PK([group_pubkey_no, bob], n=2)
   //   Bob has his own key, but needs oracle NO key — which was never signed.
   //
-  //   NOTE: Nutshell 0.19.2 does NOT enforce NUT-11 P2PK spending conditions
-  //   on /v1/swap, so we verify at the client/protocol level using cashu-ts
-  //   signP2PKProofs. A compliant mint WILL reject these.
+  //   NOTE: Nutshell 0.19.2 DOES enforce NUT-11 P2PK spending conditions
+  //   on /v1/swap (returns 400 without valid witness). We additionally verify
+  //   at the client/protocol level using signP2PKProofs for defense-in-depth.
   // -------------------------------------------------------------------------
 
   test("7. Bob cannot produce valid 2-of-2 signature without oracle NO key", () => {
