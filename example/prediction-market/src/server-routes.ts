@@ -605,18 +605,30 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       newPairs.push(pair);
     }
 
+    // Non-custodial: return counterparty's locked token to the bettor immediately.
+    // The mint enforces P2PK spending conditions (verified: Nutshell 0.19.2),
+    // so holding the token string without the correct signatures is harmless.
+    // The bettor can only redeem after Oracle produces the winning FROST signature.
     return c.json({
       order_id: orderId,
       side,
       amount_sats,
       cashu_locked: proofs.length > 0,
       proof_source: proofSource,
-      matches: newPairs.map((p) => ({
-        pair_id: p.pair_id,
-        amount_sats: p.amount_sats,
-        status: p.status,
-        has_htlc: p.token_yes_to_no !== "",
-      })),
+      matches: newPairs.map((p) => {
+        // Give each bettor the token they CAN redeem if they win:
+        // YES bettor receives token_no_to_yes (Bob's sats, redeemable if YES wins)
+        // NO bettor receives token_yes_to_no (Alice's sats, redeemable if NO wins)
+        const redeemable_token = side === "yes" ? p.token_no_to_yes : p.token_yes_to_no;
+        return {
+          pair_id: p.pair_id,
+          amount_sats: p.amount_sats,
+          status: p.status,
+          has_htlc: p.token_yes_to_no !== "",
+          // Non-custodial: token distributed at match time, not at redeem time
+          redeemable_token: redeemable_token || undefined,
+        };
+      }),
       market: {
         yes_pool_sats: market.yes_pool_sats,
         no_pool_sats: market.no_pool_sats,
@@ -773,43 +785,36 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
     const outcome = market.status === "resolved_yes" ? "yes" : "no";
 
-    // Find all matched pairs where this pubkey is the winner
-    const winningPairs: Array<{
-      pair_id: string;
-      token: string;
-      amount_sats: number;
-      /** HTLC mode: preimage for redemption. */
-      preimage?: string;
-      /** FROST P2PK mode: Oracle's Schnorr signature for redemption. */
-      oracle_signature?: string;
-      /** Which group pubkey the signature corresponds to. */
-      oracle_pubkey?: string;
-    }> = [];
+    // Non-custodial: the user already holds the counterparty's locked token
+    // (received at match time). The redeem endpoint only provides the Oracle's
+    // attestation (signature or preimage) needed to satisfy the spending condition.
+    // The user combines: locked_token + oracle_attestation + own_signature → mint.
 
+    const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
+
+    // Count how many winning pairs this user has
+    let winningPairCount = 0;
+    let totalWinningSats = 0;
     for (const pair of s.matchedPairs.values()) {
       if (pair.market_id !== id) continue;
-
       const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
-      if (winnerPubkey !== pubkey) continue;
-
-      // The winner's redeemable token:
-      // YES wins -> winner gets token_no_to_yes (locked to group_pubkey_a / hash_a)
-      // NO wins  -> winner gets token_yes_to_no (locked to group_pubkey_b / hash_b)
-      const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
-
-      // For FROST P2PK: include the oracle pubkey so client knows which key signed
-      const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
-
-      winningPairs.push({
-        pair_id: pair.pair_id,
-        token: redeemableToken,
-        amount_sats: pair.amount_sats,
-        ...(preimage ? { preimage } : {}),
-        ...(oracleSignature ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
-      });
+      if (winnerPubkey === pubkey) {
+        winningPairCount++;
+        totalWinningSats += pair.amount_sats;
+      }
     }
 
-    return c.json({ pairs: winningPairs });
+    return c.json({
+      outcome,
+      winning_pairs: winningPairCount,
+      total_winning_sats: totalWinningSats,
+      // The attestation needed to redeem at the mint:
+      ...(oracleSignature ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
+      ...(preimage ? { preimage } : {}),
+      // Instructions: combine with the locked token you received at match time
+      // + sign with your private key → swap at mint
+      redeem_instructions: "Use wallet.receive(token, { privkey, preimage_or_signatures }) at the Cashu mint",
+    });
   });
 
   // -----------------------------------------------------------------------

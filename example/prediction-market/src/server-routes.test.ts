@@ -534,39 +534,39 @@ describe("Market API: redemption", () => {
     });
   });
 
-  test("winner gets oracle_signature", async () => {
+  test("winner gets oracle_signature (non-custodial)", async () => {
     const res = await app.request(`${BASE}/markets/${marketId}/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "alice" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { pairs: Array<{ oracle_signature?: string; amount_sats: number }> };
-    expect(json.pairs).toHaveLength(1);
-    expect(json.pairs[0]!.amount_sats).toBe(100);
-    expect(json.pairs[0]!.oracle_signature).toBeTruthy();
+    const json = await res.json() as { winning_pairs: number; total_winning_sats: number; oracle_signature?: string };
+    expect(json.winning_pairs).toBe(1);
+    expect(json.total_winning_sats).toBe(100);
+    expect(json.oracle_signature).toBeTruthy();
   });
 
-  test("loser gets nothing", async () => {
+  test("loser gets zero winning pairs", async () => {
     const res = await app.request(`${BASE}/markets/${marketId}/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "bob" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { pairs: unknown[] };
-    expect(json.pairs).toHaveLength(0);
+    const json = await res.json() as { winning_pairs: number };
+    expect(json.winning_pairs).toBe(0);
   });
 
-  test("non-participant gets nothing", async () => {
+  test("non-participant gets zero winning pairs", async () => {
     const res = await app.request(`${BASE}/markets/${marketId}/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "charlie" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { pairs: unknown[] };
-    expect(json.pairs).toHaveLength(0);
+    const json = await res.json() as { winning_pairs: number };
+    expect(json.winning_pairs).toBe(0);
   });
 
   test("redeem on unresolved market returns 409", async () => {
@@ -794,17 +794,17 @@ describe("Market API: full lifecycle", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "alice" }),
     });
-    const redeemJson = await redeemRes.json() as { pairs: Array<{ oracle_signature?: string }> };
-    expect(redeemJson.pairs).toHaveLength(1);
-    expect(redeemJson.pairs[0]!.oracle_signature).toBeTruthy();
+    const redeemJson = await redeemRes.json() as { winning_pairs: number; oracle_signature?: string };
+    expect(redeemJson.winning_pairs).toBe(1);
+    expect(redeemJson.oracle_signature).toBeTruthy();
 
     const bobRedeem = await app.request(`${BASE}/markets/${marketId}/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "bob" }),
     });
-    const bobJson = await bobRedeem.json() as { pairs: unknown[] };
-    expect(bobJson.pairs).toHaveLength(0);
+    const bobJson = await bobRedeem.json() as { winning_pairs: number };
+    expect(bobJson.winning_pairs).toBe(0);
   });
 
   test("NO resolution lifecycle", async () => {
@@ -836,16 +836,16 @@ describe("Market API: full lifecycle", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "bob" }),
     });
-    const bobJson = await bobRedeem.json() as { pairs: Array<{ oracle_signature?: string }> };
-    expect(bobJson.pairs).toHaveLength(1);
-    expect(bobJson.pairs[0]!.oracle_signature).toBeTruthy();
+    const bobJson = await bobRedeem.json() as { winning_pairs: number; oracle_signature?: string };
+    expect(bobJson.winning_pairs).toBe(1);
+    expect(bobJson.oracle_signature).toBeTruthy();
 
     const aliceRedeem = await app.request(`${BASE}/markets/${marketId}/redeem`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "alice" }),
     });
-    const aliceJson = await aliceRedeem.json() as { pairs: unknown[] };
-    expect(aliceJson.pairs).toHaveLength(0);
+    const aliceJson = await aliceRedeem.json() as { winning_pairs: number };
+    expect(aliceJson.winning_pairs).toBe(0);
   });
 });
