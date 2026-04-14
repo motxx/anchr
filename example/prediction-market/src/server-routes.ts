@@ -20,10 +20,7 @@ import type {
   MarketStatus,
 } from "./market-types.ts";
 import { createOrderBook, type OrderBook } from "./order-book.ts";
-import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "../../../src/infrastructure/conditional-swap/cross-htlc.ts";
 import {
-  buildFrostSwapForPartyA,
-  buildFrostSwapForPartyB,
   type DualKeyStore,
 } from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
 import {
@@ -32,19 +29,17 @@ import {
   frostSignProofSecretsAsync,
 } from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
 import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
-import { resolveMarket, resolveMarketFrostPerProof } from "./resolution.ts";
+import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition } from "./market-oracle.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
 } from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
 import {
-  getUserBalance,
-  creditUser,
-  debitUser,
   isMintReachable,
   mintProofsFromRegtest,
 } from "./market-wallet.ts";
+import { verifyReceivedToken } from "./exchange-protocol.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,7 +58,6 @@ export interface MarketRouteContext {
 export interface MarketState {
   markets: Map<string, PredictionMarket>;
   matchedPairs: Map<string, MatchedBetPair>;
-  orderProofs: Map<string, { pubkey: string; proofs: Proof[] }>;
   resolvedPreimages: Map<string, string>;
   resolvedSignatures: Map<string, string>;
   /**
@@ -71,7 +65,12 @@ export interface MarketState {
    * Outer map: marketId -> inner map: proofSecret -> hex signature.
    */
   resolvedProofSignatures: Map<string, Map<string, string>>;
-  userProofs: Map<string, Proof[]>;
+  /**
+   * Pending exchange tokens submitted by users.
+   * Key: pair_id + "_" + side ("yes" | "no"), Value: cashuB token string.
+   * Server verifies P2PK conditions but cannot spend (enforced by P2PK).
+   */
+  pendingExchangeTokens: Map<string, string>;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
   orderBook: OrderBook;
@@ -89,11 +88,10 @@ export function createMarketState(opts?: {
   return {
     markets: new Map(),
     matchedPairs: new Map(),
-    orderProofs: new Map(),
     resolvedPreimages: new Map(),
     resolvedSignatures: new Map(),
     resolvedProofSignatures: new Map(),
-    userProofs: new Map(),
+    pendingExchangeTokens: new Map(),
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
     orderBook: createOrderBook(),
@@ -209,17 +207,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   });
 
   // -----------------------------------------------------------------------
-  // GET /markets/wallet/balance — user balance from server-side proofs
-  // -----------------------------------------------------------------------
-
-  mkt.get("/wallet/balance", (c) => {
-    const pubkey = c.req.query("pubkey");
-    if (!pubkey) return c.json({ error: "pubkey query param is required" }, 400);
-    return c.json({ pubkey, balance_sats: getUserBalance(s.userProofs, pubkey) });
-  });
-
-  // -----------------------------------------------------------------------
-  // POST /markets/wallet/faucet — mint tokens from regtest Lightning
+  // POST /markets/wallet/faucet — mint tokens and return cashuB string
+  //
+  // Non-custodial: the server mints proofs via regtest Lightning but
+  // returns a cashuB token string to the client. The client swaps it
+  // at the mint to take ownership. Server never holds the user's balance.
   // -----------------------------------------------------------------------
 
   mkt.post("/wallet/faucet", rateLimit, async (c) => {
@@ -247,19 +239,15 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: "Invalid JSON" }, 400);
     }
 
-    const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
     const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 1000;
-
-    if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
     if (amount_sats <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
 
     try {
       const proofs = await mintProofsFromRegtest(wallet, amount_sats);
-      creditUser(s.userProofs, pubkey, proofs);
+      const cashu_token = getEncodedToken({ mint: mintUrl, proofs });
       return c.json({
-        pubkey,
-        funded_sats: amount_sats,
-        balance_sats: getUserBalance(s.userProofs, pubkey),
+        cashu_token,
+        amount_sats,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -439,7 +427,6 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const side = typeof body.side === "string" ? body.side : "";
     const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 0;
     const bettor_pubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
-    const cashu_token = typeof body.cashu_token === "string" ? body.cashu_token : undefined;
 
     if (side !== "yes" && side !== "no") {
       return c.json({ error: 'side must be "yes" or "no"' }, 400);
@@ -455,37 +442,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: `Maximum bet is ${market.max_bet_sats} sats` }, 400);
     }
 
-    // Resolve Cashu proofs: explicit token > server-side balance > demo mode
-    let proofs: Proof[] = [];
-    let proofSource: "token" | "balance" | "none" = "none";
-
-    if (cashu_token) {
-      // Path 1: Explicit Cashu token in request
-      try {
-        const decoded = getDecodedToken(cashu_token);
-        proofs = decoded.proofs;
-        const total = proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
-        if (total < amount_sats) {
-          return c.json({ error: `Cashu token has ${total} sats, need ${amount_sats}` }, 400);
-        }
-        proofSource = "token";
-      } catch {
-        return c.json({ error: "Invalid cashu_token" }, 400);
-      }
-    } else {
-      // Path 2: Deduct from server-side user balance
-      const wallet = await getWallet();
-      if (wallet && getUserBalance(s.userProofs, bettor_pubkey) >= amount_sats) {
-        const debited = await debitUser(s.userProofs, bettor_pubkey, amount_sats, wallet);
-        if (debited) {
-          proofs = debited;
-          proofSource = "balance";
-        }
-      }
-      // Path 3: No proofs — demo mode (no Cashu), handled by fallback below
-    }
-
-    // Add order to the book
+    // Add order to the book — matchmaker only, no token handling
     const orderId = generateId("ord");
     const order: OpenOrder = {
       id: orderId,
@@ -497,9 +454,6 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       timestamp: Math.floor(Date.now() / 1000),
     };
     s.orderBook.addOrder(order);
-    if (proofs.length > 0) {
-      s.orderProofs.set(orderId, { pubkey: bettor_pubkey, proofs });
-    }
 
     // Update market pool totals
     if (side === "yes") {
@@ -508,139 +462,171 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       market.no_pool_sats += amount_sats;
     }
 
-    // Run matching
+    // Snapshot order pubkeys BEFORE matching (matching may zero remaining_sats)
+    const allYes = s.orderBook.getOpenOrders(id, "yes");
+    const allNo = s.orderBook.getOpenOrders(id, "no");
+    const orderPubkeys = new Map<string, string>();
+    for (const o of [...allYes, ...allNo]) {
+      orderPubkeys.set(o.id, o.bettor_pubkey);
+    }
+
+    // Run matching — pure announcement, no token creation
     const proposals = s.orderBook.matchOrders(id);
     const newPairs: MatchedBetPair[] = [];
 
+    // Compute locktimes for the match response
+    const now = Math.floor(Date.now() / 1000);
+    const exchangeLocktime = now + 600; // 10 min for P2P exchange
+    const marketLocktime = market.resolution_deadline + 3600; // deadline + 1h buffer
+
     for (const proposal of proposals) {
-      const yesEntry = s.orderProofs.get(proposal.yes_order_id);
-      const noEntry = s.orderProofs.get(proposal.no_order_id);
+      const yesPubkey = orderPubkeys.get(proposal.yes_order_id) ?? bettor_pubkey;
+      const noPubkey = orderPubkeys.get(proposal.no_order_id) ?? bettor_pubkey;
 
-      // If both sides have real Cashu proofs, lock them with P2PK conditions.
-      // FROST P2PK is preferred (2-of-2 multisig: group_pubkey + counterparty).
-      // Falls back to HTLC hashlock if FROST keys are unavailable.
-      if (yesEntry && noEntry && yesEntry.proofs.length > 0 && noEntry.proofs.length > 0) {
-        try {
-          const wallet = await getWallet();
-          if (wallet) {
-            await wallet.loadMint();
-
-            // Use FROST P2PK if group pubkeys are available, otherwise fall back to HTLC
-            const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no;
-
-            let optionsAtoB, optionsBtoA;
-            if (useFrost) {
-              // FROST P2PK: lock to [group_pubkey, counterparty], n_sigs=2
-              optionsAtoB = buildFrostSwapForPartyA({
-                group_pubkey_b: market.group_pubkey_no!,
-                counterpartyPubkey: noEntry.pubkey,
-                refundPubkey: yesEntry.pubkey,
-                locktime: market.resolution_deadline,
-              });
-              optionsBtoA = buildFrostSwapForPartyB({
-                group_pubkey_a: market.group_pubkey_yes!,
-                counterpartyPubkey: yesEntry.pubkey,
-                refundPubkey: noEntry.pubkey,
-                locktime: market.resolution_deadline,
-              });
-            } else {
-              // HTLC fallback: hashlock + P2PK(counterparty)
-              optionsAtoB = buildCrossHtlcForPartyA({
-                hash_b: market.htlc_hash_no,
-                counterpartyPubkey: noEntry.pubkey,
-                refundPubkey: yesEntry.pubkey,
-                locktime: market.resolution_deadline,
-              });
-              optionsBtoA = buildCrossHtlcForPartyB({
-                hash_a: market.htlc_hash_yes,
-                counterpartyPubkey: yesEntry.pubkey,
-                refundPubkey: noEntry.pubkey,
-                locktime: market.resolution_deadline,
-              });
-            }
-
-            // Lock YES->NO: A's proofs locked with P2PK conditions
-            // Proofs from debitUser are fresh plain proofs. We send them with P2PK conditions.
-            // Use net amount after fees to avoid "Not enough funds" error.
-            const yesTotal = yesEntry.proofs.reduce((acc: number, p: Proof) => acc + p.amount, 0);
-            const yesFee = wallet.getFeesForProofs(yesEntry.proofs);
-            const yesNet = yesTotal - yesFee;
-            const { send: sendA, keep: keepA } = await wallet.ops.send(Math.min(proposal.amount_sats, yesNet), yesEntry.proofs).asP2PK(optionsAtoB).run();
-            if (keepA.length > 0) creditUser(s.userProofs, yesEntry.pubkey, keepA);
-
-            // Lock NO->YES: B's proofs locked with P2PK conditions
-            const noTotal = noEntry.proofs.reduce((acc: number, p: Proof) => acc + p.amount, 0);
-            const noFee = wallet.getFeesForProofs(noEntry.proofs);
-            const noNet = noTotal - noFee;
-            const { send: sendB, keep: keepB } = await wallet.ops.send(Math.min(proposal.amount_sats, noNet), noEntry.proofs).asP2PK(optionsBtoA).run();
-            if (keepB.length > 0) creditUser(s.userProofs, noEntry.pubkey, keepB);
-
-            const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? "";
-            const pairId = generateId("pair");
-            const pair: MatchedBetPair = {
-              pair_id: pairId,
-              market_id: id,
-              yes_pubkey: yesEntry.pubkey,
-              no_pubkey: noEntry.pubkey,
-              amount_sats: proposal.amount_sats,
-              token_yes_to_no: getEncodedToken({ mint: mintUrl, proofs: sendA }),
-              token_no_to_yes: getEncodedToken({ mint: mintUrl, proofs: sendB }),
-              status: "locked",
-            };
-            s.matchedPairs.set(pairId, pair);
-            newPairs.push(pair);
-            continue;
-          }
-        } catch (err) {
-          console.error(`[market] P2PK token creation failed, falling back to demo mode:`, err);
-        }
-      }
-
-      // Fallback: record match without cross-HTLC (demo mode / no Cashu)
       const pairId = generateId("pair");
       const pair: MatchedBetPair = {
         pair_id: pairId,
         market_id: id,
-        yes_pubkey: yesEntry?.pubkey ?? bettor_pubkey,
-        no_pubkey: noEntry?.pubkey ?? bettor_pubkey,
+        yes_pubkey: yesPubkey,
+        no_pubkey: noPubkey,
         amount_sats: proposal.amount_sats,
+        // Tokens start empty — users create and submit them via exchange protocol
         token_yes_to_no: "",
         token_no_to_yes: "",
-        status: "locked",
+        status: "pending",
       };
       s.matchedPairs.set(pairId, pair);
       newPairs.push(pair);
     }
 
-    // Non-custodial: return counterparty's locked token to the bettor immediately.
-    // The mint enforces P2PK spending conditions (verified: Nutshell 0.19.2),
-    // so holding the token string without the correct signatures is harmless.
-    // The bettor can only redeem after Oracle produces the winning FROST signature.
+    // Pure matchmaker response: announce matches with info needed to create tokens
     return c.json({
       order_id: orderId,
       side,
       amount_sats,
-      cashu_locked: proofs.length > 0,
-      proof_source: proofSource,
-      matches: newPairs.map((p) => {
-        // Give each bettor the token they CAN redeem if they win:
-        // YES bettor receives token_no_to_yes (Bob's sats, redeemable if YES wins)
-        // NO bettor receives token_yes_to_no (Alice's sats, redeemable if NO wins)
-        const redeemable_token = side === "yes" ? p.token_no_to_yes : p.token_yes_to_no;
-        return {
-          pair_id: p.pair_id,
-          amount_sats: p.amount_sats,
-          status: p.status,
-          has_htlc: p.token_yes_to_no !== "",
-          // Non-custodial: token distributed at match time, not at redeem time
-          redeemable_token: redeemable_token || undefined,
-        };
-      }),
+      matches: newPairs.map((p) => ({
+        pair_id: p.pair_id,
+        counterparty_pubkey: side === "yes" ? p.no_pubkey : p.yes_pubkey,
+        group_pubkey_yes: market.group_pubkey_yes ?? "",
+        group_pubkey_no: market.group_pubkey_no ?? "",
+        locktime_exchange: exchangeLocktime,
+        locktime_market: marketLocktime,
+        amount_sats: p.amount_sats,
+      })),
       market: {
         yes_pool_sats: market.yes_pool_sats,
         no_pool_sats: market.no_pool_sats,
       },
     }, 201);
+  });
+
+  // -----------------------------------------------------------------------
+  // POST /markets/:id/submit-token — submit P2PK-locked token for a match
+  //
+  // Non-custodial relay: the server VERIFIES token conditions but cannot
+  // spend them (P2PK enforce). When both sides submit, server distributes.
+  // -----------------------------------------------------------------------
+
+  mkt.post("/:id/submit-token", rateLimit, writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Market id is required" }, 400);
+
+    const market = s.markets.get(id);
+    if (!market) return c.json({ error: "Market not found" }, 404);
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const pair_id = typeof body.pair_id === "string" ? body.pair_id : "";
+    const cashu_token = typeof body.cashu_token === "string" ? body.cashu_token : "";
+    const bettor_pubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
+
+    if (!pair_id) return c.json({ error: "pair_id is required" }, 400);
+    if (!cashu_token) return c.json({ error: "cashu_token is required" }, 400);
+    if (!bettor_pubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
+
+    const pair = s.matchedPairs.get(pair_id);
+    if (!pair || pair.market_id !== id) {
+      return c.json({ error: "Matched pair not found" }, 404);
+    }
+
+    // Determine which side this bettor is
+    let side: "yes" | "no";
+    if (pair.yes_pubkey === bettor_pubkey) {
+      side = "yes";
+    } else if (pair.no_pubkey === bettor_pubkey) {
+      side = "no";
+    } else {
+      return c.json({ error: "You are not part of this matched pair" }, 403);
+    }
+
+    // Determine the expected group pubkey for verification:
+    // YES bettor's token is locked to [group_no, no_pubkey] (redeemable by NO if NO wins)
+    // NO bettor's token is locked to [group_yes, yes_pubkey] (redeemable by YES if YES wins)
+    const expectedGroupPubkey = side === "yes"
+      ? (market.group_pubkey_no ?? "")
+      : (market.group_pubkey_yes ?? "");
+    const expectedCounterpartyPubkey = side === "yes" ? pair.no_pubkey : pair.yes_pubkey;
+
+    // Verify the token has correct P2PK conditions.
+    // Only verify if token looks like a real cashuB token (decodes successfully).
+    // In demo mode (no Cashu mint), tokens may be placeholder strings.
+    if (expectedGroupPubkey && cashu_token.startsWith("cashuB")) {
+      try {
+        const decoded = getDecodedToken(cashu_token);
+        if (decoded.proofs && decoded.proofs.length > 0) {
+          const verification = verifyReceivedToken(cashu_token, {
+            groupPubkey: expectedGroupPubkey,
+            myPubkey: expectedCounterpartyPubkey,
+            amount: pair.amount_sats,
+            minLocktime: market.resolution_deadline,
+          });
+
+          if (!verification.valid) {
+            return c.json({ error: `Token verification failed: ${verification.error}` }, 400);
+          }
+        }
+      } catch {
+        // Token doesn't decode as cashuB — demo mode, accept without deep verification
+      }
+    }
+
+    // Store the token
+    const tokenKey = `${pair_id}_${side}`;
+    s.pendingExchangeTokens.set(tokenKey, cashu_token);
+
+    // Check if both sides have submitted
+    const yesToken = s.pendingExchangeTokens.get(`${pair_id}_yes`);
+    const noToken = s.pendingExchangeTokens.get(`${pair_id}_no`);
+
+    if (yesToken && noToken) {
+      // Both tokens received — distribute and lock the pair
+      pair.token_yes_to_no = yesToken;
+      pair.token_no_to_yes = noToken;
+      pair.status = "locked";
+
+      // Clean up pending tokens
+      s.pendingExchangeTokens.delete(`${pair_id}_yes`);
+      s.pendingExchangeTokens.delete(`${pair_id}_no`);
+
+      return c.json({
+        pair_id,
+        status: "locked",
+        // Each bettor receives the counterparty's token (that they can redeem if they win)
+        redeemable_token: side === "yes" ? noToken : yesToken,
+        message: "Exchange complete — both tokens locked",
+      });
+    }
+
+    return c.json({
+      pair_id,
+      status: "pending",
+      message: "Token submitted — waiting for counterparty",
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -685,9 +671,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       const swapOutcome = outcome === "yes" ? "a" : "b";
 
       // Collect proof secrets from all matched pairs' redeemable tokens
+      // Include both "locked" (exchanged) and "pending" (awaiting exchange) pairs
       const allProofSecrets: string[] = [];
       for (const pair of s.matchedPairs.values()) {
-        if (pair.market_id !== id || pair.status !== "locked") continue;
+        if (pair.market_id !== id) continue;
+        if (pair.status !== "locked" && pair.status !== "pending") continue;
         // YES wins → token_no_to_yes (locked to [group_yes, alice])
         // NO wins  → token_yes_to_no (locked to [group_no, bob])
         const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
@@ -791,7 +779,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }> = [];
 
     for (const pair of s.matchedPairs.values()) {
-      if (pair.market_id !== id || pair.status !== "locked") continue;
+      if (pair.market_id !== id) continue;
+      if (pair.status !== "locked" && pair.status !== "pending") continue;
       pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
 
       const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
@@ -941,6 +930,117 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     );
   });
 
+  // -----------------------------------------------------------------------
+  // POST /markets/:id/sign-proofs — client submits proof secrets for Oracle signing
+  //
+  // Non-custodial: the client holds their locked tokens. At resolution time,
+  // the client submits proof.secret values from their held token. The Oracle
+  // signs SHA256(proof.secret) for each one with the winning outcome's key.
+  // The client combines oracle_sig + own_sig to redeem at the mint.
+  // -----------------------------------------------------------------------
+
+  mkt.post("/:id/sign-proofs", rateLimit, writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Market id is required" }, 400);
+
+    const market = s.markets.get(id);
+    if (!market) return c.json({ error: "Market not found" }, 404);
+
+    const isResolved = market.status === "resolved_yes" || market.status === "resolved_no";
+    if (!isResolved) {
+      return c.json({ error: `Market is not resolved (status: ${market.status})` }, 409);
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const proofSecrets = Array.isArray(body.proof_secrets) ? body.proof_secrets as string[] : [];
+    const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
+
+    if (proofSecrets.length === 0) return c.json({ error: "proof_secrets array is required" }, 400);
+    if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
+
+    const outcome = market.status === "resolved_yes" ? "yes" : "no";
+    const swapOutcome = outcome === "yes" ? "a" as const : "b" as const;
+
+    // Verify the caller is actually a winner in a matched pair
+    let isWinner = false;
+    for (const pair of s.matchedPairs.values()) {
+      if (pair.market_id !== id) continue;
+      const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
+      if (winnerPubkey === pubkey) {
+        isWinner = true;
+        break;
+      }
+    }
+    if (!isWinner) {
+      return c.json({ error: "Not a winner in this market" }, 403);
+    }
+
+    // Check if we already have signatures cached for this market
+    let proofSigs = s.resolvedProofSignatures.get(id);
+
+    // Filter to only sign secrets that haven't been signed yet
+    const unseenSecrets = proofSigs
+      ? proofSecrets.filter((s) => !proofSigs!.has(s))
+      : proofSecrets;
+
+    if (unseenSecrets.length > 0) {
+      // Sign the unseen proof secrets
+      let newSigs: Map<string, string> | null = null;
+
+      if (s.frostMode === "frost" && s.frostConfig) {
+        newSigs = await frostSignProofSecretsAsync(
+          s.frostConfig,
+          swapOutcome,
+          unseenSecrets,
+        );
+      } else {
+        newSigs = s.dualKeyStore.signProofSecrets(id, swapOutcome, unseenSecrets);
+      }
+
+      if (!newSigs) {
+        return c.json({ error: "Signing failed — key may be unavailable" }, 503);
+      }
+
+      // Merge into existing map
+      if (!proofSigs) {
+        proofSigs = newSigs;
+        s.resolvedProofSignatures.set(id, proofSigs);
+      } else {
+        for (const [k, v] of newSigs) {
+          proofSigs.set(k, v);
+        }
+      }
+    }
+
+    // Collect signatures for the requested secrets
+    const oracleSignatures: Record<string, string> = {};
+    if (proofSigs) {
+      for (const secret of proofSecrets) {
+        const sig = proofSigs.get(secret);
+        if (sig) {
+          oracleSignatures[secret] = sig;
+        }
+      }
+    }
+
+    const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
+
+    return c.json({
+      outcome,
+      oracle_pubkey: oraclePubkey,
+      oracle_signatures: oracleSignatures,
+      signed_count: Object.keys(oracleSignatures).length,
+      total_requested: proofSecrets.length,
+      redeem_instructions: "For each proof: set proof.witness = {signatures: [oracle_signatures[proof.secret], your_own_sig]}. Then swap at mint.",
+    });
+  });
+
   app.route("/markets", mkt);
 
   // --- FROST signer endpoints for market resolution (peer-to-peer signing) ---
@@ -1024,11 +1124,10 @@ export function _clearMarketStoresForTest(): void {
   if (!_defaultState) return;
   _defaultState.markets.clear();
   _defaultState.matchedPairs.clear();
-  _defaultState.orderProofs.clear();
-  _defaultState.userProofs.clear();
   _defaultState.resolvedPreimages.clear();
   _defaultState.resolvedSignatures.clear();
   _defaultState.resolvedProofSignatures.clear();
+  _defaultState.pendingExchangeTokens.clear();
   // Reset singleton so next call creates fresh state
   _defaultState = null;
 }

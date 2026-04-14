@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import type { Market } from "../mock-data";
-import { placeBet, redeemWinnings, type RedeemResult } from "../api";
+import { placeBet, redeemWinnings, type RedeemResult, type MatchInfo } from "../api";
 import { cn } from "../lib/utils";
 import { getUserPubkey } from "../keypair";
 
@@ -68,7 +68,17 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
       const result = await placeBet(market.id, side, amountNum, userPubkey);
       const matchCount = result.matches?.length ?? 0;
       setBetStatus("success");
-      setBetMessage(`Bet placed! ${amountNum} sats on ${side.toUpperCase()}${matchCount > 0 ? ` — ${matchCount} match(es)` : ""}`);
+      if (matchCount > 0) {
+        const match = result.matches[0]!;
+        const cpKey = match.counterparty_pubkey;
+        const cpShort = cpKey.length > 12 ? `${cpKey.slice(0, 8)}...${cpKey.slice(-4)}` : cpKey;
+        setBetMessage(
+          `Matched! ${amountNum} sats on ${side.toUpperCase()} vs ${cpShort}. ` +
+          `Create P2PK token to complete exchange.`
+        );
+      } else {
+        setBetMessage(`Order placed! ${amountNum} sats on ${side.toUpperCase()} — waiting for counterparty`);
+      }
       setAmount("");
       if (onBetPlaced) onBetPlaced();
     } catch (err) {
@@ -87,12 +97,11 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
     setRedeemStatus("redeeming");
     setRedeemMessage(null);
     try {
-      const result: RedeemResult = await redeemWinnings(market.id, userPubkey);
-      const totalSats = result.pairs.reduce((sum, p) => sum + p.amount_sats, 0);
+      const result = await redeemWinnings(market.id, userPubkey);
       setRedeemStatus("success");
       setRedeemMessage(
-        result.pairs.length > 0
-          ? `Redeemed ${totalSats.toLocaleString()} sats from ${result.pairs.length} pair(s). Use preimage to verify at mint.`
+        result.winning_pairs > 0
+          ? `Won ${result.total_winning_sats.toLocaleString()} sats from ${result.winning_pairs} pair(s). Use sign-proofs endpoint with your held token to redeem at mint.`
           : "No winning pairs found for your pubkey."
       );
     } catch (err) {
@@ -206,19 +215,19 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-start gap-3">
                 <span className="text-primary mt-0.5">1.</span>
-                <span>Bets are locked in Cashu HTLC escrow (NUT-14) — no custodian holds your sats</span>
+                <span>You create P2PK-locked tokens in your browser — server never touches your sats</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-primary mt-0.5">2.</span>
-                <span>Oracle fetches resolution data via TLSNotary MPC-TLS — cryptographic proof, not trust</span>
+                <span>Matchmaker announces pairs; you exchange tokens P2P with counterparty</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-primary mt-0.5">3.</span>
-                <span>If YES: Oracle reveals preimage on Nostr, winners redeem HTLC tokens from mint</span>
+                <span>Oracle fetches resolution data via TLSNotary MPC-TLS — cryptographic proof, not trust</span>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-primary mt-0.5">4.</span>
-                <span>If NO: HTLC locktime expires, NO bettors claim proportional payouts</span>
+                <span>Winner submits proof secrets; Oracle signs each proof (NUT-11 P2PK 2-of-2). Redeem at mint.</span>
               </div>
             </div>
           </div>
@@ -345,7 +354,7 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
               </button>
 
               <p className="text-[11px] text-muted-foreground text-center mt-3">
-                Escrowed via Cashu HTLC. No custodian.
+                Trustless P2PK exchange. Server is a matchmaker only.
               </p>
             </div>
           ) : (
@@ -396,7 +405,7 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                         : "Redeem Winnings"}
                   </button>
                   <p className="text-[11px] text-muted-foreground text-center">
-                    Verify the preimage and redeem your HTLC tokens at the Cashu mint.
+                    Submit your token's proof secrets to get Oracle signatures, then redeem at the Cashu mint.
                   </p>
                 </div>
               )}
