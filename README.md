@@ -459,6 +459,20 @@ All produce the same fundamental output: a proof that a specific server returned
 | `ORACLE_PORT` | Oracle server port (default: 4000) |
 | `ORACLE_API_KEY` | Oracle server API key |
 
+## Examples
+
+Applications built on Anchr:
+
+| Example | Description |
+|---------|-------------|
+| [Prediction Market](example/prediction-market/) | Trustless betting with Cashu HTLC + FROST threshold Oracle + Nostr |
+| [Airdrop Bot Shield](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance — prove you're human, stay anonymous |
+| [Auto-Claim](example/auto-claim/) | Automatic money recovery via browser extension |
+| [C2PA Media Verification](example/c2pa-media-verification/) | Prove a photo is a real camera capture, not AI-generated |
+| [Supply Chain Proof](example/supply-chain-proof/) | Tamper-proof supply chain records with GPS + C2PA + TLSNotary |
+| [Fiat Swap (Square)](example/tlsn-fiat-swap-square/) | TLSNotary-proved fiat payment → Bitcoin atomic swap |
+| [Bounty Board](example/bounty-board/) | Web UI for browsing and fulfilling bounty queries |
+
 ## Specifications
 
 Protocol specifications are in [`specs/`](specs/). Anyone may implement them.
