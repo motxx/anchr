@@ -18,8 +18,19 @@ export interface ResolutionResult {
 }
 
 export interface FrostResolutionResult {
-  /** Oracle's Schnorr signature for the winning outcome. (FROST P2PK mode) */
+  /**
+   * @deprecated Use proof_signatures for NUT-11 P2PK redemption.
+   * Retained for backward compat: Oracle's Schnorr signature on market-level message.
+   */
   oracle_signature: string;
+  /** Which outcome won. */
+  outcome: "yes" | "no";
+}
+
+/** Per-proof FROST resolution result for NUT-11 P2PK redemption. */
+export interface FrostPerProofResolutionResult {
+  /** Map of proof.secret -> oracle's Schnorr signature (hex). */
+  proof_signatures: Map<string, string>;
   /** Which outcome won. */
   outcome: "yes" | "no";
 }
@@ -53,11 +64,17 @@ export function resolveMarket(
 }
 
 /**
- * Resolve a prediction market using FROST P2PK mode.
+ * Resolve a prediction market using FROST P2PK mode (legacy market-level signature).
+ *
+ * @deprecated Use resolveMarketFrostPerProof for NUT-11 compatible per-proof signing.
  *
  * Oracle signs a message with the winning outcome's group key.
  * The signature serves as the Oracle's attestation that the outcome occurred.
  * Winners attach this signature + their own signature to redeem at the mint.
+ *
+ * WARNING: This produces a signature on `${market_id}:${outcome}`, which is
+ * NOT the same as what NUT-11 P2PK expects (SHA256(proof.secret)). The mint
+ * will reject this signature. Use resolveMarketFrostPerProof instead.
  *
  * @param market_id - Market / swap identifier
  * @param outcome - Determined outcome ("yes" or "no")
@@ -75,4 +92,38 @@ export function resolveMarketFrost(
   if (!signature) return null;
 
   return { oracle_signature: signature, outcome };
+}
+
+/**
+ * Resolve a prediction market using FROST P2PK mode with per-proof signing.
+ *
+ * For NUT-11 P2PK redemption, the Oracle must sign each individual proof.secret
+ * (specifically, SHA256(proof.secret)), NOT a market-level message.
+ *
+ * This function takes the proof secrets from all redeemable tokens for the
+ * winning side and produces one signature per proof. The winner then combines
+ * the oracle signature + their own signature for each proof to satisfy the
+ * 2-of-2 P2PK spending condition at the mint.
+ *
+ * @param market_id - Market / swap identifier
+ * @param outcome - Determined outcome ("yes" or "no")
+ * @param proofSecrets - Array of proof.secret strings to sign
+ * @param dualKeyStore - Dual key store holding both keypairs
+ */
+export function resolveMarketFrostPerProof(
+  market_id: string,
+  outcome: "yes" | "no",
+  proofSecrets: string[],
+  dualKeyStore: DualKeyStore,
+): FrostPerProofResolutionResult | null {
+  const swapOutcome = outcome === "yes" ? "a" : "b";
+
+  const proof_signatures = dualKeyStore.signProofSecrets(
+    market_id,
+    swapOutcome,
+    proofSecrets,
+  );
+  if (!proof_signatures) return null;
+
+  return { proof_signatures, outcome };
 }

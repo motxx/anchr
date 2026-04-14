@@ -29,9 +29,10 @@ import {
 import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
+  frostSignProofSecretsAsync,
 } from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
 import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
-import { resolveMarket } from "./resolution.ts";
+import { resolveMarket, resolveMarketFrostPerProof } from "./resolution.ts";
 import { evaluateCondition } from "./market-oracle.ts";
 import {
   createDualPreimageStore,
@@ -65,6 +66,11 @@ export interface MarketState {
   orderProofs: Map<string, { pubkey: string; proofs: Proof[] }>;
   resolvedPreimages: Map<string, string>;
   resolvedSignatures: Map<string, string>;
+  /**
+   * Per-proof oracle signatures for NUT-11 P2PK redemption.
+   * Outer map: marketId -> inner map: proofSecret -> hex signature.
+   */
+  resolvedProofSignatures: Map<string, Map<string, string>>;
   userProofs: Map<string, Proof[]>;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
@@ -86,6 +92,7 @@ export function createMarketState(opts?: {
     orderProofs: new Map(),
     resolvedPreimages: new Map(),
     resolvedSignatures: new Map(),
+    resolvedProofSignatures: new Map(),
     userProofs: new Map(),
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
@@ -670,35 +677,94 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     let oracleSignature: string | undefined;
 
     if (useFrost) {
-      // FROST P2PK mode: Oracle signs with the winning outcome's key.
-      const signMessage = new TextEncoder().encode(`${id}:${outcome}`);
+      // FROST P2PK mode: Oracle signs each proof.secret from redeemable tokens.
+      //
+      // NUT-11 P2PK requires signatures on SHA256(proof.secret) for each proof,
+      // NOT a market-level message. Extract proof secrets from all matched pairs'
+      // winning redeemable tokens and sign each one.
       const swapOutcome = outcome === "yes" ? "a" : "b";
 
-      let sig: string | null = null;
+      // Collect proof secrets from all matched pairs' redeemable tokens
+      const allProofSecrets: string[] = [];
+      for (const pair of s.matchedPairs.values()) {
+        if (pair.market_id !== id || pair.status !== "locked") continue;
+        // YES wins → token_no_to_yes (locked to [group_yes, alice])
+        // NO wins  → token_yes_to_no (locked to [group_no, bob])
+        const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+        if (redeemableToken) {
+          try {
+            const decoded = getDecodedToken(redeemableToken);
+            for (const proof of decoded.proofs) {
+              allProofSecrets.push(proof.secret);
+            }
+          } catch {
+            // Token may be empty in demo mode (no Cashu)
+          }
+        }
+      }
 
-      if (s.frostMode === "frost" && s.frostConfig) {
-        // Multi-Oracle threshold signing via peer coordination
-        const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
-        sig = await frostDualKeySignAsync(
-          s.frostConfig,
-          swapOutcome,
-          signMessage,
-          verifiedBody ? {
-            market_id: id,
-            resolution_url: market.resolution_url,
-            verified_body: verifiedBody,
-          } : undefined,
-        );
+      let proofSigs: Map<string, string> | null = null;
+
+      if (allProofSecrets.length > 0) {
+        // Sign each proof secret
+        if (s.frostMode === "frost" && s.frostConfig) {
+          // Multi-Oracle threshold signing via peer coordination
+          const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
+          proofSigs = await frostSignProofSecretsAsync(
+            s.frostConfig,
+            swapOutcome,
+            allProofSecrets,
+            verifiedBody ? {
+              market_id: id,
+              resolution_url: market.resolution_url,
+              verified_body: verifiedBody,
+            } : undefined,
+          );
+        } else {
+          // Single-key per-proof signing (demo mode)
+          proofSigs = s.dualKeyStore.signProofSecrets(id, swapOutcome, allProofSecrets);
+        }
+
+        if (!proofSigs) {
+          return c.json({ error: "Resolution failed — per-proof signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
+        }
+
+        // Store per-proof signatures
+        s.resolvedProofSignatures.set(id, proofSigs);
+
+        // Store first signature as legacy oracle_signature for backward compat
+        const firstSig = proofSigs.values().next().value;
+        if (firstSig) {
+          oracleSignature = firstSig;
+          s.resolvedSignatures.set(id, firstSig);
+        }
       } else {
-        // Single-key signing (demo mode)
-        sig = s.dualKeyStore.sign(id, swapOutcome, signMessage);
-      }
+        // No real tokens (demo mode without Cashu) — sign market-level message as fallback
+        const signMessage = new TextEncoder().encode(`${id}:${outcome}`);
+        let sig: string | null = null;
 
-      if (!sig) {
-        return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
+        if (s.frostMode === "frost" && s.frostConfig) {
+          const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
+          sig = await frostDualKeySignAsync(
+            s.frostConfig,
+            swapOutcome,
+            signMessage,
+            verifiedBody ? {
+              market_id: id,
+              resolution_url: market.resolution_url,
+              verified_body: verifiedBody,
+            } : undefined,
+          );
+        } else {
+          sig = s.dualKeyStore.sign(id, swapOutcome, signMessage);
+        }
+
+        if (!sig) {
+          return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
+        }
+        oracleSignature = sig;
+        s.resolvedSignatures.set(id, sig);
       }
-      oracleSignature = sig;
-      s.resolvedSignatures.set(id, sig);
 
       // Also resolve HTLC side for backward compatibility
       resolveMarket(id, outcome, s.dualPreimageStore);
@@ -736,12 +802,16 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       });
     }
 
+    const proofSigMap = s.resolvedProofSignatures.get(id);
+
     return c.json({
       market_id: id,
       outcome,
       // FROST P2PK mode returns oracle_signature; HTLC mode returns preimage
       ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
       ...(resolvedPreimage ? { preimage: resolvedPreimage } : {}),
+      // Per-proof signature count for NUT-11 P2PK
+      ...(proofSigMap ? { proof_signatures_count: proofSigMap.size } : {}),
       mode: useFrost ? "frost_p2pk" : "htlc",
       status: newStatus,
       yes_pool_sats: market.yes_pool_sats,
@@ -778,42 +848,71 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
     const preimage = s.resolvedPreimages.get(id);
     const oracleSignature = s.resolvedSignatures.get(id);
+    const proofSigMap = s.resolvedProofSignatures.get(id);
 
-    if (!preimage && !oracleSignature) {
+    if (!preimage && !oracleSignature && !proofSigMap) {
       return c.json({ error: "Resolution attestation not found — market may not be fully resolved" }, 500);
     }
 
     const outcome = market.status === "resolved_yes" ? "yes" : "no";
 
     // Non-custodial: the user already holds the counterparty's locked token
-    // (received at match time). The redeem endpoint only provides the Oracle's
-    // attestation (signature or preimage) needed to satisfy the spending condition.
-    // The user combines: locked_token + oracle_attestation + own_signature → mint.
+    // (received at match time). The redeem endpoint provides the Oracle's
+    // per-proof signatures needed to satisfy NUT-11 P2PK spending conditions.
+    // The user combines: locked_token + oracle_per_proof_signatures + own_signature → mint.
 
     const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
 
-    // Count how many winning pairs this user has
+    // Collect winning pairs and per-proof oracle signatures for this user
     let winningPairCount = 0;
     let totalWinningSats = 0;
+    const userOracleSignatures: Record<string, string> = {};
+
     for (const pair of s.matchedPairs.values()) {
       if (pair.market_id !== id) continue;
       const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
       if (winnerPubkey === pubkey) {
         winningPairCount++;
         totalWinningSats += pair.amount_sats;
+
+        // Extract proof secrets from this user's redeemable token and collect signatures
+        if (proofSigMap) {
+          const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+          if (redeemableToken) {
+            try {
+              const decoded = getDecodedToken(redeemableToken);
+              for (const proof of decoded.proofs) {
+                const sig = proofSigMap.get(proof.secret);
+                if (sig) {
+                  userOracleSignatures[proof.secret] = sig;
+                }
+              }
+            } catch {
+              // Token may be empty in demo mode
+            }
+          }
+        }
       }
     }
+
+    const hasPerProofSigs = Object.keys(userOracleSignatures).length > 0;
 
     return c.json({
       outcome,
       winning_pairs: winningPairCount,
       total_winning_sats: totalWinningSats,
-      // The attestation needed to redeem at the mint:
-      ...(oracleSignature ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
+      // Per-proof oracle signatures for NUT-11 P2PK redemption:
+      ...(hasPerProofSigs ? {
+        oracle_signatures: userOracleSignatures,
+        oracle_pubkey: oraclePubkey,
+      } : {}),
+      // Legacy: single oracle_signature for backward compat
+      ...(oracleSignature && !hasPerProofSigs ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
       ...(preimage ? { preimage } : {}),
-      // Instructions: combine with the locked token you received at match time
-      // + sign with your private key → swap at mint
-      redeem_instructions: "Use wallet.receive(token, { privkey, preimage_or_signatures }) at the Cashu mint",
+      // Instructions for NUT-11 P2PK redemption
+      redeem_instructions: hasPerProofSigs
+        ? "For each proof: set proof.witness = {signatures: [oracle_signatures[proof.secret], your_own_sig]}. Then swap at mint."
+        : "Use wallet.receive(token, { privkey, preimage_or_signatures }) at the Cashu mint",
     });
   });
 
@@ -929,6 +1028,7 @@ export function _clearMarketStoresForTest(): void {
   _defaultState.userProofs.clear();
   _defaultState.resolvedPreimages.clear();
   _defaultState.resolvedSignatures.clear();
+  _defaultState.resolvedProofSignatures.clear();
   // Reset singleton so next call creates fresh state
   _defaultState = null;
 }

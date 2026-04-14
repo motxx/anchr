@@ -90,6 +90,22 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       return null;
     },
 
+    signProofSecrets(
+      swap_id: string,
+      _outcome: "a" | "b",
+      _proofSecrets: string[],
+    ): Map<string, string> | null {
+      const entry = entries.get(swap_id);
+      if (!entry || entry.signed || signedSwaps.has(swap_id)) return null;
+
+      // FROST per-proof signing is async -- use frostSignProofSecretsAsync() instead.
+      console.warn(
+        "[frost-dual-key-store] signProofSecrets() called synchronously -- " +
+        "use frostSignProofSecretsAsync() for real FROST threshold signing"
+      );
+      return null;
+    },
+
     getPubkeys(swap_id: string): { pubkey_a: string; pubkey_b: string } | null {
       const entry = entries.get(swap_id);
       if (!entry) return null;
@@ -169,6 +185,47 @@ export async function frostDualKeySignAsync(
     `[frost-dual-key-store] FROST signing succeeded: ${result.signers_participated.length} signers participated`
   );
   return result.signature;
+}
+
+/**
+ * Perform FROST threshold signing for multiple proof secrets (NUT-11 P2PK).
+ *
+ * For each proof secret, computes SHA256(secret) and coordinates FROST signing
+ * across peer Oracle nodes. Returns a map of proofSecret -> hex signature.
+ *
+ * This is sequential per-proof for simplicity. Future optimization: batch
+ * nonce commitments across all secrets in one round-trip.
+ *
+ * @param config FROST node config
+ * @param outcome Which group key to sign with ("a" = YES, "b" = NO)
+ * @param proofSecrets Array of proof secret strings to sign
+ * @param conditionData Optional condition data for peers to verify independently
+ */
+export async function frostSignProofSecretsAsync(
+  config: MarketFrostNodeConfig,
+  outcome: "a" | "b",
+  proofSecrets: string[],
+  conditionData?: { market_id: string; resolution_url: string; verified_body: string },
+): Promise<Map<string, string> | null> {
+  const { sha256 } = await import("@noble/hashes/sha2.js");
+
+  const result = new Map<string, string>();
+
+  for (const proofSecret of proofSecrets) {
+    // NUT-11 P2PK: signing message = SHA256(proof.secret)
+    const msgHash = sha256(new TextEncoder().encode(proofSecret));
+    const sig = await frostDualKeySignAsync(config, outcome, msgHash, conditionData);
+    if (!sig) {
+      console.error(`[frost-dual-key-store] FROST per-proof signing failed for secret`);
+      return null;
+    }
+    result.set(proofSecret, sig);
+  }
+
+  console.log(
+    `[frost-dual-key-store] FROST per-proof signing succeeded: ${proofSecrets.length} proofs signed`
+  );
+  return result;
 }
 
 // ---------------------------------------------------------------------------

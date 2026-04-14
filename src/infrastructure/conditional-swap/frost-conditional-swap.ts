@@ -26,6 +26,7 @@ import {
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 // ---------------------------------------------------------------------------
 // P2PK option builders
@@ -109,6 +110,24 @@ export interface DualKeyStore {
   create(swap_id: string): DualKeyEntry;
   /** Sign a message with the winning outcome's key. Returns hex signature or null. */
   sign(swap_id: string, outcome: "a" | "b", message: Uint8Array): string | null;
+  /**
+   * Sign multiple proof secrets for NUT-11 P2PK redemption.
+   *
+   * For each proof secret string, computes SHA256(secret) and signs with the
+   * winning outcome's key. This is what NUT-11 expects: the signing message
+   * is the hash of the proof's secret field.
+   *
+   * Unlike `sign()`, this does NOT mark the swap as "signed" (one-time),
+   * because proof secrets are only available at resolution time when matched
+   * pairs' tokens are decoded.
+   *
+   * @returns Map of proofSecret -> hex signature, or null on failure
+   */
+  signProofSecrets(
+    swap_id: string,
+    outcome: "a" | "b",
+    proofSecrets: string[],
+  ): Map<string, string> | null;
   /** Get public keys for a swap. */
   getPubkeys(swap_id: string): { pubkey_a: string; pubkey_b: string } | null;
   /** Check whether a swap exists. */
@@ -169,6 +188,38 @@ export function createDualKeyStore(): DualKeyStore {
 
       const sig = schnorr.sign(message, hexToBytes(secret));
       return bytesToHex(sig);
+    },
+
+    signProofSecrets(
+      swap_id: string,
+      outcome: "a" | "b",
+      proofSecrets: string[],
+    ): Map<string, string> | null {
+      const entry = entries.get(swap_id);
+      if (!entry) return null;
+
+      const secret = outcome === "a" ? entry.secret_a : entry.secret_b;
+      if (!secret) return null;
+
+      const sk = hexToBytes(secret);
+      const result = new Map<string, string>();
+
+      for (const proofSecret of proofSecrets) {
+        // NUT-11 P2PK: signing message = SHA256(proof.secret)
+        const msgHash = sha256(new TextEncoder().encode(proofSecret));
+        const sig = schnorr.sign(msgHash, sk);
+        result.set(proofSecret, bytesToHex(sig));
+      }
+
+      // Mark as signed and delete the losing key — irreversible
+      entry.signed = true;
+      if (outcome === "a") {
+        delete entry.secret_b;
+      } else {
+        delete entry.secret_a;
+      }
+
+      return result;
     },
 
     getPubkeys(swap_id: string): { pubkey_a: string; pubkey_b: string } | null {
