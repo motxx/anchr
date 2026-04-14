@@ -197,8 +197,23 @@ has(swap_id) -> boolean
 
 The 1:1 bounty query (Specs 00-06) is the special case where N=1, M=1. The conditional swap extends this to N:M by:
 
-1. Replacing the single preimage with a dual-preimage scheme.
+1. Replacing the single preimage with a dual-preimage scheme (or FROST P2PK dual-key).
 2. Introducing a matching layer that pairs participants.
 3. Using the same `EscrowProvider`, `verify()`, and messaging infrastructure.
 
-The Oracle's role is identical: verify data, produce an attestation, release the appropriate preimage. The difference is that the preimage resolves many pairs simultaneously.
+The Oracle's role is identical: verify data, produce an attestation, release the appropriate preimage or signature.
+
+## Settlement Limitations
+
+Cashu's standard NUTs (NUT-11 P2PK, NUT-14 HTLC) do not support conditional branching (IF outcome=A THEN pay X, ELSE pay Y). This limits the settlement options for conditional swaps:
+
+| Settlement Mode | Oracle Fund Custody | Fair Exchange | Status |
+|----------------|--------------------|--------------|---------|
+| Oracle escrow (P2PK n_sigs=1) | Yes — t-of-n can steal | Not needed | Implemented |
+| P2P cross-lock (P2PK n_sigs=2) | No — Oracle can't steal | Unsolved without trusted intermediary | Experimental |
+| DLC on Cashu mint | No | Not needed | [Proposed (PR #128)](https://github.com/cashubtc/nuts/pull/128) |
+| DLC on Bitcoin L1 | No | Not needed | Roadmap |
+
+The Oracle escrow mode is suitable for scenarios where the Oracle group (t-of-n FROST) is trusted. For trustless settlement where the Oracle cannot access funds, a DLC-based approach is required.
+
+Anchr's Oracle verification (TLSNotary + FROST threshold signing) is independent of the settlement layer and works with any of the above modes.
