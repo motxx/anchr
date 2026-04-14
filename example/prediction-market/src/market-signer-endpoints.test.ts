@@ -22,10 +22,10 @@ import {
   createMarketState,
   type MarketState,
   type MarketRouteContext,
-} from "./market-api-routes.ts";
-import type { MarketFrostNodeConfig } from "./frost/market-frost-config.ts";
-import type { PredictionMarket } from "../../example/prediction-market/src/market-types.ts";
-import { _setFrostSignerPathForTest } from "./frost/frost-cli.ts";
+} from "./server-routes.ts";
+import type { MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
+import type { PredictionMarket } from "./market-types.ts";
+import { _setFrostSignerPathForTest } from "../../../src/infrastructure/frost/frost-cli.ts";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

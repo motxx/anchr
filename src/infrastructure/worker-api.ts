@@ -19,7 +19,6 @@ import {
   registerLogRoutes,
 } from "./worker-api-routes";
 import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes";
-import { registerMarketRoutes } from "./market-api-routes";
 import { createListingStore, type ListingStore } from "./marketplace/listing-store";
 
 export interface WorkerApiDeps {
@@ -164,9 +163,6 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   // --- Marketplace routes ---
   const listingStore = deps?.listingStore ?? createListingStore();
   registerMarketplaceRoutes(app, { listingStore, preimageStore: pStore, writeAuth, rateLimit });
-
-  // --- Prediction market routes ---
-  registerMarketRoutes(app, { writeAuth, rateLimit });
 
   return app;
 }

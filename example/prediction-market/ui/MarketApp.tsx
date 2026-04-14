@@ -5,7 +5,7 @@ import { Header } from "./components/Header";
 import { StatsBar } from "./components/StatsBar";
 import { MarketCard } from "./components/MarketCard";
 import { MarketDetail } from "./components/MarketDetail";
-import { cn } from "../lib/utils";
+import { cn } from "./lib/utils";
 
 type SortMode = "volume" | "newest" | "ending_soon" | "bettors";
 

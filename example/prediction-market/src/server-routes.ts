@@ -18,25 +18,25 @@ import type {
   OpenOrder,
   MatchedBetPair,
   MarketStatus,
-} from "../../example/prediction-market/src/market-types.ts";
-import { createOrderBook, type OrderBook } from "../../example/prediction-market/src/order-book.ts";
-import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "./conditional-swap/cross-htlc.ts";
+} from "./market-types.ts";
+import { createOrderBook, type OrderBook } from "./order-book.ts";
+import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "../../../src/infrastructure/conditional-swap/cross-htlc.ts";
 import {
   buildFrostSwapForPartyA,
   buildFrostSwapForPartyB,
   type DualKeyStore,
-} from "./conditional-swap/frost-conditional-swap.ts";
+} from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
 import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
-} from "./conditional-swap/frost-dual-key-store.ts";
-import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "./frost/market-frost-config.ts";
-import { resolveMarket } from "../../example/prediction-market/src/resolution.ts";
-import { evaluateCondition } from "../../example/prediction-market/src/market-oracle.ts";
+} from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
+import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
+import { resolveMarket } from "./resolution.ts";
+import { evaluateCondition } from "./market-oracle.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
-} from "./conditional-swap/dual-preimage-store.ts";
+} from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
 import {
   getUserBalance,
   creditUser,
@@ -877,7 +877,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
       const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
       const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
-      const { signRound1 } = await import("./frost/frost-cli.ts");
+      const { signRound1 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
       const r1 = await signRound1(JSON.stringify(keyPkg));
       if (!r1.ok) return c.json({ error: r1.error }, 500);
 
@@ -896,7 +896,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       pendingMarketNonces.delete(reqBody.nonce_id);
 
       const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
-      const { signRound2 } = await import("./frost/frost-cli.ts");
+      const { signRound2 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
       const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
       if (!r2.ok) return c.json({ error: r2.error }, 500);
       return c.json({ signature_share: r2.data!.signature_share });

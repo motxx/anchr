@@ -1,7 +1,11 @@
 import type { Market, MarketCategory } from "./mock-data";
-import { apiFetch } from "../api-config";
 
 const API_BASE = "/markets";
+
+/** Fetch wrapper — standalone market UI uses same-origin relative paths. */
+function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(path, init);
+}
 
 export interface BetResult {
   order_id: string;

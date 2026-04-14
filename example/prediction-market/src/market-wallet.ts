@@ -6,7 +6,7 @@
  */
 
 import { Wallet, type Proof } from "@cashu/cashu-ts";
-import { spawn } from "../runtime/mod.ts";
+import { spawn } from "../../../src/runtime/mod.ts";
 
 // ---------------------------------------------------------------------------
 // Core wallet operations (pure functions on userProofs map)

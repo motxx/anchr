@@ -1,6 +1,6 @@
 import React from "react";
 import type { Market } from "../mock-data";
-import { cn } from "../../lib/utils";
+import { cn } from "../lib/utils";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(1)}M`;

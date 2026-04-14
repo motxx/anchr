@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from "react";
 import type { Market } from "../mock-data";
 import { placeBet, redeemWinnings, type RedeemResult } from "../api";
-import { cn } from "../../lib/utils";
+import { cn } from "../lib/utils";
 import { getUserPubkey } from "../keypair";
 
 function formatSats(sats: number): string {
