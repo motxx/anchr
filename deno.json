@@ -62,6 +62,9 @@
     "test:ci": "deno test src/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts'",
     "test:example": "deno test --allow-all example/",
     "test": "deno test src/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:all": "./scripts/test-all.sh --local",
+    "test:all:docker": "./scripts/test-all.sh --docker",
+    "test:all:full": "./scripts/test-all.sh full",
 
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",

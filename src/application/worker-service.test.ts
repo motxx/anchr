@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { DiscoveredQuery, WorkerConfig } from "./worker-service";
+import type { DiscoveredQuery, WorkerConfig } from "../infrastructure/nostr/worker-service";
 import {
   parseQueryRequestPayload,
   type QueryRequestPayload,

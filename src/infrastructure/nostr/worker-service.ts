@@ -16,9 +16,9 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { TlsnEncryptedContext } from "../domain/types";
-import type { NostrIdentity } from "../infrastructure/nostr/identity";
-import { generateEphemeralIdentity } from "../infrastructure/nostr/identity";
+import type { TlsnEncryptedContext } from "../../domain/types";
+import type { NostrIdentity } from "./identity";
+import { generateEphemeralIdentity } from "./identity";
 import {
   buildQuoteFeedbackEvent,
   buildQueryResponseEvent,
@@ -28,17 +28,17 @@ import {
   type QueryResponsePayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "../infrastructure/nostr/events";
-import { parseOracleDM, type OracleDMPayload } from "../infrastructure/nostr/dm";
+} from "./events";
+import { parseOracleDM, type OracleDMPayload } from "./dm";
 import {
   publishEvent,
   subscribeToQueries,
   subscribeToFeedback,
   subscribeToDMs,
-} from "../infrastructure/nostr/client";
-import { encryptNip44, deriveConversationKey } from "../infrastructure/nostr/encryption";
-import { workerUpload, type WorkerUploadResult } from "../infrastructure/blossom/worker-upload";
-import type { BlossomUploadResult } from "../infrastructure/blossom/client";
+} from "./client";
+import { encryptNip44, deriveConversationKey } from "./encryption";
+import { workerUpload, type WorkerUploadResult } from "../blossom/worker-upload";
+import type { BlossomUploadResult } from "../blossom/client";
 
 export interface WorkerConfig {
   /** Trusted Oracle pubkeys. Queries from unknown Oracles are ignored. */

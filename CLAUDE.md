@@ -73,6 +73,15 @@ Run the server:
 deno task build:ui && deno task build:css && deno task dev
 ```
 
+## Test Commands
+
+| Command | Scope | Docker |
+|---------|-------|--------|
+| `deno task test:all` | lint + unit + protocol + frost + integration + example | No |
+| `deno task test:all:docker` | e2e relay + regtest (starts/stops Docker) | Yes |
+| `deno task test:all:full` | all of the above combined | Yes |
+| `./scripts/test-all.sh --ci` | same as full, CI-optimized | Yes |
+
 ## Architecture Lint
 
 `deno task lint:arch` enforces Clean Architecture layer dependencies:
@@ -83,6 +92,7 @@ deno task build:ui && deno task build:css && deno task dev
 | E002 | `runtime/` | domain, application, infrastructure, ui |
 | E003 | `ui/` | infrastructure, application |
 | E004 | Any | `express`, `dotenv`, `ws` (banned packages) |
+| E005 | `application/` | infrastructure, ui, runtime |
 | W001 | Any | npm: when JSR equivalent exists |
 
 - Runs automatically on every Edit/Write via Claude Code hook (PostToolUse)

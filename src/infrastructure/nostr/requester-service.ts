@@ -13,8 +13,8 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "../infrastructure/nostr/identity";
-import { generateEphemeralIdentity } from "../infrastructure/nostr/identity";
+import type { NostrIdentity } from "./identity";
+import { generateEphemeralIdentity } from "./identity";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -22,10 +22,10 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "../infrastructure/nostr/events";
-import { publishEvent, subscribeToFeedback } from "../infrastructure/nostr/client";
-import type { EscrowProvider } from "./escrow-port";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../domain/types";
+} from "./events";
+import { publishEvent, subscribeToFeedback } from "./client";
+import type { EscrowProvider } from "../../application/escrow-port";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types";
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */

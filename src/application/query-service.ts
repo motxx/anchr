@@ -1,9 +1,8 @@
 import { createQueryStore } from "../domain/query-store";
 import { isOpenStatus } from "../domain/query-transitions";
 import type { QueryStore } from "../domain/query-store";
-import { resolveOracle } from "../infrastructure/oracle";
-import type { OracleRegistry } from "../infrastructure/oracle/registry";
-import type { PreimageStore } from "../infrastructure/preimage/preimage-store";
+import type { OracleRegistry } from "./oracle-port";
+import type { PreimageStore } from "./preimage-port";
 import type { EscrowProvider } from "./escrow-port";
 import type { ProofDelivery } from "./proof-delivery";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
@@ -98,6 +97,8 @@ export interface QueryServiceDeps {
   escrowProvider?: EscrowProvider;
   hooks?: QueryHooks;
   proofDelivery?: ProofDelivery;
+  /** Normalize attachment refs in a QueryResult. Defaults to identity. */
+  normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }
 
 export interface HtlcOutcome {
@@ -154,10 +155,11 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
 
   // Oracle resolver callbacks — passed to extracted methods so they don't close over registry.
   const oracleResolver = (oracleId: string | undefined, acceptableIds: string[] | undefined) =>
-    registry ? registry.resolve(oracleId, acceptableIds) : resolveOracle(oracleId, acceptableIds);
+    registry ? registry.resolve(oracleId, acceptableIds) : null;
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);
 
-  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, proofDelivery };
+  const normalizeResult = deps?.normalizeResult;
+  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, proofDelivery, normalizeResult };
 
   return {
     createQuery: (input, options) => doCreateQuery(svcDeps, input, options, hooks),
@@ -175,71 +177,53 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     recordQuote: (queryId, quote) => doRecordQuote(store, queryId, quote),
     selectWorker: (queryId, wp, ht) => doSelectWorker(svcDeps, queryId, wp, ht),
     beginWork: (queryId) => doBeginWork(store, queryId),
-    recordResult: (queryId, result, wp, bk) => doRecordResult(store, queryId, result, wp, bk),
+    recordResult: (queryId, result, wp, bk) => doRecordResult(svcDeps, queryId, result, wp, bk),
     completeVerification: (queryId, passed, oId) => doCompleteVerification(store, queryId, passed, oId),
     submitHtlcResult: (queryId, result, wp, oId, bk) => doSubmitHtlcResult(svcDeps, queryId, result, wp, oId, bk),
   };
 }
 
-// --- Relay publish hook (default for production) ---
+// --- Default singleton service (backward compat) ---
+// Configurable from the composition root via setDefaultService().
 
-function publishQueryToRelay(query: Query): void {
-  import("../infrastructure/nostr/client").then(async ({ isNostrEnabled, publishEvent }) => {
-    if (!isNostrEnabled()) return;
-    const { buildQueryRequestEvent } = await import("../infrastructure/nostr/events");
-    const { generateEphemeralIdentity } = await import("../infrastructure/nostr/identity");
+let _defaultService: QueryService | null = null;
 
-    const identity = generateEphemeralIdentity();
-    const event = buildQueryRequestEvent(identity, query.id, {
-      description: query.description,
-      nonce: query.challenge_nonce,
-      expires_at: query.expires_at,
-      oracle_ids: query.oracle_ids,
-      verification_requirements: query.verification_requirements,
-      bounty: query.bounty?.escrow_token
-        ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.escrow_token }
-        : undefined,
-    }, query.location_hint);
-
-    const MAX_RETRIES = 3;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      const result = await publishEvent(event);
-      if (result.successes.length > 0) {
-        console.error(`[relay] Query ${query.id} published to ${result.successes.length} relay(s)`);
-        return;
-      }
-      if (attempt < MAX_RETRIES) {
-        const delaySec = attempt * 2;
-        console.error(`[relay] Query ${query.id} publish failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
-        await new Promise((r) => setTimeout(r, delaySec * 1000));
-      }
-    }
-    console.error(`[relay] Query ${query.id} failed to publish after ${MAX_RETRIES} attempts`);
-  }).catch((err) => {
-    console.error("[relay] Failed to publish query:", err);
-  });
+/** Replace the default singleton service. Call from the composition root. */
+export function setDefaultService(svc: QueryService): void {
+  _defaultService = svc;
 }
 
-// --- Default singleton service (backward compat) ---
+function getDefaultService(): QueryService {
+  if (!_defaultService) {
+    throw new Error(
+      "Default QueryService not initialized. Call setDefaultService() from the composition root before using module-level exports.",
+    );
+  }
+  return _defaultService;
+}
 
-export const defaultService = createQueryService({
-  hooks: { onCreated: publishQueryToRelay },
+/** @deprecated Use createQueryService() with explicit deps instead. */
+// deno-lint-ignore no-explicit-any
+export const defaultService: QueryService = new Proxy({} as QueryService, {
+  get(_target, prop) {
+    return (getDefaultService() as any)[prop];
+  },
 });
 
 export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
-  return defaultService.createQuery(input, options);
+  return getDefaultService().createQuery(input, options);
 }
 
 export function getQuery(id: string): Query | null {
-  return defaultService.getQuery(id);
+  return getDefaultService().getQuery(id);
 }
 
 export function listOpenQueries(): Query[] {
-  return defaultService.listOpenQueries();
+  return getDefaultService().listOpenQueries();
 }
 
 export function listAllQueries(): Query[] {
-  return defaultService.listAllQueries();
+  return getDefaultService().listAllQueries();
 }
 
 export async function submitQueryResult(
@@ -249,21 +233,21 @@ export async function submitQueryResult(
   oracleId?: string,
   blossomKeys?: BlossomKeyMap,
 ): Promise<SubmitQueryOutcome> {
-  return defaultService.submitQueryResult(id, result, submissionMeta, oracleId, blossomKeys);
+  return getDefaultService().submitQueryResult(id, result, submissionMeta, oracleId, blossomKeys);
 }
 
 export function cancelQuery(id: string): CancelQueryOutcome {
-  return defaultService.cancelQuery(id);
+  return getDefaultService().cancelQuery(id);
 }
 
 export function expireQueries(): number {
-  return defaultService.expireQueries();
+  return getDefaultService().expireQueries();
 }
 
 export function purgeExpiredFromStore(): Query[] {
-  return defaultService.purgeExpiredFromStore();
+  return getDefaultService().purgeExpiredFromStore();
 }
 
 export function clearQueryStore(): void {
-  defaultService.clearQueryStore();
+  getDefaultService().clearQueryStore();
 }
