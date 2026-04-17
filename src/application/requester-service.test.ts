@@ -1,7 +1,7 @@
 import { describe, test, afterAll, beforeAll } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
-import { requestOracleHash } from "./requester-service";
+import { requestOracleHash } from "../infrastructure/nostr/requester-service";
 
 const ORACLE_PORT = 18900 + Math.floor(Math.random() * 100);
 const oracleApp = new Hono();

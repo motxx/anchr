@@ -4,15 +4,22 @@ import { createPreimageStore } from "./cashu/preimage-store";
 import { createQueryService } from "../application/query-service";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 import { serveStatic } from "hono/deno";
+import { normalizeQueryResult } from "./attachments";
+import { publishQueryToRelay } from "./nostr/relay-publish";
+import { createOracleRegistry } from "./oracle/registry";
 
 export async function startReferenceApp() {
   setupServerLogCapture();
   await prepareWorkerApiAssets();
 
   const preimageStore = createPreimageStore();
+  const oracleRegistry = createOracleRegistry();
 
   const queryService = createQueryService({
     preimageStore,
+    oracleRegistry,
+    normalizeResult: normalizeQueryResult,
+    hooks: { onCreated: publishQueryToRelay },
   });
 
   const app = buildWorkerApiApp({ queryService, preimageStore });

@@ -1,8 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { QueryStore } from "../domain/query-store";
-import { normalizeQueryResult } from "../infrastructure/attachments";
 import { buildChallengeRule, generateNonce } from "../domain/challenge";
-import type { PreimageStore } from "../infrastructure/preimage/preimage-store";
+import type { PreimageStore } from "./preimage-port";
 import type { EscrowProvider } from "./escrow-port";
 import { verifyWithQuorum } from "./query-verification";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification";
@@ -44,7 +43,11 @@ export interface ServiceDeps {
   preimageStore?: PreimageStore;
   escrowProvider?: EscrowProvider;
   proofDelivery?: ProofDelivery;
+  /** Normalize attachment refs in a QueryResult. Defaults to identity. */
+  normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }
+
+const identityNormalize = (result: QueryResult): QueryResult => result;
 
 const DEFAULT_TTL_MS = 10 * 60 * 1000;
 
@@ -203,7 +206,7 @@ export async function doSubmitQueryResult(
     return { ok: false, query, message: "Query has expired" };
   }
 
-  const normalizedResult = normalizeQueryResult(result);
+  const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
   const { passed, attestations, verification, updated } = await verifyAndFinalize(
     query, normalizedResult, deps, blossomKeys, oracleId,
   );
@@ -330,12 +333,13 @@ export function doBeginWork(
 }
 
 export function doRecordResult(
-  store: QueryStore,
+  deps: ServiceDeps,
   queryId: string,
   result: QueryResult,
   workerPubkey: string,
   blossomKeys?: BlossomKeyMap,
 ): HtlcOutcome {
+  const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
   if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
@@ -344,7 +348,7 @@ export function doRecordResult(
     return { ok: false, message: "Worker pubkey does not match selected worker" };
   }
 
-  const normalizedResult = normalizeQueryResult(result);
+  const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
   store.set(queryId, {
     ...query,
     status: "verifying",
@@ -397,7 +401,7 @@ export async function doSubmitHtlcResult(
   }
 
   // 1. Record result (processing -> verifying)
-  const normalizedResult = normalizeQueryResult(result);
+  const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
   const verifyingQuery: Query = {
     ...query,
     status: "verifying",

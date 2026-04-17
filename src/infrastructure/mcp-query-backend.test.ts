@@ -1,20 +1,24 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { clearQueryStore, createQuery, getQuery, submitQueryResult } from "../application/query-service";
+import { createQueryService, setDefaultService } from "../application/query-service";
+import { createOracleRegistry } from "./oracle/registry";
+import { normalizeQueryResult } from "./attachments";
 import { clearIntegrityStore } from "./verification/integrity-store";
 
 /**
  * Tests for MCP query backend data transformation.
  *
  * Since getMcpQueryBackend() creates a default backend that delegates to
- * the same query-service functions, we test the data flow through
- * create → status → list → cancel to ensure correctness.
- *
- * The module is loaded dynamically to avoid top-level env issues.
+ * the same query-service singleton functions, we initialize the singleton
+ * with proper deps via setDefaultService().
  */
 
 beforeEach(() => {
-  clearQueryStore();
+  // Reset the singleton with fresh store + oracle registry for each test
+  setDefaultService(createQueryService({
+    oracleRegistry: createOracleRegistry(),
+    normalizeResult: normalizeQueryResult,
+  }));
   clearIntegrityStore();
 });
 

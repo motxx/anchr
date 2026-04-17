@@ -18,6 +18,7 @@ export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "./domain/types
 export {
   cancelQuery, clearQueryStore, createQuery, createQueryService,
   createQueryStore, expireQueries, getQuery, listOpenQueries, submitQueryResult,
+  setDefaultService,
 } from "./application/query-service";
 export type {
   AttachmentRef, AttachmentStorageKind, CancelQueryOutcome, CreateQueryOptions,
@@ -32,25 +33,28 @@ export type { EscrowProvider } from "./application/escrow-port";
 export {
   discoverQueries, submitQuote, waitForSelection, encryptAndUpload,
   publishResult, waitForPreimage,
-} from "./application/worker-service";
-export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./application/worker-service";
+} from "./infrastructure/nostr/worker-service";
+export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./infrastructure/nostr/worker-service";
 
 export {
   requestOracleHash, createHtlcQuery, subscribeToQuotes, selectWorker,
-} from "./application/requester-service";
-export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./application/requester-service";
+} from "./infrastructure/nostr/requester-service";
+export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./infrastructure/nostr/requester-service";
 
 // --- Infrastructure: Escrow providers ---
 export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-provider";
 export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider";
 
+// --- Application: Preimage port ---
+export type { PreimageStore, PreimageEntry } from "./application/preimage-port";
 // --- Infrastructure: Preimage store ---
 export { createPreimageStore, createPersistentPreimageStore } from "./infrastructure/preimage/preimage-store";
-export type { PreimageStore, PreimageEntry } from "./infrastructure/preimage/preimage-store";
 
+// --- Application: Oracle port ---
+export type { OracleRegistry } from "./application/oracle-port";
 // --- Infrastructure: Oracle ---
 export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./infrastructure/oracle";
-export type { Oracle, OracleInfo, OracleAttestation, OracleRegistry, HttpOracleConfig } from "./infrastructure/oracle";
+export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./infrastructure/oracle";
 
 // --- Infrastructure: Servers & apps ---
 export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server";

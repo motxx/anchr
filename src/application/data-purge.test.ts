@@ -3,15 +3,16 @@ import { expect } from "@std/expect";
 import { mkdtemp, rm, readdir, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clearQueryStore, createQuery, expireQueries } from "./query-service";
-import { purgeExpiredQueries } from "./data-purge";
+import { createQueryService } from "./query-service";
+import type { QueryService } from "./query-service";
 
 describe("data purge", () => {
   let tempDir: string;
+  let svc: QueryService;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "anchr-purge-test-"));
-    clearQueryStore();
+    svc = createQueryService();
   });
 
   afterEach(async () => {
@@ -20,27 +21,26 @@ describe("data purge", () => {
 
   test("purges expired queries from memory store", async () => {
     // Create an expired query
-    createQuery(
+    svc.createQuery(
       { description: "expired test query" },
       { ttlMs: -1 },
     );
     // Create an active query
-    const active = createQuery(
+    const active = svc.createQuery(
       { description: "active test query" },
       { ttlMs: 60_000 },
     );
 
     // Expire pending queries first
-    const expired = expireQueries();
+    const expired = svc.expireQueries();
     expect(expired).toBe(1);
 
     // Purge expired
-    const purged = await purgeExpiredQueries();
-    expect(purged).toBe(1);
+    const purged = svc.purgeExpiredFromStore();
+    expect(purged).toHaveLength(1);
 
     // Active query should still exist
-    const { getQuery } = await import("./query-service");
-    expect(getQuery(active.id)).not.toBeNull();
+    expect(svc.getQuery(active.id)).not.toBeNull();
   });
 
   test("deletes attachment files for expired queries", async () => {

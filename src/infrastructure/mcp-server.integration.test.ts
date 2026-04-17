@@ -99,7 +99,16 @@ class DenoStdioTransport implements Transport {
 }
 
 async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
+  // Configure defaultService with oracle registry so singleton functions work
+  const setupDefaultService = [
+    `const { setDefaultService, createQueryService } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
+    `const { createOracleRegistry } = await import(${JSON.stringify(join(moduleDir(import.meta), "oracle/registry.ts"))});`,
+    `const { normalizeQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "attachments.ts"))});`,
+    `setDefaultService(createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult }));`,
+  ].join("\n");
+
   const bootstrap = [
+    setupDefaultService,
     bootstrapPreamble,
     `const { startMcpServer } = await import(${JSON.stringify(join(moduleDir(import.meta), "mcp-server.ts"))});`,
     "await startMcpServer();",

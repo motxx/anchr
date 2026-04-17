@@ -1,14 +1,8 @@
 import { builtInOracle, BUILT_IN_ORACLE_ID } from "./built-in";
 import type { Oracle, OracleInfo } from "./types";
-
-export interface OracleRegistry {
-  get(id: string): Oracle | null;
-  list(): OracleInfo[];
-  register(oracle: Oracle): void;
-  resolve(oracleId: string | undefined, acceptableIds: string[] | undefined): Oracle | null;
-  /** Resolve up to `count` oracles from the acceptable set (for quorum). */
-  resolveMultiple(acceptableIds: string[] | undefined, count: number): Oracle[];
-}
+import type { OracleRegistry } from "../../application/oracle-port";
+// Re-export port interface for backward compatibility
+export type { OracleRegistry } from "../../application/oracle-port";
 
 export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): OracleRegistry {
   const oracles = new Map<string, Oracle>();

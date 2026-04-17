@@ -47,65 +47,57 @@ jobs:
       - name: Setup Rust (for frost-signer)
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Architecture lint
-        run: deno task lint:arch
-
-      - name: Refactor lint
-        run: deno task lint:refactor
-        continue-on-error: true
+      - name: Build frost-signer
+        run: cd crates/frost-signer && cargo build --release
 
       - name: Typecheck
         run: deno check src/**/*.ts
 
-      - name: Unit tests (no Docker needed)
-        run: deno task test:unit
+      # Phase 1: Local tests (no Docker)
+      - name: Local tests (lint + unit + protocol + frost + integration + example)
+        run: deno task test:all
 
-      - name: Example tests (prediction market)
-        run: deno task test:example
-
-      - name: Protocol tests (security properties)
-        run: deno task test:protocol
-
-      - name: Build frost-signer
-        run: cd crates/frost-signer && cargo build --release
-
-      - name: FROST threshold tests (no Docker needed)
-        run: deno task test:frost
-
-      - name: Start infrastructure (relay + Blossom + regtest Lightning)
+      # Phase 2: Docker-dependent tests
+      - name: Start infrastructure (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: docker compose up -d relay blossom bitcoind lnd-mint lnd-user && sleep 5
+        run: docker compose up -d relay blossom && sleep 5
 
-      - name: Integration & E2E tests (relay + Blossom)
+      - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: deno test src/infrastructure/worker-api.integration.test.ts src/infrastructure/mcp-server.integration.test.ts e2e/relay.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
+        run: deno task test:e2e:relay
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
+
+      # Phase 3: Regtest Lightning tests
+      - name: Start regtest Lightning stack
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d bitcoind lnd-mint lnd-user
+          sleep 5
 
       - name: Initialize regtest (wait for LND + fund + open channel)
         if: ${{ !cancelled() }}
         run: ./scripts/init-regtest.sh
 
-      - name: Start Cashu mint (with restart for LND cert refresh)
+      - name: Start Cashu mint
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d cashu-mint
           sleep 5
           docker compose restart cashu-mint
-          echo "Waiting for Cashu mint to be ready (up to 60s)..."
+          echo "Waiting for Cashu mint..."
           for i in $(seq 1 20); do
             if curl -sf http://localhost:3338/v1/info > /dev/null 2>&1; then
-              echo "Cashu mint is ready."
+              echo "Cashu mint ready."
               break
             fi
-            echo "  Waiting... ($i/20)"
             sleep 3
           done
 
       - name: Regtest E2E tests (HTLC + Cashu)
         if: ${{ !cancelled() }}
-        run: deno test e2e/regtest-htlc-trustless.test.ts e2e/regtest-cashu.test.ts --allow-env --allow-read --allow-net --allow-run
+        run: deno task test:regtest
         env:
           CASHU_MINT_URL: http://localhost:3338
           NOSTR_RELAYS: ws://localhost:7777

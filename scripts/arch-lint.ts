@@ -12,6 +12,7 @@
  *   [E002] runtime must not import from domain, application, infrastructure, or ui
  *   [E003] ui must not import from infrastructure or application
  *   [E004] Banned packages: express, dotenv, ws
+ *   [E005] application must not import from infrastructure, ui, or runtime
  *   [W001] Prefer JSR over npm for packages that have JSR equivalents
  */
 
@@ -42,6 +43,7 @@ interface Violation {
 // Layer → set of layers it must NOT import from.
 const FORBIDDEN_IMPORTS: Record<string, string[]> = {
   domain: ["application", "infrastructure", "ui", "runtime"],
+  application: ["infrastructure", "ui", "runtime"],
   runtime: ["domain", "application", "infrastructure", "ui"],
   ui: ["infrastructure", "application"],
 };
@@ -121,6 +123,7 @@ function checkFile(
       const code = layer === "domain" ? "E001"
         : layer === "runtime" ? "E002"
         : layer === "ui" ? "E003"
+        : layer === "application" ? "E005"
         : "E001";
       violations.push({
         file: relPath,

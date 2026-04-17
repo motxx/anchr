@@ -8,24 +8,9 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-export interface PreimageEntry {
-  hash: string;
-  preimage: string;
-  created_at: number;
-}
-
-export interface PreimageStore {
-  /** Generate a new preimage/hash pair. Returns the entry (hash is the key). */
-  create(): PreimageEntry;
-  /** Retrieve the preimage by hash (Oracle-only). */
-  getPreimage(hash: string): string | null;
-  /** Check if a hash exists in the store. */
-  has(hash: string): boolean;
-  /** Verify a preimage matches the stored hash. */
-  verify(hash: string, preimage: string): boolean;
-  /** Delete the entry (after delivery or expiry). */
-  delete(hash: string): void;
-}
+import type { PreimageEntry, PreimageStore } from "../../application/preimage-port";
+// Re-export port interfaces for backward compatibility
+export type { PreimageEntry, PreimageStore } from "../../application/preimage-port";
 
 function createPreimage(): { preimage: string; hash: string } {
   const raw = crypto.getRandomValues(new Uint8Array(32));
