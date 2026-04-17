@@ -110,6 +110,21 @@ const queries = await anchr.listOpenQueries({ lat: 35.66, lon: 139.70 });
 const result = await anchr.submitPresentation(queryId, presentationBase64);
 ```
 
+## MCP (AI Agent Integration)
+
+```json
+{
+  "mcpServers": {
+    "anchr": {
+      "command": "deno",
+      "args": ["run", "--allow-all", "/path/to/anchr/src/mcp.ts"]
+    }
+  }
+}
+```
+
+Tools: `create_query`, `get_query_status`, `list_available_queries`, `cancel_query`, `get_query_attachment`
+
 ## License
 
 MIT
