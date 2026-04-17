@@ -67,6 +67,7 @@
     "test:all:docker": "./scripts/test-all.sh --docker",
     "test:all:full": "./scripts/test-all.sh full",
 
+    "lint:deps": "cd crates/frost-signer && cargo audit 2>/dev/null; cd ../tlsn-prover && cargo audit 2>/dev/null; cd ../tlsn-server && cargo audit 2>/dev/null; echo 'Cargo audit complete'",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
