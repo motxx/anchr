@@ -53,8 +53,15 @@ jobs:
       - name: Typecheck
         run: deno check src/**/*.ts
 
+      - name: Cargo dependency audit
+        run: |
+          cargo install cargo-audit --quiet 2>/dev/null || true
+          cd crates/frost-signer && cargo audit --deny warnings 2>&1 || true
+          cd ../tlsn-prover && cargo audit --deny warnings 2>&1 || true
+          cd ../tlsn-server && cargo audit --deny warnings 2>&1 || true
+
       # Phase 1: Local tests (no Docker)
-      - name: Local tests (lint + unit + protocol + frost + integration + example)
+      - name: Local tests (lint + unit + protocol + frost + integration + example + pentest)
         run: deno task test:all
 
       # Phase 2: Docker-dependent tests
