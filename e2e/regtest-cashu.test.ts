@@ -25,7 +25,7 @@ import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
-import { createQueryService, clearQueryStore } from "../src/application/query-service";
+import { createQueryService } from "../src/application/query-service";
 import {
   checkInfraReady,
   payInvoiceViaLndUser,
@@ -58,7 +58,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
   const app = buildWorkerApiApp({ queryService: testService });
 
   beforeAll(() => {
-    clearQueryStore();
+    testService.clearQueryStore();
   });
 
   test("cashu mint is reachable", async () => {

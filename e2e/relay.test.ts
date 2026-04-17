@@ -14,7 +14,9 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
-import { clearQueryStore } from "../src/application/query-service.ts";
+import { createQueryService, setDefaultService } from "../src/application/query-service.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import { publishQueryToRelay } from "../src/infrastructure/nostr/relay-publish.ts";
 import { closePool } from "../src/infrastructure/nostr/client.ts";
 import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events.ts";
 
@@ -73,9 +75,16 @@ const suite = RELAY_REACHABLE ? describe : describe.ignore;
 
 // Relay tests need actual relay hooks (fire-and-forget WebSocket publishes),
 // so we disable Deno's resource/ops sanitizers and clean up via closePool().
+// Initialize the default service with relay hooks for this E2E test.
+const relayService = createQueryService({
+  oracleRegistry: createOracleRegistry(),
+  hooks: { onCreated: publishQueryToRelay },
+});
+setDefaultService(relayService);
+
 suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, sanitizeResources: false }, () => {
   afterAll(() => {
-    clearQueryStore();
+    relayService.clearQueryStore();
     closePool();
   });
 
