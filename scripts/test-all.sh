@@ -64,6 +64,34 @@ run_local() {
   run_test "example tests"    deno task test:example
 }
 
+# --- Phase 1.5: Pentest (needs app server running) ---
+
+run_pentest() {
+  step "Phase 1.5: Penetration Tests"
+
+  # Start the server for pentest
+  local port=8091
+  HTTP_API_KEYS=pentest-key-001 PORT=$port \
+    deno run --allow-all src/infrastructure/server.ts &
+  local server_pid=$!
+  sleep 3
+
+  # Verify server is up
+  if ! curl -sf "http://localhost:$port/health" > /dev/null 2>&1; then
+    echo "  Server failed to start on port $port"
+    kill $server_pid 2>/dev/null || true
+    fail "pentest server start"
+    return
+  fi
+
+  PENTEST_APP_URL="http://localhost:$port" \
+  HTTP_API_KEYS=pentest-key-001 \
+  run_test "pentest" deno task test:pentest
+
+  kill $server_pid 2>/dev/null || true
+  wait $server_pid 2>/dev/null || true
+}
+
 # --- Phase 2: Docker-dependent tests ---
 
 wait_for_service() {
@@ -138,6 +166,7 @@ run_docker_tests() {
 case "$MODE" in
   --local)
     run_local
+    run_pentest
     ;;
   --docker)
     trap cleanup EXIT
@@ -148,6 +177,7 @@ case "$MODE" in
   --ci|full|*)
     trap cleanup EXIT
     run_local
+    run_pentest
 
     if [ "$FAILED" = "1" ] && [ "$MODE" != "--ci" ]; then
       echo -e "\n${RED}Local tests failed. Skipping Docker tests.${NC}"
