@@ -405,6 +405,7 @@ suite("e2e: Multi-Party Attacks", () => {
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
   });
 
+  // INV-03: Requester can't unlock escrow before timeout
   test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();

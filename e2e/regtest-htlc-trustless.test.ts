@@ -374,6 +374,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 8. Refund path BEFORE locktime (Requester tries early refund)
   // ---------------------------------------------------------------------------
 
+  // INV-03: Requester can't unlock escrow before timeout
   test("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
