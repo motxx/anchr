@@ -228,7 +228,7 @@ auto-approves the confirmPopup, runs the plugin, and verifies:
 
 ```bash
 # Launch Chrome for Testing with extension
-CHROMIUM=~/.cache/puppeteer/chrome/*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing
+CHROMIUM=~/.cache/puppeteer/chrome/*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing  # allow-local-path: generic puppeteer cache location
 EXT=/tmp/tlsn-extension/packages/extension/build
 "$CHROMIUM" --no-first-run --disable-extensions-except="$EXT" --load-extension="$EXT"
 ```
