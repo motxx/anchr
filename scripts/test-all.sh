@@ -57,6 +57,7 @@ run_local() {
   step "Phase 1: Lint & Local Tests"
 
   run_test "arch lint"        deno task lint:arch
+  run_test "invariant lint"   deno task lint:invariants
   run_test "dep audit"        deno task lint:deps
   run_test "unit tests"       deno task test:unit
   run_test "protocol tests"   deno task test:protocol
@@ -70,9 +71,13 @@ run_local() {
 run_pentest() {
   step "Phase 1.5: Penetration Tests"
 
-  # Start the server for pentest
+  # Start the server for pentest. RATE_LIMIT_MAX is bumped because the
+  # DOS + SSRF + fuzz tests issue ~150 requests from the same socket IP;
+  # the default 60/min would starve every downstream test. The rate-limit
+  # test isolates itself with a distinct x-real-ip bucket and fires past
+  # this ceiling to verify the limiter actually trips.
   local port=8091
-  HTTP_API_KEYS=pentest-key-001 PORT=$port \
+  HTTP_API_KEYS=pentest-key-001 PORT=$port RATE_LIMIT_MAX=500 \
     deno run --allow-all src/infrastructure/server.ts &
   local server_pid=$!
 

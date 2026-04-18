@@ -6,9 +6,9 @@ Anchr is a protocol for atomically exchanging cryptographic proofs and Bitcoin p
 
 A Requester posts a bounty. A Worker produces a cryptographic proof (TLSNotary for web data, C2PA for photos). An Oracle verifies the proof. Payment releases only when verification passes.
 
-- Requester can't revoke payment (sats locked in escrow before work begins)
-- Worker can't forge proofs (verification is cryptographic)
-- Oracle can't steal funds (escrow requires Worker's signature to redeem)
+- Requester can't revoke payment (sats locked in escrow before work begins) — see [INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)
+- Worker can't forge proofs (verification is cryptographic) — see [INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)
+- Oracle can't steal funds (escrow requires Worker's signature to redeem) — see [INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)
 - For high-value queries, t-of-n independent Oracles verify via FROST threshold signing
 
 ## Architecture

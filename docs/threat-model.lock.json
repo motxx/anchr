@@ -1,0 +1,14 @@
+{
+  "INV-01": {
+    "hash": "sha256:6c96002e19c303b091d4c18435607c2a018b872b57f9dc64f15777b138e902f6",
+    "justification": "initial declaration"
+  },
+  "INV-02": {
+    "hash": "sha256:1046a5c773b861332c33cb05f6a4218cdfefc7ca3b1b958130f17892767fddd5",
+    "justification": "initial declaration"
+  },
+  "INV-03": {
+    "hash": "sha256:febdfbf2f18da92803b0d7756d072de33f1128e14ae115d357f1e1e7dfe5c1f7",
+    "justification": "initial declaration"
+  }
+}
