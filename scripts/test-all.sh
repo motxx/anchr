@@ -75,11 +75,10 @@ run_pentest() {
   HTTP_API_KEYS=pentest-key-001 PORT=$port \
     deno run --allow-all src/infrastructure/server.ts &
   local server_pid=$!
-  sleep 3
 
-  # Verify server is up
-  if ! curl -sf "http://localhost:$port/health" > /dev/null 2>&1; then
-    echo "  Server failed to start on port $port"
+  # Poll /health for up to 30s — CI cold-start (tailwind CSS build + Deno cache)
+  # can exceed 3s on a fresh runner.
+  if ! wait_for_service "pentest server" "http://localhost:$port/health" 15; then
     kill $server_pid 2>/dev/null || true
     fail "pentest server start"
     return
