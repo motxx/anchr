@@ -57,11 +57,39 @@ run_local() {
   step "Phase 1: Lint & Local Tests"
 
   run_test "arch lint"        deno task lint:arch
+  run_test "dep audit"        deno task lint:deps
   run_test "unit tests"       deno task test:unit
   run_test "protocol tests"   deno task test:protocol
   run_test "FROST tests"      deno task test:frost
   run_test "integration tests" deno task test:integration
   run_test "example tests"    deno task test:example
+}
+
+# --- Phase 1.5: Pentest (needs app server running) ---
+
+run_pentest() {
+  step "Phase 1.5: Penetration Tests"
+
+  # Start the server for pentest
+  local port=8091
+  HTTP_API_KEYS=pentest-key-001 PORT=$port \
+    deno run --allow-all src/infrastructure/server.ts &
+  local server_pid=$!
+
+  # Poll /health for up to 30s — CI cold-start (tailwind CSS build + Deno cache)
+  # can exceed 3s on a fresh runner.
+  if ! wait_for_service "pentest server" "http://localhost:$port/health" 15; then
+    kill $server_pid 2>/dev/null || true
+    fail "pentest server start"
+    return
+  fi
+
+  PENTEST_APP_URL="http://localhost:$port" \
+  HTTP_API_KEYS=pentest-key-001 \
+  run_test "pentest" deno task test:pentest
+
+  kill $server_pid 2>/dev/null || true
+  wait $server_pid 2>/dev/null || true
 }
 
 # --- Phase 2: Docker-dependent tests ---
@@ -138,6 +166,7 @@ run_docker_tests() {
 case "$MODE" in
   --local)
     run_local
+    run_pentest
     ;;
   --docker)
     trap cleanup EXIT
@@ -148,6 +177,7 @@ case "$MODE" in
   --ci|full|*)
     trap cleanup EXIT
     run_local
+    run_pentest
 
     if [ "$FAILED" = "1" ] && [ "$MODE" != "--ci" ]; then
       echo -e "\n${RED}Local tests failed. Skipping Docker tests.${NC}"

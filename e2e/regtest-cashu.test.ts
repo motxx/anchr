@@ -25,7 +25,10 @@ import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
-import { createQueryService, clearQueryStore } from "../src/application/query-service";
+import { createQueryService } from "../src/application/query-service";
+import { createOracleRegistry } from "../src/infrastructure/oracle/registry";
+import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
+import { normalizeQueryResult } from "../src/infrastructure/attachments";
 import {
   checkInfraReady,
   payInvoiceViaLndUser,
@@ -52,13 +55,26 @@ async function mintCashuToken(amountSats: number): Promise<{ token: string; proo
 const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
-const testService = createQueryService({ hooks: {} });
+// Wire oracleRegistry + preimageStore so verification can actually succeed
+// (mirrors production composition in src/infrastructure/reference-app.ts).
+const testOracleRegistry = createOracleRegistry();
+const testPreimageStore = createPreimageStore();
+const testService = createQueryService({
+  oracleRegistry: testOracleRegistry,
+  preimageStore: testPreimageStore,
+  normalizeResult: normalizeQueryResult,
+  hooks: {},
+});
 
 suite("e2e: regtest Cashu bounty lifecycle", () => {
-  const app = buildWorkerApiApp({ queryService: testService });
+  const app = buildWorkerApiApp({
+    queryService: testService,
+    oracleRegistry: testOracleRegistry,
+    preimageStore: testPreimageStore,
+  });
 
   beforeAll(() => {
-    clearQueryStore();
+    testService.clearQueryStore();
   });
 
   test("cashu mint is reachable", async () => {
