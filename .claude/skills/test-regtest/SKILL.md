@@ -22,6 +22,8 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh && docker compose restart cashu-mint && sleep 5
 
 # 2. Run E2E tests (30 tests: Cashu bounty lifecycle + HTLC trustless + HTLC attacks)
+#    The `test:regtest` task in deno.json injects CASHU_MINT_URL / NOSTR_RELAYS /
+#    BLOSSOM_SERVERS inline — no manual `export` needed for the main command.
 deno task test:regtest
 ```
 
@@ -153,6 +155,11 @@ curl -s -X POST http://localhost:3000/queries \
 | `verification_requirements` | no | `["gps","ai_check"]` | `["gps","nonce","timestamp","oracle","ai_check"]` |
 | `ttl_seconds` | no | 600 | Query lifetime (60–86400) |
 | `bounty` | no | — | `{amount_sats, cashu_token}` |
+
+Each verification check is independent — pick the subset you need:
+- `["gps"]` — GPS proximity only (photo still required by server)
+- `["gps","ai_check"]` — GPS + AI photo-content validation (default)
+- `[]` — text-only mode (set `--text-only` on the helper script)
 
 ### Query types
 
