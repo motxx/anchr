@@ -18,7 +18,7 @@ FROM denoland/deno@sha256:9c47e8b8fa41e91fe2dd1448888244a56c4ec90124333d5341319b
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl npm tini \
+  && apt-get install -y --no-install-recommends adduser ca-certificates curl npm tini \
   && rm -rf /var/lib/apt/lists/*
 
 # Native binaries built above
