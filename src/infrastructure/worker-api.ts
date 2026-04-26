@@ -56,7 +56,7 @@ function extractApiKey(c: Context): string | null {
 const writeAuth: MiddlewareHandler = async (c, next) => {
   const { httpApiKeys } = getRuntimeConfig();
   if (httpApiKeys.length === 0) {
-    if (process.env.NODE_ENV === "production") {
+    if (Deno.env.get("NODE_ENV") === "production") {
       return c.json({ error: "Server misconfigured: no API keys set" }, 503);
     }
     console.error("[security] WARNING: No API keys configured — write endpoints are unauthenticated");
@@ -112,17 +112,17 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   const app = new Hono();
 
-  const corsOrigin = process.env.CORS_ORIGIN;
-  if (!corsOrigin && process.env.NODE_ENV === "production") {
+  const corsOrigin = Deno.env.get("CORS_ORIGIN");
+  if (!corsOrigin && Deno.env.get("NODE_ENV") === "production") {
     console.error("[security] WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only");
   }
   app.use("*", cors({
-    origin: corsOrigin || (process.env.NODE_ENV === "production" ? "" : "*"),
+    origin: corsOrigin || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
   }));
 
   // --- Rate limiting for write endpoints ---
   const RATE_WINDOW_MS = 60_000;
-  const RATE_MAX_REQUESTS = Number(process.env.RATE_LIMIT_MAX) || 60;
+  const RATE_MAX_REQUESTS = Number(Deno.env.get("RATE_LIMIT_MAX")) || 60;
   const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
   // Rate limiting: use Fly-Client-IP (Fly.io) > X-Real-IP (nginx) > socket address.

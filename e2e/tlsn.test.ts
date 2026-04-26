@@ -12,7 +12,7 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
 import { createQueryService, createQueryStore } from "../src/application/query-service";
 import type { QueryInput, QueryResult } from "../packages/core-domain/src/types";

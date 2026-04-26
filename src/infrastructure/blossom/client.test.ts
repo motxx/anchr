@@ -46,18 +46,18 @@ describe("Blossom client", () => {
   });
 
   test("isBlossomEnabled returns false when not configured", () => {
-    const original = process.env.BLOSSOM_SERVERS;
-    delete process.env.BLOSSOM_SERVERS;
+    const original = Deno.env.get("BLOSSOM_SERVERS");
+    Deno.env.delete("BLOSSOM_SERVERS");
 
     expect(isBlossomEnabled()).toBe(false);
     expect(getBlossomConfig()).toBe(null);
 
-    if (original) process.env.BLOSSOM_SERVERS = original;
+    if (original) Deno.env.set("BLOSSOM_SERVERS", original);
   });
 
   test("getBlossomConfig parses comma-separated URLs", () => {
-    const original = process.env.BLOSSOM_SERVERS;
-    process.env.BLOSSOM_SERVERS = "https://blossom1.example, https://blossom2.example/";
+    const original = Deno.env.get("BLOSSOM_SERVERS");
+    Deno.env.set("BLOSSOM_SERVERS", "https://blossom1.example, https://blossom2.example/");
 
     const config = getBlossomConfig();
     expect(config).not.toBe(null);
@@ -67,9 +67,9 @@ describe("Blossom client", () => {
     ]);
 
     if (original) {
-      process.env.BLOSSOM_SERVERS = original;
+      Deno.env.set("BLOSSOM_SERVERS", original);
     } else {
-      delete process.env.BLOSSOM_SERVERS;
+      Deno.env.delete("BLOSSOM_SERVERS");
     }
   });
 });

@@ -25,7 +25,7 @@ export function publishQueryToRelay(query: Query): void {
     oracle_ids: query.oracle_ids,
     verification_requirements: query.verification_requirements,
     bounty: query.bounty?.escrow_token
-      ? { mint: process.env.CASHU_MINT_URL ?? "", token: query.bounty.escrow_token }
+      ? { mint: Deno.env.get("CASHU_MINT_URL") ?? "", token: query.bounty.escrow_token }
       : undefined,
   }, query.location_hint);
 

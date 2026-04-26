@@ -17,7 +17,7 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { createDualPreimageStore } from "../src/infrastructure/conditional-swap/dual-preimage-store.ts";
+import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import { resolveMarket as resolveMarketDual } from "../example/prediction-market/src/resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,

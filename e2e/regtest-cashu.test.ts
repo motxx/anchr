@@ -22,7 +22,7 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
 import { createQueryService } from "../src/application/query-service";

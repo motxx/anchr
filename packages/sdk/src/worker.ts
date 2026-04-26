@@ -255,7 +255,7 @@ export class AnchrWorker {
         }
       }
     }
-    const socksProxy = process.env.TLSN_SOCKS_PROXY;
+    const socksProxy = Deno.env.get("TLSN_SOCKS_PROXY");
     if (socksProxy) args.push("--socks-proxy", socksProxy);
 
     const { stdout, stderr, exitCode } = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {

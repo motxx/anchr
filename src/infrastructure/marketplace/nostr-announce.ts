@@ -14,7 +14,7 @@ import type { DataListing } from "./types";
 
 /** Get the Nostr identity keypair. Returns null if not configured. */
 async function getIdentityKey(): Promise<Uint8Array | null> {
-  const hexKey = process.env.NOSTR_PRIVATE_KEY?.trim();
+  const hexKey = Deno.env.get("NOSTR_PRIVATE_KEY")?.trim();
   if (!hexKey) return null;
   return Uint8Array.from(Buffer.from(hexKey, "hex"));
 }

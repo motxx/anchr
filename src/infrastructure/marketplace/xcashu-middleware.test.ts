@@ -34,7 +34,7 @@ function makeApp(listing: DataListing | null) {
 describe("X-Cashu Payment Middleware", () => {
   beforeEach(() => {
     _clearSeenTokensForTest();
-    delete process.env.CASHU_MINT_URL;
+    Deno.env.delete("CASHU_MINT_URL");
   });
 
   test("no payment header returns 402 with pricing info", async () => {

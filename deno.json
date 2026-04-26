@@ -41,6 +41,7 @@
     "@modelcontextprotocol/sdk/shared/transport.js": "npm:@modelcontextprotocol/sdk@^1/shared/transport.js",
     "@modelcontextprotocol/sdk/types.js": "npm:@modelcontextprotocol/sdk@^1/types.js",
     "@hono/zod-validator": "npm:@hono/zod-validator@^0.7",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "react": "npm:react@^19",
     "react-dom": "npm:react-dom@^19",
     "react-dom/client": "npm:react-dom@^19/client",

@@ -34,10 +34,10 @@ import {
 } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { createDualPreimageStore } from "../src/infrastructure/conditional-swap/dual-preimage-store.ts";
+import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import { createOrderBook } from "../example/prediction-market/src/order-book.ts";
 import { resolveMarket } from "../example/prediction-market/src/resolution.ts";
-import type { ConditionalSwapDef } from "../src/domain/conditional-swap-types.ts";
+import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
 import type { OpenOrder, MatchProposal, MatchedBetPair } from "../example/prediction-market/src/market-types.ts";
 import {
   checkInfraReady,

@@ -23,7 +23,7 @@ export interface BlossomConfig {
 }
 
 export function getBlossomConfig(): BlossomConfig | null {
-  const urls = process.env.BLOSSOM_SERVERS?.split(",")
+  const urls = Deno.env.get("BLOSSOM_SERVERS")?.split(",")
     .map((u) => u.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 

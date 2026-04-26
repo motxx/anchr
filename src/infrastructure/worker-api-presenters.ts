@@ -10,14 +10,14 @@ import {
 import type { AttachmentRef, Query } from "../../packages/core-domain/src/types";
 
 export const TRUSTED_HOSTS = new Set(
-  (process.env.TRUSTED_PROXY_HOSTS ?? "")
+  (Deno.env.get("TRUSTED_PROXY_HOSTS") ?? "")
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean),
 );
 
 export function getPublicRequestUrl(c: Context): string {
-  const publicBase = process.env.PUBLIC_BASE_URL;
+  const publicBase = Deno.env.get("PUBLIC_BASE_URL");
   if (publicBase) {
     const url = new URL(c.req.url);
     const base = new URL(publicBase);

@@ -18,7 +18,7 @@ export interface NostrClientConfig {
 }
 
 export function getNostrConfig(): NostrClientConfig | null {
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",")
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",")
     .map((url) => url.trim())
     .filter(Boolean);
 

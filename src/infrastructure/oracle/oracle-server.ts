@@ -35,9 +35,9 @@ function safeCompare(a: string, b: string): boolean {
     : !timingSafeEqual(userValue, userValue);
 }
 
-const ORACLE_ID = process.env.ORACLE_ID ?? "remote-oracle";
-const ORACLE_API_KEY = process.env.ORACLE_API_KEY?.trim();
-const ORACLE_PORT = Number(process.env.ORACLE_PORT) || 4000;
+const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "remote-oracle";
+const ORACLE_API_KEY = Deno.env.get("ORACLE_API_KEY")?.trim();
+const ORACLE_PORT = Number(Deno.env.get("ORACLE_PORT")) || 4000;
 
 export interface OracleAppOptions {
   oracleId?: string;
@@ -93,7 +93,7 @@ export function buildOracleApp(
     c.json({
       id: oracleId,
       name: `Oracle ${oracleId}`,
-      fee_ppm: Number(process.env.ORACLE_FEE_PPM) || 0,
+      fee_ppm: Number(Deno.env.get("ORACLE_FEE_PPM")) || 0,
     }),
   );
 
@@ -443,7 +443,7 @@ export function buildOracleApp(
 
 // Run as standalone server when executed directly
 if (import.meta.main) {
-  const preimageDbPath = process.env.ORACLE_PREIMAGE_DB?.trim();
+  const preimageDbPath = Deno.env.get("ORACLE_PREIMAGE_DB")?.trim();
   const preimageStore = preimageDbPath
     ? createPersistentPreimageStore(preimageDbPath)
     : undefined;
@@ -451,7 +451,7 @@ if (import.meta.main) {
   // Load FROST config if available
   let frostNodeConfig: FrostNodeConfig | undefined;
   let frostConfig: ThresholdOracleConfig | undefined;
-  const frostConfigPath = process.env.FROST_CONFIG_PATH?.trim();
+  const frostConfigPath = Deno.env.get("FROST_CONFIG_PATH")?.trim();
   if (frostConfigPath) {
     try {
       const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../../../packages/cashu-frost-oracle/src/config.ts");

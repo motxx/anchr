@@ -2,7 +2,7 @@
  * Shared E2E helpers for regtest Cashu / Lightning tests.
  */
 
-import { spawn } from "../../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { bytesToHex } from "@noble/hashes/utils.js";

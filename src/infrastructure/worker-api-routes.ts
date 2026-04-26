@@ -431,7 +431,7 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || (process.env.NODE_ENV === "production" ? "" : "*"),
+        "Access-Control-Allow-Origin": Deno.env.get("CORS_ORIGIN") || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
       },
     });
   });

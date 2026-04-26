@@ -272,11 +272,11 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
  * Create an Oracle Nostr service from environment variable.
  */
 export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
-  const secretKeyHex = process.env.ORACLE_NOSTR_SECRET_KEY?.trim();
+  const secretKeyHex = Deno.env.get("ORACLE_NOSTR_SECRET_KEY")?.trim();
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",").map((u) => u.trim()).filter(Boolean);
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",").map((u) => u.trim()).filter(Boolean);
 
   return createOracleNostrService({ identity, relayUrls });
 }

@@ -166,7 +166,7 @@ async function loadImageContent(
  *
  * @example
  * const check = createAiContentChecker({
- *   getConfig: () => ({ enabled: true, anthropicApiKey: process.env.ANTHROPIC_API_KEY }),
+ *   getConfig: () => ({ enabled: true, anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY") }),
  *   readAttachment: (ref, key) => readStoredAttachmentBuffer(ref, undefined, key),
  * });
  * const result = await check(query, result, blossomKeys);

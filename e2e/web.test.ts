@@ -13,9 +13,9 @@
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn, fileExists } from "../src/runtime/mod.ts";
+import { spawn, fileExists } from "@anchr/core-runtime";
 
-const BROWSE = `${process.env.HOME}/.claude/skills/gstack/browse/dist/browse`;
+const BROWSE = `${Deno.env.get("HOME")}/.claude/skills/gstack/browse/dist/browse`;
 const SERVER_URL = "http://localhost:3000";
 const WEB_URL = "http://localhost:8082";
 

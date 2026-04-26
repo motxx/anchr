@@ -122,7 +122,7 @@ export async function createHtlcQuery(
     oracle_pubkey: config.oraclePubkey,
     requester_pubkey: identity.publicKey,
     bounty: {
-      mint: process.env.CASHU_MINT_URL ?? "",
+      mint: Deno.env.get("CASHU_MINT_URL") ?? "",
       token: hold.escrow_ref,
     },
     expires_at: Date.now() + (request.ttlSeconds ?? 600) * 1000,

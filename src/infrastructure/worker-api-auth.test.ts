@@ -20,17 +20,17 @@ function makeMockOracle(id: string): Oracle {
  * Sets HTTP_API_KEY for the duration of the callback.
  */
 async function withApiKey(key: string, fn: () => Promise<void>): Promise<void> {
-  const savedKey = process.env.HTTP_API_KEY;
-  const savedKeys = process.env.HTTP_API_KEYS;
-  process.env.HTTP_API_KEY = key;
-  delete process.env.HTTP_API_KEYS;
+  const savedKey = Deno.env.get("HTTP_API_KEY");
+  const savedKeys = Deno.env.get("HTTP_API_KEYS");
+  Deno.env.set("HTTP_API_KEY", key);
+  Deno.env.delete("HTTP_API_KEYS");
   try {
     await fn();
   } finally {
-    if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-    else delete process.env.HTTP_API_KEY;
-    if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-    else delete process.env.HTTP_API_KEYS;
+    if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+    else Deno.env.delete("HTTP_API_KEY");
+    if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+    else Deno.env.delete("HTTP_API_KEYS");
   }
 }
 
@@ -63,23 +63,23 @@ describe("writeAuth on /queries/all", () => {
   });
 
   test("returns 200 when no keys configured (dev mode)", async () => {
-    const savedKey = process.env.HTTP_API_KEY;
-    const savedKeys = process.env.HTTP_API_KEYS;
-    const savedEnv = process.env.NODE_ENV;
-    delete process.env.HTTP_API_KEY;
-    delete process.env.HTTP_API_KEYS;
-    delete process.env.NODE_ENV;
+    const savedKey = Deno.env.get("HTTP_API_KEY");
+    const savedKeys = Deno.env.get("HTTP_API_KEYS");
+    const savedEnv = Deno.env.get("NODE_ENV");
+    Deno.env.delete("HTTP_API_KEY");
+    Deno.env.delete("HTTP_API_KEYS");
+    Deno.env.delete("NODE_ENV");
     try {
       const { app } = makeTestApp();
       const res = await app.request("http://localhost/queries/all");
       expect(res.status).toBe(200);
     } finally {
-      if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-      else delete process.env.HTTP_API_KEY;
-      if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-      else delete process.env.HTTP_API_KEYS;
-      if (savedEnv !== undefined) process.env.NODE_ENV = savedEnv;
-      else delete process.env.NODE_ENV;
+      if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+      else Deno.env.delete("HTTP_API_KEY");
+      if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+      else Deno.env.delete("HTTP_API_KEYS");
+      if (savedEnv !== undefined) Deno.env.set("NODE_ENV", savedEnv);
+      else Deno.env.delete("NODE_ENV");
     }
   });
 });

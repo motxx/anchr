@@ -23,7 +23,7 @@ type McpMixedResult = { content: Array<{ type: "text"; text: string } | { type: 
 export function buildRequesterMeta(): RequesterMeta {
   return {
     requester_type: "agent",
-    client_name: process.env.REMOTE_QUERY_API_BASE_URL ? "mcp-remote" : "mcp",
+    client_name: Deno.env.get("REMOTE_QUERY_API_BASE_URL") ? "mcp-remote" : "mcp",
   };
 }
 

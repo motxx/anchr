@@ -13,14 +13,14 @@ export function withEnv(
 ): void | Promise<void> {
   const saved: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
+    saved[key] = Deno.env.get(key);
+    if (value === undefined) Deno.env.delete(key);
+    else Deno.env.set(key, value);
   }
   const restore = () => {
     for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+      if (value === undefined) Deno.env.delete(key);
+      else Deno.env.set(key, value);
     }
   };
   const result = fn();
@@ -36,16 +36,16 @@ export function withEnvThunk(
   return async () => {
     const saved: Record<string, string | undefined> = {};
     for (const key of Object.keys(overrides)) {
-      saved[key] = process.env[key];
-      if (overrides[key] === undefined) delete process.env[key];
-      else process.env[key] = overrides[key];
+      saved[key] = Deno.env.get(key);
+      if (overrides[key] === undefined) Deno.env.delete(key);
+      else Deno.env.set(key, overrides[key]);
     }
     try {
       await fn();
     } finally {
       for (const key of Object.keys(saved)) {
-        if (saved[key] === undefined) delete process.env[key];
-        else process.env[key] = saved[key];
+        if (saved[key] === undefined) Deno.env.delete(key);
+        else Deno.env.set(key, saved[key]);
       }
     }
   };

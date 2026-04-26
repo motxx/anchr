@@ -71,7 +71,7 @@ export function parseOracleRegistry(raw: string): OracleConfigEntry[] {
  * Called at application startup.
  */
 export function loadOraclesFromEnv(registry: OracleRegistry): number {
-  const raw = process.env.ORACLE_REGISTRY?.trim();
+  const raw = Deno.env.get("ORACLE_REGISTRY")?.trim();
   if (!raw) return 0;
 
   const entries = parseOracleRegistry(raw);
