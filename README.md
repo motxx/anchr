@@ -37,7 +37,7 @@ crates/                        Rust crates: frost-signer, tlsn-prover, tlsn-serv
 |---------|---------|---|
 | `core-runtime` | Deno runtime helpers (spawn, file I/O, PATH lookup, module dir) | ✅ |
 | `core-domain` | Type definitions for Query / QueryResult / Oracle / Attachment / Blossom keys | ✅ |
-| `core-cashu` | HTLC escrow primitive (`createHtlcToken`, `redeemHtlcToken`) + preimage store | ⚠️ Imports host's wallet (`src/infrastructure/cashu/wallet`) for mint config |
+| `core-cashu` | HTLC escrow primitive (`createHtlcToken`, `redeemHtlcToken`) + preimage store + Cashu wallet bindings | ✅ |
 | `tlsn-toolkit` | `validateTlsn`, `evaluateCondition`, `isSuspiciousRegex` (ReDoS guard), replay protection, subprocess wrapper for the `tlsn-verifier` Rust binary | ✅ |
 | `photo-bounty` | `validateC2pa`, `validateExif`, `parseProofModeZip`, `createAiContentChecker` (DI), `haversineKm`, `integrity-store` | ✅ |
 | `cashu-frost-oracle` | `createFrostCoordinator`, `coordinateSigning`, FROST DKG/sign CLI wrapper | ✅ |
@@ -56,7 +56,7 @@ crates/                        Rust crates: frost-signer, tlsn-prover, tlsn-serv
 | Messaging | Nostr (NIP-90 DVM, NIP-44 DM) | `src/infrastructure/nostr/` |
 | Storage | Blossom (AES-256-GCM) | `src/infrastructure/blossom/` |
 
-Each layer is pluggable. Swapping Cashu for Fedimint, or TLSNotary for another zkTLS provider, means implementing an adapter.
+Each layer is pluggable. Swapping Cashu for Fedimint, or TLSNotary for another zkTLS provider, means implementing an adapter — the `EscrowProvider` interface (`src/application/escrow-port.ts`) already supports Cashu HTLC and FROST P2PK implementations.
 
 ## Protocol Flow
 
@@ -115,29 +115,41 @@ deno task test:regtest               # E2E tests against regtest
 
 ```bash
 deno task test:ci         # unit + protocol + all packages (CI pipeline)
-deno task test:example    # all 7 example apps
-deno task test:regtest    # Cashu + Lightning E2E (Docker)
+deno task test:unit       # unit tests only
+deno task test:protocol   # protocol verification (trustless / attacks / exploits / quorum)
 deno task test:frost      # FROST threshold signing
+deno task test:regtest    # Cashu + Lightning E2E (Docker)
+deno task test:pentest    # penetration tests
+deno task test:example    # all 7 example apps
 deno task test            # everything (including e2e)
 ```
+
+See also: `deno task test:all` (lint + unit + protocol + frost + integration + example), `deno task test:all:docker` (e2e relay + regtest with Docker), `deno task test:all:full` (all combined).
 
 Current baseline: **313 tests / 975 steps / 0 failed** (250 host + 63 examples).
 
 ## API (host server)
 
 <details>
-<summary>Endpoints</summary>
+<summary>Query Endpoints</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/queries` | Create query |
 | `GET` | `/queries` | List open queries |
+| `GET` | `/queries/all` | List all queries (auth required) |
 | `GET` | `/queries/:id` | Query detail |
+| `GET` | `/queries/:id/quotes` | List quotes for query |
 | `POST` | `/queries/:id/quotes` | Worker submits quote |
 | `POST` | `/queries/:id/select` | Select Worker |
 | `POST` | `/queries/:id/begin` | Worker begins work |
 | `POST` | `/queries/:id/result` | Submit proof + verify + settle |
 | `POST` | `/queries/:id/cancel` | Cancel query |
+| `POST` | `/queries/:id/upload` | Upload photo/media (auth required) |
+| `GET` | `/queries/:id/attachments` | List attachments |
+| `GET` | `/queries/:id/attachments/:index` | Get attachment (redirect) |
+| `GET` | `/queries/:id/attachments/:index/meta` | Attachment metadata |
+| `GET` | `/queries/:id/attachments/:index/preview` | Attachment preview image |
 | `POST` | `/hash` | Oracle generates preimage/hash |
 | `GET` | `/oracles` | List oracles |
 | `GET` | `/health` | Health check |
@@ -145,18 +157,43 @@ Current baseline: **313 tests / 975 steps / 0 failed** (250 host + 63 examples).
 </details>
 
 <details>
+<summary>Marketplace Endpoints</summary>
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/marketplace/listings` | List active data listings |
+| `GET` | `/marketplace/listings/:id` | Get listing detail |
+| `POST` | `/marketplace/listings` | Create listing (auth required) |
+| `DELETE` | `/marketplace/listings/:id` | Deactivate listing (auth required) |
+| `GET` | `/marketplace/data/:id` | Get purchase info (returns 402 with payment instructions) |
+| `POST` | `/marketplace/data/:id` | Purchase data (X-Cashu or X-Cashu-Htlc header) |
+| `POST` | `/marketplace/listings/:id/announce` | Announce listing on Nostr (auth required) |
+
+</details>
+
+<details>
 <summary>Configuration</summary>
 
-| Variable | Description |
-|----------|-------------|
-| `NOSTR_RELAYS` | Relay WebSocket URLs |
-| `BLOSSOM_SERVERS` | Blossom blob server URLs |
-| `CASHU_MINT_URL` | Cashu mint URL |
-| `TLSN_VERIFIER_URL` | TLSNotary Verifier URL |
-| `FROST_CONFIG_PATH` | FROST node config file |
-| `HTTP_API_KEY` | API key for write endpoints |
-| `AI_CONTENT_CHECK` | `true` to enable vision-LLM content check (opt-in) |
-| `ANTHROPIC_API_KEY` | Required when `AI_CONTENT_CHECK=true` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` / `REFERENCE_APP_PORT` | Server port | `3000` |
+| `HTTP_API_KEY` | API key for write endpoints | — |
+| `HTTP_API_KEYS` | Comma-separated API keys (alternative) | — |
+| `CASHU_MINT_URL` | Cashu mint URL | — |
+| `NOSTR_RELAYS` | Relay WebSocket URLs | — |
+| `BLOSSOM_SERVERS` | Blossom blob server URLs | — |
+| `TLSN_VERIFIER_URL` | TLSNotary Verifier URL | — |
+| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL | — |
+| `FROST_CONFIG_PATH` | FROST node config file | — |
+| `TRUSTED_ORACLE_PUBKEYS` | Comma-separated Oracle pubkeys for whitelist | — |
+| `ANTHROPIC_API_KEY` | Claude API key (for AI content check) | — |
+| `AI_CONTENT_CHECK` | Enable AI content verification | `false` |
+| `REMOTE_QUERY_API_BASE_URL` | Remote query backend URL | — |
+| `REMOTE_QUERY_API_KEY` | Remote query backend API key | — |
+| `QUERY_SWEEP_INTERVAL_MS` | Query cleanup interval (ms) | `30000` |
+| `PREVIEW_MAX_DIMENSION` | Max preview image dimension (px) | `768` |
+| `PREVIEW_JPEG_QUALITY` | JPEG preview quality (1-100) | `75` |
+| `RUNTIME_DATA_DIR` | Local data directory | `.local` |
 
 </details>
 

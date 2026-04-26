@@ -110,3 +110,32 @@ the refund path works once locktime elapses.
   aggregation fails` once declared.
 - **INV-05:** C2PA manifest signature + GPS binding. Scoped after
   `crates/` gets a C2PA verifier.
+
+---
+
+## Trust surface: Proof publication
+
+Proof publication (visibility `"public"`) is implemented and irreversible
+(Nostr events cannot be deleted). Risks to other use cases:
+
+| Risk | Severity | Trigger | Mitigation |
+|------|----------|---------|------------|
+| Accidental publication (Nostr is append-only) | High | Developer misconfiguration | `visibility` is a required parameter with no default |
+| Metadata correlation | Medium | Same Oracle handles public + private proofs | Separate Oracle keys per use case |
+| Tor anonymity breach | Medium | Same node does Tor traffic + Nostr publish | Node isolation or Tor-routed Nostr relay |
+| Default-change pressure | Medium | Future protocol updates | `visibility` must never have a default value |
+| Query content inference | Low | Oracle specialization revealed by public proofs | Oracle separation |
+
+## Trust surface: Mint layer
+
+| Option | Trust level | Anchr fit | Cost |
+|--------|------------|-----------|------|
+| Cashu (current) | Single Mint trust | High (existing impl) | 0 |
+| Fedimint | Federated Mint (threshold signing) | High (EscrowProvider ready) | ~10 person-days |
+| DLC | No Mint (2-of-2 multisig) | Low (incompatible with pool betting) | ~50 person-days |
+
+DLC removes Mint trust entirely but conflicts with Anchr's pool-based
+betting model: DLC requires pairwise contracts (not many-to-many pools),
+pre-enumerated outcomes (limiting Anchr's arbitrary-URL market creation),
+and TLSNotary-to-DLC attestation conversion is an open research problem.
+Better suited as a future "high-value market" option.
