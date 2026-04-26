@@ -74,7 +74,7 @@ export function createIntegrityStore(): IntegrityStore {
   };
 }
 
-// --- Default singleton (backward compat) ---
+// --- Module-level singleton — convenience for callers that don't compose their own store ---
 
 const defaultStore = createIntegrityStore();
 

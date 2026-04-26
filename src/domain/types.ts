@@ -158,20 +158,6 @@ export interface EscrowInfo {
   escrow_ref?: string;
 }
 
-/**
- * HTLC escrow information — backward-compatible subset of EscrowInfo.
- * @deprecated Use EscrowInfo instead.
- */
-export interface HtlcInfo {
-  hash: string;
-  oracle_pubkey: string;
-  requester_pubkey: string;
-  worker_pubkey?: string;
-  locktime: number;
-  escrow_token?: string;
-  verified_escrow_sats?: number;
-}
-
 /** A quote from a Worker offering to fulfill a query. */
 export interface QuoteInfo {
   /** Worker's Nostr pubkey (hex). */
@@ -230,8 +216,6 @@ export interface Query {
   verification?: VerificationDetail;
   submission_meta?: SubmissionMeta;
   payment_status: PaymentStatus;
-  /** @deprecated Use escrow instead. */
-  htlc?: HtlcInfo;
   /** Escrow details (present when payment escrow is used). */
   escrow?: EscrowInfo;
   /** Worker quotes received for this query. */

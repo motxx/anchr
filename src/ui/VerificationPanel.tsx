@@ -32,9 +32,10 @@ interface OracleAttestationRecord {
   tlsn_verified?: TlsnVerifiedData;
 }
 
-interface HtlcSummary {
+interface EscrowSummary {
+  type: "htlc" | "p2pk_frost";
   hash: string;
-  oracle_pubkey: string;
+  oracle_pubkeys: string[];
   worker_pubkey?: string | null;
   locktime: number;
   verified_escrow_sats?: number | null;
@@ -45,7 +46,7 @@ export interface VerificationPanelProps {
   preimage?: string | null;
   paymentStatus?: string;
   oracleId?: string | null;
-  htlc?: HtlcSummary | null;
+  escrow?: EscrowSummary | null;
   attestations?: OracleAttestationRecord[] | null;
 }
 
@@ -127,18 +128,18 @@ function TlsnVerifiedPanel({ data }: { data: TlsnVerifiedData }) {
   );
 }
 
-function HtlcInfoPanel({
+function EscrowInfoPanel({
   preimage,
   paymentStatus,
-  htlc,
+  escrow,
 }: {
   preimage?: string | null;
   paymentStatus?: string;
-  htlc?: HtlcSummary | null;
+  escrow?: EscrowSummary | null;
 }) {
   const [copied, setCopied] = useState(false);
 
-  if (!preimage && !(htlc && htlc.verified_escrow_sats)) return null;
+  if (!preimage && !(escrow && escrow.verified_escrow_sats)) return null;
 
   function handleCopy(text: string) {
     navigator.clipboard.writeText(text);
@@ -183,10 +184,10 @@ function HtlcInfoPanel({
           )}>{paymentStatus}</span>
         </div>
       )}
-      {htlc?.verified_escrow_sats != null && (
+      {escrow?.verified_escrow_sats != null && (
         <div className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground">Escrow:</span>
-          <span className="text-amber-400 font-semibold">{htlc.verified_escrow_sats} sats</span>
+          <span className="text-amber-400 font-semibold">{escrow.verified_escrow_sats} sats</span>
         </div>
       )}
     </div>
@@ -220,7 +221,7 @@ export function VerificationPanel({
   preimage,
   paymentStatus,
   oracleId,
-  htlc,
+  escrow,
   attestations,
 }: VerificationPanelProps) {
   if (!verification && !preimage) return null;
@@ -230,7 +231,7 @@ export function VerificationPanel({
       {verification && <ChecksList checks={verification.checks} />}
       {verification && <FailuresList failures={verification.failures} />}
       {verification?.tlsn_verified && <TlsnVerifiedPanel data={verification.tlsn_verified} />}
-      <HtlcInfoPanel preimage={preimage} paymentStatus={paymentStatus} htlc={htlc} />
+      <EscrowInfoPanel preimage={preimage} paymentStatus={paymentStatus} escrow={escrow} />
       {attestations && <OracleAttestations attestations={attestations} />}
       {oracleId && !attestations?.length && (
         <div className="flex items-center gap-2 text-xs">

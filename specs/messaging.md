@@ -1,4 +1,4 @@
-# Spec 05: Messaging
+# Nostr DVM Messaging
 
 ## Abstract
 

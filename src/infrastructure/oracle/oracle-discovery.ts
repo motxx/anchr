@@ -1,5 +1,5 @@
 /**
- * Oracle discovery via Nostr relays (Spec 08).
+ * Oracle discovery via Nostr relays (the oracle-registry spec).
  *
  * Queries relays for kind 30088 Oracle Announcement events
  * and parses them into typed OracleAnnouncement objects.

@@ -31,7 +31,7 @@ events:
 | Requester | Download and access the verified data |
 
 Keys are ephemeral and per-blob. They are included in the `blossom_keys`
-field of the QueryResponsePayload (see `specs/05-messaging.md`).
+field of the QueryResponsePayload (see `specs/messaging.md`).
 
 ### Download
 

@@ -19,7 +19,7 @@
  *     Requester reclaims after locktime expires.
  *
  * Also exposes a 2-of-2(Oracle, Worker) P2PK escrow primitive for the
- * pre-HTLC settlement path (Spec 02 → @anchr/core-cashu/SPEC.md).
+ * pre-HTLC settlement path (the core-cashu SPEC → @anchr/core-cashu/SPEC.md).
  */
 
 import {

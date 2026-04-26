@@ -1,7 +1,7 @@
 import { builtInOracle, BUILT_IN_ORACLE_ID } from "./built-in.ts";
 import type { Oracle, OracleInfo } from "./types.ts";
 import type { OracleRegistry } from "../../application/oracle-port.ts";
-// Re-export port interface for backward compatibility
+// Re-export the port type so callers can import OracleRegistry alongside the registry implementation.
 export type { OracleRegistry } from "../../application/oracle-port.ts";
 
 export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): OracleRegistry {
@@ -49,7 +49,7 @@ export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): Oracl
   return registry;
 }
 
-// --- Default singleton (backward compat) ---
+// --- Module-level singleton — convenience for tests and CLI tools that don't compose their own registry ---
 
 const defaultRegistry = createOracleRegistry();
 

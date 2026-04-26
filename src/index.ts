@@ -12,7 +12,7 @@ export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./dom
 export {
   validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
 } from "./domain/value-objects.ts";
-export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "./domain/types.ts";
+export type { EscrowInfo, EscrowType, QuoteInfo } from "./domain/types.ts";
 
 // --- Application ---
 export { createQueryService, createQueryStore } from "./application/query-service.ts";

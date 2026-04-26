@@ -50,7 +50,7 @@ export function createInMemoryQueryRepository(): QueryRepository {
   };
 }
 
-/** Backward-compatible adapter: wrap a QueryStore as a QueryRepository. */
+/** Adapter: wrap a QueryStore as a QueryRepository (call sites switching to the repository port). */
 export function toRepository(store: QueryStore): QueryRepository {
   return {
     get(id) {

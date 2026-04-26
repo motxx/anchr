@@ -49,11 +49,6 @@ export interface PredictionMarket {
   htlc_hash_yes: string;
   /** SHA-256 hash of the NO preimage. Oracle reveals if NO wins. (HTLC mode) */
   htlc_hash_no: string;
-  /**
-   * @deprecated Use htlc_hash_yes. Retained for backward compat.
-   * When set, treated as alias for htlc_hash_yes.
-   */
-  htlc_hash?: string;
   /** FROST group pubkey for YES outcome (BIP-340 x-only hex). (FROST P2PK mode) */
   group_pubkey_yes?: string;
   /** FROST group pubkey for NO outcome (BIP-340 x-only hex). (FROST P2PK mode) */

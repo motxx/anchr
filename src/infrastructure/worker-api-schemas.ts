@@ -14,9 +14,10 @@ export const bountySchema = z.object({
 
 export const oracleIdsSchema = z.array(z.string().min(1)).optional();
 
-export const htlcSchema = z.object({
+export const escrowSchema = z.object({
+  type: z.enum(["htlc", "p2pk_frost"]),
   hash: z.string().min(1),
-  oracle_pubkey: z.string().min(1),
+  oracle_pubkeys: z.array(z.string().min(1)).min(1),
   requester_pubkey: z.string().min(1),
   locktime: z.number().int().min(0),
   escrow_token: z.string().min(1).optional(),
@@ -61,7 +62,7 @@ export const createQuerySchema = z.object({
   requester: requesterMetaSchema.optional(),
   bounty: bountySchema.optional(),
   oracle_ids: oracleIdsSchema,
-  htlc: htlcSchema.optional(),
+  escrow: escrowSchema.optional(),
   verification_requirements: verificationRequirementsSchema,
   tlsn_requirements: tlsnRequirementSchema.optional(),
   quorum: quorumSchema.optional(),

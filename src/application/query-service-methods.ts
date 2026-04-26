@@ -14,7 +14,7 @@ import {
 } from "./query-htlc-validation.ts";
 import type {
   BlossomKeyMap,
-  HtlcInfo,
+  EscrowInfo,
   HtlcSubmitOutcome,
   OracleAttestationRecord,
   PaymentStatus,
@@ -125,7 +125,7 @@ async function verifyAndFinalize(
   return { passed, attestations, verification, updated };
 }
 
-/** Shared: attempt to reveal a preimage for an approved HTLC query. */
+/** Shared: attempt to reveal a preimage for an approved escrow query. */
 function tryRevealPreimage(
   preimageStore: PreimageStore | undefined,
   htlcHash: string | undefined,
@@ -146,11 +146,11 @@ export function doCreateQuery(
   const now = Date.now();
 
   // CTF-3: Enforce minimum HTLC locktime to prevent immediate-refund race attacks.
-  if (options?.htlc?.locktime) {
+  if (options?.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    if (options.htlc.locktime - nowSecs < MIN_HTLC_LOCKTIME_SECS) {
+    if (options.escrow.locktime - nowSecs < MIN_HTLC_LOCKTIME_SECS) {
       throw new Error(
-        `HTLC locktime must be at least ${MIN_HTLC_LOCKTIME_SECS}s in the future (got ${options.htlc.locktime - nowSecs}s)`,
+        `HTLC locktime must be at least ${MIN_HTLC_LOCKTIME_SECS}s in the future (got ${options.escrow.locktime - nowSecs}s)`,
       );
     }
   }
@@ -159,10 +159,10 @@ export function doCreateQuery(
     ?? DEFAULT_VERIFICATION_FACTORS;
   const needsNonce = requirements.includes("nonce");
   const nonce = needsNonce ? generateNonce() : undefined;
-  const isHtlc = options?.htlc !== undefined;
+  const isEscrow = options?.escrow !== undefined;
   const query: Query = {
     id: generateQueryId(),
-    status: isHtlc ? "awaiting_quotes" : "pending",
+    status: isEscrow ? "awaiting_quotes" : "pending",
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
@@ -173,9 +173,9 @@ export function doCreateQuery(
     requester_meta: options?.requesterMeta,
     bounty: options?.bounty,
     oracle_ids: options?.oracleIds,
-    payment_status: isHtlc ? "htlc_locked" : "locked",
-    htlc: options?.htlc,
-    quotes: isHtlc ? [] : undefined,
+    payment_status: isEscrow ? "htlc_locked" : "locked",
+    escrow: options?.escrow,
+    quotes: isEscrow ? [] : undefined,
     nostr_event_id: options?.nostrEventId,
     expected_gps: input.expected_gps,
     max_gps_distance_km: input.max_gps_distance_km,
@@ -263,7 +263,7 @@ export function doRecordQuote(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
   if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
   const quotes = [...(query.quotes ?? []), quote];
@@ -280,11 +280,11 @@ export async function doSelectWorker(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
   if (!validateHtlcTransition(query.status, "worker_selected")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
   // Verify escrow amount matches bounty
-  const escrowRef = query.escrow?.escrow_ref ?? query.htlc?.escrow_token ?? htlcToken;
+  const escrowRef = query.escrow?.escrow_ref ?? query.escrow?.escrow_token ?? htlcToken;
   const expectedSats = query.bounty?.amount_sats;
   let verifiedEscrowSats: number | undefined;
   if (escrowRef && expectedSats && deps.escrowProvider) {
@@ -296,7 +296,7 @@ export async function doSelectWorker(
   }
 
   // CTF-2: Verify escrow lock conditions (hashlock + P2PK).
-  const paymentHash = query.escrow?.hash ?? query.htlc?.hash;
+  const paymentHash = query.escrow?.hash;
   if (escrowRef && paymentHash && deps.escrowProvider) {
     const lockCheck = await verifyEscrowLock(deps.escrowProvider, escrowRef, paymentHash, workerPubkey);
     if (!lockCheck.ok) {
@@ -304,17 +304,17 @@ export async function doSelectWorker(
     }
   }
 
-  const htlc: HtlcInfo = {
-    ...query.htlc!,
+  const escrow: EscrowInfo = {
+    ...query.escrow!,
     worker_pubkey: workerPubkey,
-    escrow_token: htlcToken ?? query.htlc?.escrow_token,
+    escrow_token: htlcToken ?? query.escrow?.escrow_token,
     verified_escrow_sats: verifiedEscrowSats,
   };
 
   store.set(queryId, {
     ...query,
     status: "worker_selected",
-    htlc,
+    escrow,
     payment_status: htlcToken ? "htlc_swapped" : query.payment_status,
   });
   return { ok: true, message: "Worker selected" };
@@ -326,7 +326,7 @@ export function doBeginWork(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
   if (!validateHtlcTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not worker_selected` };
   store.set(queryId, { ...query, status: "processing" });
   return { ok: true, message: "Work begun" };
@@ -342,9 +342,9 @@ export function doRecordResult(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
   if (!validateHtlcTransition(query.status, "verifying")) return { ok: false, message: `Query is ${query.status}, not processing` };
-  if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+  if (query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, message: "Worker pubkey does not match selected worker" };
   }
 
@@ -368,7 +368,7 @@ export function doCompleteVerification(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
   const verifyTarget: QueryStatus = passed ? "approved" : "rejected";
   if (!validateHtlcTransition(query.status, verifyTarget)) return { ok: false, message: `Query is ${query.status}, not verifying` };
 
@@ -394,9 +394,9 @@ export async function doSubmitHtlcResult(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, query: null, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, query, message: "Not an HTLC query" };
+  if (!isHtlcQuery(query)) return { ok: false, query, message: "Not an escrow query" };
   if (!validateHtlcTransition(query.status, "verifying")) return { ok: false, query, message: `Query is ${query.status}, not processing` };
-  if (query.htlc?.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+  if (query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, query, message: "Worker pubkey does not match selected worker" };
   }
 
@@ -419,7 +419,7 @@ export async function doSubmitHtlcResult(
   store.set(queryId, updated);
 
   // 3. Reveal preimage on success (HTLC settlement = preimage disclosure)
-  const preimage = tryRevealPreimage(deps.preimageStore, query.htlc?.hash, passed);
+  const preimage = tryRevealPreimage(deps.preimageStore, query.escrow?.hash, passed);
   if (preimage) {
     return { ok: true, query: updated, message: "Verification passed. Preimage revealed for HTLC redemption.", preimage };
   }

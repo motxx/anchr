@@ -205,7 +205,7 @@ export function buildQuerySettlementEvent(
 /**
  * Build an Oracle Announcement event (kind 30088).
  *
- * Parametrized replaceable event per Spec 08 — Oracles publish their
+ * Parametrized replaceable event per the oracle-registry spec — Oracles publish their
  * capabilities, fees, and endpoints so Requesters can discover them.
  */
 export function buildOracleAnnouncementEvent(

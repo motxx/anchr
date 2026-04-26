@@ -111,6 +111,27 @@ Quality invariants the CI enforces:
 - `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use. Anywhere else, write the precise type.
 - Enforced by `deno task lint:refactor` (runs in CI via `scripts/test-all.sh`).
 
+## Versioning + deprecation policy
+
+Pre-1.0 (no published version, no users): when a function, field, or
+endpoint is replaced, **delete the old path outright**. Don't carry
+`@deprecated` aliases, "legacy" fallbacks, or "backward compat"
+shims through refactors. If a regression is the worry, write a test
+that locks the new behaviour — do not preserve the old one.
+
+Post-1.0 (SemVer in effect): `@deprecated` notices are allowed only on
+**minor / patch boundaries** and must name the version that introduces
+the deprecation and the version that removes the symbol, e.g.
+`@deprecated since v1.4, removed in v2.0. Use X.`. Major versions
+delete; they do not deprecate.
+
+Enforcement: `deno task lint:deprecation` (`scripts/lint-deprecation.ts`)
+bans `@deprecated`, "deprecated", "legacy", and "backward(s) compat"
+in `*.ts` / `*.tsx` / `*.rs` source. Per-line opt-out is
+`allow-deprecation-vocab: <reason>` and is reserved for legitimate
+post-1.0 deprecation notices. Markdown is not scanned (specs and
+design docs may legitimately discuss the policy itself).
+
 ## Verification bar
 
 - A change is "done" only after a full local run passes: `deno task test:all` (lint + unit + protocol + frost + integration + example + pentest) **plus** `deno task test:all:docker` (Docker-backed e2e: relay + regtest). Don't claim done after only unit tests.

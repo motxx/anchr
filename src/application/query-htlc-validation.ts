@@ -42,7 +42,7 @@ export function validateHtlcTransition(from: QueryStatus, to: QueryStatus): bool
 }
 
 export function isHtlcQuery(query: Query): boolean {
-  return query.htlc !== undefined || query.escrow !== undefined;
+  return query.escrow !== undefined;
 }
 
 export interface EscrowAmountResult {

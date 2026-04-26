@@ -1,5 +1,5 @@
 import type {
-  HtlcInfo,
+  EscrowInfo,
   PaymentStatus,
   Query,
   QueryInput,
@@ -31,7 +31,7 @@ export interface CreateQueryAggregateOptions {
   requesterMeta?: RequesterMeta;
   bounty?: BountyInfo;
   oracleIds?: string[];
-  htlc?: HtlcInfo;
+  escrow?: EscrowInfo;
   nostrEventId?: string;
   quorum?: QuorumConfig;
 }
@@ -53,20 +53,20 @@ export function createQueryAggregate(
 
   const now = Date.now();
 
-  if (options.htlc?.locktime) {
+  if (options.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    const locktimeError = validateHtlcLocktime(options.htlc.locktime, nowSecs, MIN_HTLC_LOCKTIME_SECS);
+    const locktimeError = validateHtlcLocktime(options.escrow.locktime, nowSecs, MIN_HTLC_LOCKTIME_SECS);
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
   const requirements = input.verification_requirements ?? DEFAULT_VERIFICATION_FACTORS;
   const needsNonce = requirements.includes("nonce");
   const nonce = needsNonce ? generateNonce() : undefined;
-  const isHtlc = options.htlc !== undefined;
+  const isEscrow = options.escrow !== undefined;
 
   const query: Query = {
     id: generateQueryId(),
-    status: isHtlc ? "awaiting_quotes" : "pending",
+    status: isEscrow ? "awaiting_quotes" : "pending",
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
@@ -77,9 +77,9 @@ export function createQueryAggregate(
     requester_meta: options.requesterMeta,
     bounty: options.bounty,
     oracle_ids: options.oracleIds,
-    payment_status: isHtlc ? "htlc_locked" : "locked",
-    htlc: options.htlc,
-    quotes: isHtlc ? [] : undefined,
+    payment_status: isEscrow ? "htlc_locked" : "locked",
+    escrow: options.escrow,
+    quotes: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
     expected_gps: input.expected_gps,
     max_gps_distance_km: input.max_gps_distance_km,
@@ -101,8 +101,8 @@ export function submitResult(
   attestations?: OracleAttestationRecord[],
   blossomKeys?: BlossomKeyMap,
 ): TransitionResult {
-  if (query.htlc !== undefined) {
-    return { ok: false, error: "Use HTLC-specific functions for HTLC queries" };
+  if (query.escrow !== undefined) {
+    return { ok: false, error: "Use HTLC-specific functions for escrow queries" };
   }
   if (query.status !== "pending") {
     return { ok: false, error: `Query is ${query.status}, not pending` };
@@ -160,12 +160,12 @@ export function cancelQuery(query: Query): TransitionResult {
   };
 }
 
-// --- HTLC path ---
+// --- Escrow path ---
 
-/** Record a worker quote for an HTLC query. */
+/** Record a worker quote for an escrow query. */
 export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (query.status !== "awaiting_quotes") {
     return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
@@ -181,19 +181,19 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
 export function selectWorker(
   query: Query,
   workerPubkey: string,
-  htlcUpdates: Partial<HtlcInfo>,
+  escrowUpdates: Partial<EscrowInfo>,
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "worker_selected", true)) {
     return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
   }
 
-  const htlc: HtlcInfo = {
-    ...query.htlc,
+  const escrow: EscrowInfo = {
+    ...query.escrow,
     worker_pubkey: workerPubkey,
-    ...htlcUpdates,
+    ...escrowUpdates,
   };
 
   return {
@@ -201,16 +201,16 @@ export function selectWorker(
     query: {
       ...query,
       status: "worker_selected",
-      htlc,
-      payment_status: htlcUpdates.escrow_token ? "htlc_swapped" : query.payment_status,
+      escrow,
+      payment_status: escrowUpdates.escrow_token ? "htlc_swapped" : query.payment_status,
     },
   };
 }
 
 /** Worker acknowledges selection and begins work (worker_selected → processing). */
 export function beginWork(query: Query): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "processing", true)) {
     return { ok: false, error: `Query is ${query.status}, not worker_selected` };
@@ -228,13 +228,13 @@ export function recordResult(
   workerPubkey: string,
   blossomKeys?: BlossomKeyMap,
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "verifying", true)) {
     return { ok: false, error: `Query is ${query.status}, not processing` };
   }
-  if (query.htlc.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+  if (query.escrow.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, error: "Worker pubkey does not match selected worker" };
   }
 
@@ -259,8 +259,8 @@ export function completeVerification(
   oracleId?: string,
   attestations?: OracleAttestationRecord[],
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   const target: QueryStatus = passed ? "approved" : "rejected";
   if (!isValidTransition(query.status, target, true)) {

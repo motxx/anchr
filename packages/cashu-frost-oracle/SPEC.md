@@ -3,7 +3,7 @@
 > **Scope:** P2PK+FROST escrow plus the threshold-signing flow that this
 > package owns. The plain-HTLC escrow primitive lives in
 > `packages/core-cashu/SPEC.md`. The conditional-swap (cross-HTLC +
-> dual-preimage / dual-key) wire format is in `specs/07-conditional-swap.md`.
+> dual-preimage / dual-key) wire format is in `specs/conditional-swap.md`.
 
 A threshold Oracle requires t-of-n independent Oracles to approve before
 payment is released. This eliminates single-Oracle trust. This document
@@ -114,7 +114,7 @@ pending --> committing --> signing --> completed
 
 DKG and signing messages are exchanged via Nostr NIP-44 encrypted direct
 messages. (The kind 5300/6300/7000 wire format for end-user query
-traffic is documented in `specs/05-messaging.md`; the messages below are
+traffic is documented in `specs/messaging.md`; the messages below are
 private inter-Oracle traffic.)
 
 ### DKG Messages

@@ -23,7 +23,7 @@ export interface Market {
   max_bet_sats: number;
   fee_ppm: number;
   oracle_pubkey: string;
-  htlc_hash: string;
+  htlc_hash_yes: string;
   creator_pubkey: string;
   status: MarketStatus;
   volume_sats: number;
@@ -50,7 +50,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 1_000_000,
     fee_ppm: 10_000,
     oracle_pubkey: "npub1oracle...abc",
-    htlc_hash: "f8e86960ff0ad691...",
+    htlc_hash_yes: "f8e86960ff0ad691...",
     creator_pubkey: "npub1creator...xyz",
     status: "open",
     volume_sats: 2_340_000,
@@ -70,7 +70,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 500_000,
     fee_ppm: 5_000,
     oracle_pubkey: "npub1oracle...def",
-    htlc_hash: "a3c4d5e6f7890...",
+    htlc_hash_yes: "a3c4d5e6f7890...",
     creator_pubkey: "npub1alice...123",
     status: "open",
     volume_sats: 1_560_000,
@@ -90,7 +90,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 2_000_000,
     fee_ppm: 8_000,
     oracle_pubkey: "npub1oracle...ghi",
-    htlc_hash: "b4c5d6e7f8901...",
+    htlc_hash_yes: "b4c5d6e7f8901...",
     creator_pubkey: "npub1bob...456",
     status: "open",
     volume_sats: 5_890_000,
@@ -110,7 +110,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 500_000,
     fee_ppm: 10_000,
     oracle_pubkey: "npub1oracle...jkl",
-    htlc_hash: "c5d6e7f8g9012...",
+    htlc_hash_yes: "c5d6e7f8g9012...",
     creator_pubkey: "npub1charlie...789",
     status: "open",
     volume_sats: 890_000,
@@ -130,7 +130,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 1_000_000,
     fee_ppm: 5_000,
     oracle_pubkey: "npub1oracle...mno",
-    htlc_hash: "d6e7f8g9h0123...",
+    htlc_hash_yes: "d6e7f8g9h0123...",
     creator_pubkey: "npub1dave...abc",
     status: "open",
     volume_sats: 3_200_000,
@@ -150,7 +150,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 1_000_000,
     fee_ppm: 10_000,
     oracle_pubkey: "npub1oracle...pqr",
-    htlc_hash: "e7f8g9h0i1234...",
+    htlc_hash_yes: "e7f8g9h0i1234...",
     creator_pubkey: "npub1eve...def",
     status: "resolved_yes",
     volume_sats: 4_500_000,
@@ -170,7 +170,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 500_000,
     fee_ppm: 7_500,
     oracle_pubkey: "npub1oracle...stu",
-    htlc_hash: "f8g9h0i1j2345...",
+    htlc_hash_yes: "f8g9h0i1j2345...",
     creator_pubkey: "npub1frank...ghi",
     status: "open",
     volume_sats: 1_120_000,
@@ -190,7 +190,7 @@ export const MOCK_MARKETS: Market[] = [
     max_bet_sats: 100_000,
     fee_ppm: 10_000,
     oracle_pubkey: "npub1oracle...vwx",
-    htlc_hash: "g9h0i1j2k3456...",
+    htlc_hash_yes: "g9h0i1j2k3456...",
     creator_pubkey: "npub1grace...jkl",
     status: "open",
     volume_sats: 780_000,

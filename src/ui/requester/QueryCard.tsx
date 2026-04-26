@@ -17,7 +17,7 @@ import { DecryptedImage } from "./DecryptedImage.tsx";
 import { TlsnProofPanel } from "./TlsnProofPanel.tsx";
 
 interface Bounty { amount_sats: number }
-interface HtlcSummary { hash: string; oracle_pubkey: string; worker_pubkey: string | null; locktime: number }
+interface EscrowSummary { type: "htlc" | "p2pk_frost"; hash: string; oracle_pubkeys: string[]; worker_pubkey: string | null; locktime: number }
 interface BlossomKeyMaterial { encrypt_key: string; encrypt_iv: string }
 
 interface QuerySummary {
@@ -30,7 +30,7 @@ interface QuerySummary {
   challenge_rule: string | null;
   expires_at: number;
   expires_in_seconds: number;
-  htlc: HtlcSummary | null;
+  escrow: EscrowSummary | null;
   quotes_count: number;
 }
 
@@ -138,13 +138,13 @@ function ChallengeNonce({ nonce, rule }: { nonce: string | null; rule: string | 
   );
 }
 
-function HtlcInfo({ htlc }: { htlc: HtlcSummary }) {
+function EscrowInfo({ escrow }: { escrow: EscrowSummary }) {
   return (
     <div className="rounded-xl border border-blue-950 bg-blue-950/30 px-3 py-3 space-y-1">
-      <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">HTLC Escrow</p>
-      <p className="text-xs text-muted-foreground font-mono truncate">Hash: {htlc.hash}</p>
-      {htlc.worker_pubkey && (
-        <p className="text-xs text-muted-foreground font-mono truncate">Worker: {htlc.worker_pubkey}</p>
+      <p className="text-[10px] uppercase tracking-widest text-blue-400 font-bold">{escrow.type === "p2pk_frost" ? "P2PK+FROST Escrow" : "HTLC Escrow"}</p>
+      <p className="text-xs text-muted-foreground font-mono truncate">Hash: {escrow.hash}</p>
+      {escrow.worker_pubkey && (
+        <p className="text-xs text-muted-foreground font-mono truncate">Worker: {escrow.worker_pubkey}</p>
       )}
     </div>
   );
@@ -260,7 +260,7 @@ export function QueryCard({ query }: { query: QuerySummary }) {
         <CardContent className="px-4 pb-4 pt-3 border-t space-y-4">
           <QueryMeta detail={detail} query={query} isActive={isActive} />
           <ChallengeNonce nonce={query.challenge_nonce} rule={query.challenge_rule} />
-          {query.htlc && <HtlcInfo htlc={query.htlc} />}
+          {query.escrow && <EscrowInfo escrow={query.escrow} />}
 
           {detail?.payment_status && detail.payment_status !== "none" && (
             <div className="flex items-center gap-2 text-xs">

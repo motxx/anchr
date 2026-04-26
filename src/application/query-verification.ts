@@ -56,7 +56,7 @@ export async function verifyWithQuorum(
   const effectiveOracleId = query.oracle_ids?.length ? oracleId : undefined;
 
   if (!query.quorum) {
-    // Single oracle — backward compatible
+    // Single oracle path — no quorum config supplied
     return verifySingleOracle(query, result, resolveOracle, effectiveOracleId, blossomKeys);
   }
 

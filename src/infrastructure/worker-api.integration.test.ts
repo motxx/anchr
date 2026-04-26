@@ -203,13 +203,13 @@ describe("writeAuth middleware", () => {
     expect(res.status).toBe(401);
   }));
 
-  test("rejects unauthenticated submit", withEnv(authEnv, async () => {
+  test("rejects unauthenticated result submission", withEnv(authEnv, async () => {
     const app = buildWorkerApiApp({ queryService: testService });
     const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
-    const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
+    const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ attachments: [], notes: "" }),
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "" }),
     });
     expect(res.status).toBe(401);
   }));

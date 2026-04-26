@@ -23,8 +23,8 @@ import type { ServiceDeps } from "./query-service-methods.ts";
 import type {
   BlossomKeyMap,
   BountyInfo,
+  EscrowInfo,
   ExecutorType,
-  HtlcInfo,
   HtlcSubmitOutcome,
   Query,
   QueryInput,
@@ -59,8 +59,8 @@ export interface CreateQueryOptions {
   bounty?: BountyInfo;
   /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
   oracleIds?: string[];
-  /** HTLC escrow info — when present, creates an HTLC-mode query. */
-  htlc?: HtlcInfo;
+  /** Escrow info — when present, creates an escrow-mode (HTLC or P2PK+FROST) query. */
+  escrow?: EscrowInfo;
   /** Nostr event ID of the kind 5300 Job Request. */
   nostrEventId?: string;
   /** Multi-oracle quorum config. When set with FROST, oracle_ids become FROST signers. */
@@ -80,9 +80,6 @@ export interface CancelQueryOutcome {
 
 // --- QueryStore (extracted to domain layer) ---
 export { createQueryStore, type QueryStore } from "../domain/query-store.ts";
-
-// --- Re-export HTLC constant for backward compatibility ---
-export { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";
 
 // --- QueryService ---
 
