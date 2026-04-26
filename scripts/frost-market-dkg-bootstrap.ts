@@ -25,9 +25,12 @@ import {
   dkgRound2,
   dkgRound3,
   isFrostSignerAvailable,
-} from "../src/infrastructure/frost/frost-cli.ts";
-import type { PeerConfig } from "../src/infrastructure/frost/config.ts";
-import type { MarketFrostNodeConfig } from "../src/infrastructure/frost/market-frost-config.ts";
+} from "@anchr/cashu-frost-oracle/frost-cli";
+import type { PeerConfig } from "@anchr/cashu-frost-oracle/config";
+import {
+  saveMarketFrostNodeConfigAsync,
+  type MarketFrostNodeConfig,
+} from "@anchr/cashu-frost-oracle/market-frost-config";
 
 // --- Parse CLI args ---
 
@@ -225,10 +228,20 @@ async function main() {
     };
 
     const path = join(OUTPUT_DIR, `signer-${i + 1}.json`);
-    Deno.writeTextFileSync(path, JSON.stringify(marketConfig, null, 2));
-    // Set 0600 -- only owner can read/write. Contains FROST secret key shares.
-    try { Deno.chmodSync(path, 0o600); } catch { /* Windows or restricted fs */ }
-    console.log(`  ${path} (mode 0600)`);
+    const passphrase = Deno.env.get("FROST_KEY_PASSPHRASE")?.trim();
+    await saveMarketFrostNodeConfigAsync(path, marketConfig, passphrase ? { passphrase } : undefined);
+    if (passphrase) {
+      console.log(`  ${path} (encrypted, AES-256-GCM, mode 0600)`);
+    } else {
+      console.log(`  ${path} (plaintext, mode 0600)`);
+    }
+  }
+  if (!Deno.env.get("FROST_KEY_PASSPHRASE")?.trim()) {
+    console.warn(
+      "\n[warn] FROST_KEY_PASSPHRASE not set — DKG output written as plaintext.\n" +
+      "       For production, re-run with FROST_KEY_PASSPHRASE=<passphrase>\n" +
+      "       to encrypt the secret key shares at rest.",
+    );
   }
 
   console.log(`\nDKG complete.`);
