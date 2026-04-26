@@ -11,7 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
-import { which, writeFile, spawn } from "../../../src/runtime/mod.ts";
+import { which, writeFile, spawn } from "../../core-runtime/src/mod.ts";
 
 export interface C2paManifest {
   title?: string;

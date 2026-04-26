@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { spawn, fileExists, fileLastModified, moduleDir } from "../runtime/mod.ts";
+import { spawn, fileExists, fileLastModified, moduleDir } from "../../packages/core-runtime/src/mod.ts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";

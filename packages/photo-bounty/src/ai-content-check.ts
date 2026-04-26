@@ -11,7 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
-import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "../../../src/runtime/mod.ts";
+import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "../../core-runtime/src/mod.ts";
 // MIGRATION DEBT: domain/types will move to core-domain package eventually.
 import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "../../../src/domain/types";
 

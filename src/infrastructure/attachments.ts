@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../../packages/core-runtime/src/mod.ts";
 import { getRuntimeConfig } from "./config";
 import type {
   AttachmentAccess,

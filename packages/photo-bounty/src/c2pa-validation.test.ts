@@ -6,7 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
-import { spawn, writeFile, fileExists, readFileAsArrayBuffer } from "../../../src/runtime/mod.ts";
+import { spawn, writeFile, fileExists, readFileAsArrayBuffer } from "../../core-runtime/src/mod.ts";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).

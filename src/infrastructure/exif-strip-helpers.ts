@@ -3,7 +3,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../../packages/core-runtime/src/mod.ts";
 
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;

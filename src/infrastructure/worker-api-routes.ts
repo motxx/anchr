@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { spawn } from "../runtime/mod.ts";
+import { spawn } from "../../packages/core-runtime/src/mod.ts";
 import { uploadAttachment } from "./attachment-store";
 import { materializeAttachmentRef } from "./attachments";
 import { getRuntimeConfig } from "./config";

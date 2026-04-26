@@ -15,7 +15,7 @@ import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
-import { moduleDir, which, writeFile, spawn } from "../../../src/runtime/mod.ts";
+import { moduleDir, which, writeFile, spawn } from "../../core-runtime/src/mod.ts";
 // MIGRATION DEBT: domain/types will move to core-domain package eventually.
 import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../../src/domain/types";
 
