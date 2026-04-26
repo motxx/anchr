@@ -181,6 +181,72 @@ describe("Market API: CRUD", () => {
     expect(called).toBe(false);
   });
 
+  test("POST /markets rejects loopback resolution_url (SSRF guard)", async () => {
+    const res = await app.request(`${BASE}/markets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(createMarketBody({
+        resolution_url: "http://127.0.0.1:6379/keys",
+        resolution_condition: {
+          type: "contains_text",
+          target_url: "http://127.0.0.1:6379/keys",
+          expected_text: "x",
+          description: "blocked",
+        },
+      })),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string };
+    expect(json.error).toContain("resolution_url:");
+  });
+
+  test("POST /markets rejects link-local resolution_url (cloud-metadata SSRF guard)", async () => {
+    const res = await app.request(`${BASE}/markets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(createMarketBody({
+        resolution_url: "http://169.254.169.254/latest/meta-data/",
+        resolution_condition: {
+          type: "contains_text",
+          target_url: "http://169.254.169.254/latest/meta-data/",
+          expected_text: "AccessKey",
+          description: "blocked",
+        },
+      })),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /markets rejects URL with embedded credentials", async () => {
+    const res = await app.request(`${BASE}/markets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(createMarketBody({
+        resolution_url: "https://user:pass@evil.example/api",
+        resolution_condition: {
+          type: "contains_text",
+          target_url: "https://user:pass@evil.example/api",
+          expected_text: "x",
+          description: "blocked",
+        },
+      })),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /markets rejects deadline within minimum lifetime", async () => {
+    const res = await app.request(`${BASE}/markets`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(createMarketBody({
+        resolution_deadline: Math.floor(Date.now() / 1000) + 5, // 5s — too soon
+      })),
+    });
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string };
+    expect(json.error).toContain("resolution_deadline");
+  });
+
   test("POST /markets succeeds even when Nostr publish throws", async () => {
     const state = createMarketState({
       nostrIdentity: { secretKey: new Uint8Array(32).fill(2), pubkey: "b".repeat(64) },

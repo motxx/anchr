@@ -32,6 +32,7 @@ import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "@anchr/ca
 import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
 import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition } from "./market-oracle.ts";
+import { settleMarket } from "./market-settlement.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
@@ -44,6 +45,22 @@ import { verifyReceivedToken } from "./exchange-protocol.ts";
 import { publishMarket, type MarketIdentity } from "./nostr-market.ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { hexToBytes } from "@noble/hashes/utils.js";
+import { validateTruthSourceUrl } from "./url-guard.ts";
+
+/**
+ * Minimum window between market creation and the resolution deadline.
+ * Prevents an attacker from creating a market with deadline=0 to trigger
+ * an immediate auto-resolver fetch with no betting window. Also bounds
+ * the worst case for the SSRF defenses below: an attacker creates a
+ * malicious URL, but at least N seconds must pass before any fetch.
+ *
+ * Override with MIN_MARKET_LIFETIME_SECS for tests / dev.
+ */
+function minMarketLifetimeSecs(): number {
+  const raw = Deno.env.get("MIN_MARKET_LIFETIME_SECS");
+  const n = raw ? Number(raw) : 60;
+  return Number.isFinite(n) && n >= 0 ? n : 60;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -405,6 +422,24 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     if (!resolution_url) return c.json({ error: "resolution_url is required" }, 400);
     if (!resolution_deadline) return c.json({ error: "resolution_deadline is required" }, 400);
 
+    // SSRF guard: anyone can create a market, so the resolution_url is an
+    // attacker-influenced URL the server's auto-resolver will fetch later.
+    // Reject http(s) URLs that point at loopback/private/link-local hosts,
+    // URLs with embedded credentials, and non-http(s) schemes.
+    const urlError = validateTruthSourceUrl(resolution_url);
+    if (urlError) {
+      return c.json({ error: `resolution_url: ${urlError}` }, 400);
+    }
+
+    // Minimum betting window — prevents instant auto-resolution.
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const minLife = minMarketLifetimeSecs();
+    if (resolution_deadline < nowSecs + minLife) {
+      return c.json({
+        error: `resolution_deadline must be at least ${minLife}s in the future`,
+      }, 400);
+    }
+
     // Validate category
     const validCategories = ["crypto", "sports", "politics", "economics", "custom"];
     if (!validCategories.includes(category)) {
@@ -435,6 +470,15 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
           target_url: resolution_url,
           description: title,
         };
+
+    // SSRF guard for the condition target URL too (defense in depth — usually
+    // identical to resolution_url, but the schema permits it to differ).
+    if (resolution_condition.target_url !== resolution_url) {
+      const targetError = validateTruthSourceUrl(resolution_condition.target_url);
+      if (targetError) {
+        return c.json({ error: `resolution_condition.target_url: ${targetError}` }, 400);
+      }
+    }
 
     // Validate resolution condition
     const ct = resolution_condition.type;
@@ -728,13 +772,6 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
-    const market = s.markets.get(id);
-    if (!market) return c.json({ error: "Market not found" }, 404);
-
-    if (market.status !== "open" && market.status !== "closed") {
-      return c.json({ error: `Market cannot be resolved (status: ${market.status})` }, 409);
-    }
-
     let body: Record<string, unknown>;
     try {
       body = (await c.req.json()) as Record<string, unknown>;
@@ -747,159 +784,22 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: 'outcome must be "yes" or "no"' }, 400);
     }
 
-    // Determine resolution mode: FROST P2PK (preferred) or HTLC preimage (fallback)
-    const useFrost = !!market.group_pubkey_yes && !!market.group_pubkey_no && s.dualKeyStore.has(id);
-
-    let resolvedPreimage: string | undefined;
-    let oracleSignature: string | undefined;
-
-    if (useFrost) {
-      // FROST P2PK mode: Oracle signs each proof.secret from redeemable tokens.
-      //
-      // NUT-11 P2PK requires signatures on SHA256(proof.secret) for each proof,
-      // NOT a market-level message. Extract proof secrets from all matched pairs'
-      // winning redeemable tokens and sign each one.
-      const swapOutcome = outcome === "yes" ? "a" : "b";
-
-      // Collect proof secrets from all matched pairs' redeemable tokens
-      // Include both "locked" (exchanged) and "pending" (awaiting exchange) pairs
-      const allProofSecrets: string[] = [];
-      for (const pair of s.matchedPairs.values()) {
-        if (pair.market_id !== id) continue;
-        if (pair.status !== "locked" && pair.status !== "pending") continue;
-        // YES wins → token_no_to_yes (locked to [group_yes, alice])
-        // NO wins  → token_yes_to_no (locked to [group_no, bob])
-        const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
-        if (redeemableToken) {
-          try {
-            const decoded = getDecodedToken(redeemableToken);
-            for (const proof of decoded.proofs) {
-              allProofSecrets.push(proof.secret);
-            }
-          } catch {
-            // Token may be empty in demo mode (no Cashu)
-          }
-        }
-      }
-
-      let proofSigs: Map<string, string> | null = null;
-
-      if (allProofSecrets.length > 0) {
-        // Sign each proof secret
-        if (s.frostMode === "frost" && s.frostConfig) {
-          // Multi-Oracle threshold signing via peer coordination
-          const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
-          proofSigs = await frostSignProofSecretsAsync(
-            s.frostConfig,
-            swapOutcome,
-            allProofSecrets,
-            verifiedBody ? {
-              market_id: id,
-              resolution_url: market.resolution_url,
-              verified_body: verifiedBody,
-            } : undefined,
-          );
-        } else {
-          // Single-key per-proof signing (demo mode)
-          proofSigs = s.dualKeyStore.signProofSecrets(id, swapOutcome, allProofSecrets);
-        }
-
-        if (!proofSigs) {
-          return c.json({ error: "Resolution failed — per-proof signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
-        }
-
-        // Store per-proof signatures
-        s.resolvedProofSignatures.set(id, proofSigs);
-
-        // Surface one of the per-proof signatures as a market-level field
-        // for response payloads that want a single sentinel signature.
-        const firstSig = proofSigs.values().next().value;
-        if (firstSig) {
-          oracleSignature = firstSig;
-          s.resolvedSignatures.set(id, firstSig);
-        }
-      } else {
-        // No real tokens (demo mode without Cashu) — sign market-level message as fallback
-        const signMessage = new TextEncoder().encode(`${id}:${outcome}`);
-        let sig: string | null = null;
-
-        if (s.frostMode === "frost" && s.frostConfig) {
-          const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
-          sig = await frostDualKeySignAsync(
-            s.frostConfig,
-            swapOutcome,
-            signMessage,
-            verifiedBody ? {
-              market_id: id,
-              resolution_url: market.resolution_url,
-              verified_body: verifiedBody,
-            } : undefined,
-          );
-        } else {
-          sig = s.dualKeyStore.sign(id, swapOutcome, signMessage);
-        }
-
-        if (!sig) {
-          return c.json({ error: "Resolution failed — signing failed (threshold not met or already signed)", mode: s.frostMode }, 503);
-        }
-        oracleSignature = sig;
-        s.resolvedSignatures.set(id, sig);
-      }
-
-      // Also resolve the HTLC side. In dual-mode markets we keep both the
-      // FROST signature path and the HTLC preimage path live so wallets that
-      // settle via either redemption flow get the data they need.
-      resolveMarket(id, outcome, s.dualPreimageStore);
-    } else {
-      // HTLC preimage mode (fallback)
-      const result = resolveMarket(id, outcome, s.dualPreimageStore);
-      if (!result) {
-        return c.json({ error: "Resolution failed — preimage not found or already revealed" }, 500);
-      }
-      resolvedPreimage = result.preimage;
-      s.resolvedPreimages.set(id, result.preimage);
+    const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
+    const result = await settleMarket(s, id, outcome, { verifiedBody });
+    if (!result.ok) {
+      return c.json({ error: result.error, ...(result.mode ? { mode: result.mode } : {}) }, result.status as 400 | 404 | 409 | 500 | 503);
     }
-
-    // Update market status
-    const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
-    market.status = newStatus;
-
-    // Mark matched pairs as settled (but do NOT auto-redeem server-side).
-    // Clients call POST /markets/:id/redeem to get their tokens + attestation.
-    const settledPairs: Array<{
-      pair_id: string;
-      winner_pubkey: string;
-      amount_sats: number;
-    }> = [];
-
-    for (const pair of s.matchedPairs.values()) {
-      if (pair.market_id !== id) continue;
-      if (pair.status !== "locked" && pair.status !== "pending") continue;
-      pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
-
-      const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
-      settledPairs.push({
-        pair_id: pair.pair_id,
-        winner_pubkey: winnerPubkey,
-        amount_sats: pair.amount_sats,
-      });
-    }
-
-    const proofSigMap = s.resolvedProofSignatures.get(id);
-
     return c.json({
-      market_id: id,
-      outcome,
-      // FROST P2PK mode returns oracle_signature; HTLC mode returns preimage
-      ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
-      ...(resolvedPreimage ? { preimage: resolvedPreimage } : {}),
-      // Per-proof signature count for NUT-11 P2PK
-      ...(proofSigMap ? { proof_signatures_count: proofSigMap.size } : {}),
-      mode: useFrost ? "frost_p2pk" : "htlc",
-      status: newStatus,
-      yes_pool_sats: market.yes_pool_sats,
-      no_pool_sats: market.no_pool_sats,
-      settled_pairs: settledPairs,
+      market_id: result.market_id,
+      outcome: result.outcome,
+      ...(result.oracle_signature ? { oracle_signature: result.oracle_signature } : {}),
+      ...(result.preimage ? { preimage: result.preimage } : {}),
+      ...(result.proof_signatures_count !== undefined ? { proof_signatures_count: result.proof_signatures_count } : {}),
+      mode: result.mode,
+      status: result.status,
+      yes_pool_sats: result.yes_pool_sats,
+      no_pool_sats: result.no_pool_sats,
+      settled_pairs: result.settled_pairs,
     });
   });
 

@@ -17,7 +17,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "hono/deno";
 import type { MiddlewareHandler } from "hono";
-import { registerMarketRoutes } from "./src/server-routes.ts";
+import { createMarketState, registerMarketRoutes } from "./src/server-routes.ts";
+import { startAutoResolver } from "./src/auto-resolver.ts";
 
 const app = new Hono();
 app.use("*", cors());
@@ -25,10 +26,27 @@ app.use("*", cors());
 // No auth for demo — production should add API key middleware
 const noopMiddleware: MiddlewareHandler = async (_c, next) => await next();
 
+// Construct state explicitly so we can also hand it to the auto-resolver.
+const state = createMarketState();
+
 registerMarketRoutes(app, {
   writeAuth: noopMiddleware,
   rateLimit: noopMiddleware,
-});
+}, state);
+
+// Background scheduler — resolves markets once their deadline has passed.
+// Disable with AUTO_RESOLVE_DISABLED=1 (e.g. for tests / dev that want to
+// drive resolution manually).
+if (Deno.env.get("AUTO_RESOLVE_DISABLED") !== "1") {
+  const pollMs = Number(Deno.env.get("AUTO_RESOLVE_POLL_MS")) || 30_000;
+  const handle = startAutoResolver(state, { pollIntervalMs: pollMs });
+  console.log(`[market] auto-resolver started (poll=${pollMs}ms)`);
+  // Stop on SIGINT so the scheduler doesn't keep the process alive.
+  Deno.addSignalListener("SIGINT", () => {
+    handle.stop();
+    Deno.exit(0);
+  });
+}
 
 // Serve UI static files
 app.get("/", serveStatic({ path: "./example/prediction-market/ui/index.html" }));
