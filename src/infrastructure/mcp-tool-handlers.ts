@@ -3,8 +3,20 @@
  */
 
 import type { QueryInput, QueryResult } from "../application/query-service.ts";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
+
+function normalizeMcpQueryResult(raw: Record<string, unknown>): QueryResult {
+  const attachments = Array.isArray(raw.attachments) ? raw.attachments as AttachmentRef[] : [];
+  const result: QueryResult = { attachments };
+  if (typeof raw.notes === "string") result.notes = raw.notes;
+  if (raw.gps && typeof raw.gps === "object") result.gps = raw.gps as QueryResult["gps"];
+  if (raw.tlsn_attestation && typeof raw.tlsn_attestation === "object") {
+    result.tlsn_attestation = raw.tlsn_attestation as QueryResult["tlsn_attestation"];
+  }
+  if (raw.tlsn_extension_result !== undefined) result.tlsn_extension_result = raw.tlsn_extension_result;
+  return result;
+}
 
 interface CreateQueryArgs {
   description: string;
@@ -75,10 +87,7 @@ export async function handleSubmitQueryResult(
   result: Record<string, unknown>,
   oracleId?: string,
 ): Promise<McpTextResult> {
-  // The MCP transport delivers untyped JSON. The application service validates
-  // and rejects malformed shapes; here we narrow via QueryResult's structural
-  // compatibility with Record<string, unknown> (no double-cast through unknown).
-  const payload = await backend.submitQueryResult(queryId, result as QueryResult, oracleId);
+  const payload = await backend.submitQueryResult(queryId, normalizeMcpQueryResult(result), oracleId);
   return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
 }
 

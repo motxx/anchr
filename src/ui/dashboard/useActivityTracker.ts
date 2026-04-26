@@ -65,7 +65,7 @@ export function useActivityTracker(queries: QuerySummary[]): ActivityEvent[] {
     }
 
     if (newEvents.length > 0) {
-      setEvents((prev) => [...prev, ...newEvents].slice(-50));
+      setEvents((prev: ActivityEvent[]) => [...prev, ...newEvents].slice(-50));
     }
     prevRef.current = next;
   }, [queries]);
