@@ -43,7 +43,7 @@ cd crates/tlsn-prover && cargo build && cd ../tlsn-verifier && cargo build --rel
 docker compose up tlsn-verifier -d
 deno task dev &
 until curl -sf http://localhost:3000/health >/dev/null 2>&1; do :; done
-deno test e2e/tlsn.test.ts --allow-all --no-check
+deno test e2e/tlsn.test.ts --allow-all
 docker compose down tlsn-verifier
 pkill -f "deno.*server.ts"
 ```
@@ -219,7 +219,7 @@ Endpoints:
 ### 5c. Automated test
 
 ```bash
-deno test e2e/tlsn-browser.test.ts --allow-all --no-check
+deno test e2e/tlsn-browser.test.ts --allow-all
 ```
 
 This launches Chrome for Testing with the built extension, opens DevConsole,
@@ -295,18 +295,35 @@ curl -s -X POST "http://localhost:3000/queries/${QID}/result" \
   -d @/tmp/submit.json | jq '{ok, verification}'
 ```
 
-**Expected response shape:**
+**Expected response shape** (matches `VerificationDetail` in `src/domain/types.ts`):
 ```json
 {
   "ok": true,
+  "message": "Verification passed",
   "verification": {
-    "signature": { "passed": true },
-    "domain":    { "passed": true },
-    "freshness": { "passed": true },
-    "condition": { "passed": true }
-  }
+    "passed": true,
+    "checks": [
+      "tlsn signature cryptographically verified",
+      "tlsn server name matches target",
+      "tlsn freshness within 300s",
+      "tlsn condition: Product code exists"
+    ],
+    "failures": [],
+    "tlsn_verified": {
+      "server_name": "api.bitflyer.com",
+      "revealed_body": "{\"product_code\":\"BTC_JPY\",...}",
+      "session_timestamp": 1761525000
+    }
+  },
+  "oracle_id": "default",
+  "payment_status": "released",
+  "preimage": null
 }
 ```
+
+`verification.passed` is the gate; individual checks are listed in
+`checks[]` (or `failures[]` on rejection) — there's no nested per-check
+object. `preimage` is non-null only for HTLC-mode queries.
 
 `worker_pubkey` accepts any string identifier in dev/regtest mode (e.g.
 `"cli_worker"`); production deployments may require a real cryptographic pubkey
@@ -382,7 +399,7 @@ curl -s "https://anchr-app.fly.dev/queries/$QID" | jq '{status, verification_req
 
 ```bash
 deno task test:unit                                  # unit tests (includes tlsn-validation)
-deno test e2e/tlsn.test.ts --allow-all --no-check   # 5 E2E tests (requires infra)
+deno test e2e/tlsn.test.ts --allow-all   # 5 E2E tests (requires infra)
 ```
 
 ### Target API: bitFlyer
