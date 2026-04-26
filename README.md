@@ -50,9 +50,15 @@ Worker ─ redeems token at Cashu Mint ──► Requester gets the verified dat
                                                   timeout? ─► escrow refunds
 ```
 
-Read the full protocol in [`specs/`](specs/) (8 specs, CC0). Each layer is
-pluggable — Cashu can be replaced with Fedimint, TLSNotary with another
-zkTLS provider, etc.; see the `EscrowProvider` / verification interfaces.
+Wire-format specs needed for an alternative implementation live in
+[`specs/`](specs/) (CC0): Nostr DVM messaging, conditional-swap
+primitive, oracle registry. Per-package implementation guides live in
+each package's `SPEC.md` (e.g.
+[`packages/core-cashu/SPEC.md`](packages/core-cashu/SPEC.md),
+[`packages/tlsn-toolkit/SPEC.md`](packages/tlsn-toolkit/SPEC.md)).
+Each layer is pluggable — Cashu can be replaced with Fedimint,
+TLSNotary with another zkTLS provider, etc.; see the `EscrowProvider`
+and `verify()` interfaces.
 
 ## Use it as a library
 
@@ -131,8 +137,8 @@ packages/
 src/                           Reference host server (Hono on Deno) — composes the packages above
 example/                       Worked, runnable examples; each is its own `deno.json`
 crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-specs/                         Protocol specs (CC0)
-docs/threat-model.md           Cryptographic + protocol-state invariants (CI-enforced)
+specs/                         Wire-format specs (CC0): Nostr DVM, conditional swap, oracle registry
+docs/                          Host implementation guides (lifecycle, storage) + threat-model invariants
 ```
 
 Each `packages/*` is independently typecheckable and testable
