@@ -34,7 +34,7 @@ import {
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { redeemHtlcToken, verifyHtlcProofs } from "../packages/core-cashu/src/escrow";
+import { redeemHtlcToken, verifyHtlcProofs } from "../packages/core-cashu/src/escrow.ts";
 import {
   checkInfraReady,
   createWallet as createRegtestWallet,
@@ -42,7 +42,8 @@ import {
   throttleMintOp,
   retryOnRateLimit,
   generateKeypair,
-} from "./helpers/regtest";
+} from "./helpers/regtest.ts";
+import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const AMOUNT_SATS = 64;
@@ -125,7 +126,7 @@ async function attemptRedeem(
     // - With preimage: receiver path (preimage + signatures)
     // - With key but no preimage: refund path (signatures only)
     // - Neither: no witness at all
-    let proofsWithWitness = htlcProofs.map((p) => ({
+    const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: preimage
         ? JSON.stringify({ preimage, signatures: [] })

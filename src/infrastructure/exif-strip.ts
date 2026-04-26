@@ -7,7 +7,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { stripJpegExif, stripExifWithTool } from "./exif-strip-helpers";
+import { stripJpegExif, stripExifWithTool } from "./exif-strip-helpers.ts";
 
 const IMAGE_EXTENSIONS = new Set([
   ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif",

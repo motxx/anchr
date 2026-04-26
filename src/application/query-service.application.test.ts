@@ -1,10 +1,10 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createQueryService, createQueryStore } from "./query-service";
-import type { QueryService, QueryStore } from "./query-service";
-import { createOracleRegistry } from "../infrastructure/oracle";
-import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle";
-import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../../packages/core-domain/src/types";
+import { createQueryService, createQueryStore } from "./query-service.ts";
+import type { QueryService, QueryStore } from "./query-service.ts";
+import { createOracleRegistry } from "../infrastructure/oracle/index.ts";
+import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle/index.ts";
+import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../../packages/core-domain/src/types.ts";
 
 // --- Mock oracle ---
 

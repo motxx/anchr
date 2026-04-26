@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import process from "node:process";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 if (!STRIPE_SECRET_KEY) {

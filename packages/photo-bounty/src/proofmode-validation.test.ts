@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { parseProofModeZip } from "./proofmode-validation";
+import { parseProofModeZip } from "./proofmode-validation.ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { execSync } from "node:child_process";

@@ -1,5 +1,5 @@
 import React from "react";
-import type { Market } from "../mock-data";
+import type { Market } from "../mock-data.ts";
 
 interface StatsBarProps {
   markets: Market[];

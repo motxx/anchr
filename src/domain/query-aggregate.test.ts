@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { makeQuery } from "../testing/factories";
+import { makeQuery } from "../testing/factories.ts";
 import {
   createQueryAggregate,
   submitResult,
@@ -12,7 +12,7 @@ import {
   recordResult,
   completeVerification,
   MIN_HTLC_LOCKTIME_SECS,
-} from "./query-aggregate";
+} from "./query-aggregate.ts";
 import type {
   Query,
   QueryInput,
@@ -21,8 +21,8 @@ import type {
   SubmissionMeta,
   QuoteInfo,
   HtlcInfo,
-} from "../../packages/core-domain/src/types";
-import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate";
+} from "../../packages/core-domain/src/types.ts";
+import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate.ts";
 
 // --- Helpers ---
 

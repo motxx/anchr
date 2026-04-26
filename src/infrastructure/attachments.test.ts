@@ -8,7 +8,7 @@ import {
   materializeQueryResult,
   normalizeQueryResult,
   resolveStoredAttachment,
-} from "./attachments";
+} from "./attachments.ts";
 
 test("resolveStoredAttachment accepts absolute URLs", () => {
   const attachment = resolveStoredAttachment("https://cdn.example.com/query/image.png");

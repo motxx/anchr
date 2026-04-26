@@ -1,7 +1,7 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createListingStore } from "./listing-store";
-import type { DataListing } from "./types";
+import { createListingStore } from "./listing-store.ts";
+import type { DataListing } from "./types.ts";
 
 function makeListing(overrides?: Partial<DataListing>): DataListing {
   return {

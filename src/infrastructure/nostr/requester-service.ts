@@ -13,8 +13,8 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "./identity";
-import { generateEphemeralIdentity } from "./identity";
+import type { NostrIdentity } from "./identity.ts";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -22,10 +22,10 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events";
-import { publishEvent, subscribeToFeedback } from "./client";
-import type { EscrowProvider } from "../../application/escrow-port";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types";
+} from "./events.ts";
+import { publishEvent, subscribeToFeedback } from "./client.ts";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "requester"]);

@@ -4,7 +4,7 @@ import {
   Terminal,
 } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import { cn } from "./lib/utils";
+import { cn } from "./lib/utils.ts";
 
 interface LogEntry {
   service: string;
@@ -130,7 +130,7 @@ export function LogsPanel() {
       return;
     }
 
-    const apiBase = typeof window !== "undefined" ? window.location.origin : "";
+    const apiBase = typeof window !== "undefined" ? globalThis.location.origin : "";
     const es = new EventSource(`${apiBase}/logs/stream`);
     esRef.current = es;
 

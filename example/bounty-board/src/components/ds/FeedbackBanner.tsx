@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { DSText } from "./Text";
+import { DSText } from "./Text.tsx";
 
 type FeedbackVariant = "success" | "error" | "warning" | "info";
 

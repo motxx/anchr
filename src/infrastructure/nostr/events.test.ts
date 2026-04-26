@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "./identity";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildQueryRequestEvent,
   buildQueryResponseEvent,
@@ -19,7 +19,7 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events";
+} from "./events.ts";
 
 describe("Nostr events (NIP-90 DVM)", () => {
   test("builds and parses QueryRequest event with DVM tags", () => {

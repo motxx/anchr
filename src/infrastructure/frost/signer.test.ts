@@ -1,13 +1,13 @@
 import { describe, test, afterEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createFrostSigner } from "./signer";
+import { createFrostSigner } from "./signer.ts";
 import {
   _setFrostSignerPathForTest,
   findFrostSigner,
   isFrostSignerAvailable,
   dkgRound1,
-} from "../../../packages/cashu-frost-oracle/src/frost-cli";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types";
+} from "../../../packages/cashu-frost-oracle/src/frost-cli.ts";
+import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

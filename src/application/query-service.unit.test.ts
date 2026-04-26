@@ -1,18 +1,18 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
 import {
   createOracleRegistry,
-} from "../infrastructure/oracle/registry";
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
+} from "../infrastructure/oracle/registry.ts";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
 import {
   createQueryService,
   createQueryStore,
-} from "./query-service";
-import type { Query, QueryResult } from "../../packages/core-domain/src/types";
-import type { EscrowProvider } from "./escrow-port";
-import { createIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
+} from "./query-service.ts";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types.ts";
+import type { EscrowProvider } from "./escrow-port.ts";
+import { createIntegrityStore } from "../../packages/photo-bounty/src/integrity-store.ts";
 
 /** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {
@@ -608,7 +608,7 @@ describe("submitHtlcResult", () => {
   }
 
   /** Create htlcInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../../packages/core-cashu/src/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../../packages/core-cashu/src/preimage-store.ts").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
       htlcInfo: {

@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { getMcpQueryBackend } from "./mcp-query-backend";
-import { isNostrEnabled } from "./nostr/client";
-import { isCashuEnabled } from "../../packages/core-cashu/src/wallet";
-import type { VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types";
-import { VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
+import { getMcpQueryBackend } from "./mcp-query-backend.ts";
+import { isNostrEnabled } from "./nostr/client.ts";
+import { isCashuEnabled } from "../../packages/core-cashu/src/wallet.ts";
+import type { VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
+import { VERIFICATION_FACTORS } from "../../packages/core-domain/src/types.ts";
 import {
   handleCreateQuery,
   handleGetQueryStatus,
@@ -14,12 +14,12 @@ import {
   handleSubmitQueryResult,
   handleGetQueryAttachment,
   handleGetQueryAttachmentPreview,
-} from "./mcp-tool-handlers";
+} from "./mcp-tool-handlers.ts";
 import {
   handleMarketplaceListData,
   handleMarketplaceBuyData,
   handleMarketplaceSearchListings,
-} from "./mcp-marketplace-handlers";
+} from "./mcp-marketplace-handlers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "mcp-server"]);

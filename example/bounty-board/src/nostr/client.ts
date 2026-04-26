@@ -1,8 +1,8 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_FEEDBACK } from "./events";
-import { useSettingsStore } from "../store/settings";
+import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_FEEDBACK } from "./events.ts";
+import { useSettingsStore } from "../store/settings.ts";
 
 let _pool: SimplePool | null = null;
 

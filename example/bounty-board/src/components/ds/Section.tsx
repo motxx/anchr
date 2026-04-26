@@ -1,6 +1,6 @@
 import React, { type ReactNode } from "react";
 import { View } from "react-native";
-import { DSText } from "./Text";
+import { DSText } from "./Text.tsx";
 
 export interface DSSectionProps {
   title?: string;

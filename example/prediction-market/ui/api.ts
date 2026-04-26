@@ -1,4 +1,4 @@
-import type { Market, MarketCategory } from "./mock-data";
+import type { Market, MarketCategory } from "./mock-data.ts";
 
 const API_BASE = "/markets";
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import type { DemoEvent } from "./DemoApp";
-import { StoryCard } from "./StoryCard";
-import type { StoryStepDef } from "./StoryCard";
+import type { DemoEvent } from "./DemoApp.tsx";
+import { StoryCard } from "./StoryCard.tsx";
+import type { StoryStepDef } from "./StoryCard.tsx";
 
 type Actor = "requester" | "worker" | "oracle" | "system";
 
@@ -118,8 +118,8 @@ export function StoryView({ events, finished }: Props) {
 
         {finished && (
           <div className="rounded-xl border border-emerald-400/30 bg-emerald-950/20 p-6 text-center animate-slide-in">
-            <span className="text-4xl">{"\uD83C\uDF89"}</span>
-            <h3 className="text-lg font-bold text-emerald-400 mt-3">{"\u5B8C\u4E86!"}</h3>
+            <span className="text-4xl">🎉</span>
+            <h3 className="text-lg font-bold text-emerald-400 mt-3">完了!</h3>
             <p className="text-sm text-muted-foreground mt-1">
               {"\u5168\u3066\u306E\u30B9\u30C6\u30C3\u30D7\u304C\u6B63\u5E38\u306B\u5B8C\u4E86\u3057\u307E\u3057\u305F\u3002\u30EF\u30FC\u30AB\u30FC\u306F\u5408\u9375\u3067\u30A8\u30B9\u30AF\u30ED\u30FC\u3092\u89E3\u9664\u3057\u3001\u5831\u916C\u3092\u53D7\u3051\u53D6\u308A\u307E\u3057\u305F\u3002"}
             </p>

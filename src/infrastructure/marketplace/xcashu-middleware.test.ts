@@ -1,8 +1,8 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
-import { createPaymentMiddleware, _clearSeenTokensForTest } from "./xcashu-middleware";
-import type { DataListing, MarketplaceEnv } from "./types";
+import { createPaymentMiddleware, _clearSeenTokensForTest } from "./xcashu-middleware.ts";
+import type { DataListing, MarketplaceEnv } from "./types.ts";
 
 function makeListing(overrides?: Partial<DataListing>): DataListing {
   return {

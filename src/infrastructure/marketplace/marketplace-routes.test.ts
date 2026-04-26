@@ -1,14 +1,14 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildWorkerApiApp } from "../worker-api";
-import { createListingStore } from "./listing-store";
-import { createOracleRegistry } from "../oracle/registry";
-import { createQueryService, createQueryStore } from "../../application/query-service";
-import type { Oracle, OracleAttestation } from "../../../packages/core-domain/src/oracle-types";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
-import { _clearSeenTokensForTest } from "./xcashu-middleware";
-import { _clearPurchaseLogForTest } from "./marketplace-routes";
-import { _clearCacheForTest } from "./data-fetcher";
+import { buildWorkerApiApp } from "../worker-api.ts";
+import { createListingStore } from "./listing-store.ts";
+import { createOracleRegistry } from "../oracle/registry.ts";
+import { createQueryService, createQueryStore } from "../../application/query-service.ts";
+import type { Oracle, OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import { _clearSeenTokensForTest } from "./xcashu-middleware.ts";
+import { _clearPurchaseLogForTest } from "./marketplace-routes.ts";
+import { _clearCacheForTest } from "./data-fetcher.ts";
 
 function makeMockOracle(id: string): Oracle {
   return {

@@ -11,16 +11,16 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createOracleRegistry } from "./infrastructure/oracle/registry";
-import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
-import { createQueryService, createQueryStore } from "./application/query-service";
+import { createOracleRegistry } from "./infrastructure/oracle/registry.ts";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+import { createQueryService, createQueryStore } from "./application/query-service.ts";
 import {
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
   makeHtlcInfo,
   driveToProcessing,
-} from "./testing/protocol-helpers";
+} from "./testing/protocol-helpers.ts";
 
 // =============================================================================
 // 1. Preimage Isolation

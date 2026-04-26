@@ -8,13 +8,13 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { validateZ } from "../zod-validator-shim";
-import { createListingSchema } from "./marketplace-schemas";
-import { createPaymentMiddleware } from "./xcashu-middleware";
-import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher";
-import { validateAttachmentUri } from "../url-validation";
-import { announceListingOnNostr } from "./nostr-announce";
-import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types";
+import { validateZ } from "../zod-validator-shim.ts";
+import { createListingSchema } from "./marketplace-schemas.ts";
+import { createPaymentMiddleware } from "./xcashu-middleware.ts";
+import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
+import { validateAttachmentUri } from "../url-validation.ts";
+import { announceListingOnNostr } from "./nostr-announce.ts";
+import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "marketplace"]);

@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { emitLog, subscribeLog, getRecentLogs, type LogEntry } from "./log-stream";
+import { emitLog, subscribeLog, getRecentLogs, type LogEntry } from "./log-stream.ts";
 
 describe("log-stream", () => {
   test("emitLog delivers to subscribers", () => {

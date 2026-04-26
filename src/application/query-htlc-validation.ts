@@ -1,5 +1,5 @@
-import type { EscrowProvider } from "./escrow-port";
-import type { Query, QueryStatus } from "../../packages/core-domain/src/types";
+import type { EscrowProvider } from "./escrow-port.ts";
+import type { Query, QueryStatus } from "../../packages/core-domain/src/types.ts";
 
 export interface HtlcTokenLockResult {
   ok: boolean;

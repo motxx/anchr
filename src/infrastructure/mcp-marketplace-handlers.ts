@@ -2,7 +2,7 @@
  * MCP tool handlers for the Verified Data Marketplace.
  */
 
-import type { McpQueryBackend } from "./mcp-query-backend";
+import type { McpQueryBackend } from "./mcp-query-backend.ts";
 
 type McpTextResult = { content: Array<{ type: "text"; text: string }> };
 

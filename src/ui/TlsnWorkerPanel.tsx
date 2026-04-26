@@ -9,9 +9,9 @@ import {
   Lock,
 } from "lucide-react";
 import React, { useRef, useState } from "react";
-import { Button } from "./components/ui/button";
-import { cn } from "./lib/utils";
-import { generatePluginCode } from "./plugin-codegen";
+import { Button } from "./components/ui/button.tsx";
+import { cn } from "./lib/utils.ts";
+import { generatePluginCode } from "./plugin-codegen.ts";
 
 interface TlsnRequirement {
   target_url: string;
@@ -68,9 +68,9 @@ function ExtensionInstructions({
       </p>
       <ol className="text-[11px] text-muted-foreground space-y-1.5 list-decimal list-inside">
         <li>Copy the plugin code below</li>
-        <li>Open TLSNotary extension {"\u2192"} DevConsole</li>
+        <li>Open TLSNotary extension → DevConsole</li>
         <li>Paste and click <strong className="text-foreground">Run Code</strong></li>
-        <li>Result is copied to clipboard {"\u2014"} paste it below</li>
+        <li>Result is copied to clipboard — paste it below</li>
       </ol>
       <div className="relative group">
         <pre className="bg-black/50 rounded-lg p-3 overflow-x-auto text-[11px] leading-relaxed max-h-48 overflow-y-auto">
@@ -227,7 +227,7 @@ export function TlsnWorkerPanel({
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const apiOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const apiOrigin = typeof window !== "undefined" ? globalThis.location.origin : "";
   const pluginCode = generatePluginCode(query, apiOrigin);
 
   function handleCopy() {

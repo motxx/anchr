@@ -1,13 +1,13 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "./identity";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,
   ANCHR_ORACLE_ATTESTATION,
-} from "./oracle-attestation";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types";
+} from "./oracle-attestation.ts";
+import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
 
 const oracleIdentity = generateEphemeralIdentity();
 

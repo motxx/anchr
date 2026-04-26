@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { CATEGORIES, type Market, type MarketCategory } from "./mock-data";
-import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api";
-import { Header } from "./components/Header";
-import { StatsBar } from "./components/StatsBar";
-import { MarketCard } from "./components/MarketCard";
-import { MarketDetail } from "./components/MarketDetail";
-import { cn } from "./lib/utils";
+import { CATEGORIES, type Market, type MarketCategory } from "./mock-data.ts";
+import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api.ts";
+import { Header } from "./components/Header.tsx";
+import { StatsBar } from "./components/StatsBar.tsx";
+import { MarketCard } from "./components/MarketCard.tsx";
+import { MarketDetail } from "./components/MarketDetail.tsx";
+import { cn } from "./lib/utils.ts";
 
 type SortMode = "volume" | "newest" | "ending_soon" | "bettors";
 

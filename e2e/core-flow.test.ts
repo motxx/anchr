@@ -29,18 +29,19 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
-import { createQueryService, createQueryStore } from "../src/application/query-service";
-import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
-import { createOracleRegistry } from "../src/infrastructure/oracle/registry";
-import type { Oracle, OracleAttestation } from "../packages/core-domain/src/oracle-types";
-import type { Query, QueryResult } from "../packages/core-domain/src/types";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
+import { createQueryService, createQueryStore } from "../src/application/query-service.ts";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import type { Oracle, OracleAttestation } from "../packages/core-domain/src/oracle-types.ts";
+import type { Query, QueryResult } from "../packages/core-domain/src/types.ts";
 import {
   checkInfraReady,
   createWallet,
   throttledMintProofs,
   throttleMintOp,
-} from "./helpers/regtest";
+} from "./helpers/regtest.ts";
+import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;

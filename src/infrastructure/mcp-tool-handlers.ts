@@ -2,9 +2,9 @@
  * Individual MCP tool handler functions.
  */
 
-import type { QueryInput, QueryResult } from "../application/query-service";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types";
-import type { McpQueryBackend } from "./mcp-query-backend";
+import type { QueryInput, QueryResult } from "../application/query-service.ts";
+import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
+import type { McpQueryBackend } from "./mcp-query-backend.ts";
 
 interface CreateQueryArgs {
   description: string;

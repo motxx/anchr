@@ -37,7 +37,7 @@ import {
   encodeProofs,
   loadAndSend,
   computeNetAmount,
-} from "./escrow-helpers";
+} from "./escrow-helpers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "cashu-escrow"]);

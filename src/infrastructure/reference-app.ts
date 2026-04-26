@@ -1,12 +1,12 @@
-import { getRuntimeConfig } from "./config";
-import { setupServerLogCapture } from "./log-stream";
-import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
-import { createQueryService } from "../application/query-service";
-import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
+import { getRuntimeConfig } from "./config.ts";
+import { setupServerLogCapture } from "./log-stream.ts";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import { createQueryService } from "../application/query-service.ts";
+import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api.ts";
 import { serveStatic } from "hono/deno";
-import { normalizeQueryResult } from "./attachments";
-import { publishQueryToRelay } from "./nostr/relay-publish";
-import { createOracleRegistry } from "./oracle/registry";
+import { normalizeQueryResult } from "./attachments.ts";
+import { publishQueryToRelay } from "./nostr/relay-publish.ts";
+import { createOracleRegistry } from "./oracle/registry.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "reference-app"]);

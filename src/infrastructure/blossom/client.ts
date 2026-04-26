@@ -16,7 +16,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { finalizeEvent, type EventTemplate } from "nostr-tools";
-import type { NostrIdentity } from "../nostr/identity";
+import type { NostrIdentity } from "../nostr/identity.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "blossom"]);

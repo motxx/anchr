@@ -7,10 +7,10 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ErrorBoundary } from "../src/components/ErrorBoundary";
-import { useSettingsStore } from "../src/store/settings";
-import { useWalletStore } from "../src/store/wallet";
-import { useAuthStore } from "../src/store/auth";
+import { ErrorBoundary } from "../src/components/ErrorBoundary.tsx";
+import { useSettingsStore } from "../src/store/settings.ts";
+import { useWalletStore } from "../src/store/wallet.ts";
+import { useAuthStore } from "../src/store/auth.ts";
 import "../global.css";
 
 const queryClient = new QueryClient({

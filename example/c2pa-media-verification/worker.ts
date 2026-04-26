@@ -11,6 +11,7 @@
  *   bun run example/c2pa-media-verification/worker.ts [path-to-c2pa-photo]
  */
 
+import process from "node:process";
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const PHOTO_PATH = process.argv[2] ?? "signed-photo.jpg";
 

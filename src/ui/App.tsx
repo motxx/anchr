@@ -6,12 +6,12 @@ import {
   RefreshCw,
   Wallet,
 } from "lucide-react";
-import { apiFetch } from "./api-config";
+import { apiFetch } from "./api-config.ts";
 import React, { useCallback } from "react";
-import { ClosedQueryCard } from "./ClosedQueryCard";
-import { LogsPanel } from "./LogsPanel";
-import { QueryCard } from "./QueryCard";
-import type { Query } from "./QueryCard";
+import { ClosedQueryCard } from "./ClosedQueryCard.tsx";
+import { LogsPanel } from "./LogsPanel.tsx";
+import { QueryCard } from "./QueryCard.tsx";
+import type { Query } from "./QueryCard.tsx";
 
 // ---- Types ----
 

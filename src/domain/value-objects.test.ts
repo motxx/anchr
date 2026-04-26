@@ -6,7 +6,7 @@ import {
   validateHtlcLocktime,
   validateQueryInput,
   validateQuoteInfo,
-} from "./value-objects";
+} from "./value-objects.ts";
 
 describe("validateGpsCoord", () => {
   // --- Valid ---

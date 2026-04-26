@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { View, Pressable } from "react-native";
-import { DSAvatar, DSText, DSBadge } from "../ds";
-import { truncateNpub } from "../../utils/format";
-import { clipboardProvider } from "../../platform/clipboard";
+import { DSAvatar, DSText, DSBadge } from "../ds/index.ts";
+import { truncateNpub } from "../../utils/format.ts";
+import { clipboardProvider } from "../../platform/clipboard.ts";
 import { Ionicons } from "@expo/vector-icons";
 
 interface ProfileHeaderProps {

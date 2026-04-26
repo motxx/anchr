@@ -5,16 +5,16 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "./attachments";
-import { getRuntimeConfig } from "./config";
+} from "./attachments.ts";
+import { getRuntimeConfig } from "./config.ts";
 import {
   cancelQuery,
   createQuery,
   getQuery,
   listOpenQueries,
   submitQueryResult,
-} from "../application/query-service";
-import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../../packages/core-domain/src/types";
+} from "../application/query-service.ts";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../../packages/core-domain/src/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
 const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;

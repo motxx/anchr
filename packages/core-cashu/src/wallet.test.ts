@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isCashuEnabled, getCashuConfig } from "./wallet";
+import { isCashuEnabled, getCashuConfig } from "./wallet.ts";
 
 describe("Cashu wallet", () => {
   test("isCashuEnabled returns false when CASHU_MINT_URL is not set", () => {

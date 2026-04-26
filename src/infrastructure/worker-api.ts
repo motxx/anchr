@@ -4,22 +4,22 @@ import { spawn, fileExists, fileLastModified, moduleDir } from "../../packages/c
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
-import { getRuntimeConfig } from "./config";
-import { listOracles } from "./oracle";
-import type { OracleRegistry } from "./oracle/registry";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store";
+import { getRuntimeConfig } from "./config.ts";
+import { listOracles } from "./oracle/index.ts";
+import type { OracleRegistry } from "./oracle/registry.ts";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
 import {
   defaultService as defaultQueryService,
   type QueryService,
-} from "../application/query-service";
+} from "../application/query-service.ts";
 import {
   registerQueryRoutes,
   registerAttachmentRoutes,
   registerHtlcRoutes,
   registerLogRoutes,
-} from "./worker-api-routes";
-import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes";
-import { createListingStore, type ListingStore } from "./marketplace/listing-store";
+} from "./worker-api-routes.ts";
+import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes.ts";
+import { createListingStore, type ListingStore } from "./marketplace/listing-store.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "security"]);

@@ -1,6 +1,6 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { DSTabBar } from "../../src/components/ds";
+import { DSTabBar } from "../../src/components/ds/index.ts";
 
 export default function TabLayout() {
   return (

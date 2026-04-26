@@ -110,12 +110,12 @@ function VerificationBlock({ verification }: {
       </div>
       {verification.checks.map((c, i) => (
         <div key={i} className="text-[10px] text-muted-foreground">
-          {"\u2713"} {c}
+          ✓ {c}
         </div>
       ))}
       {verification.failures.map((f, i) => (
         <div key={i} className="text-[10px] text-red-400">
-          {"\u2717"} {f}
+          ✗ {f}
         </div>
       ))}
     </div>

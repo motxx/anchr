@@ -7,10 +7,10 @@
 
 import { Buffer } from "node:buffer";
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
-import { publishEvent } from "../nostr/client";
-import { getCashuConfig } from "../../../packages/core-cashu/src/wallet";
-import { ANCHR_MARKETPLACE_LISTING } from "../nostr/events";
-import type { DataListing } from "./types";
+import { publishEvent } from "../nostr/client.ts";
+import { getCashuConfig } from "../../../packages/core-cashu/src/wallet.ts";
+import { ANCHR_MARKETPLACE_LISTING } from "../nostr/events.ts";
+import type { DataListing } from "./types.ts";
 
 /** Get the Nostr identity keypair. Returns null if not configured. */
 async function getIdentityKey(): Promise<Uint8Array | null> {

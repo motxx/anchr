@@ -13,13 +13,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types";
-import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
-import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
+import { verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
+import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
+import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-server"]);
@@ -419,11 +419,7 @@ export function buildOracleApp(
    */
   app.get("/frost/sign/:queryId", authMiddleware, (c) => {
     const queryId = c.req.param("queryId");
-    // Find session by queryId
-    // Note: In a full impl, we'd have a reverse map. For now, iterate.
-    let found: ReturnType<typeof frostCoordinator.getSigningSession>;
-    // Try direct session ID lookup first, then search
-    found = frostCoordinator.getSigningSession(queryId);
+    const found = frostCoordinator.getSigningSession(queryId);
 
     if (!found) {
       return c.json({ error: "Signing session not found" }, 404);

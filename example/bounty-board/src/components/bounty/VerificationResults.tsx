@@ -1,8 +1,8 @@
 import React from "react";
 import { View } from "react-native";
-import { DSCard, DSText, DSFeedbackBanner } from "../ds";
+import { DSCard, DSText, DSFeedbackBanner } from "../ds/index.ts";
 import { Ionicons } from "@expo/vector-icons";
-import type { VerificationDetail } from "../../api/types";
+import type { VerificationDetail } from "../../api/types.ts";
 
 interface VerificationResultsProps {
   verification: VerificationDetail;

@@ -1,7 +1,7 @@
 import React from "react";
 import { ScrollView } from "react-native";
-import { DSChip } from "../ds";
-import { useFeedStore, type FeedFilter } from "../../store/feed";
+import { DSChip } from "../ds/index.ts";
+import { useFeedStore, type FeedFilter } from "../../store/feed.ts";
 
 const FILTERS: { key: FeedFilter; label: string; icon: string }[] = [
   { key: "nearby", label: "Nearby", icon: "location" },

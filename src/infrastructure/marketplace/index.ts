@@ -9,11 +9,11 @@ export type {
   PaymentInfo,
   PurchaseRecord,
   MarketplaceRouteContext,
-} from "./types";
+} from "./types.ts";
 
-export { createListingStore, type ListingStore } from "./listing-store";
-export { createPaymentMiddleware, _clearSeenTokensForTest } from "./xcashu-middleware";
-export { fetchWithProof, validateMarketplaceProof, _clearCacheForTest } from "./data-fetcher";
-export { registerMarketplaceRoutes, _clearPurchaseLogForTest } from "./marketplace-routes";
-export { buildListingAnnouncementEvent, announceListingOnNostr } from "./nostr-announce";
-export { createListingSchema, type CreateListingInput } from "./marketplace-schemas";
+export { createListingStore, type ListingStore } from "./listing-store.ts";
+export { createPaymentMiddleware, _clearSeenTokensForTest } from "./xcashu-middleware.ts";
+export { fetchWithProof, validateMarketplaceProof, _clearCacheForTest } from "./data-fetcher.ts";
+export { registerMarketplaceRoutes, _clearPurchaseLogForTest } from "./marketplace-routes.ts";
+export { buildListingAnnouncementEvent, announceListingOnNostr } from "./nostr-announce.ts";
+export { createListingSchema, type CreateListingInput } from "./marketplace-schemas.ts";

@@ -18,7 +18,7 @@ import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
-  computeNetAmount,
+  type computeNetAmount,
 } from "@anchr/core-cashu/escrow-helpers";
 
 import { getLogger } from "@anchr/core-runtime/logger";

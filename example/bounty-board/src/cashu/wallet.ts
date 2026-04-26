@@ -1,5 +1,5 @@
 import { CashuMint, CashuWallet, CheckStateEnum, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
-import { useSettingsStore } from "../store/settings";
+import { useSettingsStore } from "../store/settings.ts";
 
 let _wallet: CashuWallet | null = null;
 let _lastMintUrl: string | null = null;

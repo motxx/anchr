@@ -15,6 +15,7 @@
  */
 import { chromium } from "playwright";
 import { spawn } from "../src/runtime/mod.ts";
+import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;

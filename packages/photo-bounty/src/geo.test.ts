@@ -1,6 +1,6 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { haversineKm } from "./geo";
+import { haversineKm } from "./geo.ts";
 
 test("haversineKm returns 0 for same point", () => {
   expect(haversineKm(35.6762, 139.6503, 35.6762, 139.6503)).toBe(0);

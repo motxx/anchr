@@ -12,28 +12,28 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { NostrIdentity } from "../nostr/identity";
-import { restoreIdentity } from "../nostr/identity";
-import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm";
+import type { NostrIdentity } from "../nostr/identity.ts";
+import { restoreIdentity } from "../nostr/identity.ts";
+import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm.ts";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
-} from "../nostr/client";
-import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
-import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
-import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator";
-import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
+} from "../nostr/client.ts";
+import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
+import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator.ts";
+import { verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
 import {
   type WatchedQuery,
   buildQueryFromPayload,
   buildResultFromPayload,
   handleFeedbackEvent,
   parseResponsePayload,
-} from "./oracle-nostr-handlers";
+} from "./oracle-nostr-handlers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-nostr"]);

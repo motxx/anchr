@@ -77,6 +77,8 @@
     "test:all:docker": "./scripts/test-all.sh --docker",
     "test:all:full": "./scripts/test-all.sh full",
 
+    "lint": "deno lint",
+    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:refactor",
     "lint:deps": "cd crates/frost-signer && cargo audit 2>/dev/null; cd ../tlsn-prover && cargo audit 2>/dev/null; cd ../tlsn-server && cargo audit 2>/dev/null; echo 'Cargo audit complete'",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
@@ -88,5 +90,30 @@
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": ["mobile", "node_modules", "example/prediction-market/src/demo.ts", "example/prediction-market/src/nostr-market.ts"],
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "include": [
+        "no-eval",
+        "no-self-compare",
+        "default-param-last"
+      ],
+      "exclude": [
+        "no-unused-vars",
+        "require-await",
+        "no-explicit-any",
+        "no-slow-types",
+        "jsx-button-has-type",
+        "no-import-prefix"
+      ]
+    },
+    "exclude": [
+      "mobile",
+      "example/prediction-market/src/demo.ts",
+      "example/prediction-market/src/nostr-market.ts",
+      "scripts/",
+      "src/infrastructure/log-stream.ts"
+    ]
+  },
   "nodeModulesDir": "auto"
 }

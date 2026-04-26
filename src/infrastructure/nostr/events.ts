@@ -15,8 +15,8 @@
  *   status=success/error     → Completion feedback
  */
 
-import type { TlsnEncryptedContext, VerificationFactor } from "../../../packages/core-domain/src/types";
-import { deriveConversationKey, decryptNip44 } from "./encryption";
+import type { TlsnEncryptedContext, VerificationFactor } from "../../../packages/core-domain/src/types.ts";
+import { deriveConversationKey, decryptNip44 } from "./encryption.ts";
 
 // NIP-90 DVM event kinds for Anchr.
 export const ANCHR_QUERY_REQUEST = 5300;   // DVM Job Request
@@ -161,7 +161,7 @@ export {
   buildSelectionFeedbackEvent,
   buildQuerySettlementEvent,
   buildOracleAnnouncementEvent,
-} from "./event-builders";
+} from "./event-builders.ts";
 
 // --- Parsers ---
 

@@ -8,11 +8,11 @@ import {
   Lock,
 } from "lucide-react";
 import React, { useState } from "react";
-import { apiFetch } from "./api-config";
-import { Card, CardContent, CardHeader } from "./components/ui/card";
-import { cn } from "./lib/utils";
-import { VerificationPanel, ResultProofPanel } from "./ResultProofPanel";
-import type { Query } from "./QueryCard";
+import { apiFetch } from "./api-config.ts";
+import { Card, CardContent, CardHeader } from "./components/ui/card.tsx";
+import { cn } from "./lib/utils.ts";
+import { VerificationPanel, ResultProofPanel } from "./ResultProofPanel.tsx";
+import type { Query } from "./QueryCard.tsx";
 
 function isTlsnQuery(query: Query): boolean {
   return query.verification_requirements?.includes("tlsn") === true;

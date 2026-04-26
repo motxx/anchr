@@ -11,7 +11,7 @@
  * - .ots (OpenTimestamps, Bitcoin blockchain proof)
  */
 
-import { Buffer } from "node:buffer";
+import type { Buffer } from "node:buffer";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -204,7 +204,7 @@ async function extractZipEntries(zipBuffer: Buffer): Promise<Record<string, Buff
     await proc.exited;
 
     const entries: Record<string, Buffer> = {};
-    function readDir(dir: string, prefix: string) {
+    const readDir = (dir: string, prefix: string): void => {
       for (const item of readdirSync(dir, { withFileTypes: true })) {
         const fullPath = `${dir}/${item.name}`;
         const entryName = prefix ? `${prefix}/${item.name}` : item.name;
@@ -214,7 +214,7 @@ async function extractZipEntries(zipBuffer: Buffer): Promise<Record<string, Buff
           entries[item.name] = readFileSync(fullPath) as Buffer;
         }
       }
-    }
+    };
     readDir(tmpDir, "");
     rmSync(tmpDir, { recursive: true, force: true });
 

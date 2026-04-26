@@ -12,8 +12,8 @@ declare global {
 
 function getApiBaseUrl(): string {
   // 1. Explicit global override (e.g. set by CDN deployment)
-  if (typeof window !== "undefined" && window.__ANCHR_API_URL__) {
-    return window.__ANCHR_API_URL__.replace(/\/+$/, "");
+  if (typeof window !== "undefined" && globalThis.__ANCHR_API_URL__) {
+    return globalThis.__ANCHR_API_URL__.replace(/\/+$/, "");
   }
 
   // 2. Data attribute on root element

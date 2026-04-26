@@ -1,9 +1,9 @@
 import { describe, test, afterEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getNostrConfig, isNostrEnabled, closePool, publishEvent } from "./client";
-import { generateEphemeralIdentity } from "./identity";
-import { buildQueryRequestEvent } from "./events";
-import { withEnv } from "../../testing/helpers";
+import { getNostrConfig, isNostrEnabled, closePool, publishEvent } from "./client.ts";
+import { generateEphemeralIdentity } from "./identity.ts";
+import { buildQueryRequestEvent } from "./events.ts";
+import { withEnv } from "../../testing/helpers.ts";
 
 afterEach(() => {
   closePool();

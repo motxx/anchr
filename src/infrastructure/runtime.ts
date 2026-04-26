@@ -1,11 +1,11 @@
-import { getRuntimeConfig } from "./config";
-import { purgeExpiredQueries } from "../application/data-purge";
-import { startMcpServer } from "./mcp-server";
-import { createQueryService, setDefaultService, expireQueries } from "../application/query-service";
-import { startReferenceApp } from "./reference-app";
-import { createOracleRegistry } from "./oracle/registry";
-import { normalizeQueryResult } from "./attachments";
-import { publishQueryToRelay } from "./nostr/relay-publish";
+import { getRuntimeConfig } from "./config.ts";
+import { purgeExpiredQueries } from "../application/data-purge.ts";
+import { startMcpServer } from "./mcp-server.ts";
+import { createQueryService, setDefaultService, expireQueries } from "../application/query-service.ts";
+import { startReferenceApp } from "./reference-app.ts";
+import { createOracleRegistry } from "./oracle/registry.ts";
+import { normalizeQueryResult } from "./attachments.ts";
+import { publishQueryToRelay } from "./nostr/relay-publish.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "scheduler"]);

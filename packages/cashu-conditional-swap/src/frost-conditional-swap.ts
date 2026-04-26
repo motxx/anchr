@@ -14,7 +14,7 @@ import {
   P2PKBuilder,
   type Proof,
   type P2PKOptions,
-  getEncodedToken,
+  type getEncodedToken,
 } from "@cashu/cashu-ts";
 import type { EscrowToken } from "@anchr/core-cashu/escrow";
 import type { FrostConditionalSwapDef } from "./conditional-swap-types.ts";

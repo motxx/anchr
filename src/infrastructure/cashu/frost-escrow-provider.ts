@@ -6,4 +6,4 @@ export {
   createFrostEscrowProvider,
   buildFrostP2PKOptions,
   type FrostEscrowConfig,
-} from "../frost/frost-escrow-provider";
+} from "../frost/frost-escrow-provider.ts";

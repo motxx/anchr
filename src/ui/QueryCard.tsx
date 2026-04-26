@@ -10,12 +10,12 @@ import {
   Loader2,
 } from "lucide-react";
 import React, { useState } from "react";
-import { apiFetch } from "./api-config";
-import { Card, CardContent, CardHeader } from "./components/ui/card";
-import { cn } from "./lib/utils";
-import { SubmitForm } from "./SubmitForm";
-import { TlsnWorkerPanel } from "./TlsnWorkerPanel";
-import { VerificationPanel } from "./ResultProofPanel";
+import { apiFetch } from "./api-config.ts";
+import { Card, CardContent, CardHeader } from "./components/ui/card.tsx";
+import { cn } from "./lib/utils.ts";
+import { SubmitForm } from "./SubmitForm.tsx";
+import { TlsnWorkerPanel } from "./TlsnWorkerPanel.tsx";
+import { VerificationPanel } from "./ResultProofPanel.tsx";
 
 interface VerificationDetail {
   passed: boolean;

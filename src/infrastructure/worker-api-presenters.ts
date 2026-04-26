@@ -1,13 +1,13 @@
 import type { Context } from "hono";
-import { getRuntimeConfig } from "./config";
+import { getRuntimeConfig } from "./config.ts";
 import {
   buildAttachmentAbsoluteUrl,
   buildAttachmentHandle,
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "./attachments";
-import type { AttachmentRef, Query } from "../../packages/core-domain/src/types";
+} from "./attachments.ts";
+import type { AttachmentRef, Query } from "../../packages/core-domain/src/types.ts";
 
 export const TRUSTED_HOSTS = new Set(
   (Deno.env.get("TRUSTED_PROXY_HOSTS") ?? "")

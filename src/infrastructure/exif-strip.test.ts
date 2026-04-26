@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { stripExif } from "./exif-strip";
+import { stripExif } from "./exif-strip.ts";
 
 /**
  * Build a minimal JPEG with an EXIF APP1 segment containing GPS-like data.

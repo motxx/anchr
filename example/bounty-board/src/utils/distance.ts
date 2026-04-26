@@ -1,4 +1,4 @@
-import type { GpsCoord } from "../api/types";
+import type { GpsCoord } from "../api/types.ts";
 
 const EARTH_RADIUS_KM = 6371;
 

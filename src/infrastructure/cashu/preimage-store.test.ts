@@ -1,6 +1,6 @@
 import { describe, test, afterEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore, createPersistentPreimageStore } from "../../../packages/core-cashu/src/preimage-store";
+import { createPreimageStore, createPersistentPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
 
 describe("PreimageStore", () => {
   test("create generates hash/preimage pair", () => {

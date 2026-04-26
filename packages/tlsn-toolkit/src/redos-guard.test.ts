@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isSuspiciousRegex } from "./tlsn-validation";
+import { isSuspiciousRegex } from "./tlsn-validation.ts";
 
 describe("isSuspiciousRegex (ReDoS guard)", () => {
   // --- Should REJECT (catastrophic backtracking patterns) ---

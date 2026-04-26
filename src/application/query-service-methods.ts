@@ -1,17 +1,17 @@
 import { randomBytes } from "node:crypto";
-import type { QueryStore } from "../domain/query-store";
-import { buildChallengeRule, generateNonce } from "../domain/challenge";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port";
-import type { EscrowProvider } from "./escrow-port";
-import { verifyWithQuorum } from "./query-verification";
-import type { OracleResolver, MultiOracleResolver } from "./query-verification";
+import type { QueryStore } from "../domain/query-store.ts";
+import { buildChallengeRule, generateNonce } from "../domain/challenge.ts";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port.ts";
+import type { EscrowProvider } from "./escrow-port.ts";
+import { verifyWithQuorum } from "./query-verification.ts";
+import type { OracleResolver, MultiOracleResolver } from "./query-verification.ts";
 import {
   isHtlcQuery,
   MIN_HTLC_LOCKTIME_SECS,
   validateHtlcTransition,
   verifyEscrowAmount,
   verifyEscrowLock,
-} from "./query-htlc-validation";
+} from "./query-htlc-validation.ts";
 import type {
   BlossomKeyMap,
   HtlcInfo,
@@ -24,17 +24,17 @@ import type {
   QueryStatus,
   SubmissionMeta,
   QuoteInfo,
-} from "../../packages/core-domain/src/types";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
-import type { ProofDelivery } from "./proof-delivery";
-import { isCancellable, isExpirable } from "../domain/query-transitions";
+} from "../../packages/core-domain/src/types.ts";
+import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types.ts";
+import type { ProofDelivery } from "./proof-delivery.ts";
+import { isCancellable, isExpirable } from "../domain/query-transitions.ts";
 import type {
   CancelQueryOutcome,
   CreateQueryOptions,
   HtlcOutcome,
   QueryHooks,
   SubmitQueryOutcome,
-} from "./query-service";
+} from "./query-service.ts";
 
 export interface ServiceDeps {
   store: QueryStore;

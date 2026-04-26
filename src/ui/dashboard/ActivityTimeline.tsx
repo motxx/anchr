@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import type { ActivityEvent } from "./useActivityTracker";
+import type { ActivityEvent } from "./useActivityTracker.ts";
 
 const ACTOR_LABEL: Record<string, { emoji: string; color: string }> = {
   requester: { emoji: "R", color: "bg-blue-400" },

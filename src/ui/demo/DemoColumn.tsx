@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import type { DemoEvent } from "./DemoApp";
+import type { DemoEvent } from "./DemoApp.tsx";
 
 interface Props {
   actor: string;

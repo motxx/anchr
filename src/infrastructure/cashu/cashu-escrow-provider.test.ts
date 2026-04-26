@@ -10,8 +10,8 @@ import { expect } from "@std/expect";
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import {
   createCashuEscrowProvider,
-} from "./cashu-escrow-provider";
-import type { EscrowProvider } from "../../application/escrow-port";
+} from "./cashu-escrow-provider.ts";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
 
 // Valid 32-byte x-only pubkeys (64 hex chars)
 const WORKER_PUB  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

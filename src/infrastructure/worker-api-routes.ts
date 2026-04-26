@@ -1,14 +1,14 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { z } from "zod";
-import { validateZ } from "./zod-validator-shim";
+import { validateZ } from "./zod-validator-shim.ts";
 import { spawn } from "../../packages/core-runtime/src/mod.ts";
-import { uploadAttachment } from "./attachment-store";
-import { materializeAttachmentRef } from "./attachments";
-import { getRuntimeConfig } from "./config";
-import { validateAttachmentUri } from "./url-validation";
-import { haversineKm } from "../../packages/photo-bounty/src/geo";
-import { createQuerySchema, resultBodySchema } from "./worker-api-schemas";
+import { uploadAttachment } from "./attachment-store.ts";
+import { materializeAttachmentRef } from "./attachments.ts";
+import { getRuntimeConfig } from "./config.ts";
+import { validateAttachmentUri } from "./url-validation.ts";
+import { haversineKm } from "../../packages/photo-bounty/src/geo.ts";
+import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
 import {
   buildAttachmentPayload,
   buildCreatedQueryPayload,
@@ -17,15 +17,15 @@ import {
   queryDetail,
   querySummary,
   renderStoredAttachmentPreview,
-} from "./worker-api-presenters";
-import type { QueryService, QueryInput, QueryResult } from "../application/query-service";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types";
+} from "./worker-api-presenters.ts";
+import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
   pStore?: PreimageStore;
-  doListOracles: () => ReturnType<typeof import("./oracle").listOracles>;
+  doListOracles: () => ReturnType<typeof import("./oracle/index.ts").listOracles>;
   writeAuth: MiddlewareHandler;
   rateLimit: MiddlewareHandler;
 }
@@ -409,7 +409,7 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
           } catch { /* client gone */ }
         };
 
-        const { getRecentLogs, subscribeLog } = await import("./log-stream");
+        const { getRecentLogs, subscribeLog } = await import("./log-stream.ts");
         for (const entry of getRecentLogs()) send(entry);
         unsubscribe = subscribeLog(send);
 

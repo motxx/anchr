@@ -20,15 +20,15 @@ import {
   type P2PKOptions,
   getDecodedToken,
 } from "@cashu/cashu-ts";
-import type { EscrowProvider } from "../../application/escrow-port";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
   computeNetAmount,
   sumProofAmounts,
-} from "../../../packages/core-cashu/src/escrow-helpers";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet";
+} from "../../../packages/core-cashu/src/escrow-helpers.ts";
+import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-escrow"]);

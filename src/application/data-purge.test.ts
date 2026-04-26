@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import { mkdtemp, rm, readdir, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createQueryService } from "./query-service";
-import type { QueryService } from "./query-service";
+import { createQueryService } from "./query-service.ts";
+import type { QueryService } from "./query-service.ts";
 
 describe("data purge", () => {
   let tempDir: string;

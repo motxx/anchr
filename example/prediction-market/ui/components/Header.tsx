@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { fetchBalance, requestFaucet } from "../api";
-import { getUserPubkey, truncatePubkey } from "../keypair";
+import { fetchBalance, requestFaucet } from "../api.ts";
+import { getUserPubkey, truncatePubkey } from "../keypair.ts";
 
 /** Re-export for other components that need the user's pubkey. */
-export { getUserPubkey } from "../keypair";
+export { getUserPubkey } from "../keypair.ts";
 
 export function Header() {
   const pubkey = getUserPubkey();

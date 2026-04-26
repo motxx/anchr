@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Code2, Inbox, LayoutDashboard, Loader2, RefreshCw, Wallet } from "lucide-react";
 import React, { useState } from "react";
-import { apiFetch } from "../api-config";
-import { CreateQueryForm } from "./CreateQueryForm";
-import { QueryCard } from "./QueryCard";
-import { SdkPlayground } from "./SdkPlayground";
+import { apiFetch } from "../api-config.ts";
+import { CreateQueryForm } from "./CreateQueryForm.tsx";
+import { QueryCard } from "./QueryCard.tsx";
+import { SdkPlayground } from "./SdkPlayground.tsx";
 
 interface QuerySummary {
   id: string;

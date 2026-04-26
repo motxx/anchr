@@ -1,11 +1,11 @@
-import { createQueryStore } from "../domain/query-store";
-import { isOpenStatus } from "../domain/query-transitions";
-import type { QueryStore } from "../domain/query-store";
-import type { OracleRegistry } from "./oracle-port";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port";
-import type { EscrowProvider } from "./escrow-port";
-import type { ProofDelivery } from "./proof-delivery";
-import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
+import { createQueryStore } from "../domain/query-store.ts";
+import { isOpenStatus } from "../domain/query-transitions.ts";
+import type { QueryStore } from "../domain/query-store.ts";
+import type { OracleRegistry } from "./oracle-port.ts";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port.ts";
+import type { EscrowProvider } from "./escrow-port.ts";
+import type { ProofDelivery } from "./proof-delivery.ts";
+import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";
 import {
   doBeginWork,
   doCancelQuery,
@@ -18,8 +18,8 @@ import {
   doSelectWorker,
   doSubmitHtlcResult,
   doSubmitQueryResult,
-} from "./query-service-methods";
-import type { ServiceDeps } from "./query-service-methods";
+} from "./query-service-methods.ts";
+import type { ServiceDeps } from "./query-service-methods.ts";
 import type {
   BlossomKeyMap,
   BountyInfo,
@@ -35,7 +35,7 @@ import type {
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
-} from "../../packages/core-domain/src/types";
+} from "../../packages/core-domain/src/types.ts";
 
 export type {
   AttachmentRef,
@@ -47,7 +47,7 @@ export type {
   VerificationFactor,
   RequesterMeta,
   RequesterType,
-} from "../../packages/core-domain/src/types";
+} from "../../packages/core-domain/src/types.ts";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
 export type QuerySubmissionMeta = SubmissionMeta;
@@ -79,10 +79,10 @@ export interface CancelQueryOutcome {
 }
 
 // --- QueryStore (extracted to domain layer) ---
-export { createQueryStore, type QueryStore } from "../domain/query-store";
+export { createQueryStore, type QueryStore } from "../domain/query-store.ts";
 
 // --- Re-export HTLC constant for backward compatibility ---
-export { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
+export { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";
 
 // --- QueryService ---
 

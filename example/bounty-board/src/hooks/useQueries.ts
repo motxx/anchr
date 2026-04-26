@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchQueries, fetchQueryDetail } from "../api/client";
-import { isTerminalStatus } from "../utils/time";
-import type { QuerySummary, QueryDetail } from "../api/types";
+import { fetchQueries, fetchQueryDetail } from "../api/client.ts";
+import { isTerminalStatus } from "../utils/time.ts";
+import type { QuerySummary, QueryDetail } from "../api/types.ts";
 
 export function useQueries() {
   return useQuery<QuerySummary[]>({

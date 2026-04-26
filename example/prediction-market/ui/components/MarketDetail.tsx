@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from "react";
-import type { Market } from "../mock-data";
-import { placeBet, redeemWinnings, type RedeemResult, type MatchInfo } from "../api";
-import { cn } from "../lib/utils";
-import { getUserPubkey } from "../keypair";
+import type { Market } from "../mock-data.ts";
+import { placeBet, redeemWinnings, type RedeemResult, type MatchInfo } from "../api.ts";
+import { cn } from "../lib/utils.ts";
+import { getUserPubkey } from "../keypair.ts";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;

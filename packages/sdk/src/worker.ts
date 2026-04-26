@@ -105,7 +105,7 @@ export class AnchrWorker {
 
   private emit<K extends keyof EventHandler>(event: K, ...args: Parameters<EventHandler[K]>): void {
     for (const handler of (this.handlers[event] ?? []) as EventHandler[K][]) {
-      (handler as Function)(...args);
+      (handler as (...a: Parameters<EventHandler[K]>) => void)(...args);
     }
   }
 

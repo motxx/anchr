@@ -8,6 +8,7 @@
  */
 
 import { AnchrWorker } from "./worker.ts";
+import process from "node:process";
 
 function parseArgs(): Record<string, string> {
   const args: Record<string, string> = {};

@@ -5,8 +5,8 @@
  * to detect AI-generated images (which lack real EXIF data).
  */
 
-import { Buffer } from "node:buffer";
-import { haversineKm } from "./geo";
+import type { Buffer } from "node:buffer";
+import { haversineKm } from "./geo.ts";
 
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
@@ -272,7 +272,7 @@ function parseExifDateTime(dt: string): Date | null {
 }
 
 // Re-export geo helper for convenience (callers expect this from ExifValidation module)
-export { haversineKm } from "./geo";
+export { haversineKm } from "./geo.ts";
 
 export interface ExifValidationOptions {
   /** Max allowed age of photo timestamp in ms (default: 1 hour) */

@@ -1,6 +1,6 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildEscrowP2PKOptions, calculateOracleFee, inspectEscrowToken } from "./escrow";
+import { buildEscrowP2PKOptions, calculateOracleFee, inspectEscrowToken } from "./escrow.ts";
 
 // Valid 32-byte x-only pubkeys (64 hex chars)
 const ORACLE_PUB = "0000000000000000000000000000000000000000000000000000000000000001";

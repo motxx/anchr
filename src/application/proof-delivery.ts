@@ -7,7 +7,7 @@
  * existing NIP-44 DM and this interface returns null.
  */
 
-import type { OracleAttestationRecord, ProofVisibility, Query } from "../../packages/core-domain/src/types";
+import type { OracleAttestationRecord, ProofVisibility, Query } from "../../packages/core-domain/src/types.ts";
 
 /** Result of a proof publish attempt. */
 export interface ProofPublishResult {

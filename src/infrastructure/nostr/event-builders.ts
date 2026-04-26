@@ -3,8 +3,8 @@
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { NostrIdentity } from "./identity";
-import { deriveConversationKey, encryptNip44 } from "./encryption";
+import type { NostrIdentity } from "./identity.ts";
+import { deriveConversationKey, encryptNip44 } from "./encryption.ts";
 import {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
@@ -16,8 +16,8 @@ import {
   type SelectionFeedbackPayload,
   type QuerySettlementPayload,
   type OracleResponsePayload,
-} from "./events";
-import type { OracleInfo } from "../../../packages/core-domain/src/oracle-types";
+} from "./events.ts";
+import type { OracleInfo } from "../../../packages/core-domain/src/oracle-types.ts";
 
 function nowUnix(): number {
   return Math.floor(Date.now() / 1000);

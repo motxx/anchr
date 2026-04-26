@@ -6,7 +6,7 @@
  */
 
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuConfig } from "../../../packages/core-cashu/src/wallet";
+import { getCashuConfig } from "../../../packages/core-cashu/src/wallet.ts";
 import {
   type WalletRole,
   type WalletData,
@@ -15,7 +15,7 @@ import {
   selectProofs,
   computeBalance,
   pruneSpentProofs,
-} from "./wallet-store-helpers";
+} from "./wallet-store-helpers.ts";
 
 export type { WalletRole, WalletBalance };
 

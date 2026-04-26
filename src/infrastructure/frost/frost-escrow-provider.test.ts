@@ -12,8 +12,8 @@ import {
   buildFrostP2PKOptions,
   createFrostEscrowProvider,
   type FrostEscrowConfig,
-} from "./frost-escrow-provider";
-import type { EscrowProvider } from "../../application/escrow-port";
+} from "./frost-escrow-provider.ts";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
 
 // Valid 32-byte x-only pubkeys (64 hex chars)
 const WORKER_PUB = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -77,7 +77,7 @@ function createTestableProvider(groupPubkey: string) {
 
   // Approach: Create a provider and seed it via a custom factory.
   const tokenMap = new Map<string, { token: string; proofs: import("@cashu/cashu-ts").Proof[] }>();
-  let refCounter = 0;
+  const refCounter = 0;
 
   const config: FrostEscrowConfig = { groupPubkey };
 

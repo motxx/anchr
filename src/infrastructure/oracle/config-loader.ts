@@ -7,8 +7,8 @@
  *   ORACLE_REGISTRY=ext1:https://oracle1.example.com:50000:sk-xxx,ext2:https://oracle2.example.com:30000
  */
 
-import { createHttpOracle } from "./http-oracle";
-import type { OracleRegistry } from "./registry";
+import { createHttpOracle } from "./http-oracle.ts";
+import type { OracleRegistry } from "./registry.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-config"]);
