@@ -3,6 +3,11 @@
 A demo application using Anchr's Oracle + TLSNotary verification + Cashu
 HTLC (or FROST P2PK) atomic settlement for prediction-market resolution.
 
+> **Operator runbook:** [`docs/prediction-market/deployment.md`](../../docs/prediction-market/deployment.md)
+> covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
+> resolution, and the public-testnet deploy checklist. Screenshots of
+> the running UI live in [`docs/prediction-market/screenshots/`](../../docs/prediction-market/screenshots/).
+
 ## What this is
 
 This example demonstrates Anchr's Oracle capabilities — TLSNotary-verified
