@@ -22,19 +22,19 @@ import type {
 import { createOrderBook, type OrderBook } from "./order-book.ts";
 import {
   type DualKeyStore,
-} from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
+} from "../../../packages/cashu-conditional-swap/src/frost-conditional-swap.ts";
 import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
   frostSignProofSecretsAsync,
-} from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
+} from "../../../packages/cashu-conditional-swap/src/frost-dual-key-store.ts";
 import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/market-frost-config.ts";
 import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition } from "./market-oracle.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
-} from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
+} from "../../../packages/cashu-conditional-swap/src/dual-preimage-store.ts";
 import {
   isMintReachable,
   mintProofsFromRegtest,

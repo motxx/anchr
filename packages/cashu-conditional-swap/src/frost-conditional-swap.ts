@@ -16,13 +16,14 @@ import {
   type P2PKOptions,
   getEncodedToken,
 } from "@cashu/cashu-ts";
-import type { EscrowToken } from "../cashu/escrow.ts";
-import type { FrostConditionalSwapDef } from "../../domain/conditional-swap-types.ts";
+// MIGRATION DEBT: cashu/escrow + escrow-helpers will move to a core-cashu package.
+import type { EscrowToken } from "../../../src/infrastructure/cashu/escrow.ts";
+import type { FrostConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
-} from "../cashu/escrow-helpers.ts";
+} from "../../../src/infrastructure/cashu/escrow-helpers.ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";

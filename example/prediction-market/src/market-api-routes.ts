@@ -13,12 +13,12 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { createOrderBook, type OrderBook } from "./order-book.ts";
-import { createDualPreimageStore, type DualPreimageStore } from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
-import type { DualKeyStore } from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
+import { createDualPreimageStore, type DualPreimageStore } from "../../../packages/cashu-conditional-swap/src/dual-preimage-store.ts";
+import type { DualKeyStore } from "../../../packages/cashu-conditional-swap/src/frost-conditional-swap.ts";
 import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
-} from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
+} from "../../../packages/cashu-conditional-swap/src/frost-dual-key-store.ts";
 import type { MarketFrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/market-frost-config.ts";
 import {
   evaluateCondition,

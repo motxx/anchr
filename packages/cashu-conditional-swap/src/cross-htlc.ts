@@ -12,14 +12,15 @@ import {
   type Proof,
   type P2PKOptions,
 } from "@cashu/cashu-ts";
-import type { EscrowToken } from "../cashu/escrow.ts";
-import type { ConditionalSwapDef } from "../../domain/conditional-swap-types.ts";
+// MIGRATION DEBT: cashu/escrow + escrow-helpers will move to a core-cashu package.
+import type { EscrowToken } from "../../../src/infrastructure/cashu/escrow.ts";
+import type { ConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
   computeNetAmount,
-} from "../cashu/escrow-helpers.ts";
+} from "../../../src/infrastructure/cashu/escrow-helpers.ts";
 
 /**
  * Build P2PK options for party A's token.
