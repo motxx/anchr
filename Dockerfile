@@ -26,7 +26,17 @@ RUN apt-get update \
 COPY --from=rust-builder /build/crates/tlsn-verifier/target/release/tlsn-verifier /usr/local/bin/
 COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /usr/local/bin/
 
+# Copy the root manifest plus every workspace member's deno.json so that
+# `deno install` can resolve workspace packages before the rest of the
+# source tree lands in the next COPY step.
 COPY deno.json deno.lock ./
+COPY packages/core-runtime/deno.json ./packages/core-runtime/
+COPY packages/core-domain/deno.json ./packages/core-domain/
+COPY packages/core-cashu/deno.json ./packages/core-cashu/
+COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
+COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
+COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
+COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 RUN deno install
 
 COPY . .
