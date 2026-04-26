@@ -5,7 +5,7 @@ import { createQueryService, createQueryStore } from "../application/query-servi
 import type { QueryService } from "../application/query-service";
 import { createOracleRegistry } from "./oracle";
 import type { Oracle, OracleAttestation } from "./oracle";
-import type { Query, QueryResult, BlossomKeyMap } from "../domain/types";
+import type { Query, QueryResult, BlossomKeyMap } from "../../packages/core-domain/src/types";
 
 // --- Mock oracle ---
 

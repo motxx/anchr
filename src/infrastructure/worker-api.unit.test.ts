@@ -1,10 +1,10 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "./cashu/preimage-store";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import { createOracleRegistry } from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
 import { createQueryService, createQueryStore } from "../application/query-service";
-import type { Query, QueryResult } from "../domain/types";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types";
 import { buildWorkerApiApp } from "./worker-api";
 
 function makeMockOracle(id: string): Oracle {

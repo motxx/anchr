@@ -1,0 +1,27 @@
+{
+  "name": "@anchr/tlsn-toolkit",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/tlsn-validation.ts",
+    "./tlsn-validation": "./src/tlsn-validation.ts",
+    "./proof-redaction": "./src/proof-redaction.ts"
+  },
+  "imports": {
+    "@anchr/core-runtime": "../core-runtime/src/mod.ts",
+    "@anchr/core-domain/types": "../core-domain/src/types.ts",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --no-check --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
+  }
+}

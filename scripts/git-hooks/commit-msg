@@ -1,0 +1,4 @@
+#!/bin/sh
+# Scan the commit message for local filesystem path leaks.
+# Arg $1 is the path to .git/COMMIT_EDITMSG.
+exec deno run --allow-read scripts/check-no-local-paths.ts "$1"

@@ -2,7 +2,7 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createInMemoryQueryRepository, toRepository } from "./query-repository";
 import { createQueryStore } from "./query-store";
-import type { Query } from "./types";
+import type { Query } from "../../packages/core-domain/src/types";
 import type { QueryRepository } from "./query-repository";
 import { makeQuery } from "../testing/factories";
 

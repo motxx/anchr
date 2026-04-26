@@ -3,7 +3,7 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
 import { createQueryService } from "../application/query-service";
-import { storeIntegrity } from "./verification/integrity-store";
+import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
 import { buildWorkerApiApp } from "./worker-api";
 import { withEnvThunk as withEnv } from "../testing/helpers";
 

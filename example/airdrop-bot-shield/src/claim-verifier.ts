@@ -13,7 +13,7 @@
  *
  * Reference modules:
  *   - validateTlsn, evaluateCondition from ../../../src/infrastructure/verification/tlsn-validation
- *   - TlsnVerifiedData, TlsnAttestation from ../../../src/domain/types
+ *   - TlsnVerifiedData, TlsnAttestation from ../../../packages/core-domain/src/types
  *   - redeemHtlcToken from ../../../src/infrastructure/cashu/escrow
  */
 

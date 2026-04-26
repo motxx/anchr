@@ -10,7 +10,7 @@
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "../../packages/sdk/src/index.ts";
+import { Anchr } from "anchr-sdk";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 

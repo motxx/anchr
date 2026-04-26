@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { fetchBlossomAttachment } from "./fetch-attachment";
-import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types";
+import type { AttachmentRef, BlossomKeyMaterial } from "../../../packages/core-domain/src/types";
 
 /**
  * Tests for fetchBlossomAttachment guard logic.

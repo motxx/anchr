@@ -1,9 +1,9 @@
 import { Buffer } from "node:buffer";
 import { checkAttachmentContent } from "./ai-content-check";
-import { validateC2pa } from "./c2pa-validation";
-import { haversineKm } from "./exif-validation";
-import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
-import { validateTlsn } from "./tlsn-validation";
+import { validateC2pa } from "../../../packages/photo-bounty/src/c2pa-validation";
+import { haversineKm } from "../../../packages/photo-bounty/src/geo";
+import { getIntegrity, getIntegrityForQuery } from "../../../packages/photo-bounty/src/integrity-store";
+import { validateTlsn } from "../../../packages/tlsn-toolkit/src/tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import { validateAttachmentUri } from "../url-validation";
 import type {
@@ -14,7 +14,7 @@ import type {
   QueryResult,
   TlsnVerifiedData,
   VerificationDetail,
-} from "../../domain/types";
+} from "../../../packages/core-domain/src/types";
 /** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 

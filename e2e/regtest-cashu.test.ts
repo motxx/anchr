@@ -27,7 +27,7 @@ import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
 import { createQueryService } from "../src/application/query-service";
 import { createOracleRegistry } from "../src/infrastructure/oracle/registry";
-import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
 import { normalizeQueryResult } from "../src/infrastructure/attachments";
 import {
   checkInfraReady,

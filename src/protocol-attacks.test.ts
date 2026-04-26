@@ -12,7 +12,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createOracleRegistry } from "./infrastructure/oracle/registry";
-import { createPreimageStore } from "./infrastructure/cashu/preimage-store";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
 import { createQueryService, createQueryStore } from "./application/query-service";
 import {
   makeFakeToken,

@@ -7,7 +7,7 @@ import {
   renderStoredAttachmentPreview,
   statStoredAttachment,
 } from "./attachments";
-import type { AttachmentRef, Query } from "../domain/types";
+import type { AttachmentRef, Query } from "../../packages/core-domain/src/types";
 
 export const TRUSTED_HOSTS = new Set(
   (process.env.TRUSTED_PROXY_HOSTS ?? "")

@@ -6,11 +6,11 @@
 
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "../infrastructure/oracle/registry";
-import { createPreimageStore, type PreimageStore } from "../infrastructure/cashu/preimage-store";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
+import { createPreimageStore, type PreimageStore } from "../../packages/core-cashu/src/preimage-store";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
 import type { EscrowProvider } from "../application/escrow-port";
 import { createQueryService, createQueryStore } from "../application/query-service";
-import type { Query, QueryResult } from "../domain/types";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types";
 
 /** Mock EscrowProvider that decodes Cashu tokens for amount verification in tests. */
 export function createMockEscrowProvider(): EscrowProvider {

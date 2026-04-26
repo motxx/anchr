@@ -16,7 +16,7 @@ import {
   buildFrostSwapForPartyA,
   buildFrostSwapForPartyB,
   createDualKeyStore,
-} from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
+} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import { resolveMarketFrost } from "./resolution.ts";
 import { calculatePayouts } from "./market-oracle.ts";
 import type { PredictionMarket } from "./market-types.ts";

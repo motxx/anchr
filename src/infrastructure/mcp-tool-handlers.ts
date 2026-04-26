@@ -3,7 +3,7 @@
  */
 
 import type { QueryInput, QueryResult } from "../application/query-service";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../domain/types";
+import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types";
 import type { McpQueryBackend } from "./mcp-query-backend";
 
 interface CreateQueryArgs {

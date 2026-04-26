@@ -1,6 +1,6 @@
 import { getRuntimeConfig } from "./config";
 import { setupServerLogCapture } from "./log-stream";
-import { createPreimageStore } from "./cashu/preimage-store";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import { createQueryService } from "../application/query-service";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
 import { serveStatic } from "hono/deno";

@@ -6,7 +6,7 @@ import { expect } from "@std/expect";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { JSONRPCMessage, JSONRPCMessageSchema } from "@modelcontextprotocol/sdk/types.js";
-import { moduleDir } from "../runtime/mod.ts";
+import { moduleDir } from "../../packages/core-runtime/src/mod.ts";
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -137,7 +137,7 @@ Deno.test({ name: "mcp tools expose query status and attachment metadata", sanit
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
     `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
-    `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "verification/integrity-store.ts"))});`,
+    `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "../../packages/photo-bounty/src/integrity-store.ts"))});`,
     `const query = createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,

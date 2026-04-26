@@ -1,18 +1,18 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore } from "../infrastructure/cashu/preimage-store";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle/registry";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
 import {
   createQueryService,
   createQueryStore,
 } from "./query-service";
-import type { Query, QueryResult } from "../domain/types";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types";
 import type { EscrowProvider } from "./escrow-port";
-import { createIntegrityStore } from "../infrastructure/verification/integrity-store";
+import { createIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
 
 /** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {
@@ -608,7 +608,7 @@ describe("submitHtlcResult", () => {
   }
 
   /** Create htlcInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../infrastructure/cashu/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../../packages/core-cashu/src/preimage-store").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
       htlcInfo: {

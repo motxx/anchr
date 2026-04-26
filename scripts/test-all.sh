@@ -58,6 +58,7 @@ run_local() {
 
   run_test "arch lint"        deno task lint:arch
   run_test "invariant lint"   deno task lint:invariants
+  run_test "path leak lint"   deno task lint:paths
   run_test "dep audit"        deno task lint:deps
   run_test "unit tests"       deno task test:unit
   run_test "protocol tests"   deno task test:protocol

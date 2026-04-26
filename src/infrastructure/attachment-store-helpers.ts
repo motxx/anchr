@@ -3,8 +3,8 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { ProofModeIntegrity } from "./verification/integrity-store";
-import type { ProofModeData } from "./verification/proofmode-validation";
+import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
+import type { ProofModeData } from "../../packages/photo-bounty/src/proofmode-validation";
 
 export function detectZip(rawBuffer: Buffer, filename: string): boolean {
   return filename.endsWith(".zip") || (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);

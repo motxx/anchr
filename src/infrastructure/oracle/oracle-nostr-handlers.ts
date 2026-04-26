@@ -10,7 +10,7 @@ import {
   type QuoteFeedbackPayload,
   type OracleResponsePayload,
 } from "../nostr/events";
-import type { Query, QueryResult } from "../../domain/types";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
 
 export interface WatchedQuery {
   queryId: string;

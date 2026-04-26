@@ -2,7 +2,7 @@
 name: test-tlsn
 description: TLSNotary verification E2E test with real cryptographic proofs. Three worker modes — CLI/TCP, CLI/WebSocket, Browser Extension. Requires Docker (Verifier Server) and Rust toolchain.
 disable-model-invocation: false
-argument-hint: "[full|build|infra|tcp|ws|browser|anchr|teardown]"
+argument-hint: "[full|build|infra|tcp|ws|browser|anchr|teardown|deploy]"
 ---
 
 # TLSNotary E2E Test Runbook
@@ -80,7 +80,11 @@ docker compose ps tlsn-verifier
 ### Option B: Local Verifier (dual protocol, TCP 7047 + WS 7048)
 ```bash
 crates/tlsn-server/target/debug/tlsn-server --tcp-port 7047 --ws-port 7048 &
+until curl -sf http://localhost:7048/health >/dev/null 2>&1; do :; done
 ```
+
+WS mode only uses the WS port; TCP port is fine to leave running but not
+required for WS provers. Both ports are started together for convenience.
 
 ### Start Anchr server
 ```bash
@@ -228,7 +232,7 @@ auto-approves the confirmPopup, runs the plugin, and verifies:
 
 ```bash
 # Launch Chrome for Testing with extension
-CHROMIUM=~/.cache/puppeteer/chrome/*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing
+CHROMIUM=~/.cache/puppeteer/chrome/*/chrome-mac-arm64/Google\ Chrome\ for\ Testing.app/Contents/MacOS/Google\ Chrome\ for\ Testing  # allow-local-path: generic puppeteer cache location
 EXT=/tmp/tlsn-extension/packages/extension/build
 "$CHROMIUM" --no-first-run --disable-extensions-except="$EXT" --load-extension="$EXT"
 ```
@@ -291,7 +295,22 @@ curl -s -X POST "http://localhost:3000/queries/${QID}/result" \
   -d @/tmp/submit.json | jq '{ok, verification}'
 ```
 
-**Expected:** `ok: true`, all 4 checks pass (signature, domain, freshness, condition).
+**Expected response shape:**
+```json
+{
+  "ok": true,
+  "verification": {
+    "signature": { "passed": true },
+    "domain":    { "passed": true },
+    "freshness": { "passed": true },
+    "condition": { "passed": true }
+  }
+}
+```
+
+`worker_pubkey` accepts any string identifier in dev/regtest mode (e.g.
+`"cli_worker"`); production deployments may require a real cryptographic pubkey
+— check server config before submitting from a non-local endpoint.
 
 ---
 

@@ -1,13 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { spawn, fileExists, fileLastModified, moduleDir } from "../runtime/mod.ts";
+import { spawn, fileExists, fileLastModified, moduleDir } from "../../packages/core-runtime/src/mod.ts";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
 import { getRuntimeConfig } from "./config";
 import { listOracles } from "./oracle";
 import type { OracleRegistry } from "./oracle/registry";
-import type { PreimageStore } from "./cashu/preimage-store";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import {
   defaultService as defaultQueryService,
   type QueryService,

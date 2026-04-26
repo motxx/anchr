@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { moduleDir } from "../runtime/mod.ts";
+import { moduleDir } from "../../packages/core-runtime/src/mod.ts";
 
 function readNumberEnv(name: string, fallback: number): number {
   const value = process.env[name];

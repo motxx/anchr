@@ -34,7 +34,7 @@ import {
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { redeemHtlcToken, verifyHtlcProofs } from "../src/infrastructure/cashu/escrow";
+import { redeemHtlcToken, verifyHtlcProofs } from "../packages/core-cashu/src/escrow";
 import {
   checkInfraReady,
   createWallet as createRegtestWallet,

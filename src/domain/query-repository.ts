@@ -1,4 +1,4 @@
-import type { Query, QueryStatus } from "./types";
+import type { Query, QueryStatus } from "../../packages/core-domain/src/types";
 import { isExpirable } from "./query-transitions";
 import type { QueryStore } from "./query-store";
 

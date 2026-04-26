@@ -16,12 +16,12 @@
 
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
-import { createDualPreimageStore } from "../../../src/infrastructure/conditional-swap/dual-preimage-store.ts";
+import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import {
   buildFrostSwapForPartyA,
   buildFrostSwapForPartyB,
   createDualKeyStore,
-} from "../../../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
+} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import { createOrderBook } from "./order-book.ts";
 import { resolveMarket as resolveMarketDual, resolveMarketFrost } from "./resolution.ts";
 import {

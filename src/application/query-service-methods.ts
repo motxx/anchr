@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { QueryStore } from "../domain/query-store";
 import { buildChallengeRule, generateNonce } from "../domain/challenge";
-import type { PreimageStore } from "./preimage-port";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port";
 import type { EscrowProvider } from "./escrow-port";
 import { verifyWithQuorum } from "./query-verification";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification";
@@ -24,8 +24,8 @@ import type {
   QueryStatus,
   SubmissionMeta,
   QuoteInfo,
-} from "../domain/types";
-import { DEFAULT_VERIFICATION_FACTORS } from "../domain/types";
+} from "../../packages/core-domain/src/types";
+import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
 import type { ProofDelivery } from "./proof-delivery";
 import { isCancellable, isExpirable } from "../domain/query-transitions";
 import type {

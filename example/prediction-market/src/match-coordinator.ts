@@ -6,8 +6,8 @@
  */
 
 import type { Proof } from "@cashu/cashu-ts";
-import type { ConditionalSwapDef } from "../../../src/domain/conditional-swap-types.ts";
-import { createSwapPairTokens } from "../../../src/infrastructure/conditional-swap/cross-htlc.ts";
+import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
+import { createSwapPairTokens } from "@anchr/cashu-conditional-swap";
 import type { MatchedBetPair, MatchProposal } from "./market-types.ts";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 

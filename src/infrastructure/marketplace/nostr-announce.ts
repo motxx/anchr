@@ -8,7 +8,7 @@
 import { Buffer } from "node:buffer";
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
 import { publishEvent } from "../nostr/client";
-import { getCashuConfig } from "../cashu/wallet";
+import { getCashuConfig } from "../../../packages/core-cashu/src/wallet";
 import { ANCHR_MARKETPLACE_LISTING } from "../nostr/events";
 import type { DataListing } from "./types";
 

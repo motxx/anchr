@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "./worker-api";
 import { createQueryService, createQueryStore } from "../application/query-service";
 import { createOracleRegistry } from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
-import type { Query, QueryResult } from "../domain/types";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types";
 
 function makeMockOracle(id: string): Oracle {
   return {

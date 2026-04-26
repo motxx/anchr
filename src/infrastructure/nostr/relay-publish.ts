@@ -5,7 +5,7 @@
  * injected into the application layer via QueryHooks.onCreated.
  */
 
-import type { Query } from "../../domain/types";
+import type { Query } from "../../../packages/core-domain/src/types";
 import { isNostrEnabled, publishEvent } from "./client";
 import { buildQueryRequestEvent } from "./event-builders";
 import { generateEphemeralIdentity } from "./identity";

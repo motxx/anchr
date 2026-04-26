@@ -12,7 +12,7 @@ export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./dom
 export {
   validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
 } from "./domain/value-objects";
-export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "./domain/types";
+export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "../packages/core-domain/src/types";
 
 // --- Application ---
 export {
@@ -46,9 +46,9 @@ export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-p
 export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider";
 
 // --- Application: Preimage port ---
-export type { PreimageStore, PreimageEntry } from "./application/preimage-port";
+export type { PreimageStore, PreimageEntry } from "../packages/core-cashu/src/preimage-port";
 // --- Infrastructure: Preimage store ---
-export { createPreimageStore, createPersistentPreimageStore } from "./infrastructure/preimage/preimage-store";
+export { createPreimageStore, createPersistentPreimageStore } from "../packages/core-cashu/src/preimage-store";
 
 // --- Application: Oracle port ---
 export type { OracleRegistry } from "./application/oracle-port";

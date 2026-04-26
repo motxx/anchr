@@ -25,13 +25,13 @@ import {
 import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
 import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
 import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
-import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
-import { createBountyToken } from "../src/infrastructure/cashu/wallet";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
+import { createBountyToken } from "../packages/core-cashu/src/wallet";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,
   inspectEscrowToken,
-} from "../src/infrastructure/cashu/escrow";
+} from "../packages/core-cashu/src/escrow";
 import { workerUpload } from "../src/infrastructure/blossom/worker-upload";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";

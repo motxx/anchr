@@ -15,7 +15,7 @@ import { expect } from "@std/expect";
 import { spawn } from "../src/runtime/mod.ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
 import { createQueryService, createQueryStore } from "../src/application/query-service";
-import type { QueryInput, QueryResult } from "../src/domain/types";
+import type { QueryInput, QueryResult } from "../packages/core-domain/src/types";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 

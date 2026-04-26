@@ -2,7 +2,7 @@ import { createQueryStore } from "../domain/query-store";
 import { isOpenStatus } from "../domain/query-transitions";
 import type { QueryStore } from "../domain/query-store";
 import type { OracleRegistry } from "./oracle-port";
-import type { PreimageStore } from "./preimage-port";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port";
 import type { EscrowProvider } from "./escrow-port";
 import type { ProofDelivery } from "./proof-delivery";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation";
@@ -35,7 +35,7 @@ import type {
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 
 export type {
   AttachmentRef,
@@ -47,7 +47,7 @@ export type {
   VerificationFactor,
   RequesterMeta,
   RequesterType,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
 export type QuerySubmissionMeta = SubmissionMeta;

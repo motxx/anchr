@@ -5,8 +5,8 @@ import {
   _setFrostSignerPathForTest,
   findFrostSigner,
   isFrostSignerAvailable,
-} from "./frost-cli";
-import type { AttachmentRef } from "../../domain/types";
+} from "../../../packages/cashu-frost-oracle/src/frost-cli";
+import type { AttachmentRef } from "../../../packages/core-domain/src/types";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -100,7 +100,7 @@ binaryDescribe("FrostSigner with real binary", () => {
     _setFrostSignerPathForTest(realBinary!);
 
     // First, run DKG to get a real key package
-    const { dkgRound1 } = await import("./frost-cli.ts");
+    const { dkgRound1 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const r1Result = await dkgRound1(1, 3, 2);
     if (!r1Result.ok || !r1Result.data) {
       // If DKG round 1 fails, we cannot proceed — skip gracefully
