@@ -14,7 +14,7 @@ import { createPaymentMiddleware } from "./xcashu-middleware.ts";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
 import { validateAttachmentUri } from "../url-validation.ts";
 import { announceListingOnNostr } from "./nostr-announce.ts";
-import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
+import type { DataListing, MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "marketplace"]);
@@ -22,16 +22,14 @@ const log = getLogger(["anchr", "marketplace"]);
 /** In-memory purchase log (replay defense + audit). */
 const purchaseLog = new Map<string, PurchaseRecord>();
 
-// deno-lint-ignore no-explicit-any
-export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteContext): void {
+export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContext): void {
   const { listingStore, preimageStore, writeAuth, rateLimit } = ctx;
   const mkt = new Hono<MarketplaceEnv>();
 
   // --- Listings CRUD ---
 
   // Public listing response — omit source_url to prevent leaking internal URLs.
-  // deno-lint-ignore no-explicit-any
-  function publicListing(listing: any) {
+  function publicListing(listing: DataListing): Omit<DataListing, "source_url"> {
     const { source_url: _url, ...rest } = listing;
     return rest;
   }
@@ -70,7 +68,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
       }
 
       const id = `listing_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
-      listingStore.set(id, {
+      const listing: DataListing = {
         id,
         name: payload.name,
         description: payload.description,
@@ -82,8 +80,9 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
         active: true,
         created_at: Date.now(),
         provider_pubkey: payload.provider_pubkey,
-      });
-      return c.json(publicListing(listingStore.get(id)), 201);
+      };
+      listingStore.set(id, listing);
+      return c.json(publicListing(listing), 201);
     },
   );
 
