@@ -28,28 +28,216 @@ export interface MarketFrostNodeConfig extends FrostNodeConfig {
   group_pubkey_no: string;
 }
 
-/** Load a market FROST node config from a JSON file. */
+/** Load a market FROST node config from a JSON file (plaintext only). */
 export function loadMarketFrostNodeConfig(filePath: string): MarketFrostNodeConfig {
   const text = Deno.readTextFileSync(filePath);
-  const config = JSON.parse(text) as MarketFrostNodeConfig;
+  const parsed = JSON.parse(text) as MarketFrostNodeConfig | EncryptedFrostConfig;
 
-  // Validate that both groups are present
-  if (!config.group_pubkey) {
-    throw new Error(`Market FROST config missing group_pubkey (YES group) in ${filePath}`);
-  }
-  if (!config.group_pubkey_no) {
-    throw new Error(`Market FROST config missing group_pubkey_no (NO group) in ${filePath}`);
-  }
-  if (!config.key_package_no) {
-    throw new Error(`Market FROST config missing key_package_no in ${filePath}`);
+  if (isEncryptedEnvelope(parsed)) {
+    throw new Error(
+      `Market FROST config at ${filePath} is encrypted. Use loadMarketFrostNodeConfigAsync({ passphrase }) to decrypt.`,
+    );
   }
 
-  return config;
+  validateMarketFrostNodeConfig(parsed, filePath);
+  return parsed;
 }
 
-/** Save a market FROST node config to a JSON file. */
+/** Save a market FROST node config to a JSON file (plaintext). */
 export function saveMarketFrostNodeConfig(filePath: string, config: MarketFrostNodeConfig): void {
   Deno.writeTextFileSync(filePath, JSON.stringify(config, null, 2));
+}
+
+// ---------------------------------------------------------------------------
+// Encrypted-at-rest variant
+// ---------------------------------------------------------------------------
+//
+// FROST DKG output contains long-lived secret-key shares. Storing them as
+// plaintext on disk is the right tradeoff for development and CI but a poor
+// posture for production deploys. The async load/save pair below encrypts
+// with AES-256-GCM using a PBKDF2-derived key from a passphrase (sourced
+// from FROST_KEY_PASSPHRASE env in the operator scripts).
+//
+// Format (stable, version-tagged):
+//   {
+//     "version": 1,
+//     "algorithm": "aes-256-gcm",
+//     "kdf": "pbkdf2-sha256",
+//     "iterations": 600000,
+//     "salt": "<32-hex-char>",     // 16-byte salt
+//     "iv": "<24-hex-char>",       // 12-byte GCM IV
+//     "ciphertext": "<base64>"     // includes 16-byte auth tag suffix
+//   }
+
+const ENCRYPTED_VERSION = 1 as const;
+const PBKDF2_ITERATIONS = 600_000; // OWASP 2025 minimum for SHA-256
+const SALT_BYTES = 16;
+const IV_BYTES = 12;
+
+export interface EncryptedFrostConfig {
+  version: typeof ENCRYPTED_VERSION;
+  algorithm: "aes-256-gcm";
+  kdf: "pbkdf2-sha256";
+  iterations: number;
+  salt: string;
+  iv: string;
+  ciphertext: string;
+}
+
+function isEncryptedEnvelope(x: unknown): x is EncryptedFrostConfig {
+  return typeof x === "object" && x !== null
+    && (x as { version?: unknown }).version === ENCRYPTED_VERSION
+    && (x as { algorithm?: unknown }).algorithm === "aes-256-gcm"
+    && typeof (x as { ciphertext?: unknown }).ciphertext === "string";
+}
+
+function validateMarketFrostNodeConfig(config: MarketFrostNodeConfig, where: string): void {
+  if (!config.group_pubkey) throw new Error(`Market FROST config missing group_pubkey (YES group) in ${where}`);
+  if (!config.group_pubkey_no) throw new Error(`Market FROST config missing group_pubkey_no (NO group) in ${where}`);
+  if (!config.key_package_no) throw new Error(`Market FROST config missing key_package_no in ${where}`);
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += b.toString(16).padStart(2, "0");
+  return s;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) throw new Error("invalid hex length");
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let s = "";
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s);
+}
+
+function base64ToBytes(b64: string): Uint8Array {
+  const s = atob(b64);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+
+async function deriveKey(passphrase: string, salt: ArrayBuffer, iterations: number): Promise<CryptoKey> {
+  const passKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passphrase).buffer as ArrayBuffer,
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"],
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    passKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
+/** Encrypt a config with a passphrase. Caller-supplied passphrase strength matters. */
+export async function encryptMarketFrostNodeConfig(
+  config: MarketFrostNodeConfig,
+  passphrase: string,
+): Promise<EncryptedFrostConfig> {
+  if (!passphrase) throw new Error("passphrase required for encryption");
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const key = await deriveKey(passphrase, toArrayBuffer(salt), PBKDF2_ITERATIONS);
+  const plaintext = new TextEncoder().encode(JSON.stringify(config));
+  const ciphertext = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: toArrayBuffer(iv) }, key, toArrayBuffer(plaintext)),
+  );
+  return {
+    version: ENCRYPTED_VERSION,
+    algorithm: "aes-256-gcm",
+    kdf: "pbkdf2-sha256",
+    iterations: PBKDF2_ITERATIONS,
+    salt: bytesToHex(salt),
+    iv: bytesToHex(iv),
+    ciphertext: bytesToBase64(ciphertext),
+  };
+}
+
+async function decryptMarketFrostNodeConfig(
+  envelope: EncryptedFrostConfig,
+  passphrase: string,
+): Promise<MarketFrostNodeConfig> {
+  if (!passphrase) throw new Error("passphrase required for decryption");
+  const salt = hexToBytes(envelope.salt);
+  const iv = hexToBytes(envelope.iv);
+  const ciphertext = base64ToBytes(envelope.ciphertext);
+  const key = await deriveKey(passphrase, toArrayBuffer(salt), envelope.iterations);
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: toArrayBuffer(iv) }, key, toArrayBuffer(ciphertext));
+  } catch {
+    // Catching here keeps the error message uniform — don't leak whether the
+    // failure was bad passphrase, corrupted ciphertext, or tampered tag.
+    throw new Error("FROST config decryption failed (wrong passphrase or corrupted file)");
+  }
+  return JSON.parse(new TextDecoder().decode(plaintext)) as MarketFrostNodeConfig;
+}
+
+/**
+ * Load a market FROST node config from disk. Auto-detects whether the file
+ * is plaintext JSON (development default) or an encrypted envelope. If
+ * encrypted, requires a passphrase (typically from FROST_KEY_PASSPHRASE).
+ */
+export async function loadMarketFrostNodeConfigAsync(
+  filePath: string,
+  opts?: { passphrase?: string },
+): Promise<MarketFrostNodeConfig> {
+  const text = await Deno.readTextFile(filePath);
+  const parsed = JSON.parse(text) as MarketFrostNodeConfig | EncryptedFrostConfig;
+
+  if (isEncryptedEnvelope(parsed)) {
+    if (!opts?.passphrase) {
+      throw new Error(
+        `${filePath} is encrypted. Set FROST_KEY_PASSPHRASE or pass opts.passphrase to loadMarketFrostNodeConfigAsync.`,
+      );
+    }
+    const config = await decryptMarketFrostNodeConfig(parsed, opts.passphrase);
+    validateMarketFrostNodeConfig(config, filePath);
+    return config;
+  }
+
+  validateMarketFrostNodeConfig(parsed, filePath);
+  return parsed;
+}
+
+/**
+ * Save a market FROST node config. With a passphrase, writes an encrypted
+ * envelope; without, writes plaintext JSON (and the caller should rely on
+ * 0600 file permissions).
+ */
+export async function saveMarketFrostNodeConfigAsync(
+  filePath: string,
+  config: MarketFrostNodeConfig,
+  opts?: { passphrase?: string },
+): Promise<void> {
+  if (opts?.passphrase) {
+    const envelope = await encryptMarketFrostNodeConfig(config, opts.passphrase);
+    await Deno.writeTextFile(filePath, JSON.stringify(envelope, null, 2));
+  } else {
+    await Deno.writeTextFile(filePath, JSON.stringify(config, null, 2));
+  }
+  try {
+    await Deno.chmod(filePath, 0o600);
+  } catch {
+    // Windows / restricted FS — caller's deploy is on its own.
+  }
 }
 
 /**

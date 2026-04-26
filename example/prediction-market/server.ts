@@ -19,6 +19,10 @@ import { serveStatic } from "hono/deno";
 import type { MiddlewareHandler } from "hono";
 import { createMarketState, registerMarketRoutes } from "./src/server-routes.ts";
 import { startAutoResolver } from "./src/auto-resolver.ts";
+import {
+  loadMarketFrostNodeConfigAsync,
+  type MarketFrostNodeConfig,
+} from "@anchr/cashu-frost-oracle/market-frost-config";
 
 const app = new Hono();
 app.use("*", cors());
@@ -26,8 +30,25 @@ app.use("*", cors());
 // No auth for demo — production should add API key middleware
 const noopMiddleware: MiddlewareHandler = async (_c, next) => await next();
 
+// Optional FROST cluster config. Plaintext (dev) or AES-256-GCM-encrypted
+// envelope (prod). The passphrase comes from FROST_KEY_PASSPHRASE.
+let frostConfig: MarketFrostNodeConfig | undefined;
+const frostConfigPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
+if (frostConfigPath) {
+  try {
+    frostConfig = await loadMarketFrostNodeConfigAsync(frostConfigPath, {
+      passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
+    });
+    console.log(`[market] FROST market config loaded from ${frostConfigPath}`);
+    console.log(`[market] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`);
+  } catch (err) {
+    console.error(`[market] failed to load FROST config: ${err instanceof Error ? err.message : err}`);
+    Deno.exit(1);
+  }
+}
+
 // Construct state explicitly so we can also hand it to the auto-resolver.
-const state = createMarketState();
+const state = createMarketState({ frostConfig });
 
 registerMarketRoutes(app, {
   writeAuth: noopMiddleware,
