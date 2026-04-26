@@ -30,7 +30,8 @@ import {
   signRound2,
   aggregateSignatures,
   verifySignature,
-} from "../src/infrastructure/frost/frost-cli";
+} from "@anchr/cashu-frost-oracle/frost-cli";
+import { buildOracleApp } from "../src/infrastructure/oracle/oracle-server";
 
 // ---------------------------------------------------------------------------
 // Oracle operators — all independent, no Requester/Worker
@@ -372,7 +373,7 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
   const API_KEY = "frost-e2e-key";
 
   test("/frost/signer/round1 rejects missing query+result (400)", async () => {
-    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,
@@ -400,7 +401,7 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
   });
 
   test("/frost/signer/round1 rejects failed verification (403)", async () => {
-    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,
@@ -440,7 +441,7 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
   });
 
   test("/frost/signer/round2 requires nonce_id (400)", async () => {
-    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,
@@ -468,7 +469,7 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
   });
 
   test("/frost/signer/round2 rejects unknown nonce_id (409)", async () => {
-    const { buildOracleApp } = await import("../src/infrastructure/oracle/oracle-server");
+    
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,

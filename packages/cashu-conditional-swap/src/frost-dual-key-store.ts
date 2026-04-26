@@ -18,6 +18,7 @@ import { createDualKeyStore } from "./frost-conditional-swap.ts";
 import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
 import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
 import { isFrostSignerAvailable } from "@anchr/cashu-frost-oracle/frost-cli";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 // ---------------------------------------------------------------------------
@@ -207,8 +208,6 @@ export async function frostSignProofSecretsAsync(
   proofSecrets: string[],
   conditionData?: { market_id: string; resolution_url: string; verified_body: string },
 ): Promise<Map<string, string> | null> {
-  const { sha256 } = await import("@noble/hashes/sha2.js");
-
   const result = new Map<string, string>();
 
   for (const proofSecret of proofSecrets) {
