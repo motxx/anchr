@@ -57,17 +57,26 @@ async function buildEntry(entry: EntryPoint) {
     },
   });
 
-  // Copy + rewrite HTML
+  // Copy + rewrite HTML. Skip the write when we're emitting in-place
+  // (src == out) and the file already references main.js — otherwise
+  // we'd churn the source file on every build.
   const htmlSrc = join(srcDir, entry.html);
   let html = await readFile(htmlSrc, "utf-8");
-  html = html.replace(/src="\.\/main\.tsx"/g, 'src="./main.js"');
-  await writeFile(join(outDir, entry.html), html);
+  const rewritten = html.replace(/src="\.\/main\.tsx"/g, 'src="./main.js"');
+  if (rewritten !== html || srcDir !== outDir) {
+    html = rewritten;
+    await writeFile(join(outDir, entry.html), html);
+  }
 
-  // Copy generated.css if it exists
-  try {
-    await copyFile(join(srcDir, "generated.css"), join(outDir, "generated.css"));
-  } catch {
-    // generated.css may not exist yet — will be created by build:css
+  // Copy generated.css when emitting to a separate output dir. node:fs's
+  // copyFile *truncates* the destination when source and dest are the same
+  // path, so skip the self-copy for in-place builds.
+  if (srcDir !== outDir) {
+    try {
+      await copyFile(join(srcDir, "generated.css"), join(outDir, "generated.css"));
+    } catch {
+      // generated.css may not exist yet — will be created by build:css
+    }
   }
 
   console.log(`[build-ui] ${entry.name}: ${outDir}`);

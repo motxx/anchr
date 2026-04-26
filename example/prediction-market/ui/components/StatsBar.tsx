@@ -21,7 +21,13 @@ export function StatsBar({ markets }: StatsBarProps) {
       <StatCard label="Active Markets" value={String(openMarkets)} />
       <StatCard label="Total Volume" value={`${formatSats(totalVolume)} sats`} mono />
       <StatCard label="Total Bettors" value={String(totalBettors)} />
-      <StatCard label="Avg Pool" value={`${formatSats(Math.floor(totalVolume / markets.length))} sats`} mono />
+      <StatCard
+        label="Avg Pool"
+        value={markets.length > 0
+          ? `${formatSats(Math.floor(totalVolume / markets.length))} sats`
+          : "—"}
+        mono
+      />
     </div>
   );
 }
