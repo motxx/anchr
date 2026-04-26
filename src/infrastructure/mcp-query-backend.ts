@@ -7,13 +7,7 @@ import {
   statStoredAttachment,
 } from "./attachments.ts";
 import { getRuntimeConfig } from "./config.ts";
-import {
-  cancelQuery,
-  createQuery,
-  getQuery,
-  listOpenQueries,
-  submitQueryResult,
-} from "../application/query-service.ts";
+import type { QueryService } from "../application/query-service.ts";
 import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
@@ -144,18 +138,18 @@ function errorPayload(queryId: string, index: number, message: string) {
 
 // --- Default backend (in-memory + relay sync) ---
 
-function createDefaultBackend(): McpQueryBackend {
+function createDefaultBackend(service: QueryService): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
-      const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
+      const query = service.createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
       return buildCreatedPayload(query, localBaseUrl);
     },
     async getQueryStatus(queryId) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       return query ? buildStatusPayload(query, localBaseUrl) : { error: "Query not found" };
     },
     async listAvailableQueries() {
-      return listOpenQueries().map((q) => ({
+      return service.listOpenQueries().map((q) => ({
         query_id: q.id,
         description: q.description,
         challenge_rule: q.challenge_rule ?? null,
@@ -164,10 +158,10 @@ function createDefaultBackend(): McpQueryBackend {
       }));
     },
     async cancelQuery(queryId) {
-      return cancelQuery(queryId);
+      return service.cancelQuery(queryId);
     },
     async submitQueryResult(queryId, result, oracleId) {
-      const outcome = await submitQueryResult(queryId, result, { executor_type: "agent", channel: "mcp" }, oracleId);
+      const outcome = await service.submitQueryResult(queryId, result, { executor_type: "agent", channel: "mcp" }, oracleId);
       return {
         ok: outcome.ok,
         message: outcome.message,
@@ -178,7 +172,7 @@ function createDefaultBackend(): McpQueryBackend {
       };
     },
     async getQueryAttachment(queryId, attachmentIndex) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       if (!query) return { error: "Query not found" };
       const attachments = getAttachments(query);
       if (!attachments) return { error: "Query does not have attachments" };
@@ -187,7 +181,7 @@ function createDefaultBackend(): McpQueryBackend {
       return buildAttachmentPayload(query, ref, attachmentIndex, localBaseUrl);
     },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       if (!query) return errorPayload(queryId, attachmentIndex, "Query not found");
       const attachments = getAttachments(query);
       if (!attachments) return errorPayload(queryId, attachmentIndex, "Query does not have attachments");
@@ -328,13 +322,14 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
 /**
  * Backend selection:
  * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP proxy
- * 2. Default → In-memory store + Nostr relay sync
+ * 2. Default → In-memory store + Nostr relay sync (uses the supplied
+ *    QueryService so it shares state with the rest of the host).
  */
-export function getMcpQueryBackend(): McpQueryBackend {
+export function getMcpQueryBackend(service: QueryService): McpQueryBackend {
   const remoteBaseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL")?.trim().replace(/\/+$/, "");
   const remoteApiKey = Deno.env.get("REMOTE_QUERY_API_KEY")?.trim() || Deno.env.get("HTTP_API_KEY")?.trim() || "";
   if (remoteBaseUrl) {
     return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }
-  return createDefaultBackend();
+  return createDefaultBackend(service);
 }

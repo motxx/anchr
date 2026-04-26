@@ -5,13 +5,13 @@
  * Blossom blob cleanup is handled server-side.
  */
 
-import { purgeExpiredFromStore } from "./query-service.ts";
+import type { QueryService } from "./query-service.ts";
 
 /**
  * Purge all expired queries from the in-memory store.
  * Returns number of queries purged.
  */
-export async function purgeExpiredQueries(): Promise<number> {
-  const expired = purgeExpiredFromStore();
+export async function purgeExpiredQueries(service: QueryService): Promise<number> {
+  const expired = service.purgeExpiredFromStore();
   return expired.length;
 }

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import type { QueryService } from "../application/query-service.ts";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
 import { isNostrEnabled } from "./nostr/client.ts";
 import { isCashuEnabled } from "@anchr/core-cashu/wallet";
@@ -24,12 +25,16 @@ import {
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "mcp-server"]);
 
-export async function startMcpServer() {
+export interface McpServerDeps {
+  queryService: QueryService;
+}
+
+export async function startMcpServer(deps: McpServerDeps) {
   const server = new McpServer({
     name: "anchr",
     version: "0.3.0",
   });
-  const backend = getMcpQueryBackend();
+  const backend = getMcpQueryBackend(deps.queryService);
 
   server.tool(
     "create_query",
