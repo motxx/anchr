@@ -137,7 +137,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     // Verify initial state
     const q0 = service.getQuery(query_id)!;
     expect(q0.status).toBe("awaiting_quotes");
-    expect(q0.payment_status).toBe("htlc_locked");
+    expect(q0.payment_status).toBe("escrow_locked");
 
     // 2b. Worker submits quote
     const quoteRes = await app.request(`http://localhost/queries/${query_id}/quotes`, {
@@ -257,7 +257,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     service.beginWork(query.id);
 
     // Submit result — oracle rejects
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "strict-oracle");
+    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "strict-oracle");
 
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined(); // No preimage revealed!

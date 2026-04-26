@@ -19,7 +19,9 @@ import type {
 import { DEFAULT_VERIFICATION_FACTORS } from "./types.ts";
 import { randomBytes } from "node:crypto";
 import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
-import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects.ts";
+import { MIN_ESCROW_LOCKTIME_SECS, validateQueryInput, validateEscrowLocktime, validateQuoteInfo } from "./value-objects.ts";
+
+export { MIN_ESCROW_LOCKTIME_SECS };
 import { buildChallengeRule, generateNonce } from "./challenge.ts";
 
 export type TransitionResult =
@@ -35,9 +37,6 @@ export interface CreateQueryAggregateOptions {
   nostrEventId?: string;
   quorum?: QuorumConfig;
 }
-
-/** Minimum HTLC locktime in seconds (10 minutes). */
-export const MIN_HTLC_LOCKTIME_SECS = 600;
 
 function generateQueryId(): string {
   return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
@@ -55,7 +54,7 @@ export function createQueryAggregate(
 
   if (options.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    const locktimeError = validateHtlcLocktime(options.escrow.locktime, nowSecs, MIN_HTLC_LOCKTIME_SECS);
+    const locktimeError = validateEscrowLocktime(options.escrow.locktime, nowSecs, MIN_ESCROW_LOCKTIME_SECS);
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
@@ -77,7 +76,7 @@ export function createQueryAggregate(
     requester_meta: options.requesterMeta,
     bounty: options.bounty,
     oracle_ids: options.oracleIds,
-    payment_status: isEscrow ? "htlc_locked" : "locked",
+    payment_status: isEscrow ? "escrow_locked" : "locked",
     escrow: options.escrow,
     quotes: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
@@ -102,7 +101,7 @@ export function submitResult(
   blossomKeys?: BlossomKeyMap,
 ): TransitionResult {
   if (query.escrow !== undefined) {
-    return { ok: false, error: "Use HTLC-specific functions for escrow queries" };
+    return { ok: false, error: "Use the escrow-mode functions for queries with an escrow" };
   }
   if (query.status !== "pending") {
     return { ok: false, error: `Query is ${query.status}, not pending` };
@@ -177,11 +176,20 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
   return { ok: true, query: { ...query, quotes } };
 }
 
+/**
+ * Fields that worker selection can mutate. Constrained to runtime-only
+ * fields (token, verified amount, opaque ref) so callers can't switch the
+ * escrow type or hashlock mid-flight.
+ */
+export type EscrowSelectionUpdates = Partial<
+  Pick<EscrowInfo, "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "worker_pubkey">
+>;
+
 /** Select a worker and transition awaiting_quotes → worker_selected. */
 export function selectWorker(
   query: Query,
   workerPubkey: string,
-  escrowUpdates: Partial<EscrowInfo>,
+  escrowUpdates: EscrowSelectionUpdates,
 ): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
@@ -202,7 +210,7 @@ export function selectWorker(
       ...query,
       status: "worker_selected",
       escrow,
-      payment_status: escrowUpdates.escrow_token ? "htlc_swapped" : query.payment_status,
+      payment_status: escrowUpdates.escrow_token ? "escrow_swapped" : query.payment_status,
     },
   };
 }

@@ -181,7 +181,7 @@ describe("HTLC endpoints", () => {
     expect(res.status).toBe(201);
     const json = await res.json() as { query_id: string; status: string; payment_status: string; escrow: { hash: string } | null };
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.payment_status).toBe("htlc_locked");
+    expect(json.payment_status).toBe("escrow_locked");
     expect(json.escrow?.hash).toBe("abcd1234");
     expect(queryService.getQuery(json.query_id)?.escrow).toBeDefined();
   }));
@@ -257,7 +257,7 @@ describe("HTLC endpoints", () => {
     expect(res.status).toBe(200);
     const json = await res.json() as { status: string; payment_status: string };
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.payment_status).toBe("htlc_locked");
+    expect(json.payment_status).toBe("escrow_locked");
   }));
 
   test("HTLC full lifecycle via HTTP (inline verification)", withOpenAuth(async () => {
@@ -305,6 +305,101 @@ describe("HTLC endpoints", () => {
     expect(resultJson.oracle_id).toBe("test-oracle");
     expect(resultJson.payment_status).toBe("released");
     expect(queryService.getQuery(query_id)?.status).toBe("approved");
+  }));
+});
+
+describe("P2PK+FROST escrow endpoints", () => {
+  // Smaller surface than HTLC: settlement is a threshold signature delivered
+  // out-of-band by the FROST coordinator (see packages/cashu-frost-oracle),
+  // so the Query API today only exercises wire-shape round-tripping for the
+  // FROST variant. These tests lock down the discriminated-union side of the
+  // schema so HTLC and P2PK+FROST stay distinguishable on the wire.
+  const frostEscrow = {
+    type: "p2pk_frost" as const,
+    group_pubkey: "f".repeat(64),
+    oracle_pubkeys: ["frost_signer_a", "frost_signer_b", "frost_signer_c"],
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  test("POST /queries accepts a p2pk_frost escrow", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "FROST query",
+        escrow: frostEscrow,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const json = await res.json() as {
+      query_id: string;
+      status: string;
+      payment_status: string;
+      escrow: { type: string; group_pubkey?: string; hash?: string } | null;
+    };
+    expect(json.status).toBe("awaiting_quotes");
+    expect(json.payment_status).toBe("escrow_locked");
+    expect(json.escrow?.type).toBe("p2pk_frost");
+    expect(json.escrow?.group_pubkey).toBe("f".repeat(64));
+    expect(json.escrow?.hash).toBeUndefined();
+
+    const stored = queryService.getQuery(json.query_id);
+    expect(stored?.escrow?.type).toBe("p2pk_frost");
+    if (stored?.escrow?.type === "p2pk_frost") {
+      expect(stored.escrow.group_pubkey).toBe("f".repeat(64));
+      expect(stored.escrow.oracle_pubkeys).toHaveLength(3);
+    }
+  }));
+
+  test("GET /queries/:id round-trips the p2pk_frost discriminator", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "FROST detail" }, { escrow: frostEscrow });
+    const res = await app.request(`http://localhost/queries/${query.id}`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { escrow: { type: string; group_pubkey?: string; hash?: string } | null };
+    expect(json.escrow?.type).toBe("p2pk_frost");
+    expect(json.escrow?.group_pubkey).toBe("f".repeat(64));
+    expect(json.escrow?.hash).toBeUndefined();
+  }));
+
+  test("POST /queries rejects a p2pk_frost escrow missing group_pubkey", withOpenAuth(async () => {
+    const { app } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "FROST without group_pubkey",
+        escrow: {
+          type: "p2pk_frost",
+          // group_pubkey deliberately omitted
+          oracle_pubkeys: ["a", "b"],
+          requester_pubkey: "r",
+          locktime: Math.floor(Date.now() / 1000) + 3600,
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
+  }));
+
+  test("POST /queries rejects an htlc escrow missing hash", withOpenAuth(async () => {
+    const { app } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "HTLC without hash",
+        escrow: {
+          type: "htlc",
+          // hash deliberately omitted
+          oracle_pubkeys: ["a"],
+          requester_pubkey: "r",
+          locktime: Math.floor(Date.now() / 1000) + 3600,
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
   }));
 });
 

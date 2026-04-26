@@ -13,9 +13,9 @@ export type QueryStatus =
 
 export type PaymentStatus =
   | "none"
-  | "htlc_pending"
-  | "htlc_locked"
-  | "htlc_swapped"
+  | "escrow_pending"
+  | "escrow_locked"
+  | "escrow_swapped"
   | "locked"
   | "released"
   | "cancelled";

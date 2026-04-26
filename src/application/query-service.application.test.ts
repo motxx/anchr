@@ -198,7 +198,7 @@ describe("Application Service — HTLC lifecycle", () => {
     expect(svc.getQuery(query.id)?.status).toBe("processing");
 
     // Submit + verify in one call
-    const submitOutcome = await svc.submitHtlcResult(
+    const submitOutcome = await svc.submitEscrowResult(
       query.id,
       defaultResult,
       "worker1",
@@ -218,7 +218,7 @@ describe("Application Service — HTLC lifecycle", () => {
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
 
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.status).toBe("rejected");
   });
@@ -276,7 +276,7 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: cannot submit to non-HTLC query", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput);
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("escrow");
   });
@@ -288,7 +288,7 @@ describe("Application Service — HTLC lifecycle", () => {
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
 
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "wrong_worker");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "wrong_worker");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
   });

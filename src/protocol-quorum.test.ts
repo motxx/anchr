@@ -34,7 +34,7 @@ describe("Quorum: threshold enforcement", () => {
     const { service, preimageStore } = makeQuorumService({ oracleIds: ids });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -49,7 +49,7 @@ describe("Quorum: threshold enforcement", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -67,7 +67,7 @@ describe("Quorum: threshold enforcement", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(false);
@@ -85,7 +85,7 @@ describe("Quorum: threshold enforcement", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -103,7 +103,7 @@ describe("Quorum: threshold enforcement", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(false);
@@ -127,7 +127,7 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(false);
@@ -146,7 +146,7 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -173,7 +173,7 @@ describe("Quorum: collusion resistance", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     // 2 colluders meet threshold — this is expected.
@@ -195,7 +195,7 @@ describe("Quorum: collusion resistance", () => {
     });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(false);
@@ -213,7 +213,7 @@ describe("Quorum: Oracle availability", () => {
     const { service, preimageStore } = makeQuorumService({ oracleIds: ids });
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -228,7 +228,7 @@ describe("Quorum: Oracle availability", () => {
       2,
     );
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(false);
@@ -244,7 +244,7 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     expect(outcome.ok).toBe(true);
@@ -261,7 +261,7 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     // Drive with quorum
     const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id, { attachments: [] }, "worker_pub",
     );
     // 2-of-3 pass (anchr + oracle-a) → approved

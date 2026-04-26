@@ -5,7 +5,7 @@ import type { OracleRegistry } from "./oracle-port.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
-import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";
+import { MIN_ESCROW_LOCKTIME_SECS } from "./query-escrow-validation.ts";
 import {
   doBeginWork,
   doCancelQuery,
@@ -16,7 +16,7 @@ import {
   doRecordQuote,
   doRecordResult,
   doSelectWorker,
-  doSubmitHtlcResult,
+  doSubmitEscrowResult,
   doSubmitQueryResult,
 } from "./query-service-methods.ts";
 import type { ServiceDeps } from "./query-service-methods.ts";
@@ -25,7 +25,7 @@ import type {
   BountyInfo,
   EscrowInfo,
   ExecutorType,
-  HtlcSubmitOutcome,
+  EscrowSubmitOutcome,
   Query,
   QueryInput,
   QueryResult,
@@ -125,7 +125,7 @@ export interface QueryService {
   /** Record a Worker quote for an HTLC query. */
   recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
   /** Select a Worker and transition to worker_selected. */
-  selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<HtlcOutcome>;
+  selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<HtlcOutcome>;
   /** Worker acknowledges selection and begins work (worker_selected → processing). */
   beginWork(queryId: string): HtlcOutcome;
   /** Record a Worker's result submission (transition to verifying). */
@@ -133,13 +133,13 @@ export interface QueryService {
   /** Complete Oracle verification (transition to approved/rejected). */
   completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
   /** Submit result for HTLC query with inline verification — returns preimage on success. */
-  submitHtlcResult(
+  submitEscrowResult(
     queryId: string,
     result: QueryResult,
     workerPubkey: string,
     oracleId?: string,
     blossomKeys?: BlossomKeyMap,
-  ): Promise<HtlcSubmitOutcome>;
+  ): Promise<EscrowSubmitOutcome>;
 }
 
 export function createQueryService(deps?: QueryServiceDeps): QueryService {
@@ -176,7 +176,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     beginWork: (queryId) => doBeginWork(store, queryId),
     recordResult: (queryId, result, wp, bk) => doRecordResult(svcDeps, queryId, result, wp, bk),
     completeVerification: (queryId, passed, oId) => doCompleteVerification(store, queryId, passed, oId),
-    submitHtlcResult: (queryId, result, wp, oId, bk) => doSubmitHtlcResult(svcDeps, queryId, result, wp, oId, bk),
+    submitEscrowResult: (queryId, result, wp, oId, bk) => doSubmitEscrowResult(svcDeps, queryId, result, wp, oId, bk),
   };
 }
 

@@ -6,7 +6,7 @@ const SIMPLE_TRANSITIONS: Record<string, QueryStatus[]> = {
 };
 
 /** Valid state transitions for HTLC queries. */
-const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
+const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
   awaiting_quotes: ["worker_selected", "expired"],
   worker_selected: ["processing", "expired"],
   processing: ["verifying", "expired"],
@@ -24,7 +24,7 @@ const EXPIRABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker
 
 /** Check if a state transition is valid. */
 export function isValidTransition(from: QueryStatus, to: QueryStatus, isHtlc: boolean): boolean {
-  const table = isHtlc ? HTLC_TRANSITIONS : SIMPLE_TRANSITIONS;
+  const table = isHtlc ? ESCROW_TRANSITIONS : SIMPLE_TRANSITIONS;
   return table[from]?.includes(to) ?? false;
 }
 

@@ -6,16 +6,16 @@ import type { EscrowProvider } from "./escrow-port.ts";
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification.ts";
 import {
-  isHtlcQuery,
-  MIN_HTLC_LOCKTIME_SECS,
-  validateHtlcTransition,
+  isEscrowQuery,
+  MIN_ESCROW_LOCKTIME_SECS,
+  validateEscrowTransition,
   verifyEscrowAmount,
   verifyEscrowLock,
-} from "./query-htlc-validation.ts";
+} from "./query-escrow-validation.ts";
 import type {
   BlossomKeyMap,
   EscrowInfo,
-  HtlcSubmitOutcome,
+  EscrowSubmitOutcome,
   OracleAttestationRecord,
   PaymentStatus,
   Query,
@@ -148,9 +148,9 @@ export function doCreateQuery(
   // CTF-3: Enforce minimum HTLC locktime to prevent immediate-refund race attacks.
   if (options?.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    if (options.escrow.locktime - nowSecs < MIN_HTLC_LOCKTIME_SECS) {
+    if (options.escrow.locktime - nowSecs < MIN_ESCROW_LOCKTIME_SECS) {
       throw new Error(
-        `HTLC locktime must be at least ${MIN_HTLC_LOCKTIME_SECS}s in the future (got ${options.escrow.locktime - nowSecs}s)`,
+        `HTLC locktime must be at least ${MIN_ESCROW_LOCKTIME_SECS}s in the future (got ${options.escrow.locktime - nowSecs}s)`,
       );
     }
   }
@@ -173,7 +173,7 @@ export function doCreateQuery(
     requester_meta: options?.requesterMeta,
     bounty: options?.bounty,
     oracle_ids: options?.oracleIds,
-    payment_status: isEscrow ? "htlc_locked" : "locked",
+    payment_status: isEscrow ? "escrow_locked" : "locked",
     escrow: options?.escrow,
     quotes: isEscrow ? [] : undefined,
     nostr_event_id: options?.nostrEventId,
@@ -263,7 +263,7 @@ export function doRecordQuote(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
+  if (!isEscrowQuery(query)) return { ok: false, message: "Not an escrow query" };
   if (query.status !== "awaiting_quotes") return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
   const quotes = [...(query.quotes ?? []), quote];
@@ -275,16 +275,16 @@ export async function doSelectWorker(
   deps: ServiceDeps,
   queryId: string,
   workerPubkey: string,
-  htlcToken?: string,
+  escrowToken?: string,
 ): Promise<HtlcOutcome> {
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
-  if (!validateHtlcTransition(query.status, "worker_selected")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
+  if (!isEscrowQuery(query)) return { ok: false, message: "Not an escrow query" };
+  if (!validateEscrowTransition(query.status, "worker_selected")) return { ok: false, message: `Query is ${query.status}, not awaiting_quotes` };
 
   // Verify escrow amount matches bounty
-  const escrowRef = query.escrow?.escrow_ref ?? query.escrow?.escrow_token ?? htlcToken;
+  const escrowRef = query.escrow?.escrow_ref ?? query.escrow?.escrow_token ?? escrowToken;
   const expectedSats = query.bounty?.amount_sats;
   let verifiedEscrowSats: number | undefined;
   if (escrowRef && expectedSats && deps.escrowProvider) {
@@ -295,8 +295,10 @@ export async function doSelectWorker(
     verifiedEscrowSats = check.amountSats;
   }
 
-  // CTF-2: Verify escrow lock conditions (hashlock + P2PK).
-  const paymentHash = query.escrow?.hash;
+  // CTF-2: Verify escrow lock conditions (HTLC hashlock + P2PK).
+  // P2PK+FROST settlement uses a group signature instead of a preimage; the
+  // hashlock check below is HTLC-only and skipped for the FROST variant.
+  const paymentHash = query.escrow?.type === "htlc" ? query.escrow.hash : undefined;
   if (escrowRef && paymentHash && deps.escrowProvider) {
     const lockCheck = await verifyEscrowLock(deps.escrowProvider, escrowRef, paymentHash, workerPubkey);
     if (!lockCheck.ok) {
@@ -307,7 +309,7 @@ export async function doSelectWorker(
   const escrow: EscrowInfo = {
     ...query.escrow!,
     worker_pubkey: workerPubkey,
-    escrow_token: htlcToken ?? query.escrow?.escrow_token,
+    escrow_token: escrowToken ?? query.escrow?.escrow_token,
     verified_escrow_sats: verifiedEscrowSats,
   };
 
@@ -315,7 +317,7 @@ export async function doSelectWorker(
     ...query,
     status: "worker_selected",
     escrow,
-    payment_status: htlcToken ? "htlc_swapped" : query.payment_status,
+    payment_status: escrowToken ? "escrow_swapped" : query.payment_status,
   });
   return { ok: true, message: "Worker selected" };
 }
@@ -326,8 +328,8 @@ export function doBeginWork(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
-  if (!validateHtlcTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not worker_selected` };
+  if (!isEscrowQuery(query)) return { ok: false, message: "Not an escrow query" };
+  if (!validateEscrowTransition(query.status, "processing")) return { ok: false, message: `Query is ${query.status}, not worker_selected` };
   store.set(queryId, { ...query, status: "processing" });
   return { ok: true, message: "Work begun" };
 }
@@ -342,8 +344,8 @@ export function doRecordResult(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
-  if (!validateHtlcTransition(query.status, "verifying")) return { ok: false, message: `Query is ${query.status}, not processing` };
+  if (!isEscrowQuery(query)) return { ok: false, message: "Not an escrow query" };
+  if (!validateEscrowTransition(query.status, "verifying")) return { ok: false, message: `Query is ${query.status}, not processing` };
   if (query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, message: "Worker pubkey does not match selected worker" };
   }
@@ -368,9 +370,9 @@ export function doCompleteVerification(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, message: "Not an escrow query" };
+  if (!isEscrowQuery(query)) return { ok: false, message: "Not an escrow query" };
   const verifyTarget: QueryStatus = passed ? "approved" : "rejected";
-  if (!validateHtlcTransition(query.status, verifyTarget)) return { ok: false, message: `Query is ${query.status}, not verifying` };
+  if (!validateEscrowTransition(query.status, verifyTarget)) return { ok: false, message: `Query is ${query.status}, not verifying` };
 
   const newStatus: QueryStatus = verifyTarget;
   const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
@@ -383,19 +385,19 @@ export function doCompleteVerification(
   return { ok: true, message: passed ? "Verification passed" : "Verification failed" };
 }
 
-export async function doSubmitHtlcResult(
+export async function doSubmitEscrowResult(
   deps: ServiceDeps,
   queryId: string,
   result: QueryResult,
   workerPubkey: string,
   oracleId?: string,
   blossomKeys?: BlossomKeyMap,
-): Promise<HtlcSubmitOutcome> {
+): Promise<EscrowSubmitOutcome> {
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, query: null, message: "Query not found" };
-  if (!isHtlcQuery(query)) return { ok: false, query, message: "Not an escrow query" };
-  if (!validateHtlcTransition(query.status, "verifying")) return { ok: false, query, message: `Query is ${query.status}, not processing` };
+  if (!isEscrowQuery(query)) return { ok: false, query, message: "Not an escrow query" };
+  if (!validateEscrowTransition(query.status, "verifying")) return { ok: false, query, message: `Query is ${query.status}, not processing` };
   if (query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, query, message: "Worker pubkey does not match selected worker" };
   }
@@ -418,8 +420,11 @@ export async function doSubmitHtlcResult(
   );
   store.set(queryId, updated);
 
-  // 3. Reveal preimage on success (HTLC settlement = preimage disclosure)
-  const preimage = tryRevealPreimage(deps.preimageStore, query.escrow?.hash, passed);
+  // 3. Reveal preimage on success (HTLC settlement = preimage disclosure).
+  // P2PK+FROST queries don't carry a hashlock; settlement is the threshold
+  // signature returned out-of-band by the FROST coordinator.
+  const htlcHash = query.escrow?.type === "htlc" ? query.escrow.hash : undefined;
+  const preimage = tryRevealPreimage(deps.preimageStore, htlcHash, passed);
   if (preimage) {
     return { ok: true, query: updated, message: "Verification passed. Preimage revealed for HTLC redemption.", preimage };
   }

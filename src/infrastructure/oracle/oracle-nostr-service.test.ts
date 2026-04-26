@@ -86,7 +86,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
@@ -120,7 +120,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
@@ -147,7 +147,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     // Verify passes but no preimage exists, so rejection DM is sent

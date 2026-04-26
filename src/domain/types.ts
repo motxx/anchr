@@ -10,9 +10,9 @@ export type QueryStatus =
   | "expired";
 export type PaymentStatus =
   | "none"
-  | "htlc_pending"
-  | "htlc_locked"
-  | "htlc_swapped"
+  | "escrow_pending"
+  | "escrow_locked"
+  | "escrow_swapped"
   | "locked"
   | "released"
   | "cancelled";
@@ -133,16 +133,12 @@ export interface BountyInfo {
   escrow_token?: string;
 }
 
-/** Escrow mechanism type. */
+/** Escrow mechanism type — discriminator for the EscrowInfo union. */
 export type EscrowType = "htlc" | "p2pk_frost";
 
-/** Escrow information — supports both HTLC and P2PK+FROST. */
-export interface EscrowInfo {
-  /** Escrow mechanism type. */
-  type: EscrowType;
-  /** SHA-256 hash of the preimage — HTLC only (empty for P2PK+FROST). */
-  hash: string;
-  /** Oracle pubkeys (single for HTLC, FROST group_pubkey for threshold). */
+/** Fields shared by every escrow variant. */
+interface EscrowCommonFields {
+  /** Oracle pubkeys (singleton for HTLC, FROST signers for threshold). */
   oracle_pubkeys: string[];
   /** Requester's Nostr pubkey (hex) — used for refund. */
   requester_pubkey: string;
@@ -158,6 +154,31 @@ export interface EscrowInfo {
   escrow_ref?: string;
 }
 
+/**
+ * NUT-14 hashlocked timelock contract — Oracle reveals a preimage to settle.
+ * The escrow token is locked to `worker_pubkey` AND the hash; both must be
+ * satisfied to redeem.
+ */
+export interface HtlcEscrow extends EscrowCommonFields {
+  type: "htlc";
+  /** SHA-256 hash of the preimage Oracle reveals on a passing verification. */
+  hash: string;
+}
+
+/**
+ * NUT-11 pay-to-pubkey escrow signed by a FROST t-of-n Oracle group.
+ * Settlement is a threshold Schnorr signature instead of a preimage reveal.
+ * See `packages/cashu-frost-oracle/SPEC.md` for the signing flow.
+ */
+export interface P2pkFrostEscrow extends EscrowCommonFields {
+  type: "p2pk_frost";
+  /** BIP-340 x-only FROST group public key (the t-of-n threshold key). */
+  group_pubkey: string;
+}
+
+/** Escrow information for an in-flight Query. Discriminated by `type`. */
+export type EscrowInfo = HtlcEscrow | P2pkFrostEscrow;
+
 /** A quote from a Worker offering to fulfill a query. */
 export interface QuoteInfo {
   /** Worker's Nostr pubkey (hex). */
@@ -170,8 +191,8 @@ export interface QuoteInfo {
   received_at: number;
 }
 
-/** Outcome of submitHtlcResult — includes preimage on success. */
-export interface HtlcSubmitOutcome {
+/** Outcome of submitEscrowResult — includes preimage on success. */
+export interface EscrowSubmitOutcome {
   ok: boolean;
   query: Query | null;
   message: string;

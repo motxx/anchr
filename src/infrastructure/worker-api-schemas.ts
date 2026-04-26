@@ -14,14 +14,29 @@ export const bountySchema = z.object({
 
 export const oracleIdsSchema = z.array(z.string().min(1)).optional();
 
-export const escrowSchema = z.object({
-  type: z.enum(["htlc", "p2pk_frost"]),
-  hash: z.string().min(1),
+const escrowCommonFields = {
   oracle_pubkeys: z.array(z.string().min(1)).min(1),
   requester_pubkey: z.string().min(1),
   locktime: z.number().int().min(0),
   escrow_token: z.string().min(1).optional(),
+};
+
+export const htlcEscrowSchema = z.object({
+  type: z.literal("htlc"),
+  hash: z.string().min(1),
+  ...escrowCommonFields,
 });
+
+export const p2pkFrostEscrowSchema = z.object({
+  type: z.literal("p2pk_frost"),
+  group_pubkey: z.string().min(1),
+  ...escrowCommonFields,
+});
+
+export const escrowSchema = z.discriminatedUnion("type", [
+  htlcEscrowSchema,
+  p2pkFrostEscrowSchema,
+]);
 
 export const gpsSchema = z.object({
   lat: z.number().min(-90).max(90),

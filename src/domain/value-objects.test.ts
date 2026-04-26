@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   validateGpsCoord,
   validateBountyInfo,
-  validateHtlcLocktime,
+  validateEscrowLocktime,
   validateQueryInput,
   validateQuoteInfo,
 } from "./value-objects.ts";
@@ -89,26 +89,26 @@ describe("validateBountyInfo", () => {
   });
 });
 
-describe("validateHtlcLocktime", () => {
+describe("validateEscrowLocktime", () => {
   const minSecs = 600;
 
   test("exactly at minimum", () => {
-    expect(validateHtlcLocktime(1600, 1000, minSecs)).toBeNull();
+    expect(validateEscrowLocktime(1600, 1000, minSecs)).toBeNull();
   });
   test("well above minimum", () => {
-    expect(validateHtlcLocktime(2000, 1000, minSecs)).toBeNull();
+    expect(validateEscrowLocktime(2000, 1000, minSecs)).toBeNull();
   });
   test("1 second short of minimum", () => {
-    expect(validateHtlcLocktime(1599, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(1599, 1000, minSecs)).toContain("600s");
   });
   test("already expired", () => {
-    expect(validateHtlcLocktime(500, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(500, 1000, minSecs)).toContain("600s");
   });
   test("equal to now (0s remaining)", () => {
-    expect(validateHtlcLocktime(1000, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(1000, 1000, minSecs)).toContain("600s");
   });
   test("NaN locktime", () => {
-    expect(validateHtlcLocktime(NaN, 1000, minSecs)).toContain("finite");
+    expect(validateEscrowLocktime(NaN, 1000, minSecs)).toContain("finite");
   });
 });
 

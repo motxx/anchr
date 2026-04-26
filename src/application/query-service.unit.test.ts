@@ -407,8 +407,11 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     expect(query.status).toBe("awaiting_quotes");
-    expect(query.payment_status).toBe("htlc_locked");
-    expect(query.escrow?.hash).toBe("abcd1234");
+    expect(query.payment_status).toBe("escrow_locked");
+    expect(query.escrow?.type).toBe("htlc");
+    if (query.escrow?.type === "htlc") {
+      expect(query.escrow.hash).toBe("abcd1234");
+    }
     expect(query.quotes).toEqual([]);
   });
 
@@ -447,7 +450,7 @@ describe("HTLC lifecycle", () => {
     const updated = service.getQuery(query.id)!;
     expect(updated.status).toBe("worker_selected");
     expect(updated.escrow?.worker_pubkey).toBe("worker_pub_1");
-    expect(updated.payment_status).toBe("htlc_swapped");
+    expect(updated.payment_status).toBe("escrow_swapped");
   });
 
   test("selectWorker verifies escrow token amount matches bounty", async () => {
@@ -587,7 +590,7 @@ describe("HTLC lifecycle", () => {
   });
 });
 
-describe("submitHtlcResult", () => {
+describe("submitEscrowResult", () => {
   function makeIsolatedServiceWithPreimage(opts?: {
     mockOracle?: Oracle;
   }) {
@@ -623,13 +626,13 @@ describe("submitHtlcResult", () => {
     };
   }
 
-  test("submitHtlcResult returns preimage on verification success", async () => {
+  test("submitEscrowResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo, entry } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "done" },
       "w1",
@@ -641,7 +644,7 @@ describe("submitHtlcResult", () => {
     expect(outcome.query?.payment_status).toBe("released");
   });
 
-  test("submitHtlcResult does not return preimage on verification failure", async () => {
+  test("submitEscrowResult does not return preimage on verification failure", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
@@ -649,7 +652,7 @@ describe("submitHtlcResult", () => {
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["strict-oracle"] });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -661,10 +664,10 @@ describe("submitHtlcResult", () => {
     expect(outcome.query?.payment_status).toBe("cancelled");
   });
 
-  test("submitHtlcResult fails for non-HTLC query", async () => {
+  test("submitEscrowResult fails for non-HTLC query", async () => {
     const { service } = makeIsolatedServiceWithPreimage();
     const query = service.createQuery({ description: "Simple query" });
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -674,13 +677,13 @@ describe("submitHtlcResult", () => {
     expect(outcome.message).toContain("Not an escrow query");
   });
 
-  test("submitHtlcResult fails for wrong worker", async () => {
+  test("submitEscrowResult fails for wrong worker", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "wrong_worker",
@@ -690,12 +693,12 @@ describe("submitHtlcResult", () => {
     expect(outcome.message).toContain("does not match");
   });
 
-  test("submitHtlcResult fails for wrong state", async () => {
+  test("submitEscrowResult fails for wrong state", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     // Still in awaiting_quotes, not processing
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -787,7 +790,7 @@ describe("verifyWithQuorum", () => {
     expect(outcome.query?.attestations).toBeUndefined();
   });
 
-  test("quorum with HTLC submitHtlcResult", async () => {
+  test("quorum with HTLC submitEscrowResult", async () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("oracle-a", () => true));
@@ -814,7 +817,7 @@ describe("verifyWithQuorum", () => {
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
