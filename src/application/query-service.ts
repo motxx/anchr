@@ -2,7 +2,7 @@ import { createQueryStore } from "../domain/query-store.ts";
 import { isOpenStatus } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
 import type { OracleRegistry } from "./oracle-port.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";

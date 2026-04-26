@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
 import { isNostrEnabled } from "./nostr/client.ts";
-import { isCashuEnabled } from "../../packages/core-cashu/src/wallet.ts";
+import { isCashuEnabled } from "@anchr/core-cashu/wallet";
 import type { VerificationFactor, TlsnCondition } from "../domain/types.ts";
 import { VERIFICATION_FACTORS } from "../domain/types.ts";
 import {

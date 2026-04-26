@@ -3,7 +3,7 @@
  */
 
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuWallet } from "../../../packages/core-cashu/src/wallet.ts";
+import { getCashuWallet } from "@anchr/core-cashu/wallet";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "wallet"]);

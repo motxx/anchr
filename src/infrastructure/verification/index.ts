@@ -5,12 +5,12 @@ export {
   extractExifMetadata,
   type ExifMetadata,
   type ExifValidationResult,
-} from "../../../packages/photo-bounty/src/exif-validation.ts";
+} from "@anchr/photo-bounty/exif-validation";
 export {
   validateC2pa,
   isC2paAvailable,
   type C2paValidationResult,
   type C2paManifest,
-} from "../../../packages/photo-bounty/src/c2pa-validation.ts";
-export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "../../../packages/tlsn-toolkit/src/tlsn-validation.ts";
-export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "../../../packages/photo-bounty/src/integrity-store.ts";
+} from "@anchr/photo-bounty/c2pa-validation";
+export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "@anchr/photo-bounty/integrity-store";

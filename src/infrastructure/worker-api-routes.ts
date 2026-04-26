@@ -1,12 +1,12 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { z } from "zod";
-import { spawn } from "../../packages/core-runtime/src/mod.ts";
+import { spawn } from "@anchr/core-runtime/mod";
 import { uploadAttachment } from "./attachment-store.ts";
 import { materializeAttachmentRef } from "./attachments.ts";
 import { getRuntimeConfig } from "./config.ts";
 import { validateAttachmentUri } from "./url-validation.ts";
-import { haversineKm } from "../../packages/photo-bounty/src/geo.ts";
+import { haversineKm } from "@anchr/photo-bounty/geo";
 import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
 import {
   buildAttachmentPayload,
@@ -18,7 +18,7 @@ import {
   renderStoredAttachmentPreview,
 } from "./worker-api-presenters.ts";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
 
 export interface RouteContext {

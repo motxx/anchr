@@ -46,9 +46,9 @@ export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-p
 export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider.ts";
 
 // --- Application: Preimage port ---
-export type { PreimageStore, PreimageEntry } from "../packages/core-cashu/src/preimage-port.ts";
+export type { PreimageStore, PreimageEntry } from "@anchr/core-cashu/preimage-port";
 // --- Infrastructure: Preimage store ---
-export { createPreimageStore, createPersistentPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+export { createPreimageStore, createPersistentPreimageStore } from "@anchr/core-cashu/preimage-store";
 
 // --- Application: Oracle port ---
 export type { OracleRegistry } from "./application/oracle-port.ts";

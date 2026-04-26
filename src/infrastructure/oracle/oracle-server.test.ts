@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server.ts";
-import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { Query, QueryResult } from "../../domain/types.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 

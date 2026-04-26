@@ -5,8 +5,8 @@
  */
 
 import type { EscrowProvider } from "../../application/escrow-port.ts";
-import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "../../../packages/core-cashu/src/escrow.ts";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
+import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "@anchr/core-cashu/escrow";
+import { verifyToken } from "@anchr/core-cashu/wallet";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
 export interface CashuEscrowProviderConfig {

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { QueryStore } from "../domain/query-store.ts";
 import { buildChallengeRule, generateNonce } from "../domain/challenge.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification.ts";

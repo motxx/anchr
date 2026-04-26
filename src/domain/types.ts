@@ -47,7 +47,7 @@ import type {
   TlsnEncryptedContext,
   TlsnRequirement,
   TlsnVerifiedData,
-} from "../../packages/tlsn-toolkit/src/tlsn-types.ts";
+} from "@anchr/tlsn-toolkit/tlsn-types";
 export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
 
 export interface QueryInput {

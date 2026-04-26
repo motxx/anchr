@@ -6,7 +6,7 @@
  */
 
 import type { TlsnRequirement, TlsnAttestation } from "../../domain/types.ts";
-import { validateTlsn, type TlsnValidationResult } from "../../../packages/tlsn-toolkit/src/tlsn-validation.ts";
+import { validateTlsn, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
 import { validateAttachmentUri } from "../url-validation.ts";
 
 export interface FetchedData {

@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer";
 import { isBlossomEnabled } from "./blossom/client.ts";
 import { workerUpload } from "./blossom/worker-upload.ts";
-import { validateC2pa } from "../../packages/photo-bounty/src/c2pa-validation.ts";
-import { validateExif } from "../../packages/photo-bounty/src/exif-validation.ts";
-import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
-import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
-import { parseProofModeZip } from "../../packages/photo-bounty/src/proofmode-validation.ts";
+import { validateC2pa } from "@anchr/photo-bounty/c2pa-validation";
+import { validateExif } from "@anchr/photo-bounty/exif-validation";
+import { storeIntegrity } from "@anchr/photo-bounty/integrity-store";
+import type { ProofModeIntegrity } from "@anchr/photo-bounty/integrity-store";
+import { parseProofModeZip } from "@anchr/photo-bounty/proofmode-validation";
 import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types.ts";
 import {
   detectZip,
