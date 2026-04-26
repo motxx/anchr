@@ -127,7 +127,11 @@ export async function createLockedToken(
 ): Promise<TokenResult> {
   const options = buildOptionsForSide(config, config.exchangeLocktime);
 
-  await wallet.loadMint();
+  // Force-refresh the mint's keyset cache. By default cashu-ts's loadMint
+  // re-uses cached keysets, but the proofs we are about to swap may reference
+  // a keyset the wallet picked up only after its initial load (e.g. mint
+  // rotated keysets between createWallet() and this call).
+  await wallet.loadMint(true);
   const { send } = await wallet.ops
     .send(config.amountSats, proofs)
     .asP2PK(options)
@@ -165,7 +169,8 @@ export async function createMarketToken(
 ): Promise<TokenResult> {
   const options = buildOptionsForSide(config, config.marketLocktime);
 
-  await wallet.loadMint();
+  // See createLockedToken for why we force-refresh.
+  await wallet.loadMint(true);
   const { send } = await wallet.ops
     .send(config.amountSats, proofs)
     .asP2PK(options)
