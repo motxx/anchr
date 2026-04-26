@@ -981,6 +981,37 @@ describe("Market API: faucet (non-custodial)", () => {
   });
 });
 
+describe("Market API: wallet/config", () => {
+  test("returns null mint_url when CASHU_MINT_URL is unset", async () => {
+    const prev = Deno.env.get("CASHU_MINT_URL");
+    Deno.env.delete("CASHU_MINT_URL");
+    try {
+      const { app } = makeTestApp();
+      const res = await app.request(`${BASE}/markets/wallet/config`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mint_url).toBeNull();
+    } finally {
+      if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
+    }
+  });
+
+  test("returns the configured mint_url when CASHU_MINT_URL is set", async () => {
+    const prev = Deno.env.get("CASHU_MINT_URL");
+    Deno.env.set("CASHU_MINT_URL", "http://mint.example:3338");
+    try {
+      const { app } = makeTestApp();
+      const res = await app.request(`${BASE}/markets/wallet/config`);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.mint_url).toBe("http://mint.example:3338");
+    } finally {
+      if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
+      else Deno.env.delete("CASHU_MINT_URL");
+    }
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Test: Full lifecycle (non-custodial)
 // ---------------------------------------------------------------------------

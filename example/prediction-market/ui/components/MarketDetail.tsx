@@ -1,8 +1,21 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import type { Market } from "../mock-data.ts";
-import { placeBet, redeemWinnings, type RedeemResult, type MatchInfo } from "../api.ts";
+import {
+  placeBet,
+  redeemWinnings,
+  submitToken,
+  fetchWalletConfig,
+  type RedeemResult,
+  type MatchInfo,
+} from "../api.ts";
 import { cn } from "../lib/utils.ts";
 import { getUserPubkey } from "../keypair.ts";
+import {
+  lockFundsForMatch,
+  saveHeldToken,
+  loadHeldTokensForMarket,
+  type HeldToken,
+} from "../wallet.ts";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;
@@ -43,6 +56,22 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
   const [betMessage, setBetMessage] = useState<string | null>(null);
   const [redeemStatus, setRedeemStatus] = useState<"idle" | "redeeming" | "success" | "error">("idle");
   const [redeemMessage, setRedeemMessage] = useState<string | null>(null);
+  const [mintUrl, setMintUrl] = useState<string | null>(null);
+  const [heldTokens, setHeldTokens] = useState<HeldToken[]>(
+    () => loadHeldTokensForMarket(market.id),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchWalletConfig()
+      .then((cfg) => { if (!cancelled) setMintUrl(cfg.mint_url); })
+      .catch(() => { /* leave null — UI falls back to "configure mint" message */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  const refreshHeldTokens = useCallback(() => {
+    setHeldTokens(loadHeldTokensForMarket(market.id));
+  }, [market.id]);
 
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesPercent = total > 0 ? Math.round((market.yes_pool_sats / total) * 100) : 50;
@@ -57,6 +86,53 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
       : Math.floor((amountNum / (market.no_pool_sats + amountNum)) * (total + amountNum) * (1 - market.fee_ppm / 1_000_000))
     : 0;
 
+  const lockMatchTokens = useCallback(
+    async (matches: MatchInfo[]): Promise<{ locked: number; failures: string[] }> => {
+      if (!mintUrl) {
+        return {
+          locked: 0,
+          failures: ["mint not configured — funds remain unlocked. Set CASHU_MINT_URL on the server"],
+        };
+      }
+      let locked = 0;
+      const failures: string[] = [];
+      for (const match of matches) {
+        try {
+          // 1. Lock our own funds in a P2PK token.
+          const { token } = await lockFundsForMatch({
+            mintUrl,
+            myPubkey: userPubkey,
+            mySide: side,
+            counterpartyPubkey: match.counterparty_pubkey,
+            groupPubkeyYes: match.group_pubkey_yes,
+            groupPubkeyNo: match.group_pubkey_no,
+            exchangeLocktime: match.locktime_exchange,
+            marketLocktime: match.locktime_market,
+            amountSats: match.amount_sats,
+          });
+          // 2. Submit to the matchmaker; if both sides have submitted, the
+          //    server returns the counterparty's redeemable token.
+          const submitResult = await submitToken(market.id, match.pair_id, token, userPubkey);
+          if (submitResult.redeemable_token) {
+            saveHeldToken({
+              market_id: market.id,
+              pair_id: match.pair_id,
+              my_side: side,
+              amount_sats: match.amount_sats,
+              cashu_token: submitResult.redeemable_token,
+              received_at: Math.floor(Date.now() / 1000),
+            });
+          }
+          locked += 1;
+        } catch (err) {
+          failures.push(err instanceof Error ? err.message : String(err));
+        }
+      }
+      return { locked, failures };
+    },
+    [mintUrl, userPubkey, side, market.id],
+  );
+
   const handlePlaceBet = useCallback(async () => {
     if (amountNum < market.min_bet_sats) return;
     if (betStatus === "submitting") return;
@@ -67,16 +143,31 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
     try {
       const result = await placeBet(market.id, side, amountNum, userPubkey);
       const matchCount = result.matches?.length ?? 0;
-      setBetStatus("success");
       if (matchCount > 0) {
-        const match = result.matches[0]!;
-        const cpKey = match.counterparty_pubkey;
-        const cpShort = cpKey.length > 12 ? `${cpKey.slice(0, 8)}...${cpKey.slice(-4)}` : cpKey;
-        setBetMessage(
-          `Matched! ${amountNum} sats on ${side.toUpperCase()} vs ${cpShort}. ` +
-          `Create P2PK token to complete exchange.`
-        );
+        // Try to lock funds for each match. If the mint isn't configured, the
+        // server still has the order; the user can lock later from another
+        // session that has wallet access.
+        const { locked, failures } = await lockMatchTokens(result.matches);
+        if (locked > 0 && failures.length === 0) {
+          setBetStatus("success");
+          setBetMessage(
+            `Matched and locked ${locked} pair${locked > 1 ? "s" : ""} (${amountNum} sats on ${side.toUpperCase()}). ` +
+            `Held redeemable token saved.`,
+          );
+          refreshHeldTokens();
+        } else if (locked > 0) {
+          setBetStatus("success");
+          setBetMessage(
+            `Matched ${matchCount}, locked ${locked}. ${failures.length} failed: ${failures[0]}`,
+          );
+          refreshHeldTokens();
+        } else {
+          // All locks failed — surface the first error so the user can fix balance / mint config.
+          setBetStatus("error");
+          setBetMessage(`Match found but lock failed: ${failures[0] ?? "unknown error"}`);
+        }
       } else {
+        setBetStatus("success");
         setBetMessage(`Order placed! ${amountNum} sats on ${side.toUpperCase()} — waiting for counterparty`);
       }
       setAmount("");
@@ -85,7 +176,17 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
       setBetStatus("error");
       setBetMessage(err instanceof Error ? err.message : "Network error — please try again");
     }
-  }, [amountNum, market.id, market.min_bet_sats, side, betStatus, onBetPlaced]);
+  }, [
+    amountNum,
+    market.id,
+    market.min_bet_sats,
+    side,
+    betStatus,
+    onBetPlaced,
+    userPubkey,
+    lockMatchTokens,
+    refreshHeldTokens,
+  ]);
 
   const clearBetStatus = useCallback(() => {
     setBetStatus("idle");
@@ -420,6 +521,42 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Held redeemable tokens for this market */}
+          {heldTokens.length > 0 && (
+            <div className="rounded-xl border border-border bg-card p-5">
+              <h2 className="text-sm font-medium text-foreground mb-3">
+                Held Tokens ({heldTokens.length})
+              </h2>
+              <p className="text-[11px] text-muted-foreground mb-3">
+                Counterparty-locked tokens redeemable if your side wins.
+              </p>
+              <div className="space-y-2">
+                {heldTokens.map((t) => (
+                  <div key={t.pair_id} className="rounded-lg bg-muted p-3 space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Pair</span>
+                      <span className="font-mono text-foreground">{t.pair_id.slice(0, 12)}...</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Side / Amount</span>
+                      <span className={cn("font-mono", t.my_side === "yes" ? "text-yes" : "text-no")}>
+                        {t.my_side.toUpperCase()} · {t.amount_sats} sats
+                      </span>
+                    </div>
+                    <details className="text-[11px]">
+                      <summary className="text-muted-foreground cursor-pointer hover:text-foreground">
+                        cashuB token
+                      </summary>
+                      <code className="font-mono text-foreground break-all block mt-1.5 max-h-24 overflow-y-auto">
+                        {t.cashu_token}
+                      </code>
+                    </details>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

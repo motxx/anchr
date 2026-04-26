@@ -309,6 +309,19 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // at the mint to take ownership. Server never holds the user's balance.
   // -----------------------------------------------------------------------
 
+  // -----------------------------------------------------------------------
+  // GET /markets/wallet/config — public mint URL the browser should connect to
+  //
+  // The browser-side Cashu wallet (ui/wallet.ts) calls this on load to
+  // discover the mint without an env var. Returns mint_url=null when the
+  // server has no wallet configured (e.g. demo/manual mode).
+  // -----------------------------------------------------------------------
+
+  mkt.get("/wallet/config", (c) => {
+    const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
+    return c.json({ mint_url: mintUrl });
+  });
+
   mkt.post("/wallet/faucet", rateLimit, async (c) => {
     const wallet = await getWallet();
     if (!wallet) {

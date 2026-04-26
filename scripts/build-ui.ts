@@ -14,25 +14,29 @@ import { copyFile, mkdir, readFile, writeFile, cp } from "node:fs/promises";
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
 const SRC_UI = join(PROJECT_ROOT, "src/ui");
 const DIST_UI = join(PROJECT_ROOT, "dist/ui");
+const MARKET_UI = join(PROJECT_ROOT, "example/prediction-market/ui");
 
 interface EntryPoint {
   name: string;
-  /** Directory relative to src/ui/ */
-  dir: string;
+  /** Source directory containing the entry tsx + html. */
+  srcDir: string;
+  /** Output directory for bundled main.js + index.html. */
+  outDir: string;
   entryTsx: string;
   html: string;
 }
 
 const ENTRIES: EntryPoint[] = [
-  { name: "worker", dir: ".", entryTsx: "main.tsx", html: "index.html" },
-  { name: "requester", dir: "requester", entryTsx: "main.tsx", html: "index.html" },
-  { name: "dashboard", dir: "dashboard", entryTsx: "main.tsx", html: "index.html" },
-  // Market UI is in example/prediction-market/ui/ (separate from core Anchr UI)
+  { name: "worker",    srcDir: SRC_UI,                       outDir: DIST_UI,                          entryTsx: "main.tsx", html: "index.html" },
+  { name: "requester", srcDir: join(SRC_UI, "requester"),    outDir: join(DIST_UI, "requester"),       entryTsx: "main.tsx", html: "index.html" },
+  { name: "dashboard", srcDir: join(SRC_UI, "dashboard"),    outDir: join(DIST_UI, "dashboard"),       entryTsx: "main.tsx", html: "index.html" },
+  // Market UI is bundled in-place (server.ts serves directly from the source dir).
+  { name: "market",    srcDir: MARKET_UI,                    outDir: MARKET_UI,                        entryTsx: "main.tsx", html: "index.html" },
 ];
 
 async function buildEntry(entry: EntryPoint) {
-  const srcDir = join(SRC_UI, entry.dir);
-  const outDir = entry.dir === "." ? DIST_UI : join(DIST_UI, entry.dir);
+  const srcDir = entry.srcDir;
+  const outDir = entry.outDir;
   await mkdir(outDir, { recursive: true });
 
   // Bundle TSX → JS

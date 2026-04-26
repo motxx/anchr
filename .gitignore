@@ -48,6 +48,10 @@ uploads/*
 # ui
 generated.css
 
+# bundled UI outputs (rebuilt by `deno task build:ui`)
+example/prediction-market/ui/main.js
+example/prediction-market/ui/main.js.map
+
 # mobile (expo)
 mobile/.expo/
 mobile/ios/

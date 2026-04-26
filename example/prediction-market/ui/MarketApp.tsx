@@ -5,6 +5,7 @@ import { Header } from "./components/Header.tsx";
 import { StatsBar } from "./components/StatsBar.tsx";
 import { MarketCard } from "./components/MarketCard.tsx";
 import { MarketDetail } from "./components/MarketDetail.tsx";
+import { WalletPanel } from "./components/WalletPanel.tsx";
 import { cn } from "./lib/utils.ts";
 
 type SortMode = "volume" | "newest" | "ending_soon" | "bettors";
@@ -73,6 +74,7 @@ export function MarketApp() {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-6xl mx-auto px-5 py-8">
+          <WalletPanel />
           <MarketDetail
             market={selectedMarket}
             onBack={handleBack}
@@ -88,6 +90,8 @@ export function MarketApp() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-5 py-8">
+        <WalletPanel />
+
         {/* Hero */}
         <div className="flex items-start justify-between mb-8">
           <div>

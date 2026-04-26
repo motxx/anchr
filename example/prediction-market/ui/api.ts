@@ -173,6 +173,20 @@ export async function submitToken(
 }
 
 // ---------------------------------------------------------------------------
+// Wallet config
+// ---------------------------------------------------------------------------
+
+export interface WalletConfig {
+  mint_url: string | null;
+}
+
+export async function fetchWalletConfig(): Promise<WalletConfig> {
+  const res = await apiFetch(`${API_BASE}/wallet/config`);
+  if (!res.ok) throw new Error(`Failed to fetch wallet config: ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
 // Faucet (non-custodial — returns cashuB token string)
 // ---------------------------------------------------------------------------
 
