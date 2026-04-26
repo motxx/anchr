@@ -17,16 +17,6 @@ export interface ResolutionResult {
   outcome: "yes" | "no";
 }
 
-export interface FrostResolutionResult {
-  /**
-   * @deprecated Use proof_signatures for NUT-11 P2PK redemption.
-   * Retained for backward compat: Oracle's Schnorr signature on market-level message.
-   */
-  oracle_signature: string;
-  /** Which outcome won. */
-  outcome: "yes" | "no";
-}
-
 /** Per-proof FROST resolution result for NUT-11 P2PK redemption. */
 export interface FrostPerProofResolutionResult {
   /** Map of proof.secret -> oracle's Schnorr signature (hex). */
@@ -61,37 +51,6 @@ export function resolveMarket(
   if (!preimage) return null;
 
   return { preimage, outcome };
-}
-
-/**
- * Resolve a prediction market using FROST P2PK mode (legacy market-level signature).
- *
- * @deprecated Use resolveMarketFrostPerProof for NUT-11 compatible per-proof signing.
- *
- * Oracle signs a message with the winning outcome's group key.
- * The signature serves as the Oracle's attestation that the outcome occurred.
- * Winners attach this signature + their own signature to redeem at the mint.
- *
- * WARNING: This produces a signature on `${market_id}:${outcome}`, which is
- * NOT the same as what NUT-11 P2PK expects (SHA256(proof.secret)). The mint
- * will reject this signature. Use resolveMarketFrostPerProof instead.
- *
- * @param market_id - Market / swap identifier
- * @param outcome - Determined outcome ("yes" or "no")
- * @param dualKeyStore - Dual key store holding both keypairs
- */
-export function resolveMarketFrost(
-  market_id: string,
-  outcome: "yes" | "no",
-  dualKeyStore: DualKeyStore,
-): FrostResolutionResult | null {
-  const swapOutcome = outcome === "yes" ? "a" : "b";
-  const message = new TextEncoder().encode(`${market_id}:${outcome}`);
-
-  const signature = dualKeyStore.sign(market_id, swapOutcome, message);
-  if (!signature) return null;
-
-  return { oracle_signature: signature, outcome };
 }
 
 /**

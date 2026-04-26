@@ -721,7 +721,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         // Store per-proof signatures
         s.resolvedProofSignatures.set(id, proofSigs);
 
-        // Store first signature as legacy oracle_signature for backward compat
+        // Surface one of the per-proof signatures as a market-level field
+        // for response payloads that want a single sentinel signature.
         const firstSig = proofSigs.values().next().value;
         if (firstSig) {
           oracleSignature = firstSig;
@@ -896,7 +897,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         oracle_signatures: userOracleSignatures,
         oracle_pubkey: oraclePubkey,
       } : {}),
-      // Legacy: single oracle_signature for backward compat
+      // Single market-level signature when per-proof signing didn't run
+      // (e.g. demo path with no real proofs to sign).
       ...(oracleSignature && !hasPerProofSigs ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
       ...(preimage ? { preimage } : {}),
       // Instructions for NUT-11 P2PK redemption
