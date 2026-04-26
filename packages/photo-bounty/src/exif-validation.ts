@@ -6,7 +6,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { haversineKm } from "../../domain/geo";
+import { haversineKm } from "./geo";
 
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
@@ -271,8 +271,8 @@ function parseExifDateTime(dt: string): Date | null {
   return new Date(`${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}`);
 }
 
-// Re-export from domain layer for backward compatibility
-export { haversineKm } from "../../domain/geo";
+// Re-export geo helper for convenience (callers expect this from ExifValidation module)
+export { haversineKm } from "./geo";
 
 export interface ExifValidationOptions {
   /** Max allowed age of photo timestamp in ms (default: 1 hour) */

@@ -6,9 +6,9 @@
  * even though the client-supplied attachment refs are untrusted.
  */
 
-import type { C2paValidationResult } from "./c2pa-validation";
-import type { ExifValidationResult } from "./exif-validation";
-import type { ProofModeMetadata } from "./proofmode-validation";
+import type { C2paValidationResult } from "../../../packages/photo-bounty/src/c2pa-validation";
+import type { ExifValidationResult } from "../../../packages/photo-bounty/src/exif-validation";
+import type { ProofModeMetadata } from "../../../packages/photo-bounty/src/proofmode-validation";
 
 export interface ProofModeIntegrity {
   /** Parsed proof.json metadata. */

@@ -7,7 +7,7 @@ import { uploadAttachment } from "./attachment-store";
 import { materializeAttachmentRef } from "./attachments";
 import { getRuntimeConfig } from "./config";
 import { validateAttachmentUri } from "./url-validation";
-import { haversineKm } from "./verification/exif-validation";
+import { haversineKm } from "../../packages/photo-bounty/src/geo";
 import { createQuerySchema, resultBodySchema } from "./worker-api-schemas";
 import {
   buildAttachmentPayload,

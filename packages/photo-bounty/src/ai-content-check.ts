@@ -1,0 +1,230 @@
+/**
+ * AI content check: vision-LLM verification of photo/video relevance.
+ *
+ * DI design: caller injects `getConfig()` and `readAttachment()` so this module
+ * has no implicit dependency on the host's config / attachment storage.
+ */
+
+import { Buffer } from "node:buffer";
+import Anthropic from "@anthropic-ai/sdk";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+// MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
+import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "../../../src/runtime/mod.ts";
+// MIGRATION DEBT: domain/types will move to core-domain package eventually.
+import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "../../../src/domain/types";
+
+export interface ContentCheckResult {
+  passed: boolean;
+  reason: string;
+}
+
+export interface AiContentCheckConfig {
+  /** Whether AI content check is enabled (opt-in for privacy). */
+  enabled: boolean;
+  /** Anthropic API key for vision-LLM call. If absent, returns null. */
+  anthropicApiKey?: string;
+}
+
+export interface AttachmentBuffer {
+  data: Buffer;
+  mimeType?: string;
+}
+
+export interface AiContentCheckDeps {
+  /**
+   * Returns config per call. Called inside `checkAttachmentContent` so that
+   * env-driven config (`AI_CONTENT_CHECK`, `ANTHROPIC_API_KEY`) takes effect
+   * dynamically without re-creating the checker.
+   */
+  getConfig: () => AiContentCheckConfig;
+  /** Reader for attachment buffer. Returns null if attachment is unavailable. */
+  readAttachment: (ref: AttachmentRef, blossomKey?: BlossomKeyMaterial) => Promise<AttachmentBuffer | null>;
+}
+
+const IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+
+const VIDEO_MIME_TYPES = new Set([
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+]);
+
+type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+function isImageMime(mime: string): mime is ImageMediaType {
+  return IMAGE_MIME_TYPES.has(mime);
+}
+
+function isVideoMime(mime: string): boolean {
+  return VIDEO_MIME_TYPES.has(mime);
+}
+
+async function extractVideoFrames(
+  videoBuffer: Buffer,
+  inputExt: string,
+  maxFrames = 3,
+): Promise<{ data: Buffer; mimeType: ImageMediaType }[]> {
+  const ffmpeg = which("ffmpeg");
+  if (!ffmpeg) return [];
+
+  const tempDir = await mkdtemp(join(tmpdir(), "anchr-frames-"));
+  const inputPath = join(tempDir, `input${inputExt}`);
+  const outputPattern = join(tempDir, "frame_%03d.jpg");
+
+  try {
+    await writeFile(inputPath, videoBuffer);
+
+    const proc = spawn(
+      [ffmpeg, "-i", inputPath, "-vf", "fps=1", "-frames:v", String(maxFrames), "-q:v", "2", outputPattern],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    await proc.exited;
+    if (proc.exitCode !== 0) return [];
+
+    const frames: { data: Buffer; mimeType: ImageMediaType }[] = [];
+    for (let i = 1; i <= maxFrames; i++) {
+      const framePath = join(tempDir, `frame_${String(i).padStart(3, "0")}.jpg`);
+      if (await fileExists(framePath)) {
+        frames.push({
+          data: Buffer.from(await readFileAsArrayBuffer(framePath)),
+          mimeType: "image/jpeg",
+        });
+      }
+    }
+    return frames;
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+function buildPrompt(query: Query): string {
+  const nonce = query.challenge_nonce;
+  if (nonce) {
+    return [
+      `You are verifying a photo/video submission. Check TWO things:`,
+      `1. Does the image show content relevant to the query description below?`,
+      `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
+      ``,
+      `Both must be true to pass. Answer in the following JSON format only:`,
+      `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
+      ``,
+      `<query_description>`,
+      query.description,
+      `</query_description>`,
+    ].join("\n");
+  }
+  return [
+    `You are verifying a photo/video submission. Check whether the image shows content relevant to the query description below.`,
+    ``,
+    `Answer in the following JSON format only:`,
+    `{"relevant": true or false, "reason": "brief explanation in the language of the query description"}`,
+    ``,
+    `<query_description>`,
+    query.description,
+    `</query_description>`,
+  ].join("\n");
+}
+
+async function loadImageContent(
+  attachments: AttachmentRef[],
+  blossomKeys: BlossomKeyMap | undefined,
+  readAttachment: AiContentCheckDeps["readAttachment"],
+): Promise<{ data: string; mimeType: ImageMediaType }[]> {
+  const images: { data: string; mimeType: ImageMediaType }[] = [];
+
+  for (const ref of attachments) {
+    const mime = ref.mime_type?.toLowerCase() ?? "";
+    const keyMaterial = blossomKeys?.[ref.id];
+
+    if (isImageMime(mime)) {
+      const buf = await readAttachment(ref, keyMaterial);
+      if (buf) {
+        images.push({ data: buf.data.toString("base64"), mimeType: mime });
+      }
+    } else if (isVideoMime(mime)) {
+      const buf = await readAttachment(ref, keyMaterial);
+      if (buf) {
+        const ext = ref.filename?.match(/\.[^.]+$/)?.[0] ?? ".mp4";
+        const frames = await extractVideoFrames(buf.data, ext);
+        for (const frame of frames) {
+          images.push({ data: frame.data.toString("base64"), mimeType: frame.mimeType });
+        }
+      }
+    }
+  }
+
+  return images;
+}
+
+/**
+ * Create an AI content checker with injected dependencies.
+ *
+ * @example
+ * const check = createAiContentChecker({
+ *   getConfig: () => ({ enabled: true, anthropicApiKey: process.env.ANTHROPIC_API_KEY }),
+ *   readAttachment: (ref, key) => readStoredAttachmentBuffer(ref, undefined, key),
+ * });
+ * const result = await check(query, result, blossomKeys);
+ */
+export function createAiContentChecker(deps: AiContentCheckDeps) {
+  return async function checkAttachmentContent(
+    query: Query,
+    result: QueryResult,
+    blossomKeys?: BlossomKeyMap,
+  ): Promise<ContentCheckResult | null> {
+    const config = deps.getConfig();
+    if (!config.enabled) return null;
+    if (!config.anthropicApiKey) return null;
+    const client = new Anthropic({ apiKey: config.anthropicApiKey });
+
+    const attachments = result.attachments;
+    if (!attachments?.length) return null;
+
+    const images = await loadImageContent(attachments, blossomKeys, deps.readAttachment);
+    if (images.length === 0) return null;
+
+    const prompt = buildPrompt(query);
+    const content: Anthropic.MessageCreateParams["messages"][0]["content"] = images.map((img) => ({
+      type: "image" as const,
+      source: { type: "base64" as const, media_type: img.mimeType, data: img.data },
+    }));
+    content.push({ type: "text" as const, text: prompt });
+
+    try {
+      const response = await client.messages.create({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 256,
+        messages: [{ role: "user", content }],
+      });
+
+      const text = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("");
+
+      const jsonMatch = text.match(/\{[\s\S]*?\}/);
+      if (!jsonMatch) {
+        return { passed: true, reason: "AI response could not be parsed; skipping check" };
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; nonce_visible?: boolean; reason: string };
+      const nonceRequired = query.verification_requirements.includes("nonce");
+      const passed = Boolean(parsed.relevant) && (!nonceRequired || Boolean(parsed.nonce_visible));
+      return {
+        passed,
+        reason: parsed.reason || (passed ? "Content matches query" : "Content check failed"),
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("[ai-content-check] API error, skipping:", message);
+      return null;
+    }
+  };
+}

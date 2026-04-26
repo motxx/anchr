@@ -10,7 +10,8 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn } from "../../runtime/mod.ts";
+// MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
+import { which, writeFile, spawn } from "../../../src/runtime/mod.ts";
 
 export interface C2paManifest {
   title?: string;
