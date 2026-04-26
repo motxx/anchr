@@ -41,6 +41,7 @@ import { createLockedToken } from "../example/prediction-market/src/exchange-pro
 import {
   checkInfraReady,
   createWallet,
+  generateKeypair,
   throttledMintProofs,
 } from "./helpers/regtest.ts";
 import process from "node:process";
@@ -51,11 +52,6 @@ const INFRA_READY = await checkInfraReady(MINT_URL);
 const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
 
 const BASE = "http://localhost";
-
-// Stable test pubkeys (33-byte compressed secp256k1 pubkeys are 66 hex chars,
-// but the matchmaker treats `bettor_pubkey` as opaque — anything non-empty works).
-const ALICE_PK = "alice_pk_yes_" + "a".repeat(50);
-const BOB_PK = "bob_pk_no_" + "b".repeat(50);
 
 interface MatchInfo {
   pair_id: string;
@@ -99,6 +95,13 @@ const suite = INFRA_READY ? describe : describe.ignore;
 suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
   test("alice (YES) + bob (NO) bet → match → P2PK lock → YES resolve → alice signs proofs", async () => {
     // === Phase 1: Setup ===
+    // Real secp256k1 pubkeys — cashu-ts' P2PKBuilder validates the key format
+    // before locking, so opaque test strings won't pass.
+    const alice = generateKeypair();
+    const bob = generateKeypair();
+    const ALICE_PK = alice.publicKey;
+    const BOB_PK = bob.publicKey;
+
     const wallet = await createWallet(MINT_URL);
     const aliceProofs: Proof[] = await throttledMintProofs(wallet, 200);
     const bobProofs: Proof[] = await throttledMintProofs(wallet, 200);
