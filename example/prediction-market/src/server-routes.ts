@@ -31,7 +31,7 @@ import {
 import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
 import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
 import { resolveMarket } from "./resolution.ts";
-import { evaluateCondition } from "./market-oracle.ts";
+import { evaluateCondition, OracleError, verifyMarketResolution } from "./market-oracle.ts";
 import { settleMarket } from "./market-settlement.ts";
 import {
   createDualPreimageStore,
@@ -800,6 +800,98 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       yes_pool_sats: result.yes_pool_sats,
       no_pool_sats: result.no_pool_sats,
       settled_pairs: result.settled_pairs,
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // POST /markets/:id/submit-resolution — anyone can submit a TLSNotary
+  // proof of the truth source's response. The server cryptographically
+  // verifies the proof, evaluates the condition against the verified body,
+  // and settles the market. This is the trustless settlement path: no one
+  // — not even the server operator — needs to be trusted to read the URL
+  // honestly.
+  //
+  // Race semantics: first valid proof wins. The cryptographic binding is
+  // (server name, response body, session timestamp); a proof captured at
+  // any moment after the resolution deadline can settle the market, with
+  // freshness bounded by the verifier's max-age check (default 10 min).
+  // This is deliberate — early observers commit the market to one outcome
+  // and concurrent submissions for the same market hit the state-machine
+  // 409 from settleMarket. Operators that want a wider observation window
+  // can adjust max_age_seconds per request.
+  // -----------------------------------------------------------------------
+
+  mkt.post("/:id/submit-resolution", rateLimit, writeAuth, async (c) => {
+    const id = c.req.param("id");
+    if (!id) return c.json({ error: "Market id is required" }, 400);
+
+    const market = s.markets.get(id);
+    if (!market) return c.json({ error: "Market not found" }, 404);
+
+    // Bound the request body. TLSNotary presentations are typically <100 KiB
+    // base64; 1 MiB leaves room for headers, encoded server certs, and slack.
+    const MAX_BODY_BYTES = 1_048_576;
+    const contentLength = Number(c.req.header("content-length") ?? "0");
+    if (contentLength > MAX_BODY_BYTES) {
+      return c.json({ error: "request body too large" }, 413);
+    }
+    const rawBody = await c.req.text();
+    if (rawBody.length > MAX_BODY_BYTES) {
+      return c.json({ error: "request body too large" }, 413);
+    }
+    let body: { tlsn_presentation?: unknown; max_age_seconds?: unknown };
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    if (typeof body.tlsn_presentation !== "string" || !body.tlsn_presentation) {
+      return c.json({ error: "tlsn_presentation is required (base64-encoded TLSNotary presentation)" }, 400);
+    }
+    // Sanity-check: base64 alphabet + reasonable length. Real presentations
+    // are tens of KiB; we cap an order of magnitude above expected to leave
+    // headroom for future format expansion without becoming a DoS vector.
+    if (!/^[A-Za-z0-9+/=\s]{16,1500000}$/.test(body.tlsn_presentation)) {
+      return c.json({ error: "tlsn_presentation must be base64 (16..1.5e6 chars)" }, 400);
+    }
+    const maxAgeSeconds = typeof body.max_age_seconds === "number" ? body.max_age_seconds : undefined;
+
+    let verified;
+    try {
+      verified = await verifyMarketResolution(market, body.tlsn_presentation, { maxAgeSeconds });
+    } catch (err) {
+      const message = err instanceof OracleError
+        ? err.message
+        : err instanceof Error
+        ? err.message
+        : "TLSNotary verification failed";
+      return c.json({ error: message }, 400);
+    }
+
+    const settled = await settleMarket(s, id, verified.outcome, {
+      verifiedBody: verified.verifiedBody,
+    });
+    if (!settled.ok) {
+      return c.json({ error: settled.error, ...(settled.mode ? { mode: settled.mode } : {}) }, settled.status as 400 | 404 | 409 | 500 | 503);
+    }
+
+    return c.json({
+      market_id: settled.market_id,
+      outcome: settled.outcome,
+      mode: settled.mode,
+      status: settled.status,
+      tlsn: {
+        verified_server_name: verified.verifiedServerName,
+        verified_timestamp: verified.verifiedTimestamp,
+        verified_body_length: verified.verifiedBody.length,
+      },
+      ...(settled.oracle_signature ? { oracle_signature: settled.oracle_signature } : {}),
+      ...(settled.preimage ? { preimage: settled.preimage } : {}),
+      ...(settled.proof_signatures_count !== undefined ? { proof_signatures_count: settled.proof_signatures_count } : {}),
+      yes_pool_sats: settled.yes_pool_sats,
+      no_pool_sats: settled.no_pool_sats,
+      settled_pairs: settled.settled_pairs,
     });
   });
 

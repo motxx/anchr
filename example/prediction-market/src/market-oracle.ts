@@ -18,6 +18,8 @@ import type {
   ResolutionCondition,
   OracleHtlcKeypair,
 } from "./market-types.ts";
+import { validateTlsn } from "@anchr/tlsn-toolkit/tlsn-validation";
+import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
 
 // --- HTLC key generation ---
 
@@ -48,18 +50,13 @@ export function verifyPreimage(preimage: string, expectedHash: string): boolean 
 // --- Market resolution ---
 
 /**
- * Resolve a prediction market using a TLSNotary proof.
+ * Resolve a prediction market from already-verified TLSNotary data.
  *
- * Steps:
- *   1. Parse the TLSNotary presentation to extract verified data
- *   2. Verify the server name matches the resolution URL domain
- *   3. Evaluate the resolution condition against the response body
- *   4. If YES: attach the preimage for HTLC redemption
- *   5. If NO: no preimage — HTLC locktime expires, NO bettors refund
- *
- * In production, step 1 uses the TLSNotary verifier library to
- * cryptographically verify the presentation. This demo simulates
- * the verification with a pre-parsed response body.
+ * The caller is responsible for cryptographic verification (see
+ * `verifyMarketResolution` for the trustless path that does the crypto
+ * itself). This function trusts the caller's claim of `verifiedBody` /
+ * `verifiedServerName` / `verifiedTimestamp` — useful for tests and
+ * for callers that have already validated the presentation upstream.
  */
 export function resolveMarket(
   market: PredictionMarket,
@@ -109,6 +106,74 @@ export function resolveMarket(
     },
     // Only reveal preimage if YES wins
     preimage: outcome === "yes" ? oraclePreimage : undefined,
+  };
+}
+
+// --- Trustless verification: validate the TLSNotary proof, then evaluate ---
+
+/**
+ * Trustless market resolution: cryptographically verify the TLSNotary
+ * presentation, check it pins the right server + isn't stale, then
+ * evaluate the market's `resolution_condition` against the verified body.
+ *
+ * Throws `OracleError` on any verification failure. Returns the derived
+ * outcome plus the verified context so the caller can pass it into
+ * `settleMarket`.
+ *
+ * Calling this requires the TLSNotary verifier binary to be on the
+ * host (`crates/tlsn-verifier/target/{debug,release}/tlsn-verifier` or
+ * `tlsn-verifier` on PATH). Without the binary, the call throws —
+ * see `isTlsnVerifierAvailable` to gate the UI.
+ */
+export async function verifyMarketResolution(
+  market: PredictionMarket,
+  tlsnPresentation: string,
+  opts?: { maxAgeSeconds?: number },
+): Promise<{
+  outcome: "yes" | "no";
+  verifiedBody: string;
+  verifiedServerName: string;
+  verifiedTimestamp: number;
+}> {
+  const expectedHostname = new URL(market.resolution_url).hostname;
+  const requirement: TlsnRequirement = {
+    target_url: market.resolution_url,
+    max_attestation_age_seconds: opts?.maxAgeSeconds ?? 600,
+    domain_hint: expectedHostname,
+  };
+
+  const result = await validateTlsn({ presentation: tlsnPresentation }, requirement);
+
+  if (!result.available) {
+    throw new OracleError("TLSNotary verifier binary not available; cannot verify proof");
+  }
+  if (!result.signatureValid) {
+    throw new OracleError(
+      `TLSNotary signature invalid: ${result.failures.join("; ") || "verification failed"}`,
+    );
+  }
+  if (!result.serverIdentityValid) {
+    throw new OracleError(
+      `TLSNotary server identity mismatch: ${result.failures.join("; ") || `expected ${expectedHostname}`}`,
+    );
+  }
+  if (!result.attestationFresh) {
+    throw new OracleError(
+      `TLSNotary attestation too old: ${result.failures.join("; ") || `max age ${requirement.max_attestation_age_seconds}s`}`,
+    );
+  }
+
+  const verifiedBody = result.verifiedData?.revealed_body ?? "";
+  const verifiedServerName = result.verifiedData?.server_name ?? "";
+  const verifiedTimestamp = result.verifiedData?.session_timestamp ?? 0;
+
+  const conditionMet = evaluateCondition(market.resolution_condition, verifiedBody);
+
+  return {
+    outcome: conditionMet ? "yes" : "no",
+    verifiedBody,
+    verifiedServerName,
+    verifiedTimestamp,
   };
 }
 
