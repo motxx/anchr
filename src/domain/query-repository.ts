@@ -1,6 +1,6 @@
-import type { Query, QueryStatus } from "../../packages/core-domain/src/types";
-import { isExpirable } from "./query-transitions";
-import type { QueryStore } from "./query-store";
+import type { Query, QueryStatus } from "../../packages/core-domain/src/types.ts";
+import { isExpirable } from "./query-transitions.ts";
+import type { QueryStore } from "./query-store.ts";
 
 export interface QueryRepository {
   get(id: string): Query | null;

@@ -1,14 +1,14 @@
 import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { C2paValidationResult } from "./c2pa-validation";
-import type { ExifValidationResult } from "./exif-validation";
+import type { C2paValidationResult } from "./c2pa-validation.ts";
+import type { ExifValidationResult } from "./exif-validation.ts";
 import {
   clearIntegrityStore,
   getIntegrity,
   getIntegrityForQuery,
   purgeStaleIntegrity,
   storeIntegrity,
-} from "./integrity-store";
+} from "./integrity-store.ts";
 
 const dummyExif: ExifValidationResult = {
   hasExif: true,

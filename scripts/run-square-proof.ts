@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import process from "node:process";
 
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 if (!SQUARE_ACCESS_TOKEN) {

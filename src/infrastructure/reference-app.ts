@@ -1,12 +1,15 @@
-import { getRuntimeConfig } from "./config";
-import { setupServerLogCapture } from "./log-stream";
-import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
-import { createQueryService } from "../application/query-service";
-import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api";
+import { getRuntimeConfig } from "./config.ts";
+import { setupServerLogCapture } from "./log-stream.ts";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import { createQueryService } from "../application/query-service.ts";
+import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api.ts";
 import { serveStatic } from "hono/deno";
-import { normalizeQueryResult } from "./attachments";
-import { publishQueryToRelay } from "./nostr/relay-publish";
-import { createOracleRegistry } from "./oracle/registry";
+import { normalizeQueryResult } from "./attachments.ts";
+import { publishQueryToRelay } from "./nostr/relay-publish.ts";
+import { createOracleRegistry } from "./oracle/registry.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "reference-app"]);
 
 export async function startReferenceApp() {
   setupServerLogCapture();
@@ -47,7 +50,7 @@ export async function startReferenceApp() {
 
   Deno.serve({ port }, app.fetch);
 
-  console.error(`[reference-app] Worker    → http://localhost:${port}`);
-  console.error(`[reference-app] Requester → http://localhost:${port}/requester`);
-  console.error(`[reference-app] Dashboard → http://localhost:${port}/dashboard`);
+  log.error(`Worker    → http://localhost:${port}`);
+  log.error(`Requester → http://localhost:${port}/requester`);
+  log.error(`Dashboard → http://localhost:${port}/dashboard`);
 }

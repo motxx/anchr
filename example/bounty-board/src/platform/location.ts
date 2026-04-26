@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import type { GpsCoord } from "../api/types";
+import type { GpsCoord } from "../api/types.ts";
 
 export interface LocationProvider {
   requestPermission(): Promise<boolean>;

@@ -19,6 +19,7 @@ import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
 import { publishQueryToRelay } from "../src/infrastructure/nostr/relay-publish.ts";
 import { closePool } from "../src/infrastructure/nostr/client.ts";
 import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events.ts";
+import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();
 const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";

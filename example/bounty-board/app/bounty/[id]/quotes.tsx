@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSFeedbackBanner } from "../../../src/components/ds";
-import { QuoteList } from "../../../src/components/bounty/QuoteList";
-import { selectWorker } from "../../../src/api/client";
+import { DSText, DSFeedbackBanner } from "../../../src/components/ds/index.ts";
+import { QuoteList } from "../../../src/components/bounty/QuoteList.tsx";
+import { selectWorker } from "../../../src/api/client.ts";
 import { Ionicons } from "@expo/vector-icons";
-import type { QuoteInfo } from "../../../src/api/types";
+import type { QuoteInfo } from "../../../src/api/types.ts";
 
 export default function QuotesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

@@ -1,6 +1,6 @@
 import { test, describe } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateNonce, buildChallengeRule } from "./challenge";
+import { generateNonce, buildChallengeRule } from "./challenge.ts";
 
 describe("generateNonce", () => {
   test("returns string of default length 6", () => {

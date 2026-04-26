@@ -5,7 +5,7 @@ import { validateC2pa, isC2paAvailable } from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, writeFile, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
+import { spawn, writeFile, type fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).

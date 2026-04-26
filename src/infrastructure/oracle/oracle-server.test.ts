@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildOracleApp } from "./oracle-server";
-import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
-import { makeQuery as makeBaseQuery } from "../../testing/factories";
+import { buildOracleApp } from "./oracle-server.ts";
+import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const TEST_PORT = 14200 + Math.floor(Math.random() * 100);
 const API_KEY = "oracle-test-key";

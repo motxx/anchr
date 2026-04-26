@@ -6,7 +6,7 @@
  *   const input = queryTemplates.photoProof("Shibuya crossing, Tokyo");
  */
 
-import type { QueryInput } from "../../packages/core-domain/src/types";
+import type { QueryInput } from "../../packages/core-domain/src/types.ts";
 
 export const queryTemplates = {
   /** Request a photo proof of a location or scene. */

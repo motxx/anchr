@@ -120,8 +120,8 @@ async function createMcpClient(envOverrides: Record<string, string> = {}, bootst
   writeFileSync(scriptPath, bootstrap);
 
   const transport = new DenoStdioTransport(scriptPath, {
-    ...process.env as Record<string, string>,
-    REFERENCE_APP_PORT: process.env.REFERENCE_APP_PORT ?? "3000",
+    ...Deno.env.toObject(),
+    REFERENCE_APP_PORT: Deno.env.get("REFERENCE_APP_PORT") ?? "3000",
     ...envOverrides,
   });
 
@@ -236,7 +236,7 @@ Deno.test({ name: "mcp create_query supports TLSNotary parameters", sanitizeReso
 Deno.test({ name: "mcp can use a remote HTTP query backend", sanitizeResources: false, sanitizeOps: false, fn: async () => {
   const baseUrl = "http://remote.test";
   const bootstrapPreamble = [
-    `process.env.HTTP_API_KEY = "remote-test-key";`,
+    `Deno.env.set("HTTP_API_KEY", "remote-test-key");`,
     `const { buildWorkerApiApp } = await import(${JSON.stringify(join(moduleDir(import.meta), "worker-api.ts"))});`,
     `const app = buildWorkerApiApp();`,
     `const originalFetch = globalThis.fetch.bind(globalThis);`,

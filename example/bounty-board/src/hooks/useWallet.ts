@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { useWalletStore } from "../store/wallet";
-import { verifyToken, decodeTokenAmount } from "../cashu/wallet";
+import { useWalletStore } from "../store/wallet.ts";
+import { verifyToken, decodeTokenAmount } from "../cashu/wallet.ts";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
 export function useWallet() {

@@ -63,7 +63,7 @@ esac
 }
 
 function teardownMockBinary() {
-  _setFrostSignerPathForTest(undefined as unknown as string | null);
+  _setFrostSignerPathForTest(undefined);
   try { rmSync(mockDir, { recursive: true, force: true }); } catch { /* ok */ }
 }
 

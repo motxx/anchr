@@ -8,8 +8,8 @@
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events";
-import type { EscrowType, VerificationFactor } from "../../../packages/core-domain/src/types";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events.ts";
+import type { EscrowType, VerificationFactor } from "../../../packages/core-domain/src/types.ts";
 
 /** Parsed oracle announcement from a Nostr kind 30088 event. */
 export interface OracleAnnouncement {

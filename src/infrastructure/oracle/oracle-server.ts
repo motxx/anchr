@@ -13,13 +13,16 @@
 import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types";
-import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
-import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
+import { verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
+import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
+import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "oracle-server"]);
 
 // Timing-safe API key comparison following Cloudflare's recommended pattern.
 // When lengths differ, compare the input against itself to maintain constant time
@@ -35,9 +38,9 @@ function safeCompare(a: string, b: string): boolean {
     : !timingSafeEqual(userValue, userValue);
 }
 
-const ORACLE_ID = process.env.ORACLE_ID ?? "remote-oracle";
-const ORACLE_API_KEY = process.env.ORACLE_API_KEY?.trim();
-const ORACLE_PORT = Number(process.env.ORACLE_PORT) || 4000;
+const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "remote-oracle";
+const ORACLE_API_KEY = Deno.env.get("ORACLE_API_KEY")?.trim();
+const ORACLE_PORT = Number(Deno.env.get("ORACLE_PORT")) || 4000;
 
 export interface OracleAppOptions {
   oracleId?: string;
@@ -93,7 +96,7 @@ export function buildOracleApp(
     c.json({
       id: oracleId,
       name: `Oracle ${oracleId}`,
-      fee_ppm: Number(process.env.ORACLE_FEE_PPM) || 0,
+      fee_ppm: Number(Deno.env.get("ORACLE_FEE_PPM")) || 0,
     }),
   );
 
@@ -416,11 +419,7 @@ export function buildOracleApp(
    */
   app.get("/frost/sign/:queryId", authMiddleware, (c) => {
     const queryId = c.req.param("queryId");
-    // Find session by queryId
-    // Note: In a full impl, we'd have a reverse map. For now, iterate.
-    let found: ReturnType<typeof frostCoordinator.getSigningSession>;
-    // Try direct session ID lookup first, then search
-    found = frostCoordinator.getSigningSession(queryId);
+    const found = frostCoordinator.getSigningSession(queryId);
 
     if (!found) {
       return c.json({ error: "Signing session not found" }, 404);
@@ -443,7 +442,7 @@ export function buildOracleApp(
 
 // Run as standalone server when executed directly
 if (import.meta.main) {
-  const preimageDbPath = process.env.ORACLE_PREIMAGE_DB?.trim();
+  const preimageDbPath = Deno.env.get("ORACLE_PREIMAGE_DB")?.trim();
   const preimageStore = preimageDbPath
     ? createPersistentPreimageStore(preimageDbPath)
     : undefined;
@@ -451,15 +450,15 @@ if (import.meta.main) {
   // Load FROST config if available
   let frostNodeConfig: FrostNodeConfig | undefined;
   let frostConfig: ThresholdOracleConfig | undefined;
-  const frostConfigPath = process.env.FROST_CONFIG_PATH?.trim();
+  const frostConfigPath = Deno.env.get("FROST_CONFIG_PATH")?.trim();
   if (frostConfigPath) {
     try {
       const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../../../packages/cashu-frost-oracle/src/config.ts");
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
-      console.log(`[oracle-server] FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
+      log.info(`FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
     } catch (e) {
-      console.error(`[oracle-server] Failed to load FROST config from ${frostConfigPath}:`, e);
+      log.error(`Failed to load FROST config from ${frostConfigPath}:`, e);
     }
   }
 
@@ -473,9 +472,9 @@ if (import.meta.main) {
   });
 
   if (preimageDbPath) {
-    console.log(`[oracle-server] Preimage store persisted to ${preimageDbPath}`);
+    log.info(`Preimage store persisted to ${preimageDbPath}`);
   }
-  console.log(`[oracle-server] Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
+  log.info(`Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
 
   Deno.serve({ port: ORACLE_PORT }, app.fetch);
 }

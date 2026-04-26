@@ -2,11 +2,11 @@ import React from "react";
 import { View, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSCard, DSSatsAmount, DSEmptyState } from "../../src/components/ds";
-import { FlightCard } from "../../src/components/claim/ClaimCard";
-import { useAutoClaims } from "../../src/hooks/useAutoClaims";
+import { DSText, DSCard, DSSatsAmount, DSEmptyState } from "../../src/components/ds/index.ts";
+import { FlightCard } from "../../src/components/claim/ClaimCard.tsx";
+import { useAutoClaims } from "../../src/hooks/useAutoClaims.ts";
 import { Ionicons } from "@expo/vector-icons";
-import type { FlightClaim } from "../../src/hooks/useAutoClaims";
+import type { FlightClaim } from "../../src/hooks/useAutoClaims.ts";
 
 export default function ClaimsScreen() {
   const insets = useSafeAreaInsets();

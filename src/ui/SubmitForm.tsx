@@ -1,9 +1,9 @@
 import { Loader2 } from "lucide-react";
 import React, { useRef, useState } from "react";
-import { apiFetch } from "./api-config";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { cn } from "./lib/utils";
+import { apiFetch } from "./api-config.ts";
+import { Button } from "./components/ui/button.tsx";
+import { Input } from "./components/ui/input.tsx";
+import { cn } from "./lib/utils.ts";
 import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../domain/types";
 
 interface UploadResponse {
@@ -105,7 +105,7 @@ export function SubmitForm({
 
   async function handleSubmit() {
     let attachments: AttachmentRef[] = [];
-    let encryptionKeys: BlossomKeyMap = {};
+    const encryptionKeys: BlossomKeyMap = {};
     const file = fileRef.current?.files?.[0];
     if (file) {
       setUploading(true);

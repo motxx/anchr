@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View } from "react-native";
-import { DSInput, DSButton, DSSection, DSCard } from "../ds";
-import { useSettingsStore } from "../../store/settings";
+import { DSInput, DSButton, DSSection, DSCard } from "../ds/index.ts";
+import { useSettingsStore } from "../../store/settings.ts";
 
 export function SettingsForm() {
   const { serverUrl, relayUrls, mintUrl, setServerUrl, setRelayUrls, setMintUrl } = useSettingsStore();

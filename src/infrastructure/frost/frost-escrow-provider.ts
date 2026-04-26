@@ -20,15 +20,18 @@ import {
   type P2PKOptions,
   getDecodedToken,
 } from "@cashu/cashu-ts";
-import type { EscrowProvider } from "../../application/escrow-port";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
   computeNetAmount,
   sumProofAmounts,
-} from "../../../packages/core-cashu/src/escrow-helpers";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet";
+} from "../../../packages/core-cashu/src/escrow-helpers.ts";
+import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost-escrow"]);
 
 export interface FrostEscrowConfig {
   /** FROST group public key (BIP-340 x-only hex). */
@@ -78,7 +81,7 @@ export function createFrostEscrowProvider(
         tokenMap.set(ref, { token, proofs: send });
         return { escrow_ref: ref };
       } catch (error) {
-        console.error("[frost-escrow] Failed to create hold:", error instanceof Error ? error.message : error);
+        log.error("Failed to create hold:", error instanceof Error ? error.message : error);
         return null;
       }
     },
@@ -110,7 +113,7 @@ export function createFrostEscrowProvider(
         tokenMap.delete(escrow_ref);
         return { escrow_ref: newRef };
       } catch (error) {
-        console.error("[frost-escrow] Failed to bind worker:", error instanceof Error ? error.message : error);
+        log.error("Failed to bind worker:", error instanceof Error ? error.message : error);
         return null;
       }
     },

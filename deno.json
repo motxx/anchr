@@ -41,6 +41,7 @@
     "@modelcontextprotocol/sdk/shared/transport.js": "npm:@modelcontextprotocol/sdk@^1/shared/transport.js",
     "@modelcontextprotocol/sdk/types.js": "npm:@modelcontextprotocol/sdk@^1/types.js",
     "@hono/zod-validator": "npm:@hono/zod-validator@^0.7",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "react": "npm:react@^19",
     "react-dom": "npm:react-dom@^19",
     "react-dom/client": "npm:react-dom@^19/client",
@@ -71,11 +72,14 @@
     "test:ci": "deno test src/ packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-domain/ packages/core-cashu/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts,packages/sdk/'",
     "test:example": "deno test --allow-all example/",
     "test": "deno test src/ packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-domain/ packages/core-cashu/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:packages": "deno test packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-domain/ packages/core-cashu/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:pentest": "deno test e2e/pentest/ --allow-env --allow-read --allow-net --allow-run --allow-sys",
     "test:all": "./scripts/test-all.sh --local",
     "test:all:docker": "./scripts/test-all.sh --docker",
     "test:all:full": "./scripts/test-all.sh full",
 
+    "lint": "deno lint",
+    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:refactor",
     "lint:deps": "cd crates/frost-signer && cargo audit 2>/dev/null; cd ../tlsn-prover && cargo audit 2>/dev/null; cd ../tlsn-server && cargo audit 2>/dev/null; echo 'Cargo audit complete'",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
@@ -87,5 +91,30 @@
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": ["mobile", "node_modules", "example/prediction-market/src/demo.ts", "example/prediction-market/src/nostr-market.ts"],
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "include": [
+        "no-eval",
+        "no-self-compare",
+        "default-param-last"
+      ],
+      "exclude": [
+        "no-unused-vars",
+        "require-await",
+        "no-explicit-any",
+        "no-slow-types",
+        "jsx-button-has-type",
+        "no-import-prefix"
+      ]
+    },
+    "exclude": [
+      "mobile",
+      "example/prediction-market/src/demo.ts",
+      "example/prediction-market/src/nostr-market.ts",
+      "scripts/",
+      "src/infrastructure/log-stream.ts"
+    ]
+  },
   "nodeModulesDir": "auto"
 }

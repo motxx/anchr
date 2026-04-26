@@ -40,7 +40,7 @@ import { schnorr } from "@noble/curves/secp256k1";
 import {
   buildFrostSwapForPartyA,
   buildFrostSwapForPartyB,
-} from "../src/infrastructure/conditional-swap/frost-conditional-swap.ts";
+} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
   checkInfraReady,
   createWallet,

@@ -3,7 +3,7 @@
  * Follows the same pattern as src/domain/query-store.ts.
  */
 
-import type { DataListing } from "./types";
+import type { DataListing } from "./types.ts";
 
 export interface ListingStore {
   get(id: string): DataListing | null;

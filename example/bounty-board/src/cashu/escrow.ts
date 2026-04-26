@@ -3,7 +3,7 @@ import {
   getEncodedToken,
   getDecodedToken,
 } from "@cashu/cashu-ts";
-import { getCashuWallet, getMintUrl } from "./wallet";
+import { getCashuWallet, getMintUrl } from "./wallet.ts";
 
 export interface EscrowToken {
   token: string;

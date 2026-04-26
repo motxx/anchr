@@ -8,13 +8,16 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { createListingSchema } from "./marketplace-schemas";
-import { createPaymentMiddleware } from "./xcashu-middleware";
-import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher";
-import { validateAttachmentUri } from "../url-validation";
-import { announceListingOnNostr } from "./nostr-announce";
-import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types";
+import { validateZ } from "../zod-validator-shim.ts";
+import { createListingSchema } from "./marketplace-schemas.ts";
+import { createPaymentMiddleware } from "./xcashu-middleware.ts";
+import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
+import { validateAttachmentUri } from "../url-validation.ts";
+import { announceListingOnNostr } from "./nostr-announce.ts";
+import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "marketplace"]);
 
 /** In-memory purchase log (replay defense + audit). */
 const purchaseLog = new Map<string, PurchaseRecord>();
@@ -49,15 +52,14 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     "/listings",
     rateLimit,
     writeAuth,
-    // deno-lint-ignore no-explicit-any -- Zod v4 ZodObject is not assignable to @hono/zod-validator's ZodSchema (Zod v3 type)
-    zValidator("json", createListingSchema as any, (result, c) => {
+    validateZ("json", createListingSchema, (result, c) => {
       if (!result.success) {
         return c.json({
           error: "Invalid listing payload",
           issues: result.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         }, 400);
       }
-    }) as unknown as MiddlewareHandler,
+    }),
     (c) => {
       const payload = c.req.valid("json" as never) as ReturnType<typeof createListingSchema.parse>;
       // Validate source_url at creation time (not just at fetch time) to prevent
@@ -167,7 +169,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[marketplace] Fetch failed for listing ${id}:`, msg);
+      log.error(`Fetch failed for listing ${id}:`, msg);
       return c.json({ error: "Failed to fetch upstream data", detail: msg }, 502);
     }
   });

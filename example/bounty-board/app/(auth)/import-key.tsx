@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { DSText, DSInput, DSButton, DSFeedbackBanner } from "../../src/components/ds";
-import { useAuthStore } from "../../src/store/auth";
-import { isValidNsec, nsecDecode } from "../../src/nostr/nip19";
+import { DSText, DSInput, DSButton, DSFeedbackBanner } from "../../src/components/ds/index.ts";
+import { useAuthStore } from "../../src/store/auth.ts";
+import { isValidNsec, nsecDecode } from "../../src/nostr/nip19.ts";
 
 export default function ImportKeyScreen() {
   const [nsec, setNsec] = useState("");

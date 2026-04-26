@@ -1,4 +1,4 @@
-import type { BlossomKeyMap, EscrowType, Query, QueryResult, TlsnVerifiedData, VerificationDetail, VerificationFactor } from "./types";
+import type { BlossomKeyMap, EscrowType, Query, QueryResult, TlsnVerifiedData, VerificationDetail, VerificationFactor } from "./types.ts";
 
 /** Metadata about an oracle service. */
 export interface OracleInfo {

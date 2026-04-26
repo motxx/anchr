@@ -1,6 +1,6 @@
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { NostrIdentity } from "./identity";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
+import type { NostrIdentity } from "./identity.ts";
+import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.ts";
 
 export const DM_KIND = 4;
 

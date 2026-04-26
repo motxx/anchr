@@ -23,6 +23,7 @@
  */
 
 import { Anchr, type QueryCondition } from "./index.ts";
+import { statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
 
@@ -105,7 +106,7 @@ export class AnchrWorker {
 
   private emit<K extends keyof EventHandler>(event: K, ...args: Parameters<EventHandler[K]>): void {
     for (const handler of (this.handlers[event] ?? []) as EventHandler[K][]) {
-      (handler as Function)(...args);
+      (handler as (...a: Parameters<EventHandler[K]>) => void)(...args);
     }
   }
 
@@ -255,7 +256,7 @@ export class AnchrWorker {
         }
       }
     }
-    const socksProxy = process.env.TLSN_SOCKS_PROXY;
+    const socksProxy = Deno.env.get("TLSN_SOCKS_PROXY");
     if (socksProxy) args.push("--socks-proxy", socksProxy);
 
     const { stdout, stderr, exitCode } = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
@@ -292,8 +293,7 @@ export class AnchrWorker {
     ];
     for (const path of candidates) {
       try {
-        const stat = require("node:fs").statSync(path);
-        if (stat.isFile()) return path;
+        if (statSync(path).isFile()) return path;
       } catch { /* not found */ }
     }
     // Fallback to PATH

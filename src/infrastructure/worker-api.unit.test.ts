@@ -1,11 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
-import { createOracleRegistry } from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
-import { createQueryService, createQueryStore } from "../application/query-service";
-import type { Query, QueryResult } from "../../packages/core-domain/src/types";
-import { buildWorkerApiApp } from "./worker-api";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import { createOracleRegistry } from "./oracle/registry.ts";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
+import { createQueryService, createQueryStore } from "../application/query-service.ts";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types.ts";
+import { buildWorkerApiApp } from "./worker-api.ts";
 
 function makeMockOracle(id: string): Oracle {
   return {
@@ -35,17 +35,17 @@ function makeTestApp() {
 
 function withOpenAuth(fn: () => Promise<void>) {
   return async () => {
-    const savedKey = process.env.HTTP_API_KEY;
-    const savedKeys = process.env.HTTP_API_KEYS;
-    delete process.env.HTTP_API_KEY;
-    delete process.env.HTTP_API_KEYS;
+    const savedKey = Deno.env.get("HTTP_API_KEY");
+    const savedKeys = Deno.env.get("HTTP_API_KEYS");
+    Deno.env.delete("HTTP_API_KEY");
+    Deno.env.delete("HTTP_API_KEYS");
     try {
       await fn();
     } finally {
-      if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-      else delete process.env.HTTP_API_KEY;
-      if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-      else delete process.env.HTTP_API_KEYS;
+      if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+      else Deno.env.delete("HTTP_API_KEY");
+      if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+      else Deno.env.delete("HTTP_API_KEYS");
     }
   };
 }

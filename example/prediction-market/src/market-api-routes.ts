@@ -20,6 +20,7 @@ import {
   frostDualKeySignAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
 import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
 import {
   evaluateCondition,
   calculatePayouts,
@@ -339,7 +340,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_no;
 
-    const { signRound1 } = await import("@anchr/cashu-frost-oracle/frost-cli");
+    
     const keyPackageJson = JSON.stringify(keyPackage);
     const result = await signRound1(keyPackageJson);
     if (!result.ok) {
@@ -386,7 +387,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_no;
 
-    const { signRound2 } = await import("@anchr/cashu-frost-oracle/frost-cli");
+    
     const keyPackageJson = JSON.stringify(keyPackage);
     const result = await signRound2(keyPackageJson, nonceEntry.nonces, body.commitments, body.message);
 
@@ -433,7 +434,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
 
     const outcomeKey = outcome === "yes" ? "a" : "b";
     const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
-    const { signRound1 } = await import("@anchr/cashu-frost-oracle/frost-cli");
+    
     const result = await signRound1(JSON.stringify(keyPackage));
     if (!result.ok) return c.json({ error: result.error }, 500);
 
@@ -452,7 +453,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     pendingMarketNonces.delete(body.nonce_id);
 
     const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
-    const { signRound2 } = await import("@anchr/cashu-frost-oracle/frost-cli");
+    
     const result = await signRound2(JSON.stringify(keyPackage), stored.nonces, body.commitments, body.message);
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });

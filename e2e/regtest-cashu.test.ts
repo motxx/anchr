@@ -22,19 +22,20 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../src/infrastructure/worker-api";
-import { createQueryService } from "../src/application/query-service";
-import { createOracleRegistry } from "../src/infrastructure/oracle/registry";
-import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
-import { normalizeQueryResult } from "../src/infrastructure/attachments";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
+import { createQueryService } from "../src/application/query-service.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+import { normalizeQueryResult } from "../src/infrastructure/attachments.ts";
 import {
   checkInfraReady,
   payInvoiceViaLndUser,
   throttledMintProofs,
   createWallet,
-} from "./helpers/regtest";
+} from "./helpers/regtest.ts";
+import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;

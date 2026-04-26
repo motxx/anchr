@@ -18,7 +18,11 @@ import { createDualKeyStore } from "./frost-conditional-swap.ts";
 import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
 import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
 import { isFrostSignerAvailable } from "@anchr/cashu-frost-oracle/frost-cli";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost-dual-key-store"]);
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -47,7 +51,7 @@ export interface FrostDualKeyStoreConfig {
  */
 export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKeyStore {
   if (!isFrostSignerAvailable()) {
-    console.warn("[frost-dual-key-store] frost-signer not available, falling back to single-key mode");
+    log.warn("frost-signer not available, falling back to single-key mode");
     return createDualKeyStore();
   }
 
@@ -83,8 +87,7 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       // FROST signing is async but DualKeyStore.sign() is sync.
       // Return a placeholder -- the actual signing happens via signAsync().
       // Consumers that need FROST should use signAsync() instead.
-      console.warn(
-        "[frost-dual-key-store] sign() called synchronously -- " +
+      log.warn("sign() called synchronously -- " +
         "use signAsync() for real FROST threshold signing"
       );
       return null;
@@ -99,8 +102,7 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       if (!entry || entry.signed || signedSwaps.has(swap_id)) return null;
 
       // FROST per-proof signing is async -- use frostSignProofSecretsAsync() instead.
-      console.warn(
-        "[frost-dual-key-store] signProofSecrets() called synchronously -- " +
+      log.warn("signProofSecrets() called synchronously -- " +
         "use frostSignProofSecretsAsync() for real FROST threshold signing"
       );
       return null;
@@ -177,12 +179,11 @@ export async function frostDualKeySignAsync(
 
   const result = await coordinateSigning(signingConfig, messageHex);
   if (!result) {
-    console.error("[frost-dual-key-store] FROST signing failed -- threshold not met");
+    log.error("FROST signing failed -- threshold not met");
     return null;
   }
 
-  console.log(
-    `[frost-dual-key-store] FROST signing succeeded: ${result.signers_participated.length} signers participated`
+  log.info(`FROST signing succeeded: ${result.signers_participated.length} signers participated`
   );
   return result.signature;
 }
@@ -207,8 +208,6 @@ export async function frostSignProofSecretsAsync(
   proofSecrets: string[],
   conditionData?: { market_id: string; resolution_url: string; verified_body: string },
 ): Promise<Map<string, string> | null> {
-  const { sha256 } = await import("@noble/hashes/sha2.js");
-
   const result = new Map<string, string>();
 
   for (const proofSecret of proofSecrets) {
@@ -216,14 +215,13 @@ export async function frostSignProofSecretsAsync(
     const msgHash = sha256(new TextEncoder().encode(proofSecret));
     const sig = await frostDualKeySignAsync(config, outcome, msgHash, conditionData);
     if (!sig) {
-      console.error(`[frost-dual-key-store] FROST per-proof signing failed for secret`);
+      log.error(`FROST per-proof signing failed for secret`);
       return null;
     }
     result.set(proofSecret, sig);
   }
 
-  console.log(
-    `[frost-dual-key-store] FROST per-proof signing succeeded: ${proofSecrets.length} proofs signed`
+  log.info(`FROST per-proof signing succeeded: ${proofSecrets.length} proofs signed`
   );
   return result;
 }

@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import { secureStoreProvider } from "../platform/secure-store";
-import { generateIdentity, restoreIdentity, type NostrIdentity } from "../nostr/identity";
-import { npubEncode } from "../nostr/nip19";
+import { secureStoreProvider } from "../platform/secure-store.ts";
+import { generateIdentity, restoreIdentity, type NostrIdentity } from "../nostr/identity.ts";
+import { npubEncode } from "../nostr/nip19.ts";
 
 interface AuthState {
   /** Whether auth has been loaded from storage. */

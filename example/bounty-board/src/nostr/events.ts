@@ -1,7 +1,7 @@
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { VerificationFactor } from "../api/types";
-import type { NostrIdentity } from "./identity";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
+import type { VerificationFactor } from "../api/types.ts";
+import type { NostrIdentity } from "./identity.ts";
+import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.ts";
 
 export const ANCHR_QUERY_REQUEST = 5300;
 export const ANCHR_QUERY_RESPONSE = 6300;

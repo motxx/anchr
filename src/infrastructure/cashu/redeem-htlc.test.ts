@@ -31,7 +31,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import {
   buildHtlcFinalOptions,
   verifyHtlcProofs,
-} from "../../../packages/core-cashu/src/escrow";
+} from "../../../packages/core-cashu/src/escrow.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

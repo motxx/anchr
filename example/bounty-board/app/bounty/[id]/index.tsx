@@ -2,13 +2,13 @@ import React from "react";
 import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSCard, DSSection, DSBadge, DSSatsAmount, DSDivider, DSButton } from "../../../src/components/ds";
-import { StatusTimeline } from "../../../src/components/bounty/StatusTimeline";
-import { VerificationResults } from "../../../src/components/bounty/VerificationResults";
-import { useQueryDetail } from "../../../src/hooks/useQueries";
-import { useAuthStore } from "../../../src/store/auth";
-import { timeLeft, isExpired, formatShortTime } from "../../../src/utils/time";
-import { formatStatus } from "../../../src/utils/format";
+import { DSText, DSCard, DSSection, DSBadge, DSSatsAmount, DSDivider, DSButton } from "../../../src/components/ds/index.ts";
+import { StatusTimeline } from "../../../src/components/bounty/StatusTimeline.tsx";
+import { VerificationResults } from "../../../src/components/bounty/VerificationResults.tsx";
+import { useQueryDetail } from "../../../src/hooks/useQueries.ts";
+import { useAuthStore } from "../../../src/store/auth.ts";
+import { timeLeft, isExpired, formatShortTime } from "../../../src/utils/time.ts";
+import { formatStatus } from "../../../src/utils/format.ts";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function BountyDetailScreen() {

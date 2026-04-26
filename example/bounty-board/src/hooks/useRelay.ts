@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { publishEvent as nostrPublish } from "../nostr/client";
-import { useSettingsStore } from "../store/settings";
+import { publishEvent as nostrPublish } from "../nostr/client.ts";
+import { useSettingsStore } from "../store/settings.ts";
 import type { VerifiedEvent } from "nostr-tools/core";
 
 export function useRelay() {

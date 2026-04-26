@@ -1,15 +1,15 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { withEnv } from "../../testing/helpers";
+import { withEnv } from "../../testing/helpers.ts";
 import {
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
   _setPublishEventForTest,
   _setVerifyForTest,
-} from "./oracle-nostr-service";
-import type { OracleNostrServiceConfig } from "./oracle-nostr-service";
-import { generateEphemeralIdentity } from "../nostr/identity";
-import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store";
+} from "./oracle-nostr-service.ts";
+import type { OracleNostrServiceConfig } from "./oracle-nostr-service.ts";
+import { generateEphemeralIdentity } from "../nostr/identity.ts";
+import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

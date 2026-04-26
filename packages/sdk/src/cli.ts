@@ -8,6 +8,7 @@
  */
 
 import { AnchrWorker } from "./worker.ts";
+import process from "node:process";
 
 function parseArgs(): Record<string, string> {
   const args: Record<string, string> = {};
@@ -25,10 +26,10 @@ function parseArgs(): Record<string, string> {
 const args = parseArgs();
 
 const worker = new AnchrWorker({
-  serverUrl: args.server ?? process.env.ANCHR_SERVER_URL ?? "http://localhost:3000",
-  verifierHost: args.verifier ?? process.env.TLSN_VERIFIER_HOST ?? "localhost:7047",
-  proverBin: args.prover ?? process.env.TLSN_PROVER_BIN,
-  apiKey: args["api-key"] ?? process.env.HTTP_API_KEY,
+  serverUrl: args.server ?? Deno.env.get("ANCHR_SERVER_URL") ?? "http://localhost:3000",
+  verifierHost: args.verifier ?? Deno.env.get("TLSN_VERIFIER_HOST") ?? "localhost:7047",
+  proverBin: args.prover ?? Deno.env.get("TLSN_PROVER_BIN"),
+  apiKey: args["api-key"] ?? Deno.env.get("HTTP_API_KEY"),
   pollIntervalMs: Number(args["poll-interval"] ?? 5000),
   maxConcurrent: Number(args["max-concurrent"] ?? 1),
   minBountySats: Number(args["min-bounty"] ?? 0),

@@ -10,11 +10,14 @@
  * what was cryptographically verified — no post-hoc modification.
  */
 
-import type { ProofDelivery, ProofPublishResult } from "../../application/proof-delivery";
-import type { OracleAttestationRecord, ProofVisibility, Query } from "../../../packages/core-domain/src/types";
-import type { NostrIdentity } from "./identity";
-import { buildOracleAttestationEvent } from "./oracle-attestation";
-import { publishEvent } from "./client";
+import type { ProofDelivery, ProofPublishResult } from "../../application/proof-delivery.ts";
+import type { OracleAttestationRecord, ProofVisibility, Query } from "../../../packages/core-domain/src/types.ts";
+import type { NostrIdentity } from "./identity.ts";
+import { buildOracleAttestationEvent } from "./oracle-attestation.ts";
+import { publishEvent } from "./client.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "proof-publisher"]);
 
 export interface NostrProofPublisherConfig {
   identity: NostrIdentity;
@@ -57,8 +60,7 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
       const result = await publishEvent(event, config.relayUrls);
 
       if (result.successes.length > 0) {
-        console.error(
-          `[proof-publisher] Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
+        log.error(`Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
         );
         return {
           event_id: event.id,
@@ -66,8 +68,7 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
         };
       }
 
-      console.error(
-        `[proof-publisher] Failed to publish attestation for query ${query.id}: ${result.failures.join(", ")}`,
+      log.error(`Failed to publish attestation for query ${query.id}: ${result.failures.join(", ")}`,
       );
       return null;
     },

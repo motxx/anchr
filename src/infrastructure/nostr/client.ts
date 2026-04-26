@@ -9,16 +9,16 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "./events";
-import { DM_KIND } from "./dm";
-import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation";
+import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "./events.ts";
+import { DM_KIND } from "./dm.ts";
+import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation.ts";
 
 export interface NostrClientConfig {
   relayUrls: string[];
 }
 
 export function getNostrConfig(): NostrClientConfig | null {
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",")
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",")
     .map((url) => url.trim())
     .filter(Boolean);
 
@@ -58,7 +58,7 @@ export async function publishEvent(
   const failures: string[] = [];
 
   const results = await Promise.allSettled(
-    pool.publish(urls, event as unknown as Event),
+    pool.publish(urls, event),
   );
 
   for (let i = 0; i < results.length; i++) {

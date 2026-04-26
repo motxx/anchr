@@ -3,14 +3,14 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
 import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../../packages/core-runtime/src/mod.ts";
-import { getRuntimeConfig } from "./config";
+import { getRuntimeConfig } from "./config.ts";
 import type {
   AttachmentAccess,
   AttachmentHandle,
   AttachmentRef,
   AttachmentStorageKind,
   QueryResult,
-} from "../../packages/core-domain/src/types";
+} from "../../packages/core-domain/src/types.ts";
 import {
   attachmentRefSource,
   inferAttachmentId,
@@ -20,7 +20,8 @@ import {
   normalizeFromString,
   readBlossomAttachment,
   readExternalAttachment,
-} from "./attachment-helpers";
+} from "./attachment-helpers.ts";
+import process from "node:process";
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -113,7 +114,7 @@ function inferMimeTypeFromFilename(filename: string): string {
 }
 
 export function attachmentPublicBaseUrl(requestUrl?: string): string {
-  const configured = process.env.ATTACHMENT_PUBLIC_BASE_URL ?? process.env.PUBLIC_BASE_URL;
+  const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ?? Deno.env.get("PUBLIC_BASE_URL");
   if (configured) return configured.replace(/\/+$/, "");
   if (requestUrl) return new URL("/", requestUrl).toString().replace(/\/+$/, "");
   return `http://localhost:${getRuntimeConfig().referenceAppPort}`;
@@ -231,7 +232,7 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../../packages/core-domain/src/types").BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../../packages/core-domain/src/types.ts").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
   if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
     return readBlossomAttachment(ref, blossomKeyMaterial);

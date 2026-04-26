@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   buildHtlcInitialOptions,
   buildHtlcFinalOptions,
-} from "../../../packages/core-cashu/src/escrow";
+} from "../../../packages/core-cashu/src/escrow.ts";
 
 const WORKER_PUB = "0000000000000000000000000000000000000000000000000000000000000001";
 const REQUESTER_PUB = "0000000000000000000000000000000000000000000000000000000000000002";

@@ -10,12 +10,12 @@
  * their own checker via `createAiContentChecker` from the package.
  */
 
-import { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check";
-import { getRuntimeConfig } from "../config";
-import { readStoredAttachmentBuffer } from "../attachments";
+import { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";
+import { getRuntimeConfig } from "../config.ts";
+import { readStoredAttachmentBuffer } from "../attachments.ts";
 
-export type { ContentCheckResult } from "../../../packages/photo-bounty/src/ai-content-check";
-export { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check";
+export type { ContentCheckResult } from "../../../packages/photo-bounty/src/ai-content-check.ts";
+export { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";
 
 const checker = createAiContentChecker({
   getConfig: () => {

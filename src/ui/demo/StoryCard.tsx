@@ -27,7 +27,7 @@ function FlowIndicator({ actor, target }: { actor: Actor; target?: Actor }) {
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-2">
       <span>{from.emoji} {from.label}</span>
-      <span className="text-muted-foreground/50">{"\u2192"}</span>
+      <span className="text-muted-foreground/50">→</span>
       <span>{to.emoji} {to.label}</span>
     </div>
   );
@@ -77,7 +77,7 @@ function StoryCardHeader({ def, active, completed }: { def: StoryStepDef; active
         <span className="ml-auto w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
       )}
       {completed && !active && (
-        <span className="ml-auto text-[10px] text-emerald-400">{"\u2713"}</span>
+        <span className="ml-auto text-[10px] text-emerald-400">✓</span>
       )}
     </div>
   );

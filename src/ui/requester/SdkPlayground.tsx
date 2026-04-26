@@ -1,6 +1,6 @@
 import { Copy, Check, Terminal, Globe, Camera } from "lucide-react";
 import React, { useState } from "react";
-import { API_BASE } from "../api-config";
+import { API_BASE } from "../api-config.ts";
 
 function CodeBlock({ code, language = "typescript" }: { code: string; language?: string }) {
   const [copied, setCopied] = useState(false);
@@ -30,7 +30,7 @@ function CodeBlock({ code, language = "typescript" }: { code: string; language?:
   );
 }
 
-const serverUrl = API_BASE || window.location.origin;
+const serverUrl = API_BASE || globalThis.location.origin;
 
 const SDK_EXAMPLES = [
   {

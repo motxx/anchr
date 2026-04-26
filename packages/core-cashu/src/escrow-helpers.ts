@@ -4,7 +4,7 @@
 
 import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { getCashuWallet, getCashuConfig } from "./wallet";
+import { getCashuWallet, getCashuConfig } from "./wallet.ts";
 
 export async function getWalletAndConfig() {
   const wallet = getCashuWallet();

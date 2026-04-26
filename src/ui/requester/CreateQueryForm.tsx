@@ -1,11 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Camera, Globe, Loader2, MapPin, Plus } from "lucide-react";
 import React, { useRef, useState } from "react";
-import { apiFetch } from "../api-config";
-import { Button } from "../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Input } from "../components/ui/input";
-import { Textarea } from "../components/ui/textarea";
+import { apiFetch } from "../api-config.ts";
+import { Button } from "../components/ui/button.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.tsx";
+import { Input } from "../components/ui/input.tsx";
+import { Textarea } from "../components/ui/textarea.tsx";
 
 interface CreateResponse { query_id: string; status: string; description: string; challenge_nonce: string | null }
 type QueryMode = "tlsn" | "photo";

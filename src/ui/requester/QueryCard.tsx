@@ -9,12 +9,12 @@ import {
   XCircle,
 } from "lucide-react";
 import React, { useState } from "react";
-import { apiFetch } from "../api-config";
-import { Badge } from "../components/ui/badge";
-import { Card, CardContent, CardHeader } from "../components/ui/card";
-import { cn } from "../lib/utils";
-import { DecryptedImage } from "./DecryptedImage";
-import { TlsnProofPanel } from "./TlsnProofPanel";
+import { apiFetch } from "../api-config.ts";
+import { Badge } from "../components/ui/badge.tsx";
+import { Card, CardContent, CardHeader } from "../components/ui/card.tsx";
+import { cn } from "../lib/utils.ts";
+import { DecryptedImage } from "./DecryptedImage.tsx";
+import { TlsnProofPanel } from "./TlsnProofPanel.tsx";
 
 interface Bounty { amount_sats: number }
 interface HtlcSummary { hash: string; oracle_pubkey: string; worker_pubkey: string | null; locktime: number }
@@ -122,7 +122,7 @@ function QueryMeta({ detail, query, isActive }: { detail?: QueryDetail; query: Q
       <span>{timeAgo(detail?.created_at ?? Date.now())}</span>
       {query.location_hint && <span>{query.location_hint}</span>}
       {isActive && <span className="text-amber-500">{timeLeft(query.expires_at)}</span>}
-      {query.quotes_count > 0 && <span>{query.quotes_count}{"\u4EF6\u306E\u898B\u7A4D\u3082\u308A"}</span>}
+      {query.quotes_count > 0 && <span>{query.quotes_count}件の見積もり</span>}
     </div>
   );
 }
@@ -195,7 +195,7 @@ function AttachmentList({
     <div className="space-y-3">
       <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
         <ImageIcon className="w-3.5 h-3.5" />
-        {"\u6DFB\u4ED8\u30D5\u30A1\u30A4\u30EB"} ({attachments.length})
+        添付ファイル ({attachments.length})
       </p>
       {attachments.map((att) => {
         const km = blossomKeys?.[att.id];
@@ -264,7 +264,7 @@ export function QueryCard({ query }: { query: QuerySummary }) {
 
           {detail?.payment_status && detail.payment_status !== "none" && (
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">{"\u652F\u6255\u3044:"}</span>
+              <span className="text-muted-foreground">支払い:</span>
               <Badge variant="outline" className="text-[10px]">{detail.payment_status}</Badge>
             </div>
           )}

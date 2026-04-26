@@ -2,7 +2,7 @@
  * MCP tool handlers for the Verified Data Marketplace.
  */
 
-import type { McpQueryBackend } from "./mcp-query-backend";
+import type { McpQueryBackend } from "./mcp-query-backend.ts";
 
 type McpTextResult = { content: Array<{ type: "text"; text: string }> };
 
@@ -10,7 +10,7 @@ export async function handleMarketplaceListData(
   backend: McpQueryBackend,
   activeOnly: boolean,
 ): Promise<McpTextResult> {
-  const baseUrl = process.env.REMOTE_QUERY_API_BASE_URL ?? "http://localhost:3000";
+  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ?? "http://localhost:3000";
   const url = `${baseUrl}/marketplace/listings`;
 
   try {
@@ -31,7 +31,7 @@ export async function handleMarketplaceBuyData(
   listingId: string,
   cashuToken: string,
 ): Promise<McpTextResult> {
-  const baseUrl = process.env.REMOTE_QUERY_API_BASE_URL ?? "http://localhost:3000";
+  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ?? "http://localhost:3000";
   const url = `${baseUrl}/marketplace/data/${listingId}`;
 
   try {
@@ -57,7 +57,7 @@ export async function handleMarketplaceSearchListings(
   backend: McpQueryBackend,
   query: string,
 ): Promise<McpTextResult> {
-  const baseUrl = process.env.REMOTE_QUERY_API_BASE_URL ?? "http://localhost:3000";
+  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ?? "http://localhost:3000";
   const url = `${baseUrl}/marketplace/listings`;
 
   try {

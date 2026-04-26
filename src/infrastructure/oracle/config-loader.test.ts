@@ -57,8 +57,8 @@ describe("parseOracleRegistry", () => {
 
 describe("loadOraclesFromEnv", () => {
   test("registers oracles from env var", () => {
-    const originalEnv = process.env.ORACLE_REGISTRY;
-    process.env.ORACLE_REGISTRY = "ext1:https://oracle1.example.com:50000";
+    const originalEnv = Deno.env.get("ORACLE_REGISTRY");
+    Deno.env.set("ORACLE_REGISTRY", "ext1:https://oracle1.example.com:50000");
 
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const count = loadOraclesFromEnv(registry);
@@ -68,17 +68,18 @@ describe("loadOraclesFromEnv", () => {
     expect(oracles.length).toBe(1);
     expect(oracles[0]!.id).toBe("ext1");
 
-    process.env.ORACLE_REGISTRY = originalEnv;
+    if (originalEnv !== undefined) Deno.env.set("ORACLE_REGISTRY", originalEnv);
+    else Deno.env.delete("ORACLE_REGISTRY");
   });
 
   test("returns 0 when no env var set", () => {
-    const originalEnv = process.env.ORACLE_REGISTRY;
-    delete process.env.ORACLE_REGISTRY;
+    const originalEnv = Deno.env.get("ORACLE_REGISTRY");
+    Deno.env.delete("ORACLE_REGISTRY");
 
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const count = loadOraclesFromEnv(registry);
     expect(count).toBe(0);
 
-    process.env.ORACLE_REGISTRY = originalEnv;
+    if (originalEnv !== undefined) Deno.env.set("ORACLE_REGISTRY", originalEnv);
   });
 });

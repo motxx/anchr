@@ -12,8 +12,10 @@
   },
   "imports": {
     "@anchr/core-runtime": "../core-runtime/src/mod.ts",
+    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
     "@anchr/core-domain/oracle-types": "../core-domain/src/oracle-types.ts",
     "hono": "jsr:@hono/hono@^4",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1"
   },
@@ -27,6 +29,6 @@
     "strict": true
   },
   "tasks": {
-    "test": "deno test --no-check --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
   }
 }

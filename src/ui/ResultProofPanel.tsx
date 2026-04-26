@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 import React, { useState } from "react";
 
-export { VerificationPanel } from "./VerificationPanel";
-export type { VerificationPanelProps } from "./VerificationPanel";
+export { VerificationPanel } from "./VerificationPanel.tsx";
+export type { VerificationPanelProps } from "./VerificationPanel.tsx";
 
 // ---- Types ----
 
@@ -206,7 +206,7 @@ export function ResultProofPanel({ queryId, result }: ResultProofPanelProps) {
 
   if (!hasAnyProof) return null;
 
-  const apiOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const apiOrigin = typeof window !== "undefined" ? globalThis.location.origin : "";
 
   return (
     <div className="space-y-3">

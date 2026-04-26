@@ -7,6 +7,8 @@ import {
   isFrostSignerAvailable,
   runFrostCommand,
   _setFrostSignerPathForTest,
+  dkgRound1,
+  verifySignature,
 } from "./frost-cli.ts";
 
 const PROJECT_ROOT = join(import.meta.dirname!, "../../..");
@@ -29,7 +31,7 @@ const realBinary = findRealBinary();
 describe("frost-cli wrapper", () => {
   afterEach(() => {
     // Reset to undefined so findFrostSigner re-discovers on next call
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("findFrostSigner returns a path when binary exists", () => {
@@ -60,12 +62,11 @@ const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("frost-cli with real binary", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("dkgRound1 calls through to binary and returns structured JSON", async () => {
     _setFrostSignerPathForTest(realBinary!);
-    const { dkgRound1 } = await import("./frost-cli.ts");
     const result = await dkgRound1(1, 3, 2);
     // The binary should return ok:true with data containing round1 package
     expect(result.ok).toBe(true);
@@ -74,7 +75,6 @@ binaryDescribe("frost-cli with real binary", () => {
 
   test("verifySignature returns ok with valid field", async () => {
     _setFrostSignerPathForTest(realBinary!);
-    const { verifySignature } = await import("./frost-cli.ts");
     // Use dummy values — the binary will likely return ok:true with valid:false
     // or ok:false with an error; either way the structure should be correct
     const result = await verifySignature("aa".repeat(32), "bb".repeat(32), "cc".repeat(16));

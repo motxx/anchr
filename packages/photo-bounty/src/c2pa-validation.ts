@@ -6,11 +6,14 @@
  * EXIF validation + handwritten nonce provide coverage without C2PA.
  */
 
-import { Buffer } from "node:buffer";
+import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { which, writeFile, spawn } from "@anchr/core-runtime";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "c2pa"]);
 
 export interface C2paManifest {
   title?: string;
@@ -42,7 +45,7 @@ function findC2paTool(): string | null {
   if (c2paToolPath !== undefined) return c2paToolPath;
   c2paToolPath = which("c2patool");
   if (c2paToolPath) {
-    console.error(`[c2pa] Found c2patool at ${c2paToolPath}`);
+    log.error(`Found c2patool at ${c2paToolPath}`);
   }
   return c2paToolPath;
 }

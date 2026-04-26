@@ -13,9 +13,9 @@ import {
   toAttestationRecord,
   type OracleResolver,
   type MultiOracleResolver,
-} from "./query-verification";
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
-import type { Query, QueryResult } from "../../packages/core-domain/src/types";
+} from "./query-verification.ts";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types.ts";
 
 // --- Test helpers ---
 

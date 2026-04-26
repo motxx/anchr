@@ -1,9 +1,9 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in";
-import { createOracleRegistry } from "./registry";
-import type { Oracle, OracleAttestation } from "./types";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
+import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
+import { createOracleRegistry } from "./registry.ts";
+import type { Oracle, OracleAttestation } from "./types.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
 
 function makeFakeOracle(id: string): Oracle {
   return {

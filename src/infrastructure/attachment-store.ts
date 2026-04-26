@@ -1,18 +1,18 @@
 import { Buffer } from "node:buffer";
-import { isBlossomEnabled } from "./blossom/client";
-import { workerUpload } from "./blossom/worker-upload";
-import { validateC2pa } from "../../packages/photo-bounty/src/c2pa-validation";
-import { validateExif } from "../../packages/photo-bounty/src/exif-validation";
-import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
-import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
-import { parseProofModeZip } from "../../packages/photo-bounty/src/proofmode-validation";
-import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../../packages/core-domain/src/types";
+import { isBlossomEnabled } from "./blossom/client.ts";
+import { workerUpload } from "./blossom/worker-upload.ts";
+import { validateC2pa } from "../../packages/photo-bounty/src/c2pa-validation.ts";
+import { validateExif } from "../../packages/photo-bounty/src/exif-validation.ts";
+import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
+import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
+import { parseProofModeZip } from "../../packages/photo-bounty/src/proofmode-validation.ts";
+import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../../packages/core-domain/src/types.ts";
 import {
   detectZip,
   inferMimeType,
   extractProofModeIntegrity,
   logIntegrity,
-} from "./attachment-store-helpers";
+} from "./attachment-store-helpers.ts";
 
 export interface UploadResult {
   attachment: AttachmentRef;

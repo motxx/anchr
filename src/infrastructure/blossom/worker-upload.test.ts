@@ -1,6 +1,6 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { encryptBlob, decryptBlob } from "./client";
+import { encryptBlob, decryptBlob } from "./client.ts";
 
 test("encryptBlob + decryptBlob round-trip", async () => {
   const original = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);

@@ -41,8 +41,21 @@ npm packages (via `npm:` prefix):
 
 - `Deno.serve()` for HTTP servers. Use Hono for routing. Don't use `express`.
 - `Deno.upgradeWebSocket()` for WebSocket support.
-- Runtime compat layer at `src/runtime/mod.ts` provides: `spawn`, `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `which`, `moduleDir`
+- Runtime compat layer at `packages/core-runtime/` exposes: `spawn`, `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `which`, `moduleDir`. Import as `@anchr/core-runtime` (or subpaths like `@anchr/core-runtime/logger`).
+- Env access: use `Deno.env.get/set/delete` — never `process.env` (caught by lint).
 - `WebSocket` is built-in. Don't use `ws`.
+
+## Logging
+
+Use logTape via `@anchr/core-runtime/logger` (re-exposed for the host as `src/infrastructure/logger.ts`). Don't call `console.*` in `src/infrastructure/` or `packages/` — `console` is reserved for UI/scripts and the `log-stream` tee.
+
+```ts
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "verifier"]);
+log.info("verification passed", { queryId, oracleId });
+```
+
+The level is read from `ANCHR_LOG_LEVEL` (or `LOG_LEVEL`) — `info` by default.
 
 ## Testing
 
@@ -77,10 +90,20 @@ deno task build:ui && deno task build:css && deno task dev
 
 | Command | Scope | Docker |
 |---------|-------|--------|
-| `deno task test:all` | lint + unit + protocol + frost + integration + example | No |
+| `deno task lint` | recommended deno-lint rules + no-eval / no-self-compare / default-param-last | No |
+| `deno task lint:strict` | deno lint + arch + invariants + paths + refactor | No |
+| `deno task test:packages` | per-package tests across all 7 workspace members | No |
+| `deno task test:all` | deno lint + arch + invariants + paths + dep audit + unit + protocol + frost + integration + example + pentest | No |
 | `deno task test:all:docker` | e2e relay + regtest (starts/stops Docker) | Yes |
 | `deno task test:all:full` | all of the above combined | Yes |
 | `./scripts/test-all.sh --ci` | same as full, CI-optimized | Yes |
+
+Quality invariants the CI enforces:
+- No `--no-check` in test tasks (full TypeScript checking)
+- No `as unknown as` casts in source
+- No dynamic `await import(...)` in libraries (only platform conditionals + scripts)
+- No `process.env` in `src/`/`packages/` (use `Deno.env`)
+- No `console.*` in `src/infrastructure/` or `packages/` (use `getLogger` from `@anchr/core-runtime/logger`)
 
 ## Architecture Lint
 

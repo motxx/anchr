@@ -1,11 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildWorkerApiApp } from "./worker-api";
-import { createQueryService, createQueryStore } from "../application/query-service";
-import type { QueryService } from "../application/query-service";
-import { createOracleRegistry } from "./oracle";
-import type { Oracle, OracleAttestation } from "./oracle";
-import type { Query, QueryResult, BlossomKeyMap } from "../../packages/core-domain/src/types";
+import { buildWorkerApiApp } from "./worker-api.ts";
+import { createQueryService, createQueryStore } from "../application/query-service.ts";
+import type { QueryService } from "../application/query-service.ts";
+import { createOracleRegistry } from "./oracle/index.ts";
+import type { Oracle, OracleAttestation } from "./oracle/index.ts";
+import type { Query, QueryResult, BlossomKeyMap } from "../../packages/core-domain/src/types.ts";
 
 // --- Mock oracle ---
 
@@ -31,10 +31,10 @@ function makeApp(oraclePass = true) {
   registry.register(makeMockOracle(oraclePass));
   const svc = createQueryService({ store, oracleRegistry: registry });
   // Ensure no API key required for tests
-  const savedKey = process.env.HTTP_API_KEY;
-  const savedKeys = process.env.HTTP_API_KEYS;
-  delete process.env.HTTP_API_KEY;
-  delete process.env.HTTP_API_KEYS;
+  const savedKey = Deno.env.get("HTTP_API_KEY");
+  const savedKeys = Deno.env.get("HTTP_API_KEYS");
+  Deno.env.delete("HTTP_API_KEY");
+  Deno.env.delete("HTTP_API_KEYS");
 
   const app = buildWorkerApiApp({ queryService: svc });
 
@@ -42,10 +42,10 @@ function makeApp(oraclePass = true) {
     app,
     svc,
     cleanup: () => {
-      if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-      else delete process.env.HTTP_API_KEY;
-      if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-      else delete process.env.HTTP_API_KEYS;
+      if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+      else Deno.env.delete("HTTP_API_KEY");
+      if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+      else Deno.env.delete("HTTP_API_KEYS");
     },
   };
 }

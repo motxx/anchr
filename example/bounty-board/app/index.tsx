@@ -1,5 +1,5 @@
 import { Redirect } from "expo-router";
-import { useAuthStore } from "../src/store/auth";
+import { useAuthStore } from "../src/store/auth.ts";
 
 export default function Index() {
   const secretKeyHex = useAuthStore((s) => s.secretKeyHex);

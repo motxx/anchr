@@ -1,12 +1,13 @@
 import { describe, test, afterEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createFrostSigner } from "./signer";
+import { createFrostSigner } from "./signer.ts";
 import {
   _setFrostSignerPathForTest,
   findFrostSigner,
   isFrostSignerAvailable,
-} from "../../../packages/cashu-frost-oracle/src/frost-cli";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types";
+  dkgRound1,
+} from "../../../packages/cashu-frost-oracle/src/frost-cli.ts";
+import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -36,7 +37,7 @@ const signerConfig = {
 
 describe("FrostSigner verification gating", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("verifyAndSign returns null when verification fails (expired query)", async () => {
@@ -93,14 +94,13 @@ const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("FrostSigner with real binary", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("verifyAndSign round 1 returns nonce_commitment when verification passes", async () => {
     _setFrostSignerPathForTest(realBinary!);
 
     // First, run DKG to get a real key package
-    const { dkgRound1 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const r1Result = await dkgRound1(1, 3, 2);
     if (!r1Result.ok || !r1Result.data) {
       // If DKG round 1 fails, we cannot proceed — skip gracefully

@@ -1,14 +1,14 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { validateZ } from "./zod-validator-shim.ts";
 import { spawn } from "../../packages/core-runtime/src/mod.ts";
-import { uploadAttachment } from "./attachment-store";
-import { materializeAttachmentRef } from "./attachments";
-import { getRuntimeConfig } from "./config";
-import { validateAttachmentUri } from "./url-validation";
-import { haversineKm } from "../../packages/photo-bounty/src/geo";
-import { createQuerySchema, resultBodySchema } from "./worker-api-schemas";
+import { uploadAttachment } from "./attachment-store.ts";
+import { materializeAttachmentRef } from "./attachments.ts";
+import { getRuntimeConfig } from "./config.ts";
+import { validateAttachmentUri } from "./url-validation.ts";
+import { haversineKm } from "../../packages/photo-bounty/src/geo.ts";
+import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
 import {
   buildAttachmentPayload,
   buildCreatedQueryPayload,
@@ -17,15 +17,15 @@ import {
   queryDetail,
   querySummary,
   renderStoredAttachmentPreview,
-} from "./worker-api-presenters";
-import type { QueryService, QueryInput, QueryResult } from "../application/query-service";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types";
+} from "./worker-api-presenters.ts";
+import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
+import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
   pStore?: PreimageStore;
-  doListOracles: () => ReturnType<typeof import("./oracle").listOracles>;
+  doListOracles: () => ReturnType<typeof import("./oracle/index.ts").listOracles>;
   writeAuth: MiddlewareHandler;
   rateLimit: MiddlewareHandler;
 }
@@ -107,15 +107,14 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
     "/queries",
     rateLimit,
     writeAuth,
-    // deno-lint-ignore no-explicit-any -- Zod v4 ZodObject is not assignable to @hono/zod-validator's ZodSchema (Zod v3 type)
-    zValidator("json", createQuerySchema as any, (result, c) => {
+    validateZ("json", createQuerySchema, (result, c) => {
       if (!result.success) {
         return c.json({
           error: "Invalid query payload",
           issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         }, 400);
       }
-    }) as unknown as MiddlewareHandler,
+    }),
     (c) => handleCreateQuery(c, svc, () => getPublicRequestUrl(c)),
   );
 
@@ -410,7 +409,7 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
           } catch { /* client gone */ }
         };
 
-        const { getRecentLogs, subscribeLog } = await import("./log-stream");
+        const { getRecentLogs, subscribeLog } = await import("./log-stream.ts");
         for (const entry of getRecentLogs()) send(entry);
         unsubscribe = subscribeLog(send);
 
@@ -432,7 +431,7 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || (process.env.NODE_ENV === "production" ? "" : "*"),
+        "Access-Control-Allow-Origin": Deno.env.get("CORS_ORIGIN") || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
       },
     });
   });

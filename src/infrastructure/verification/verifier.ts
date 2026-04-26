@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer";
-import { checkAttachmentContent } from "./ai-content-check";
-import { validateC2pa } from "../../../packages/photo-bounty/src/c2pa-validation";
-import { haversineKm } from "../../../packages/photo-bounty/src/geo";
-import { getIntegrity, getIntegrityForQuery } from "../../../packages/photo-bounty/src/integrity-store";
-import { validateTlsn } from "../../../packages/tlsn-toolkit/src/tlsn-validation";
-import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
-import { validateAttachmentUri } from "../url-validation";
+import { checkAttachmentContent } from "./ai-content-check.ts";
+import { validateC2pa } from "../../../packages/photo-bounty/src/c2pa-validation.ts";
+import { haversineKm } from "../../../packages/photo-bounty/src/geo.ts";
+import { getIntegrity, getIntegrityForQuery } from "../../../packages/photo-bounty/src/integrity-store.ts";
+import { validateTlsn } from "../../../packages/tlsn-toolkit/src/tlsn-validation.ts";
+import { fetchBlossomAttachment } from "../blossom/fetch-attachment.ts";
+import { validateAttachmentUri } from "../url-validation.ts";
 import type {
   AttachmentRef,
   BlossomKeyMap,
@@ -14,7 +14,7 @@ import type {
   QueryResult,
   TlsnVerifiedData,
   VerificationDetail,
-} from "../../../packages/core-domain/src/types";
+} from "../../../packages/core-domain/src/types.ts";
 /** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 

@@ -12,28 +12,31 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { NostrIdentity } from "../nostr/identity";
-import { restoreIdentity } from "../nostr/identity";
-import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm";
+import type { NostrIdentity } from "../nostr/identity.ts";
+import { restoreIdentity } from "../nostr/identity.ts";
+import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm.ts";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
-} from "../nostr/client";
-import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
-import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
-import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator";
-import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
+} from "../nostr/client.ts";
+import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
+import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator.ts";
+import { verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
 import {
   type WatchedQuery,
   buildQueryFromPayload,
   buildResultFromPayload,
   handleFeedbackEvent,
   parseResponsePayload,
-} from "./oracle-nostr-handlers";
+} from "./oracle-nostr-handlers.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "oracle-nostr"]);
 
 /** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */
 let _publishEventFn: typeof publishEvent = publishEvent;
@@ -93,14 +96,14 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     if (!entry) return;
 
     if (entry.selectedWorkerPubkey && event.pubkey !== entry.selectedWorkerPubkey) {
-      console.error(`[oracle-nostr] Ignoring result from non-selected Worker ${event.pubkey}`);
+      log.error(`Ignoring result from non-selected Worker ${event.pubkey}`);
       return;
     }
 
     try {
       const oraclePayload = parseResponsePayload(config.identity, event);
       if (!oraclePayload) {
-        console.error(`[oracle-nostr] No oracle_payload tag in result for ${queryId}`);
+        log.error(`No oracle_payload tag in result for ${queryId}`);
         return;
       }
 
@@ -109,7 +112,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       const passed = await verifyAndDeliverInternal(queryId, query, result, event.pubkey);
       config.onVerification?.(queryId, passed, event.pubkey);
     } catch (error) {
-      console.error(`[oracle-nostr] Failed to process result for ${queryId}:`, error);
+      log.error(`Failed to process result for ${queryId}:`, error);
     }
   }
 
@@ -132,13 +135,13 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         const publishResult = await _publishEventFn(dm, config.relayUrls);
         if (publishResult.successes.length > 0) {
-          console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId} (${publishResult.successes.length} relay(s))`);
+          log.error(`Preimage delivered to Worker for ${queryId} (${publishResult.successes.length} relay(s))`);
           delivered = true;
           break;
         }
         if (attempt < MAX_RETRIES) {
           const delaySec = attempt * 2;
-          console.error(`[oracle-nostr] Preimage delivery failed for ${queryId} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
+          log.error(`Preimage delivery failed for ${queryId} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
           await new Promise((r) => setTimeout(r, delaySec * 1000));
         }
       }
@@ -147,14 +150,14 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
         preimageStore.delete(hash);
         queryHashMap.delete(queryId);
       } else {
-        console.error(`[oracle-nostr] Preimage delivery failed for ${queryId} after ${MAX_RETRIES} attempts — preimage retained for HTTP fallback`);
+        log.error(`Preimage delivery failed for ${queryId} after ${MAX_RETRIES} attempts — preimage retained for HTTP fallback`);
       }
       return true;
     } else {
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
       await _publishEventFn(dm, config.relayUrls);
-      console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
+      log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
       return false;
     }
   }
@@ -209,7 +212,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
 
     async verifyAndDeliverFrost(queryId, query, result, workerPubkey) {
       if (!config.frostNodeConfig) {
-        console.error(`[oracle-nostr] FROST node config not available, falling back to HTLC`);
+        log.error(`FROST node config not available, falling back to HTLC`);
         return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
       }
 
@@ -219,7 +222,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
         const reason = detail.failures.join(", ") || "Verification failed";
         const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
         await _publishEventFn(dm, config.relayUrls);
-        console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
+        log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
         return false;
       }
 
@@ -236,7 +239,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       );
 
       if (!sigResult) {
-        console.error(`[oracle-nostr] FROST signing failed for ${queryId} — threshold not met`);
+        log.error(`FROST signing failed for ${queryId} — threshold not met`);
         const dm = buildRejectionDM(config.identity, workerPubkey, queryId, "FROST threshold not met — insufficient Oracle approvals");
         await _publishEventFn(dm, config.relayUrls);
         return false;
@@ -252,7 +255,7 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       );
       const publishResult = await _publishEventFn(dm, config.relayUrls);
       if (publishResult.successes.length > 0) {
-        console.error(`[oracle-nostr] FROST signature delivered to Worker for ${queryId} (signers: ${sigResult.signers_participated.join(",")})`);
+        log.error(`FROST signature delivered to Worker for ${queryId} (signers: ${sigResult.signers_participated.join(",")})`);
       }
       return true;
     },
@@ -272,11 +275,11 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
  * Create an Oracle Nostr service from environment variable.
  */
 export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
-  const secretKeyHex = process.env.ORACLE_NOSTR_SECRET_KEY?.trim();
+  const secretKeyHex = Deno.env.get("ORACLE_NOSTR_SECRET_KEY")?.trim();
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",").map((u) => u.trim()).filter(Boolean);
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",").map((u) => u.trim()).filter(Boolean);
 
   return createOracleNostrService({ identity, relayUrls });
 }

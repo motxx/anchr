@@ -15,6 +15,7 @@ import { expect } from "@std/expect";
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import process from "node:process";
 
 function findChromium(): string | null {
   const base = join(process.env.HOME ?? "", ".cache/puppeteer/chrome");

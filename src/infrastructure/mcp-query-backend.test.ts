@@ -1,9 +1,9 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createQueryService, setDefaultService } from "../application/query-service";
-import { createOracleRegistry } from "./oracle/registry";
-import { normalizeQueryResult } from "./attachments";
-import { clearIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
+import { createQueryService, setDefaultService } from "../application/query-service.ts";
+import { createOracleRegistry } from "./oracle/registry.ts";
+import { normalizeQueryResult } from "./attachments.ts";
+import { clearIntegrityStore } from "../../packages/photo-bounty/src/integrity-store.ts";
 
 /**
  * Tests for MCP query backend data transformation.
@@ -24,7 +24,7 @@ beforeEach(() => {
 
 describe("MCP query backend — default backend", () => {
   test("createQuery returns created payload with expected fields", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     const result = await backend.createQuery(
@@ -43,7 +43,7 @@ describe("MCP query backend — default backend", () => {
   });
 
   test("getQueryStatus returns status payload for existing query", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     const created = await backend.createQuery(
@@ -61,7 +61,7 @@ describe("MCP query backend — default backend", () => {
   });
 
   test("getQueryStatus returns error for unknown query", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     const result = await backend.getQueryStatus("nonexistent") as Record<string, unknown>;
@@ -69,7 +69,7 @@ describe("MCP query backend — default backend", () => {
   });
 
   test("listAvailableQueries returns open queries", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     await backend.createQuery({ description: "Q1" }, 600, { requester_type: "agent" });
@@ -83,7 +83,7 @@ describe("MCP query backend — default backend", () => {
   });
 
   test("cancelQuery cancels existing query", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     const created = await backend.createQuery(
@@ -100,7 +100,7 @@ describe("MCP query backend — default backend", () => {
   });
 
   test("getQueryAttachment returns error when no attachments", async () => {
-    const { getMcpQueryBackend } = await import("./mcp-query-backend");
+    const { getMcpQueryBackend } = await import("./mcp-query-backend.ts");
     const backend = getMcpQueryBackend();
 
     const created = await backend.createQuery(

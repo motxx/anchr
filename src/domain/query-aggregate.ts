@@ -15,12 +15,12 @@ import type {
   QuorumConfig,
   OracleAttestationRecord,
   RequesterMeta,
-} from "../../packages/core-domain/src/types";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
+} from "../../packages/core-domain/src/types.ts";
+import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types.ts";
 import { randomBytes } from "node:crypto";
-import { isValidTransition, isCancellable, isExpirable } from "./query-transitions";
-import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects";
-import { buildChallengeRule, generateNonce } from "./challenge";
+import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
+import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects.ts";
+import { buildChallengeRule, generateNonce } from "./challenge.ts";
 
 export type TransitionResult =
   | { ok: true; query: Query }

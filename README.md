@@ -114,8 +114,11 @@ deno task test:regtest               # E2E tests against regtest
 ## Testing
 
 ```bash
+deno task lint            # deno lint (recommended + no-eval / no-self-compare / default-param-last)
+deno task lint:strict     # deno lint + arch + invariants + paths + refactor
 deno task test:ci         # unit + protocol + all packages (CI pipeline)
 deno task test:unit       # unit tests only
+deno task test:packages   # workspace package tests only (each package in isolation)
 deno task test:protocol   # protocol verification (trustless / attacks / exploits / quorum)
 deno task test:frost      # FROST threshold signing
 deno task test:regtest    # Cashu + Lightning E2E (Docker)
@@ -124,9 +127,9 @@ deno task test:example    # all 7 example apps
 deno task test            # everything (including e2e)
 ```
 
-See also: `deno task test:all` (lint + unit + protocol + frost + integration + example), `deno task test:all:docker` (e2e relay + regtest with Docker), `deno task test:all:full` (all combined).
+See also: `deno task test:all` (deno lint + arch + invariants + paths + dep audit + unit + protocol + frost + integration + example + pentest), `deno task test:all:docker` (e2e relay + regtest with Docker), `deno task test:all:full` (all combined).
 
-Current baseline: **313 tests / 975 steps / 0 failed** (250 host + 63 examples).
+Current baseline: **312 unit/protocol/frost/example tests + 71 package tests / 0 failed**, deno lint clean, all 7 packages independently typecheck and test.
 
 ## API (host server)
 
@@ -194,6 +197,7 @@ Current baseline: **313 tests / 975 steps / 0 failed** (250 host + 63 examples).
 | `PREVIEW_MAX_DIMENSION` | Max preview image dimension (px) | `768` |
 | `PREVIEW_JPEG_QUALITY` | JPEG preview quality (1-100) | `75` |
 | `RUNTIME_DATA_DIR` | Local data directory | `.local` |
+| `ANCHR_LOG_LEVEL` / `LOG_LEVEL` | logTape level (`debug` / `info` / `warning` / `error` / `fatal`) | `info` |
 
 </details>
 

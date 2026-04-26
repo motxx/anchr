@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQueryService } from "../application/query-service";
-import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
-import { buildWorkerApiApp } from "./worker-api";
-import { withEnvThunk as withEnv } from "../testing/helpers";
+import { isBlossomEnabled, getBlossomConfig } from "./blossom/client.ts";
+import { createQueryService } from "../application/query-service.ts";
+import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
+import { buildWorkerApiApp } from "./worker-api.ts";
+import { withEnvThunk as withEnv } from "../testing/helpers.ts";
 
 // QueryService without relay hooks — avoids fire-and-forget WebSocket leaks
 // that trip Deno's resource sanitizer.

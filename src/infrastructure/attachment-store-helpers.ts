@@ -3,8 +3,11 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
-import type { ProofModeData } from "../../packages/photo-bounty/src/proofmode-validation";
+import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
+import type { ProofModeData } from "../../packages/photo-bounty/src/proofmode-validation.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "integrity"]);
 
 export function detectZip(rawBuffer: Buffer, filename: string): boolean {
   return filename.endsWith(".zip") || (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);
@@ -42,9 +45,9 @@ export function logIntegrity(
     failures.push(...proofmode.failures);
   }
   if (checks.length > 0) {
-    console.error(`[integrity] ${queryId}: ${checks.join("; ")}`);
+    log.error(`${queryId}: ${checks.join("; ")}`);
   }
   if (failures.length > 0) {
-    console.error(`[integrity] ${queryId} warnings: ${failures.join("; ")}`);
+    log.error(`${queryId} warnings: ${failures.join("; ")}`);
   }
 }

@@ -5,7 +5,7 @@
  * Blossom blob cleanup is handled server-side.
  */
 
-import { purgeExpiredFromStore } from "./query-service";
+import { purgeExpiredFromStore } from "./query-service.ts";
 
 /**
  * Purge all expired queries from the in-memory store.

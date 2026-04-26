@@ -7,8 +7,11 @@
  *   ORACLE_REGISTRY=ext1:https://oracle1.example.com:50000:sk-xxx,ext2:https://oracle2.example.com:30000
  */
 
-import { createHttpOracle } from "./http-oracle";
-import type { OracleRegistry } from "./registry";
+import { createHttpOracle } from "./http-oracle.ts";
+import type { OracleRegistry } from "./registry.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "oracle-config"]);
 
 export interface OracleConfigEntry {
   id: string;
@@ -27,7 +30,7 @@ export function parseOracleRegistry(raw: string): OracleConfigEntry[] {
   for (const entry of entries) {
     const parts = entry.split(":");
     if (parts.length < 3) {
-      console.error(`[oracle-config] Invalid entry (need id:endpoint:fee_ppm): ${entry}`);
+      log.error(`Invalid entry (need id:endpoint:fee_ppm): ${entry}`);
       continue;
     }
 
@@ -52,7 +55,7 @@ export function parseOracleRegistry(raw: string): OracleConfigEntry[] {
         }
       }
       if (feeIdx === -1) {
-        console.error(`[oracle-config] Cannot parse fee_ppm in entry: ${entry}`);
+        log.error(`Cannot parse fee_ppm in entry: ${entry}`);
         continue;
       }
       fee_ppm = Number(parts[feeIdx]!);
@@ -71,7 +74,7 @@ export function parseOracleRegistry(raw: string): OracleConfigEntry[] {
  * Called at application startup.
  */
 export function loadOraclesFromEnv(registry: OracleRegistry): number {
-  const raw = process.env.ORACLE_REGISTRY?.trim();
+  const raw = Deno.env.get("ORACLE_REGISTRY")?.trim();
   if (!raw) return 0;
 
   const entries = parseOracleRegistry(raw);
@@ -84,7 +87,7 @@ export function loadOraclesFromEnv(registry: OracleRegistry): number {
       apiKey: entry.apiKey,
     });
     registry.register(oracle);
-    console.error(`[oracle-config] Registered oracle: ${entry.id} at ${entry.endpoint}`);
+    log.error(`Registered oracle: ${entry.id} at ${entry.endpoint}`);
   }
 
   return entries.length;

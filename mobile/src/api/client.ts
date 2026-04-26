@@ -6,6 +6,8 @@ import type {
   AttachmentRef,
   BlossomKeyMap,
 } from "./types";
+// Side-effect import: augments FormData.append with the RN { uri, name, type } overload.
+import "../types/rn-formdata.d.ts";
 import { useSettingsStore } from "../store/settings";
 
 function getBaseUrl(): string {
@@ -46,7 +48,7 @@ export async function uploadPhoto(
     uri: fileUri,
     name: filename,
     type: mimeType,
-  } as unknown as Blob);
+  });
 
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/upload`, {
     method: "POST",

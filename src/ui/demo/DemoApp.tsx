@@ -1,6 +1,6 @@
 import React, { useEffect, useReducer, useCallback, useRef, useState } from "react";
-import { DemoColumn } from "./DemoColumn";
-import { StoryView } from "./StoryView";
+import { DemoColumn } from "./DemoColumn.tsx";
+import { StoryView } from "./StoryView.tsx";
 
 export interface DemoEvent {
   actor: "requester" | "worker" | "oracle" | "system";

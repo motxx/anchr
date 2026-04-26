@@ -8,6 +8,9 @@
 import type { FrostNodeConfig, PeerConfig } from "./config.ts";
 import { signRound1, signRound2, aggregateSignatures } from "./frost-cli.ts";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost-coord"]);
+
 export interface SigningCoordinatorConfig {
   /** This node's FROST config. */
   nodeConfig: FrostNodeConfig;
@@ -44,7 +47,7 @@ export async function coordinateSigning(
   // This node's round 1
   const localR1 = await signRound1(keyPackageJson);
   if (!localR1.ok || !localR1.data) {
-    console.error("[frost-coord] Local sign-round1 failed:", localR1.error);
+    log.error("Local sign-round1 failed:", localR1.error);
     return null;
   }
 
@@ -78,7 +81,7 @@ export async function coordinateSigning(
       );
 
       if (!res.ok) {
-        console.error(`[frost-coord] Peer ${peer.signer_index} round1 failed: ${res.status}`);
+        log.error(`Peer ${peer.signer_index} round1 failed: ${res.status}`);
         continue;
       }
 
@@ -87,7 +90,7 @@ export async function coordinateSigning(
       commitments[peerId] = data.commitments;
       participatingPeers.push({ ...peer, nonce_id: data.nonce_id });
     } catch (err) {
-      console.error(`[frost-coord] Peer ${peer.signer_index} round1 error:`, err instanceof Error ? err.message : err);
+      log.error(`Peer ${peer.signer_index} round1 error:`, err instanceof Error ? err.message : err);
     }
 
     // Stop once we have enough (threshold)
@@ -95,7 +98,7 @@ export async function coordinateSigning(
   }
 
   if (Object.keys(commitments).length < nodeConfig.threshold) {
-    console.error(`[frost-coord] Only ${Object.keys(commitments).length}/${nodeConfig.threshold} commitments — below threshold`);
+    log.error(`Only ${Object.keys(commitments).length}/${nodeConfig.threshold} commitments — below threshold`);
     return null;
   }
 
@@ -108,7 +111,7 @@ export async function coordinateSigning(
   // This node's round 2
   const localR2 = await signRound2(keyPackageJson, localNonces, commitmentsJson, messageHex);
   if (!localR2.ok || !localR2.data) {
-    console.error("[frost-coord] Local sign-round2 failed:", localR2.error);
+    log.error("Local sign-round2 failed:", localR2.error);
     return null;
   }
   shares[localIdentifier] = localR2.data.signature_share;
@@ -131,7 +134,7 @@ export async function coordinateSigning(
       );
 
       if (!res.ok) {
-        console.error(`[frost-coord] Peer ${peer.signer_index} round2 failed: ${res.status}`);
+        log.error(`Peer ${peer.signer_index} round2 failed: ${res.status}`);
         continue;
       }
 
@@ -139,12 +142,12 @@ export async function coordinateSigning(
       const peerId = identifierFromIndex(peer.signer_index);
       shares[peerId] = data.signature_share;
     } catch (err) {
-      console.error(`[frost-coord] Peer ${peer.signer_index} round2 error:`, err instanceof Error ? err.message : err);
+      log.error(`Peer ${peer.signer_index} round2 error:`, err instanceof Error ? err.message : err);
     }
   }
 
   if (Object.keys(shares).length < nodeConfig.threshold) {
-    console.error(`[frost-coord] Only ${Object.keys(shares).length}/${nodeConfig.threshold} shares — below threshold`);
+    log.error(`Only ${Object.keys(shares).length}/${nodeConfig.threshold} shares — below threshold`);
     return null;
   }
 
@@ -159,7 +162,7 @@ export async function coordinateSigning(
   );
 
   if (!agg.ok || !agg.data?.signature) {
-    console.error("[frost-coord] Aggregation failed:", agg.error);
+    log.error("Aggregation failed:", agg.error);
     return null;
   }
 

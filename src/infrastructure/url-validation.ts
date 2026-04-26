@@ -84,7 +84,7 @@ export function validateAttachmentUri(uri: string): string | null {
 
   const isLocalhost =
     parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-  const isProduction = process.env.NODE_ENV === "production";
+  const isProduction = Deno.env.get("NODE_ENV") === "production";
 
   // In production, reject localhost/loopback — prevents SSRF to co-hosted services
   if (isProduction && isLocalhost) {

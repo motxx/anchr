@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { validateAttachmentUri } from "./url-validation";
+import { validateAttachmentUri } from "./url-validation.ts";
 
 describe("validateAttachmentUri", () => {
   // --- Valid URLs ---

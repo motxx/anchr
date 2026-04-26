@@ -5,16 +5,16 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "./attachments";
-import { getRuntimeConfig } from "./config";
+} from "./attachments.ts";
+import { getRuntimeConfig } from "./config.ts";
 import {
   cancelQuery,
   createQuery,
   getQuery,
   listOpenQueries,
   submitQueryResult,
-} from "../application/query-service";
-import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../../packages/core-domain/src/types";
+} from "../application/query-service.ts";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../../packages/core-domain/src/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
 const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
@@ -331,8 +331,8 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
  * 2. Default → In-memory store + Nostr relay sync
  */
 export function getMcpQueryBackend(): McpQueryBackend {
-  const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
-  const remoteApiKey = process.env.REMOTE_QUERY_API_KEY?.trim() || process.env.HTTP_API_KEY?.trim() || "";
+  const remoteBaseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL")?.trim().replace(/\/+$/, "");
+  const remoteApiKey = Deno.env.get("REMOTE_QUERY_API_KEY")?.trim() || Deno.env.get("HTTP_API_KEY")?.trim() || "";
   if (remoteBaseUrl) {
     return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }

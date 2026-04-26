@@ -13,8 +13,8 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "./identity";
-import { generateEphemeralIdentity } from "./identity";
+import type { NostrIdentity } from "./identity.ts";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -22,10 +22,13 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events";
-import { publishEvent, subscribeToFeedback } from "./client";
-import type { EscrowProvider } from "../../application/escrow-port";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types";
+} from "./events.ts";
+import { publishEvent, subscribeToFeedback } from "./client.ts";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "requester"]);
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */
@@ -122,7 +125,7 @@ export async function createHtlcQuery(
     oracle_pubkey: config.oraclePubkey,
     requester_pubkey: identity.publicKey,
     bounty: {
-      mint: process.env.CASHU_MINT_URL ?? "",
+      mint: Deno.env.get("CASHU_MINT_URL") ?? "",
       token: hold.escrow_ref,
     },
     expires_at: Date.now() + (request.ttlSeconds ?? 600) * 1000,
@@ -137,7 +140,7 @@ export async function createHtlcQuery(
 
   const publishResult = await publishEvent(event, config.relayUrls);
   if (publishResult.successes.length === 0) {
-    console.error("[requester] Failed to publish query to any relay");
+    log.error("Failed to publish query to any relay");
   }
 
   const escrow: EscrowInfo = {

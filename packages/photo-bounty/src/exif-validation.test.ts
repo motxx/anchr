@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { extractExifMetadata, validateExif } from "./exif-validation";
+import { extractExifMetadata, validateExif } from "./exif-validation.ts";
 
 // Minimal valid JPEG with EXIF APP1 segment containing Make, Model, DateTime
 function buildJpegWithExif(options: {

@@ -1,9 +1,9 @@
 import React from "react";
 import { View } from "react-native";
-import { DSPressableCard, DSText, DSBadge, DSSatsAmount } from "../ds";
-import { timeLeft, isUrgent, isExpired } from "../../utils/time";
-import { formatDistance, haversineKm } from "../../utils/distance";
-import type { QuerySummary, GpsCoord } from "../../api/types";
+import { DSPressableCard, DSText, DSBadge, DSSatsAmount } from "../ds/index.ts";
+import { timeLeft, isUrgent, isExpired } from "../../utils/time.ts";
+import { formatDistance, haversineKm } from "../../utils/distance.ts";
+import type { QuerySummary, GpsCoord } from "../../api/types.ts";
 import { Ionicons } from "@expo/vector-icons";
 
 interface BountyCardProps {

@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
-import { apiFetch } from "../api-config";
-import { ActivityTimeline } from "./ActivityTimeline";
-import { DashboardLogsPanel } from "./LogsPanel";
-import { ProofPanel } from "./ProofPanel";
-import { useActivityTracker } from "./useActivityTracker";
+import { apiFetch } from "../api-config.ts";
+import { ActivityTimeline } from "./ActivityTimeline.tsx";
+import { DashboardLogsPanel } from "./LogsPanel.tsx";
+import { ProofPanel } from "./ProofPanel.tsx";
+import { useActivityTracker } from "./useActivityTracker.ts";
 
 const WORKER_PUBKEY = "worker_ui_placeholder_pubkey";
 const REQUESTER_PUBKEY = "requester_demo";

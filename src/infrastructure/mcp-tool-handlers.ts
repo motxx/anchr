@@ -2,9 +2,21 @@
  * Individual MCP tool handler functions.
  */
 
-import type { QueryInput, QueryResult } from "../application/query-service";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types";
-import type { McpQueryBackend } from "./mcp-query-backend";
+import type { QueryInput, QueryResult } from "../application/query-service.ts";
+import type { AttachmentRef, RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
+import type { McpQueryBackend } from "./mcp-query-backend.ts";
+
+function normalizeMcpQueryResult(raw: Record<string, unknown>): QueryResult {
+  const attachments = Array.isArray(raw.attachments) ? raw.attachments as AttachmentRef[] : [];
+  const result: QueryResult = { attachments };
+  if (typeof raw.notes === "string") result.notes = raw.notes;
+  if (raw.gps && typeof raw.gps === "object") result.gps = raw.gps as QueryResult["gps"];
+  if (raw.tlsn_attestation && typeof raw.tlsn_attestation === "object") {
+    result.tlsn_attestation = raw.tlsn_attestation as QueryResult["tlsn_attestation"];
+  }
+  if (raw.tlsn_extension_result !== undefined) result.tlsn_extension_result = raw.tlsn_extension_result;
+  return result;
+}
 
 interface CreateQueryArgs {
   description: string;
@@ -23,7 +35,7 @@ type McpMixedResult = { content: Array<{ type: "text"; text: string } | { type: 
 export function buildRequesterMeta(): RequesterMeta {
   return {
     requester_type: "agent",
-    client_name: process.env.REMOTE_QUERY_API_BASE_URL ? "mcp-remote" : "mcp",
+    client_name: Deno.env.get("REMOTE_QUERY_API_BASE_URL") ? "mcp-remote" : "mcp",
   };
 }
 
@@ -75,7 +87,7 @@ export async function handleSubmitQueryResult(
   result: Record<string, unknown>,
   oracleId?: string,
 ): Promise<McpTextResult> {
-  const payload = await backend.submitQueryResult(queryId, result as unknown as QueryResult, oracleId);
+  const payload = await backend.submitQueryResult(queryId, normalizeMcpQueryResult(result), oracleId);
   return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
 }
 

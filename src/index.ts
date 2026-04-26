@@ -1,81 +1,81 @@
 // --- Domain ---
-export { queryTemplates } from "./domain/query-templates";
+export { queryTemplates } from "./domain/query-templates.ts";
 export {
   cancelQuery as cancelQueryAggregate, createQueryAggregate, submitResult,
   expireQuery, addQuote, selectWorker as selectWorkerAggregate,
   recordResult, completeVerification,
-} from "./domain/query-aggregate";
-export type { TransitionResult, CreateQueryAggregateOptions } from "./domain/query-aggregate";
-export { createInMemoryQueryRepository, toRepository } from "./domain/query-repository";
-export type { QueryRepository } from "./domain/query-repository";
-export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./domain/query-transitions";
+} from "./domain/query-aggregate.ts";
+export type { TransitionResult, CreateQueryAggregateOptions } from "./domain/query-aggregate.ts";
+export { createInMemoryQueryRepository, toRepository } from "./domain/query-repository.ts";
+export type { QueryRepository } from "./domain/query-repository.ts";
+export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./domain/query-transitions.ts";
 export {
   validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
-} from "./domain/value-objects";
-export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "../packages/core-domain/src/types";
+} from "./domain/value-objects.ts";
+export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "../packages/core-domain/src/types.ts";
 
 // --- Application ---
 export {
   cancelQuery, clearQueryStore, createQuery, createQueryService,
   createQueryStore, expireQueries, getQuery, listOpenQueries, submitQueryResult,
   setDefaultService,
-} from "./application/query-service";
+} from "./application/query-service.ts";
 export type {
   AttachmentRef, AttachmentStorageKind, CancelQueryOutcome, CreateQueryOptions,
   HtlcOutcome, Query, QueryHooks, QueryService, QueryServiceDeps, QueryStore,
   RequesterMeta, RequesterType, QueryExecutorType, QueryInput, QueryResult,
   QueryStatus, QuerySubmissionMeta, QueryVerification, SubmitQueryOutcome,
-} from "./application/query-service";
-export { MIN_HTLC_LOCKTIME_SECS } from "./application/query-htlc-validation";
-export { purgeExpiredQueries } from "./application/data-purge";
-export type { EscrowProvider } from "./application/escrow-port";
+} from "./application/query-service.ts";
+export { MIN_HTLC_LOCKTIME_SECS } from "./application/query-htlc-validation.ts";
+export { purgeExpiredQueries } from "./application/data-purge.ts";
+export type { EscrowProvider } from "./application/escrow-port.ts";
 
 export {
   discoverQueries, submitQuote, waitForSelection, encryptAndUpload,
   publishResult, waitForPreimage,
-} from "./infrastructure/nostr/worker-service";
-export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./infrastructure/nostr/worker-service";
+} from "./infrastructure/nostr/worker-service.ts";
+export type { WorkerConfig, DiscoveredQuery, WorkerQueryState } from "./infrastructure/nostr/worker-service.ts";
 
 export {
   requestOracleHash, createHtlcQuery, subscribeToQuotes, selectWorker,
-} from "./infrastructure/nostr/requester-service";
-export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./infrastructure/nostr/requester-service";
+} from "./infrastructure/nostr/requester-service.ts";
+export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./infrastructure/nostr/requester-service.ts";
 
 // --- Infrastructure: Escrow providers ---
-export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-provider";
-export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider";
+export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-provider.ts";
+export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider.ts";
 
 // --- Application: Preimage port ---
-export type { PreimageStore, PreimageEntry } from "../packages/core-cashu/src/preimage-port";
+export type { PreimageStore, PreimageEntry } from "../packages/core-cashu/src/preimage-port.ts";
 // --- Infrastructure: Preimage store ---
-export { createPreimageStore, createPersistentPreimageStore } from "../packages/core-cashu/src/preimage-store";
+export { createPreimageStore, createPersistentPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
 
 // --- Application: Oracle port ---
-export type { OracleRegistry } from "./application/oracle-port";
+export type { OracleRegistry } from "./application/oracle-port.ts";
 // --- Infrastructure: Oracle ---
-export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./infrastructure/oracle";
-export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./infrastructure/oracle";
+export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./infrastructure/oracle/index.ts";
+export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./infrastructure/oracle/index.ts";
 
 // --- Infrastructure: Servers & apps ---
-export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server";
-export { startReferenceApp } from "./infrastructure/reference-app";
-export { startReferenceRuntime } from "./infrastructure/runtime";
-export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./infrastructure/worker-api";
-export { verify as verifyQueryResult } from "./infrastructure/verification/verifier";
-export { stripExif } from "./infrastructure/exif-strip";
+export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server.ts";
+export { startReferenceApp } from "./infrastructure/reference-app.ts";
+export { startReferenceRuntime } from "./infrastructure/runtime.ts";
+export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./infrastructure/worker-api.ts";
+export { verify as verifyQueryResult } from "./infrastructure/verification/verifier.ts";
+export { stripExif } from "./infrastructure/exif-strip.ts";
 
 // --- Infrastructure: Nostr, Blossom, Verification ---
-export * as nostr from "./infrastructure/nostr/index";
-export * as blossom from "./infrastructure/blossom/client";
-export { workerUpload } from "./infrastructure/blossom/worker-upload";
-export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload";
-export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment";
-export * as verification from "./infrastructure/verification/index";
+export * as nostr from "./infrastructure/nostr/index.ts";
+export * as blossom from "./infrastructure/blossom/client.ts";
+export { workerUpload } from "./infrastructure/blossom/worker-upload.ts";
+export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload.ts";
+export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment.ts";
+export * as verification from "./infrastructure/verification/index.ts";
 
 // --- Infrastructure: Oracle Nostr service ---
-export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/oracle-nostr-service";
-export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/oracle-nostr-service";
+export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/oracle-nostr-service.ts";
+export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/oracle-nostr-service.ts";
 
 if (import.meta.main) {
-  await import("./infrastructure/server");
+  await import("./infrastructure/server.ts");
 }

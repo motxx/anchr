@@ -3,14 +3,14 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { NostrIdentity } from "../nostr/identity";
+import type { NostrIdentity } from "../nostr/identity.ts";
 import {
   parseOracleResponsePayload,
   parseFeedbackPayload,
   type QuoteFeedbackPayload,
   type OracleResponsePayload,
-} from "../nostr/events";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types";
+} from "../nostr/events.ts";
+import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
 
 export interface WatchedQuery {
   queryId: string;

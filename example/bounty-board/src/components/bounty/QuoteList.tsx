@@ -1,9 +1,9 @@
 import React from "react";
 import { View } from "react-native";
-import { DSCard, DSText, DSButton, DSAvatar, DSSatsAmount } from "../ds";
-import type { QuoteInfo } from "../../api/types";
-import { truncateNpub } from "../../utils/format";
-import { npubEncode } from "../../nostr/nip19";
+import { DSCard, DSText, DSButton, DSAvatar, DSSatsAmount } from "../ds/index.ts";
+import type { QuoteInfo } from "../../api/types.ts";
+import { truncateNpub } from "../../utils/format.ts";
+import { npubEncode } from "../../nostr/nip19.ts";
 
 interface QuoteListProps {
   quotes: QuoteInfo[];

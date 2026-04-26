@@ -37,7 +37,10 @@ import {
   encodeProofs,
   loadAndSend,
   computeNetAmount,
-} from "./escrow-helpers";
+} from "./escrow-helpers.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "cashu-escrow"]);
 
 // --- Legacy P2PK escrow (retained for backward compatibility) ---
 
@@ -110,7 +113,7 @@ export async function createEscrowToken(
       amountSats,
     };
   } catch (error) {
-    console.error("[cashu-escrow] Failed to create escrow token:", error instanceof Error ? error.message : error);
+    log.error("Failed to create escrow token:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -131,7 +134,7 @@ export async function executeEscrowSwap(
   const workerSats = totalSats - feeSats;
 
   if (workerSats <= 0) {
-    console.error("[cashu-escrow] Fee exceeds total amount");
+    log.error("Fee exceeds total amount");
     return null;
   }
 
@@ -161,7 +164,7 @@ export async function executeEscrowSwap(
       oracleFeeSats: feeSats,
     };
   } catch (error) {
-    console.error("[cashu-escrow] Swap failed:", error instanceof Error ? error.message : error);
+    log.error("Swap failed:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -244,7 +247,7 @@ export async function createHtlcToken(
     const send = await loadAndSend(ctx.wallet, amountSats, sourceProofs);
     return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions: null, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to create initial hold token:", error instanceof Error ? error.message : error);
+    log.error("Failed to create initial hold token:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -267,14 +270,14 @@ export async function swapHtlcBindWorker(
   try {
     const amountSats = computeNetAmount(ctx.wallet, initialProofs);
     if (amountSats === null) {
-      console.error("[cashu-htlc] Fee exceeds total amount");
+      log.error("Fee exceeds total amount");
       return null;
     }
 
     const send = await loadAndSend(ctx.wallet, amountSats, initialProofs, p2pkOptions);
     return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to swap HTLC for worker binding:", error instanceof Error ? error.message : error);
+    log.error("Failed to swap HTLC for worker binding:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -311,14 +314,14 @@ export async function redeemHtlcToken(
 
     const amountSats = computeNetAmount(ctx.wallet, signedProofs);
     if (amountSats === null) {
-      console.error("[cashu-htlc] Fee exceeds total amount");
+      log.error("Fee exceeds total amount");
       return null;
     }
 
     const send = await loadAndSend(ctx.wallet, amountSats, signedProofs, undefined, workerPrivateKey);
     return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to redeem HTLC token:", error instanceof Error ? error.message : error);
+    log.error("Failed to redeem HTLC token:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -335,7 +338,7 @@ function verifyHtlcSpendAuth(signedProofs: Proof[]): string | null {
   for (const proof of signedProofs) {
     if (!isHTLCSpendAuthorised(proof)) {
       const detail = verifyHTLCSpendingConditions(proof);
-      console.error("[cashu-htlc] HTLC spending condition NOT met:", detail);
+      log.error("HTLC spending condition NOT met:", detail);
       return "HTLC spending condition not met";
     }
   }

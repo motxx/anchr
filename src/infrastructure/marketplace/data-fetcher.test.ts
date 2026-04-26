@@ -1,6 +1,6 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { fetchWithProof, _clearCacheForTest } from "./data-fetcher";
+import { fetchWithProof, _clearCacheForTest } from "./data-fetcher.ts";
 
 describe("fetchWithProof SSRF protection", () => {
   beforeEach(() => {

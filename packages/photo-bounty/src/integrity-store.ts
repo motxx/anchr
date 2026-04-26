@@ -6,9 +6,9 @@
  * even though the client-supplied attachment refs are untrusted.
  */
 
-import type { C2paValidationResult } from "./c2pa-validation";
-import type { ExifValidationResult } from "./exif-validation";
-import type { ProofModeMetadata } from "./proofmode-validation";
+import type { C2paValidationResult } from "./c2pa-validation.ts";
+import type { ExifValidationResult } from "./exif-validation.ts";
+import type { ProofModeMetadata } from "./proofmode-validation.ts";
 
 export interface ProofModeIntegrity {
   /** Parsed proof.json metadata. */

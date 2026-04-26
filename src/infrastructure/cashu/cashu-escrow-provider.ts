@@ -4,9 +4,9 @@
  * Thin adapter: delegates to escrow.ts functions without changing any existing logic.
  */
 
-import type { EscrowProvider } from "../../application/escrow-port";
-import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "../../../packages/core-cashu/src/escrow";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet";
+import type { EscrowProvider } from "../../application/escrow-port.ts";
+import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "../../../packages/core-cashu/src/escrow.ts";
+import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
 export interface CashuEscrowProviderConfig {

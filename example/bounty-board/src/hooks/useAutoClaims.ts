@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useQueries } from "./useQueries";
-import type { QuerySummary } from "../api/types";
+import { useQueries } from "./useQueries.ts";
+import type { QuerySummary } from "../api/types.ts";
 
 export interface FlightClaim {
   id: string;

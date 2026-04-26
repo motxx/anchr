@@ -1,8 +1,8 @@
 import React from "react";
 import { View } from "react-native";
-import { DSPressableCard, DSText, DSSatsAmount } from "../ds";
-import { timeLeft } from "../../utils/time";
-import type { FlightClaim } from "../../hooks/useAutoClaims";
+import { DSPressableCard, DSText, DSSatsAmount } from "../ds/index.ts";
+import { timeLeft } from "../../utils/time.ts";
+import type { FlightClaim } from "../../hooks/useAutoClaims.ts";
 import { Ionicons } from "@expo/vector-icons";
 
 interface FlightCardProps {

@@ -7,10 +7,10 @@
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
-import type { NostrIdentity } from "./identity";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption";
-import type { OracleDMPayload, PreimageDMPayload, RejectionDMPayload, FrostSignatureDMPayload } from "./events";
-export type { OracleDMPayload, FrostSignatureDMPayload } from "./events";
+import type { NostrIdentity } from "./identity.ts";
+import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.ts";
+import type { OracleDMPayload, PreimageDMPayload, RejectionDMPayload, FrostSignatureDMPayload } from "./events.ts";
+export type { OracleDMPayload, FrostSignatureDMPayload } from "./events.ts";
 
 /** NIP-04/NIP-44 Direct Message kind. */
 export const DM_KIND = 4;

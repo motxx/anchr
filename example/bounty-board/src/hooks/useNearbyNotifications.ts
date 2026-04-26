@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { notificationProvider } from "../platform/notifications";
-import { haversineKm } from "../utils/distance";
-import type { GpsCoord, QuerySummary } from "../api/types";
+import { notificationProvider } from "../platform/notifications.ts";
+import { haversineKm } from "../utils/distance.ts";
+import type { GpsCoord, QuerySummary } from "../api/types.ts";
 
 const NEARBY_RADIUS_KM = 10;
 

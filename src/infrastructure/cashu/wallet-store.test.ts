@@ -1,6 +1,6 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createWalletStore, type WalletStore } from "./wallet-store";
+import { createWalletStore, type WalletStore } from "./wallet-store.ts";
 import type { Proof } from "@cashu/cashu-ts";
 
 function fakeProof(amount: number, secret?: string): Proof {
