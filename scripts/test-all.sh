@@ -56,6 +56,7 @@ cleanup() {
 run_local() {
   step "Phase 1: Lint & Local Tests"
 
+  run_test "deno lint"        deno task lint
   run_test "arch lint"        deno task lint:arch
   run_test "invariant lint"   deno task lint:invariants
   run_test "path leak lint"   deno task lint:paths
