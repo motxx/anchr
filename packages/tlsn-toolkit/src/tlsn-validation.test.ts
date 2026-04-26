@@ -1,9 +1,17 @@
+/**
+ * Unit tests for tlsn-validation: pure functions and validateTlsn against
+ * a mock verifier binary. Integration tests that exercise the end-to-end
+ * verifier orchestration flow live in src/infrastructure/verification/
+ * verifier-tlsn.test.ts (that file imports the host's verifier wrapper
+ * which is not part of the package).
+ */
+
 import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest, _clearSeenPresentationsForTest } from "./tlsn-validation";
-import { verify } from "./verifier";
-import type { TlsnAttestation, TlsnRequirement } from "../../domain/types";
+// MIGRATION DEBT: types will move to core-domain.
+import type { TlsnAttestation, TlsnRequirement } from "../../../src/domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -210,75 +218,5 @@ describe("validateTlsn with mock binary", () => {
     expect(result.conditionResults[1]!.passed).toBe(false);
     expect(result.checks.some((c) => c.includes("BTC price"))).toBe(true);
     expect(result.failures.some((f) => f.includes("DOGE present"))).toBe(true);
-  });
-});
-
-// --- Integration: verify() with tlsn ---
-
-describe("verify() integration with tlsn", () => {
-  beforeEach(() => _clearSeenPresentationsForTest());
-
-  test("tlsn query with missing attestation fails", async () => {
-    _setVerifierPathForTest(null);
-    const query = {
-      id: "test_tlsn_1",
-      status: "pending" as const,
-      description: "Test",
-      verification_requirements: ["tlsn"] as const,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60_000,
-      payment_status: "locked" as const,
-      tlsn_requirements: makeRequirement(),
-    };
-    const result = { attachments: [] };
-
-    const verification = await verify(query, result);
-    expect(verification.passed).toBe(false);
-    expect(verification.failures.some((f) => f.includes("no attestation provided"))).toBe(true);
-  });
-
-  test("tlsn query without tlsn_requirements fails", async () => {
-    _setVerifierPathForTest(null);
-    const query = {
-      id: "test_tlsn_2",
-      status: "pending" as const,
-      description: "Test",
-      verification_requirements: ["tlsn"] as const,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60_000,
-      payment_status: "locked" as const,
-    };
-    const result = { attachments: [], tlsn_attestation: makeAttestation() };
-
-    const verification = await verify(query, result);
-    expect(verification.passed).toBe(false);
-    expect(verification.failures.some((f) => f.includes("missing tlsn_requirements"))).toBe(true);
-  });
-
-  test("tlsn query does not require photo attachments", async () => {
-    writeMockVerifier({
-      valid: true,
-      server_name: "api.coingecko.com",
-      revealed_body: '{"bitcoin":{"usd":42000}}',
-      time: Math.floor(Date.now() / 1000) - 5,
-    });
-    _setVerifierPathForTest(mockVerifierPath);
-
-    const query = {
-      id: "test_tlsn_3",
-      status: "pending" as const,
-      description: "Test",
-      verification_requirements: ["tlsn"] as const,
-      created_at: Date.now(),
-      expires_at: Date.now() + 60_000,
-      payment_status: "locked" as const,
-      tlsn_requirements: makeRequirement(),
-    };
-    const result = { attachments: [], tlsn_attestation: makeAttestation() };
-
-    const verification = await verify(query, result);
-    expect(verification.failures.filter((f) => f.includes("no media evidence"))).toHaveLength(0);
-    expect(verification.passed).toBe(true);
-    expect(verification.tlsn_verified?.server_name).toBe("api.coingecko.com");
   });
 });

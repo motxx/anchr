@@ -14,8 +14,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, which, writeFile, spawn } from "../../runtime/mod.ts";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../domain/types";
+// MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
+import { moduleDir, which, writeFile, spawn } from "../../../src/runtime/mod.ts";
+// MIGRATION DEBT: domain/types will move to core-domain package eventually.
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../../src/domain/types";
 
 // --- Proof replay protection ---
 // Stores SHA-256 hashes of previously accepted presentations to prevent reuse.
@@ -355,7 +357,6 @@ async function runVerifierBinary(
         verifiedBody: result.revealed_body ?? undefined,
         verifiedHeaders: result.revealed_headers ?? undefined,
         verifiedTime: result.time ?? undefined,
-        error: result.error ?? undefined,
       };
     } catch {
       return { signatureValid: false, error: "failed to parse verifier output" };

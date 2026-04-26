@@ -3,7 +3,7 @@ import { checkAttachmentContent } from "./ai-content-check";
 import { validateC2pa } from "../../../packages/photo-bounty/src/c2pa-validation";
 import { haversineKm } from "../../../packages/photo-bounty/src/geo";
 import { getIntegrity, getIntegrityForQuery } from "../../../packages/photo-bounty/src/integrity-store";
-import { validateTlsn } from "./tlsn-validation";
+import { validateTlsn } from "../../../packages/tlsn-toolkit/src/tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import { validateAttachmentUri } from "../url-validation";
 import type {

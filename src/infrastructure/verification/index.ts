@@ -12,5 +12,5 @@ export {
   type C2paValidationResult,
   type C2paManifest,
 } from "../../../packages/photo-bounty/src/c2pa-validation";
-export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "./tlsn-validation";
+export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "../../../packages/tlsn-toolkit/src/tlsn-validation";
 export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "../../../packages/photo-bounty/src/integrity-store";
