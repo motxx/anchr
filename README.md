@@ -1,94 +1,82 @@
 # Anchr
 
 [![CI](https://github.com/motxx/anchr/actions/workflows/ci.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Toolkit for atomically exchanging cryptographic proofs and Bitcoin (Cashu) payments without a trusted third party.
+**Buy cryptographically verified data with sats. No trusted middleman.**
 
-A Requester posts a bounty. A Worker produces a cryptographic proof (TLSNotary for HTTPS responses, C2PA for photos, GPS for location, ProofMode for mobile capture). An Oracle verifies the proof. Payment releases only when verification passes.
+Anchr is a TypeScript / Deno toolkit and reference server for atomic
+exchanges of *cryptographic proofs* (TLSNotary for HTTPS responses, C2PA
+for photos, GPS for location, ProofMode for mobile capture) and *Bitcoin
+payments* (Cashu HTLC, optionally backed by FROST t-of-n threshold
+oracles).
 
-- Requester can't revoke payment (sats locked in escrow before work begins) — see [INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)
-- Worker can't forge proofs (verification is cryptographic) — see [INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)
-- Oracle can't steal funds (escrow requires Worker's signature to redeem) — see [INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)
-- For high-value queries, t-of-n independent Oracles verify via FROST threshold signing
+- **Requesters can't revoke payment** — sats lock in escrow before work begins ([INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)).
+- **Workers can't forge proofs** — verification is cryptographic ([INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)).
+- **Oracles can't steal funds** — escrow only releases against the worker's signature ([INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)).
 
-## Packages
+For high-value queries, t-of-n independent oracles can verify in parallel
+via FROST; below threshold, no party can produce a valid release signature.
 
-Anchr is a monorepo of independent packages plus a reference host server. Each package is usable on its own — pick what you need.
+## What you can build with it
 
-```
-packages/
-├── core-runtime/              Bun ↔ Deno runtime compat (spawn, fs, which, moduleDir)
-├── core-domain/               Shared domain types (Query, Worker, Oracle, AttachmentRef, …)
-├── core-cashu/                Cashu HTLC escrow + preimage store
-├── tlsn-toolkit/              TLSNotary application layer (validation, ReDoS-safe conditions, replay protection)
-├── photo-bounty/              Photo verification (C2PA + EXIF + ProofMode + AI check + GPS Haversine)
-├── cashu-frost-oracle/        FROST t-of-n cluster for Cashu P2PK threshold signing
-├── cashu-conditional-swap/    N:M binary outcome conditional swap primitive (HTLC dual-preimage + FROST dual-key)
-└── sdk/                       AI agent SDK + CLI (HTTP client for the Anchr server)
+Each example below is runnable code under [`example/`](example/) — they
+double as integration tests and are exercised in CI.
 
-src/                           Reference host server: Hono HTTP API, Nostr/Blossom integrations, oracle wiring
-example/                       7 worked examples that compose the packages above
-crates/                        Rust crates: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-```
+| Example | What it shows |
+|---|---|
+| **[Prediction market](example/prediction-market/)** | Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
+| **[Auto-claim](example/auto-claim/)** | "Install the extension. Browse normally. Money you're owed comes back automatically." |
+| **[Airdrop bot shield](example/airdrop-bot-shield/)** | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
+| **[Square fiat → BTC swap](example/tlsn-fiat-swap-square/)** | Counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC trustlessly. |
+| **[C2PA photo verification](example/c2pa-media-verification/)** | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
+| **[Supply-chain proof](example/supply-chain-proof/)** | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
 
-### Package details
-
-| Package | Purpose | Independent of host? |
-|---------|---------|---|
-| `core-runtime` | Deno runtime helpers (spawn, file I/O, PATH lookup, module dir) | ✅ |
-| `core-domain` | Type definitions for Query / QueryResult / Oracle / Attachment / Blossom keys | ✅ |
-| `core-cashu` | HTLC escrow primitive (`createHtlcToken`, `redeemHtlcToken`) + preimage store + Cashu wallet bindings | ✅ |
-| `tlsn-toolkit` | `validateTlsn`, `evaluateCondition`, `isSuspiciousRegex` (ReDoS guard), replay protection, subprocess wrapper for the `tlsn-verifier` Rust binary | ✅ |
-| `photo-bounty` | `validateC2pa`, `validateExif`, `parseProofModeZip`, `createAiContentChecker` (DI), `haversineKm`, `integrity-store` | ✅ |
-| `cashu-frost-oracle` | `createFrostCoordinator`, `coordinateSigning`, FROST DKG/sign CLI wrapper | ✅ |
-| `cashu-conditional-swap` | `createSwapPairTokens` (cross-HTLC), `createDualPreimageStore`, `createDualKeyStore` (FROST dual-key) | Depends on `core-cashu` and `cashu-frost-oracle` |
-| `sdk` (`anchr-sdk`) | TypeScript HTTP client + CLI + MCP integration for AI agents | Targets a deployed Anchr server |
-
-## Architecture
-
-| Layer | Implementation | Where it lives |
-|-------|---------------|---|
-| Payment | Cashu NUT-11 P2PK + NUT-14 HTLC | `packages/core-cashu/` |
-| Web Verification | TLSNotary MPC-TLS | `packages/tlsn-toolkit/` + `crates/tlsn-*` |
-| Photo Verification | C2PA + EXIF + ProofMode + AI check | `packages/photo-bounty/` |
-| Threshold Signing | FROST t-of-n BIP-340 Schnorr | `packages/cashu-frost-oracle/` + `crates/frost-signer/` |
-| Conditional Swap | HTLC dual-preimage / FROST dual-key | `packages/cashu-conditional-swap/` |
-| Messaging | Nostr (NIP-90 DVM, NIP-44 DM) | `src/infrastructure/nostr/` |
-| Storage | Blossom (AES-256-GCM) | `src/infrastructure/blossom/` |
-
-Each layer is pluggable. Swapping Cashu for Fedimint, or TLSNotary for another zkTLS provider, means implementing an adapter — the `EscrowProvider` interface (`src/application/escrow-port.ts`) already supports Cashu HTLC and FROST P2PK implementations.
-
-## Protocol Flow
+## How it works
 
 ```
-Requester → lock escrow → post query (Nostr)
-                                ↓
-Worker discovers → produces proof (TLSNotary / C2PA / ProofMode / GPS)
-                                ↓
-Oracle verifies → reveals preimage or FROST signature
-                                ↓
-Worker redeems at Cashu Mint → Requester gets verified data
-                                ↓
-            timeout? → escrow refunds to Requester
+Requester ─ locks escrow ──► posts query (Nostr DVM)
+                                      │
+                                      ▼
+Worker ─ discovers ────────► produces proof  (TLSNotary / C2PA / ProofMode / GPS)
+                                      │
+                                      ▼
+Oracle ─ verifies cryptographically ──► reveals HTLC preimage  (or FROST t-of-n signs)
+                                      │
+                                      ▼
+Worker ─ redeems token at Cashu Mint ──► Requester gets the verified data
+
+                                                  timeout? ─► escrow refunds
 ```
 
-## Examples
+Read the full protocol in [`specs/`](specs/) (8 specs, CC0). Each layer is
+pluggable — Cashu can be replaced with Fedimint, TLSNotary with another
+zkTLS provider, etc.; see the `EscrowProvider` / verification interfaces.
 
-Each example is independently runnable (own `deno.json`) and composes the packages above.
+## Use it as a library
 
-| Example | What it composes |
-|---------|------------------|
-| [Prediction Market](example/prediction-market/) | `cashu-conditional-swap` + `cashu-frost-oracle` + `tlsn-toolkit` |
-| [Airdrop Bot Shield](example/airdrop-bot-shield/) | `tlsn-toolkit` + `core-cashu` for Sybil-resistant airdrop |
-| [Auto-Claim](example/auto-claim/) | `tlsn-toolkit` + `anchr-sdk` for automated claim filing |
-| [C2PA Media Verification](example/c2pa-media-verification/) | `photo-bounty` for camera-signed photo proof |
-| [Supply Chain Proof](example/supply-chain-proof/) | `photo-bounty` (GPS + C2PA + ProofMode) |
-| [TLSN Fiat Swap (Square)](example/tlsn-fiat-swap-square/) | `tlsn-toolkit` + `core-cashu` + `anchr-sdk` |
-| [Bounty Board](example/bounty-board/) | Expo mobile client for the host server |
+```typescript
+import { Anchr } from "anchr-sdk";
 
-## Quick Start
+const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
 
-Run the reference host server:
+const result = await anchr.query({
+  description: "BTC price from CoinGecko",
+  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
+  maxSats: 21,
+});
+
+console.log(result.verified);   // true
+console.log(result.data);       // { bitcoin: { usd: 71000 } }
+console.log(result.serverName); // "api.coingecko.com" (cryptographically verified)
+console.log(result.proof);      // base64 TLSNotary presentation, independently verifiable
+```
+
+Install: `bun add anchr-sdk` (or `npm i anchr-sdk`).
+
+## Run the server locally
 
 ```bash
 deno install
@@ -96,127 +84,150 @@ deno task build:ui && deno task build:css
 deno task dev                        # http://localhost:3000
 ```
 
-With FROST Oracle cluster:
-
-```bash
-cd crates/frost-signer && cargo build --release
-deno run --allow-all scripts/frost-dkg-bootstrap.ts
-deno run --allow-all scripts/frost-oracle-cluster.ts
-```
-
-With Docker (Cashu + Lightning + Nostr + Blossom):
+With Bitcoin regtest + Cashu mint + Nostr relay + Blossom storage in Docker:
 
 ```bash
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh
-deno task test:regtest               # E2E tests against regtest
+deno task test:regtest               # full E2E against regtest
 ```
 
-## Testing
+See the [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
+[`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks for the deep
+local-CI flow.
+
+## Project state
+
+**Active development. Baseline tests are green and threat-model invariants
+are tracked.** The reference server runs in production at
+[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). API stability is
+not guaranteed yet — pin versions and follow the changelog if you depend
+on the SDK or HTTP API.
+
+| Surface | State |
+|---|---|
+| Cashu HTLC payment + escrow | Implemented, fuzzed (`e2e/regtest-htlc-attacks.test.ts`) |
+| TLSNotary proof verification | Implemented (replay-protected, ReDoS-safe conditions) |
+| FROST t-of-n threshold oracles | Implemented (`crates/frost-signer`, BIP-340 Schnorr) |
+| C2PA / ProofMode / GPS / EXIF | Implemented |
+| Nostr DVM (NIP-90) discovery | Implemented |
+| Blossom (NIP-44 + AES-256-GCM) | Implemented |
+| Fedimint escrow | Adapter scaffolded; not implemented |
+| DLC settlement | Not planned (incompatible with pool betting) |
+
+Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model.md).
+
+## Architecture
+
+```
+packages/
+├── core-runtime/              Bun ↔ Deno runtime helpers (spawn, fs, which, logger, env)
+├── core-cashu/                Cashu HTLC escrow + preimage store
+├── tlsn-toolkit/              TLSNotary application layer (validation, replay defence, ReDoS guard)
+├── photo-bounty/              C2PA + EXIF + ProofMode + AI content check + GPS Haversine
+├── cashu-frost-oracle/        FROST t-of-n cluster wrapper for Cashu P2PK threshold signing
+├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
+└── sdk/                       anchr-sdk: HTTP / MCP client for AI agents
+
+src/                           Reference host server (Hono on Deno) — composes the packages above
+example/                       Worked, runnable examples; each is its own `deno.json`
+crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
+specs/                         Protocol specs (CC0)
+docs/threat-model.md           Cryptographic + protocol-state invariants (CI-enforced)
+```
+
+Each `packages/*` is independently typecheckable and testable
+(`deno task test:packages`). No package depends on host-side code.
+
+## Develop
 
 ```bash
-deno task lint            # deno lint (recommended + no-eval / no-self-compare / default-param-last)
-deno task lint:strict     # deno lint + arch + invariants + paths + refactor
-deno task test:ci         # unit + protocol + all packages (CI pipeline)
-deno task test:unit       # unit tests only
-deno task test:packages   # workspace package tests only (each package in isolation)
-deno task test:protocol   # protocol verification (trustless / attacks / exploits / quorum)
-deno task test:frost      # FROST threshold signing
-deno task test:regtest    # Cashu + Lightning E2E (Docker)
-deno task test:pentest    # penetration tests
-deno task test:example    # all 7 example apps
-deno task test            # everything (including e2e)
+deno task lint:strict          # deno lint + arch + invariants + paths + types
+deno task test:unit            # 217 unit tests
+deno task test:packages        # 71 per-package tests, each in isolation
+deno task test:protocol        # protocol-level invariants (trustless / attacks / exploits / quorum)
+deno task test:frost           # FROST threshold signing
+deno task test:regtest         # full Cashu + Lightning E2E (Docker)
+deno task test:pentest         # penetration tests
+deno task test:example         # all 7 example apps
+./scripts/test-all.sh --local  # what CI runs in Phase 1
 ```
 
-See also: `deno task test:all` (deno lint + arch + invariants + paths + dep audit + unit + protocol + frost + integration + example + pentest), `deno task test:all:docker` (e2e relay + regtest with Docker), `deno task test:all:full` (all combined).
+Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
 
-Current baseline: **312 unit/protocol/frost/example tests + 71 package tests / 0 failed**, deno lint clean, all 7 packages independently typecheck and test.
+- No `--no-check` in test tasks; full TypeScript strict.
+- No `as` casts or `any` in `src/` or `packages/`. `unknown` only at HTTP/JSON
+  boundaries with a `// type-lint-allow:` reason.
+- Architecture lint enforces a single shared root (`core-runtime`); no other
+  inter-package dependencies (`deno task lint:arch`).
+- Threat-model invariants must each have a test (`deno task lint:invariants`).
+- `console.*` in non-UI code routes through logTape via
+  `@anchr/core-runtime/logger`.
 
-## API (host server)
+## HTTP API (reference server)
 
 <details>
-<summary>Query Endpoints</summary>
+<summary>Query / oracle endpoints</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/queries` | Create query |
 | `GET` | `/queries` | List open queries |
-| `GET` | `/queries/all` | List all queries (auth required) |
 | `GET` | `/queries/:id` | Query detail |
-| `GET` | `/queries/:id/quotes` | List quotes for query |
 | `POST` | `/queries/:id/quotes` | Worker submits quote |
 | `POST` | `/queries/:id/select` | Select Worker |
 | `POST` | `/queries/:id/begin` | Worker begins work |
 | `POST` | `/queries/:id/result` | Submit proof + verify + settle |
 | `POST` | `/queries/:id/cancel` | Cancel query |
-| `POST` | `/queries/:id/upload` | Upload photo/media (auth required) |
+| `POST` | `/queries/:id/upload` | Upload media (auth required) |
 | `GET` | `/queries/:id/attachments` | List attachments |
-| `GET` | `/queries/:id/attachments/:index` | Get attachment (redirect) |
-| `GET` | `/queries/:id/attachments/:index/meta` | Attachment metadata |
-| `GET` | `/queries/:id/attachments/:index/preview` | Attachment preview image |
-| `POST` | `/hash` | Oracle generates preimage/hash |
+| `POST` | `/hash` | Oracle generates preimage / hash |
 | `GET` | `/oracles` | List oracles |
 | `GET` | `/health` | Health check |
 
 </details>
 
 <details>
-<summary>Marketplace Endpoints</summary>
+<summary>Marketplace endpoints</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/marketplace/listings` | List active data listings |
-| `GET` | `/marketplace/listings/:id` | Get listing detail |
 | `POST` | `/marketplace/listings` | Create listing (auth required) |
-| `DELETE` | `/marketplace/listings/:id` | Deactivate listing (auth required) |
-| `GET` | `/marketplace/data/:id` | Get purchase info (returns 402 with payment instructions) |
-| `POST` | `/marketplace/data/:id` | Purchase data (X-Cashu or X-Cashu-Htlc header) |
-| `POST` | `/marketplace/listings/:id/announce` | Announce listing on Nostr (auth required) |
+| `GET` | `/marketplace/data/:id` | Purchase info (HTTP 402) |
+| `POST` | `/marketplace/data/:id` | Buy data (X-Cashu / X-Cashu-Htlc) |
 
 </details>
 
 <details>
-<summary>Configuration</summary>
+<summary>Configuration (env)</summary>
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` / `REFERENCE_APP_PORT` | Server port | `3000` |
-| `HTTP_API_KEY` | API key for write endpoints | — |
-| `HTTP_API_KEYS` | Comma-separated API keys (alternative) | — |
-| `CASHU_MINT_URL` | Cashu mint URL | — |
-| `NOSTR_RELAYS` | Relay WebSocket URLs | — |
-| `BLOSSOM_SERVERS` | Blossom blob server URLs | — |
-| `TLSN_VERIFIER_URL` | TLSNotary Verifier URL | — |
-| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL | — |
-| `FROST_CONFIG_PATH` | FROST node config file | — |
-| `TRUSTED_ORACLE_PUBKEYS` | Comma-separated Oracle pubkeys for whitelist | — |
-| `ANTHROPIC_API_KEY` | Claude API key (for AI content check) | — |
-| `AI_CONTENT_CHECK` | Enable AI content verification | `false` |
-| `REMOTE_QUERY_API_BASE_URL` | Remote query backend URL | — |
-| `REMOTE_QUERY_API_KEY` | Remote query backend API key | — |
-| `QUERY_SWEEP_INTERVAL_MS` | Query cleanup interval (ms) | `30000` |
-| `PREVIEW_MAX_DIMENSION` | Max preview image dimension (px) | `768` |
-| `PREVIEW_JPEG_QUALITY` | JPEG preview quality (1-100) | `75` |
-| `RUNTIME_DATA_DIR` | Local data directory | `.local` |
-| `ANCHR_LOG_LEVEL` / `LOG_LEVEL` | logTape level (`debug` / `info` / `warning` / `error` / `fatal`) | `info` |
+| Variable | Default |
+|---|---|
+| `PORT` / `REFERENCE_APP_PORT` | `3000` |
+| `HTTP_API_KEYS` (comma-separated) | — |
+| `CASHU_MINT_URL` | — |
+| `NOSTR_RELAYS` | — |
+| `BLOSSOM_SERVERS` | — |
+| `TLSN_VERIFIER_URL` / `TLSN_PROXY_URL` | — |
+| `FROST_CONFIG_PATH` | — |
+| `TRUSTED_ORACLE_PUBKEYS` | — |
+| `ANTHROPIC_API_KEY` (for AI content check) | — |
+| `ANCHR_LOG_LEVEL` (`debug`/`info`/`warning`/`error`) | `info` |
+| `RUNTIME_DATA_DIR` | `.local` |
 
 </details>
 
-## Polyrepo migration
+## Security
 
-Each package in `packages/` is **polyrepo-ready** — it has its own `deno.json` with `name`, `version`, `exports`, scoped imports, and tasks. Inter-package imports use package names (`@anchr/core-runtime`, `@anchr/core-domain/types`, …) resolved via the Deno workspace declared in the root `deno.json`.
+If you find a vulnerability, **do not file a public issue.** See
+[`SECURITY.md`](SECURITY.md) for the disclosure process.
 
-To split any package into its own repo:
+## Contributing
 
-1. Move `packages/<name>/` to a fresh repository
-2. In its `deno.json`, replace `"@anchr/<dep>": "../<dep>/src/..."` with `"@anchr/<dep>": "jsr:@anchr/<dep>@^0.1"`
-3. Publish with `deno publish`
-
-Each package can be tested standalone: `cd packages/<name> && deno task test`. The combined `test:ci` exercises the same code via the workspace.
-
-## Specifications
-
-Protocol specs in [`specs/`](specs/). Released under CC0 (public domain). Anyone may implement them.
+Issues and PRs welcome. Run `./scripts/test-all.sh --local` before pushing;
+the CI gate enforces the quality bar above plus `test:all:docker` for the
+relay + regtest phases.
 
 ## License
 
-Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE)
+Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) (anyone may implement them)
