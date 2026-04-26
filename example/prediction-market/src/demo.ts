@@ -23,7 +23,7 @@ import {
   createDualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import { createOrderBook } from "./order-book.ts";
-import { resolveMarket as resolveMarketDual, resolveMarketFrost } from "./resolution.ts";
+import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,
   evaluateCondition,
@@ -257,26 +257,26 @@ console.log(`  Outcome:   ${outcome.toUpperCase()}`);
 // FROST P2PK signing — the core of N:M conditional swap
 console.log("\n  FROST P2PK resolution (Oracle signs with winning key):");
 
-const frostResolution = resolveMarketFrost(marketId, outcome as "yes" | "no", keyStore);
-if (frostResolution) {
-  console.log(`  Oracle signature (${frostResolution.outcome.toUpperCase()}): ${frostResolution.oracle_signature.slice(0, 32)}...`);
+const winningSide: "a" | "b" = outcome === "yes" ? "a" : "b";
+const signMessage = new TextEncoder().encode(`${marketId}:${outcome}`);
+const oracleSignature = keyStore.sign(marketId, winningSide, signMessage);
+if (oracleSignature) {
+  console.log(`  Oracle signature (${outcome.toUpperCase()}): ${oracleSignature.slice(0, 32)}...`);
   console.log(`  Losing secret key: PERMANENTLY DELETED`);
 
-  // Verify the signature
-  const signMessage = new TextEncoder().encode(`${marketId}:${outcome}`);
   const winningPubkey = outcome === "yes" ? frostKeys.pubkey_a : frostKeys.pubkey_b;
-  const sigValid = schnorr.verify(hexToBytes(frostResolution.oracle_signature), signMessage, hexToBytes(winningPubkey));
+  const sigValid = schnorr.verify(hexToBytes(oracleSignature), signMessage, hexToBytes(winningPubkey));
   console.log(`  Signature valid: ${sigValid}`);
 
   // Verify the losing key cannot be used
-  const trySignAgain = keyStore.sign(marketId, outcome === "yes" ? "b" : "a", signMessage);
+  const trySignAgain = keyStore.sign(marketId, winningSide === "a" ? "b" : "a", signMessage);
   console.log(`  Second sign attempt: ${trySignAgain === null ? "null (correctly rejected)" : "ERROR: should be null"}`);
 } else {
   console.log("  ERROR: FROST resolution failed");
 }
 
-// Also demonstrate HTLC preimage reveal (backward compat)
-console.log("\n  HTLC preimage reveal (backward compat):");
+// Also demonstrate HTLC preimage reveal — the dual-preimage primitive.
+console.log("\n  HTLC preimage reveal:");
 const htlcResolution = resolveMarketDual(marketId, outcome as "yes" | "no", dualStore);
 if (htlcResolution) {
   console.log(`  Winning preimage (${htlcResolution.outcome.toUpperCase()}): ${htlcResolution.preimage.slice(0, 16)}...`);

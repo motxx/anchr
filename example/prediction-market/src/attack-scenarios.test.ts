@@ -17,7 +17,6 @@ import {
   buildFrostSwapForPartyB,
   createDualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
-import { resolveMarketFrost } from "./resolution.ts";
 import { calculatePayouts } from "./market-oracle.ts";
 import type { PredictionMarket } from "./market-types.ts";
 
@@ -192,19 +191,18 @@ describe("Attack 2: Oracle Double-Signing Prevention", () => {
     expect(store.sign("swap-key-delete", "b", randomBytes(32))).toBeNull();
   });
 
-  test("resolveMarketFrost returns null on second resolution attempt", () => {
+  test("DualKeyStore.sign returns null on second resolution attempt", () => {
     const store = createDualKeyStore();
     store.create("market-double-resolve");
 
-    // First resolution (YES wins) — succeeds
-    const result1 = resolveMarketFrost("market-double-resolve", "yes", store);
-    expect(result1).not.toBeNull();
-    expect(result1!.outcome).toBe("yes");
-    expect(result1!.oracle_signature).toBeTruthy();
+    // First resolution (YES → outcome a) — succeeds
+    const sig1 = store.sign("market-double-resolve", "a", new TextEncoder().encode("market-double-resolve:yes"));
+    expect(sig1).not.toBeNull();
+    expect(typeof sig1).toBe("string");
 
-    // Second resolution attempt (NO) — fails
-    const result2 = resolveMarketFrost("market-double-resolve", "no", store);
-    expect(result2).toBeNull();
+    // Second resolution attempt (NO → outcome b) — fails (one-time op)
+    const sig2 = store.sign("market-double-resolve", "b", new TextEncoder().encode("market-double-resolve:no"));
+    expect(sig2).toBeNull();
   });
 
   test("both-sides betting by same user yields zero net profit", () => {

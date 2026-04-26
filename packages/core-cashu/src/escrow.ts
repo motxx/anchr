@@ -18,7 +18,8 @@
  *   Refund:
  *     Requester reclaims after locktime expires.
  *
- * Also retains the legacy 2-of-2(Oracle, Worker) P2PK escrow for backward compat.
+ * Also exposes a 2-of-2(Oracle, Worker) P2PK escrow primitive for the
+ * pre-HTLC settlement path (Spec 02 → @anchr/core-cashu/SPEC.md).
  */
 
 import {
@@ -42,7 +43,7 @@ import {
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "cashu-escrow"]);
 
-// --- Legacy P2PK escrow (retained for backward compatibility) ---
+// --- 2-of-2 P2PK escrow primitive ---
 
 export interface EscrowParams {
   /** Oracle's public key (hex). */
@@ -78,7 +79,8 @@ export interface SwapResult {
 }
 
 /**
- * Build P2PK options for legacy escrow: 2-of-2(Oracle, Worker) + timeout refund to Requester.
+ * Build P2PK options for the 2-of-2(Oracle, Worker) escrow with timeout
+ * refund to Requester.
  */
 export function buildEscrowP2PKOptions(params: EscrowParams): P2PKOptions {
   return new P2PKBuilder()
@@ -92,7 +94,7 @@ export function buildEscrowP2PKOptions(params: EscrowParams): P2PKOptions {
 }
 
 /**
- * Create a P2PK-locked escrow token (legacy 2-of-2).
+ * Create a P2PK-locked escrow token (2-of-2 Oracle + Worker).
  */
 export async function createEscrowToken(
   amountSats: number,
@@ -119,7 +121,7 @@ export async function createEscrowToken(
 }
 
 /**
- * Execute the atomic swap (legacy): Oracle + Worker co-sign to split the escrowed token.
+ * Execute the atomic swap: Oracle + Worker co-sign to split the escrowed token.
  */
 export async function executeEscrowSwap(
   signedProofs: Proof[],
