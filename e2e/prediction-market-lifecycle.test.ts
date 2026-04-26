@@ -236,7 +236,12 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     // === Phase 6: Winner (alice — held bob's NO-locked token) signs proofs ===
     // Alice received bob's token (bobToken). She submits the secrets so the
     // Oracle co-signs each NUT-11 P2PK lock condition.
-    const decodedBob = getDecodedToken(bobToken.token);
+    //
+    // cashu-ts encodes proofs with short v2 keyset IDs in cashuB tokens. To
+    // decode, getDecodedToken needs the wallet's known keyset IDs to expand
+    // short → long; without them it throws "Couldn't map short keyset ID …".
+    const knownKeysetIds = bobWallet.keyChain.getAllKeysetIds();
+    const decodedBob = getDecodedToken(bobToken.token, knownKeysetIds);
     expect(decodedBob.proofs.length).toBeGreaterThan(0);
     const aliceProofSecrets = decodedBob.proofs.map((p) => p.secret);
 
@@ -261,7 +266,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     }
 
     // === Phase 7: Loser (bob — held alice's YES-locked token) is rejected ===
-    const decodedAlice = getDecodedToken(aliceToken.token);
+    const decodedAlice = getDecodedToken(aliceToken.token, aliceWallet.keyChain.getAllKeysetIds());
     const bobSignTry = await postJson(app, `/markets/${market.id}/sign-proofs`, {
       pubkey: BOB_PK,
       proof_secrets: decodedAlice.proofs.map((p) => p.secret),
