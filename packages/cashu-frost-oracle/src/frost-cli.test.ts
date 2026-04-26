@@ -29,7 +29,7 @@ const realBinary = findRealBinary();
 describe("frost-cli wrapper", () => {
   afterEach(() => {
     // Reset to undefined so findFrostSigner re-discovers on next call
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("findFrostSigner returns a path when binary exists", () => {
@@ -60,7 +60,7 @@ const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("frost-cli with real binary", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("dkgRound1 calls through to binary and returns structured JSON", async () => {

@@ -8,6 +8,8 @@ import type {
   CreateQueryRequest,
   QuoteInfo,
 } from "./types";
+// Side-effect import: augments FormData.append with the RN { uri, name, type } overload.
+import "../types/rn-formdata.d.ts";
 import { useSettingsStore } from "../store/settings";
 import { useAuthStore } from "../store/auth";
 
@@ -62,7 +64,7 @@ export async function uploadPhoto(
     uri: fileUri,
     name: filename,
     type: mimeType,
-  } as unknown as Blob);
+  });
 
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/upload`, {
     method: "POST",

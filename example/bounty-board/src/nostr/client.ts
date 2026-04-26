@@ -27,7 +27,7 @@ export async function publishEvent(
   const failures: string[] = [];
 
   const results = await Promise.allSettled(
-    pool.publish(urls, event as unknown as Event),
+    pool.publish(urls, event),
   );
 
   for (let i = 0; i < results.length; i++) {

@@ -143,7 +143,9 @@ async function attemptRedeem(
     }
 
     const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
-    return signatures as unknown as Proof[];
+    // See redeem-attempt note in regtest-htlc-trustless: blinded signatures are
+    // mapped to a Proof-shaped record purely as a structural carrier for tests.
+    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-attempt] Error: ${msg}`);
@@ -195,7 +197,8 @@ async function attemptRedeemWithCustomWitness(
     }
 
     const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
-    return signatures as unknown as Proof[];
+    // See redeem-attempt note above.
+    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-custom] Error: ${msg}`);

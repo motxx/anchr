@@ -11,8 +11,8 @@ import { moduleDir, which, spawn } from "@anchr/core-runtime";
 
 let frostSignerPath: string | null | undefined;
 
-/** Allow tests to override the binary path. */
-export function _setFrostSignerPathForTest(path: string | null): void {
+/** Allow tests to override the binary path. Pass `undefined` to reset to auto-detect. */
+export function _setFrostSignerPathForTest(path: string | null | undefined): void {
   frostSignerPath = path;
 }
 

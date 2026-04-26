@@ -55,8 +55,8 @@ export interface TlsnValidationResult {
 
 let tlsnVerifierPath: string | null | undefined;
 
-/** Allow tests to override the verifier path. */
-export function _setVerifierPathForTest(path: string | null): void {
+/** Allow tests to override the verifier path. Pass `undefined` to reset to auto-detect. */
+export function _setVerifierPathForTest(path: string | null | undefined): void {
   tlsnVerifierPath = path;
 }
 

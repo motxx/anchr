@@ -75,7 +75,10 @@ export async function handleSubmitQueryResult(
   result: Record<string, unknown>,
   oracleId?: string,
 ): Promise<McpTextResult> {
-  const payload = await backend.submitQueryResult(queryId, result as unknown as QueryResult, oracleId);
+  // The MCP transport delivers untyped JSON. The application service validates
+  // and rejects malformed shapes; here we narrow via QueryResult's structural
+  // compatibility with Record<string, unknown> (no double-cast through unknown).
+  const payload = await backend.submitQueryResult(queryId, result as QueryResult, oracleId);
   return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
 }
 

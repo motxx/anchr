@@ -66,8 +66,12 @@ test("resolveMarket works with htlc_hash_yes", () => {
 
 test("resolveMarket falls back to htlc_hash for legacy markets", () => {
   const { preimage, hash } = makePreimage();
-  // Simulate a legacy market with htlc_hash but no htlc_hash_yes
-  const market = makeMarket({ htlc_hash_yes: undefined as unknown as string, htlc_hash: hash } as Partial<PredictionMarket>);
+  // Simulate a legacy market with htlc_hash but no htlc_hash_yes. The type
+  // models current/dual-hash markets; legacy data has htlc_hash_yes absent.
+  // We build via the factory (which always populates htlc_hash_yes), then
+  // delete that property to mimic the legacy on-disk shape.
+  const market = makeMarket({ htlc_hash: hash } as Partial<PredictionMarket>);
+  delete (market as Partial<PredictionMarket>).htlc_hash_yes;
   const now = Math.floor(Date.now() / 1000);
   const body = JSON.stringify({ price: 200 });
 

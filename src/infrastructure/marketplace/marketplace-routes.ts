@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
+import { validateZ } from "../zod-validator-shim";
 import { createListingSchema } from "./marketplace-schemas";
 import { createPaymentMiddleware } from "./xcashu-middleware";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher";
@@ -49,15 +49,14 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     "/listings",
     rateLimit,
     writeAuth,
-    // deno-lint-ignore no-explicit-any -- Zod v4 ZodObject is not assignable to @hono/zod-validator's ZodSchema (Zod v3 type)
-    zValidator("json", createListingSchema as any, (result, c) => {
+    validateZ("json", createListingSchema, (result, c) => {
       if (!result.success) {
         return c.json({
           error: "Invalid listing payload",
           issues: result.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         }, 400);
       }
-    }) as unknown as MiddlewareHandler,
+    }),
     (c) => {
       const payload = c.req.valid("json" as never) as ReturnType<typeof createListingSchema.parse>;
       // Validate source_url at creation time (not just at fetch time) to prevent

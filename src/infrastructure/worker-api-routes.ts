@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { validateZ } from "./zod-validator-shim";
 import { spawn } from "../../packages/core-runtime/src/mod.ts";
 import { uploadAttachment } from "./attachment-store";
 import { materializeAttachmentRef } from "./attachments";
@@ -107,15 +107,14 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
     "/queries",
     rateLimit,
     writeAuth,
-    // deno-lint-ignore no-explicit-any -- Zod v4 ZodObject is not assignable to @hono/zod-validator's ZodSchema (Zod v3 type)
-    zValidator("json", createQuerySchema as any, (result, c) => {
+    validateZ("json", createQuerySchema, (result, c) => {
       if (!result.success) {
         return c.json({
           error: "Invalid query payload",
           issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         }, 400);
       }
-    }) as unknown as MiddlewareHandler,
+    }),
     (c) => handleCreateQuery(c, svc, () => getPublicRequestUrl(c)),
   );
 

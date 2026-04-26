@@ -53,11 +53,21 @@ function makeMockWallet(opts?: {
     },
   });
 
-  return {
+  // Test-only stub: a Proxy traps all WalletOps method accesses so unimplemented
+  // calls fail loudly instead of being silently typed away with `as unknown as`.
+  // Only `send` is exercised by getUserBalance / sendToHtlc.
+  const opsStub = new Proxy({} as Wallet["ops"], {
+    get(_target, prop) {
+      if (prop === "send") return mockSend;
+      throw new Error(`market-wallet test stub: unimplemented WalletOps method "${String(prop)}"`);
+    },
+  });
+  const stub: Pick<Wallet, "loadMint" | "ops" | "getFeesForProofs"> = {
     loadMint: async () => {},
-    ops: { send: mockSend },
+    ops: opsStub,
     getFeesForProofs: () => 0,
-  } as unknown as Wallet;
+  };
+  return stub as Wallet;
 }
 
 // ---------------------------------------------------------------------------

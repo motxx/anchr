@@ -36,7 +36,7 @@ const signerConfig = {
 
 describe("FrostSigner verification gating", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("verifyAndSign returns null when verification fails (expired query)", async () => {
@@ -93,7 +93,7 @@ const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("FrostSigner with real binary", () => {
   afterEach(() => {
-    _setFrostSignerPathForTest(undefined as unknown as string | null);
+    _setFrostSignerPathForTest(undefined);
   });
 
   test("verifyAndSign round 1 returns nonce_commitment when verification passes", async () => {

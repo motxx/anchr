@@ -45,7 +45,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  _setVerifierPathForTest(undefined as unknown as null);
+  _setVerifierPathForTest(undefined);
   rmSync(mockVerifierDir, { recursive: true, force: true });
 });
 
