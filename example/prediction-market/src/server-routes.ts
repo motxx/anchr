@@ -41,6 +41,9 @@ import {
   mintProofsFromRegtest,
 } from "./market-wallet.ts";
 import { verifyReceivedToken } from "./exchange-protocol.ts";
+import { publishMarket, type MarketIdentity } from "./nostr-market.ts";
+import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { hexToBytes } from "@noble/hashes/utils.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,11 +82,27 @@ export interface MarketState {
   frostConfig?: MarketFrostNodeConfig;
   /** Override for getCashuWallet — tests can inject a mock. */
   getCashuWallet?: () => Promise<Wallet | null>;
+  /** Nostr identity used to sign published market events. */
+  nostrIdentity?: MarketIdentity;
+  /** Relays to publish new markets to. Empty array = publish disabled. */
+  nostrRelays: string[];
+  /**
+   * Override for the Nostr publish call. Tests inject a mock so they can
+   * assert publish was called without spinning up a relay.
+   */
+  publishMarket?: (
+    market: PredictionMarket,
+    identity: MarketIdentity,
+    relayUrls: string[],
+  ) => Promise<string>;
 }
 
 /** Create a fresh MarketState. Used for tests and as default state. */
 export function createMarketState(opts?: {
   frostConfig?: MarketFrostNodeConfig;
+  nostrIdentity?: MarketIdentity;
+  nostrRelays?: string[];
+  publishMarket?: MarketState["publishMarket"];
 }): MarketState {
   const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
   return {
@@ -98,7 +117,53 @@ export function createMarketState(opts?: {
     orderBook: createOrderBook(),
     frostMode,
     frostConfig: opts?.frostConfig,
+    nostrIdentity: opts?.nostrIdentity,
+    nostrRelays: opts?.nostrRelays ?? [],
+    publishMarket: opts?.publishMarket,
   };
+}
+
+/**
+ * Resolve the Nostr publishing identity from environment.
+ *
+ * NOSTR_MARKET_SECRET_KEY (hex, 64 chars) — pinned identity for repeated
+ *   restarts so consumers can filter by author.
+ * If unset, generate an ephemeral keypair and log the pubkey so the
+ *   operator can pin it later. Markets created in this run will all share
+ *   that ephemeral key.
+ */
+function resolveNostrIdentity(): MarketIdentity {
+  const hex = Deno.env.get("NOSTR_MARKET_SECRET_KEY")?.trim();
+  if (hex && /^[0-9a-fA-F]{64}$/.test(hex)) {
+    const secretKey = hexToBytes(hex);
+    return { secretKey, pubkey: getPublicKey(secretKey) };
+  }
+  const secretKey = generateSecretKey();
+  const pubkey = getPublicKey(secretKey);
+  console.warn(
+    `[market] NOSTR_MARKET_SECRET_KEY not set — generated ephemeral keypair (pubkey=${pubkey.slice(0, 16)}...). ` +
+    `Markets will be unsigned-by-this-server after restart. Pin the key with NOSTR_MARKET_SECRET_KEY=<hex>.`,
+  );
+  return { secretKey, pubkey };
+}
+
+function resolveNostrRelays(): string[] {
+  const raw = Deno.env.get("NOSTR_RELAYS")?.trim();
+  if (!raw) return [];
+  return raw.split(",").map((url) => url.trim()).filter((url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "ws:" && parsed.protocol !== "wss:") {
+        console.warn(`[market] dropping non-ws(s) relay URL: ${url}`);
+        return false;
+      }
+      return true;
+    } catch {
+      console.warn(`[market] dropping malformed relay URL: ${url}`);
+      return false;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +187,19 @@ function getDefaultState(): MarketState {
     }
   } catch { /* FROST not configured — single-key mode */ }
 
-  _defaultState = createMarketState({ frostConfig: marketFrostConfig });
+  const nostrIdentity = resolveNostrIdentity();
+  const nostrRelays = resolveNostrRelays();
+  if (nostrRelays.length > 0) {
+    console.log(`[market] Nostr publishing enabled — pubkey=${nostrIdentity.pubkey.slice(0, 16)}... relays=${nostrRelays.length}`);
+  } else {
+    console.log(`[market] Nostr publishing disabled — set NOSTR_RELAYS=ws://... to enable.`);
+  }
+
+  _defaultState = createMarketState({
+    frostConfig: marketFrostConfig,
+    nostrIdentity,
+    nostrRelays,
+  });
   console.log(`[market] Resolution mode: ${_defaultState.frostMode}`);
   return _defaultState;
 }
@@ -177,6 +254,7 @@ function marketSummary(m: PredictionMarket, state: MarketState) {
     volume_sats: m.yes_pool_sats + m.no_pool_sats,
     num_bettors: orders.length * 2,
     created_at: Math.floor(Date.now() / 1000),
+    nostr_event_id: m.nostr_event_id,
     ...(preimage ? { resolved_preimage: preimage } : {}),
     ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
   };
@@ -394,11 +472,24 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       htlc_hash_no: hashes.hash_b,  // outcome B = NO  (HTLC fallback)
       group_pubkey_yes: frostKeys.pubkey_a, // FROST P2PK: outcome A = YES
       group_pubkey_no: frostKeys.pubkey_b,  // FROST P2PK: outcome B = NO
-      nostr_event_id: "", // not published to Nostr in API mode
+      nostr_event_id: "",
       status: "open",
     };
 
     s.markets.set(id, market);
+
+    // Publish to Nostr (best-effort; failure is logged, not blocking).
+    // The market is queryable via HTTP regardless; Nostr publication makes
+    // it discoverable to off-server clients.
+    if (s.nostrIdentity && s.nostrRelays.length > 0) {
+      const publishFn = s.publishMarket ?? publishMarket;
+      try {
+        const eventId = await publishFn(market, s.nostrIdentity, s.nostrRelays);
+        market.nostr_event_id = eventId;
+      } catch (err) {
+        console.warn(`[market] Nostr publish failed for ${id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
 
     return c.json(marketSummary(market, s), 201);
   });
