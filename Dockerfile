@@ -31,7 +31,6 @@ COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /us
 # source tree lands in the next COPY step.
 COPY deno.json deno.lock ./
 COPY packages/core-runtime/deno.json ./packages/core-runtime/
-COPY packages/core-domain/deno.json ./packages/core-domain/
 COPY packages/core-cashu/deno.json ./packages/core-cashu/
 COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
 COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
