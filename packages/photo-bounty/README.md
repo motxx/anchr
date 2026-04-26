@@ -8,8 +8,7 @@ Cryptographically verified photo / video evidence: C2PA Content Credentials, EXI
 {
   "imports": {
     "@anchr/photo-bounty": "jsr:@anchr/photo-bounty@^0.1",
-    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1",
-    "@anchr/core-domain": "jsr:@anchr/core-domain@^0.1"
+    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
   }
 }
 ```
@@ -62,10 +61,13 @@ Tests skip gracefully when optional binaries (`c2patool`, `unzip`, `gpg`) are no
 
 ## Dependencies
 
-- `@anchr/core-runtime` — for `spawn`, file I/O, `which`
-- `@anchr/core-domain` — for `Query`, `QueryResult`, `AttachmentRef`, `BlossomKeyMap` types
+- `@anchr/core-runtime` — for `spawn`, file I/O, `which`, shared logger
 - `@anthropic-ai/sdk` — for vision-LLM AI check (only used if `AI_CONTENT_CHECK=true`)
 - `@noble/hashes` — for SHA-256 (ProofMode hash verification)
+
+The package's API is generic over the consumer's `AttachmentRef` shape
+(via `AiContentCheckQuery` / `AiContentCheckResult<TRef>`); it carries
+no opinion on the host's `Query` / `QueryResult` types.
 
 ## License
 
