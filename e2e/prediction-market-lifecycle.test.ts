@@ -102,24 +102,29 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     const ALICE_PK = alice.publicKey;
     const BOB_PK = bob.publicKey;
 
+    // Each bettor uses an independent wallet instance so cashu-ts's
+    // per-wallet keyset cache stays consistent with the proofs it minted.
     // Mint headroom: a regtest mint can charge a small swap fee, and
     // wallet.ops.send(BET_SATS, proofs) needs `proofs ≥ BET_SATS + fee`. The
     // matchmaker also verifies the locked amount is ≥ BET_SATS via
-    // verifyReceivedToken, so we mint a bit more than we lock.
+    // verifyReceivedToken, so we mint power-of-two slack on top of the bet.
     const BET_SATS = 200;
     const MINT_SATS = 256;
 
-    const wallet = await createWallet(MINT_URL);
-    const aliceProofs: Proof[] = await throttledMintProofs(wallet, MINT_SATS);
-    const bobProofs: Proof[] = await throttledMintProofs(wallet, MINT_SATS);
+    const aliceWallet = await createWallet(MINT_URL);
+    const bobWallet = await createWallet(MINT_URL);
+    const serverWallet = await createWallet(MINT_URL);
+    const aliceProofs: Proof[] = await throttledMintProofs(aliceWallet, MINT_SATS);
+    const bobProofs: Proof[] = await throttledMintProofs(bobWallet, MINT_SATS);
 
     expect(aliceProofs.reduce((s, p) => s + p.amount, 0)).toBe(MINT_SATS);
     expect(bobProofs.reduce((s, p) => s + p.amount, 0)).toBe(MINT_SATS);
 
-    // Wire the in-process market server with the real wallet so /faucet
-    // and /submit-token can decode real cashuB tokens.
+    // Wire the in-process market server with a wallet so /submit-token can
+    // decode real cashuB tokens. The market server only needs decode/verify,
+    // not signing power, so an independent wallet handle is fine.
     const state = createMarketState();
-    state.getCashuWallet = async () => wallet;
+    state.getCashuWallet = async () => serverWallet;
     const app = buildMarketApp(state);
 
     // === Phase 2: Create the market ===
@@ -170,7 +175,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     expect(match.group_pubkey_no).toBe(market.group_pubkey_no);
 
     // === Phase 4: Both bettors create P2PK tokens and submit ===
-    const aliceToken = await createLockedToken(wallet, aliceProofs, {
+    const aliceToken = await createLockedToken(aliceWallet, aliceProofs, {
       mintUrl: MINT_URL,
       marketGroupPubkeyYes: match.group_pubkey_yes,
       marketGroupPubkeyNo: match.group_pubkey_no,
@@ -183,7 +188,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     });
     expect(aliceToken.token.startsWith("cashuB")).toBe(true);
 
-    const bobToken = await createLockedToken(wallet, bobProofs, {
+    const bobToken = await createLockedToken(bobWallet, bobProofs, {
       mintUrl: MINT_URL,
       marketGroupPubkeyYes: match.group_pubkey_yes,
       marketGroupPubkeyNo: match.group_pubkey_no,
