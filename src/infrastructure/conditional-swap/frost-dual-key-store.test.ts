@@ -5,7 +5,7 @@ import {
   createAdaptiveDualKeyStore,
 } from "./frost-dual-key-store.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
-import { _setFrostSignerPathForTest } from "../frost/frost-cli.ts";
+import { _setFrostSignerPathForTest } from "../../../packages/cashu-frost-oracle/src/frost-cli";
 
 // Ensure frost-signer is NOT available for these unit tests
 // (FROST integration tests require the actual binary)

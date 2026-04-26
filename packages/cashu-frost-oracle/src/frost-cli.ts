@@ -7,7 +7,8 @@
 
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { moduleDir, which, spawn } from "../../runtime/mod.ts";
+// MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
+import { moduleDir, which, spawn } from "../../../src/runtime/mod.ts";
 
 let frostSignerPath: string | null | undefined;
 

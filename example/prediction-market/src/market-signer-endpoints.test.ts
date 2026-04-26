@@ -23,9 +23,9 @@ import {
   type MarketState,
   type MarketRouteContext,
 } from "./server-routes.ts";
-import type { MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
+import type { MarketFrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/market-frost-config.ts";
 import type { PredictionMarket } from "./market-types.ts";
-import { _setFrostSignerPathForTest } from "../../../src/infrastructure/frost/frost-cli.ts";
+import { _setFrostSignerPathForTest } from "../../../packages/cashu-frost-oracle/src/frost-cli.ts";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

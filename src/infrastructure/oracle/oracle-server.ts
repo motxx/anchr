@@ -17,9 +17,9 @@ import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import type { OracleAttestation } from "../../domain/oracle-types";
 import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../preimage/preimage-store";
-import { createFrostCoordinator, type FrostCoordinator } from "../frost/coordinator";
+import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
 import type { ThresholdOracleConfig } from "../../domain/oracle-types";
-import type { FrostNodeConfig } from "../frost/config.ts";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
 
 // Timing-safe API key comparison following Cloudflare's recommended pattern.
 // When lengths differ, compare the input against itself to maintain constant time
@@ -454,7 +454,7 @@ if (import.meta.main) {
   const frostConfigPath = process.env.FROST_CONFIG_PATH?.trim();
   if (frostConfigPath) {
     try {
-      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../frost/config.ts");
+      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../../../packages/cashu-frost-oracle/src/config.ts");
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
       console.log(`[oracle-server] FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);

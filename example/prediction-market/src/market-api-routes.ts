@@ -19,7 +19,7 @@ import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
 } from "../../../src/infrastructure/conditional-swap/frost-dual-key-store.ts";
-import type { MarketFrostNodeConfig } from "../../../src/infrastructure/frost/market-frost-config.ts";
+import type { MarketFrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/market-frost-config.ts";
 import {
   evaluateCondition,
   calculatePayouts,
@@ -339,7 +339,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_no;
 
-    const { signRound1 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const { signRound1 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const keyPackageJson = JSON.stringify(keyPackage);
     const result = await signRound1(keyPackageJson);
     if (!result.ok) {
@@ -386,7 +386,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_no;
 
-    const { signRound2 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const { signRound2 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const keyPackageJson = JSON.stringify(keyPackage);
     const result = await signRound2(keyPackageJson, nonceEntry.nonces, body.commitments, body.message);
 
@@ -433,7 +433,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
 
     const outcomeKey = outcome === "yes" ? "a" : "b";
     const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
-    const { signRound1 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const { signRound1 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const result = await signRound1(JSON.stringify(keyPackage));
     if (!result.ok) return c.json({ error: result.error }, 500);
 
@@ -452,7 +452,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     pendingMarketNonces.delete(body.nonce_id);
 
     const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
-    const { signRound2 } = await import("../../../src/infrastructure/frost/frost-cli.ts");
+    const { signRound2 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
     const result = await signRound2(JSON.stringify(keyPackage), stored.nonces, body.commitments, body.message);
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });

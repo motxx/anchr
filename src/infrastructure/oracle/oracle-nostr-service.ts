@@ -22,9 +22,9 @@ import {
 } from "../nostr/client";
 import { createPreimageStore, type PreimageStore } from "../preimage/preimage-store";
 import type { ThresholdOracleConfig } from "../../domain/oracle-types";
-import type { FrostCoordinator } from "../frost/coordinator";
-import type { FrostNodeConfig } from "../frost/config.ts";
-import { coordinateSigning } from "../frost/signing-coordinator.ts";
+import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
+import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
+import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator";
 import { verify } from "../verification/verifier";
 import type { Query, QueryResult } from "../../domain/types";
 import {
