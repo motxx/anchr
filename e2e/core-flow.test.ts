@@ -103,9 +103,10 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     // 1c. Requester creates HTLC-locked escrow token
     //     Condition: SHA-256(preimage) + Worker's pubkey
     //     For this test, we use the preimage hash directly as the HTLC condition
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash,
-      oracle_pubkey: "e2e_oracle_pub",
+      oracle_pubkeys: ["e2e_oracle_pub"],
       requester_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600, // 1 hour
     };
@@ -125,7 +126,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
         verification_requirements: [],
         oracle_ids: ["e2e-oracle"],
         ttl_seconds: 600,
-        htlc: htlcInfo,
+        escrow: escrowInfo,
         bounty: { amount_sats: BOUNTY_SATS, escrow_token: escrowToken },
       }),
     });
@@ -235,9 +236,10 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     registry.register(strictOracle);
 
     const entry = preimageStore.create();
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "e2e_oracle_pub",
+      oracle_pubkeys: ["e2e_oracle_pub"],
       requester_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
@@ -248,7 +250,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     // Create query, quote, select, begin
     const query = service.createQuery(
       { description: "E2E rejection test" },
-      { htlc: htlcInfo, bounty: { amount_sats: BOUNTY_SATS, escrow_token: token }, oracleIds: ["strict-oracle"] },
+      { escrow: escrowInfo, bounty: { amount_sats: BOUNTY_SATS, escrow_token: token }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await service.selectWorker(query.id, "w1");
@@ -268,16 +270,17 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
 
   test("expiry flow: no submission before locktime → query expires", async () => {
     const entry = preimageStore.create();
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "e2e_oracle_pub",
+      oracle_pubkeys: ["e2e_oracle_pub"],
       requester_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
     const query = service.createQuery(
       { description: "E2E expiry test" },
-      { htlc: htlcInfo, ttlMs: 1 }, // Expires immediately
+      { escrow: escrowInfo, ttlMs: 1 }, // Expires immediately
     );
     expect(query.status).toBe("awaiting_quotes");
 
