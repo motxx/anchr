@@ -160,7 +160,24 @@ share an address space) but the same Fly machine. That's the threshold
 crypto guarantee, not geo-distribution — the next iteration is splitting
 into three Fly apps.
 
-### One-time setup
+### One-time setup (recommended: GitHub Actions)
+
+The fastest way is the **Bootstrap Anchr Market** workflow. It creates
+the Fly app + volume idempotently, runs DKG inside the runner, uploads
+the encrypted shares + passphrase as Fly secrets, then deploys.
+
+1. In GitHub → Settings → Secrets and variables → Actions, add:
+   - `FLY_API_TOKEN_MARKET` — Fly deploy token scoped to `anchr-market`
+     (`flyctl tokens create deploy --name anchr-market`).
+   - `FROST_KEY_PASSPHRASE` — generate locally with
+     `openssl rand -hex 32` and paste.
+2. Actions → **Bootstrap Anchr Market** → Run workflow.
+
+After it succeeds, every future commit to `main` redeploys
+automatically via the regular `deploy-market` job. To rotate FROST
+keys, re-run the bootstrap workflow with `rotate_keys=true`.
+
+### One-time setup (alternative: local CLI)
 
 ```bash
 # 1. Create the Fly app + volume.

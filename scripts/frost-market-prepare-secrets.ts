@@ -28,6 +28,11 @@ const THRESHOLD = 2;
 const TOTAL = 3;
 const BASE_PORT = 4001; // the cluster listens on 127.0.0.1:4001-4003 inside the VM
 
+// `--emit-env` switches stdout to KEY=VALUE lines suitable for
+// `flyctl secrets import` (used by the bootstrap GitHub Actions
+// workflow). Without it, a human-readable runbook is printed.
+const EMIT_ENV = Deno.args.includes("--emit-env");
+
 const passphrase = Deno.env.get("FROST_KEY_PASSPHRASE")?.trim();
 if (!passphrase) {
   console.error("ERROR: FROST_KEY_PASSPHRASE must be set (32+ hex chars recommended).");
@@ -37,9 +42,16 @@ if (!passphrase) {
 
 if (!existsSync(OUTPUT_DIR)) mkdirSync(OUTPUT_DIR, { recursive: true });
 
-console.log(`[prepare-secrets] Running ${THRESHOLD}-of-${TOTAL} DKG (output: ${OUTPUT_DIR}/)`);
+// In emit-env mode, route progress logs to stderr so stdout stays a
+// clean KEY=VALUE stream pipeable into `flyctl secrets import`.
+const log = (msg: string) => {
+  if (EMIT_ENV) console.error(msg);
+  else console.log(msg);
+};
 
-const dkg = new Deno.Command("deno", {
+log(`[prepare-secrets] Running ${THRESHOLD}-of-${TOTAL} DKG (output: ${OUTPUT_DIR}/)`);
+
+const dkgCmd = new Deno.Command("deno", {
   args: [
     "run", "--allow-all", "--config", "deno.json",
     "scripts/frost-market-dkg-bootstrap.ts",
@@ -49,10 +61,20 @@ const dkg = new Deno.Command("deno", {
     "--base-port", String(BASE_PORT),
   ],
   env: { ...Deno.env.toObject(), FROST_KEY_PASSPHRASE: passphrase },
-  stdout: "inherit",
+  // Pipe stdout in emit-env mode so we can forward DKG progress to stderr
+  // and keep our own stdout reserved for KEY=VALUE secret lines.
+  stdout: EMIT_ENV ? "piped" : "inherit",
   stderr: "inherit",
 });
-const { code } = await dkg.output();
+const dkg = dkgCmd.spawn();
+if (EMIT_ENV && dkg.stdout) {
+  void dkg.stdout.pipeTo(
+    new WritableStream({
+      write(chunk) { Deno.stderr.writeSync(chunk); },
+    }),
+  ).catch(() => {});
+}
+const { code } = await dkg.status;
 if (code !== 0) {
   console.error("[prepare-secrets] DKG bootstrap failed");
   Deno.exit(code);
@@ -66,7 +88,14 @@ for (let i = 1; i <= TOTAL; i++) {
   b64s.push(encodeBase64(raw));
 }
 
-console.log(`
+if (EMIT_ENV) {
+  // KEY=VALUE lines on stdout, suitable for `flyctl secrets import`.
+  console.log(`FROST_KEY_PASSPHRASE=${passphrase}`);
+  console.log(`FROST_SIGNER_1_CONFIG_B64=${b64s[0]}`);
+  console.log(`FROST_SIGNER_2_CONFIG_B64=${b64s[1]}`);
+  console.log(`FROST_SIGNER_3_CONFIG_B64=${b64s[2]}`);
+} else {
+  console.log(`
 ==============================================================
   FROST DKG complete. Encrypted configs are in ${OUTPUT_DIR}/
 ==============================================================
@@ -90,3 +119,4 @@ and starts the market server on :8080.
 
 KEEP THE PASSPHRASE SAFE. Losing it makes the DKG output undecryptable.
 ==============================================================`);
+}
