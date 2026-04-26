@@ -9,7 +9,29 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events.ts";
-import type { EscrowType, VerificationFactor } from "../../../packages/core-domain/src/types.ts";
+import { type EscrowType, type VerificationFactor, VERIFICATION_FACTORS } from "../../../packages/core-domain/src/types.ts";
+import { isRecord, optionalNumber, optionalString, requireNumber, requireString } from "../lib/runtime-types.ts";
+
+const VERIFICATION_FACTOR_VALUES = new Set<string>(VERIFICATION_FACTORS);
+const ESCROW_TYPE_VALUES = new Set<string>(["htlc", "p2pk_frost"]);
+
+function isVerificationFactor(x: unknown): x is VerificationFactor {
+  return typeof x === "string" && VERIFICATION_FACTOR_VALUES.has(x);
+}
+
+function isEscrowType(x: unknown): x is EscrowType {
+  return typeof x === "string" && ESCROW_TYPE_VALUES.has(x);
+}
+
+function filterVerificationFactors(value: unknown): VerificationFactor[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isVerificationFactor);
+}
+
+function filterEscrowTypes(value: unknown): EscrowType[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isEscrowType);
+}
 
 /** Parsed oracle announcement from a Nostr kind 30088 event. */
 export interface OracleAnnouncement {
@@ -38,26 +60,19 @@ export function parseOracleAnnouncementEvent(event: Event): OracleAnnouncement |
   if (!dTag || !dTag[1]) return null;
 
   try {
-    const content = JSON.parse(event.content) as Record<string, unknown>;
-
-    if (typeof content.name !== "string" || typeof content.fee_ppm !== "number") {
-      return null;
-    }
+    const content: unknown = JSON.parse(event.content);
+    if (!isRecord(content)) return null;
 
     return {
       id: dTag[1],
-      name: content.name as string,
-      endpoint: typeof content.endpoint === "string" ? content.endpoint : undefined,
-      fee_ppm: content.fee_ppm as number,
-      supported_factors: Array.isArray(content.supported_factors)
-        ? (content.supported_factors as VerificationFactor[])
-        : [],
-      supported_escrow_types: Array.isArray(content.supported_escrow_types)
-        ? (content.supported_escrow_types as EscrowType[])
-        : [],
-      min_bounty_sats: typeof content.min_bounty_sats === "number" ? content.min_bounty_sats : undefined,
-      max_bounty_sats: typeof content.max_bounty_sats === "number" ? content.max_bounty_sats : undefined,
-      description: typeof content.description === "string" ? content.description : undefined,
+      name: requireString(content, "name"),
+      endpoint: optionalString(content, "endpoint"),
+      fee_ppm: requireNumber(content, "fee_ppm"),
+      supported_factors: filterVerificationFactors(content.supported_factors),
+      supported_escrow_types: filterEscrowTypes(content.supported_escrow_types),
+      min_bounty_sats: optionalNumber(content, "min_bounty_sats"),
+      max_bounty_sats: optionalNumber(content, "max_bounty_sats"),
+      description: optionalString(content, "description"),
       pubkey: event.pubkey,
       announced_at: event.created_at,
     };
