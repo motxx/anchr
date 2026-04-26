@@ -4,7 +4,7 @@ import { createQueryService } from "./query-service";
 import type { QueryService } from "./query-service";
 import { createOracleRegistry } from "../infrastructure/oracle/registry";
 import { normalizeQueryResult } from "../infrastructure/attachments";
-import { storeIntegrity, clearIntegrityStore } from "../infrastructure/verification/integrity-store";
+import { storeIntegrity, clearIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
 
 let svc: QueryService;
 

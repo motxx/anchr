@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import { createQueryService, setDefaultService } from "../application/query-service";
 import { createOracleRegistry } from "./oracle/registry";
 import { normalizeQueryResult } from "./attachments";
-import { clearIntegrityStore } from "./verification/integrity-store";
+import { clearIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
 
 /**
  * Tests for MCP query backend data transformation.

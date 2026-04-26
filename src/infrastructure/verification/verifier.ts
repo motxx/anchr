@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { checkAttachmentContent } from "./ai-content-check";
 import { validateC2pa } from "../../../packages/photo-bounty/src/c2pa-validation";
 import { haversineKm } from "../../../packages/photo-bounty/src/geo";
-import { getIntegrity, getIntegrityForQuery } from "./integrity-store";
+import { getIntegrity, getIntegrityForQuery } from "../../../packages/photo-bounty/src/integrity-store";
 import { validateTlsn } from "./tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment";
 import { validateAttachmentUri } from "../url-validation";

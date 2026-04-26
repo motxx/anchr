@@ -3,8 +3,8 @@ import { isBlossomEnabled } from "./blossom/client";
 import { workerUpload } from "./blossom/worker-upload";
 import { validateC2pa } from "../../packages/photo-bounty/src/c2pa-validation";
 import { validateExif } from "../../packages/photo-bounty/src/exif-validation";
-import { storeIntegrity } from "./verification/integrity-store";
-import type { ProofModeIntegrity } from "./verification/integrity-store";
+import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
+import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store";
 import { parseProofModeZip } from "../../packages/photo-bounty/src/proofmode-validation";
 import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types";
 import {

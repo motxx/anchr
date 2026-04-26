@@ -12,7 +12,7 @@ import {
 } from "./query-service";
 import type { Query, QueryResult } from "../domain/types";
 import type { EscrowProvider } from "./escrow-port";
-import { createIntegrityStore } from "../infrastructure/verification/integrity-store";
+import { createIntegrityStore } from "../../packages/photo-bounty/src/integrity-store";
 
 /** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {

@@ -1,7 +1,7 @@
 import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { C2paValidationResult } from "../../../packages/photo-bounty/src/c2pa-validation";
-import type { ExifValidationResult } from "../../../packages/photo-bounty/src/exif-validation";
+import type { C2paValidationResult } from "./c2pa-validation";
+import type { ExifValidationResult } from "./exif-validation";
 import {
   clearIntegrityStore,
   getIntegrity,
