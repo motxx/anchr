@@ -1,51 +1,65 @@
-# core-cashu
+# @anchr/core-cashu
 
-Cashu HTLC escrow + preimage store helpers, decoupled from any specific application.
+Cashu HTLC escrow + preimage store helpers. Self-contained — bring your own Cashu mint.
 
-## Scope
+## Install
 
-- **HTLC escrow** — `createHtlcToken`, `redeemHtlcToken`, `swapHtlcBindWorker`, `verifyHtlcProofs`
-- **P2PK escrow (legacy 2-of-2)** — `buildEscrowP2PKOptions`, `inspectEscrowToken`, `calculateOracleFee`
-- **Escrow helpers** — `getWalletAndConfig`, `encodeProofs`, `loadAndSend`, `computeNetAmount`, `sumProofAmounts`
-- **Preimage store** — `createPreimageStore`, `createPersistentPreimageStore`, `PreimageStore` / `PreimageEntry` interfaces
+```jsonc
+{
+  "imports": {
+    "@anchr/core-cashu": "jsr:@anchr/core-cashu@^0.1"
+  }
+}
+```
 
 ## Public API
 
 ```typescript
 import {
+  // HTLC escrow
   createHtlcToken, redeemHtlcToken, swapHtlcBindWorker,
-  verifyHtlcProofs, buildEscrowP2PKOptions,
-  inspectEscrowToken, calculateOracleFee,
+  verifyHtlcProofs,
+  // Legacy 2-of-2 P2PK
+  buildEscrowP2PKOptions, inspectEscrowToken, calculateOracleFee,
   type EscrowToken, type EscrowParams,
-} from "core-cashu/escrow";
+} from "@anchr/core-cashu/escrow";
+
 import {
   getWalletAndConfig, encodeProofs, loadAndSend,
   computeNetAmount, sumProofAmounts,
-} from "core-cashu/escrow-helpers";
+} from "@anchr/core-cashu/escrow-helpers";
+
 import {
   createPreimageStore, createPersistentPreimageStore,
   type PreimageStore, type PreimageEntry,
-} from "core-cashu/preimage-store";
+} from "@anchr/core-cashu/preimage-store";
+
+import {
+  getCashuWallet, getCashuConfig, isCashuEnabled,
+  createBountyToken, encodeToken, verifyToken,
+} from "@anchr/core-cashu/wallet";
 ```
 
-## Host integration points
+## Configuration
 
-Two cross-boundary imports are intentional, not migration debt:
+Set the mint URL via environment:
 
-- `escrow-helpers` reads Cashu wallet bindings from the host
-  (`src/infrastructure/cashu/wallet`) which configures the mint URL via env vars.
-- `preimage-store` re-exports the `PreimageStore` / `PreimageEntry` port
-  interfaces defined by the host application
-  (`src/application/preimage-port`).
+```bash
+CASHU_MINT_URL=https://mint.example.com
+```
 
-These keep this package agnostic of the specific Cashu mint configuration
-and the host's port abstractions.
+`getCashuConfig()` returns `null` if unset, allowing graceful no-op behaviour in test environments.
 
 ## Tests
 
 ```bash
-deno test packages/core-cashu/ --allow-all
+deno task test
 ```
+
+## Dependencies
+
+- `@cashu/cashu-ts` — Cashu protocol implementation
+- `@noble/hashes` — SHA-256
 
 ## License
 

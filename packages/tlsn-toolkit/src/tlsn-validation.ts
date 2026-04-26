@@ -14,8 +14,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, which, writeFile, spawn } from "../../core-runtime/src/mod.ts";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../core-domain/src/types";
+import { moduleDir, which, writeFile, spawn } from "@anchr/core-runtime";
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "@anchr/core-domain/types";
 
 // --- Proof replay protection ---
 // Stores SHA-256 hashes of previously accepted presentations to prevent reuse.

@@ -10,7 +10,7 @@ import { Buffer } from "node:buffer";
 import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest, _clearSeenPresentationsForTest } from "./tlsn-validation";
-import type { TlsnAttestation, TlsnRequirement } from "../../core-domain/src/types";
+import type { TlsnAttestation, TlsnRequirement } from "@anchr/core-domain/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

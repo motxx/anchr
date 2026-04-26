@@ -28,7 +28,7 @@ import {
   computeNetAmount,
   sumProofAmounts,
 } from "../../../packages/core-cashu/src/escrow-helpers";
-import { verifyToken } from "../cashu/wallet";
+import { verifyToken } from "../../../packages/core-cashu/src/wallet";
 
 export interface FrostEscrowConfig {
   /** FROST group public key (BIP-340 x-only hex). */

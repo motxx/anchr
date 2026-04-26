@@ -1,4 +1,7 @@
 {
+  "imports": {
+    "anchr-sdk": "../../packages/sdk/src/index.ts"
+  },
   "tasks": {
     "buyer": "deno run --allow-all buyer.ts",
     "seller": "deno run --allow-all seller.ts"

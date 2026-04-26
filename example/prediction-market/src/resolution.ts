@@ -7,8 +7,8 @@
  * In both modes the losing side's secret is permanently deleted.
  */
 
-import type { DualPreimageStore } from "../../../packages/cashu-conditional-swap/src/dual-preimage-store.ts";
-import type { DualKeyStore } from "../../../packages/cashu-conditional-swap/src/frost-conditional-swap.ts";
+import type { DualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
+import type { DualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 
 export interface ResolutionResult {
   /** The revealed preimage for the winning outcome. (HTLC mode) */

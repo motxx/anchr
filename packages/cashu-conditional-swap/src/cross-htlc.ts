@@ -12,14 +12,14 @@ import {
   type Proof,
   type P2PKOptions,
 } from "@cashu/cashu-ts";
-import type { EscrowToken } from "../../core-cashu/src/escrow";
+import type { EscrowToken } from "@anchr/core-cashu/escrow";
 import type { ConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
   computeNetAmount,
-} from "../../core-cashu/src/escrow-helpers";
+} from "@anchr/core-cashu/escrow-helpers";
 
 /**
  * Build P2PK options for party A's token.

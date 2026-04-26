@@ -26,7 +26,7 @@ import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
 import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
 import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
 import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
-import { createBountyToken } from "../src/infrastructure/cashu/wallet";
+import { createBountyToken } from "../packages/core-cashu/src/wallet";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,

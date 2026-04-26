@@ -4,9 +4,7 @@
 
 import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
-// Host injection point: Cashu wallet bindings are wired by the host application
-// (src/infrastructure/cashu/wallet) since they read host config (mint URL, etc.).
-import { getCashuWallet, getCashuConfig } from "../../../src/infrastructure/cashu/wallet";
+import { getCashuWallet, getCashuConfig } from "./wallet";
 
 export async function getWalletAndConfig() {
   const wallet = getCashuWallet();

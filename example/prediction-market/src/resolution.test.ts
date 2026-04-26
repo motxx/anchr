@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
-import { createDualPreimageStore } from "../../../packages/cashu-conditional-swap/src/dual-preimage-store.ts";
-import { createDualKeyStore } from "../../../packages/cashu-conditional-swap/src/frost-conditional-swap.ts";
+import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
+import { createDualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import { resolveMarket, resolveMarketFrostPerProof } from "./resolution.ts";
 
 test("resolveMarket YES maps to outcome a", () => {

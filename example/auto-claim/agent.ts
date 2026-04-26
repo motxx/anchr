@@ -15,8 +15,8 @@
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "../../packages/sdk/src/index.ts";
-import { spawn } from "../../packages/core-runtime/src/mod.ts";
+import { Anchr } from "anchr-sdk";
+import { spawn } from "@anchr/core-runtime";
 
 const SERVER_URL = Deno.env.get("ANCHR_URL") ?? "http://localhost:3000";
 const VERIFIER_HOST = Deno.env.get("TLSN_VERIFIER_HOST") ?? "localhost:7046";

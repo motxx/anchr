@@ -5,6 +5,8 @@
  * Each Oracle node loads its own config file at startup.
  */
 
+import type { ThresholdOracleConfig } from "@anchr/core-domain/oracle-types";
+
 export interface FrostNodeConfig {
   /** Signer index (1-based, matching DKG participant index). */
   signer_index: number;
@@ -43,7 +45,7 @@ export function saveFrostNodeConfig(filePath: string, config: FrostNodeConfig): 
 }
 
 /** Build a ThresholdOracleConfig from a FrostNodeConfig. */
-export function toThresholdOracleConfig(config: FrostNodeConfig): import("../../core-domain/src/oracle-types").ThresholdOracleConfig {
+export function toThresholdOracleConfig(config: FrostNodeConfig): ThresholdOracleConfig {
   return {
     threshold: config.threshold,
     total_signers: config.total_signers,

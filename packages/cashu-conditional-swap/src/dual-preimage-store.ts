@@ -10,7 +10,7 @@ import {
   createPreimageStore,
   type PreimageStore,
   type PreimageEntry,
-} from "../../core-cashu/src/preimage-store";
+} from "@anchr/core-cashu/preimage-store";
 
 export interface DualPreimageEntry {
   swap_id: string;

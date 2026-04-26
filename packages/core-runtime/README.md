@@ -1,13 +1,29 @@
-# core-runtime
+# @anchr/core-runtime
 
-Thin runtime compatibility layer (Bun ↔ Deno equivalents) used by all Anchr packages.
+Thin runtime compatibility layer for the Deno / Bun ↔ Node.js boundary: process spawning, file I/O, `which`, and module-directory lookup.
 
-## Scope
+This package is part of the Anchr ecosystem but has **zero dependencies** and is usable in any Deno project that needs the same compat surface.
 
-- `spawn` — process spawning with stdin/stdout/stderr piping
-- `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `readFileAsArrayBuffer` — file I/O
-- `which` — `PATH` binary lookup
-- `moduleDir(import.meta)` — current module's directory
+## Install
+
+```jsonc
+// deno.json
+{
+  "imports": {
+    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
+  }
+}
+```
+
+In a workspace alongside other Anchr packages, use a relative path:
+
+```jsonc
+{
+  "imports": {
+    "@anchr/core-runtime": "../core-runtime/src/mod.ts"
+  }
+}
+```
 
 ## Public API
 
@@ -17,10 +33,18 @@ import {
   readFile, writeFile, fileExists, fileLastModified, readFileAsArrayBuffer,
   which,
   moduleDir,
-} from "core-runtime/mod";
+} from "@anchr/core-runtime";
 ```
 
-Each helper is also available as a separate file (`core-runtime/process`, `core-runtime/fs`, etc.) for tree-shaking.
+Each helper is also available as a separate sub-export (`@anchr/core-runtime/process`, `/fs`, `/which`, `/env`) for finer-grained imports.
+
+## Tests
+
+```bash
+deno task test
+```
+
+(This package has no test fixtures — tested transitively by consumers.)
 
 ## License
 

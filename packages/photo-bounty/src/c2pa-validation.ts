@@ -10,7 +10,7 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn } from "../../core-runtime/src/mod.ts";
+import { which, writeFile, spawn } from "@anchr/core-runtime";
 
 export interface C2paManifest {
   title?: string;

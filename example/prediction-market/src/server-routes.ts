@@ -22,19 +22,19 @@ import type {
 import { createOrderBook, type OrderBook } from "./order-book.ts";
 import {
   type DualKeyStore,
-} from "../../../packages/cashu-conditional-swap/src/frost-conditional-swap.ts";
+} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
   frostSignProofSecretsAsync,
-} from "../../../packages/cashu-conditional-swap/src/frost-dual-key-store.ts";
-import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/market-frost-config.ts";
+} from "@anchr/cashu-conditional-swap/frost-dual-key-store";
+import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
 import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition } from "./market-oracle.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
-} from "../../../packages/cashu-conditional-swap/src/dual-preimage-store.ts";
+} from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import {
   isMintReachable,
   mintProofsFromRegtest,
@@ -1081,7 +1081,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
       const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
       const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
-      const { signRound1 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
+      const { signRound1 } = await import("@anchr/cashu-frost-oracle/frost-cli");
       const r1 = await signRound1(JSON.stringify(keyPkg));
       if (!r1.ok) return c.json({ error: r1.error }, 500);
 
@@ -1100,7 +1100,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       pendingMarketNonces.delete(reqBody.nonce_id);
 
       const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
-      const { signRound2 } = await import("../../../packages/cashu-frost-oracle/src/frost-cli.ts");
+      const { signRound2 } = await import("@anchr/cashu-frost-oracle/frost-cli");
       const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
       if (!r2.ok) return c.json({ error: r2.error }, 500);
       return c.json({ signature_share: r2.data!.signature_share });

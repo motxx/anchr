@@ -1,33 +1,42 @@
-# core-domain
+# @anchr/core-domain
 
-Shared domain type definitions used across Anchr packages and the host server.
+Shared TypeScript domain type definitions for the Anchr toolkit.
 
-## Scope
+This package is **type-only** — no runtime code, just shapes. Zero runtime dependencies.
 
-- `Query`, `QueryResult`, `QueryStatus`, `QueryInput`, `PaymentStatus`, …
-- `AttachmentRef`, `BlossomKeyMap`, `BlossomKeyMaterial`
-- `TlsnRequirement`, `TlsnAttestation`, `TlsnCondition`, `TlsnVerifiedData`
-- `VerificationFactor`, `VerificationDetail`
-- `BountyInfo`, `QuoteInfo`, `RequesterMeta`, `SubmissionMeta`
-- `HtlcInfo`, `EscrowInfo`, `EscrowType`
-- `QuorumConfig`, `GpsCoord`
-- `Oracle`, `OracleAttestation`, `ThresholdOracleConfig` (in `oracle-types`)
+## Install
 
-This package is intentionally type-only — no runtime code, just shared shapes.
+```jsonc
+{
+  "imports": {
+    "@anchr/core-domain": "jsr:@anchr/core-domain@^0.1"
+  }
+}
+```
 
 ## Public API
 
 ```typescript
 import type {
-  Query, QueryResult, QueryStatus, AttachmentRef,
-  BlossomKeyMap, BlossomKeyMaterial,
-  TlsnRequirement, TlsnAttestation, TlsnVerifiedData,
+  // Query lifecycle
+  Query, QueryResult, QueryStatus, QueryInput, PaymentStatus,
+  // Attachments + Blossom keys
+  AttachmentRef, BlossomKeyMap, BlossomKeyMaterial,
+  // TLSNotary types
+  TlsnRequirement, TlsnAttestation, TlsnCondition, TlsnVerifiedData,
+  // Verification
   VerificationFactor, VerificationDetail,
-  BountyInfo, QuoteInfo, GpsCoord, EscrowInfo,
-} from "core-domain/types";
+  // Bounty / quotes
+  BountyInfo, QuoteInfo, RequesterMeta, SubmissionMeta,
+  // HTLC / escrow
+  HtlcInfo, EscrowInfo, EscrowType,
+  // Quorum / GPS
+  QuorumConfig, GpsCoord,
+} from "@anchr/core-domain/types";
+
 import type {
   Oracle, OracleAttestation, ThresholdOracleConfig,
-} from "core-domain/oracle-types";
+} from "@anchr/core-domain/oracle-types";
 ```
 
 ## License

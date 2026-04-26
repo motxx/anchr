@@ -7,7 +7,7 @@
 
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { moduleDir, which, spawn } from "../../core-runtime/src/mod.ts";
+import { moduleDir, which, spawn } from "@anchr/core-runtime";
 
 let frostSignerPath: string | null | undefined;
 

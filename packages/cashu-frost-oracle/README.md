@@ -1,56 +1,67 @@
-# cashu-frost-oracle
+# @anchr/cashu-frost-oracle
 
-FROST t-of-n threshold signing toolkit for Cashu P2PK.
+FROST t-of-n threshold signing toolkit for Cashu P2PK. Brand-neutral — usable beyond Anchr for any Bitcoin / Cashu app that needs a threshold-signing Oracle.
 
-Brand-neutral: this package is a generic FROST cluster toolkit usable beyond Anchr — multi-sig Cashu vaults, DAO treasuries, distributed escrow services, dispute-resolution juries.
+Use cases: multi-sig Cashu vaults with social recovery, DAO treasuries, dispute-resolution juries, distributed escrow services, prediction-market oracles.
 
-## Scope
+## Install
 
-- **DKG protocol** — round-1/2/3 distributed key generation orchestration
-- **Threshold signing** — round-1/2 commitments + signature shares + aggregation
-- **Coordinator** — `createFrostCoordinator()` for in-process multi-signer state
-- **Signing coordinator** — `coordinateSigning()` for cross-node HTTP coordination
-- **CLI wrapper** — `signRound1`, `signRound2`, `dkgRound1/2/3`, `aggregateSignatures` invoke the upstream `frost-secp256k1-tr` Rust binary
-- **Configuration** — `FrostNodeConfig`, `MarketFrostNodeConfig`, JSON file loaders
+```jsonc
+{
+  "imports": {
+    "@anchr/cashu-frost-oracle": "jsr:@anchr/cashu-frost-oracle@^0.1",
+    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1",
+    "@anchr/core-domain": "jsr:@anchr/core-domain@^0.1"
+  }
+}
+```
 
-Companion Rust crate: `crates/frost-signer/` (RFC 9591 / Komlo-Goldberg via ZcashFoundation `frost-secp256k1-tr`).
+## Companion Rust binary
+
+Built from `frost-secp256k1-tr` (ZcashFoundation, RFC 9591 / Komlo-Goldberg, BIP-340 Taproot compatible). Path resolution: project-local `crates/frost-signer/target/release/frost-signer` → `PATH`.
+
+```bash
+git clone https://github.com/motxx/anchr.git
+cd anchr/crates/frost-signer && cargo build --release
+```
+
+If the binary is absent, signing functions return `null` and the package gracefully no-ops.
 
 ## Public API
 
 ```typescript
-import { createFrostCoordinator, type FrostCoordinator } from "cashu-frost-oracle/coordinator";
-import {
-  coordinateSigning,
-  type SigningCoordinatorConfig,
-} from "cashu-frost-oracle/signing-coordinator";
+import { createFrostCoordinator, type FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
+import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
 import {
   signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3,
   aggregateSignatures, isFrostSignerAvailable,
-} from "cashu-frost-oracle/frost-cli";
+} from "@anchr/cashu-frost-oracle/frost-cli";
 import {
   loadFrostNodeConfig, saveFrostNodeConfig,
   type FrostNodeConfig, type PeerConfig,
-} from "cashu-frost-oracle/config";
+} from "@anchr/cashu-frost-oracle/config";
 import {
   loadMarketFrostNodeConfig,
   type MarketFrostNodeConfig,
-} from "cashu-frost-oracle/market-frost-config";
+} from "@anchr/cashu-frost-oracle/market-frost-config";
 import type {
   ThresholdOracleConfig, FrostSigningSession, DkgSession,
-} from "cashu-frost-oracle/types";
+} from "@anchr/cashu-frost-oracle/types";
 ```
 
 ## Tests
 
 ```bash
-deno test packages/cashu-frost-oracle/ --allow-all
+deno task test
 ```
 
-Tests skip gracefully when the `frost-signer` Rust binary is not built. To exercise the full DKG / signing path:
+Tests skip gracefully when the `frost-signer` Rust binary is not built.
 
-```bash
-cd crates/frost-signer && cargo build --release
-```
+## Dependencies
+
+- `@anchr/core-runtime` — for `spawn` to invoke the Rust binary
+- `@anchr/core-domain/oracle-types` — for `ThresholdOracleConfig` shape
+- `hono` — for the HTTP signing-coordinator (RPC between cluster nodes)
 
 ## License
 

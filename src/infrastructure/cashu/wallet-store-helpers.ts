@@ -3,7 +3,7 @@
  */
 
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuWallet } from "./wallet";
+import { getCashuWallet } from "../../../packages/core-cashu/src/wallet";
 
 export type WalletRole = "requester" | "worker";
 

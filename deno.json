@@ -1,4 +1,13 @@
 {
+  "workspace": [
+    "./packages/core-runtime",
+    "./packages/core-domain",
+    "./packages/core-cashu",
+    "./packages/tlsn-toolkit",
+    "./packages/photo-bounty",
+    "./packages/cashu-frost-oracle",
+    "./packages/cashu-conditional-swap"
+  ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
     "jsx": "react-jsx",

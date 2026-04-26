@@ -1,0 +1,34 @@
+{
+  "name": "@anchr/photo-bounty",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./geo": "./src/geo.ts",
+    "./c2pa-validation": "./src/c2pa-validation.ts",
+    "./exif-validation": "./src/exif-validation.ts",
+    "./proofmode-validation": "./src/proofmode-validation.ts",
+    "./ai-content-check": "./src/ai-content-check.ts",
+    "./integrity-store": "./src/integrity-store.ts"
+  },
+  "imports": {
+    "@anchr/core-runtime": "../core-runtime/src/mod.ts",
+    "@anchr/core-domain/types": "../core-domain/src/types.ts",
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
+    "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
+    "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --no-check --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
+  }
+}

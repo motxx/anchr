@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createAiContentChecker, type AiContentCheckDeps } from "./ai-content-check";
-import type { Query, QueryResult } from "../../core-domain/src/types";
+import type { Query, QueryResult } from "@anchr/core-domain/types";
 
 const baseQuery: Query = {
   id: "q1",

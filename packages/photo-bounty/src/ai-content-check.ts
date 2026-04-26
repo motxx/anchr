@@ -10,8 +10,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "../../core-runtime/src/mod.ts";
-import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "../../core-domain/src/types";
+import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
+import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "@anchr/core-domain/types";
 
 export interface ContentCheckResult {
   passed: boolean;
