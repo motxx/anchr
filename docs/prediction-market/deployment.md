@@ -6,6 +6,9 @@ production-style deploy uses encrypted FROST DKG keys (PR-D), the
 auto-resolver (PR-B), trustless TLSNotary verification (PR-C), and the
 browser-side Cashu bet flow (PR-E).
 
+> **Live testnet deploy:** <https://anchr-market.fly.dev> (Fly region `sin`,
+> testnut.cashu.space mint, anchr-relay Nostr relay, anchr-tlsn-verifier).
+
 ## Architecture at a glance
 
 ```

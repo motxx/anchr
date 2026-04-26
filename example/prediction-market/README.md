@@ -3,6 +3,11 @@
 A demo application using Anchr's Oracle + TLSNotary verification + Cashu
 HTLC (or FROST P2PK) atomic settlement for prediction-market resolution.
 
+> **Live testnet deploy:** <https://anchr-market.fly.dev>
+> Backed by FROST 2-of-3 threshold signing on Fly.io (region `sin`),
+> the public testnut Cashu mint (<https://testnut.cashu.space>), the
+> Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
+
 > **Operator runbook:** [`docs/prediction-market/deployment.md`](../../docs/prediction-market/deployment.md)
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
