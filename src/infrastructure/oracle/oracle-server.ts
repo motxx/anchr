@@ -18,7 +18,7 @@ import type { Query, QueryResult } from "../../../packages/core-domain/src/types
 import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
 import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
 import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { ThresholdOracleConfig } from "../../../packages/cashu-frost-oracle/src/types.ts";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";

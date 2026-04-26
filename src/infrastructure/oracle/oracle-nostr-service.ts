@@ -21,7 +21,7 @@ import {
   subscribeToResponses,
 } from "../nostr/client.ts";
 import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { ThresholdOracleConfig } from "../../../packages/cashu-frost-oracle/src/types.ts";
 import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
 import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator.ts";
