@@ -30,8 +30,7 @@ export interface RouteContext {
   rateLimit: MiddlewareHandler;
 }
 
-// deno-lint-ignore no-explicit-any
-function handleListQueries(c: Context<any>, svc: QueryService) {
+function handleListQueries(c: Context, svc: QueryService) {
   const latParam = c.req.query("lat");
   const lonParam = c.req.query("lon");
   const maxDistParam = c.req.query("max_distance_km");
@@ -59,8 +58,7 @@ function handleListQueries(c: Context<any>, svc: QueryService) {
   return c.json(queries.map(querySummary));
 }
 
-// deno-lint-ignore no-explicit-any
-function handleCreateQuery(c: Context<any>, svc: QueryService, getUrl: () => string) {
+function handleCreateQuery(c: Context, svc: QueryService, getUrl: () => string) {
   const payload = c.req.valid("json" as never) as z.infer<typeof createQuerySchema>;
 
   const input: QueryInput = {
@@ -149,8 +147,7 @@ function resolveIndexedAttachment(
   return { query, attachment, attachments };
 }
 
-// deno-lint-ignore no-explicit-any
-async function handleAttachmentPreview(c: Context<any>, svc: QueryService) {
+async function handleAttachmentPreview(c: Context, svc: QueryService) {
   const resolved = resolveIndexedAttachment(svc, c.req.param("id"), Number(c.req.param("index")));
   if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status as 400);
   const { attachment } = resolved;
@@ -167,8 +164,7 @@ async function handleAttachmentPreview(c: Context<any>, svc: QueryService) {
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const ALLOWED_UPLOAD_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
 
-// deno-lint-ignore no-explicit-any
-async function handleUpload(c: Context<any>, svc: QueryService) {
+async function handleUpload(c: Context, svc: QueryService) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Query id is required" }, 400);
 
@@ -261,8 +257,7 @@ function buildQueryResult(body: z.infer<typeof resultBodySchema>): { result: Que
   };
 }
 
-// deno-lint-ignore no-explicit-any
-async function handleSubmitResult(c: Context<any>, svc: QueryService) {
+async function handleSubmitResult(c: Context, svc: QueryService) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Query id is required" }, 400);
   let rawBody: unknown;
