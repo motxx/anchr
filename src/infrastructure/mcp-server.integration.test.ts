@@ -99,12 +99,16 @@ class DenoStdioTransport implements Transport {
 }
 
 async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
-  // Configure defaultService with oracle registry so singleton functions work
+  // Configure defaultService with oracle registry so singleton-backed module-level
+  // functions in mcp-query-backend's createDefaultBackend still resolve. The same
+  // service instance is exposed as `globalThis.__queryService` so the test
+  // bootstrapPreamble can pass it into `buildWorkerApiApp({ queryService })`.
   const setupDefaultService = [
     `const { setDefaultService, createQueryService } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
     `const { createOracleRegistry } = await import(${JSON.stringify(join(moduleDir(import.meta), "oracle/registry.ts"))});`,
     `const { normalizeQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "attachments.ts"))});`,
-    `setDefaultService(createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult }));`,
+    `globalThis.__queryService = createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult });`,
+    `setDefaultService(globalThis.__queryService);`,
   ].join("\n");
 
   const bootstrap = [
@@ -238,7 +242,7 @@ Deno.test({ name: "mcp can use a remote HTTP query backend", sanitizeResources: 
   const bootstrapPreamble = [
     `Deno.env.set("HTTP_API_KEY", "remote-test-key");`,
     `const { buildWorkerApiApp } = await import(${JSON.stringify(join(moduleDir(import.meta), "worker-api.ts"))});`,
-    `const app = buildWorkerApiApp();`,
+    `const app = buildWorkerApiApp({ queryService: globalThis.__queryService });`,
     `const originalFetch = globalThis.fetch.bind(globalThis);`,
     `globalThis.fetch = async (input, init) => {`,
     `  const url = typeof input === "string" || input instanceof URL ? new URL(input.toString()) : new URL(input.url);`,

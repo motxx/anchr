@@ -19,7 +19,7 @@ import {
   // HTLC escrow
   createHtlcToken, redeemHtlcToken, swapHtlcBindWorker,
   verifyHtlcProofs,
-  // Legacy 2-of-2 P2PK
+  // 2-of-2 P2PK escrow primitives
   buildEscrowP2PKOptions, inspectEscrowToken, calculateOracleFee,
   type EscrowToken, type EscrowParams,
 } from "@anchr/core-cashu/escrow";

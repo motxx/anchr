@@ -8,10 +8,7 @@ import { getRuntimeConfig } from "./config.ts";
 import { listOracles } from "./oracle/index.ts";
 import type { OracleRegistry } from "./oracle/registry.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
-import {
-  defaultService as defaultQueryService,
-  type QueryService,
-} from "../application/query-service.ts";
+import type { QueryService } from "../application/query-service.ts";
 import {
   registerQueryRoutes,
   registerAttachmentRoutes,
@@ -25,7 +22,7 @@ import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "security"]);
 
 export interface WorkerApiDeps {
-  queryService?: QueryService;
+  queryService: QueryService;
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
   listingStore?: ListingStore;
@@ -108,10 +105,10 @@ export async function prepareWorkerApiAssets() {
 
 // --- App ---
 
-export function buildWorkerApiApp(deps?: WorkerApiDeps) {
-  const svc = deps?.queryService ?? defaultQueryService();
-  const pStore = deps?.preimageStore;
-  const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
+export function buildWorkerApiApp(deps: WorkerApiDeps) {
+  const svc = deps.queryService;
+  const pStore = deps.preimageStore;
+  const doListOracles = deps.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
 
   const app = new Hono();
 
@@ -164,7 +161,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
   registerLogRoutes(app, writeAuth);
 
   // --- Marketplace routes ---
-  const listingStore = deps?.listingStore ?? createListingStore();
+  const listingStore = deps.listingStore ?? createListingStore();
   registerMarketplaceRoutes(app, { listingStore, preimageStore: pStore, writeAuth, rateLimit });
 
   return app;

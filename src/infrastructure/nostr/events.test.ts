@@ -15,7 +15,6 @@ import {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
   ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_SETTLEMENT,
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
@@ -98,7 +97,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
         attachments: [{
           blossom_hash: "sha256:deadbeef",
           blossom_urls: ["https://blossom.example/deadbeef"],
-          decrypt_key: "0123456789abcdef",
+          decrypt_key_requester: "0123456789abcdef",
           decrypt_iv: "aabbccdd00112233",
           mime: "image/jpeg",
         }],
@@ -136,7 +135,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       },
     );
 
-    expect(settlement.kind).toBe(ANCHR_QUERY_SETTLEMENT);
+    expect(settlement.kind).toBe(ANCHR_QUERY_FEEDBACK);
 
     // Check tags
     const eTags = settlement.tags.filter((t) => t[0] === "e");
