@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "agent": "deno run --allow-all agent.ts",
+    "insurer": "deno run --allow-all insurer.ts",
+    "mock-airline": "deno run --allow-all mock-airline.ts"
+  }
+}

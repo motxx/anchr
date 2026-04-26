@@ -227,6 +227,75 @@ anchr/
 - 開始時: 242 passed / 850 steps
 - Phase 1 完了時: 242 / 850（shim 経由で完全互換）
 - Phase 4 完了時: 249 / 861（package テスト追加で増加、regression 0）
+- tlsn-toolkit 抽出後: 250 / 861（verifier-tlsn.test.ts 追加）
+- 最終: 250 / 861（全 4 core packages 抽出後、regression 0）
+
+### 2026-04-26（夕方）— 全 core packages 抽出完了
+
+抽出された 4 つの独立 core packages：
+
+| Package | Files | Lines | Tests | 用途 |
+|---|---|---|---|---|
+| `packages/photo-bounty/` | 11 | ~1,200 | 9 / 28 steps | C2PA + GPS + ProofMode + AI 検証 |
+| `packages/tlsn-toolkit/` | 5 | ~700 | 4 / 39 steps | TLSNotary application layer |
+| `packages/cashu-frost-oracle/` | 10 | ~1,200 | 10 / 29 steps | FROST t-of-n cluster for Cashu P2PK |
+| `packages/cashu-conditional-swap/` | 9 | ~1,500 | 18 / 45 steps | N:M binary outcome conditional swap |
+| **合計** | **35** | **~4,600** | **41 tests / 141 steps** | |
+
+加えて：
+- 7 examples すべて working（auto-claim / c2pa-media-verification / tlsn-fiat-swap-square に独自 deno.json 追加完了）
+- `test:ci` に全 packages/* 含むよう更新
+- 全 5 commits、各 commit で test:ci + arch-lint + test:example 通過確認
+
+### 達成した分離
+
+**「Anchr Protocol」一枚岩 → 4 brand-neutral core packages + host server**：
+
+```
+packages/                       ← 独立利用可能な core libraries
+├── photo-bounty/              ← Anchr-branded（multi-modal verification factor 抽象が独自価値）
+├── tlsn-toolkit/              ← brand-neutral（TLSN を本番運用するための app layer）
+├── cashu-frost-oracle/        ← brand-neutral（Cashu P2PK 用 FROST cluster）
+├── cashu-conditional-swap/    ← brand-neutral（N:M binary outcome 共通プリミティブ）
+└── sdk/                        ← 既存 anchr-sdk
+
+src/                            ← Anchr server (host)
+├── domain/                     ← server domain types
+├── application/                ← server use cases
+├── infrastructure/
+│   ├── verification/          ← verifier orchestrator + ai-content-check host adapter
+│   ├── frost/                  ← signer.ts、frost-escrow-provider.ts (host-coupled)
+│   ├── cashu/                  ← escrow + wallet (将来 core-cashu に移動候補)
+│   ├── nostr/                  ← Nostr 通信 (host)
+│   ├── oracle/                 ← Oracle endpoint (host)
+│   └── ...
+└── runtime/                    ← Deno runtime helpers (将来 core-runtime に移動候補)
+
+example/                        ← integration tests + 独自 deno.json
+├── photo-bounty 系: c2pa-media-verification, supply-chain-proof
+├── tlsn 系: tlsn-fiat-swap-square, auto-claim, airdrop-bot-shield
+├── prediction-market           ← cashu-conditional-swap + cashu-frost-oracle 利用
+└── bounty-board                ← UI shell (Expo)
+```
+
+### 残った migration debt（次のセッションでの抽出候補）
+
+- `core-runtime`: `src/runtime/mod.ts` を独立 package に → 全 packages の `../../../src/runtime/...` 参照を解消
+- `core-domain`: `src/domain/types.ts`、`src/domain/oracle-types.ts` を独立 package に → photo-bounty/ai-content-check, tlsn-toolkit, cashu-frost-oracle/config の参照を解消
+- `core-cashu`: `src/infrastructure/cashu/escrow.ts`、`escrow-helpers.ts`、`src/infrastructure/preimage/preimage-store.ts` → cashu-conditional-swap が参照中
+
+これらは **構造的負債ではなく単純な path 整理**で、必要に応じて段階的に解消可能。
+
+### 確立した migration pattern (再掲)
+
+各抽出は：
+1. 依存解析（Grep）
+2. Canonical 配置（packages/<product>/src/、`migration debt` コメント付き）
+3. 旧 path を re-export shim 化 or host adapter 化
+4. 新 test + 旧 test 両方 pass、`lint:arch` clean、`test:ci` regression 0
+5. 全 consumer 更新後 shim 削除、test:ci に packages/ 追加
+
+このパターンは **TypeScript / Deno project の段階的 monorepo split のテンプレート**として再利用可能。
 
 
 ### Migration pattern（記録）

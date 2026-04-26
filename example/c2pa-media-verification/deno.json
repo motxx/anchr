@@ -1,0 +1,6 @@
+{
+  "tasks": {
+    "requester": "deno run --allow-all requester.ts",
+    "worker": "deno run --allow-all worker.ts"
+  }
+}
