@@ -109,7 +109,7 @@ export async function prepareWorkerApiAssets() {
 // --- App ---
 
 export function buildWorkerApiApp(deps?: WorkerApiDeps) {
-  const svc = deps?.queryService ?? defaultQueryService;
+  const svc = deps?.queryService ?? defaultQueryService();
   const pStore = deps?.preimageStore;
   const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
 

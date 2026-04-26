@@ -203,12 +203,9 @@ function getDefaultService(): QueryService {
 }
 
 /** @deprecated Use createQueryService() with explicit deps instead. */
-// deno-lint-ignore no-explicit-any
-export const defaultService: QueryService = new Proxy({} as QueryService, {
-  get(_target, prop) {
-    return (getDefaultService() as any)[prop];
-  },
-});
+export function defaultService(): QueryService {
+  return getDefaultService();
+}
 
 export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
   return getDefaultService().createQuery(input, options);
