@@ -4,6 +4,7 @@ import type { QueryStore } from "../domain/query-store.ts";
 import type { OracleRegistry } from "./oracle-port.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
+import type { FrostSignaturePort } from "./frost-signature-port.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
 import { MIN_ESCROW_LOCKTIME_SECS } from "./query-escrow-validation.ts";
 import {
@@ -92,6 +93,8 @@ export interface QueryServiceDeps {
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
   escrowProvider?: EscrowProvider;
+  /** FROST coordinator port — used for P2PK+FROST settlement on success. */
+  frostSignature?: FrostSignaturePort;
   hooks?: QueryHooks;
   proofDelivery?: ProofDelivery;
   /** Normalize attachment refs in a QueryResult. Defaults to identity. */
@@ -147,6 +150,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const registry = deps?.oracleRegistry;
   const preimageStore = deps?.preimageStore;
   const escrowProvider = deps?.escrowProvider;
+  const frostSignature = deps?.frostSignature;
   const hooks = deps?.hooks;
   const proofDelivery = deps?.proofDelivery;
 
@@ -156,7 +160,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);
 
   const normalizeResult = deps?.normalizeResult;
-  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, proofDelivery, normalizeResult };
+  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, frostSignature, proofDelivery, normalizeResult };
 
   return {
     createQuery: (input, options) => doCreateQuery(svcDeps, input, options, hooks),

@@ -707,6 +707,109 @@ describe("submitEscrowResult", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
   });
+
+  test("submitEscrowResult delivers a FROST signature for p2pk_frost queries on success", async () => {
+    const requested: Array<{ groupPubkey: string; messageHex: string }> = [];
+    const mockFrost = {
+      requestSignature: async (groupPubkey: string, message: Uint8Array) => {
+        requested.push({
+          groupPubkey,
+          messageHex: Array.from(message).map((b) => b.toString(16).padStart(2, "0")).join(""),
+        });
+        return "deadbeef".repeat(8);
+      },
+    };
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracle("test-oracle"));
+    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const query = service.createQuery({ description: "FROST settlement" }, {
+      escrow: {
+        type: "p2pk_frost" as const,
+        group_pubkey: "f".repeat(64),
+        oracle_pubkeys: ["s1", "s2", "s3"],
+        requester_pubkey: "rpub",
+        locktime: Math.floor(Date.now() / 1000) + 3600,
+      },
+      oracleIds: ["test-oracle"],
+    });
+    await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
+    const outcome = await service.submitEscrowResult(
+      query.id, { attachments: [], notes: "frost done" }, "w1", "test-oracle",
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.frost_signature).toBe("deadbeef".repeat(8));
+    expect(outcome.preimage).toBeUndefined();
+    expect(requested).toHaveLength(1);
+    expect(requested[0]!.groupPubkey).toBe("f".repeat(64));
+    // Message bytes are the UTF-8 encoding of `${queryId}:approved`.
+    expect(requested[0]!.messageHex.length).toBeGreaterThan(0);
+  });
+
+  test("submitEscrowResult does NOT request a FROST signature on rejected verification", async () => {
+    let calls = 0;
+    const mockFrost = {
+      requestSignature: async (_g: string, _m: Uint8Array) => {
+        calls++;
+        return "should_not_appear";
+      },
+    };
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracle("strict-oracle", () => false));
+    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const query = service.createQuery({ description: "FROST reject" }, {
+      escrow: {
+        type: "p2pk_frost" as const,
+        group_pubkey: "f".repeat(64),
+        oracle_pubkeys: ["s1"],
+        requester_pubkey: "rpub",
+        locktime: Math.floor(Date.now() / 1000) + 3600,
+      },
+      oracleIds: ["strict-oracle"],
+    });
+    await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
+    const outcome = await service.submitEscrowResult(
+      query.id, { attachments: [] }, "w1", "strict-oracle",
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.frost_signature).toBeUndefined();
+    expect(outcome.preimage).toBeUndefined();
+    expect(calls).toBe(0);
+  });
+
+  test("submitEscrowResult swallows FROST coordinator errors and falls through", async () => {
+    const mockFrost = {
+      requestSignature: async () => {
+        throw new Error("coordinator unreachable");
+      },
+    };
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    registry.register(makeMockOracle("test-oracle"));
+    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const query = service.createQuery({ description: "FROST throws" }, {
+      escrow: {
+        type: "p2pk_frost" as const,
+        group_pubkey: "f".repeat(64),
+        oracle_pubkeys: ["s1"],
+        requester_pubkey: "rpub",
+        locktime: Math.floor(Date.now() / 1000) + 3600,
+      },
+      oracleIds: ["test-oracle"],
+    });
+    await service.selectWorker(query.id, "w1");
+    service.beginWork(query.id);
+    const outcome = await service.submitEscrowResult(
+      query.id, { attachments: [] }, "w1", "test-oracle",
+    );
+    expect(outcome.ok).toBe(true);
+    expect(outcome.frost_signature).toBeUndefined();
+    expect(outcome.preimage).toBeUndefined();
+    expect(outcome.message).toContain("Verification passed");
+  });
 });
 
 describe("verifyWithQuorum", () => {

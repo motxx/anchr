@@ -25,6 +25,7 @@ export type {
 export { MIN_ESCROW_LOCKTIME_SECS } from "./application/query-escrow-validation.ts";
 export { purgeExpiredQueries } from "./application/data-purge.ts";
 export type { EscrowProvider } from "./application/escrow-port.ts";
+export type { FrostSignaturePort } from "./application/frost-signature-port.ts";
 
 export {
   discoverQueries, submitQuote, waitForSelection, encryptAndUpload,

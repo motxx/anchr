@@ -13,9 +13,10 @@ import { useSettingsStore } from "../../src/store/settings";
 import { healthCheck } from "../../src/api/client";
 
 export default function SettingsScreen() {
-  const { serverUrl, apiKey, setServerUrl, setApiKey } = useSettingsStore();
+  const { serverUrl, apiKey, workerPubkey, setServerUrl, setApiKey, setWorkerPubkey } = useSettingsStore();
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [keyInput, setKeyInput] = useState(apiKey);
+  const [workerPubkeyInput, setWorkerPubkeyInput] = useState(workerPubkey);
 
   const testConnection = useMutation({
     mutationFn: () => healthCheck(urlInput),
@@ -24,6 +25,7 @@ export default function SettingsScreen() {
   const handleSave = () => {
     setServerUrl(urlInput);
     setApiKey(keyInput);
+    setWorkerPubkey(workerPubkeyInput);
     Alert.alert("Saved", "Settings updated.");
   };
 
@@ -74,6 +76,24 @@ export default function SettingsScreen() {
             secureTextEntry
             className="bg-background border border-border rounded-xl px-4 py-3 text-[15px] text-foreground"
           />
+        </View>
+
+        <View>
+          <Text className="text-[13px] font-semibold text-muted-foreground mb-2">
+            Worker Pubkey
+          </Text>
+          <TextInput
+            value={workerPubkeyInput}
+            onChangeText={setWorkerPubkeyInput}
+            placeholder="Hex pubkey identifying you to the server"
+            placeholderTextColor="#52525b"
+            autoCapitalize="none"
+            autoCorrect={false}
+            className="bg-background border border-border rounded-xl px-4 py-3 text-[15px] text-foreground font-mono"
+          />
+          <Text className="text-[11px] text-muted-foreground mt-1.5 leading-4">
+            Required for submitting query results. Until a Nostr keypair flow lands, paste any hex string you control.
+          </Text>
         </View>
 
         <View className="flex-row gap-3">
