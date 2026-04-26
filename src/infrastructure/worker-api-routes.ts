@@ -270,7 +270,7 @@ async function handleSubmitResult(c: Context, svc: QueryService) {
 
   const query = svc.getQuery(id);
   if (query?.escrow) {
-    const htlcOutcome = await svc.submitHtlcResult(id, result, workerPubkey, oracleId, blossomKeys);
+    const htlcOutcome = await svc.submitEscrowResult(id, result, workerPubkey, oracleId, blossomKeys);
     const status = !htlcOutcome.query ? 404 : !htlcOutcome.ok ? 422 : 200;
     return c.json({
       ok: htlcOutcome.ok,
@@ -337,9 +337,9 @@ export function registerHtlcRoutes(app: Hono, ctx: RouteContext) {
 
     const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
     if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
-    const htlcToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
+    const escrowToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
 
-    const outcome = await svc.selectWorker(id, workerPubkey, htlcToken);
+    const outcome = await svc.selectWorker(id, workerPubkey, escrowToken);
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 

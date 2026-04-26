@@ -89,11 +89,11 @@ export async function submitQuote(queryId: string, amountSats?: number): Promise
   return res.json();
 }
 
-export async function selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<{ ok: boolean }> {
+export async function selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<{ ok: boolean }> {
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/select`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ worker_pubkey: workerPubkey, htlc_token: htlcToken }),
+    body: JSON.stringify({ worker_pubkey: workerPubkey, htlc_token: escrowToken }),
   });
   if (!res.ok) throw new Error(`Select failed: ${res.status}`);
   return res.json();

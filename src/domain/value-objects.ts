@@ -1,5 +1,8 @@
 import type { BountyInfo, GpsCoord, QueryInput, QuoteInfo } from "./types.ts";
 
+/** Minimum escrow locktime in seconds (10 minutes). Applies to all escrow types. */
+export const MIN_ESCROW_LOCKTIME_SECS = 600;
+
 /** Validate GPS coordinates. Returns error string or null if valid. */
 export function validateGpsCoord(input: GpsCoord): string | null {
   if (!Number.isFinite(input.lat)) return "lat must be a finite number";
@@ -17,12 +20,12 @@ export function validateBountyInfo(input: BountyInfo): string | null {
   return null;
 }
 
-/** Validate HTLC locktime. Returns error string or null if valid. */
-export function validateHtlcLocktime(locktime: number, nowSecs: number, minSecs: number): string | null {
+/** Validate escrow locktime. Returns error string or null if valid. */
+export function validateEscrowLocktime(locktime: number, nowSecs: number, minSecs: number): string | null {
   if (!Number.isFinite(locktime)) return "locktime must be a finite number";
   const remaining = locktime - nowSecs;
   if (remaining < minSecs) {
-    return `HTLC locktime must be at least ${minSecs}s in the future (got ${remaining}s)`;
+    return `escrow locktime must be at least ${minSecs}s in the future (got ${remaining}s)`;
   }
   return null;
 }

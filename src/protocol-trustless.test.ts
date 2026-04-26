@@ -68,12 +68,12 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
     // Both conditions are required — preimage alone (Oracle) is not enough
   });
 
-  test("preimage is NOT returned to Oracle — only to Worker via submitHtlcResult", async () => {
+  test("preimage is NOT returned to Oracle — only to Worker via submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     // Oracle's verification returns preimage to the caller (Worker endpoint)
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "valid proof" },
       workerPub,
@@ -101,7 +101,7 @@ describe("NUT-14: Worker cannot redeem without valid proof", () => {
     });
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "bad proof" },
       workerPub,
@@ -225,7 +225,7 @@ describe("NUT-11: Timeout refund", () => {
     // rejected verification or timeout. This tests the non-HTLC refund path.
     const { service } = makeServiceWithPreimage();
 
-    // For HTLC, refund happens via submitHtlcResult rejection (tested below).
+    // For HTLC, refund happens via submitEscrowResult rejection (tested below).
     // Here we test the basic cancel → refund for non-HTLC queries.
     const query = service.createQuery(
       { description: "Refund test" },
@@ -258,7 +258,7 @@ describe("NUT-11: Timeout refund", () => {
     service.beginWork(query.id);
 
     // Submit invalid proof → rejected
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -279,7 +279,7 @@ describe("Worker impersonation prevention", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "impostor" },
       "impostor_worker",
@@ -330,7 +330,7 @@ describe("Oracle + Requester collusion limits", () => {
     // Oracle "withholds" by deleting preimage before result submission
     preimageStore.delete(entry.hash);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "valid proof" },
       workerPub,
@@ -363,7 +363,7 @@ describe("Oracle + Requester collusion limits", () => {
     service.beginWork(query.id);
     service.beginWork(query.id);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "good" },
       "w1",
@@ -395,7 +395,7 @@ describe("Oracle + Requester collusion limits", () => {
     service.beginWork(query.id);
     service.beginWork(query.id);
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -418,7 +418,7 @@ describe("Preimage reveal conditions", () => {
     // Pass case
     const pass = makeServiceWithPreimage();
     const passCtx = await driveToProcessing(pass.service, pass.preimageStore);
-    const passOutcome = await pass.service.submitHtlcResult(
+    const passOutcome = await pass.service.submitEscrowResult(
       passCtx.query.id,
       { attachments: [] },
       passCtx.workerPub,
@@ -431,7 +431,7 @@ describe("Preimage reveal conditions", () => {
       mockOracle: makeMockOracle("fail-oracle", () => false),
     });
     const failCtx = await driveToProcessing(fail.service, fail.preimageStore, { oracleIds: ["fail-oracle"] });
-    const failOutcome = await fail.service.submitHtlcResult(
+    const failOutcome = await fail.service.submitEscrowResult(
       failCtx.query.id,
       { attachments: [] },
       failCtx.workerPub,
@@ -474,7 +474,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     );
 
     // Still in awaiting_quotes
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",
@@ -511,7 +511,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
-    const first = await service.submitHtlcResult(
+    const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       workerPub,
@@ -519,7 +519,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     );
     expect(first.ok).toBe(true);
 
-    const second = await service.submitHtlcResult(
+    const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       workerPub,
@@ -542,8 +542,8 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     expect(quoteResult.ok).toBe(false);
     expect(quoteResult.message).toContain("Not an escrow query");
 
-    // submitHtlcResult fails
-    const htlcResult = await service.submitHtlcResult(
+    // submitEscrowResult fails
+    const htlcResult = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
       "w1",

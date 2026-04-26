@@ -61,7 +61,7 @@ export interface WorkerQueryState {
   identity: NostrIdentity;
   query: DiscoveredQuery;
   selected: boolean;
-  htlcToken?: string;
+  escrowToken?: string;
   preimage?: string;
 }
 
@@ -132,7 +132,7 @@ export async function submitQuote(
 export function waitForSelection(
   identity: NostrIdentity,
   query: DiscoveredQuery,
-  onSelected: (htlcToken?: string, encryptedContext?: TlsnEncryptedContext) => void,
+  onSelected: (escrowToken?: string, encryptedContext?: TlsnEncryptedContext) => void,
   onRejected: () => void,
   relayUrls?: string[],
 ): SubCloser {

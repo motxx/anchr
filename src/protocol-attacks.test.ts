@@ -49,7 +49,7 @@ describe("Attack: Preimage Isolation", () => {
     service.beginWork(q1.id);
 
     // First query reveals preimage (deletes from store)
-    const outcome1 = await service.submitHtlcResult(q1.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome1 = await service.submitEscrowResult(q1.id, { attachments: [] }, "w1", "test-oracle");
     expect(outcome1.ok).toBe(true);
     expect(outcome1.preimage).toBe(entry1.preimage);
 
@@ -75,7 +75,7 @@ describe("Attack: Preimage Isolation", () => {
     service.beginWork(q2.id);
 
     // Second query verification passes but preimage was already deleted
-    const outcome2 = await service.submitHtlcResult(q2.id, { attachments: [] }, "w2", "test-oracle");
+    const outcome2 = await service.submitEscrowResult(q2.id, { attachments: [] }, "w2", "test-oracle");
     expect(outcome2.ok).toBe(true);
     // Preimage was deleted from the first query — cannot be re-revealed
     expect(outcome2.preimage).toBeUndefined();
@@ -87,7 +87,7 @@ describe("Attack: Preimage Isolation", () => {
     });
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
 
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "garbage" },
       workerPub,
@@ -100,18 +100,18 @@ describe("Attack: Preimage Isolation", () => {
     expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
   });
 
-  test("deleted preimage cannot be re-requested via second submitHtlcResult", async () => {
+  test("deleted preimage cannot be re-requested via second submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
     // First submit — preimage revealed and deleted
-    const first = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const first = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(first.ok).toBe(true);
     expect(first.preimage).toBe(entry.preimage);
     expect(preimageStore.getPreimage(entry.hash)).toBeNull();
 
     // Second submit — query is no longer processing, so it fails
-    const second = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(second.ok).toBe(false);
     expect(second.preimage).toBeUndefined();
   });
@@ -196,7 +196,7 @@ describe("Attack: Race Conditions & Timing", () => {
     service.expireQueries();
 
     // Worker tries to submit result after expiry
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "test-oracle");
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
   });
@@ -205,11 +205,11 @@ describe("Attack: Race Conditions & Timing", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
 
-    const first = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const first = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(first.ok).toBe(true);
     expect(first.preimage).toBe(entry.preimage);
 
-    const second = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not processing");
     expect(second.preimage).toBeUndefined();
@@ -230,7 +230,7 @@ describe("Attack: Oracle Manipulation", () => {
     const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["rubber-stamp"] });
 
     // Worker submits completely empty result
-    const outcome = await service.submitHtlcResult(
+    const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "" },
       workerPub,
@@ -257,7 +257,7 @@ describe("Attack: Oracle Manipulation", () => {
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
-    const outcome1 = await service.submitHtlcResult(q1.id, { attachments: [] }, "w1", "flip-oracle");
+    const outcome1 = await service.submitEscrowResult(q1.id, { attachments: [] }, "w1", "flip-oracle");
     expect(outcome1.ok).toBe(false);
     expect(outcome1.preimage).toBeUndefined();
 
@@ -273,7 +273,7 @@ describe("Attack: Oracle Manipulation", () => {
     await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
     service2.beginWork(q2.id);
 
-    const outcome2 = await service2.submitHtlcResult(q2.id, { attachments: [] }, "w2", "test-oracle");
+    const outcome2 = await service2.submitEscrowResult(q2.id, { attachments: [] }, "w2", "test-oracle");
     expect(outcome2.ok).toBe(true);
     expect(outcome2.preimage).toBe(entry2.preimage);
   });
@@ -303,7 +303,7 @@ describe("Attack: Oracle Manipulation", () => {
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "oracle-pass");
+    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "oracle-pass");
     // 1 pass out of 3, need 2 — rejected
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -335,7 +335,7 @@ describe("Attack: Oracle Manipulation", () => {
     service.beginWork(query.id);
 
     // Pass a nonexistent oracle ID
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "nonexistent-oracle");
+    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "nonexistent-oracle");
     // The verification should fail because no oracle is available
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -357,7 +357,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     );
 
     // Query is in awaiting_quotes — try to submit result (should need processing)
-    const outcome = await service.submitHtlcResult(query.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "test-oracle");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
     expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
@@ -368,12 +368,12 @@ describe("Attack: State Machine — illegal transitions", () => {
     const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
     // Get approval
-    const approval = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const approval = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(approval.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("approved");
 
     // Try to submit again (revert to processing)
-    const second = await service.submitHtlcResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not processing");
     expect(service.getQuery(query.id)?.status).toBe("approved");
@@ -434,7 +434,7 @@ describe("Attack: Cross-Query", () => {
     service.beginWork(qB.id);
 
     // Worker A tries to submit result on query B
-    const outcome = await service.submitHtlcResult(qB.id, { attachments: [] }, "worker_a", "test-oracle");
+    const outcome = await service.submitEscrowResult(qB.id, { attachments: [] }, "worker_a", "test-oracle");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
 

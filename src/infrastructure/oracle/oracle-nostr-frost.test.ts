@@ -60,7 +60,7 @@ function makeQuery(id: string) {
     verification_requirements: ["ai_check"] as const,
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
-    payment_status: "htlc_swapped" as const,
+    payment_status: "escrow_swapped" as const,
   };
 }
 

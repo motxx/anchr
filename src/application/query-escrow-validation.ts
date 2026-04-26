@@ -1,7 +1,7 @@
 import type { EscrowProvider } from "./escrow-port.ts";
 import type { Query, QueryStatus } from "../domain/types.ts";
 
-export interface HtlcTokenLockResult {
+export interface EscrowTokenLockResult {
   ok: boolean;
   message?: string;
 }
@@ -20,28 +20,29 @@ export async function verifyEscrowLock(
   escrowRef: string,
   paymentHash: string,
   workerPubkey: string,
-): Promise<HtlcTokenLockResult> {
+): Promise<EscrowTokenLockResult> {
   return escrowProvider.verifyLock(escrowRef, paymentHash, workerPubkey);
 }
 
-/** Minimum HTLC locktime in seconds (10 minutes). */
-export const MIN_HTLC_LOCKTIME_SECS = 600;
+// MIN_ESCROW_LOCKTIME_SECS is defined in domain/value-objects.ts. Re-export for the
+// callers that import it via the application layer.
+export { MIN_ESCROW_LOCKTIME_SECS } from "../domain/value-objects.ts";
 
 // --- Escrow state machine helpers ---
 
-/** Valid state transitions for escrow (HTLC) queries. */
-export const HTLC_TRANSITIONS: Record<string, QueryStatus[]> = {
+/** Valid state transitions for escrow queries (HTLC and P2PK+FROST share this lifecycle). */
+export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
   awaiting_quotes: ["worker_selected"],
   worker_selected: ["processing"],
   processing: ["verifying"],
   verifying: ["approved", "rejected"],
 };
 
-export function validateHtlcTransition(from: QueryStatus, to: QueryStatus): boolean {
-  return HTLC_TRANSITIONS[from]?.includes(to) ?? false;
+export function validateEscrowTransition(from: QueryStatus, to: QueryStatus): boolean {
+  return ESCROW_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-export function isHtlcQuery(query: Query): boolean {
+export function isEscrowQuery(query: Query): boolean {
   return query.escrow !== undefined;
 }
 

@@ -11,7 +11,7 @@ import {
   beginWork,
   recordResult,
   completeVerification,
-  MIN_HTLC_LOCKTIME_SECS,
+  MIN_ESCROW_LOCKTIME_SECS,
 } from "./query-aggregate.ts";
 import type {
   Query,
@@ -46,7 +46,7 @@ const defaultOptions: CreateQueryAggregateOptions = {
   ttlMs: 600_000, // 10 min
 };
 
-function makeHtlcOptions(overrides?: Partial<EscrowInfo>): CreateQueryAggregateOptions {
+function makeHtlcOptions(overrides?: Partial<Omit<EscrowInfo, "type">>): CreateQueryAggregateOptions {
   const nowSecs = Math.floor(Date.now() / 1000);
   return {
     ttlMs: 600_000,
@@ -65,7 +65,7 @@ function makeHtlcOptions(overrides?: Partial<EscrowInfo>): CreateQueryAggregateO
 function makeHtlcQuery(overrides?: Partial<Query>): Query {
   return makeQuery({
     status: "awaiting_quotes",
-    payment_status: "htlc_locked",
+    payment_status: "escrow_locked",
     escrow: {
       type: "htlc",
       hash: "abc123hash",
@@ -115,7 +115,7 @@ describe("createQueryAggregate", () => {
   test("creates an HTLC query with awaiting_quotes status", () => {
     const q = expectOk(createQueryAggregate(defaultInput, makeHtlcOptions()));
     expect(q.status).toBe("awaiting_quotes");
-    expect(q.payment_status).toBe("htlc_locked");
+    expect(q.payment_status).toBe("escrow_locked");
     expect(q.escrow).toBeDefined();
     expect(q.quotes).toEqual([]);
   });
@@ -238,7 +238,7 @@ describe("createQueryAggregate", () => {
         hash: "h",
         oracle_pubkeys: ["o"],
         requester_pubkey: "r",
-        locktime: nowSecs + MIN_HTLC_LOCKTIME_SECS,
+        locktime: nowSecs + MIN_ESCROW_LOCKTIME_SECS,
       },
     });
     expect(result.ok).toBe(true);
@@ -498,13 +498,13 @@ describe("selectWorker", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", { escrow_token: "tok123" }));
     expect(q.escrow?.escrow_token).toBe("tok123");
-    expect(q.payment_status).toBe("htlc_swapped");
+    expect(q.payment_status).toBe("escrow_swapped");
   });
 
   test("preserves payment_status without escrow_token", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", {}));
-    expect(q.payment_status).toBe("htlc_locked");
+    expect(q.payment_status).toBe("escrow_locked");
   });
 
   test("sets verified_escrow_sats", () => {

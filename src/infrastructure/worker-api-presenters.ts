@@ -53,8 +53,9 @@ export function querySummary(query: Query) {
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
     escrow: query.escrow ? {
-      type: query.escrow.type,
-      hash: query.escrow.hash,
+      ...(query.escrow.type === "htlc"
+        ? { type: "htlc" as const, hash: query.escrow.hash }
+        : { type: "p2pk_frost" as const, group_pubkey: query.escrow.group_pubkey }),
       oracle_pubkeys: query.escrow.oracle_pubkeys,
       worker_pubkey: query.escrow.worker_pubkey ?? null,
       locktime: query.escrow.locktime,
@@ -83,7 +84,11 @@ export function buildCreatedQueryPayload(query: Query, requestUrl: string) {
     reference_app_url: `${requestOrigin}/queries/${query.id}`,
     query_api_url: `${requestOrigin}/queries/${query.id}`,
     payment_status: query.payment_status,
-    escrow: query.escrow ? { type: query.escrow.type, hash: query.escrow.hash, oracle_pubkeys: query.escrow.oracle_pubkeys } : null,
+    escrow: query.escrow
+      ? (query.escrow.type === "htlc"
+        ? { type: "htlc" as const, hash: query.escrow.hash, oracle_pubkeys: query.escrow.oracle_pubkeys }
+        : { type: "p2pk_frost" as const, group_pubkey: query.escrow.group_pubkey, oracle_pubkeys: query.escrow.oracle_pubkeys })
+      : null,
   };
 }
 

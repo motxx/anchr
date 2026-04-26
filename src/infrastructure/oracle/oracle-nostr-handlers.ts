@@ -31,7 +31,7 @@ export function buildQueryFromPayload(queryId: string, oraclePayload: OracleResp
     verification_requirements: ["gps", "ai_check"],
     created_at: 0,
     expires_at: Date.now() + 600_000,
-    payment_status: "htlc_swapped",
+    payment_status: "escrow_swapped",
   };
 }
 

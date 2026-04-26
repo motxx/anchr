@@ -10,7 +10,7 @@ export { createInMemoryQueryRepository, toRepository } from "./domain/query-repo
 export type { QueryRepository } from "./domain/query-repository.ts";
 export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./domain/query-transitions.ts";
 export {
-  validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
+  validateGpsCoord, validateBountyInfo, validateEscrowLocktime, validateQueryInput, validateQuoteInfo,
 } from "./domain/value-objects.ts";
 export type { EscrowInfo, EscrowType, QuoteInfo } from "./domain/types.ts";
 
@@ -22,7 +22,7 @@ export type {
   RequesterMeta, RequesterType, QueryExecutorType, QueryInput, QueryResult,
   QueryStatus, QuerySubmissionMeta, QueryVerification, SubmitQueryOutcome,
 } from "./application/query-service.ts";
-export { MIN_HTLC_LOCKTIME_SECS } from "./application/query-htlc-validation.ts";
+export { MIN_ESCROW_LOCKTIME_SECS } from "./application/query-escrow-validation.ts";
 export { purgeExpiredQueries } from "./application/data-purge.ts";
 export type { EscrowProvider } from "./application/escrow-port.ts";
 

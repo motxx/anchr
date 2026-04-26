@@ -179,7 +179,7 @@ function EscrowInfoPanel({
           <span className="text-muted-foreground">Payment:</span>
           <span className={cn(
             "font-medium",
-            paymentStatus === "released" || paymentStatus === "htlc_swapped" ? "text-emerald-400" :
+            paymentStatus === "released" || paymentStatus === "escrow_swapped" ? "text-emerald-400" :
             paymentStatus === "cancelled" ? "text-red-400" : "text-amber-400"
           )}>{paymentStatus}</span>
         </div>
