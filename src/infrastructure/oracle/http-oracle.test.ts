@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server.ts";
 import { createHttpOracle } from "./http-oracle.ts";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const TEST_ORACLE_ID = "test-http-oracle";

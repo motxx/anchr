@@ -7,7 +7,7 @@ import {
   renderStoredAttachmentPreview,
   statStoredAttachment,
 } from "./attachments.ts";
-import type { AttachmentRef, Query } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, Query } from "../domain/types.ts";
 
 export const TRUSTED_HOSTS = new Set(
   (Deno.env.get("TRUSTED_PROXY_HOSTS") ?? "")

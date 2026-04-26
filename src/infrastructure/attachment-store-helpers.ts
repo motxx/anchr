@@ -3,8 +3,8 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
-import type { ProofModeData } from "../../packages/photo-bounty/src/proofmode-validation.ts";
+import type { ProofModeIntegrity } from "@anchr/photo-bounty/integrity-store";
+import type { ProofModeData } from "@anchr/photo-bounty/proofmode-validation";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "integrity"]);

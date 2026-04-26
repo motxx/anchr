@@ -1,4 +1,4 @@
-import type { Query, QueryStatus } from "../../packages/core-domain/src/types.ts";
+import type { Query, QueryStatus } from "./types.ts";
 import { isExpirable } from "./query-transitions.ts";
 import type { QueryStore } from "./query-store.ts";
 

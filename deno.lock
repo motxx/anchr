@@ -16,7 +16,6 @@
     "jsr:@zod/zod@4": "4.3.6",
     "npm:@anthropic-ai/sdk@0.78": "0.78.0",
     "npm:@cashu/cashu-ts@3": "3.6.2",
-    "npm:@hono/zod-validator@0.7": "0.7.6_hono@4.12.9_zod@3.25.76",
     "npm:@modelcontextprotocol/sdk@1": "1.29.0_zod@3.25.76_hono@4.12.9_ajv@8.18.0_express@5.2.1",
     "npm:@noble/curves@2": "2.0.1",
     "npm:@tailwindcss/cli@*": "4.2.2",
@@ -273,13 +272,6 @@
       "integrity": "sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw==",
       "dependencies": [
         "hono"
-      ]
-    },
-    "@hono/zod-validator@0.7.6_hono@4.12.9_zod@3.25.76": {
-      "integrity": "sha512-Io1B6d011Gj1KknV4rXYz4le5+5EubcWEU/speUjuw9XMMIaP3n78yXLhjd2A3PXaXaUwEAluOiAyLqhBEJgsw==",
-      "dependencies": [
-        "hono",
-        "zod"
       ]
     },
     "@jridgewell/gen-mapping@0.3.13": {
@@ -2630,7 +2622,6 @@
       "jsr:@zod/zod@4",
       "npm:@anthropic-ai/sdk@0.78",
       "npm:@cashu/cashu-ts@3",
-      "npm:@hono/zod-validator@0.7",
       "npm:@modelcontextprotocol/sdk@1",
       "npm:@noble/curves@2",
       "npm:@tanstack/query-core@5",

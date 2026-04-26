@@ -1,4 +1,4 @@
-import type { BountyInfo, GpsCoord, QueryInput, QuoteInfo } from "../../packages/core-domain/src/types.ts";
+import type { BountyInfo, GpsCoord, QueryInput, QuoteInfo } from "./types.ts";
 
 /** Validate GPS coordinates. Returns error string or null if valid. */
 export function validateGpsCoord(input: GpsCoord): string | null {

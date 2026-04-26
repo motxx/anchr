@@ -2,7 +2,7 @@ import { createQueryStore } from "../domain/query-store.ts";
 import { isOpenStatus } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
 import type { OracleRegistry } from "./oracle-port.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-port.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
 import { MIN_HTLC_LOCKTIME_SECS } from "./query-htlc-validation.ts";
@@ -35,7 +35,7 @@ import type {
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
-} from "../../packages/core-domain/src/types.ts";
+} from "../domain/types.ts";
 
 export type {
   AttachmentRef,
@@ -47,7 +47,7 @@ export type {
   VerificationFactor,
   RequesterMeta,
   RequesterType,
-} from "../../packages/core-domain/src/types.ts";
+} from "../domain/types.ts";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
 export type QuerySubmissionMeta = SubmissionMeta;
@@ -203,12 +203,9 @@ function getDefaultService(): QueryService {
 }
 
 /** @deprecated Use createQueryService() with explicit deps instead. */
-// deno-lint-ignore no-explicit-any
-export const defaultService: QueryService = new Proxy({} as QueryService, {
-  get(_target, prop) {
-    return (getDefaultService() as any)[prop];
-  },
-});
+export function defaultService(): QueryService {
+  return getDefaultService();
+}
 
 export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
   return getDefaultService().createQuery(input, options);

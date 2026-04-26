@@ -3,7 +3,7 @@
  */
 
 import { Buffer } from "node:buffer";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../../packages/core-runtime/src/mod.ts";
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime/mod";
 import process from "node:process";
 
 const JPEG_SOI = 0xffd8;

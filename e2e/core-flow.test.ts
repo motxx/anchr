@@ -31,10 +31,10 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
 import { createQueryService, createQueryStore } from "../src/application/query-service.ts";
-import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
-import type { Oracle, OracleAttestation } from "../packages/core-domain/src/oracle-types.ts";
-import type { Query, QueryResult } from "../packages/core-domain/src/types.ts";
+import type { Oracle, OracleAttestation } from "../src/domain/oracle-types.ts";
+import type { Query, QueryResult } from "../src/domain/types.ts";
 import {
   checkInfraReady,
   createWallet,

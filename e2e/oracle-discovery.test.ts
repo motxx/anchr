@@ -20,7 +20,7 @@ import {
   parseOracleAnnouncementEvent,
 } from "../src/infrastructure/oracle/oracle-discovery.ts";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../src/infrastructure/nostr/events.ts";
-import type { OracleInfo } from "../packages/core-domain/src/oracle-types.ts";
+import type { OracleInfo } from "../src/domain/oracle-types.ts";
 
 // ---------------------------------------------------------------------------
 // Relay connectivity

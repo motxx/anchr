@@ -20,13 +20,13 @@ import {
   subscribeToFeedback,
   subscribeToResponses,
 } from "../nostr/client.ts";
-import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
-import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
-import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator.ts";
+import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
+import type { FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
+import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
+import { coordinateSigning } from "@anchr/cashu-frost-oracle/signing-coordinator";
 import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
 import {
   type WatchedQuery,
   buildQueryFromPayload,

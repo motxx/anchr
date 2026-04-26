@@ -8,8 +8,8 @@
  */
 
 import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult, BlossomKeyMap } from "../../../packages/core-domain/src/types.ts";
-import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "../../../packages/cashu-frost-oracle/src/frost-cli.ts";
+import type { Query, QueryResult, BlossomKeyMap } from "../../domain/types.ts";
+import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "@anchr/cashu-frost-oracle/frost-cli";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-signer"]);

@@ -14,12 +14,12 @@ import { timingSafeEqual } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
-import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
-import { createFrostCoordinator, type FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
+import type { OracleAttestation } from "../../domain/oracle-types.ts";
+import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createFrostCoordinator, type FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
+import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
+import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-server"]);
@@ -453,7 +453,7 @@ if (import.meta.main) {
   const frostConfigPath = Deno.env.get("FROST_CONFIG_PATH")?.trim();
   if (frostConfigPath) {
     try {
-      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../../../packages/cashu-frost-oracle/src/config.ts");
+      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("@anchr/cashu-frost-oracle/config");
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
       log.info(`FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);

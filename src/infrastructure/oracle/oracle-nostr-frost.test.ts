@@ -7,11 +7,11 @@ import {
 } from "./oracle-nostr-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-nostr-service.ts";
 import { generateEphemeralIdentity } from "../nostr/identity.ts";
-import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
-import { createFrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
-import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types.ts";
-import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createFrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
+import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
+import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
+import type { AttachmentRef } from "../../domain/types.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

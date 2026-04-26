@@ -17,7 +17,7 @@ import {
   type QuerySettlementPayload,
   type OracleResponsePayload,
 } from "./events.ts";
-import type { OracleInfo } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { OracleInfo } from "../../domain/oracle-types.ts";
 
 function nowUnix(): number {
   return Math.floor(Date.now() / 1000);

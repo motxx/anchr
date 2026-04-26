@@ -14,7 +14,7 @@ import {
   listOpenQueries,
   submitQueryResult,
 } from "../application/query-service.ts";
-import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
 const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;

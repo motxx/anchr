@@ -12,8 +12,8 @@
 
 import { createHash } from "node:crypto";
 import type { MiddlewareHandler } from "hono";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
-import { getCashuConfig } from "../../../packages/core-cashu/src/wallet.ts";
+import { verifyToken } from "@anchr/core-cashu/wallet";
+import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import type { DataListing, MarketplaceEnv, PaymentInfo } from "./types.ts";
 
 /** Set of token hashes already seen (defense-in-depth replay detection). */

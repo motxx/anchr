@@ -6,8 +6,8 @@ import {
   findFrostSigner,
   isFrostSignerAvailable,
   dkgRound1,
-} from "../../../packages/cashu-frost-oracle/src/frost-cli.ts";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
+} from "@anchr/cashu-frost-oracle/frost-cli";
+import type { AttachmentRef } from "../../domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

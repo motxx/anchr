@@ -1,4 +1,4 @@
-import type { QueryStatus } from "../../packages/core-domain/src/types.ts";
+import type { QueryStatus } from "./types.ts";
 
 /** Valid state transitions for Simple (non-HTLC) queries. */
 const SIMPLE_TRANSITIONS: Record<string, QueryStatus[]> = {

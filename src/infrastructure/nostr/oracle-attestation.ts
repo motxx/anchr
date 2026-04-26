@@ -8,8 +8,8 @@
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { NostrIdentity } from "./identity.ts";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
-import type { TlsnVerifiedData } from "../../../packages/core-domain/src/types.ts";
+import type { OracleAttestation } from "../../domain/oracle-types.ts";
+import type { TlsnVerifiedData } from "../../domain/types.ts";
 
 export const ANCHR_ORACLE_ATTESTATION = 30103;
 

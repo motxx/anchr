@@ -39,48 +39,16 @@ export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
 
-export interface TlsnCondition {
-  type: "contains" | "regex" | "jsonpath";
-  expression: string;
-  expected?: string;
-  description?: string;
-}
-
-export interface TlsnRequirement {
-  target_url: string;
-  method?: "GET" | "POST";
-  conditions?: TlsnCondition[];
-  /** Max age of attestation in seconds (default: 300). */
-  max_attestation_age_seconds?: number;
-  /** Domain hint for public display when actual URL is delivered via encrypted_context. */
-  domain_hint?: string;
-}
-
-/** Sensitive context encrypted to Worker — never stored publicly. */
-export interface TlsnEncryptedContext {
-  /** The actual target URL (may contain session IDs). */
-  target_url: string;
-  /** Custom HTTP headers (e.g., Authorization). */
-  headers?: Record<string, string>;
-  /** HTTP method override (default: GET). */
-  method?: "GET" | "POST";
-  /** Request body for POST requests. */
-  body?: string;
-}
-
-export interface TlsnAttestation {
-  /** Base64-encoded TLSNotary presentation file (.presentation.tlsn). */
-  presentation: string;
-}
-
-/** Cryptographically verified data extracted from a TLSNotary presentation by the oracle. */
-export interface TlsnVerifiedData {
-  server_name: string;
-  revealed_body: string;
-  revealed_headers?: string;
-  /** Session timestamp (unix seconds, from the cryptographic proof). */
-  session_timestamp: number;
-}
+// TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
+// domain re-exports them so existing call sites keep the single import surface.
+import type {
+  TlsnAttestation,
+  TlsnCondition,
+  TlsnEncryptedContext,
+  TlsnRequirement,
+  TlsnVerifiedData,
+} from "@anchr/tlsn-toolkit/tlsn-types";
+export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
 
 export interface QueryInput {
   description: string;

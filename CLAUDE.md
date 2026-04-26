@@ -105,6 +105,17 @@ Quality invariants the CI enforces:
 - No `process.env` in `src/`/`packages/` (use `Deno.env`)
 - No `console.*` in `src/infrastructure/` or `packages/` (use `getLogger` from `@anchr/core-runtime/logger`)
 
+## Type-safety bar
+
+- `as` casts and `any` are forbidden in `src/` and `packages/`. Narrow with type predicates (`x is T`) or runtime helpers in `src/infrastructure/lib/runtime-types.ts`.
+- `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use. Anywhere else, write the precise type.
+- Enforced by `deno task lint:refactor` (runs in CI via `scripts/test-all.sh`).
+
+## Verification bar
+
+- A change is "done" only after a full local run passes: `deno task test:all` (lint + unit + protocol + frost + integration + example + pentest) **plus** `deno task test:all:docker` (Docker-backed e2e: relay + regtest). Don't claim done after only unit tests.
+- If a test or check fails, fix the implementation. Do not skip the test, weaken the assertion, delete the case, or `--no-check` around it. Iterate on root cause until tests pass with the correct behavior.
+
 ## Architecture Lint
 
 `deno task lint:arch` enforces Clean Architecture layer dependencies:

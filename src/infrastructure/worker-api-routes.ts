@@ -1,13 +1,12 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { z } from "zod";
-import { validateZ } from "./zod-validator-shim.ts";
-import { spawn } from "../../packages/core-runtime/src/mod.ts";
+import { spawn } from "@anchr/core-runtime/mod";
 import { uploadAttachment } from "./attachment-store.ts";
 import { materializeAttachmentRef } from "./attachments.ts";
 import { getRuntimeConfig } from "./config.ts";
 import { validateAttachmentUri } from "./url-validation.ts";
-import { haversineKm } from "../../packages/photo-bounty/src/geo.ts";
+import { haversineKm } from "@anchr/photo-bounty/geo";
 import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
 import {
   buildAttachmentPayload,
@@ -19,8 +18,8 @@ import {
   renderStoredAttachmentPreview,
 } from "./worker-api-presenters.ts";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
@@ -30,8 +29,7 @@ export interface RouteContext {
   rateLimit: MiddlewareHandler;
 }
 
-// deno-lint-ignore no-explicit-any
-function handleListQueries(c: Context<any>, svc: QueryService) {
+function handleListQueries(c: Context, svc: QueryService) {
   const latParam = c.req.query("lat");
   const lonParam = c.req.query("lon");
   const maxDistParam = c.req.query("max_distance_km");
@@ -59,10 +57,12 @@ function handleListQueries(c: Context<any>, svc: QueryService) {
   return c.json(queries.map(querySummary));
 }
 
-// deno-lint-ignore no-explicit-any
-function handleCreateQuery(c: Context<any>, svc: QueryService, getUrl: () => string) {
-  const payload = c.req.valid("json" as never) as z.infer<typeof createQuerySchema>;
-
+function handleCreateQuery(
+  c: Context,
+  svc: QueryService,
+  payload: z.infer<typeof createQuerySchema>,
+  getUrl: () => string,
+) {
   const input: QueryInput = {
     description: payload.description,
     location_hint: payload.location_hint,
@@ -79,13 +79,14 @@ function handleCreateQuery(c: Context<any>, svc: QueryService, getUrl: () => str
       requesterMeta: payload.requester,
       bounty: payload.bounty,
       oracleIds: payload.oracle_ids,
-      htlc: payload.htlc as HtlcInfo | undefined,
-      quorum: payload.quorum as QuorumConfig | undefined,
+      htlc: payload.htlc,
+      quorum: payload.quorum,
     });
 
     return c.json(buildCreatedQueryPayload(query, getUrl()), 201);
   } catch (e) {
-    return c.json({ error: (e as Error).message }, 400);
+    const message = e instanceof Error ? e.message : String(e);
+    return c.json({ error: message }, 400);
   }
 }
 
@@ -107,15 +108,18 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
     "/queries",
     rateLimit,
     writeAuth,
-    validateZ("json", createQuerySchema, (result, c) => {
-      if (!result.success) {
+    async (c) => {
+      let raw: unknown;
+      try { raw = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      const parsed = createQuerySchema.safeParse(raw);
+      if (!parsed.success) {
         return c.json({
           error: "Invalid query payload",
-          issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         }, 400);
       }
-    }),
-    (c) => handleCreateQuery(c, svc, () => getPublicRequestUrl(c)),
+      return handleCreateQuery(c, svc, parsed.data, () => getPublicRequestUrl(c));
+    },
   );
 
   app.post("/queries/:id/submit", writeAuth, (c) => {
@@ -149,8 +153,7 @@ function resolveIndexedAttachment(
   return { query, attachment, attachments };
 }
 
-// deno-lint-ignore no-explicit-any
-async function handleAttachmentPreview(c: Context<any>, svc: QueryService) {
+async function handleAttachmentPreview(c: Context, svc: QueryService) {
   const resolved = resolveIndexedAttachment(svc, c.req.param("id"), Number(c.req.param("index")));
   if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status as 400);
   const { attachment } = resolved;
@@ -167,8 +170,7 @@ async function handleAttachmentPreview(c: Context<any>, svc: QueryService) {
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const ALLOWED_UPLOAD_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
 
-// deno-lint-ignore no-explicit-any
-async function handleUpload(c: Context<any>, svc: QueryService) {
+async function handleUpload(c: Context, svc: QueryService) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Query id is required" }, 400);
 
@@ -182,16 +184,17 @@ async function handleUpload(c: Context<any>, svc: QueryService) {
   if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
   let formData: FormData;
   try { formData = await c.req.formData(); } catch { return c.json({ error: "Expected multipart/form-data" }, 400); }
-  const file = formData.get("photo");
-  if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
+  const fileEntry = formData.get("photo");
+  if (!(fileEntry instanceof File)) return c.json({ error: "Missing photo field" }, 400);
+  const file = fileEntry;
 
-  if ((file as File).size > MAX_UPLOAD_BYTES) {
-    return c.json({ error: `File too large: ${(file as File).size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return c.json({ error: `File too large: ${file.size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
   }
 
-  const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
+  const ext = file.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
   if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-  const result = await uploadAttachment(id, file as File, { expectedGps: query.expected_gps });
+  const result = await uploadAttachment(id, file, { expectedGps: query.expected_gps });
   return c.json({
     ok: true,
     attachment: materializeAttachmentRef(result.attachment, c.req.url),
@@ -261,8 +264,7 @@ function buildQueryResult(body: z.infer<typeof resultBodySchema>): { result: Que
   };
 }
 
-// deno-lint-ignore no-explicit-any
-async function handleSubmitResult(c: Context<any>, svc: QueryService) {
+async function handleSubmitResult(c: Context, svc: QueryService) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Query id is required" }, 400);
   let rawBody: unknown;

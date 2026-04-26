@@ -27,8 +27,8 @@ import {
   loadAndSend,
   computeNetAmount,
   sumProofAmounts,
-} from "../../../packages/core-cashu/src/escrow-helpers.ts";
-import { verifyToken } from "../../../packages/core-cashu/src/wallet.ts";
+} from "@anchr/core-cashu/escrow-helpers";
+import { verifyToken } from "@anchr/core-cashu/wallet";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-escrow"]);

@@ -9,7 +9,7 @@ import {
 } from "./oracle-nostr-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-nostr-service.ts";
 import { generateEphemeralIdentity } from "../nostr/identity.ts";
-import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

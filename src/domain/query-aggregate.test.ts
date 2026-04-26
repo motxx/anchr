@@ -21,7 +21,7 @@ import type {
   SubmissionMeta,
   QuoteInfo,
   HtlcInfo,
-} from "../../packages/core-domain/src/types.ts";
+} from "./types.ts";
 import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate.ts";
 
 // --- Helpers ---

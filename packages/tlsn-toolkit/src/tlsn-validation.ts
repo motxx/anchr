@@ -15,7 +15,7 @@ import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleDir, which, writeFile, spawn } from "@anchr/core-runtime";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "@anchr/core-domain/types";
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "./tlsn-types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "tlsn"]);

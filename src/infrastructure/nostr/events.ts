@@ -15,7 +15,7 @@
  *   status=success/error     → Completion feedback
  */
 
-import type { TlsnEncryptedContext, VerificationFactor } from "../../../packages/core-domain/src/types.ts";
+import type { TlsnEncryptedContext, VerificationFactor } from "../../domain/types.ts";
 import { deriveConversationKey, decryptNip44 } from "./encryption.ts";
 
 // NIP-90 DVM event kinds for Anchr.

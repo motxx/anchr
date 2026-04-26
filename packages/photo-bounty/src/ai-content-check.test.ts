@@ -1,18 +1,16 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createAiContentChecker, type AiContentCheckDeps } from "./ai-content-check.ts";
-import type { Query, QueryResult } from "@anchr/core-domain/types";
+import {
+  createAiContentChecker,
+  type AiContentCheckDeps,
+  type AiContentCheckQuery,
+  type AiContentCheckResult,
+} from "./ai-content-check.ts";
 
-const baseQuery: Query = {
-  id: "q1",
-  status: "pending",
+const baseQuery: AiContentCheckQuery = {
   description: "Photo of Tokyo Tower",
   challenge_nonce: "ABC123",
-  challenge_rule: "test",
   verification_requirements: ["ai_check"],
-  created_at: Date.now(),
-  expires_at: Date.now() + 60_000,
-  payment_status: "none",
 };
 
 const noopReadAttachment: AiContentCheckDeps["readAttachment"] = async () => null;
@@ -24,8 +22,8 @@ describe("createAiContentChecker", () => {
       readAttachment: noopReadAttachment,
     });
     const result = await check(baseQuery, {
-      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }],
-    } as QueryResult);
+      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg" }],
+    });
     expect(result).toBeNull();
   });
 
@@ -35,8 +33,8 @@ describe("createAiContentChecker", () => {
       readAttachment: noopReadAttachment,
     });
     const result = await check(baseQuery, {
-      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }],
-    } as QueryResult);
+      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg" }],
+    });
     expect(result).toBeNull();
   });
 
@@ -45,7 +43,7 @@ describe("createAiContentChecker", () => {
       getConfig: () => ({ enabled: true, anthropicApiKey: "sk-test" }),
       readAttachment: noopReadAttachment,
     });
-    const result = await check(baseQuery, { attachments: [] } as QueryResult);
+    const result = await check(baseQuery, { attachments: [] });
     expect(result).toBeNull();
   });
 
@@ -56,10 +54,10 @@ describe("createAiContentChecker", () => {
     });
     const result = await check(baseQuery, {
       attachments: [
-        { id: "a1", uri: "https://example.com/file.pdf", mime_type: "application/pdf", storage_kind: "external" },
-        { id: "a2", uri: "https://example.com/file.txt", mime_type: "text/plain", storage_kind: "external" },
+        { id: "a1", uri: "https://example.com/file.pdf", mime_type: "application/pdf" },
+        { id: "a2", uri: "https://example.com/file.txt", mime_type: "text/plain" },
       ],
-    } as QueryResult);
+    });
     expect(result).toBeNull();
   });
 
@@ -72,15 +70,15 @@ describe("createAiContentChecker", () => {
 
     // First call: disabled
     let r = await check(baseQuery, {
-      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }],
-    } as QueryResult);
+      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg" }],
+    });
     expect(r).toBeNull();
 
     // Toggle: enabled but no API key → still null but for different reason
     enabledFlag = true;
     r = await check(baseQuery, {
-      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg", storage_kind: "external" }],
-    } as QueryResult);
+      attachments: [{ id: "a1", uri: "https://example.com/photo.jpg", mime_type: "image/jpeg" }],
+    });
     expect(r).toBeNull();
   });
 });

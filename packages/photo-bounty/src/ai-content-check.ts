@@ -11,7 +11,44 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
-import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "@anchr/core-domain/types";
+/**
+ * Subset of the host server's Query needed to build the vision-LLM prompt.
+ * photo-bounty deliberately doesn't depend on the full host Query — callers
+ * pass exactly the fields the prompt uses, decoupling the package from
+ * core-domain.
+ */
+export interface AiContentCheckQuery {
+  description: string;
+  challenge_nonce?: string;
+  verification_requirements: readonly string[];
+}
+
+/**
+ * Minimal attachment shape the AI checker needs. The host server's wider
+ * AttachmentRef (which adds `storage_kind`, `blossom_hash`, etc.) is a
+ * structural superset — callers can specialize the generic to keep their
+ * extra fields visible inside `readAttachment`.
+ */
+export interface AttachmentRefBase {
+  id: string;
+  uri: string;
+  mime_type: string;
+  filename?: string;
+}
+
+/** Subset of the host server's QueryResult needed for image extraction. */
+export interface AiContentCheckResult<TRef extends AttachmentRefBase = AttachmentRefBase> {
+  attachments: TRef[];
+}
+
+/** Ephemeral key material for Blossom E2E encryption. */
+export interface BlossomKeyMaterial {
+  encrypt_key: string;
+  encrypt_iv: string;
+}
+
+/** Map of attachment ID → key material. */
+export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "ai-content-check"]);
@@ -33,7 +70,7 @@ export interface AttachmentBuffer {
   mimeType?: string;
 }
 
-export interface AiContentCheckDeps {
+export interface AiContentCheckDeps<TRef extends AttachmentRefBase = AttachmentRefBase> {
   /**
    * Returns config per call. Called inside `checkAttachmentContent` so that
    * env-driven config (`AI_CONTENT_CHECK`, `ANTHROPIC_API_KEY`) takes effect
@@ -41,7 +78,7 @@ export interface AiContentCheckDeps {
    */
   getConfig: () => AiContentCheckConfig;
   /** Reader for attachment buffer. Returns null if attachment is unavailable. */
-  readAttachment: (ref: AttachmentRef, blossomKey?: BlossomKeyMaterial) => Promise<AttachmentBuffer | null>;
+  readAttachment: (ref: TRef, blossomKey?: BlossomKeyMaterial) => Promise<AttachmentBuffer | null>;
 }
 
 const IMAGE_MIME_TYPES = new Set([
@@ -105,7 +142,7 @@ async function extractVideoFrames(
   }
 }
 
-function buildPrompt(query: Query): string {
+function buildPrompt(query: AiContentCheckQuery): string {
   const nonce = query.challenge_nonce;
   if (nonce) {
     return [
@@ -133,10 +170,10 @@ function buildPrompt(query: Query): string {
   ].join("\n");
 }
 
-async function loadImageContent(
-  attachments: AttachmentRef[],
+async function loadImageContent<TRef extends AttachmentRefBase>(
+  attachments: TRef[],
   blossomKeys: BlossomKeyMap | undefined,
-  readAttachment: AiContentCheckDeps["readAttachment"],
+  readAttachment: AiContentCheckDeps<TRef>["readAttachment"],
 ): Promise<{ data: string; mimeType: ImageMediaType }[]> {
   const images: { data: string; mimeType: ImageMediaType }[] = [];
 
@@ -174,10 +211,10 @@ async function loadImageContent(
  * });
  * const result = await check(query, result, blossomKeys);
  */
-export function createAiContentChecker(deps: AiContentCheckDeps) {
+export function createAiContentChecker<TRef extends AttachmentRefBase = AttachmentRefBase>(deps: AiContentCheckDeps<TRef>) {
   return async function checkAttachmentContent(
-    query: Query,
-    result: QueryResult,
+    query: AiContentCheckQuery,
+    result: AiContentCheckResult<TRef>,
     blossomKeys?: BlossomKeyMap,
   ): Promise<ContentCheckResult | null> {
     const config = deps.getConfig();

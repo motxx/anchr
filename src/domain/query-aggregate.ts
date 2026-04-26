@@ -15,8 +15,8 @@ import type {
   QuorumConfig,
   OracleAttestationRecord,
   RequesterMeta,
-} from "../../packages/core-domain/src/types.ts";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types.ts";
+} from "./types.ts";
+import { DEFAULT_VERIFICATION_FACTORS } from "./types.ts";
 import { randomBytes } from "node:crypto";
 import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
 import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects.ts";

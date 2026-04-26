@@ -14,8 +14,8 @@ import {
   type OracleResolver,
   type MultiOracleResolver,
 } from "./query-verification.ts";
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
-import type { Query, QueryResult } from "../../packages/core-domain/src/types.ts";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
 
 // --- Test helpers ---
 

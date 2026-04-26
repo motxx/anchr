@@ -8,13 +8,12 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { validateZ } from "../zod-validator-shim.ts";
 import { createListingSchema } from "./marketplace-schemas.ts";
 import { createPaymentMiddleware } from "./xcashu-middleware.ts";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
 import { validateAttachmentUri } from "../url-validation.ts";
 import { announceListingOnNostr } from "./nostr-announce.ts";
-import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
+import type { DataListing, MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "marketplace"]);
@@ -22,16 +21,14 @@ const log = getLogger(["anchr", "marketplace"]);
 /** In-memory purchase log (replay defense + audit). */
 const purchaseLog = new Map<string, PurchaseRecord>();
 
-// deno-lint-ignore no-explicit-any
-export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteContext): void {
+export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContext): void {
   const { listingStore, preimageStore, writeAuth, rateLimit } = ctx;
   const mkt = new Hono<MarketplaceEnv>();
 
   // --- Listings CRUD ---
 
   // Public listing response — omit source_url to prevent leaking internal URLs.
-  // deno-lint-ignore no-explicit-any
-  function publicListing(listing: any) {
+  function publicListing(listing: DataListing): Omit<DataListing, "source_url"> {
     const { source_url: _url, ...rest } = listing;
     return rest;
   }
@@ -52,16 +49,17 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
     "/listings",
     rateLimit,
     writeAuth,
-    validateZ("json", createListingSchema, (result, c) => {
-      if (!result.success) {
+    async (c) => {
+      let raw: unknown;
+      try { raw = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      const parsed = createListingSchema.safeParse(raw);
+      if (!parsed.success) {
         return c.json({
           error: "Invalid listing payload",
-          issues: result.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+          issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         }, 400);
       }
-    }),
-    (c) => {
-      const payload = c.req.valid("json" as never) as ReturnType<typeof createListingSchema.parse>;
+      const payload = parsed.data;
       // Validate source_url at creation time (not just at fetch time) to prevent
       // storing SSRF targets and leaking them via GET /marketplace/listings.
       const urlError = validateAttachmentUri(payload.source_url);
@@ -70,7 +68,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
       }
 
       const id = `listing_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
-      listingStore.set(id, {
+      const listing: DataListing = {
         id,
         name: payload.name,
         description: payload.description,
@@ -82,8 +80,9 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
         active: true,
         created_at: Date.now(),
         provider_pubkey: payload.provider_pubkey,
-      });
-      return c.json(publicListing(listingStore.get(id)), 201);
+      };
+      listingStore.set(id, listing);
+      return c.json(publicListing(listing), 201);
     },
   );
 

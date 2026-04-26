@@ -1,13 +1,13 @@
 import { timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { spawn, fileExists, fileLastModified, moduleDir } from "../../packages/core-runtime/src/mod.ts";
+import { spawn, fileExists, fileLastModified, moduleDir } from "@anchr/core-runtime/mod";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
 import { getRuntimeConfig } from "./config.ts";
 import { listOracles } from "./oracle/index.ts";
 import type { OracleRegistry } from "./oracle/registry.ts";
-import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import {
   defaultService as defaultQueryService,
   type QueryService,
@@ -109,7 +109,7 @@ export async function prepareWorkerApiAssets() {
 // --- App ---
 
 export function buildWorkerApiApp(deps?: WorkerApiDeps) {
-  const svc = deps?.queryService ?? defaultQueryService;
+  const svc = deps?.queryService ?? defaultQueryService();
   const pStore = deps?.preimageStore;
   const doListOracles = deps?.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
 

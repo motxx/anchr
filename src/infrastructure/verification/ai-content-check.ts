@@ -10,14 +10,15 @@
  * their own checker via `createAiContentChecker` from the package.
  */
 
-import { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";
+import { createAiContentChecker } from "@anchr/photo-bounty/ai-content-check";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
+import type { AttachmentRef } from "../../domain/types.ts";
 
-export type { ContentCheckResult } from "../../../packages/photo-bounty/src/ai-content-check.ts";
-export { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";
+export type { ContentCheckResult } from "@anchr/photo-bounty/ai-content-check";
+export { createAiContentChecker } from "@anchr/photo-bounty/ai-content-check";
 
-const checker = createAiContentChecker({
+const checker = createAiContentChecker<AttachmentRef>({
   getConfig: () => {
     const c = getRuntimeConfig();
     return { enabled: c.aiContentCheckEnabled, anthropicApiKey: c.anthropicApiKey };
