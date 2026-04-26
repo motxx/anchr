@@ -28,8 +28,6 @@ export const ANCHR_ORACLE_ANNOUNCEMENT = 30088;
 
 // Marketplace listing (NIP-33 parameterized replaceable, Routstr-compatible).
 export const ANCHR_MARKETPLACE_LISTING = 38421;
-/** @deprecated Use ANCHR_QUERY_FEEDBACK */
-export const ANCHR_QUERY_SETTLEMENT = ANCHR_QUERY_FEEDBACK;
 
 // --- Payload types ---
 
@@ -62,8 +60,6 @@ export interface QueryResponsePayload {
     /** IV for AES-256-GCM decryption (hex). */
     decrypt_iv: string;
     mime: string;
-    /** @deprecated Use decrypt_key_requester */
-    decrypt_key?: string;
   }>;
   notes?: string;
 }
@@ -96,7 +92,7 @@ export interface CompletionFeedbackPayload {
   escrow_token?: string;
 }
 
-/** Legacy settlement payload (backward compat). */
+/** Settlement payload published as kind ANCHR_QUERY_FEEDBACK. */
 export interface QuerySettlementPayload {
   status: "accepted" | "rejected";
   escrow_token?: string;

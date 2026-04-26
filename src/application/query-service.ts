@@ -202,11 +202,6 @@ function getDefaultService(): QueryService {
   return _defaultService;
 }
 
-/** @deprecated Use createQueryService() with explicit deps instead. */
-export function defaultService(): QueryService {
-  return getDefaultService();
-}
-
 export function createQuery(input: QueryInput, options?: CreateQueryOptions): Query {
   return getDefaultService().createQuery(input, options);
 }

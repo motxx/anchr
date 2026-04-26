@@ -18,7 +18,6 @@ export {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
   ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_SETTLEMENT,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
