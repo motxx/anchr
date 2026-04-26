@@ -1,4 +1,4 @@
-# Spec 07: Conditional Swap
+# Conditional Swap
 
 ## Abstract
 

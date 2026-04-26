@@ -39,7 +39,7 @@ export interface Query {
   tlsn_proxy_url?: string | null;
   verification?: VerificationDetail;
   payment_status?: string;
-  htlc?: { hash: string; oracle_pubkey: string; worker_pubkey?: string | null; locktime: number; verified_escrow_sats?: number | null } | null;
+  escrow?: { type: "htlc" | "p2pk_frost"; hash: string; oracle_pubkeys: string[]; worker_pubkey?: string | null; locktime: number; verified_escrow_sats?: number | null } | null;
   submitted_at?: number;
   assigned_oracle_id?: string | null;
   attestations?: { oracle_id: string; passed: boolean; checks: string[]; failures: string[]; attested_at: number }[] | null;

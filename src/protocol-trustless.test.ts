@@ -25,7 +25,7 @@ import {
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-  makeHtlcInfo,
+  makeEscrowInfo,
   driveToProcessing,
 } from "./testing/protocol-helpers.ts";
 
@@ -153,11 +153,11 @@ describe("NUT-14: Worker cannot redeem without valid proof", () => {
 describe("NUT-07: Requester cannot revoke payment", () => {
   test("escrow token amount is verified at worker selection", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Escrow verify test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -180,11 +180,11 @@ describe("NUT-07: Requester cannot revoke payment", () => {
 
   test("invalid escrow token is rejected at worker selection", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Invalid token test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -243,11 +243,11 @@ describe("NUT-11: Timeout refund", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Reject refund test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -294,11 +294,11 @@ describe("Worker impersonation prevention", () => {
 
   test("only quoted Worker can be selected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Worker check" },
-      { htlc: htlcInfo },
+      { escrow: escrowInfo },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "legit_worker",
@@ -313,7 +313,7 @@ describe("Worker impersonation prevention", () => {
     expect(outcome.ok).toBe(true);
     // But HTLC token is now locked to other_worker ��� legit_worker can't redeem
     expect(service.getQuery(query.id)?.status).toBe("worker_selected");
-    expect(service.getQuery(query.id)?.htlc?.worker_pubkey).toBe("other_worker");
+    expect(service.getQuery(query.id)?.escrow?.worker_pubkey).toBe("other_worker");
   });
 });
 
@@ -348,11 +348,11 @@ describe("Oracle + Requester collusion limits", () => {
 
   test("approved query reveals preimage (honest Oracle)", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Settlement test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -380,11 +380,11 @@ describe("Oracle + Requester collusion limits", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Reject test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -466,11 +466,11 @@ describe("Preimage reveal conditions", () => {
 describe("HTLC state machine — invalid transitions blocked", () => {
   test("cannot submit result before Worker is selected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "State test" },
-      { htlc: htlcInfo },
+      { escrow: escrowInfo },
     );
 
     // Still in awaiting_quotes
@@ -487,11 +487,11 @@ describe("HTLC state machine — invalid transitions blocked", () => {
 
   test("cannot select Worker twice", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { htlcInfo } = makeHtlcInfo(preimageStore);
+    const { escrowInfo } = makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Double select" },
-      { htlc: htlcInfo },
+      { escrow: escrowInfo },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -540,7 +540,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
       received_at: Date.now(),
     });
     expect(quoteResult.ok).toBe(false);
-    expect(quoteResult.message).toContain("Not an HTLC query");
+    expect(quoteResult.message).toContain("Not an escrow query");
 
     // submitHtlcResult fails
     const htlcResult = await service.submitHtlcResult(
@@ -550,7 +550,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
       "test-oracle",
     );
     expect(htlcResult.ok).toBe(false);
-    expect(htlcResult.message).toContain("Not an HTLC query");
+    expect(htlcResult.message).toContain("Not an escrow query");
   });
 });
 
@@ -592,7 +592,7 @@ describe("Two-phase HTLC: Phase 1 (plain) vs Phase 2 (locked)", () => {
     expect(refundKeys).toContain(`02${REQUESTER}`);
   });
 
-  test("legacy 2-of-2 escrow is distinct from HTLC (requires both Oracle + Worker)", () => {
+  test("P2PK 2-of-2 escrow is distinct from HTLC (requires both Oracle + Worker signatures)", () => {
     const opts = buildEscrowP2PKOptions({
       oraclePubkey: "o" + "0".repeat(63),
       workerPubkey: "w" + "0".repeat(63),
@@ -603,6 +603,6 @@ describe("Two-phase HTLC: Phase 1 (plain) vs Phase 2 (locked)", () => {
     expect(opts.requiredSignatures).toBe(2);
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys).toHaveLength(2);
-    // Legacy requires BOTH Oracle and Worker — different from NUT-14 HTLC
+    // P2PK 2-of-2 requires BOTH Oracle and Worker — distinct from the NUT-14 HTLC redemption path.
   });
 });

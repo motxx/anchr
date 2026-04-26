@@ -337,9 +337,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "HTLC query",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "abc123",
-          oracle_pubkey: "oracle_pub",
+          oracle_pubkeys: ["oracle_pub"],
           requester_pubkey: "req_pub",
           locktime: nowSecs + 1200,
         },
@@ -351,9 +352,9 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       // Verify via HTTP
       const getRes = await app.request(`/queries/${id}`, { method: "GET" });
       expect(getRes.status).toBe(200);
-      const detail = await getRes.json() as { status: string; htlc: unknown };
+      const detail = await getRes.json() as { status: string; escrow: unknown };
       expect(detail.status).toBe("awaiting_quotes");
-      expect(detail.htlc).toBeDefined();
+      expect(detail.escrow).toBeDefined();
     } finally {
       cleanup();
     }
@@ -365,9 +366,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "HTLC flow",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h123",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },
@@ -404,9 +406,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "Quote test",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },
@@ -441,9 +444,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       await createQueryViaHttp(app, {
         description: "HTLC listed",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },

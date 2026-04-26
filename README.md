@@ -223,11 +223,6 @@ Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
 
 </details>
 
-## Security
-
-If you find a vulnerability, **do not file a public issue.** See
-[`SECURITY.md`](SECURITY.md) for the disclosure process.
-
 ## Contributing
 
 Issues and PRs welcome. Run `./scripts/test-all.sh --local` before pushing;

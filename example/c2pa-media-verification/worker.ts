@@ -112,7 +112,6 @@ console.log();
 console.log("Step 3: Submitting for verification...\n");
 
 // Submit with the attachment ref and optional encryption keys for oracle verification.
-// Uses POST /queries/:id/result (the /submit endpoint is deprecated).
 const submitRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/result`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

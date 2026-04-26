@@ -92,7 +92,7 @@ describe("FROST DM building and parsing", () => {
     expect(parsed.group_pubkey).toBe(groupPubkey);
   });
 
-  test("parseOracleDM handles preimage type (backward compat)", () => {
+  test("parseOracleDM handles preimage DM type", () => {
     const oracle = generateEphemeralIdentity();
     const worker = generateEphemeralIdentity();
     const preimage = "abcdef0123456789".repeat(4);
@@ -105,7 +105,7 @@ describe("FROST DM building and parsing", () => {
     expect((parsed as { preimage: string }).preimage).toBe(preimage);
   });
 
-  test("parseOracleDM handles rejection type (backward compat)", () => {
+  test("parseOracleDM handles rejection DM type", () => {
     const oracle = generateEphemeralIdentity();
     const worker = generateEphemeralIdentity();
 

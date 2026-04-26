@@ -156,7 +156,7 @@ export function buildOracleApp(
 
     // Record verification result + worker pubkey for preimage gating
     if (detail.passed) {
-      const workerPubkey = body.worker_pubkey ?? body.query.htlc?.worker_pubkey ?? "";
+      const workerPubkey = body.worker_pubkey ?? body.query.escrow?.worker_pubkey ?? "";
       verifiedQueries.set(body.query.id, workerPubkey);
     }
 
@@ -181,7 +181,7 @@ export function buildOracleApp(
       return c.json({ error: "Verification has not passed for this query" }, 403);
     }
 
-    // Verify caller is the selected Worker for this query (Spec 05)
+    // Verify caller is the selected Worker for this query (the messaging spec)
     if (verifiedWorker && body.worker_pubkey && body.worker_pubkey !== verifiedWorker) {
       return c.json({ error: "Worker pubkey does not match selected worker" }, 403);
     }

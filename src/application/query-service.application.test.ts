@@ -161,9 +161,10 @@ describe("Application Service — Simple lifecycle", () => {
 
 describe("Application Service — HTLC lifecycle", () => {
   const htlcOptions = () => ({
-    htlc: {
+    escrow: {
+      type: "htlc" as const,
       hash: "abc123",
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
@@ -174,7 +175,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
     expect(query.status).toBe("awaiting_quotes");
-    expect(query.htlc).toBeDefined();
+    expect(query.escrow).toBeDefined();
     expect(query.quotes).toEqual([]);
   });
 
@@ -277,7 +278,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput);
     const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
-    expect(outcome.message).toContain("HTLC");
+    expect(outcome.message).toContain("escrow");
   });
 
   test("HTLC: worker pubkey mismatch", async () => {
@@ -341,9 +342,10 @@ describe("Application Service — Aggregate error propagation", () => {
     const { svc } = setup();
     const nowSecs = Math.floor(Date.now() / 1000);
     expect(() => svc.createQuery(defaultInput, {
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: nowSecs + 100,
       },

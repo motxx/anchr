@@ -395,25 +395,26 @@ describe("HTLC lifecycle", () => {
     };
   }
 
-  const htlcInfo = {
+  const escrowInfo = {
+    type: "htlc" as const,
     hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
+    oracle_pubkeys: ["oracle_pub"],
     requester_pubkey: "requester_pub",
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
 
   test("createQuery with htlc option sets awaiting_quotes status", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     expect(query.status).toBe("awaiting_quotes");
     expect(query.payment_status).toBe("htlc_locked");
-    expect(query.htlc?.hash).toBe("abcd1234");
+    expect(query.escrow?.hash).toBe("abcd1234");
     expect(query.quotes).toEqual([]);
   });
 
   test("recordQuote adds quote to awaiting_quotes query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     const outcome = service.recordQuote(query.id, {
       worker_pubkey: "worker_pub_1",
       amount_sats: 100,
@@ -434,18 +435,18 @@ describe("HTLC lifecycle", () => {
       received_at: Date.now(),
     });
     expect(outcome.ok).toBe(false);
-    expect(outcome.message).toContain("Not an HTLC query");
+    expect(outcome.message).toContain("Not an escrow query");
   });
 
   test("selectWorker transitions awaiting_quotes → worker_selected", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     service.recordQuote(query.id, { worker_pubkey: "worker_pub_1", quote_event_id: "evt_1", received_at: Date.now() });
     const outcome = await service.selectWorker(query.id, "worker_pub_1", "htlc_token_123");
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
     expect(updated.status).toBe("worker_selected");
-    expect(updated.htlc?.worker_pubkey).toBe("worker_pub_1");
+    expect(updated.escrow?.worker_pubkey).toBe("worker_pub_1");
     expect(updated.payment_status).toBe("htlc_swapped");
   });
 
@@ -454,12 +455,12 @@ describe("HTLC lifecycle", () => {
     const validToken = makeFakeToken(100);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     const outcome = await service.selectWorker(query.id, "worker_pub_1", validToken);
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
-    expect(updated.htlc?.verified_escrow_sats).toBe(100);
+    expect(updated.escrow?.verified_escrow_sats).toBe(100);
   });
 
   test("selectWorker rejects escrow token with insufficient amount", async () => {
@@ -467,7 +468,7 @@ describe("HTLC lifecycle", () => {
     const smallToken = makeFakeToken(50);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     const outcome = await service.selectWorker(query.id, "worker_pub_1", smallToken);
     expect(outcome.ok).toBe(false);
@@ -481,7 +482,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
       { description: "HTLC test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     const outcome = await service.selectWorker(query.id, "worker_pub_1", "not_a_valid_token");
     expect(outcome.ok).toBe(false);
@@ -494,16 +495,16 @@ describe("HTLC lifecycle", () => {
     const bigToken = makeFakeToken(200);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { htlc: htlcInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     const outcome = await service.selectWorker(query.id, "worker_pub_1", bigToken);
     expect(outcome.ok).toBe(true);
-    expect(service.getQuery(query.id)?.htlc?.verified_escrow_sats).toBe(200);
+    expect(service.getQuery(query.id)?.escrow?.verified_escrow_sats).toBe(200);
   });
 
   test("selectWorker fails on wrong state", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "worker_pub_1");
     const outcome = await service.selectWorker(query.id, "worker_pub_2");
     expect(outcome.ok).toBe(false);
@@ -512,7 +513,7 @@ describe("HTLC lifecycle", () => {
 
   test("recordResult transitions processing → verifying", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(query.id, { attachments: [], notes: "done" }, "worker_pub_1");
@@ -522,7 +523,7 @@ describe("HTLC lifecycle", () => {
 
   test("recordResult fails for wrong worker", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(query.id, { attachments: [] }, "wrong_worker");
@@ -532,7 +533,7 @@ describe("HTLC lifecycle", () => {
 
   test("completeVerification transitions verifying → approved", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
@@ -546,7 +547,7 @@ describe("HTLC lifecycle", () => {
 
   test("completeVerification transitions verifying → rejected", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
@@ -559,14 +560,14 @@ describe("HTLC lifecycle", () => {
   test("listOpenQueries includes HTLC queries in active states", async () => {
     const { service } = makeIsolatedService();
     service.createQuery({ description: "Simple" }, { ttlMs: 60_000 });
-    service.createQuery({ description: "HTLC" }, { htlc: htlcInfo, ttlMs: 60_000 });
+    service.createQuery({ description: "HTLC" }, { escrow: escrowInfo, ttlMs: 60_000 });
     const open = service.listOpenQueries();
     expect(open).toHaveLength(2);
   });
 
   test("full HTLC lifecycle: create → quote → select → result → verify", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Full HTLC" }, { htlc: htlcInfo });
+    const query = service.createQuery({ description: "Full HTLC" }, { escrow: escrowInfo });
     expect(query.status).toBe("awaiting_quotes");
 
     service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
@@ -607,13 +608,14 @@ describe("submitHtlcResult", () => {
     };
   }
 
-  /** Create htlcInfo using a real preimage hash from the store. */
+  /** Create escrowInfo using a real preimage hash from the store. */
   function makeHtlcWithHash(preimageStore: ReturnType<typeof import("@anchr/core-cashu/preimage-store").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
-      htlcInfo: {
+      escrowInfo: {
+        type: "htlc" as const,
         hash: entry.hash,
-        oracle_pubkey: "oracle_pub",
+        oracle_pubkeys: ["oracle_pub"],
         requester_pubkey: "requester_pub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
@@ -623,8 +625,8 @@ describe("submitHtlcResult", () => {
 
   test("submitHtlcResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { htlcInfo, entry } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
+    const { escrowInfo, entry } = makeHtlcWithHash(preimageStore);
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
@@ -643,8 +645,8 @@ describe("submitHtlcResult", () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { htlcInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo, oracleIds: ["strict-oracle"] });
+    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["strict-oracle"] });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
@@ -669,13 +671,13 @@ describe("submitHtlcResult", () => {
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);
-    expect(outcome.message).toContain("Not an HTLC query");
+    expect(outcome.message).toContain("Not an escrow query");
   });
 
   test("submitHtlcResult fails for wrong worker", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { htlcInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitHtlcResult(
@@ -690,8 +692,8 @@ describe("submitHtlcResult", () => {
 
   test("submitHtlcResult fails for wrong state", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { htlcInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { htlc: htlcInfo });
+    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
     // Still in awaiting_quotes, not processing
     const outcome = await service.submitHtlcResult(
       query.id,
@@ -765,7 +767,7 @@ describe("verifyWithQuorum", () => {
     expect(outcome.query?.attestations).toHaveLength(3);
   });
 
-  test("no quorum config uses single oracle (backward compat)", async () => {
+  test("no quorum config uses single oracle path", async () => {
     const { service } = makeQuorumService([
       { id: "oracle-a", pass: true },
       { id: "oracle-b", pass: false },
@@ -794,16 +796,17 @@ describe("verifyWithQuorum", () => {
     const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
 
     const entry = preimageStore.create();
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
     const query = service.createQuery(
       { description: "Quorum HTLC" },
       {
-        htlc: htlcInfo,
+        escrow: escrowInfo,
         oracleIds: ["oracle-a", "oracle-b"],
         quorum: { min_approvals: 2 },
       },

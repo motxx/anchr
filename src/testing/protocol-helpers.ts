@@ -53,7 +53,7 @@ export function createMockEscrowProvider(): EscrowProvider {
         }
         return { ok: true };
       } catch {
-        return { ok: true }; // Non-decodable tokens pass (backward compat)
+        return { ok: true }; // Non-decodable tokens pass — fake tokens used by unit tests skip the lock check.
       }
     },
     async settle() { return { settled: true }; },
@@ -115,13 +115,14 @@ export function makeServiceWithPreimage(opts?: { mockOracle?: Oracle; mockOracle
   };
 }
 
-/** Generate an HTLC info object and corresponding preimage store entry. */
-export function makeHtlcInfo(preimageStore: PreimageStore) {
+/** Generate an EscrowInfo (HTLC mode) and a corresponding preimage store entry. */
+export function makeEscrowInfo(preimageStore: PreimageStore) {
   const entry = preimageStore.create();
   return {
-    htlcInfo: {
+    escrowInfo: {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     },
@@ -138,10 +139,10 @@ export async function driveToProcessing(
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
-  const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
+  const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Protocol test" },
-    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: opts?.quorum },
+    { escrow: escrowInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: opts?.quorum },
   );
   service.recordQuote(query.id, {
     worker_pubkey: workerPub,
@@ -151,7 +152,7 @@ export async function driveToProcessing(
   const token = makeFakeToken(bounty);
   await service.selectWorker(query.id, workerPub, token);
   service.beginWork(query.id);
-  return { query, entry, workerPub, htlcInfo };
+  return { query, entry, workerPub, escrowInfo };
 }
 
 /**
@@ -187,13 +188,13 @@ export async function driveQuorumToProcessing(
 ) {
   const workerPub = "worker_pub";
   const bounty = 100;
-  const { htlcInfo, entry } = makeHtlcInfo(preimageStore);
+  const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Quorum protocol test" },
-    { htlc: htlcInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: { min_approvals: minApprovals } },
+    { escrow: escrowInfo, bounty: { amount_sats: bounty }, oracleIds, quorum: { min_approvals: minApprovals } },
   );
   service.recordQuote(query.id, { worker_pubkey: workerPub, quote_event_id: "evt_1", received_at: Date.now() });
   await service.selectWorker(query.id, workerPub, makeFakeToken(bounty));
   service.beginWork(query.id);
-  return { query, entry, workerPub, htlcInfo };
+  return { query, entry, workerPub, escrowInfo };
 }

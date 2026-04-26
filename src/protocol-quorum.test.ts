@@ -10,7 +10,7 @@
  *   2. Single malicious Oracle — cannot approve alone
  *   3. Majority honest — garbage rejected despite minority collusion
  *   4. Oracle availability — degrades gracefully
- *   5. Backward compat — single Oracle (no quorum) still works
+ *   5. Single-Oracle path — no quorum config still verifies through one Oracle
  */
 
 import { describe, test } from "@std/testing/bdd";
@@ -236,10 +236,10 @@ describe("Quorum: Oracle availability", () => {
 });
 
 // =============================================================================
-// 5. Backward compat — single Oracle (no quorum)
+// 5. Single-Oracle path — no quorum config still verifies through one Oracle
 // =============================================================================
 
-describe("Quorum: backward compat — no quorum = single Oracle", () => {
+describe("Quorum: no quorum config → single Oracle path", () => {
   test("no quorum config → single Oracle, preimage revealed on pass", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);

@@ -1,5 +1,5 @@
 /**
- * E2E tests for Spec 08 — Oracle Registry discovery via Nostr relay.
+ * E2E tests for the oracle-registry spec — Oracle Registry discovery via Nostr relay.
  *
  * Prerequisites:
  *   docker compose up -d          (provides relay at ws://localhost:7777)
@@ -78,7 +78,7 @@ async function publishToRelay(event: Event): Promise<void> {
 
 suite(
   {
-    name: "e2e: Spec 08 — Oracle Registry discovery",
+    name: "e2e: the oracle-registry spec — Oracle Registry discovery",
     sanitizeOps: false,
     sanitizeResources: false,
   },

@@ -3,7 +3,7 @@
 > **Scope:** the Cashu HTLC escrow primitive that this package owns. The
 > threshold-signing variant lives in `packages/cashu-frost-oracle/SPEC.md`;
 > the conditional-swap (cross-HTLC + dual-preimage) wire format is in
-> `specs/07-conditional-swap.md`.
+> `specs/conditional-swap.md`.
 
 This document describes how `@anchr/core-cashu` realises an
 `EscrowProvider`-shaped Hash Time-Locked Contract using Cashu NUT-11

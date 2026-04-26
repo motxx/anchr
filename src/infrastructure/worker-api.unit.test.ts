@@ -95,15 +95,15 @@ describe("buildWorkerApiApp with injected deps", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         description: "Test Store status check",
-        htlc: { hash: "abc123", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
+        escrow: { type: "htlc", hash: "abc123", oracle_pubkeys: ["opub"], requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; description: string; status: string; htlc: { hash: string } };
+    const json = await res.json() as { query_id: string; description: string; status: string; escrow: { hash: string } };
     expect(json.query_id).toMatch(/^query_/);
     expect(json.description).toBe("Test Store status check");
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.htlc.hash).toBe("abc123");
+    expect(json.escrow.hash).toBe("abc123");
     expect(queryService.getQuery(json.query_id)).not.toBeNull();
   }));
 
@@ -123,20 +123,6 @@ describe("buildWorkerApiApp with injected deps", () => {
     const res = await app.request("http://localhost/queries/nonexistent");
     expect(res.status).toBe(404);
   });
-
-  test("POST /queries/:id/submit returns 410 (deprecated)", withOpenAuth(async () => {
-    const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "Test query" });
-    const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ attachments: [], notes: "open" }),
-    });
-    expect(res.status).toBe(410);
-    const json = await res.json() as { error: string; hint: string };
-    expect(json.error).toBe("Deprecated");
-    expect(json.hint).toContain("HTLC");
-  }));
 
   test("POST /queries/:id/cancel cancels via injected service", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
@@ -174,9 +160,10 @@ describe("buildWorkerApiApp with injected deps", () => {
 });
 
 describe("HTLC endpoints", () => {
-  const htlcInfo = {
+  const escrowInfo = {
+    type: "htlc" as const,
     hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
+    oracle_pubkeys: ["oracle_pub"],
     requester_pubkey: "requester_pub",
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
@@ -188,20 +175,20 @@ describe("HTLC endpoints", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         description: "HTLC query",
-        htlc: htlcInfo,
+        escrow: escrowInfo,
       }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; status: string; payment_status: string; htlc: { hash: string } | null };
+    const json = await res.json() as { query_id: string; status: string; payment_status: string; escrow: { hash: string } | null };
     expect(json.status).toBe("awaiting_quotes");
     expect(json.payment_status).toBe("htlc_locked");
-    expect(json.htlc?.hash).toBe("abcd1234");
-    expect(queryService.getQuery(json.query_id)?.htlc).toBeDefined();
+    expect(json.escrow?.hash).toBe("abcd1234");
+    expect(queryService.getQuery(json.query_id)?.escrow).toBeDefined();
   }));
 
   test("GET /queries/:id/quotes returns quotes", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
     queryService.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
 
     const res = await app.request(`http://localhost/queries/${query.id}/quotes`);
@@ -213,7 +200,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/quotes records a quote", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}/quotes`, {
       method: "POST",
@@ -228,7 +215,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/select selects worker", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}/select`, {
       method: "POST",
@@ -243,7 +230,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
     queryService.beginWork(query.id);
 
@@ -264,7 +251,7 @@ describe("HTLC endpoints", () => {
 
   test("GET /queries/:id includes HTLC info", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}`);
     expect(res.status).toBe(200);
@@ -280,7 +267,7 @@ describe("HTLC endpoints", () => {
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "Full HTLC lifecycle", htlc: htlcInfo, oracle_ids: ["test-oracle"] }),
+      body: JSON.stringify({ description: "Full HTLC lifecycle", escrow: escrowInfo, oracle_ids: ["test-oracle"] }),
     });
     expect(createRes.status).toBe(201);
     const { query_id } = await createRes.json() as { query_id: string };
@@ -367,13 +354,14 @@ describe("HTLC inline verification with preimage", () => {
     const { app, queryService, preimageStore } = makeTestAppWithPreimage();
     // Generate hash first, then create query with it
     const entry = preimageStore.create();
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
     queryService.beginWork(query.id);
 
@@ -436,7 +424,7 @@ describe("Quorum via HTTP", () => {
         description: "Quorum query",
         oracle_ids: ["oracle-a", "oracle-b"],
         quorum: { min_approvals: 2 },
-        htlc: { hash: "qhash", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
+        escrow: { type: "htlc", hash: "qhash", oracle_pubkeys: ["opub"], requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);

@@ -203,8 +203,8 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                 <code className="text-xs font-mono text-muted-foreground">{market.oracle_pubkey}</code>
               </div>
               <div>
-                <span className="text-xs text-muted-foreground block mb-1">HTLC Hash</span>
-                <code className="text-xs font-mono text-muted-foreground">{market.htlc_hash}</code>
+                <span className="text-xs text-muted-foreground block mb-1">HTLC Hash (YES)</span>
+                <code className="text-xs font-mono text-muted-foreground">{market.htlc_hash_yes}</code>
               </div>
             </div>
           </div>

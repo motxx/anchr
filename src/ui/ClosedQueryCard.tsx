@@ -91,7 +91,7 @@ function ClosedQueryDetail({ queryId }: { queryId: string }) {
         preimage={undefined}
         paymentStatus={query.payment_status}
         oracleId={query.assigned_oracle_id}
-        htlc={query.htlc}
+        escrow={query.escrow}
         attestations={query.attestations}
       />
 

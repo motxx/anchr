@@ -19,7 +19,7 @@ import {
 } from "./worker-api-presenters.ts";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
+import type { AttachmentRef, BlossomKeyMap, EscrowInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
@@ -79,7 +79,7 @@ function handleCreateQuery(
       requesterMeta: payload.requester,
       bounty: payload.bounty,
       oracleIds: payload.oracle_ids,
-      htlc: payload.htlc,
+      escrow: payload.escrow,
       quorum: payload.quorum,
     });
 
@@ -121,13 +121,6 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
       return handleCreateQuery(c, svc, parsed.data, () => getPublicRequestUrl(c));
     },
   );
-
-  app.post("/queries/:id/submit", writeAuth, (c) => {
-    return c.json({
-      error: "Deprecated",
-      hint: "All queries now require HTLC escrow. Use POST /queries/:id/result with the HTLC flow instead.",
-    }, 410);
-  });
 
   app.post("/queries/:id/cancel", writeAuth, (c) => {
     const id = c.req.param("id");
@@ -276,7 +269,7 @@ async function handleSubmitResult(c: Context, svc: QueryService) {
   const { result, workerPubkey, blossomKeys, oracleId } = buildQueryResult(parsed);
 
   const query = svc.getQuery(id);
-  if (query?.htlc) {
+  if (query?.escrow) {
     const htlcOutcome = await svc.submitHtlcResult(id, result, workerPubkey, oracleId, blossomKeys);
     const status = !htlcOutcome.query ? 404 : !htlcOutcome.ok ? 422 : 200;
     return c.json({

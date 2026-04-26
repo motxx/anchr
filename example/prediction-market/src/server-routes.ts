@@ -6,7 +6,7 @@
  * dual preimage store, wired into Hono.
  *
  * State is injectable via `MarketState` for testing. When no state is
- * provided, default singletons are created (backward compatible).
+ * provided, a lazily-constructed module-level state is reused.
  */
 
 import { randomUUID } from "node:crypto";
@@ -102,7 +102,7 @@ export function createMarketState(opts?: {
 }
 
 // ---------------------------------------------------------------------------
-// Default singleton state (backward compat for production)
+// Default module-level state — lazy, reused when no MarketState is injected.
 // ---------------------------------------------------------------------------
 
 let _defaultState: MarketState | null = null;
@@ -170,7 +170,6 @@ function marketSummary(m: PredictionMarket, state: MarketState) {
     fee_ppm: m.fee_ppm,
     oracle_pubkey: m.oracle_pubkey,
     creator_pubkey: m.creator_pubkey,
-    htlc_hash: m.htlc_hash_yes,
     htlc_hash_yes: m.htlc_hash_yes,
     htlc_hash_no: m.htlc_hash_no,
     group_pubkey_yes: m.group_pubkey_yes,
@@ -756,7 +755,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         s.resolvedSignatures.set(id, sig);
       }
 
-      // Also resolve HTLC side for backward compatibility
+      // Also resolve the HTLC side. In dual-mode markets we keep both the
+      // FROST signature path and the HTLC preimage path live so wallets that
+      // settle via either redemption flow get the data they need.
       resolveMarket(id, outcome, s.dualPreimageStore);
     } else {
       // HTLC preimage mode (fallback)
@@ -1113,24 +1114,3 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   }
 }
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Clear all in-memory stores. Visible for testing.
- *
- * @deprecated Prefer injecting a fresh `createMarketState()` into
- *   `registerMarketRoutes()` for fully isolated tests.
- */
-export function _clearMarketStoresForTest(): void {
-  if (!_defaultState) return;
-  _defaultState.markets.clear();
-  _defaultState.matchedPairs.clear();
-  _defaultState.resolvedPreimages.clear();
-  _defaultState.resolvedSignatures.clear();
-  _defaultState.resolvedProofSignatures.clear();
-  _defaultState.pendingExchangeTokens.clear();
-  // Reset singleton so next call creates fresh state
-  _defaultState = null;
-}

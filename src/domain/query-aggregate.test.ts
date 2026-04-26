@@ -20,7 +20,7 @@ import type {
   VerificationDetail,
   SubmissionMeta,
   QuoteInfo,
-  HtlcInfo,
+  EscrowInfo,
 } from "./types.ts";
 import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate.ts";
 
@@ -46,13 +46,14 @@ const defaultOptions: CreateQueryAggregateOptions = {
   ttlMs: 600_000, // 10 min
 };
 
-function makeHtlcOptions(overrides?: Partial<HtlcInfo>): CreateQueryAggregateOptions {
+function makeHtlcOptions(overrides?: Partial<EscrowInfo>): CreateQueryAggregateOptions {
   const nowSecs = Math.floor(Date.now() / 1000);
   return {
     ttlMs: 600_000,
-    htlc: {
+    escrow: {
+      type: "htlc",
       hash: "abc123hash",
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "requester_pub",
       locktime: nowSecs + 1200,
       ...overrides,
@@ -65,9 +66,10 @@ function makeHtlcQuery(overrides?: Partial<Query>): Query {
   return makeQuery({
     status: "awaiting_quotes",
     payment_status: "htlc_locked",
-    htlc: {
+    escrow: {
+      type: "htlc",
       hash: "abc123hash",
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
@@ -106,7 +108,7 @@ describe("createQueryAggregate", () => {
     expect(q.status).toBe("pending");
     expect(q.description).toBe("Take a photo of Tokyo Tower");
     expect(q.payment_status).toBe("locked");
-    expect(q.htlc).toBeUndefined();
+    expect(q.escrow).toBeUndefined();
     expect(q.quotes).toBeUndefined();
   });
 
@@ -114,7 +116,7 @@ describe("createQueryAggregate", () => {
     const q = expectOk(createQueryAggregate(defaultInput, makeHtlcOptions()));
     expect(q.status).toBe("awaiting_quotes");
     expect(q.payment_status).toBe("htlc_locked");
-    expect(q.htlc).toBeDefined();
+    expect(q.escrow).toBeDefined();
     expect(q.quotes).toEqual([]);
   });
 
@@ -216,9 +218,10 @@ describe("createQueryAggregate", () => {
     const nowSecs = Math.floor(Date.now() / 1000);
     const err = expectErr(createQueryAggregate(defaultInput, {
       ttlMs: 600_000,
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: nowSecs + 100, // too short
       },
@@ -230,9 +233,10 @@ describe("createQueryAggregate", () => {
     const nowSecs = Math.floor(Date.now() / 1000);
     const result = createQueryAggregate(defaultInput, {
       ttlMs: 600_000,
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: nowSecs + MIN_HTLC_LOCKTIME_SECS,
       },
@@ -313,7 +317,7 @@ describe("submitResult", () => {
   test("rejects HTLC query", () => {
     const query = makeHtlcQuery({ status: "pending" });
     const err = expectErr(submitResult(query, defaultResult, passedVerification, defaultMeta));
-    expect(err).toContain("HTLC");
+    expect(err).toContain("escrow");
   });
 });
 
@@ -455,7 +459,7 @@ describe("addQuote", () => {
     const query = makeQuery();
     const quote: QuoteInfo = { worker_pubkey: "w", quote_event_id: "e", received_at: Date.now() };
     const err = expectErr(addQuote(query, quote));
-    expect(err).toContain("HTLC");
+    expect(err).toContain("escrow");
   });
 
   test("rejects when not awaiting_quotes", () => {
@@ -487,13 +491,13 @@ describe("selectWorker", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", {}));
     expect(q.status).toBe("worker_selected");
-    expect(q.htlc?.worker_pubkey).toBe("worker_pub");
+    expect(q.escrow?.worker_pubkey).toBe("worker_pub");
   });
 
   test("sets escrow_token and payment_status on swap", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", { escrow_token: "tok123" }));
-    expect(q.htlc?.escrow_token).toBe("tok123");
+    expect(q.escrow?.escrow_token).toBe("tok123");
     expect(q.payment_status).toBe("htlc_swapped");
   });
 
@@ -506,13 +510,13 @@ describe("selectWorker", () => {
   test("sets verified_escrow_sats", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", { verified_escrow_sats: 100 }));
-    expect(q.htlc?.verified_escrow_sats).toBe(100);
+    expect(q.escrow?.verified_escrow_sats).toBe(100);
   });
 
   test("rejects non-HTLC query", () => {
     const query = makeQuery();
     const err = expectErr(selectWorker(query, "w", {}));
-    expect(err).toContain("HTLC");
+    expect(err).toContain("escrow");
   });
 
   test("rejects wrong state (processing)", () => {
@@ -532,9 +536,10 @@ describe("recordResult", () => {
   test("transitions processing → verifying", () => {
     const query = makeHtlcQuery({
       status: "processing",
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
         worker_pubkey: "worker1",
@@ -554,9 +559,10 @@ describe("recordResult", () => {
   test("rejects mismatched worker_pubkey", () => {
     const query = makeHtlcQuery({
       status: "processing",
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
         worker_pubkey: "worker1",
@@ -576,7 +582,7 @@ describe("recordResult", () => {
   test("rejects non-HTLC query", () => {
     const query = makeQuery({ status: "processing" });
     const err = expectErr(recordResult(query, defaultResult, "w"));
-    expect(err).toContain("HTLC");
+    expect(err).toContain("escrow");
   });
 
   test("rejects wrong state (awaiting_quotes)", () => {
@@ -634,7 +640,7 @@ describe("completeVerification", () => {
   test("rejects non-HTLC query", () => {
     const query = makeQuery({ status: "verifying" });
     const err = expectErr(completeVerification(query, true, passedVerification));
-    expect(err).toContain("HTLC");
+    expect(err).toContain("escrow");
   });
 
   test("rejects wrong state (processing)", () => {

@@ -1,5 +1,5 @@
 /**
- * E2E tests for Spec 07: Conditional Swap — full prediction market lifecycle.
+ * E2E tests for the conditional-swap spec: Conditional Swap — full prediction market lifecycle.
  *
  * Tests the complete lifecycle with real Cashu escrow on regtest:
  *   1. Create dual preimage store (generates hash_a, hash_b for YES/NO outcomes)
@@ -157,7 +157,7 @@ async function executeMatchDirect(
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-suite("e2e: Spec 07 — Conditional Swap full prediction market lifecycle", () => {
+suite("e2e: the conditional-swap spec — Conditional Swap full prediction market lifecycle", () => {
   const wallet = sharedWallet!;
 
   // Shared state across the lifecycle tests
@@ -438,7 +438,7 @@ suite("e2e: Spec 07 — Conditional Swap full prediction market lifecycle", () =
 // Partial matching test (separate describe to avoid shared state conflicts)
 // =============================================================================
 
-suite("e2e: Spec 07 — Order book partial matching", () => {
+suite("e2e: the conditional-swap spec — Order book partial matching", () => {
   const wallet = sharedWallet!;
 
   test("order book handles partial matches correctly", () => {

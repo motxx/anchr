@@ -213,7 +213,7 @@ describe("e2e: Anchr Worker Web app", () => {
   test("submit text result via API and verify web reflects status", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip() || !testQueryId) return;
 
-    // Submit via API (use /result endpoint — /submit is deprecated 410)
+    // Submit the worker result via the /result endpoint.
     const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },

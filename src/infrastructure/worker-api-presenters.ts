@@ -52,12 +52,13 @@ export function querySummary(query: Query) {
     oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
     expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-    htlc: query.htlc ? {
-      hash: query.htlc.hash,
-      oracle_pubkey: query.htlc.oracle_pubkey,
-      worker_pubkey: query.htlc.worker_pubkey ?? null,
-      locktime: query.htlc.locktime,
-      verified_escrow_sats: query.htlc.verified_escrow_sats ?? null,
+    escrow: query.escrow ? {
+      type: query.escrow.type,
+      hash: query.escrow.hash,
+      oracle_pubkeys: query.escrow.oracle_pubkeys,
+      worker_pubkey: query.escrow.worker_pubkey ?? null,
+      locktime: query.escrow.locktime,
+      verified_escrow_sats: query.escrow.verified_escrow_sats ?? null,
     } : null,
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
@@ -82,7 +83,7 @@ export function buildCreatedQueryPayload(query: Query, requestUrl: string) {
     reference_app_url: `${requestOrigin}/queries/${query.id}`,
     query_api_url: `${requestOrigin}/queries/${query.id}`,
     payment_status: query.payment_status,
-    htlc: query.htlc ? { hash: query.htlc.hash, oracle_pubkey: query.htlc.oracle_pubkey } : null,
+    escrow: query.escrow ? { type: query.escrow.type, hash: query.escrow.hash, oracle_pubkeys: query.escrow.oracle_pubkeys } : null,
   };
 }
 

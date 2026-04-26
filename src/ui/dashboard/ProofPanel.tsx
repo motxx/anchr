@@ -5,9 +5,10 @@ interface QuerySummary {
   status: string;
   description: string;
   bounty: { amount_sats: number } | null;
-  htlc: {
+  escrow: {
+    type: "htlc" | "p2pk_frost";
     hash: string;
-    oracle_pubkey: string;
+    oracle_pubkeys: string[];
     worker_pubkey: string | null;
     locktime: number;
     verified_escrow_sats: number | null;
@@ -22,7 +23,7 @@ interface QuerySummary {
 
 export function ProofPanel({ queries }: { queries: QuerySummary[] }) {
   const relevantQuery = queries.find((q) =>
-    q.htlc || q.verification || q.payment_status === "released",
+    q.escrow || q.verification || q.payment_status === "released",
   );
 
   if (!relevantQuery) {
@@ -45,7 +46,7 @@ export function ProofPanel({ queries }: { queries: QuerySummary[] }) {
         Proof & Token Details
       </div>
       <div className="space-y-2 text-xs">
-        {q.htlc && <HtlcDetails htlc={q.htlc} />}
+        {q.escrow && <EscrowDetails escrow={q.escrow} />}
         {q.payment_status && <PaymentStatus status={q.payment_status} />}
         {q.verification && <VerificationBlock verification={q.verification} />}
       </div>
@@ -53,8 +54,9 @@ export function ProofPanel({ queries }: { queries: QuerySummary[] }) {
   );
 }
 
-function HtlcDetails({ htlc }: {
-  htlc: {
+function EscrowDetails({ escrow }: {
+  escrow: {
+    type: "htlc" | "p2pk_frost";
     hash: string;
     worker_pubkey: string | null;
     verified_escrow_sats: number | null;
@@ -63,22 +65,22 @@ function HtlcDetails({ htlc }: {
   return (
     <>
       <div>
-        <span className="text-muted-foreground">HTLC Hash: </span>
+        <span className="text-muted-foreground">{escrow.type === "p2pk_frost" ? "P2PK Hash: " : "HTLC Hash: "}</span>
         <span className="font-mono text-[11px] text-foreground break-all">
-          {htlc.hash.slice(0, 16)}...
+          {escrow.hash.slice(0, 16)}...
         </span>
       </div>
-      {htlc.verified_escrow_sats != null && (
+      {escrow.verified_escrow_sats != null && (
         <div>
           <span className="text-muted-foreground">Escrow: </span>
-          <span className="text-amber-400 font-semibold">{htlc.verified_escrow_sats} sats</span>
+          <span className="text-amber-400 font-semibold">{escrow.verified_escrow_sats} sats</span>
           <span className="text-emerald-400 text-[10px] ml-1">verified</span>
         </div>
       )}
-      {htlc.worker_pubkey && (
+      {escrow.worker_pubkey && (
         <div>
           <span className="text-muted-foreground">Worker: </span>
-          <span className="font-mono text-[11px] break-all">{htlc.worker_pubkey.slice(0, 16)}...</span>
+          <span className="font-mono text-[11px] break-all">{escrow.worker_pubkey.slice(0, 16)}...</span>
         </div>
       )}
     </>

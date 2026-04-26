@@ -2,9 +2,9 @@
 
 > **Scope:** the reference host server in `src/`. Other implementations
 > can structure their state machine differently — this is *not* a wire
-> spec. The wire-format specs (Nostr DVM kinds in `specs/05-messaging.md`,
-> oracle discovery in `specs/08-oracle-registry.md`, conditional swap
-> primitive in `specs/07-conditional-swap.md`) are the cross-implementation
+> spec. The wire-format specs (Nostr DVM kinds in `specs/messaging.md`,
+> oracle discovery in `specs/oracle-registry.md`, conditional swap
+> primitive in `specs/conditional-swap.md`) are the cross-implementation
 > contracts.
 
 A query represents a request for verified data. This document defines the

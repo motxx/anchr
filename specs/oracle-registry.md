@@ -1,4 +1,4 @@
-# Spec 08: Oracle Registry
+# Oracle Registry
 
 ## Abstract
 
@@ -6,7 +6,7 @@ Oracles announce their capabilities, fees, and endpoints via Nostr. Requesters d
 
 ## Motivation
 
-Spec 00 defines Oracle IDs as an input to query creation, but does not specify how a Requester discovers which Oracles exist, what they can verify, or how much they charge. Without a discovery mechanism, the protocol is closed to new Oracle operators.
+The protocol expects Oracle IDs as an input to query creation but does not, on its own, define how a Requester discovers which Oracles exist, what they can verify, or how much they charge. Without a discovery mechanism, the protocol is closed to new Oracle operators.
 
 ## Oracle Announcement Event
 
@@ -35,7 +35,7 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
 }
 ```
 
-Capability tags follow the pattern `anchr-oracle-<factor>` where `<factor>` is a verification factor from Spec 03 (`tlsn`, `gps`, `nonce`, `timestamp`, `oracle`, `ai_check`, `c2pa`).
+Capability tags follow the pattern `anchr-oracle-<factor>` where `<factor>` is a verification factor that the Oracle can check (`tlsn`, `gps`, `nonce`, `timestamp`, `oracle`, `ai_check`, `c2pa`).
 
 ### OracleAnnouncement
 
@@ -99,4 +99,4 @@ The announcement is self-reported. It tells you what an Oracle *claims* to suppo
 Requesters SHOULD:
 - Verify Oracle pubkeys against a trusted whitelist for high-value queries.
 - Start with the built-in Oracle and add third-party Oracles incrementally.
-- Use threshold Oracle (Spec 04) to distribute trust across multiple independent Oracles.
+- Use a threshold Oracle group (see [`packages/cashu-frost-oracle/SPEC.md`](../packages/cashu-frost-oracle/SPEC.md)) to distribute trust across multiple independent Oracles.

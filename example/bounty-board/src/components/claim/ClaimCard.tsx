@@ -85,5 +85,3 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
   );
 }
 
-// Re-export for backward compat
-export { FlightCard as ClaimCard };

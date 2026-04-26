@@ -254,7 +254,8 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       oracleSignature = state.dualKeyStore.sign(marketId, swapOutcome, message);
     }
 
-    // Also handle HTLC preimage (backward compat)
+    // Also resolve the HTLC preimage side so callers that settle through the
+    // HTLC redemption flow (rather than the FROST signature) receive the secret.
     const htlcResult = resolveMarketDual(marketId, outcome, state.dualPreimageStore);
     if (htlcResult) {
       preimage = htlcResult.preimage;
