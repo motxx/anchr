@@ -144,6 +144,58 @@ describe("Market API: CRUD", () => {
     expect(json.htlc_hash_no).toBeTruthy();
   });
 
+  test("POST /markets publishes to Nostr when relays + identity configured", async () => {
+    const calls: Array<{ marketId: string; pubkey: string; relays: string[] }> = [];
+    const state = createMarketState({
+      nostrIdentity: {
+        secretKey: new Uint8Array(32).fill(7),
+        pubkey: "f".repeat(64),
+      },
+      nostrRelays: ["ws://relay-a.test", "ws://relay-b.test"],
+      publishMarket: async (market, identity, relays) => {
+        calls.push({ marketId: market.id, pubkey: identity.pubkey, relays });
+        return `evt_${market.id}`;
+      },
+    });
+    const { app: localApp } = makeTestApp(state);
+    const created = await createMarket(localApp);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.marketId).toBe(created.id);
+    expect(calls[0]!.relays).toEqual(["ws://relay-a.test", "ws://relay-b.test"]);
+    // The market record is updated with the published event id, surfaced via /:id detail.
+    const detail = await localApp.request(`${BASE}/markets/${created.id}`);
+    const detailJson = await detail.json() as { nostr_event_id?: string };
+    expect(detailJson.nostr_event_id).toBe(`evt_${created.id}`);
+  });
+
+  test("POST /markets does NOT publish to Nostr when relays absent", async () => {
+    let called = false;
+    const state = createMarketState({
+      // identity present, but no relays — feature disabled.
+      nostrIdentity: { secretKey: new Uint8Array(32).fill(1), pubkey: "a".repeat(64) },
+      nostrRelays: [],
+      publishMarket: async () => { called = true; return "should_not_appear"; },
+    });
+    const { app: localApp } = makeTestApp(state);
+    await createMarket(localApp);
+    expect(called).toBe(false);
+  });
+
+  test("POST /markets succeeds even when Nostr publish throws", async () => {
+    const state = createMarketState({
+      nostrIdentity: { secretKey: new Uint8Array(32).fill(2), pubkey: "b".repeat(64) },
+      nostrRelays: ["ws://relay.test"],
+      publishMarket: async () => { throw new Error("relay unreachable"); },
+    });
+    const { app: localApp } = makeTestApp(state);
+    const created = await createMarket(localApp);
+    expect(created.id).toMatch(/^mkt_/);
+    // nostr_event_id stays empty when publish fails.
+    const detail = await localApp.request(`${BASE}/markets/${created.id}`);
+    const detailJson = await detail.json() as { nostr_event_id?: string };
+    expect(detailJson.nostr_event_id ?? "").toBe("");
+  });
+
   test("GET /markets lists all markets", async () => {
     await createMarket(app, { title: "Market A" });
     await createMarket(app, { title: "Market B" });
