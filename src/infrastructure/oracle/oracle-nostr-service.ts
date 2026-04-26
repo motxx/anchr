@@ -26,7 +26,7 @@ import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
 import { coordinateSigning } from "../../../packages/cashu-frost-oracle/src/signing-coordinator.ts";
 import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
 import {
   type WatchedQuery,
   buildQueryFromPayload,

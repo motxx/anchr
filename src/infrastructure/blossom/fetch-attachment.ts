@@ -5,7 +5,7 @@
  * using ephemeral key material passed as a parameter (E2E encryption).
  */
 
-import type { AttachmentRef, BlossomKeyMaterial } from "../../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types.ts";
 import { downloadFromBlossom } from "./client.ts";
 
 /**

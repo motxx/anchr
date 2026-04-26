@@ -1,11 +1,11 @@
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type {
   BlossomKeyMap,
   OracleAttestationRecord,
   Query,
   QueryResult,
   VerificationDetail,
-} from "../../packages/core-domain/src/types.ts";
+} from "../domain/types.ts";
 
 export interface QuorumVerificationResult {
   passed: boolean;

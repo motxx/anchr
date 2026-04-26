@@ -9,7 +9,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events.ts";
-import { type EscrowType, type VerificationFactor, VERIFICATION_FACTORS } from "../../../packages/core-domain/src/types.ts";
+import { type EscrowType, type VerificationFactor, VERIFICATION_FACTORS } from "../../domain/types.ts";
 import { isRecord, optionalNumber, optionalString, requireNumber, requireString } from "../lib/runtime-types.ts";
 
 const VERIFICATION_FACTOR_VALUES = new Set<string>(VERIFICATION_FACTORS);

@@ -2,7 +2,7 @@
  * Shared test factories for domain objects.
  */
 
-import type { Query } from "../../packages/core-domain/src/types.ts";
+import type { Query } from "../domain/types.ts";
 
 let queryCounter = 0;
 

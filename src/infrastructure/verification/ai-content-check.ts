@@ -13,7 +13,7 @@
 import { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
+import type { AttachmentRef } from "../../domain/types.ts";
 
 export type { ContentCheckResult } from "../../../packages/photo-bounty/src/ai-content-check.ts";
 export { createAiContentChecker } from "../../../packages/photo-bounty/src/ai-content-check.ts";

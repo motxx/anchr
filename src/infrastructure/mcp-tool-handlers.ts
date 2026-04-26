@@ -3,7 +3,7 @@
  */
 
 import type { QueryInput, QueryResult } from "../application/query-service.ts";
-import type { AttachmentRef, RequesterMeta, VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, RequesterMeta, VerificationFactor, TlsnCondition } from "../domain/types.ts";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
 
 function normalizeMcpQueryResult(raw: Record<string, unknown>): QueryResult {

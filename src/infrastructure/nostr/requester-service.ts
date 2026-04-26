@@ -25,7 +25,7 @@ import {
 } from "./events.ts";
 import { publishEvent, subscribeToFeedback } from "./client.ts";
 import type { EscrowProvider } from "../../application/escrow-port.ts";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types.ts";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "requester"]);

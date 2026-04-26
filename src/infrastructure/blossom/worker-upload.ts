@@ -12,7 +12,7 @@
 import { Buffer } from "node:buffer";
 import { stripExif } from "../exif-strip.ts";
 import { generateEphemeralIdentity } from "../nostr/identity.ts";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
+import type { AttachmentRef } from "../../domain/types.ts";
 import { getBlossomConfig, uploadToBlossom, type BlossomUploadResult } from "./client.ts";
 
 export interface WorkerUploadOptions {

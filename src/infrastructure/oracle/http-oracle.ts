@@ -3,7 +3,7 @@
  * as an Oracle interface so it can be used seamlessly in the registry.
  */
 
-import type { BlossomKeyMap, Query, QueryResult } from "../../../packages/core-domain/src/types.ts";
+import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types.ts";
 import type { Oracle, OracleAttestation, OracleInfo } from "./types.ts";
 import {
   isRecord,

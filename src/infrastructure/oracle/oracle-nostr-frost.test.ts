@@ -11,7 +11,7 @@ import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-s
 import { createFrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator.ts";
 import type { ThresholdOracleConfig } from "../../../packages/cashu-frost-oracle/src/types.ts";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config.ts";
-import type { AttachmentRef } from "../../../packages/core-domain/src/types.ts";
+import type { AttachmentRef } from "../../domain/types.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

@@ -4,7 +4,7 @@ import { generateEphemeralIdentity } from "../nostr/identity.ts";
 import { buildOracleAnnouncementEvent } from "../nostr/event-builders.ts";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
-import type { OracleInfo } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { OracleInfo } from "../../domain/oracle-types.ts";
 
 const FULL_ORACLE_INFO: OracleInfo = {
   id: "test-oracle",

@@ -2,7 +2,7 @@
  * TLSNotary application-layer types — canonical location for tlsn-toolkit
  * and any host that wires it in.
  *
- * Previously lived in `@anchr/core-domain/types`, but TLSNotary is the
+ * Previously lived in the host shared domain module, but TLSNotary is the
  * package's concern and host servers should import from here.
  */
 

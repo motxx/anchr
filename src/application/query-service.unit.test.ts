@@ -5,12 +5,12 @@ import { createPreimageStore } from "../../packages/core-cashu/src/preimage-stor
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle/registry.ts";
-import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types.ts";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import {
   createQueryService,
   createQueryStore,
 } from "./query-service.ts";
-import type { Query, QueryResult } from "../../packages/core-domain/src/types.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./escrow-port.ts";
 import { createIntegrityStore } from "../../packages/photo-bounty/src/integrity-store.ts";
 

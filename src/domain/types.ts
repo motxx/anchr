@@ -39,15 +39,15 @@ export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
 
-// TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. core-domain
-// re-exports them so host code can keep the single import surface.
+// TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
+// domain re-exports them so existing call sites keep the single import surface.
 import type {
   TlsnAttestation,
   TlsnCondition,
   TlsnEncryptedContext,
   TlsnRequirement,
   TlsnVerifiedData,
-} from "../../tlsn-toolkit/src/tlsn-types.ts";
+} from "../../packages/tlsn-toolkit/src/tlsn-types.ts";
 export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
 
 export interface QueryInput {

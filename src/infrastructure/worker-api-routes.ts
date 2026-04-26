@@ -19,7 +19,7 @@ import {
 } from "./worker-api-presenters.ts";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
 import type { PreimageStore } from "../../packages/core-cashu/src/preimage-store.ts";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
 
 export interface RouteContext {
   svc: QueryService;

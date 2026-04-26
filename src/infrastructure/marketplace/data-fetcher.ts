@@ -5,7 +5,7 @@
  * Caches results per listing_id within max_age_seconds.
  */
 
-import type { TlsnRequirement, TlsnAttestation } from "../../../packages/core-domain/src/types.ts";
+import type { TlsnRequirement, TlsnAttestation } from "../../domain/types.ts";
 import { validateTlsn, type TlsnValidationResult } from "../../../packages/tlsn-toolkit/src/tlsn-validation.ts";
 import { validateAttachmentUri } from "../url-validation.ts";
 

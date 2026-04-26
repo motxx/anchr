@@ -1,4 +1,4 @@
-import type { Query } from "../../packages/core-domain/src/types.ts";
+import type { Query } from "./types.ts";
 
 // --- QueryStore interface ---
 

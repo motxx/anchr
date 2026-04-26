@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { verify, _setValidateTlsnForTest } from "./verifier.ts";
 import { storeIntegrity, clearIntegrityStore } from "../../../packages/photo-bounty/src/integrity-store.ts";
-import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../../../packages/core-domain/src/types.ts";
+import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../../domain/types.ts";
 import type { TlsnValidationResult } from "../../../packages/tlsn-toolkit/src/tlsn-validation.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 

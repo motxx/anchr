@@ -6,7 +6,7 @@ import { validateExif } from "../../packages/photo-bounty/src/exif-validation.ts
 import { storeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
 import type { ProofModeIntegrity } from "../../packages/photo-bounty/src/integrity-store.ts";
 import { parseProofModeZip } from "../../packages/photo-bounty/src/proofmode-validation.ts";
-import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../../packages/core-domain/src/types.ts";
+import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types.ts";
 import {
   detectZip,
   inferMimeType,

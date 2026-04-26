@@ -7,7 +7,7 @@ import {
   toOracleAttestation,
   ANCHR_ORACLE_ATTESTATION,
 } from "./oracle-attestation.ts";
-import type { OracleAttestation } from "../../../packages/core-domain/src/oracle-types.ts";
+import type { OracleAttestation } from "../../domain/oracle-types.ts";
 
 const oracleIdentity = generateEphemeralIdentity();
 

@@ -4,7 +4,7 @@ import { apiFetch } from "./api-config.ts";
 import { Button } from "./components/ui/button.tsx";
 import { Input } from "./components/ui/input.tsx";
 import { cn } from "./lib/utils.ts";
-import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../domain/types";
+import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial } from "../domain/types.ts";
 
 interface UploadResponse {
   ok: boolean;

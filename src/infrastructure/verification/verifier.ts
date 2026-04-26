@@ -14,7 +14,7 @@ import type {
   QueryResult,
   TlsnVerifiedData,
   VerificationDetail,
-} from "../../../packages/core-domain/src/types.ts";
+} from "../../domain/types.ts";
 /** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 

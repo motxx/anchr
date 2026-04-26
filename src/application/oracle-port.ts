@@ -5,7 +5,7 @@
  * implementation in infrastructure.
  */
 
-import type { Oracle, OracleInfo } from "../../packages/core-domain/src/oracle-types.ts";
+import type { Oracle, OracleInfo } from "../domain/oracle-types.ts";
 
 export interface OracleRegistry {
   get(id: string): Oracle | null;

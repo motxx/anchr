@@ -24,8 +24,8 @@ import type {
   QueryStatus,
   SubmissionMeta,
   QuoteInfo,
-} from "../../packages/core-domain/src/types.ts";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types.ts";
+} from "../domain/types.ts";
+import { DEFAULT_VERIFICATION_FACTORS } from "../domain/types.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
 import { isCancellable, isExpirable } from "../domain/query-transitions.ts";
 import type {
