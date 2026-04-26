@@ -297,6 +297,48 @@ example/                        ← integration tests + 独自 deno.json
 
 このパターンは **TypeScript / Deno project の段階的 monorepo split のテンプレート**として再利用可能。
 
+### 2026-04-26（完了）— 全 7 packages 抽出完了 + shim 削除
+
+追加抽出（Phase 5）：
+
+| Package | 内容 | 用途 |
+|---|---|---|
+| `core-runtime` | Bun↔Deno runtime compat (spawn, fs, which, moduleDir) | 全 packages の cross-boundary 解消 |
+| `core-domain` | Query/Worker/Oracle 型, AttachmentRef, TlsnRequirement, … | photo-bounty, tlsn-toolkit, cashu-frost-oracle の cross-boundary 解消 |
+| `core-cashu` | HTLC escrow + preimage store | cashu-conditional-swap の cross-boundary 解消 |
+
+最終クリーンアップ：
+
+- 全 backward-compat shim（src/infrastructure/cashu/{escrow,escrow-helpers,preimage-store}.ts、src/infrastructure/preimage/preimage-store.ts）削除
+- 22 consumer を packages 直接 import に書き換え
+- `MIGRATION DEBT` コメント全削除（`core-cashu` の 2 つは「Host injection point」「Port interfaces」として再ラベル）
+
+### 最終状態：7 packages 完全独立
+
+```
+packages/
+├── core-runtime/              ✅ 5 files / ~155 lines
+├── core-domain/               ✅ 2 files / ~350 lines
+├── core-cashu/                ✅ 4 files / ~636 lines (escrow + helpers + preimage-store + test)
+├── tlsn-toolkit/              ✅ 5 files / ~700 lines
+├── photo-bounty/              ✅ 12 files / ~1,200 lines
+├── cashu-frost-oracle/        ✅ 10 files / ~1,200 lines
+├── cashu-conditional-swap/    ✅ 9 files / ~1,500 lines
+└── sdk/                        既存 anchr-sdk
+```
+
+**残った host 依存（intentional, not debt）**：
+- `core-cashu` → `src/infrastructure/cashu/wallet` (Cashu mint config injection)
+- `core-cashu` → `src/application/preimage-port` (Port interfaces defined by host)
+
+**最終テスト結果**：
+- `deno task test:ci`：250 passed / 861 steps / 0 failed
+- `deno task test:example`：63 passed / 114 steps / 0 failed
+- `deno task lint:arch`：✓ no violations
+- 11 commits in this session
+
+**Refactor 完了。**
+
 
 ### Migration pattern（記録）
 

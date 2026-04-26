@@ -1,16 +1,33 @@
 # core-domain
 
-Shared domain type definitions: `Query`, `Worker`, `Oracle`, `AttestationFactor`, etc.
+Shared domain type definitions used across Anchr packages and the host server.
 
-## Status
+## Scope
 
-🚧 **WIP — extracted from anchr monorepo (2026-04-26)**
+- `Query`, `QueryResult`, `QueryStatus`, `QueryInput`, `PaymentStatus`, …
+- `AttachmentRef`, `BlossomKeyMap`, `BlossomKeyMaterial`
+- `TlsnRequirement`, `TlsnAttestation`, `TlsnCondition`, `TlsnVerifiedData`
+- `VerificationFactor`, `VerificationDetail`
+- `BountyInfo`, `QuoteInfo`, `RequesterMeta`, `SubmissionMeta`
+- `HtlcInfo`, `EscrowInfo`, `EscrowType`
+- `QuorumConfig`, `GpsCoord`
+- `Oracle`, `OracleAttestation`, `ThresholdOracleConfig` (in `oracle-types`)
+
+This package is intentionally type-only — no runtime code, just shared shapes.
 
 ## Public API
 
 ```typescript
-import type { Query, QueryResult, AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, TlsnRequirement, TlsnAttestation, ... } from "core-domain/types";
-import type { ThresholdOracleConfig, OracleAttestation, ... } from "core-domain/oracle-types";
+import type {
+  Query, QueryResult, QueryStatus, AttachmentRef,
+  BlossomKeyMap, BlossomKeyMaterial,
+  TlsnRequirement, TlsnAttestation, TlsnVerifiedData,
+  VerificationFactor, VerificationDetail,
+  BountyInfo, QuoteInfo, GpsCoord, EscrowInfo,
+} from "core-domain/types";
+import type {
+  Oracle, OracleAttestation, ThresholdOracleConfig,
+} from "core-domain/oracle-types";
 ```
 
 ## License
