@@ -17,13 +17,13 @@ import {
   getEncodedToken,
 } from "@cashu/cashu-ts";
 // MIGRATION DEBT: cashu/escrow + escrow-helpers will move to a core-cashu package.
-import type { EscrowToken } from "../../../src/infrastructure/cashu/escrow.ts";
+import type { EscrowToken } from "../../core-cashu/src/escrow";
 import type { FrostConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
   getWalletAndConfig,
   encodeProofs,
   loadAndSend,
-} from "../../../src/infrastructure/cashu/escrow-helpers.ts";
+} from "../../core-cashu/src/escrow-helpers";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";

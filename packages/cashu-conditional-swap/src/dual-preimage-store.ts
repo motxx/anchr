@@ -11,7 +11,7 @@ import {
   createPreimageStore,
   type PreimageStore,
   type PreimageEntry,
-} from "../../../src/infrastructure/preimage/preimage-store.ts";
+} from "../../core-cashu/src/preimage-store";
 
 export interface DualPreimageEntry {
   swap_id: string;
