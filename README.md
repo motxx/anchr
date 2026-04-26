@@ -160,6 +160,18 @@ Current baseline: **313 tests / 975 steps / 0 failed** (250 host + 63 examples).
 
 </details>
 
+## Polyrepo migration
+
+Each package in `packages/` is **polyrepo-ready** — it has its own `deno.json` with `name`, `version`, `exports`, scoped imports, and tasks. Inter-package imports use package names (`@anchr/core-runtime`, `@anchr/core-domain/types`, …) resolved via the Deno workspace declared in the root `deno.json`.
+
+To split any package into its own repo:
+
+1. Move `packages/<name>/` to a fresh repository
+2. In its `deno.json`, replace `"@anchr/<dep>": "../<dep>/src/..."` with `"@anchr/<dep>": "jsr:@anchr/<dep>@^0.1"`
+3. Publish with `deno publish`
+
+Each package can be tested standalone: `cd packages/<name> && deno task test`. The combined `test:ci` exercises the same code via the workspace.
+
 ## Specifications
 
 Protocol specs in [`specs/`](specs/). Released under CC0 (public domain). Anyone may implement them.
