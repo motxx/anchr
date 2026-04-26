@@ -8,8 +8,9 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
+// Port interfaces are defined by the host application (src/application/preimage-port)
+// to keep this package agnostic of host-specific abstractions.
 import type { PreimageEntry, PreimageStore } from "../../../src/application/preimage-port";
-// Re-export port interfaces for backward compatibility
 export type { PreimageEntry, PreimageStore } from "../../../src/application/preimage-port";
 
 function createPreimage(): { preimage: string; hash: string } {

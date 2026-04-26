@@ -14,13 +14,13 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "./infrastructure/cashu/preimage-store";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store";
 import { createQueryService } from "./application/query-service";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
   buildEscrowP2PKOptions,
-} from "./infrastructure/cashu/escrow";
+} from "../packages/core-cashu/src/escrow";
 import {
   makeFakeToken,
   makeMockOracle,

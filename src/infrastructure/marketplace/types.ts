@@ -9,7 +9,7 @@
 import type { TlsnRequirement } from "../../../packages/core-domain/src/types";
 import type { MiddlewareHandler } from "hono";
 import type { ListingStore } from "./listing-store";
-import type { PreimageStore } from "../cashu/preimage-store";
+import type { PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
 
 // --- Data Listing ---
 

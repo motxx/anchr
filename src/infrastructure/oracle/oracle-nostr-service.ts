@@ -20,7 +20,7 @@ import {
   subscribeToFeedback,
   subscribeToResponses,
 } from "../nostr/client";
-import { createPreimageStore, type PreimageStore } from "../preimage/preimage-store";
+import { createPreimageStore, type PreimageStore } from "../../../packages/core-cashu/src/preimage-store";
 import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
 import type { FrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";

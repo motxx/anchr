@@ -4,7 +4,8 @@
 
 import type { Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
-// MIGRATION DEBT: wallet.ts stays in src/infrastructure/cashu/ for now (depends on host integrations).
+// Host injection point: Cashu wallet bindings are wired by the host application
+// (src/infrastructure/cashu/wallet) since they read host config (mint URL, etc.).
 import { getCashuWallet, getCashuConfig } from "../../../src/infrastructure/cashu/wallet";
 
 export async function getWalletAndConfig() {

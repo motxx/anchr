@@ -7,7 +7,7 @@ import {
 } from "./oracle-nostr-service";
 import type { OracleNostrServiceConfig } from "./oracle-nostr-service";
 import { generateEphemeralIdentity } from "../nostr/identity";
-import { createPreimageStore } from "../preimage/preimage-store";
+import { createPreimageStore } from "../../../packages/core-cashu/src/preimage-store";
 import { createFrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
 import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";

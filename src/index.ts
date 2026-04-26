@@ -48,7 +48,7 @@ export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-p
 // --- Application: Preimage port ---
 export type { PreimageStore, PreimageEntry } from "./application/preimage-port";
 // --- Infrastructure: Preimage store ---
-export { createPreimageStore, createPersistentPreimageStore } from "./infrastructure/preimage/preimage-store";
+export { createPreimageStore, createPersistentPreimageStore } from "../packages/core-cashu/src/preimage-store";
 
 // --- Application: Oracle port ---
 export type { OracleRegistry } from "./application/oracle-port";

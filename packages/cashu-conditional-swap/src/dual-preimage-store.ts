@@ -6,7 +6,6 @@
  * and the losing one is permanently deleted.
  */
 
-// MIGRATION DEBT: preimage/preimage-store will move to a core-cashu package.
 import {
   createPreimageStore,
   type PreimageStore,

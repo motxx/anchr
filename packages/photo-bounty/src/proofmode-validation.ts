@@ -14,7 +14,6 @@
 import { Buffer } from "node:buffer";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-// MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
 import { spawn } from "../../core-runtime/src/mod.ts";
 
 export interface ProofModeData {

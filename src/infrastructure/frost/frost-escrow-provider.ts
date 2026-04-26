@@ -27,7 +27,7 @@ import {
   loadAndSend,
   computeNetAmount,
   sumProofAmounts,
-} from "../cashu/escrow-helpers";
+} from "../../../packages/core-cashu/src/escrow-helpers";
 import { verifyToken } from "../cashu/wallet";
 
 export interface FrostEscrowConfig {

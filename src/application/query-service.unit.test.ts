@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore } from "../infrastructure/cashu/preimage-store";
+import { createPreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle/registry";
@@ -608,7 +608,7 @@ describe("submitHtlcResult", () => {
   }
 
   /** Create htlcInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../infrastructure/cashu/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("../../packages/core-cashu/src/preimage-store").createPreimageStore>) {
     const entry = preimageStore.create();
     return {
       htlcInfo: {

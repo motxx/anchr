@@ -16,7 +16,6 @@ import {
   type P2PKOptions,
   getEncodedToken,
 } from "@cashu/cashu-ts";
-// MIGRATION DEBT: cashu/escrow + escrow-helpers will move to a core-cashu package.
 import type { EscrowToken } from "../../core-cashu/src/escrow";
 import type { FrostConditionalSwapDef } from "./conditional-swap-types.ts";
 import {

@@ -6,7 +6,7 @@
 
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "../infrastructure/oracle/registry";
-import { createPreimageStore, type PreimageStore } from "../infrastructure/cashu/preimage-store";
+import { createPreimageStore, type PreimageStore } from "../../packages/core-cashu/src/preimage-store";
 import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
 import type { EscrowProvider } from "../application/escrow-port";
 import { createQueryService, createQueryStore } from "../application/query-service";
