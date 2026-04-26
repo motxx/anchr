@@ -244,6 +244,10 @@ Use MCP tools to automate verification:
 
 Since file selection in the simulator is limited, use the API to test the full submit + bounty release flow.
 
+> **Endpoint note:** the `/queries/:id/submit` endpoint returns `410 Deprecated`.
+> All submissions go through `POST /queries/:id/result` and require a non-empty
+> `worker_pubkey` (the schema is in `src/infrastructure/worker-api-schemas.ts`).
+
 ### 5a. Verify GPS-required query rejects empty submission
 
 ```bash
@@ -254,9 +258,10 @@ print(qs[0]['id'] if qs else '')
 ")
 
 # Submit without attachments — should be REJECTED
-curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/result" \
   -H "Content-Type: application/json" \
-  -d '{"gps": {"lat": 35.6595, "lon": 139.7004}, "notes": "text only attempt"}'
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d '{"worker_pubkey":"cli_worker","attachments":[],"gps":{"lat":35.6595,"lon":139.7004},"notes":"text only attempt"}'
 ```
 
 **Expected:** `ok: false`, failure: "no media evidence provided — photos are required when GPS or nonce verification is enabled"
@@ -271,9 +276,10 @@ print(qs[0]['id'] if qs else '')
 ")
 
 # Submit a text result — should PASS
-curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/result" \
   -H "Content-Type: application/json" \
-  -d '{"gps": {"lat": 35.6595, "lon": 139.7004}, "notes": "混雑してます"}'
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d '{"worker_pubkey":"cli_worker","attachments":[],"gps":{"lat":35.6595,"lon":139.7004},"notes":"混雑してます"}'
 ```
 
 **Expected:** `ok: true`, `payment_status: "released"`, `cashu_token: "cashuB..."` returned
@@ -352,15 +358,15 @@ The automated E2E tests (`deno task test:regtest`) cover 3 test suites with 30 t
 ```bash
 # Cashu bounty lifecycle only
 CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
-  deno test e2e/regtest-cashu.test.ts --allow-all --no-check
+  deno test e2e/regtest-cashu.test.ts --allow-all
 
 # HTLC trustless properties only
 CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
-  deno test e2e/regtest-htlc-trustless.test.ts --allow-all --no-check
+  deno test e2e/regtest-htlc-trustless.test.ts --allow-all
 
 # HTLC attack vectors only
 CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
-  deno test e2e/regtest-htlc-attacks.test.ts --allow-all --no-check
+  deno test e2e/regtest-htlc-attacks.test.ts --allow-all
 ```
 
 Expected: ~1m12s total, 6 passed (30 steps), 0 failed, 0 leaks.
