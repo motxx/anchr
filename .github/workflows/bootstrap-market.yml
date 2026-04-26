@@ -15,11 +15,15 @@ on:
   workflow_dispatch:
     inputs:
       region:
-        description: "Fly region for the app + volume (default nrt)"
+        description: "Fly region for the app + volume"
         required: false
-        default: "nrt"
+        default: "hkg"
       rotate_keys:
         description: "Re-run DKG and overwrite existing secrets (true/false)"
+        required: false
+        default: "false"
+      wipe_volume:
+        description: "Destroy any existing frost_data volume before (re)creating — use when an old volume is stuck on a capacity-constrained host"
         required: false
         default: "false"
 
@@ -101,6 +105,20 @@ jobs:
           else
             flyctl apps create anchr-market --org personal
           fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Wipe existing frost_data volume(s)
+        if: ${{ inputs.wipe_volume == 'true' }}
+        run: |
+          # Destroy every frost_data volume across all regions. Used when
+          # the previous deploy got stuck on a capacity-constrained host
+          # and we want to move regions cleanly.
+          for vid in $(flyctl volumes list --app anchr-market --json | \
+                       jq -r '.[] | select(.name=="frost_data") | .id'); do
+            echo "destroying volume $vid"
+            flyctl volumes destroy "$vid" --app anchr-market --yes
+          done
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
 

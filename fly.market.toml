@@ -1,5 +1,5 @@
 app = "anchr-market"
-primary_region = "nrt"
+primary_region = "hkg"
 
 [build]
   dockerfile = "example/prediction-market/Dockerfile"
