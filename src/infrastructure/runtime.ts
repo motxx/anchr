@@ -7,6 +7,9 @@ import { createOracleRegistry } from "./oracle/registry";
 import { normalizeQueryResult } from "./attachments";
 import { publishQueryToRelay } from "./nostr/relay-publish";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "scheduler"]);
+
 export interface ReferenceRuntime {
   stopScheduler(): void;
 }
@@ -25,16 +28,16 @@ export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
   const scheduler = setInterval(async () => {
     const expired = expireQueries();
     if (expired > 0) {
-      console.error(`[scheduler] Expired ${expired} query(s)`);
+      log.error(`Expired ${expired} query(s)`);
     }
     const purged = await purgeExpiredQueries();
     if (purged > 0) {
-      console.error(`[scheduler] Purged ${purged} expired query(s) and their data`);
+      log.error(`Purged ${purged} expired query(s) and their data`);
     }
   }, config.querySweepIntervalMs);
 
   startReferenceApp().catch((err: unknown) =>
-    console.error("[reference-app] Failed to start:", err)
+    log.error("Failed to start:", err)
   );
 
   await startMcpServer();

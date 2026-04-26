@@ -21,6 +21,9 @@ import {
   handleMarketplaceSearchListings,
 } from "./mcp-marketplace-handlers";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "mcp-server"]);
+
 export async function startMcpServer() {
   const server = new McpServer({
     name: "anchr",
@@ -168,5 +171,5 @@ export async function startMcpServer() {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[mcp-server] Connected via stdio");
+  log.error("Connected via stdio");
 }

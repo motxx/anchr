@@ -21,6 +21,9 @@ import {
 import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes";
 import { createListingStore, type ListingStore } from "./marketplace/listing-store";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "security"]);
+
 export interface WorkerApiDeps {
   queryService?: QueryService;
   oracleRegistry?: OracleRegistry;
@@ -59,7 +62,7 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
     if (Deno.env.get("NODE_ENV") === "production") {
       return c.json({ error: "Server misconfigured: no API keys set" }, 503);
     }
-    console.error("[security] WARNING: No API keys configured — write endpoints are unauthenticated");
+    log.error("WARNING: No API keys configured — write endpoints are unauthenticated");
     return next();
   }
 
@@ -90,7 +93,7 @@ async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
   });
   await proc.exited;
   if (proc.exitCode !== 0) {
-    console.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
+    log.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
   }
 }
 
@@ -114,7 +117,7 @@ export function buildWorkerApiApp(deps?: WorkerApiDeps) {
 
   const corsOrigin = Deno.env.get("CORS_ORIGIN");
   if (!corsOrigin && Deno.env.get("NODE_ENV") === "production") {
-    console.error("[security] WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only");
+    log.error("WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only");
   }
   app.use("*", cors({
     origin: corsOrigin || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),

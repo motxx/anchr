@@ -13,6 +13,9 @@ import { join } from "node:path";
 import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
 import type { AttachmentRef, BlossomKeyMap, BlossomKeyMaterial, Query, QueryResult } from "@anchr/core-domain/types";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "ai-content-check"]);
+
 export interface ContentCheckResult {
   passed: boolean;
   reason: string;
@@ -221,7 +224,7 @@ export function createAiContentChecker(deps: AiContentCheckDeps) {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[ai-content-check] API error, skipping:", message);
+      log.error("API error, skipping:", message);
       return null;
     }
   };

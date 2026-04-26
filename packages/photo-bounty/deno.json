@@ -12,8 +12,10 @@
   },
   "imports": {
     "@anchr/core-runtime": "../core-runtime/src/mod.ts",
+    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
     "@anchr/core-domain/types": "../core-domain/src/types.ts",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",

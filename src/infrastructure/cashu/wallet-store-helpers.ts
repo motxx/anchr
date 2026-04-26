@@ -5,6 +5,9 @@
 import type { Proof } from "@cashu/cashu-ts";
 import { getCashuWallet } from "../../../packages/core-cashu/src/wallet";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "wallet"]);
+
 export type WalletRole = "requester" | "worker";
 
 export interface WalletData {
@@ -73,12 +76,11 @@ export async function pruneSpentProofs(
     );
     if (unspent.length < data.confirmed.length) {
       const removed = data.confirmed.length - unspent.length;
-      console.error(`[wallet] Pruned ${removed} spent proof(s) from ${role}:${pubkey}`);
+      log.error(`Pruned ${removed} spent proof(s) from ${role}:${pubkey}`);
       data.confirmed = unspent;
     }
   } catch (err) {
-    console.error(
-      `[wallet] Mint verification failed for ${role}:${pubkey}:`,
+    log.error(`Mint verification failed for ${role}:${pubkey}:`,
       err instanceof Error ? err.message : err,
     );
   }

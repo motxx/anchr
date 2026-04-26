@@ -17,6 +17,9 @@ import { join } from "node:path";
 import { moduleDir, which, writeFile, spawn } from "@anchr/core-runtime";
 import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "@anchr/core-domain/types";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "tlsn"]);
+
 // --- Proof replay protection ---
 // Stores SHA-256 hashes of previously accepted presentations to prevent reuse.
 const seenPresentations = new Set<string>();
@@ -72,7 +75,7 @@ function findTlsnVerifier(): string | null {
     try {
       if (statSync(p).isFile()) {
         tlsnVerifierPath = p;
-        console.error(`[tlsn] Found tlsn-verifier at ${p}`);
+        log.error(`Found tlsn-verifier at ${p}`);
         return tlsnVerifierPath;
       }
     } catch { /* not found */ }
@@ -81,7 +84,7 @@ function findTlsnVerifier(): string | null {
   // Fall back to PATH
   tlsnVerifierPath = which("tlsn-verifier");
   if (tlsnVerifierPath) {
-    console.error(`[tlsn] Found tlsn-verifier at ${tlsnVerifierPath}`);
+    log.error(`Found tlsn-verifier at ${tlsnVerifierPath}`);
   }
   return tlsnVerifierPath;
 }

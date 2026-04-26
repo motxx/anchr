@@ -11,6 +11,9 @@ import { verify } from "../verification/verifier.ts";
 import type { Query, QueryResult, BlossomKeyMap } from "../../../packages/core-domain/src/types.ts";
 import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "../../../packages/cashu-frost-oracle/src/frost-cli";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost-signer"]);
+
 export interface FrostSignerConfig {
   /** This signer's DKG index (1-based). */
   signerIndex: number;
@@ -110,7 +113,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       // Step 1: Independent verification using existing oracle verify
       const detail = await verify(query, result, blossomKeys);
       if (!detail.passed) {
-        console.error(`[frost-signer] Verification failed for ${query.id}: ${detail.failures.join(", ")}`);
+        log.error(`Verification failed for ${query.id}: ${detail.failures.join(", ")}`);
         return null; // Refuse to sign
       }
 
@@ -128,7 +131,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       // Step 3: Round 2 — produce signature share
       const nonces = pendingNonces;
       if (!nonces) {
-        console.error(`[frost-signer] No pending nonces for round 2`);
+        log.error(`No pending nonces for round 2`);
         return null;
       }
 

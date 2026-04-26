@@ -10,6 +10,9 @@ import { isNostrEnabled, publishEvent } from "./client";
 import { buildQueryRequestEvent } from "./event-builders";
 import { generateEphemeralIdentity } from "./identity";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "relay"]);
+
 /**
  * Publish a newly created query to configured Nostr relays.
  * Designed to be used as a QueryHooks.onCreated callback.
@@ -34,17 +37,17 @@ export function publishQueryToRelay(query: Query): void {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const result = await publishEvent(event);
       if (result.successes.length > 0) {
-        console.error(`[relay] Query ${query.id} published to ${result.successes.length} relay(s)`);
+        log.error(`Query ${query.id} published to ${result.successes.length} relay(s)`);
         return;
       }
       if (attempt < MAX_RETRIES) {
         const delaySec = attempt * 2;
-        console.error(`[relay] Query ${query.id} publish failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
+        log.error(`Query ${query.id} publish failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
         await new Promise((r) => setTimeout(r, delaySec * 1000));
       }
     }
-    console.error(`[relay] Query ${query.id} failed to publish after ${MAX_RETRIES} attempts`);
+    log.error(`Query ${query.id} failed to publish after ${MAX_RETRIES} attempts`);
   })().catch((err) => {
-    console.error("[relay] Failed to publish query:", err);
+    log.error("Failed to publish query:", err);
   });
 }

@@ -7,7 +7,11 @@
     "./fs": "./src/fs.ts",
     "./process": "./src/process.ts",
     "./which": "./src/which.ts",
-    "./env": "./src/env.ts"
+    "./env": "./src/env.ts",
+    "./logger": "./src/logger.ts"
+  },
+  "imports": {
+    "@logtape/logtape": "jsr:@logtape/logtape@^2"
   },
   "compilerOptions": {
     "lib": [

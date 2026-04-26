@@ -15,7 +15,8 @@
  * filter at runtime (e.g. only see `[anchr, frost, *]`).
  */
 
-import { configure, getConsoleSink, getLogger as ltGetLogger } from "@logtape/logtape";
+import { configure, getConsoleSink } from "@logtape/logtape";
+import { getLogger as sharedGetLogger, type Logger } from "@anchr/core-runtime/logger";
 
 let configured = false;
 
@@ -33,26 +34,25 @@ export async function configureLogger(): Promise<void> {
     sinks: { console: getConsoleSink() },
     loggers: [
       { category: ["anchr"], lowestLevel: level as "debug" | "info" | "warning" | "error" | "fatal", sinks: ["console"] },
-      // logtape's own meta logger — keep at warning to avoid noise
       { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
     ],
   });
   configured = true;
 }
 
+export type { Logger };
+
 /**
  * Convenience accessor. Auto-configures on first use so callers don't need
- * to remember to call `configureLogger()` themselves.
+ * to remember to call `configureLogger()` themselves. Returns a console-
+ * compatible facade so existing variadic call sites work unchanged.
  */
-export function getLogger(category: string | readonly string[]) {
+export function getLogger(category: string | readonly string[]): Logger {
   if (!configured) {
-    // Synchronously trigger configuration; the `configure` call resolves on
-    // the next microtask but we accept that the very first log line in a
-    // process may be queued behind that promise.
     void configureLogger();
   }
-  return ltGetLogger(category);
+  return sharedGetLogger(category);
 }
 
 /** Pre-built logger for the top-level "anchr" namespace. */
-export const log = ltGetLogger(["anchr"]);
+export const log: Logger = getLogger(["anchr"]);

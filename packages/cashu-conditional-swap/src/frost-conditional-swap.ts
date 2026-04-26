@@ -28,6 +28,9 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha2.js";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost-swap"]);
+
 // ---------------------------------------------------------------------------
 // P2PK option builders
 // ---------------------------------------------------------------------------
@@ -291,8 +294,7 @@ export async function createFrostSwapPairTokens(
 
     return { tokenAtoB, tokenBtoA };
   } catch (error) {
-    console.error(
-      "[frost-swap] Failed to create swap pair tokens:",
+    log.error("Failed to create swap pair tokens:",
       error instanceof Error ? error.message : error,
     );
     return null;

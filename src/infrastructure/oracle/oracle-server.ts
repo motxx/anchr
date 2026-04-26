@@ -21,6 +21,9 @@ import { createFrostCoordinator, type FrostCoordinator } from "../../../packages
 import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "oracle-server"]);
+
 // Timing-safe API key comparison following Cloudflare's recommended pattern.
 // When lengths differ, compare the input against itself to maintain constant time
 // without leaking the secret's length via response timing.
@@ -457,9 +460,9 @@ if (import.meta.main) {
       const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("../../../packages/cashu-frost-oracle/src/config.ts");
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
-      console.log(`[oracle-server] FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
+      log.info(`FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
     } catch (e) {
-      console.error(`[oracle-server] Failed to load FROST config from ${frostConfigPath}:`, e);
+      log.error(`Failed to load FROST config from ${frostConfigPath}:`, e);
     }
   }
 
@@ -473,9 +476,9 @@ if (import.meta.main) {
   });
 
   if (preimageDbPath) {
-    console.log(`[oracle-server] Preimage store persisted to ${preimageDbPath}`);
+    log.info(`Preimage store persisted to ${preimageDbPath}`);
   }
-  console.log(`[oracle-server] Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
+  log.info(`Starting oracle "${ORACLE_ID}" on port ${ORACLE_PORT}`);
 
   Deno.serve({ port: ORACLE_PORT }, app.fetch);
 }

@@ -8,6 +8,9 @@ import { normalizeQueryResult } from "./attachments";
 import { publishQueryToRelay } from "./nostr/relay-publish";
 import { createOracleRegistry } from "./oracle/registry";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "reference-app"]);
+
 export async function startReferenceApp() {
   setupServerLogCapture();
   await prepareWorkerApiAssets();
@@ -47,7 +50,7 @@ export async function startReferenceApp() {
 
   Deno.serve({ port }, app.fetch);
 
-  console.error(`[reference-app] Worker    → http://localhost:${port}`);
-  console.error(`[reference-app] Requester → http://localhost:${port}/requester`);
-  console.error(`[reference-app] Dashboard → http://localhost:${port}/dashboard`);
+  log.error(`Worker    → http://localhost:${port}`);
+  log.error(`Requester → http://localhost:${port}/requester`);
+  log.error(`Dashboard → http://localhost:${port}/dashboard`);
 }

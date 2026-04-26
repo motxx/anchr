@@ -21,6 +21,9 @@ import {
   computeNetAmount,
 } from "@anchr/core-cashu/escrow-helpers";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "cross-htlc"]);
+
 /**
  * Build P2PK options for party A's token.
  *
@@ -120,8 +123,7 @@ export async function createSwapPairTokens(
 
     return { tokenAtoB, tokenBtoA };
   } catch (error) {
-    console.error(
-      "[cross-htlc] Failed to create swap pair tokens:",
+    log.error("Failed to create swap pair tokens:",
       error instanceof Error ? error.message : error,
     );
     return null;

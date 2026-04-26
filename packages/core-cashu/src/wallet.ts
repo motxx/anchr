@@ -15,6 +15,9 @@
 
 import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "cashu"]);
+
 export interface CashuConfig {
   mintUrl: string;
 }
@@ -52,7 +55,7 @@ export async function createBountyToken(amountSats: number): Promise<{
     await wallet.loadMint();
     const mintQuote = await wallet.createMintQuote(amountSats);
     // In production, user would pay the Lightning invoice in mintQuote.request
-    console.error(`[cashu] Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
+    log.error(`Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
 
     const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
     const token = getEncodedToken({
@@ -61,7 +64,7 @@ export async function createBountyToken(amountSats: number): Promise<{
     });
     return { token, proofs };
   } catch (error) {
-    console.error("[cashu] Failed to create bounty token:", error instanceof Error ? error.message : error);
+    log.error("Failed to create bounty token:", error instanceof Error ? error.message : error);
     return null;
   }
 }
@@ -100,10 +103,10 @@ export async function verifyToken(token: string, expectedMinSats?: number): Prom
         if (spent.length > 0) {
           return { valid: false, amountSats: totalAmount, error: `${spent.length} proof(s) already spent on mint` };
         }
-        console.error(`[cashu] Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`);
+        log.error(`Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[cashu] Mint checkstate failed:`, msg);
+        log.error(`Mint checkstate failed:`, msg);
         return { valid: false, amountSats: totalAmount, error: `Mint verification failed: ${msg}` };
       }
     }

@@ -9,6 +9,9 @@ import { statSync } from "node:fs";
 import { join } from "node:path";
 import { moduleDir, which, spawn } from "@anchr/core-runtime";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "frost"]);
+
 let frostSignerPath: string | null | undefined;
 
 /** Allow tests to override the binary path. Pass `undefined` to reset to auto-detect. */
@@ -28,7 +31,7 @@ export function findFrostSigner(): string | null {
     try {
       if (statSync(p).isFile()) {
         frostSignerPath = p;
-        console.error(`[frost] Found frost-signer at ${p}`);
+        log.error(`Found frost-signer at ${p}`);
         return frostSignerPath;
       }
     } catch { /* not found */ }
@@ -36,7 +39,7 @@ export function findFrostSigner(): string | null {
 
   frostSignerPath = which("frost-signer");
   if (frostSignerPath) {
-    console.error(`[frost] Found frost-signer at ${frostSignerPath}`);
+    log.error(`Found frost-signer at ${frostSignerPath}`);
   }
   return frostSignerPath;
 }

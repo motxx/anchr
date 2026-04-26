@@ -27,6 +27,9 @@ import { publishEvent, subscribeToFeedback } from "./client";
 import type { EscrowProvider } from "../../application/escrow-port";
 import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "requester"]);
+
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */
   oracleEndpoint?: string;
@@ -137,7 +140,7 @@ export async function createHtlcQuery(
 
   const publishResult = await publishEvent(event, config.relayUrls);
   if (publishResult.successes.length === 0) {
-    console.error("[requester] Failed to publish query to any relay");
+    log.error("Failed to publish query to any relay");
   }
 
   const escrow: EscrowInfo = {

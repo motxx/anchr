@@ -16,6 +16,9 @@ import type { NostrIdentity } from "./identity";
 import { buildOracleAttestationEvent } from "./oracle-attestation";
 import { publishEvent } from "./client";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "proof-publisher"]);
+
 export interface NostrProofPublisherConfig {
   identity: NostrIdentity;
   relayUrls?: string[];
@@ -57,8 +60,7 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
       const result = await publishEvent(event, config.relayUrls);
 
       if (result.successes.length > 0) {
-        console.error(
-          `[proof-publisher] Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
+        log.error(`Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
         );
         return {
           event_id: event.id,
@@ -66,8 +68,7 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
         };
       }
 
-      console.error(
-        `[proof-publisher] Failed to publish attestation for query ${query.id}: ${result.failures.join(", ")}`,
+      log.error(`Failed to publish attestation for query ${query.id}: ${result.failures.join(", ")}`,
       );
       return null;
     },

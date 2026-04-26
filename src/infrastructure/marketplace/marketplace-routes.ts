@@ -16,6 +16,9 @@ import { validateAttachmentUri } from "../url-validation";
 import { announceListingOnNostr } from "./nostr-announce";
 import type { MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types";
 
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "marketplace"]);
+
 /** In-memory purchase log (replay defense + audit). */
 const purchaseLog = new Map<string, PurchaseRecord>();
 
@@ -166,7 +169,7 @@ export function registerMarketplaceRoutes(app: Hono<any>, ctx: MarketplaceRouteC
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[marketplace] Fetch failed for listing ${id}:`, msg);
+      log.error(`Fetch failed for listing ${id}:`, msg);
       return c.json({ error: "Failed to fetch upstream data", detail: msg }, 502);
     }
   });
