@@ -30,7 +30,11 @@ const BUILDS: CssBuild[] = [
     input: join(PROJECT_ROOT, "src/ui/dashboard/globals.css"),
     output: join(PROJECT_ROOT, "src/ui/dashboard/generated.css"),
   },
-  // Market UI CSS is in example/prediction-market/ui/ (separate from core Anchr)
+  {
+    label: "market",
+    input: join(PROJECT_ROOT, "example/prediction-market/ui/globals.css"),
+    output: join(PROJECT_ROOT, "example/prediction-market/ui/generated.css"),
+  },
 ];
 
 async function buildCss(build: CssBuild) {

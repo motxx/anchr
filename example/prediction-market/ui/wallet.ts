@@ -9,8 +9,10 @@
  */
 
 import { Wallet, type Proof, getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
+import { createLockedToken, type ExchangeConfig } from "../src/exchange-protocol.ts";
 
 const PROOF_STORAGE_KEY = "anchr_market_proofs";
+const RECEIVED_TOKENS_KEY = "anchr_market_received_tokens";
 
 // ---------------------------------------------------------------------------
 // Wallet initialization
@@ -147,4 +149,99 @@ export function selectProofs(amountSats: number): Proof[] | null {
   // Remove selected from storage
   removeProofs(selected);
   return selected;
+}
+
+// ---------------------------------------------------------------------------
+// Bet → P2PK exchange flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the exchange-locked Cashu token for a matched bet pair.
+ *
+ * The browser owns the proofs; the server only relays the resulting
+ * cashuB token between matched bettors. The token is locked so the
+ * counterparty (and the market group) need to co-sign to spend it,
+ * with a refund-after-locktime path back to the user.
+ */
+export async function lockFundsForMatch(input: {
+  mintUrl: string;
+  myPubkey: string;
+  mySide: "yes" | "no";
+  counterpartyPubkey: string;
+  groupPubkeyYes: string;
+  groupPubkeyNo: string;
+  exchangeLocktime: number;
+  marketLocktime: number;
+  amountSats: number;
+}): Promise<{ token: string }> {
+  const wallet = await initWallet(input.mintUrl);
+  const proofs = selectProofs(input.amountSats);
+  if (!proofs) {
+    throw new Error(
+      `Insufficient balance: need ${input.amountSats} sats, have ${getBalance()}`,
+    );
+  }
+
+  const config: ExchangeConfig = {
+    mintUrl: input.mintUrl,
+    marketGroupPubkeyYes: input.groupPubkeyYes,
+    marketGroupPubkeyNo: input.groupPubkeyNo,
+    myPubkey: input.myPubkey,
+    mySide: input.mySide,
+    counterpartyPubkey: input.counterpartyPubkey,
+    amountSats: input.amountSats,
+    exchangeLocktime: input.exchangeLocktime,
+    marketLocktime: input.marketLocktime,
+  };
+
+  try {
+    const result = await createLockedToken(wallet, proofs, config);
+    return { token: result.token };
+  } catch (err) {
+    // Restore proofs on failure so the user doesn't lose their balance.
+    addProofs(proofs);
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Received tokens (locked tokens the user holds against a counterparty)
+// ---------------------------------------------------------------------------
+
+export interface HeldToken {
+  market_id: string;
+  pair_id: string;
+  /** Side this user bet on. Token is redeemable when this side wins. */
+  my_side: "yes" | "no";
+  amount_sats: number;
+  cashu_token: string;
+  /** When this match was locked (for UI sorting). */
+  received_at: number;
+}
+
+export function loadHeldTokens(): HeldToken[] {
+  try {
+    const raw = localStorage.getItem(RECEIVED_TOKENS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as HeldToken[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveHeldToken(token: HeldToken): void {
+  const existing = loadHeldTokens();
+  // Replace any prior entry for the same pair (e.g. retry).
+  const filtered = existing.filter((t) => t.pair_id !== token.pair_id);
+  filtered.push(token);
+  localStorage.setItem(RECEIVED_TOKENS_KEY, JSON.stringify(filtered));
+}
+
+export function loadHeldTokensForMarket(marketId: string): HeldToken[] {
+  return loadHeldTokens().filter((t) => t.market_id === marketId);
+}
+
+export function removeHeldToken(pairId: string): void {
+  const filtered = loadHeldTokens().filter((t) => t.pair_id !== pairId);
+  localStorage.setItem(RECEIVED_TOKENS_KEY, JSON.stringify(filtered));
 }

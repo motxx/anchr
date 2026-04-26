@@ -90,7 +90,7 @@
     "build:css": "deno run --allow-all scripts/build-css.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
-  "exclude": ["mobile", "node_modules", "example/prediction-market/src/demo.ts", "example/prediction-market/src/nostr-market.ts"],
+  "exclude": ["mobile", "node_modules", "dist/", "example/prediction-market/src/demo.ts", "example/prediction-market/src/nostr-market.ts", "example/prediction-market/ui/main.js", "example/prediction-market/ui/main.js.map"],
   "lint": {
     "rules": {
       "tags": ["recommended"],
@@ -112,6 +112,9 @@
       "mobile",
       "example/prediction-market/src/demo.ts",
       "example/prediction-market/src/nostr-market.ts",
+      "example/prediction-market/ui/main.js",
+      "example/prediction-market/ui/main.js.map",
+      "dist/",
       "scripts/",
       "src/infrastructure/log-stream.ts"
     ]
