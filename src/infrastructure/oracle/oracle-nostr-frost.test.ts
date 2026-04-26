@@ -9,9 +9,9 @@ import type { OracleNostrServiceConfig } from "./oracle-nostr-service";
 import { generateEphemeralIdentity } from "../nostr/identity";
 import { createPreimageStore } from "../preimage/preimage-store";
 import { createFrostCoordinator } from "../../../packages/cashu-frost-oracle/src/coordinator";
-import type { ThresholdOracleConfig } from "../../domain/oracle-types";
+import type { ThresholdOracleConfig } from "../../../packages/core-domain/src/oracle-types";
 import type { FrostNodeConfig } from "../../../packages/cashu-frost-oracle/src/config";
-import type { AttachmentRef } from "../../domain/types";
+import type { AttachmentRef } from "../../../packages/core-domain/src/types";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

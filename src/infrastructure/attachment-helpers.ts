@@ -7,7 +7,7 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   BlossomKeyMaterial,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 import type { StoredAttachment } from "./attachments";
 
 type AttachmentLike = AttachmentRef | string;

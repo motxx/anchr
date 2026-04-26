@@ -12,7 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bd
 import { expect } from "@std/expect";
 import { _setVerifierPathForTest, _clearSeenPresentationsForTest } from "../../../packages/tlsn-toolkit/src/tlsn-validation";
 import { verify } from "./verifier";
-import type { TlsnAttestation, TlsnRequirement } from "../../domain/types";
+import type { TlsnAttestation, TlsnRequirement } from "../../../packages/core-domain/src/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

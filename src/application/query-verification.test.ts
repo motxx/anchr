@@ -14,8 +14,8 @@ import {
   type OracleResolver,
   type MultiOracleResolver,
 } from "./query-verification";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
-import type { Query, QueryResult } from "../domain/types";
+import type { Oracle, OracleAttestation } from "../../packages/core-domain/src/oracle-types";
+import type { Query, QueryResult } from "../../packages/core-domain/src/types";
 
 // --- Test helpers ---
 

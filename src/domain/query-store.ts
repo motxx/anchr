@@ -1,4 +1,4 @@
-import type { Query } from "./types";
+import type { Query } from "../../packages/core-domain/src/types";
 
 // --- QueryStore interface ---
 

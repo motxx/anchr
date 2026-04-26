@@ -17,7 +17,7 @@ import { join } from "node:path";
 // MIGRATION DEBT: runtime/ will become its own core-runtime package eventually.
 import { moduleDir, which, writeFile, spawn } from "../../core-runtime/src/mod.ts";
 // MIGRATION DEBT: domain/types will move to core-domain package eventually.
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../../src/domain/types";
+import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "../../core-domain/src/types";
 
 // --- Proof replay protection ---
 // Stores SHA-256 hashes of previously accepted presentations to prevent reuse.

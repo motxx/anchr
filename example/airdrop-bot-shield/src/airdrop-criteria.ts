@@ -7,7 +7,7 @@
  * cryptographically verified response body.
  *
  * Reference types:
- *   - TlsnRequirement, TlsnCondition from ../../../src/domain/types
+ *   - TlsnRequirement, TlsnCondition from ../../../packages/core-domain/src/types
  *   - validateTlsn, evaluateCondition from ../../../src/infrastructure/verification/tlsn-validation
  */
 
@@ -352,7 +352,7 @@ export function maxClaims(criteria: AirdropCriteria): number {
  * This maps our high-level ProofConditions to the lower-level TlsnRequirement
  * and TlsnCondition types used by the Anchr oracle.
  *
- * Reference: TlsnRequirement from ../../../src/domain/types
+ * Reference: TlsnRequirement from ../../../packages/core-domain/src/types
  */
 export function toTlsnRequirements(conditions: ProofCondition[]): Array<{
   target_url: string;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { VERIFICATION_FACTORS } from "../domain/types";
+import { VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
 
 export const requesterMetaSchema = z.object({
   requester_type: z.enum(["agent", "human", "app"]),

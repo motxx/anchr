@@ -10,7 +10,7 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   QueryResult,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 import {
   attachmentRefSource,
   inferAttachmentId,
@@ -231,7 +231,7 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../domain/types").BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../../packages/core-domain/src/types").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
   if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
     return readBlossomAttachment(ref, blossomKeyMaterial);

@@ -4,8 +4,8 @@ import { z } from "zod";
 import { getMcpQueryBackend } from "./mcp-query-backend";
 import { isNostrEnabled } from "./nostr/client";
 import { isCashuEnabled } from "./cashu/wallet";
-import type { VerificationFactor, TlsnCondition } from "../domain/types";
-import { VERIFICATION_FACTORS } from "../domain/types";
+import type { VerificationFactor, TlsnCondition } from "../../packages/core-domain/src/types";
+import { VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
 import {
   handleCreateQuery,
   handleGetQueryStatus,

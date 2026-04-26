@@ -35,7 +35,7 @@ import type {
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 
 export type {
   AttachmentRef,
@@ -47,7 +47,7 @@ export type {
   VerificationFactor,
   RequesterMeta,
   RequesterType,
-} from "../domain/types";
+} from "../../packages/core-domain/src/types";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
 export type QuerySubmissionMeta = SubmissionMeta;

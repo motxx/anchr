@@ -25,7 +25,7 @@ import {
 } from "./events";
 import { publishEvent, subscribeToFeedback } from "./client";
 import type { EscrowProvider } from "../../application/escrow-port";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types";
+import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../../packages/core-domain/src/types";
 
 export interface RequesterConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */

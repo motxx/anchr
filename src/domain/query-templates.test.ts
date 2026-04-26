@@ -1,7 +1,7 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { queryTemplates } from "./query-templates";
-import type { QueryInput } from "./types";
+import type { QueryInput } from "../../packages/core-domain/src/types";
 
 // --- photoProof ---
 

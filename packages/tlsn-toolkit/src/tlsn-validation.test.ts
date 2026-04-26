@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bd
 import { expect } from "@std/expect";
 import { evaluateCondition, validateTlsn, _setVerifierPathForTest, _clearSeenPresentationsForTest } from "./tlsn-validation";
 // MIGRATION DEBT: types will move to core-domain.
-import type { TlsnAttestation, TlsnRequirement } from "../../../src/domain/types";
+import type { TlsnAttestation, TlsnRequirement } from "../../core-domain/src/types";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

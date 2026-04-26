@@ -12,7 +12,7 @@ export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./dom
 export {
   validateGpsCoord, validateBountyInfo, validateHtlcLocktime, validateQueryInput, validateQuoteInfo,
 } from "./domain/value-objects";
-export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "./domain/types";
+export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "../packages/core-domain/src/types";
 
 // --- Application ---
 export {

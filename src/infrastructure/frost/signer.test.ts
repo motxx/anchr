@@ -6,7 +6,7 @@ import {
   findFrostSigner,
   isFrostSignerAvailable,
 } from "../../../packages/cashu-frost-oracle/src/frost-cli";
-import type { AttachmentRef } from "../../domain/types";
+import type { AttachmentRef } from "../../../packages/core-domain/src/types";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

@@ -1,1 +1,1 @@
-export type { Oracle, OracleAttestation, OracleInfo, OracleVerificationDetail } from "../../domain/oracle-types";
+export type { Oracle, OracleAttestation, OracleInfo, OracleVerificationDetail } from "../../../packages/core-domain/src/oracle-types";

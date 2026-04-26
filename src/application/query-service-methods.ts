@@ -24,8 +24,8 @@ import type {
   QueryStatus,
   SubmissionMeta,
   QuoteInfo,
-} from "../domain/types";
-import { DEFAULT_VERIFICATION_FACTORS } from "../domain/types";
+} from "../../packages/core-domain/src/types";
+import { DEFAULT_VERIFICATION_FACTORS } from "../../packages/core-domain/src/types";
 import type { ProofDelivery } from "./proof-delivery";
 import { isCancellable, isExpirable } from "../domain/query-transitions";
 import type {

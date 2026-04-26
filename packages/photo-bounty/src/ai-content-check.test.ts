@@ -2,7 +2,7 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createAiContentChecker, type AiContentCheckDeps } from "./ai-content-check";
 // MIGRATION DEBT: types will move to core-domain.
-import type { Query, QueryResult } from "../../../src/domain/types";
+import type { Query, QueryResult } from "../../core-domain/src/types";
 
 const baseQuery: Query = {
   id: "q1",

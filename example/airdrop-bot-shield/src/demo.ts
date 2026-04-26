@@ -11,7 +11,7 @@
  *   deno run --allow-all example/airdrop-bot-shield/src/demo.ts
  *
  * Reference modules (not imported at runtime — this example is self-contained):
- *   - TlsnRequirement, TlsnCondition, HtlcInfo from ../../../src/domain/types
+ *   - TlsnRequirement, TlsnCondition, HtlcInfo from ../../../packages/core-domain/src/types
  *   - validateTlsn from ../../../src/infrastructure/verification/tlsn-validation
  *   - createHtlcToken, redeemHtlcToken from ../../../src/infrastructure/cashu/escrow
  */

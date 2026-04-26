@@ -1,7 +1,7 @@
 import { test, describe, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryStore, type QueryStore } from "./query-store";
-import type { Query } from "./types";
+import type { Query } from "../../packages/core-domain/src/types";
 
 function fakeQuery(id: string): Query {
   return {

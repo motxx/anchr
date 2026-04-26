@@ -11,7 +11,7 @@
  */
 
 import type { ProofDelivery, ProofPublishResult } from "../../application/proof-delivery";
-import type { OracleAttestationRecord, ProofVisibility, Query } from "../../domain/types";
+import type { OracleAttestationRecord, ProofVisibility, Query } from "../../../packages/core-domain/src/types";
 import type { NostrIdentity } from "./identity";
 import { buildOracleAttestationEvent } from "./oracle-attestation";
 import { publishEvent } from "./client";

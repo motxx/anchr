@@ -20,7 +20,7 @@ import {
 } from "./worker-api-presenters";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service";
 import type { PreimageStore } from "./cashu/preimage-store";
-import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../domain/types";
+import type { AttachmentRef, BlossomKeyMap, HtlcInfo, QuorumConfig, QuoteInfo } from "../../packages/core-domain/src/types";
 
 export interface RouteContext {
   svc: QueryService;

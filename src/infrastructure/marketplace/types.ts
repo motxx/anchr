@@ -6,7 +6,7 @@
  * - HTLC escrow: Oracle verifies TLSNotary proof before releasing preimage. Trustless.
  */
 
-import type { TlsnRequirement } from "../../domain/types";
+import type { TlsnRequirement } from "../../../packages/core-domain/src/types";
 import type { MiddlewareHandler } from "hono";
 import type { ListingStore } from "./listing-store";
 import type { PreimageStore } from "../cashu/preimage-store";

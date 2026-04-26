@@ -15,7 +15,7 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { Query, QueryResult } from "./domain/types";
+import type { Query, QueryResult } from "../packages/core-domain/src/types";
 import {
   makeMockOracle,
   makeQuorumService,

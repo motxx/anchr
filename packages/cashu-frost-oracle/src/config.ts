@@ -44,7 +44,7 @@ export function saveFrostNodeConfig(filePath: string, config: FrostNodeConfig): 
 
 /** Build a ThresholdOracleConfig from a FrostNodeConfig. */
 // MIGRATION DEBT: domain/oracle-types will move to core-domain package eventually.
-export function toThresholdOracleConfig(config: FrostNodeConfig): import("../../../src/domain/oracle-types").ThresholdOracleConfig {
+export function toThresholdOracleConfig(config: FrostNodeConfig): import("../../core-domain/src/oracle-types").ThresholdOracleConfig {
   return {
     threshold: config.threshold,
     total_signers: config.total_signers,

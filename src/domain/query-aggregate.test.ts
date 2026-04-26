@@ -21,7 +21,7 @@ import type {
   SubmissionMeta,
   QuoteInfo,
   HtlcInfo,
-} from "./types";
+} from "../../packages/core-domain/src/types";
 import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate";
 
 // --- Helpers ---
