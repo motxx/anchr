@@ -1,0 +1,162 @@
+name: Bootstrap Anchr Market
+
+# Manual one-shot to stand up the prediction-market Fly app from scratch:
+# creates the Fly app + volume (idempotent), runs FROST 2-of-3 DKG,
+# uploads the encrypted shares + passphrase as Fly secrets, then deploys.
+#
+# Required GitHub secrets (Settings → Secrets and variables → Actions):
+#   FLY_API_TOKEN_MARKET    — Fly deploy token scoped to anchr-market
+#   FROST_KEY_PASSPHRASE    — 32+ hex chars (e.g. `openssl rand -hex 32`)
+#
+# After this workflow succeeds, the regular .github/workflows/deploy.yml
+# `deploy-market` job picks up future commits to main automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: "Fly region for the app + volume (default nrt)"
+        required: false
+        default: "nrt"
+      rotate_keys:
+        description: "Re-run DKG and overwrite existing secrets (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    name: Bootstrap anchr-market
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: fly-market-bootstrap
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+        with:
+          deno-version: v2.x
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@b3b07ba8b418998c39fb20f53e8b695cdcc8de1b # stable
+        with:
+          toolchain: stable
+
+      - name: Cache cargo build
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry # allow-local-path: github runner cache path, not author machine
+            ~/.cargo/git # allow-local-path: github runner cache path, not author machine
+            crates/frost-signer/target
+          key: bootstrap-frost-signer-${{ hashFiles('crates/frost-signer/Cargo.toml','crates/frost-signer/src/**/*.rs') }}
+
+      - name: Build frost-signer binary
+        run: cd crates/frost-signer && cargo build --release
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master
+
+      - name: Mask passphrase
+        run: |
+          echo "::add-mask::$FROST_KEY_PASSPHRASE"
+        env:
+          FROST_KEY_PASSPHRASE: ${{ secrets.FROST_KEY_PASSPHRASE }}
+
+      - name: Validate inputs
+        run: |
+          if [ -z "${FROST_KEY_PASSPHRASE:-}" ]; then
+            echo "::error::FROST_KEY_PASSPHRASE GitHub secret is not set."
+            echo "Generate one with: openssl rand -hex 32"
+            exit 1
+          fi
+          if [ -z "${FLY_API_TOKEN:-}" ]; then
+            echo "::error::FLY_API_TOKEN_MARKET GitHub secret is not set."
+            exit 1
+          fi
+        env:
+          FROST_KEY_PASSPHRASE: ${{ secrets.FROST_KEY_PASSPHRASE }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Create Fly app (idempotent)
+        run: |
+          if flyctl apps show anchr-market >/dev/null 2>&1; then
+            echo "App anchr-market already exists, skipping create."
+          else
+            flyctl apps create anchr-market --org personal
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Create Fly volume (idempotent)
+        run: |
+          # Create the frost_data volume only if no volume with that name
+          # exists in the chosen region. Listing returns a JSON array.
+          existing=$(flyctl volumes list --app anchr-market --json | \
+            jq -r --arg region "$REGION" '.[] | select(.name=="frost_data" and .region==$region) | .id' | head -n1)
+          if [ -n "$existing" ]; then
+            echo "Volume frost_data already exists in $REGION ($existing)."
+          else
+            flyctl volumes create frost_data \
+              --app anchr-market --region "$REGION" --size 1 --yes
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+          REGION: ${{ inputs.region }}
+
+      - name: Check whether FROST secrets already exist
+        id: secrets-state
+        run: |
+          set +e
+          existing=$(flyctl secrets list --app anchr-market --json | \
+            jq -r '.[].Name' | grep -c '^FROST_SIGNER_._CONFIG_B64$')
+          set -e
+          echo "existing=$existing" >> "$GITHUB_OUTPUT"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Run DKG and import secrets
+        if: ${{ steps.secrets-state.outputs.existing != '3' || inputs.rotate_keys == 'true' }}
+        run: |
+          # Generate encrypted FROST shares + emit KEY=VALUE lines on stdout.
+          # Stderr carries DKG progress; stdout is fed straight into flyctl.
+          deno run --allow-all scripts/frost-market-prepare-secrets.ts \
+            --emit-env --app anchr-market \
+            | flyctl secrets import --app anchr-market
+        env:
+          FROST_KEY_PASSPHRASE: ${{ secrets.FROST_KEY_PASSPHRASE }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Skip DKG (secrets already present)
+        if: ${{ steps.secrets-state.outputs.existing == '3' && inputs.rotate_keys != 'true' }}
+        run: |
+          echo "All three FROST signer secrets already exist on the Fly app."
+          echo "Re-run with rotate_keys=true to regenerate."
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --config fly.market.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+
+      - name: Print public URL
+        run: |
+          flyctl status --app anchr-market || true
+          echo "Public URL: https://anchr-market.fly.dev"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}

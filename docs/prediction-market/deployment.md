@@ -126,22 +126,99 @@ This requires the TLSNotary verifier binary on the host:
 cd crates/tlsn-verifier && cargo build --release
 ```
 
-## 4. Public testnet deploy (checklist)
+## 4. Public testnet deploy on Fly.io
 
-Beyond the regtest steps:
+Ship the market with FROST 2-of-3 threshold signing, fronted by Fly's
+managed TLS, using the existing public testnut Cashu mint and the
+already-deployed Anchr Nostr relay + TLSN verifier.
 
-- [ ] Run a public Cashu mint (e.g. `nutshell` against signet/testnet
-      Lightning). Set `CASHU_MINT_URL` to its public URL.
-- [ ] Connect to public Nostr relays via `NOSTR_RELAYS`. The server
-      auto-publishes new markets as Nostr kind 30078.
-- [ ] Provision the FROST cluster across geographically separate
-      hosts. Threshold `2-of-3` is the typical sweet spot.
-- [ ] Generate the DKG with `FROST_KEY_PASSPHRASE` set; mode-0600
-      file permissions are applied automatically.
-- [ ] Front the market server with TLS (Caddy, Cloudflare, or your
-      reverse proxy of choice). Browser wallets store secret keys in
-      localStorage — TLS is mandatory.
-- [ ] Add API key middleware in `server.ts` (`writeAuth`/`rateLimit`
+### Architecture (single-VM, multi-process)
+
+```
++---------------------- anchr-market.fly.dev ----------------------+
+|                                                                  |
+|  scripts/market-cluster-entrypoint.ts (PID 1, tini)              |
+|    ├── frost-signer-1   (127.0.0.1:4001)                         |
+|    ├── frost-signer-2   (127.0.0.1:4002)                         |
+|    ├── frost-signer-3   (127.0.0.1:4003)                         |
+|    └── market-server    (0.0.0.0:8080)  ←── Fly proxy → :443     |
+|                                                                  |
+|  /data (persistent volume) holds the decrypted signer-N.json     |
++------------------------------------------------------------------+
+        │                              │
+        ▼                              ▼
+  testnut.cashu.space            anchr-relay.fly.dev
+  (public Cashu mint)            (Nostr relay, kind 30078)
+        │
+        ▼
+  anchr-tlsn-verifier.fly.dev    (TLSN proxy, used by browser
+                                   to produce attestations)
+```
+
+Three FROST signer shares live in distinct processes (so they don't
+share an address space) but the same Fly machine. That's the threshold
+crypto guarantee, not geo-distribution — the next iteration is splitting
+into three Fly apps.
+
+### One-time setup (recommended: GitHub Actions)
+
+The fastest way is the **Bootstrap Anchr Market** workflow. It creates
+the Fly app + volume idempotently, runs DKG inside the runner, uploads
+the encrypted shares + passphrase as Fly secrets, then deploys.
+
+1. In GitHub → Settings → Secrets and variables → Actions, add:
+   - `FLY_API_TOKEN_MARKET` — Fly deploy token scoped to `anchr-market`
+     (`flyctl tokens create deploy --name anchr-market`).
+   - `FROST_KEY_PASSPHRASE` — generate locally with
+     `openssl rand -hex 32` and paste.
+2. Actions → **Bootstrap Anchr Market** → Run workflow.
+
+After it succeeds, every future commit to `main` redeploys
+automatically via the regular `deploy-market` job. To rotate FROST
+keys, re-run the bootstrap workflow with `rotate_keys=true`.
+
+### One-time setup (alternative: local CLI)
+
+```bash
+# 1. Create the Fly app + volume.
+flyctl apps create anchr-market
+flyctl volumes create frost_data --app anchr-market --region nrt --size 1
+
+# 2. Generate the FROST 2-of-3 DKG output, encrypt with a passphrase,
+#    and emit the `flyctl secrets set` command.
+FROST_KEY_PASSPHRASE=$(openssl rand -hex 32) \
+  deno run --allow-all scripts/frost-market-prepare-secrets.ts --app anchr-market
+
+# 3. Run the printed `flyctl secrets set …` command. It uploads the
+#    passphrase + 3 base64-encoded encrypted configs as Fly secrets.
+
+# 4. Deploy.
+flyctl deploy --remote-only --config fly.market.toml
+```
+
+The orchestrator decrypts each `FROST_SIGNER_{1,2,3}_CONFIG_B64` to
+`/data/signer-N.json` (mode 0600) on boot, spawns the cluster on
+127.0.0.1:4001-4003, then starts the market server.
+
+### Rotating keys
+
+Re-run `frost-market-prepare-secrets.ts` and re-deploy. **Markets
+created under the old group pubkeys can no longer be settled** — drain
+them first, or pin to a fixed `htlc_hash_yes` / `htlc_hash_no` and use
+the HTLC fallback path for those legacy markets.
+
+### Ops checklist
+
+- [x] Public Cashu mint: `https://testnut.cashu.space` (set in `fly.market.toml`).
+- [x] Public Nostr relay: `wss://anchr-relay.fly.dev` (the server publishes
+      markets as Nostr kind 30078 on creation).
+- [x] TLSN verifier proxy: `https://anchr-tlsn-verifier.fly.dev` (browser
+      hits it for proof generation; the market server runs the verifier
+      *binary* locally to validate submitted presentations).
+- [x] FROST 2-of-3 with passphrase-encrypted shares (PR-D).
+- [x] TLS via Fly (`force_https = true` in `fly.market.toml`).
+- [ ] Add API key or NIP-98 auth middleware in `server.ts`
+      (`writeAuth`/`rateLimit`
       currently no-op for the demo). Wire it to your KMS.
 - [ ] Run the screenshot script as a smoke test in CI:
       `deno run --allow-all scripts/market-screenshots.ts`.
