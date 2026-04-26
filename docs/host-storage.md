@@ -1,16 +1,14 @@
-# Spec 06: Storage
+# Host: Encrypted Blob Storage via Blossom
 
-## Abstract
-
-Anchr uses Blossom for content-addressed blob storage with end-to-end encryption. Blossom servers never see plaintext. This spec defines the encryption scheme, upload/download lifecycle, and key distribution.
-
-## Blossom (BUD-01~06)
-
-Blossom is a content-addressed blob storage protocol. Blobs are identified by their SHA-256 hash. Anchr uses Blossom servers as dumb storage — all encryption happens client-side.
+> **Scope:** the reference host server in `src/infrastructure/blossom/`.
+> Blossom itself is specified externally in [BUD-01–06](https://github.com/hzrd149/blossom).
+> This document describes how the host wires Blossom together with NIP-44
+> key delivery — not a re-spec of Blossom.
 
 ## Encryption Scheme
 
-AES-256-GCM with random key and IV per blob.
+AES-256-GCM with random key and IV per blob. Blossom servers see only
+ciphertext; all encryption happens client-side.
 
 ### Upload
 
@@ -24,14 +22,16 @@ AES-256-GCM with random key and IV per blob.
 
 ### Key Distribution
 
-The encryption key and IV are distributed via NIP-44 encrypted Nostr events:
+The encryption key and IV are distributed via NIP-44 encrypted Nostr
+events:
 
 | Recipient | Purpose |
 |-----------|---------|
 | Oracle | Decrypt and verify the proof |
 | Requester | Download and access the verified data |
 
-Keys are ephemeral and per-blob. They are included in the `blossom_keys` field of the QueryResponsePayload (Spec 05).
+Keys are ephemeral and per-blob. They are included in the `blossom_keys`
+field of the QueryResponsePayload (see `specs/05-messaging.md`).
 
 ### Download
 
@@ -61,7 +61,9 @@ Each blob is referenced by:
 
 ## Multi-Server Redundancy
 
-Blobs may be uploaded to multiple Blossom servers for redundancy. The `blossom_servers` field lists all servers where the blob is available. Download attempts servers in order with exponential backoff on failure.
+Blobs may be uploaded to multiple Blossom servers for redundancy. The
+`blossom_servers` field lists all servers where the blob is available.
+Download attempts servers in order with exponential backoff on failure.
 
 ## Security Properties
 

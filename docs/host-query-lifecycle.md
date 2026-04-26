@@ -1,8 +1,15 @@
-# Spec 01: Query Lifecycle
+# Host: Query Lifecycle
 
-## Abstract
+> **Scope:** the reference host server in `src/`. Other implementations
+> can structure their state machine differently — this is *not* a wire
+> spec. The wire-format specs (Nostr DVM kinds in `specs/05-messaging.md`,
+> oracle discovery in `specs/08-oracle-registry.md`, conditional swap
+> primitive in `specs/07-conditional-swap.md`) are the cross-implementation
+> contracts.
 
-A query represents a request for verified data. This spec defines the query state machine, valid transitions, and expiry behavior.
+A query represents a request for verified data. This document defines the
+host's query state machine, valid transitions, and expiry behavior — as
+implemented in `src/domain/query-store.ts` + `query-transitions.ts`.
 
 ## States
 
@@ -16,7 +23,8 @@ A query represents a request for verified data. This spec defines the query stat
 | `rejected` | Verification failed (terminal) |
 | `expired` | Locktime reached without resolution (terminal) |
 
-For simple (non-escrow) queries, an additional `pending` state exists with direct transitions to `approved`, `rejected`, or `expired`.
+For simple (non-escrow) queries, an additional `pending` state exists
+with direct transitions to `approved`, `rejected`, or `expired`.
 
 ## State Transitions
 
@@ -54,19 +62,24 @@ awaiting_quotes --> worker_selected --> processing --> verifying --> approved
 
 ## Terminal States
 
-`approved`, `rejected`, and `expired` are terminal. No further transitions are allowed.
+`approved`, `rejected`, and `expired` are terminal. No further transitions
+are allowed.
 
 ## Cancellation
 
-A query may be cancelled by the Requester in the following states: `pending`, `awaiting_quotes`, `worker_selected`, `processing`.
+A query may be cancelled by the Requester in the following states:
+`pending`, `awaiting_quotes`, `worker_selected`, `processing`.
 
 Cancellation triggers escrow refund if escrow was locked.
 
 ## Expiry
 
-Queries carry an `expires_at` timestamp (derived from escrow locktime or a default TTL). When the current time exceeds `expires_at`, any non-terminal query transitions to `expired`.
+Queries carry an `expires_at` timestamp (derived from escrow locktime or
+a default TTL). When the current time exceeds `expires_at`, any
+non-terminal query transitions to `expired`.
 
-For HTLC queries, expiry triggers automatic escrow refund to the Requester via the Cashu mint's locktime mechanism.
+For HTLC queries, expiry triggers automatic escrow refund to the
+Requester via the Cashu mint's locktime mechanism.
 
 ## Query Input
 
@@ -82,4 +95,4 @@ A Requester creates a query with:
 | `visibility` | conditional | `public` or `requester_only` (required when `tlsn_requirements` is set) |
 | `bounty` | no | Payment amount in sats |
 | `oracle_ids` | no | Acceptable Oracle IDs (default: built-in) |
-| `quorum` | no | Multi-Oracle quorum config (see Spec 04) |
+| `quorum` | no | Multi-Oracle quorum config (see `packages/cashu-frost-oracle/SPEC.md`) |
