@@ -68,16 +68,25 @@ export async function uploadPhoto(
 
 export async function submitResult(
   queryId: string,
+  workerPubkey: string,
   attachments: AttachmentRef[],
   notes: string,
   encryptionKeys?: BlossomKeyMap,
 ): Promise<SubmitResponse> {
-  const body: Record<string, unknown> = { attachments, notes };
+  if (!workerPubkey) {
+    throw new Error("workerPubkey is required to submit a result.");
+  }
+
+  const body: Record<string, unknown> = {
+    worker_pubkey: workerPubkey,
+    attachments,
+    notes,
+  };
   if (encryptionKeys && Object.keys(encryptionKeys).length > 0) {
     body.encryption_keys = encryptionKeys;
   }
 
-  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/submit`, {
+  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/result`, {
     method: "POST",
     headers: {
       ...getHeaders(),

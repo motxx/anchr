@@ -105,12 +105,21 @@ export async function submitResult(
   notes: string,
   encryptionKeys?: BlossomKeyMap,
 ): Promise<SubmitResponse> {
-  const body: Record<string, unknown> = { attachments, notes };
+  const { publicKey } = useAuthStore.getState();
+  if (!publicKey) {
+    throw new Error("Worker pubkey is required to submit a result. Sign in first.");
+  }
+
+  const body: Record<string, unknown> = {
+    worker_pubkey: publicKey,
+    attachments,
+    notes,
+  };
   if (encryptionKeys && Object.keys(encryptionKeys).length > 0) {
     body.encryption_keys = encryptionKeys;
   }
 
-  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/submit`, {
+  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/result`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),

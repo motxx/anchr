@@ -11,7 +11,7 @@
  *   deno run --allow-all example/airdrop-bot-shield/src/demo.ts
  *
  * Reference modules (not imported at runtime — this example is self-contained):
- *   - TlsnRequirement, TlsnCondition, HtlcInfo from ../../../packages/core-domain/src/types
+ *   - TlsnRequirement, TlsnCondition, EscrowInfo from ../../../src/domain/types.ts
  *   - validateTlsn from ../../../src/infrastructure/verification/tlsn-validation
  *   - createHtlcToken, redeemHtlcToken from ../../../src/infrastructure/cashu/escrow
  */
@@ -353,6 +353,6 @@ console.log("  3. RESIST Sybil attacks through economic cost barriers");
 console.log("     (combined proof requirements make farming unprofitable)");
 console.log();
 console.log("For integration with the full Anchr server, see:");
-console.log("  - src/domain/types.ts          (TlsnRequirement, HtlcInfo)");
+console.log("  - src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
 console.log("  - src/infrastructure/verification/tlsn-validation.ts (proof verification)");
 console.log("  - src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");

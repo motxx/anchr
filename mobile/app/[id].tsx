@@ -20,6 +20,7 @@ import { ChallengeNonceDisplay } from "../src/components/ChallengeNonceDisplay";
 import { StatusBadge } from "../src/components/StatusBadge";
 import { QueryTypeBadge } from "../src/components/QueryTypeBadge";
 import { uploadPhoto, submitResult } from "../src/api/client";
+import { useSettingsStore } from "../src/store/settings";
 import { useWalletStore } from "../src/store/wallet";
 import { timeLeft, isExpired } from "../src/utils/time";
 import type {
@@ -288,7 +289,11 @@ export default function QueryDetailScreen() {
       }
 
       // 3. Submit result
-      const res = await submitResult(query.id, attachments, notes, encryptionKeys);
+      const workerPubkey = useSettingsStore.getState().workerPubkey;
+      if (!workerPubkey) {
+        throw new Error("Worker pubkey is not set. Configure it in Settings before submitting.");
+      }
+      const res = await submitResult(query.id, workerPubkey, attachments, notes, encryptionKeys);
 
       // 4. Store earned Cashu token in wallet
       if (res.ok && res.cashu_token && res.bounty_amount_sats) {

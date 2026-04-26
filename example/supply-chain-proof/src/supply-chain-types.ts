@@ -8,7 +8,7 @@
  *   - GpsCoord          (src/domain/types.ts)
  *   - TlsnAttestation   (src/domain/types.ts)
  *   - TlsnVerifiedData  (src/domain/types.ts)
- *   - HtlcInfo          (src/domain/types.ts)
+ *   - EscrowInfo        (src/domain/types.ts)
  */
 
 // ---------------------------------------------------------------------------
