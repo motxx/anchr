@@ -11,16 +11,14 @@ to a prediction-market use case.
 
 ## Settlement model — funds are *not* held by the Oracle
 
-Earlier drafts of this README described an "Oracle-as-escrow" design
-(`P2PK([oracle_group_pubkey], n_sigs=1)` where the Oracle group held the
-pool). **The actual implementation does not work that way.** Funds stay
-between the bettors at all times via cross-locked Cashu tokens; the
-Oracle's role is to release a single secret (preimage or signature share)
-that lets the *winner* unlock the *loser's* counterparty token.
+Funds stay between the bettors at all times via cross-locked Cashu
+tokens. The Oracle's role is to release a single secret (preimage or
+signature share) that lets the *winner* unlock the *loser's*
+counterparty token. No money ever flows into an Oracle wallet.
 
 There are two settlement modes, both audited end-to-end against a real
-Cashu mint on regtest. They differ only in what kind of secret the Oracle
-emits.
+Cashu mint on regtest. They differ only in what kind of secret the
+Oracle emits.
 
 ### HTLC mode (`packages/cashu-conditional-swap/src/cross-htlc.ts`)
 
