@@ -1,31 +1,26 @@
 import { getRuntimeConfig } from "./config.ts";
 import { setupServerLogCapture } from "./log-stream.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService } from "../application/query-service.ts";
+import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { QueryService } from "../application/query-service.ts";
 import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api.ts";
 import { serveStatic } from "hono/deno";
-import { normalizeQueryResult } from "./attachments.ts";
-import { publishQueryToRelay } from "./nostr/relay-publish.ts";
-import { createOracleRegistry } from "./oracle/registry.ts";
+import type { OracleRegistry } from "./oracle/registry.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "reference-app"]);
 
-export async function startReferenceApp() {
+export interface ReferenceAppDeps {
+  queryService: QueryService;
+  preimageStore: PreimageStore;
+  oracleRegistry: OracleRegistry;
+}
+
+export async function startReferenceApp(deps: ReferenceAppDeps) {
   setupServerLogCapture();
   await prepareWorkerApiAssets();
 
-  const preimageStore = createPreimageStore();
-  const oracleRegistry = createOracleRegistry();
-
-  const queryService = createQueryService({
-    preimageStore,
-    oracleRegistry,
-    normalizeResult: normalizeQueryResult,
-    hooks: { onCreated: publishQueryToRelay },
-  });
-
-  const app = buildWorkerApiApp({ queryService, preimageStore });
+  const { queryService, preimageStore, oracleRegistry } = deps;
+  const app = buildWorkerApiApp({ queryService, preimageStore, oracleRegistry });
   const port = getRuntimeConfig().referenceAppPort;
 
   // Static UI routes — must be registered after API routes in Hono,

@@ -15,11 +15,7 @@ export {
 export type { EscrowInfo, EscrowType, HtlcInfo, QuoteInfo } from "./domain/types.ts";
 
 // --- Application ---
-export {
-  cancelQuery, clearQueryStore, createQuery, createQueryService,
-  createQueryStore, expireQueries, getQuery, listOpenQueries, submitQueryResult,
-  setDefaultService,
-} from "./application/query-service.ts";
+export { createQueryService, createQueryStore } from "./application/query-service.ts";
 export type {
   AttachmentRef, AttachmentStorageKind, CancelQueryOutcome, CreateQueryOptions,
   HtlcOutcome, Query, QueryHooks, QueryService, QueryServiceDeps, QueryStore,

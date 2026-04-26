@@ -99,23 +99,22 @@ class DenoStdioTransport implements Transport {
 }
 
 async function createMcpClient(envOverrides: Record<string, string> = {}, bootstrapPreamble = "") {
-  // Configure defaultService with oracle registry so singleton-backed module-level
-  // functions in mcp-query-backend's createDefaultBackend still resolve. The same
-  // service instance is exposed as `globalThis.__queryService` so the test
-  // bootstrapPreamble can pass it into `buildWorkerApiApp({ queryService })`.
-  const setupDefaultService = [
-    `const { setDefaultService, createQueryService } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
+  // Construct one QueryService at startup and surface it via
+  // globalThis.__queryService so the test bootstrapPreamble can pass it
+  // into both `startMcpServer({ queryService })` and any
+  // `buildWorkerApiApp({ queryService })` wired by the preamble.
+  const setupQueryService = [
+    `const { createQueryService } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
     `const { createOracleRegistry } = await import(${JSON.stringify(join(moduleDir(import.meta), "oracle/registry.ts"))});`,
     `const { normalizeQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "attachments.ts"))});`,
     `globalThis.__queryService = createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult });`,
-    `setDefaultService(globalThis.__queryService);`,
   ].join("\n");
 
   const bootstrap = [
-    setupDefaultService,
+    setupQueryService,
     bootstrapPreamble,
     `const { startMcpServer } = await import(${JSON.stringify(join(moduleDir(import.meta), "mcp-server.ts"))});`,
-    "await startMcpServer();",
+    "await startMcpServer({ queryService: globalThis.__queryService });",
     "await new Promise(() => {});",
   ].join("\n");
 
@@ -140,14 +139,13 @@ Deno.test({ name: "mcp tools expose query status and attachment metadata", sanit
   // Bootstrap: create query + submit result inside the MCP subprocess so
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
-    `const { createQuery, submitQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
     `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "../../packages/photo-bounty/src/integrity-store.ts"))});`,
-    `const query = createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
+    `const query = globalThis.__queryService.createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,
     `const attachment = { id: ${JSON.stringify(attachmentId)}, uri: "https://blossom.example.com/${attachmentId}", mime_type: "image/png", storage_kind: "blossom", filename: "${attachmentId}.png", size_bytes: ${PNG_BYTES.length}, blossom_hash: ${JSON.stringify(attachmentId)}, blossom_servers: ["https://blossom.example.com"] };`,
     `storeIntegrity({ attachmentId: ${JSON.stringify(attachmentId)}, queryId: query.id, capturedAt: Date.now(), exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] }, c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "${attachmentId}.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] } });`,
-    `await submitQueryResult(query.id, { attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "worker_api" });`,
+    `await globalThis.__queryService.submitQueryResult(query.id, { attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "worker_api" });`,
   ].join(" ");
 
   const client = await createMcpClient({}, setupPreamble);
