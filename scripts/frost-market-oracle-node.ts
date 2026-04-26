@@ -12,7 +12,7 @@
  *   ORACLE_ID                 Node identifier (optional)
  */
 
-import { loadMarketFrostNodeConfig } from "../src/infrastructure/frost/market-frost-config.ts";
+import { loadMarketFrostNodeConfigAsync } from "@anchr/cashu-frost-oracle/market-frost-config";
 import { buildMarketApiRoutes } from "../example/prediction-market/src/market-api-routes.ts";
 
 const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "market-oracle";
@@ -27,7 +27,9 @@ if (!FROST_CONFIG_PATH) {
 }
 
 try {
-  const marketFrostConfig = loadMarketFrostNodeConfig(FROST_CONFIG_PATH);
+  const marketFrostConfig = await loadMarketFrostNodeConfigAsync(FROST_CONFIG_PATH, {
+    passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
+  });
   console.log(`[${ORACLE_ID}] Loaded FROST market config from ${FROST_CONFIG_PATH}`);
   console.log(`[${ORACLE_ID}] Signer ${marketFrostConfig.signer_index} of ${marketFrostConfig.total_signers} (threshold: ${marketFrostConfig.threshold})`);
   console.log(`[${ORACLE_ID}] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);

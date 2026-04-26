@@ -7,6 +7,7 @@
     "jsr:@noble/hashes@2": "2.0.1",
     "jsr:@std/assert@^1.0.17": "1.0.19",
     "jsr:@std/assert@^1.0.19": "1.0.19",
+    "jsr:@std/encoding@*": "1.0.10",
     "jsr:@std/expect@1": "1.0.18",
     "jsr:@std/fs@1": "1.0.22",
     "jsr:@std/internal@^1.0.12": "1.0.12",
@@ -48,6 +49,9 @@
       "dependencies": [
         "jsr:@std/internal"
       ]
+    },
+    "@std/encoding@1.0.10": {
+      "integrity": "8783c6384a2d13abd5e9e87a7ae0520a30e9f56aeeaa3bdf910a3eaaf5c811a1"
     },
     "@std/expect@1.0.18": {
       "integrity": "8566eab35200466f8609eb7e7aed062ed0db314e9a258d5d201b1b8997ce801a",

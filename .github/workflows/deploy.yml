@@ -122,3 +122,33 @@ jobs:
         run: flyctl deploy --remote-only --config fly.worker.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_WORKER }}
+
+  deploy-market:
+    name: Deploy Prediction Market
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: fly-market
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    environment:
+      name: production
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only --config fly.market.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
