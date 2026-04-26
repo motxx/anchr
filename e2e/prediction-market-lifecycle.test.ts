@@ -102,12 +102,19 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     const ALICE_PK = alice.publicKey;
     const BOB_PK = bob.publicKey;
 
-    const wallet = await createWallet(MINT_URL);
-    const aliceProofs: Proof[] = await throttledMintProofs(wallet, 200);
-    const bobProofs: Proof[] = await throttledMintProofs(wallet, 200);
+    // Mint headroom: a regtest mint can charge a small swap fee, and
+    // wallet.ops.send(BET_SATS, proofs) needs `proofs ≥ BET_SATS + fee`. The
+    // matchmaker also verifies the locked amount is ≥ BET_SATS via
+    // verifyReceivedToken, so we mint a bit more than we lock.
+    const BET_SATS = 200;
+    const MINT_SATS = 256;
 
-    expect(aliceProofs.reduce((s, p) => s + p.amount, 0)).toBe(200);
-    expect(bobProofs.reduce((s, p) => s + p.amount, 0)).toBe(200);
+    const wallet = await createWallet(MINT_URL);
+    const aliceProofs: Proof[] = await throttledMintProofs(wallet, MINT_SATS);
+    const bobProofs: Proof[] = await throttledMintProofs(wallet, MINT_SATS);
+
+    expect(aliceProofs.reduce((s, p) => s + p.amount, 0)).toBe(MINT_SATS);
+    expect(bobProofs.reduce((s, p) => s + p.amount, 0)).toBe(MINT_SATS);
 
     // Wire the in-process market server with the real wallet so /faucet
     // and /submit-token can decode real cashuB tokens.
@@ -139,7 +146,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     const aliceBet = await expectJson<BetResponse>(
       await postJson(app, `/markets/${market.id}/bet`, {
         side: "yes",
-        amount_sats: 200,
+        amount_sats: BET_SATS,
         bettor_pubkey: ALICE_PK,
       }),
       201,
@@ -149,7 +156,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     const bobBet = await expectJson<BetResponse>(
       await postJson(app, `/markets/${market.id}/bet`, {
         side: "no",
-        amount_sats: 200,
+        amount_sats: BET_SATS,
         bettor_pubkey: BOB_PK,
       }),
       201,
@@ -157,7 +164,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     expect(bobBet.matches.length).toBe(1);
 
     const match = bobBet.matches[0]!;
-    expect(match.amount_sats).toBe(200);
+    expect(match.amount_sats).toBe(BET_SATS);
     expect(match.counterparty_pubkey).toBe(ALICE_PK); // bob's counterparty is alice
     expect(match.group_pubkey_yes).toBe(market.group_pubkey_yes);
     expect(match.group_pubkey_no).toBe(market.group_pubkey_no);
@@ -170,7 +177,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
       myPubkey: ALICE_PK,
       mySide: "yes",
       counterpartyPubkey: BOB_PK,
-      amountSats: 200,
+      amountSats: BET_SATS,
       exchangeLocktime: match.locktime_exchange,
       marketLocktime: match.locktime_market,
     });
@@ -183,7 +190,7 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
       myPubkey: BOB_PK,
       mySide: "no",
       counterpartyPubkey: ALICE_PK,
-      amountSats: 200,
+      amountSats: BET_SATS,
       exchangeLocktime: match.locktime_exchange,
       marketLocktime: match.locktime_market,
     });
