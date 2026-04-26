@@ -17,7 +17,7 @@ on:
       region:
         description: "Fly region for the app + volume"
         required: false
-        default: "hkg"
+        default: "sin"
       rotate_keys:
         description: "Re-run DKG and overwrite existing secrets (true/false)"
         required: false
