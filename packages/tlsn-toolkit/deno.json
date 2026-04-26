@@ -4,12 +4,12 @@
   "exports": {
     ".": "./src/tlsn-validation.ts",
     "./tlsn-validation": "./src/tlsn-validation.ts",
+    "./tlsn-types": "./src/tlsn-types.ts",
     "./proof-redaction": "./src/proof-redaction.ts"
   },
   "imports": {
     "@anchr/core-runtime": "../core-runtime/src/mod.ts",
     "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
-    "@anchr/core-domain/types": "../core-domain/src/types.ts",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1"
