@@ -23,6 +23,7 @@
  */
 
 import { Anchr, type QueryCondition } from "./index.ts";
+import { statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
 
@@ -292,8 +293,7 @@ export class AnchrWorker {
     ];
     for (const path of candidates) {
       try {
-        const stat = require("node:fs").statSync(path);
-        if (stat.isFile()) return path;
+        if (statSync(path).isFile()) return path;
       } catch { /* not found */ }
     }
     // Fallback to PATH
