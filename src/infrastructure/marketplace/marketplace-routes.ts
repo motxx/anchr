@@ -8,7 +8,6 @@
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { validateZ } from "../zod-validator-shim.ts";
 import { createListingSchema } from "./marketplace-schemas.ts";
 import { createPaymentMiddleware } from "./xcashu-middleware.ts";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
@@ -50,16 +49,17 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
     "/listings",
     rateLimit,
     writeAuth,
-    validateZ("json", createListingSchema, (result, c) => {
-      if (!result.success) {
+    async (c) => {
+      let raw: unknown;
+      try { raw = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      const parsed = createListingSchema.safeParse(raw);
+      if (!parsed.success) {
         return c.json({
           error: "Invalid listing payload",
-          issues: result.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+          issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
         }, 400);
       }
-    }),
-    (c) => {
-      const payload = c.req.valid("json" as never) as ReturnType<typeof createListingSchema.parse>;
+      const payload = parsed.data;
       // Validate source_url at creation time (not just at fetch time) to prevent
       // storing SSRF targets and leaking them via GET /marketplace/listings.
       const urlError = validateAttachmentUri(payload.source_url);

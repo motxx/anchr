@@ -1,7 +1,6 @@
 import { Buffer } from "node:buffer";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { z } from "zod";
-import { validateZ } from "./zod-validator-shim.ts";
 import { spawn } from "../../packages/core-runtime/src/mod.ts";
 import { uploadAttachment } from "./attachment-store.ts";
 import { materializeAttachmentRef } from "./attachments.ts";
@@ -58,9 +57,12 @@ function handleListQueries(c: Context, svc: QueryService) {
   return c.json(queries.map(querySummary));
 }
 
-function handleCreateQuery(c: Context, svc: QueryService, getUrl: () => string) {
-  const payload = c.req.valid("json" as never) as z.infer<typeof createQuerySchema>;
-
+function handleCreateQuery(
+  c: Context,
+  svc: QueryService,
+  payload: z.infer<typeof createQuerySchema>,
+  getUrl: () => string,
+) {
   const input: QueryInput = {
     description: payload.description,
     location_hint: payload.location_hint,
@@ -77,13 +79,14 @@ function handleCreateQuery(c: Context, svc: QueryService, getUrl: () => string) 
       requesterMeta: payload.requester,
       bounty: payload.bounty,
       oracleIds: payload.oracle_ids,
-      htlc: payload.htlc as HtlcInfo | undefined,
-      quorum: payload.quorum as QuorumConfig | undefined,
+      htlc: payload.htlc,
+      quorum: payload.quorum,
     });
 
     return c.json(buildCreatedQueryPayload(query, getUrl()), 201);
   } catch (e) {
-    return c.json({ error: (e as Error).message }, 400);
+    const message = e instanceof Error ? e.message : String(e);
+    return c.json({ error: message }, 400);
   }
 }
 
@@ -105,15 +108,18 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
     "/queries",
     rateLimit,
     writeAuth,
-    validateZ("json", createQuerySchema, (result, c) => {
-      if (!result.success) {
+    async (c) => {
+      let raw: unknown;
+      try { raw = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      const parsed = createQuerySchema.safeParse(raw);
+      if (!parsed.success) {
         return c.json({
           error: "Invalid query payload",
-          issues: result.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
         }, 400);
       }
-    }),
-    (c) => handleCreateQuery(c, svc, () => getPublicRequestUrl(c)),
+      return handleCreateQuery(c, svc, parsed.data, () => getPublicRequestUrl(c));
+    },
   );
 
   app.post("/queries/:id/submit", writeAuth, (c) => {
@@ -178,16 +184,17 @@ async function handleUpload(c: Context, svc: QueryService) {
   if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
   let formData: FormData;
   try { formData = await c.req.formData(); } catch { return c.json({ error: "Expected multipart/form-data" }, 400); }
-  const file = formData.get("photo");
-  if (!file || typeof file === "string") return c.json({ error: "Missing photo field" }, 400);
+  const fileEntry = formData.get("photo");
+  if (!(fileEntry instanceof File)) return c.json({ error: "Missing photo field" }, 400);
+  const file = fileEntry;
 
-  if ((file as File).size > MAX_UPLOAD_BYTES) {
-    return c.json({ error: `File too large: ${(file as File).size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return c.json({ error: `File too large: ${file.size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
   }
 
-  const ext = (file as File).name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
+  const ext = file.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
   if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-  const result = await uploadAttachment(id, file as File, { expectedGps: query.expected_gps });
+  const result = await uploadAttachment(id, file, { expectedGps: query.expected_gps });
   return c.json({
     ok: true,
     attachment: materializeAttachmentRef(result.attachment, c.req.url),
