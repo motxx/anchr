@@ -3,6 +3,7 @@ import type { QueryStore } from "../domain/query-store.ts";
 import { buildChallengeRule, generateNonce } from "../domain/challenge.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
 import type { EscrowProvider } from "./escrow-port.ts";
+import type { FrostSignaturePort } from "./frost-signature-port.ts";
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { OracleResolver, MultiOracleResolver } from "./query-verification.ts";
 import {
@@ -42,6 +43,7 @@ export interface ServiceDeps {
   multiOracleResolver?: MultiOracleResolver;
   preimageStore?: PreimageStore;
   escrowProvider?: EscrowProvider;
+  frostSignature?: FrostSignaturePort;
   proofDelivery?: ProofDelivery;
   /** Normalize attachment refs in a QueryResult. Defaults to identity. */
   normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
@@ -420,13 +422,44 @@ export async function doSubmitEscrowResult(
   );
   store.set(queryId, updated);
 
-  // 3. Reveal preimage on success (HTLC settlement = preimage disclosure).
-  // P2PK+FROST queries don't carry a hashlock; settlement is the threshold
-  // signature returned out-of-band by the FROST coordinator.
-  const htlcHash = query.escrow?.type === "htlc" ? query.escrow.hash : undefined;
-  const preimage = tryRevealPreimage(deps.preimageStore, htlcHash, passed);
-  if (preimage) {
-    return { ok: true, query: updated, message: "Verification passed. Preimage revealed for HTLC redemption.", preimage };
+  // 3. Settlement on success — discriminated by escrow type.
+  //    HTLC: reveal the SHA-256 preimage from the preimage store.
+  //    P2PK+FROST: request a t-of-n threshold Schnorr signature on
+  //    `${queryId}:approved` from the FROST coordinator.
+  if (passed && query.escrow?.type === "htlc") {
+    const preimage = tryRevealPreimage(deps.preimageStore, query.escrow.hash, passed);
+    if (preimage) {
+      return {
+        ok: true,
+        query: updated,
+        message: "Verification passed. Preimage revealed for HTLC redemption.",
+        preimage,
+      };
+    }
+  }
+
+  if (passed && query.escrow?.type === "p2pk_frost" && deps.frostSignature) {
+    // Domain-separation tag: any future redeemer (Cashu mint, downstream verifier)
+    // must use the same prefix when validating this signature against the P2PK
+    // lock. The version suffix lets us evolve the encoding without colliding with
+    // sigs from older deployments. See ADR notes in EscrowSubmitOutcome.
+    const message = new TextEncoder().encode(
+      `anchr/query-settle/v1:${query.id}:approved`,
+    );
+    const frostSignature = await deps.frostSignature
+      .requestSignature(query.escrow.group_pubkey, message)
+      .catch((err) => {
+        console.error(`[frost-settlement] requestSignature failed:`, err);
+        return null;
+      });
+    if (frostSignature) {
+      return {
+        ok: true,
+        query: updated,
+        message: "Verification passed. FROST group signature delivered for P2PK redemption.",
+        frost_signature: frostSignature,
+      };
+    }
   }
 
   return {

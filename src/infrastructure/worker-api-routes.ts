@@ -270,15 +270,16 @@ async function handleSubmitResult(c: Context, svc: QueryService) {
 
   const query = svc.getQuery(id);
   if (query?.escrow) {
-    const htlcOutcome = await svc.submitEscrowResult(id, result, workerPubkey, oracleId, blossomKeys);
-    const status = !htlcOutcome.query ? 404 : !htlcOutcome.ok ? 422 : 200;
+    const escrowOutcome = await svc.submitEscrowResult(id, result, workerPubkey, oracleId, blossomKeys);
+    const status = !escrowOutcome.query ? 404 : !escrowOutcome.ok ? 422 : 200;
     return c.json({
-      ok: htlcOutcome.ok,
-      message: htlcOutcome.message,
-      verification: htlcOutcome.query?.verification,
-      oracle_id: htlcOutcome.query?.assigned_oracle_id ?? null,
-      payment_status: htlcOutcome.query?.payment_status,
-      preimage: htlcOutcome.preimage ?? null,
+      ok: escrowOutcome.ok,
+      message: escrowOutcome.message,
+      verification: escrowOutcome.query?.verification,
+      oracle_id: escrowOutcome.query?.assigned_oracle_id ?? null,
+      payment_status: escrowOutcome.query?.payment_status,
+      preimage: escrowOutcome.preimage ?? null,
+      frost_signature: escrowOutcome.frost_signature ?? null,
     }, status);
   }
 
