@@ -324,5 +324,5 @@ This runs a simulated coffee supply chain (Sao Paulo -> Santos -> Kawasaki -> Sh
 | `StepProof.gps_photo` | `GpsCoord` + `haversineKm()` in `src/domain/` | GPS proximity verification |
 | `StepProof.c2pa_media` | C2PA validation in `src/infrastructure/verification/` | Content Credential chain verification |
 | `StepProof.tlsn_api` | `TlsnVerifiedData` + oracle in `src/infrastructure/oracle/` | TLSNotary MPC-TLS proof verification |
-| `PaymentCondition` | `HtlcInfo` + Cashu in `src/infrastructure/` | Conditional HTLC payment release |
+| `PaymentCondition` | `EscrowInfo` + Cashu in `src/infrastructure/` | Conditional HTLC payment release |
 | `nostr_event_id` | Nostr relay integration in `src/infrastructure/` | Decentralized audit log |

@@ -95,9 +95,9 @@ console.log("  2. Open DevConsole → paste plugin code from RUNBOOK Step 6b");
 console.log("  3. Run Code → Allow → proof copied to clipboard\n");
 
 console.log("=== Submit to Anchr ===\n");
-console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/submit \\`);
+console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/result \\`);
 console.log('    -H "Content-Type: application/json" \\');
-console.log('    -d \'{"tlsn_presentation": "<base64-of-proof>"}\'');
+console.log('    -d \'{"worker_pubkey": "<your-pubkey>", "tlsn_presentation": "<base64-of-proof>"}\'');
 console.log();
 console.log("After successful verification:");
 console.log("  - Oracle releases HTLC preimage");
