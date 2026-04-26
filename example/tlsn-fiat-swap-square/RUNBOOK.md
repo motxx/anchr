@@ -241,9 +241,10 @@ export default {
 ```bash
 QUERY_ID="query_xxxxx"  # seller.ts の出力から
 
-curl -X POST http://localhost:3000/queries/${QUERY_ID}/submit \
+curl -X POST http://localhost:3000/queries/${QUERY_ID}/result \
   -H "Content-Type: application/json" \
-  -d "{\"tlsn_presentation\": \"$(base64 < proof.presentation.tlsn)\"}"
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d "{\"worker_pubkey\":\"buyer\",\"tlsn_presentation\":\"$(base64 < proof.presentation.tlsn)\"}"
 ```
 
 ---

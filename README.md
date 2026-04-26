@@ -217,8 +217,6 @@ Each package can be tested standalone: `cd packages/<name> && deno task test`. T
 
 Protocol specs in [`specs/`](specs/). Released under CC0 (public domain). Anyone may implement them.
 
-Refactor history and migration patterns in [`docs/refactor-plan.md`](docs/refactor-plan.md).
-
 ## License
 
 Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE)
