@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import type { Market } from "../mock-data.ts";
 import {
   placeBet,
@@ -16,6 +16,9 @@ import {
   loadHeldTokensForMarket,
   type HeldToken,
 } from "../wallet.ts";
+import { generateHistory, generateActivity } from "../lib/market-history.ts";
+import { PriceChart } from "./PriceChart.tsx";
+import { ActivityFeed } from "./ActivityFeed.tsx";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(2)}M`;
@@ -78,6 +81,8 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
   const noPercent = 100 - yesPercent;
   const isOpen = market.status === "open";
   const isResolved = market.status.startsWith("resolved_");
+  const history = useMemo(() => generateHistory(market, 64), [market]);
+  const activity = useMemo(() => generateActivity(market, 16), [market]);
 
   const amountNum = parseInt(amount) || 0;
   const potentialPayout = amountNum > 0
@@ -244,9 +249,12 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
             <p className="text-sm text-muted-foreground leading-relaxed">{market.description}</p>
           </div>
 
-          {/* Probability */}
+          {/* Probability chart */}
+          <PriceChart data={history} />
+
+          {/* YES/NO split */}
           <div className="rounded-xl border border-border bg-card p-6">
-            <h2 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Probability</h2>
+            <h2 className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Current Odds</h2>
             <div className="flex items-end justify-between mb-3">
               <div>
                 <span className="text-yes font-mono text-4xl font-bold">{yesPercent}%</span>
@@ -262,6 +270,9 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
               <div className="h-full bg-no rounded-r-full transition-all duration-500" style={{ width: `${noPercent}%` }} />
             </div>
           </div>
+
+          {/* Activity feed */}
+          <ActivityFeed events={activity} limit={8} />
 
           {/* Market info */}
           <div className="rounded-xl border border-border bg-card p-6">

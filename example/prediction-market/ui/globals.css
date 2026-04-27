@@ -32,10 +32,16 @@
   --color-yes-foreground: hsl(var(--yes-foreground));
   --color-no: hsl(var(--no));
   --color-no-foreground: hsl(var(--no-foreground));
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --color-sakura: hsl(var(--sakura));
+  --color-nagi: hsl(var(--nagi));
+  --color-amethyst: hsl(var(--amethyst));
+
+  /* Cute & rounded radius scale */
+  --radius-sm: 0.5rem;          /* 8px — pills, badges */
+  --radius-md: 0.875rem;        /* 14px — buttons, inputs */
+  --radius-lg: 1.25rem;         /* 20px — cards */
+  --radius-xl: 1.75rem;         /* 28px — feature cards */
+  --radius-pill: 9999px;
 }
 
 @layer base {
@@ -44,68 +50,105 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-family:
+      "M PLUS Rounded 1c",
+      "Hiragino Maru Gothic ProN",
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      system-ui,
+      sans-serif;
+    font-feature-settings: "palt" 1;
+    background-image:
+      radial-gradient(circle at 12% 18%, rgba(255, 183, 197, 0.18), transparent 38%),
+      radial-gradient(circle at 88% 8%, rgba(168, 197, 232, 0.16), transparent 42%),
+      radial-gradient(circle at 70% 92%, rgba(201, 181, 220, 0.14), transparent 45%);
+    background-attachment: fixed;
   }
+  /* Tabular numerals for any data the user compares vertically */
+  .font-mono { font-variant-numeric: tabular-nums; }
 }
 
 :root {
-  /* Nostr-inspired dark theme — deep black + purple
-   * Palette defined in DESIGN.md Section 2.
-   * Background: #0A0910, Card: #13111C, Primary: #8B5CF6 */
-  --background: 260 15% 4%;
-  --foreground: 255 25% 93%;
-  --card: 260 12% 8%;
-  --card-foreground: 255 25% 93%;
-  --popover: 260 12% 8%;
-  --popover-foreground: 255 25% 93%;
-  --primary: 258 90% 66%;
+  /* Kannagi v2 — Kawaii Pastel Shrine.
+   * Inspired by the 2008 anime かんなぎ:
+   *   - Nagi: 青髪 (blue hair) + 紫眼 (purple eyes) + 紅白 miko outfit + 桜 ribbon
+   *   - World: sunlit Japanese shrine, vermillion torii, sakura petals
+   * Atmosphere: soft sakura-mochi cream paper, pastels float on top,
+   * single sakura-coral brand accent, vermillion held back for "ceremonial"
+   * states only. Tokens documented in DESIGN.md Section 2.
+   */
+
+  /* Neutrals — sakura-mochi paper progression */
+  --background: 12 100% 98%;       /* #FFF8F4 — soft peach cream */
+  --foreground: 320 18% 22%;       /* #4A3142 — warm plum-dark */
+  --card: 0 0% 100%;
+  --card-foreground: 320 18% 22%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 320 18% 22%;
+
+  /* Brand — Sakura coral (桜珊瑚) — softer, kawaii vermillion */
+  --primary: 350 100% 71%;         /* #FF6B85 */
   --primary-foreground: 0 0% 100%;
-  --secondary: 260 14% 15%;
-  --secondary-foreground: 255 10% 66%;
-  --muted: 260 12% 11%;
-  --muted-foreground: 260 10% 46%;
-  --accent: 263 30% 20%;
-  --accent-foreground: 258 60% 75%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 260 14% 15%;
-  --input: 260 12% 11%;
-  --ring: 258 90% 66%;
-  /* Prediction market YES/NO — DESIGN.md Section 2 */
-  --yes: 142 71% 45%;
-  --yes-foreground: 142 64% 24%;
-  --no: 0 84% 60%;
-  --no-foreground: 0 63% 31%;
-  --radius: 0.75rem;
+
+  --secondary: 350 100% 92%;       /* #FFD9DF — soft rose */
+  --secondary-foreground: 320 14% 36%;
+
+  --muted: 350 100% 96%;           /* #FFEEF1 — pink tint */
+  --muted-foreground: 320 13% 52%; /* #9B7E92 */
+
+  /* Accent — Nagi (ナギ) blue — her signature hair color */
+  --accent: 211 60% 82%;           /* #A8C5E8 */
+  --accent-foreground: 211 50% 24%;
+
+  --destructive: 354 78% 56%;      /* #E63946 — ceremonial vermillion */
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 350 100% 92%;          /* #FFD9DF */
+  --input: 350 100% 96%;
+  --ring: 350 100% 71%;            /* sakura coral focus */
+
+  /* Prediction outcomes — pastel sakaki / vermillion */
+  --yes: 165 45% 56%;              /* #5FBFA0 — pastel sakaki sage */
+  --yes-foreground: 165 45% 18%;
+  --no: 354 78% 56%;               /* #E63946 — vermillion (鳥居の朱) */
+  --no-foreground: 0 0% 100%;
+
+  /* Decorative motifs (not used by Tailwind utilities but referenced
+   * directly via hsl(var(--sakura)) in components) */
+  --sakura: 350 100% 86%;          /* #FFB7C5 — sakura petal pink */
+  --nagi: 211 60% 82%;             /* #A8C5E8 — Nagi blue */
+  --amethyst: 274 35% 79%;         /* #C9B5DC — Nagi eye lavender */
+
+  --radius: 1.25rem;               /* 20px — cards by default */
 }
 
-.dark {
-  --background: 260 15% 4%;
-  --foreground: 255 25% 93%;
-  --card: 260 12% 8%;
-  --card-foreground: 255 25% 93%;
-  --popover: 260 12% 8%;
-  --popover-foreground: 255 25% 93%;
-  --primary: 258 90% 66%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 260 14% 15%;
-  --secondary-foreground: 255 10% 66%;
-  --muted: 260 12% 11%;
-  --muted-foreground: 260 10% 46%;
-  --accent: 263 30% 20%;
-  --accent-foreground: 258 60% 75%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 260 14% 15%;
-  --input: 260 12% 11%;
-  --ring: 258 90% 66%;
-  --yes: 142 71% 45%;
-  --yes-foreground: 142 64% 24%;
-  --no: 0 84% 60%;
-  --no-foreground: 0 63% 31%;
-}
-
-/* Mono font for numbers */
+/* Mono font for numbers, hashes, pubkeys */
 .font-mono {
   font-family: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* Brand wordmark only — handwritten kanji-friendly mincho */
+.font-shrine {
+  font-family: "Klee One", "Yomogi", "Hina Mincho", "Hiragino Mincho ProN", serif;
+  font-feature-settings: "palt" 1;
+  letter-spacing: 0.01em;
+}
+
+/* Cute rounded-pill button shape */
+.btn-pill {
+  border-radius: 9999px;
+}
+
+/* Decorative star/sparkle keyframes for accent dots */
+@keyframes sparkle-pulse {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
+  50% { transform: scale(1.18) rotate(20deg); opacity: 1; }
+}
+.animate-sparkle { animation: sparkle-pulse 2.4s ease-in-out infinite; }
+
+/* Soft pink glow shadow for hover/focus highlights */
+.shadow-sakura {
+  box-shadow: 0 8px 32px -12px rgba(255, 107, 133, 0.35);
 }

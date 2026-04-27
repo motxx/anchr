@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { Market } from "../mock-data.ts";
 import { cn } from "../lib/utils.ts";
+import { generateHistory } from "../lib/market-history.ts";
+import { Sparkline } from "./Sparkline.tsx";
 
 function formatSats(sats: number): string {
   if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(1)}M`;
@@ -40,11 +42,12 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
   const noPercent = 100 - yesPercent;
   const isResolved = market.status.startsWith("resolved_");
   const isOpen = market.status === "open";
+  const history = useMemo(() => generateHistory(market, 32), [market]);
 
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-xl border border-border bg-card p-5 transition-all duration-200 hover:border-primary/40 hover:bg-card/80 hover:shadow-[0_0_24px_-6px_hsl(270_80%_60%/0.15)] group"
+      className="w-full text-left rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sakura group"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -71,13 +74,14 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         {market.title}
       </h3>
 
-      {/* Probability bar */}
+      {/* Probability bar + sparkline */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5">
             <span className="text-yes font-mono text-lg font-semibold">{yesPercent}%</span>
             <span className="text-xs text-muted-foreground">Yes</span>
           </div>
+          <Sparkline data={history} width={96} height={22} className="opacity-90" />
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-muted-foreground">No</span>
             <span className="text-no font-mono text-lg font-semibold">{noPercent}%</span>

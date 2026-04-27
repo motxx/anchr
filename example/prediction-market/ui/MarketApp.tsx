@@ -93,18 +93,23 @@ export function MarketApp() {
         <WalletPanel />
 
         {/* Hero */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Prediction Markets</h1>
-            <p className="text-muted-foreground text-sm">
+            <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">
+              Prediction Markets
+              <span className="font-shrine text-base text-muted-foreground ml-2 align-middle">
+                予想市場
+              </span>
+            </h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
               Bet on real-world outcomes with sats. No KYC. No bridges. Verified by TLSNotary.
             </p>
           </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="shrink-0 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+            className="shrink-0 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all hover:-translate-y-0.5 shadow-sakura"
           >
-            {showCreateForm ? "Cancel" : "+ Create Market"}
+            {showCreateForm ? "✕ Cancel" : "✿ Create Market"}
           </button>
         </div>
 
@@ -121,16 +126,16 @@ export function MarketApp() {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
           {/* Category tabs */}
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 -mb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.value}
                 onClick={() => setCategory(cat.value)}
                 className={cn(
-                  "shrink-0 px-3 h-8 rounded-lg text-xs font-medium transition-all duration-200",
+                  "shrink-0 px-3.5 h-9 rounded-full text-xs font-semibold transition-all duration-200",
                   category === cat.value
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-primary text-primary-foreground shadow-sakura"
+                    : "text-muted-foreground bg-card border border-border hover:text-primary hover:border-primary/40"
                 )}
               >
                 {cat.label}
@@ -141,15 +146,15 @@ export function MarketApp() {
           <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto">
             {/* Search */}
             <div className="relative flex-1 sm:flex-initial">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
               </svg>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search markets..."
-                className="h-8 w-full sm:w-48 rounded-lg border border-border bg-muted pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                placeholder="Search markets…"
+                className="h-9 w-full sm:w-52 rounded-full border border-border bg-card pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
               />
             </div>
 
@@ -157,7 +162,7 @@ export function MarketApp() {
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortMode)}
-              className="h-8 rounded-lg border border-border bg-muted px-2 text-xs text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
+              className="h-9 rounded-full border border-border bg-card px-3 pr-7 text-xs font-medium text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
             >
               <option value="volume">Volume</option>
               <option value="newest">Newest</option>
@@ -214,8 +219,11 @@ export function MarketApp() {
 
         {/* Footer */}
         <footer className="mt-16 pt-6 border-t border-border text-center text-xs text-muted-foreground">
-          <p className="mb-1">
-            Powered by <span className="text-primary font-medium">Anchr</span> — Cashu HTLC + Nostr + TLSNotary
+          <p className="mb-1 flex items-center justify-center gap-1.5">
+            <span className="text-sakura">✿</span>
+            <span className="font-shrine text-primary font-semibold">Kannagi</span>
+            <span>— Cashu HTLC · Nostr · TLSNotary</span>
+            <span className="text-sakura">✿</span>
           </p>
           <p>No Polygon. No USDC. No KYC. Just sats and math.</p>
         </footer>
