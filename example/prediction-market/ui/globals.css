@@ -37,10 +37,10 @@
   --color-amethyst: hsl(var(--amethyst));
 
   /* Cute & rounded radius scale */
-  --radius-sm: 0.5rem;          /* 8px — pills, badges */
-  --radius-md: 0.875rem;        /* 14px — buttons, inputs */
-  --radius-lg: 1.25rem;         /* 20px — cards */
-  --radius-xl: 1.75rem;         /* 28px — feature cards */
+  --radius-sm: 0.375rem;        /* 6px — pills, badges */
+  --radius-md: 0.625rem;        /* 10px — buttons, inputs */
+  --radius-lg: 0.9375rem;       /* 15px — cards (designer's sweet spot) */
+  --radius-xl: 1.125rem;        /* 18px — feature cards */
   --radius-pill: 9999px;
 }
 
@@ -51,21 +51,19 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family:
-      "M PLUS Rounded 1c",
-      "Hiragino Maru Gothic ProN",
       "Inter",
+      "Zen Kaku Gothic New",
+      "Hiragino Sans",
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
       system-ui,
       sans-serif;
     font-feature-settings: "palt" 1;
-    /* Calm shoji-paper cream — sakura pink stays an accent (CTAs, badges,
-     * hover glows) and never floods the canvas. A very light radial wash
-     * at the corners keeps the surface warm without pinking it up. */
+    /* One soft top-vignette — keeps the surface from reading "unfinished
+     * Polymarket clone" without bleeding pink across the canvas. */
     background-image:
-      radial-gradient(circle at 100% 0%, rgba(255, 183, 197, 0.06), transparent 55%),
-      radial-gradient(circle at 0% 100%, rgba(168, 197, 232, 0.05), transparent 55%);
+      linear-gradient(to bottom, rgba(255, 200, 210, 0.06), transparent 240px);
     background-attachment: fixed;
   }
   /* Tabular numerals for any data the user compares vertically */
@@ -125,7 +123,7 @@
   --nagi: 211 60% 82%;             /* #A8C5E8 — Nagi blue */
   --amethyst: 274 35% 79%;         /* #C9B5DC — Nagi eye lavender */
 
-  --radius: 1.25rem;               /* 20px — cards by default */
+  --radius: 0.9375rem;             /* 15px — cards by default */
 }
 
 /* Mono font for numbers, hashes, pubkeys */
@@ -140,23 +138,10 @@
   letter-spacing: 0.01em;
 }
 
-/* Cute rounded-pill button shape */
-.btn-pill {
-  border-radius: 9999px;
-}
-
-/* Decorative star/sparkle keyframes for accent dots */
-@keyframes sparkle-pulse {
-  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.85; }
-  50% { transform: scale(1.18) rotate(20deg); opacity: 1; }
-}
-.animate-sparkle { animation: sparkle-pulse 2.4s ease-in-out infinite; }
-
-/* Falling sakura — petals descend from above the viewport, drift sideways
- * with the wind, and spin as they fall. Per-petal duration / delay / sway
- * amplitude / spin direction come from the inline-style custom properties
- * set in SakuraField.tsx. One shared keyframe; the compositor does the
- * rest, so 70 petals stay smooth. */
+/* Sakura burst — one-shot fall fired on resolution / bet-fill events.
+ * Per-petal --sway / --spin / animation-duration / -delay are set inline
+ * by SakuraBurst.tsx. Single iteration; the component unmounts after the
+ * longest petal lands. */
 @keyframes sakura-fall {
   0% {
     transform: translate3d(0, -12vh, 0) rotate(0deg);
@@ -175,19 +160,19 @@
   }
 }
 
-.sakura-petal {
+.sakura-burst-petal {
   top: 0;
   animation-name: sakura-fall;
   animation-timing-function: linear;
-  animation-iteration-count: infinite;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
   will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sakura-petal { animation: none; transform: translateY(40vh); }
+  .sakura-burst-petal { animation: none; opacity: 0 !important; }
 }
 
-/* Soft pink glow shadow for hover/focus highlights */
-.shadow-sakura {
-  box-shadow: 0 8px 32px -12px rgba(255, 107, 133, 0.35);
-}
+/* Coral primary lives only on CTAs and focus rings — no card glow,
+ * no decorative shadows. (Removed: .shadow-sakura, .animate-sparkle,
+ * .btn-pill — all replaced by neutral utility classes.) */

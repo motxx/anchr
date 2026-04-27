@@ -40,23 +40,23 @@ export function FeaturedMarket({ market, onClick }: FeaturedMarketProps) {
   return (
     <button
       onClick={onClick}
-      className="block w-full text-left rounded-2xl border border-border bg-card p-6 transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sakura group mb-6"
+      className="block w-full text-left rounded-lg border border-border bg-card p-5 sm:p-6 transition-colors hover:border-foreground/30 group mb-6"
     >
       <div className="flex items-center gap-2 mb-3">
-        <span className="rounded-full bg-primary/12 text-primary text-[10px] font-bold uppercase tracking-wider px-2.5 py-1">
-          ✦ Featured
+        <span className="rounded bg-foreground/8 text-foreground/80 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5">
+          Featured
         </span>
         <span className="text-xs text-muted-foreground uppercase tracking-wider">
           {market.category}
         </span>
-        <span className="text-xs text-muted-foreground ml-auto">
+        <span className="text-xs text-muted-foreground ml-auto font-mono">
           {formatTimeLeft(market.resolution_deadline)} left
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-end">
         <div className="min-w-0">
-          <h2 className="text-2xl font-bold leading-tight text-foreground mb-4 group-hover:text-primary/90 transition-colors">
+          <h2 className="text-2xl font-bold leading-tight text-foreground mb-4 transition-colors">
             {market.title}
           </h2>
 

@@ -47,7 +47,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-sakura group"
+      className="w-full text-left rounded-lg border border-border bg-card p-4 sm:p-5 transition-colors hover:border-foreground/30 group"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -56,8 +56,8 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
           <span className="uppercase tracking-wider">{market.category}</span>
         </div>
         <div className={cn(
-          "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium",
-          isOpen && "bg-primary/15 text-primary",
+          "shrink-0 rounded-md px-2 py-0.5 text-xs font-mono font-medium",
+          isOpen && "bg-foreground/8 text-foreground/70",
           market.status === "resolved_yes" && "bg-yes/15 text-yes",
           market.status === "resolved_no" && "bg-no/15 text-no",
           market.status === "closed" && "bg-muted text-muted-foreground",
@@ -70,7 +70,7 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
       </div>
 
       {/* Title */}
-      <h3 className="text-[15px] font-semibold leading-snug text-foreground mb-4 group-hover:text-primary/90 transition-colors">
+      <h3 className="text-[15px] font-semibold leading-snug text-foreground mb-4 transition-colors">
         {market.title}
       </h3>
 

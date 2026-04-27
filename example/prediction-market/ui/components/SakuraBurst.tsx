@@ -1,25 +1,16 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useState } from "react";
 
 interface Petal {
-  /** Horizontal start (vw). */
-  x: number;
-  /** Petal width/height in px. */
-  size: number;
-  /** Hue around sakura pink. */
+  x: number;        // start position vw
+  size: number;     // px
   hue: number;
   lightness: number;
-  /** Alpha multiplier 0–1 — entire petal stays atmospheric, never loud. */
   alpha: number;
-  /** Fall duration in seconds. */
-  duration: number;
-  delay: number;
-  /** Horizontal sway amplitude in px. */
-  sway: number;
-  /** Total rotation across one fall in degrees. */
-  spin: number;
-  /** Which of 3 petal shapes to render. */
+  duration: number; // s
+  delay: number;    // s — within the burst window
+  sway: number;     // px
+  spin: number;     // deg
   shape: 0 | 1 | 2;
-  /** Mirror horizontally — keeps asymmetric shapes from looking cloned. */
   mirror: boolean;
 }
 
@@ -34,21 +25,21 @@ function rng(seed: number): () => number {
   };
 }
 
-function buildField(seed: number, count: number): Petal[] {
+function buildBurst(seed: number, count: number): Petal[] {
   const r = rng(seed);
   const petals: Petal[] = [];
   for (let i = 0; i < count; i++) {
-    const duration = 18 + r() * 14; // 18–32s
+    const duration = 5 + r() * 4;     // 5–9s — quick burst, not ambient
     petals.push({
       x: r() * 100,
-      size: 22 + r() * 22,                   // 22–44px
-      hue: 348 + r() * 12,                   // 348–360 (sakura pink)
-      lightness: 76 + r() * 8,               // 76–84%
-      alpha: 0.32 + r() * 0.30,              // 32–62% — atmospheric
+      size: 22 + r() * 24,
+      hue: 348 + r() * 12,
+      lightness: 76 + r() * 8,
+      alpha: 0.55 + r() * 0.35,        // brighter than ambient — celebratory
       duration,
-      delay: r() * duration,
-      sway: 28 + r() * 56,                   // 28–84px
-      spin: (r() < 0.5 ? -1 : 1) * (60 + r() * 220), // ±60–280° (gentle tumble)
+      delay: r() * 1.2,                // staggered over the first 1.2s
+      sway: 28 + r() * 56,
+      spin: (r() < 0.5 ? -1 : 1) * (60 + r() * 220),
       shape: Math.floor(r() * 3) as 0 | 1 | 2,
       mirror: r() < 0.5,
     });
@@ -56,14 +47,8 @@ function buildField(seed: number, count: number): Petal[] {
   return petals;
 }
 
-/**
- * Petal silhouettes — front view, side view, and an asymmetric "leaning"
- * variant. Each shape includes a body outline and a smaller inner curve
- * used as a specular highlight reference.
- */
 const PETAL_SHAPES: Array<{ body: string; specular: string }> = [
   {
-    // 1. Front bloom — symmetric oval with a soft V-notch tip.
     body:
       "M32 4 C 46 6 54 18 52 32 C 50 46 42 56 32 60 " +
       "C 22 56 14 46 12 32 C 10 18 18 6 32 4 Z " +
@@ -73,7 +58,6 @@ const PETAL_SHAPES: Array<{ body: string; specular: string }> = [
       "C 25 36 22 30 22 24 C 22 16 24 12 28 12 Z",
   },
   {
-    // 2. Side / 3-quarter view — narrower, more elongated.
     body:
       "M32 5 C 41 6 47 16 46 28 C 45 42 41 54 32 60 " +
       "C 23 54 19 42 18 28 C 17 16 23 6 32 5 Z " +
@@ -83,7 +67,6 @@ const PETAL_SHAPES: Array<{ body: string; specular: string }> = [
       "C 26 42 23 34 23 26 C 23 18 25 14 28 14 Z",
   },
   {
-    // 3. Leaning petal — asymmetric, caught mid-flutter.
     body:
       "M28 5 C 42 6 52 18 50 32 C 48 46 38 58 26 60 " +
       "C 17 54 12 42 14 28 C 16 14 22 6 28 5 Z " +
@@ -98,57 +81,62 @@ function hsl(h: number, s: number, l: number, a = 1): string {
   return `hsla(${h.toFixed(0)} ${s}% ${l.toFixed(0)}% / ${a})`;
 }
 
-interface SakuraFieldProps {
-  /** Default 18 — quiet enough to never become visual noise. */
+interface SakuraBurstProps {
+  /** Increment to fire a new burst. */
+  trigger: number;
+  /** Petal count per burst (default 36). */
   count?: number;
-  /** Deterministic seed (default fixed). */
-  seed?: number;
 }
 
 /**
- * Falling sakura — illustrated, shaded petals descending slowly with sway
- * and gentle tumble.
+ * Trigger-fired sakura burst — replaces the always-on background field.
+ * The brand only "speaks" when something meaningful happens: the user
+ * places a bet, or a market resolves. Each `trigger` increment spawns a
+ * fresh batch of petals that fall once and clean themselves up.
  *
- * Each petal renders as a 64×64 SVG with three layers:
- *   1. A radial gradient body that simulates light falling on a curved
- *      surface — base hue at the lit edge, +8% lightness inside, –18%
- *      lightness at the shadow side.
- *   2. A soft specular highlight (white radial-fade ellipse) near the
- *      lit edge, suggesting a glossy petal surface.
- *   3. A drop-shadow filter for ambient occlusion against the page.
- *
- * Three shape variants × hue × scale × mirror keep 18 petals from
- * looking cloned. Per-petal motion is baked into CSS custom properties
- * (--sway, --spin) plus animation-duration / -delay; one shared keyframe
- * handles the descent, and the compositor does the work.
+ * Brand metaphor: 神和ぎ (kannagi) = the spirit-pacifying ritual; the
+ * petals fall when an outcome is decided. Otherwise the chrome is silent.
  */
-export function SakuraField({ count = 18, seed = 0xCAFE_F10 }: SakuraFieldProps) {
-  const petals = useMemo(() => buildField(seed, count), [seed, count]);
+export function SakuraBurst({ trigger, count = 36 }: SakuraBurstProps) {
+  // Each fire gets a unique key so React unmounts the previous batch.
+  const [activeBurst, setActiveBurst] = useState<{ id: number; petals: Petal[] } | null>(null);
+
+  useEffect(() => {
+    if (trigger <= 0) return;
+    const seed = (trigger * 0x9E3779B9) >>> 0;
+    const petals = buildBurst(seed, count);
+    setActiveBurst({ id: trigger, petals });
+    // After the longest petal finishes (max ~10s including delay), unmount.
+    const timeout = setTimeout(() => setActiveBurst(null), 11_000);
+    return () => clearTimeout(timeout);
+  }, [trigger, count]);
+
+  if (!activeBurst) return null;
 
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
     >
-      {petals.map((p, i) => {
+      {activeBurst.petals.map((p, i) => {
         const shape = PETAL_SHAPES[p.shape];
         const baseColor = hsl(p.hue, 88, p.lightness);
         const lightColor = hsl(p.hue, 95, Math.min(96, p.lightness + 10));
         const darkColor = hsl(p.hue, 70, Math.max(54, p.lightness - 18));
-        const fillId = `sakura-fill-${i}`;
-        const specId = `sakura-spec-${i}`;
+        const fillId = `sakura-fill-${activeBurst.id}-${i}`;
+        const specId = `sakura-spec-${activeBurst.id}-${i}`;
 
         return (
           <span
-            key={i}
-            className="sakura-petal absolute block"
+            key={`${activeBurst.id}-${i}`}
+            className="sakura-burst-petal absolute block"
             style={{
               left: `${p.x}vw`,
               width: p.size,
               height: p.size,
               opacity: p.alpha,
               animationDuration: `${p.duration.toFixed(2)}s`,
-              animationDelay: `-${p.delay.toFixed(2)}s`,
+              animationDelay: `${p.delay.toFixed(2)}s`,
               ["--sway" as string]: `${p.sway.toFixed(0)}px`,
               ["--spin" as string]: `${p.spin.toFixed(0)}deg`,
               filter: "drop-shadow(0 2px 3px rgba(220, 90, 130, 0.18))",
@@ -162,26 +150,19 @@ export function SakuraField({ count = 18, seed = 0xCAFE_F10 }: SakuraFieldProps)
               style={p.mirror ? { transform: "scaleX(-1)" } : undefined}
             >
               <defs>
-                {/* Body — radial gradient: light center → base → dark rim.
-                  * cx/cy off-center to simulate side-lighting. */}
                 <radialGradient id={fillId} cx="38%" cy="34%" r="70%">
                   <stop offset="0%" stopColor={lightColor} />
                   <stop offset="55%" stopColor={baseColor} />
                   <stop offset="100%" stopColor={darkColor} />
                 </radialGradient>
-                {/* Specular highlight — small bright radial-fade. */}
                 <radialGradient id={specId} cx="42%" cy="30%" r="40%">
                   <stop offset="0%" stopColor="rgba(255,255,255,0.78)" />
                   <stop offset="60%" stopColor="rgba(255,255,255,0.20)" />
                   <stop offset="100%" stopColor="rgba(255,255,255,0)" />
                 </radialGradient>
               </defs>
-
-              {/* Petal body — 3D-shaded fill */}
               <path d={shape.body} fill={`url(#${fillId})`} fillRule="evenodd" />
-              {/* Specular highlight — sits inside the petal, suggests gloss */}
               <path d={shape.specular} fill={`url(#${specId})`} />
-              {/* Subtle rim line — adds definition, very faint */}
               <path
                 d={shape.body}
                 fill="none"

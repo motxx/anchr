@@ -29,7 +29,7 @@ export function ActivityFeed({ events, limit = 8 }: ActivityFeedProps) {
   const visible = events.slice(0, limit);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Activity

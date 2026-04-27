@@ -7,7 +7,7 @@ import { StatsBar } from "./components/StatsBar.tsx";
 import { MarketCard } from "./components/MarketCard.tsx";
 import { MarketDetail } from "./components/MarketDetail.tsx";
 import { FeaturedMarket } from "./components/FeaturedMarket.tsx";
-import { SakuraField } from "./components/SakuraField.tsx";
+import { SakuraBurst } from "./components/SakuraBurst.tsx";
 import { trendingScore } from "./lib/market-history.ts";
 import { cn } from "./lib/utils.ts";
 
@@ -56,6 +56,8 @@ export function MarketApp() {
   const [sort, setSort] = useState<SortMode>("trending");
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
+  // Bumped each time a bet is placed or a market resolves — fires SakuraBurst.
+  const [sakuraTrigger, setSakuraTrigger] = useState(0);
 
   // Markets are an external resource — React Query owns the cache, retries,
   // refetch-on-focus, and re-renders. No useEffect needed.
@@ -77,47 +79,44 @@ export function MarketApp() {
 
   if (selectedMarket) {
     return (
-      <div className="min-h-screen relative">
-        <SakuraField />
-        <div className="relative z-10">
-          <Header />
-          <main className="max-w-6xl mx-auto px-5 py-8">
-            <MarketDetail
-              market={selectedMarket}
-              onBack={() => {
-                setSelectedMarketId(null);
-                invalidateMarkets();
-              }}
-              onBetPlaced={invalidateMarkets}
-            />
-          </main>
-        </div>
+      <div className="min-h-screen">
+        <SakuraBurst trigger={sakuraTrigger} />
+        <Header />
+        <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
+          <MarketDetail
+            market={selectedMarket}
+            onBack={() => {
+              setSelectedMarketId(null);
+              invalidateMarkets();
+            }}
+            onBetPlaced={() => {
+              invalidateMarkets();
+              setSakuraTrigger((v) => v + 1);
+            }}
+          />
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen relative">
-      <SakuraField />
-      <div className="relative z-10">
+    <div className="min-h-screen">
+      <SakuraBurst trigger={sakuraTrigger} />
       <Header />
 
-      <main className="max-w-6xl mx-auto px-5 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
         {/* Hero — Kannagi is the platform; the brand is established in the
-         * header, so the page lands directly on a tagline + the create CTA. */}
-        <div className="flex items-end justify-between mb-6 gap-4">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Bet on real-world outcomes with sats. Verified by TLSNotary.
-          </p>
+         * header, so the page lands directly on the create CTA. No
+         * redundant tagline or stats above the featured market. */}
+        <div className="flex items-center justify-end mb-5">
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="shrink-0 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all hover:-translate-y-0.5 shadow-sakura"
+            className="h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
           >
-            {showCreateForm ? "✕ Cancel" : "✿ Create Market"}
+            {showCreateForm ? "Cancel" : "Create market"}
           </button>
         </div>
 
-        {/* Create Market Form */}
         {showCreateForm && (
           <CreateMarketForm
             onCreated={() => {
@@ -127,8 +126,6 @@ export function MarketApp() {
             onCancel={() => setShowCreateForm(false)}
           />
         )}
-
-        <StatsBar markets={markets} />
 
         {/* Featured */}
         {featured && !showCreateForm && (
@@ -142,7 +139,7 @@ export function MarketApp() {
               key={t.key}
               onClick={() => setSort(t.key)}
               className={cn(
-                "shrink-0 px-4 h-9 rounded-full text-sm font-semibold transition-all duration-200",
+                "shrink-0 px-4 h-9 rounded-full text-sm font-semibold transition-colors",
                 sort === t.key
                   ? "bg-foreground text-background"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -155,16 +152,16 @@ export function MarketApp() {
 
         {/* Category + search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.value}
                 onClick={() => setCategory(cat.value)}
                 className={cn(
-                  "shrink-0 px-3 h-8 rounded-full text-xs font-semibold transition-all duration-200",
+                  "shrink-0 px-3 h-8 rounded-full text-xs font-semibold transition-colors",
                   category === cat.value
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground bg-card border border-border hover:text-primary hover:border-primary/40",
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground bg-card border border-border hover:text-foreground hover:border-foreground/30",
                 )}
               >
                 {cat.label}
@@ -172,7 +169,7 @@ export function MarketApp() {
             ))}
           </div>
 
-          <div className="relative flex-1 sm:flex-initial sm:ml-auto">
+          <div className="relative flex-1 sm:flex-initial sm:ml-auto w-full sm:w-auto">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
             </svg>
@@ -196,7 +193,7 @@ export function MarketApp() {
 
         {/* Error state */}
         {marketsQuery.isError && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 mb-6 text-center">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 mb-6 text-center">
             <p className="text-sm text-destructive mb-3">
               {marketsQuery.error instanceof Error ? marketsQuery.error.message : "Failed to load markets"}
             </p>
@@ -209,9 +206,9 @@ export function MarketApp() {
           </div>
         )}
 
-        {/* Market grid */}
+        {/* Market grid — 1-up mobile, 2-up tablet, 3-up xl */}
         {marketsQuery.isSuccess && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filtered.map((market) => (
               <MarketCard
                 key={market.id}
@@ -219,6 +216,13 @@ export function MarketApp() {
                 onClick={() => setSelectedMarketId(market.id)}
               />
             ))}
+          </div>
+        )}
+
+        {/* StatsBar — moved below the fold; aggregates aren't the headline */}
+        {marketsQuery.isSuccess && markets.length > 0 && (
+          <div className="mt-10">
+            <StatsBar markets={markets} />
           </div>
         )}
 
@@ -233,16 +237,14 @@ export function MarketApp() {
           </div>
         )}
 
-        {/* Footer */}
+        {/* Footer — neutral, no decorative chrome */}
         <footer className="mt-16 pt-6 border-t border-border text-center text-xs text-muted-foreground">
-          <p className="flex items-center justify-center gap-1.5">
-            <span className="text-sakura">✿</span>
-            <span className="font-shrine text-primary font-semibold">Kannagi</span>
-            <span className="text-sakura">✿</span>
+          <p>
+            <span className="font-shrine text-foreground/80">Kannagi</span>
+            <span className="text-muted-foreground/70 ml-2">かんなぎ</span>
           </p>
         </footer>
       </main>
-      </div>
     </div>
   );
 }
@@ -301,7 +303,7 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
   };
 
   return (
-    <div className="rounded-xl border border-primary/30 bg-card p-6 mb-8">
+    <div className="rounded-lg border border-border bg-card p-5 sm:p-6 mb-6">
       <h2 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wider">Create New Market</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

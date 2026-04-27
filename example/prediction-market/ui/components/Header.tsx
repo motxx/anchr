@@ -1,6 +1,6 @@
 import React from "react";
 import { getUserPubkey, truncatePubkey } from "../keypair.ts";
-import { SakuraIcon, SparkleIcon, ToriiIcon } from "./Motifs.tsx";
+import { ToriiIcon } from "./Motifs.tsx";
 import { WalletButton } from "./WalletButton.tsx";
 
 export { getUserPubkey } from "../keypair.ts";
@@ -8,23 +8,18 @@ export { getUserPubkey } from "../keypair.ts";
 export function Header() {
   const pubkey = getUserPubkey();
   return (
-    <header className="border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Brand mark — torii on a soft pink rounded square */}
-          <div className="relative w-10 h-10 rounded-2xl bg-primary/12 ring-1 ring-primary/20 flex items-center justify-center">
-            <ToriiIcon className="text-primary" size={20} />
-            <SakuraIcon
-              size={10}
-              className="absolute -top-1 -right-1 text-sakura animate-sparkle"
-            />
+    <header className="border-b border-border bg-card/85 backdrop-blur-md sticky top-0 z-40">
+      <div className="max-w-6xl mx-auto px-4 sm:px-5 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {/* Brand mark — torii in a sumi square. No decorative ornaments. */}
+          <div className="w-8 h-8 rounded-lg bg-foreground/5 ring-1 ring-foreground/10 flex items-center justify-center">
+            <ToriiIcon className="text-foreground" size={16} />
           </div>
-
-          <div className="flex items-baseline gap-2.5">
-            <span className="font-shrine text-2xl font-semibold text-foreground tracking-tight leading-none">
+          <div className="flex items-baseline gap-2">
+            <span className="font-shrine text-xl font-semibold text-foreground tracking-tight leading-none">
               Kannagi
             </span>
-            <span className="font-shrine text-sm text-muted-foreground hidden sm:inline">
+            <span className="font-shrine text-xs text-muted-foreground hidden sm:inline">
               かんなぎ
             </span>
           </div>
@@ -33,9 +28,9 @@ export function Header() {
         <div className="flex items-center gap-2">
           <WalletButton />
 
-          {/* Pubkey */}
+          {/* Pubkey — secondary; hide on mobile */}
           <div
-            className="hidden sm:flex items-center gap-1.5 rounded-full border border-border bg-card px-3 h-9"
+            className="hidden md:flex items-center gap-1.5 rounded-full border border-border bg-card px-3 h-9"
             title={pubkey}
           >
             <svg
@@ -54,12 +49,6 @@ export function Header() {
             <span className="text-xs font-mono text-muted-foreground">
               {truncatePubkey(pubkey)}
             </span>
-          </div>
-
-          {/* Live indicator */}
-          <div className="flex items-center gap-1.5 rounded-full bg-yes/12 px-3 h-9">
-            <SparkleIcon size={12} className="text-yes animate-sparkle" />
-            <span className="text-xs font-semibold text-yes">live</span>
           </div>
         </div>
       </div>

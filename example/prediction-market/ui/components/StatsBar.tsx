@@ -34,7 +34,7 @@ export function StatsBar({ markets }: StatsBarProps) {
 
 function StatCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
       <div className={`text-lg font-bold text-foreground ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>

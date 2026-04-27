@@ -1,175 +1,199 @@
 # Design System — Kannagi (かんなぎ)
 
-> Scope: this file governs the visual identity of the Prediction Market app at
-> `example/prediction-market/`. It supersedes the root `DESIGN.md` for this
-> directory only; other Anchr surfaces (Worker / Requester dashboards) keep
-> their own systems.
+> Scope: this file governs the visual identity of the Prediction Market app
+> at `example/prediction-market/`. It supersedes the root `DESIGN.md` for
+> this directory only.
 
-## 1. Visual Theme & Atmosphere
+## 1. Atmosphere
 
-**Kannagi** is named after the 2008 anime *かんなぎ* — the story of a shrine
-spirit (Nagi) bound to a sacred tree at a small Japanese 神社. The visual
-identity borrows directly from that world: a sunlit shrine on a quiet
-afternoon, vermillion torii (朱) gates against shoji-paper walls, sakaki
-greenery in the courtyard, the mint-aqua of Nagi's hair, the soft pink of
-sakura and her ribbon.
+**Kannagi** is a Bitcoin-native prediction market. The product is a
+financial-decision tool — users compare percentages, sat amounts, and
+volumes vertically all day — so the chrome stays out of the way. The brand
+expresses itself in three places only:
 
-Where the previous (Anchr / Nostr-purple) skin was a dark cypherpunk void,
-Kannagi is **bright, warm, and traditional**. The page reads like washi paper
-held up to morning light. Color is rare and ceremonial: vermillion for
-anything sacred (CTAs, focus, the brand wordmark), mint for accents that
-recall Nagi, sakaki green and crimson reserved exclusively for YES/NO
-prediction outcomes.
+1. The **wordmark** in the header (Klee One mincho + the kana subline).
+2. The **torii** glyph next to it.
+3. The **resolve / bet-fill moment** — sakura petals fall briefly when the
+   user commits a bet or a market resolves. 神和ぎ (kannagi) means
+   "spirit-pacifying"; the petals fall when the outcome is decided.
 
-**Key Characteristics**
-- Warm shoji / washi-paper background (`#FBF6EC`) — never pure white
-- Pure-white card surfaces float on the cream like shrine walls
-- Single brand accent: shrine vermillion / 朱 (`#E63946`)
-- Secondary accent: Nagi mint (`#5FCAB6`) — Nagi's hair color
-- Prediction pair: sakaki green YES / deep crimson NO
-- Inter for UI text, Geist Mono for numbers, **Shippori Mincho** for the
-  "Kannagi" wordmark only — calligraphic mincho recalls shrine signage
-- Conservative border-radius (8–12px) — polished but not bubbly
-- Vermillion glow on hover/focus — subtle, never decorative
+Outside those three moments, the canvas is silent: warm shoji-paper cream,
+sumi-ink type, single coral primary on CTAs and focus rings. No background
+patterns, no decorative motifs, no constant petals.
+
+**Key characteristics**
+- Light, warm, calm — Polymarket-style restraint with a Japanese accent
+- Sumi ink (`#251F18`) on shoji-paper cream (`#FBF6EC`)
+- Single brand accent: sakura coral `#FF6B85`, ONLY on primary actions and
+  focus rings
+- Outcome pair: pastel sakaki green YES / vermillion NO (domain colors,
+  never decorative)
+- Inter for all UI text; Klee One restricted to the brand wordmark; Geist
+  Mono for every numeric value (sats, %, hashes)
+- Card radius 15px (the designer's sweet spot — Polymarket 8 feels cheap,
+  Kalshi 6 feels banky, our 15 keeps "Kannagi" without infantilizing)
 
 **Reference works**
-- Anime *かんなぎ* (Kannagi: Crazy Shrine Maidens, 2008) — color story,
-  shrine motifs, Nagi's mint hair + pink ribbon
-- Polymarket — market card layout, probability bar mechanics
-- Kalshi — light-theme data density, range-selector chart
-- Real-world 神社 (Fushimi Inari, Yasaka) — torii vermillion, washi wall
+- The 2008 anime *かんなぎ* — naming + the resolve-moment sakura motif
+- Polymarket — featured hero, sort tabs, market-card information density
+- Kalshi — light-theme calm, restrained shadows, mobile-first sticky bet bar
 
 ## 2. Color Palette & Roles
 
-### Primary — Shrine Vermillion (朱 / 鳥居の朱)
-- **Vermillion** `#E63946` / `hsl(354, 78%, 56%)` — primary brand accent,
-  CTAs, links, focus rings, brand wordmark. The singular interactive color.
-- **Vermillion Hover** `#C8313A` / `hsl(355, 60%, 49%)` — darker for hover.
-- **Vermillion Surface** `rgba(230, 57, 70, 0.10)` — tint for selected/active
-  states and badges.
+### Primary — Sakura Coral (桜珊瑚)
+- **Coral** `#FF6B85` / `hsl(350, 100%, 71%)` — primary CTA, focus ring,
+  brand wordmark color when needed. The singular interactive accent.
+- **Coral hover** `~#FF4F6E` — slight darken on hover via `hover:bg-primary/90`.
 
-### Accent — Nagi Mint (ナギの髪)
-- **Nagi Mint** `#5FCAB6` / `hsl(170, 49%, 58%)` — secondary indicator,
-  decorative dots, "open / live" status, Nostr-channel chips.
-- **Nagi Mint Surface** `rgba(95, 202, 182, 0.12)` — tinted background.
+**Discipline rule (binding):** Coral appears on a pixel only if that pixel
+is (a) a primary action button, (b) a focus ring, or (c) the Kannagi
+wordmark / footer mention. Nowhere else. No decorative pills, no coral
+shadows, no coral hover lifts on cards. If you reach for coral elsewhere,
+use `text-foreground` or `bg-foreground` instead.
 
-### Sakura (桜) — Reserved
-- **Sakura Pink** `#FFA9C2` — soft accent for highlights, optional info
-  badges. Used sparingly so vermillion stays the singular brand.
+### Outcomes — Domain Colors
+- **YES — Sakaki Green** `#5FBFA0` / `hsl(165, 45%, 56%)` — pastel sakaki
+  pine. Distinctive vs. every emerald-green competitor.
+- **YES Foreground** `#1A4D31` — dark forest text on green bg.
+- **NO — Vermillion** `#E63946` / `hsl(354, 78%, 56%)` — torii red, deeper
+  than the coral primary so it's clearly a different signal.
+- **NO Foreground** `#FFFFFF` — white on vermillion bg.
 
-### Prediction Outcomes
-- **YES — Sakaki Green** `#3FAB6E` / `hsl(145, 47%, 46%)` — the green of the
-  sakaki (神道) branch placed at the shrine altar. Slightly more muted than
-  generic emerald so it sits comfortably on cream.
-- **YES Surface** `rgba(63, 171, 110, 0.12)`
-- **YES Foreground (on green)** `#1A4D31` — dark forest text on YES bg.
-- **NO — Deep Crimson** `#B8302E` / `hsl(1, 60%, 45%)` — distinctly deeper
-  than brand vermillion so YES/NO chrome doesn't collide with the brand.
-- **NO Surface** `rgba(184, 48, 46, 0.10)`
-- **NO Foreground (on red)** `#FFFFFF` — white on crimson.
-
-### Semantic
-- **Warning Amber** `#F59E0B` — pending escrow, expiring soon.
-- **Info — Nagi Mint** (`#5FCAB6`) — informational chips, Nostr connectivity.
-
-### Neutrals (Warm Washi Progression)
+### Neutrals — Warm Washi Progression
 | Token | Hex | HSL | Use |
 |-------|-----|-----|-----|
 | `--background` | `#FBF6EC` | `42 50% 96%` | Page background — shoji paper |
-| `--card` | `#FFFFFF` | `0 0% 100%` | Card / panel surface — shrine wall |
-| `--muted` | `#F1ECDF` | `42 38% 91%` | Elevated muted surface, input bg |
-| `--border` | `#E5DCC4` | `42 32% 84%` | Borders, dividers, parchment |
-| `--secondary` | `#E5DCC4` | `42 32% 84%` | Secondary surface |
+| `--card` | `#FFFFFF` | `0 0% 100%` | Cards, panels — shrine wall |
+| `--muted` | `#F1ECDF` | `42 38% 92%` | Inputs, muted surfaces |
+| `--border` | `#E5DCC4` | `42 28% 86%` | Borders, dividers |
 
-### Text Hierarchy (4-tier — sumi ink)
+A single 240px-tall top-vignette (`rgba(255, 200, 210, 0.06)`) keeps the
+canvas from reading as "unfinished Polymarket clone." No radial washes,
+no scattered ambient gradients.
+
+### Text Hierarchy (Sumi Ink)
 | Token | Hex | HSL | Use |
 |-------|-----|-----|-----|
-| `--foreground` | `#1F1814` | `25 20% 10%` | Primary — sumi ink |
-| `--secondary-foreground` | `#5C5040` | `30 18% 31%` | Secondary text |
-| `--muted-foreground` | `#8C8270` | `36 12% 49%` | Tertiary — timestamps, metadata |
-| Dim | `#B8B099` | `42 17% 66%` | Disabled, decorative |
+| `--foreground` | `#251F18` | `25 22% 12%` | Primary — sumi ink |
+| `--muted-foreground` | `#837A6F` | `30 12% 46%` | Secondary text, labels |
 
-### Borders
-Default `hsl(42, 32%, 84%)` — soft parchment, near-invisible on washi but
-provides structure. On hover, borders shift toward
-`rgba(230, 57, 70, 0.40)` (vermillion at 40%). Focus rings use vermillion
-at 30% opacity.
+## 3. Typography
 
-### Mode
-**Light is the default and only mode.** Kannagi's atmosphere is
-explicitly daylight-at-the-shrine; a dark mode would betray the source
-material. The `.dark` selector is intentionally absent.
+### Families
+- **UI text**: Inter (with `Zen Kaku Gothic New` JP fallback). Proven for
+  data density and tabular numerics.
+- **Brand wordmark only**: Klee One (`.font-shrine`). Used for "Kannagi"
+  in the header and footer. Never on body text or buttons.
+- **Numeric data**: Geist Mono. Sat amounts, percentages, hashes, pubkeys,
+  durations — everything the user might compare vertically.
 
-## 3. Typography Rules
+### Loading
+```
+https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Geist+Mono:wght@400;500;600&family=Klee+One:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap
+```
 
-### Font Families
-- **Primary**: `Inter Variable` with `Zen Kaku Gothic New` as the JP fallback
-  (proven for data density, supports both Latin and Kana with consistent
-  optical sizing).
-- **Mono**: `Geist Mono` (numbers, hashes, pubkeys).
-- **Brand wordmark only**: `Shippori Mincho` — applied via the `.font-shrine`
-  utility. Used for "Kannagi" itself; never for body or button text.
-- **Loading**: Google Fonts —
-  `https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Geist+Mono:wght@400;500;600&family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap`
+### Scale
+| Role | Font | Size | Weight | Use |
+|------|------|------|--------|-----|
+| Brand wordmark | Klee One | 20px | 600 | Header "Kannagi" |
+| Page Title (rare) | Inter | 24-30px | 700 | Detail-page title only |
+| Section heading | Inter | 14px | 600 | Card headers |
+| Body | Inter | 14px | 400 | Descriptions |
+| Label | Inter | 11–12px | 500 | Uppercase, tracking-wider |
+| Probability Large | Geist Mono | 36–48px | 700 | Featured % |
+| Probability Card | Geist Mono | 18px | 600 | Card YES/NO % |
+| Data | Geist Mono | 12–14px | 500 | Sats, volumes, percentages |
 
-### Hierarchy
-| Role | Font | Size | Weight | Letter-spacing | Use |
-|------|------|------|--------|----------------|-----|
-| Brand wordmark | Shippori Mincho | 20px | 700 | -0.01em | "Kannagi" header |
-| Page Title | Inter | 30px | 700 | -0.03em | "Prediction Markets" |
-| Section Heading | Inter | 20px | 600 | -0.02em | Panel titles |
-| Market Title | Inter | 15px | 600 | -0.01em | Market question text |
-| Body | Inter | 14px | 400 | normal | Descriptions |
-| Body Small | Inter | 13px | 400 | normal | Secondary descriptions |
-| Label | Inter | 12px | 500 | 0.05em, uppercase | Category, section labels |
-| Caption | Inter | 11px | 400 | normal | Footnotes, helper text |
-| Probability Large | Geist Mono | 36px | 700 | -0.02em | Detail YES/NO % |
-| Probability Card | Geist Mono | 18px | 600 | -0.01em | Card YES/NO % |
-| Data Value | Geist Mono | 14px | 500 | normal | Sat amounts, pool sizes |
-| Data Label | Geist Mono | 12px | 400 | normal | Hashes, pubkeys |
-| Stat Large | Geist Mono | 20px | 700 | normal | Stats bar numbers |
+## 4. Radius Scale
 
-### Principles
-- **Inter for UI text, Mincho only for the brand mark** — the contrast
-  between modern sans and shrine mincho calligraphy is the visual hook.
-- **Geist Mono for all numeric / cryptographic data** — sat amounts,
-  probabilities, hashes, pubkeys, timestamps.
-- **Tight tracking at display sizes** — negative letter-spacing on
-  headings creates density and authority.
-- **Uppercase labels only at 12px or below** — never uppercase body text.
+| Token | Px | Use |
+|-------|----|-----|
+| `--radius-sm` | 6px | Pills, small badges, inline tags |
+| `--radius-md` | 10px | Buttons, inputs, side selectors |
+| `--radius-lg` | 15px | Cards, panels (default `--radius`) |
+| `--radius-xl` | 18px | Featured / hero cards (rare) |
+| `--radius-pill` | 9999px | Sort tabs, search, wallet pill |
 
-## 4. Component Stylings
+Polymarket lives at 8px and feels generic; Kalshi at 6px and feels banky;
+Kannagi sits at 15px — recognizable without being toy.
 
-(See implementations in `ui/components/`. Notable Kannagi-specific
-overrides relative to a generic light theme:)
+## 5. Layout
 
-- **Header brand block**: torii icon (鳥居 — two pillars + kasagi + nuki
-  beams) on a `bg-primary/10` (vermillion-tinted) square; `font-shrine`
-  wordmark beside it.
-- **Bet buttons**: YES filled with sakaki `#3FAB6E`, dark-forest text;
-  NO filled with crimson `#B8302E`, white text. Both sit on white card
-  surfaces, so the saturated outcomes pop without needing glow.
-- **Probability bar**: same dual-segment construction as before — sakaki
-  left, crimson right — but on the new cream/white surface.
-- **PriceChart**: vermillion hover-crosshair, line color flips between
-  sakaki (trending up) and crimson (trending down).
-- **Sparkline**: same trend-coloring logic; renders cleanly on white card.
+### Grid
+- Max content width 1152px (`max-w-6xl`)
+- Markets grid: 1-up mobile → 2-up tablet → 3-up xl
+- Detail page: 3-col grid on `lg`. Chart top-left (cols 1–2), bet panel
+  rows 1–2 col 3 (sticky), rest of left column rows 2 cols 1–2
+- **Mobile reorder**: bet panel comes after the Chart in DOM order, before
+  Activity / TopHolders / About. This puts the buy CTA above the fold even
+  without sticky chrome.
 
-## 5. Layout / 6. Depth / 7. Do's & Don'ts / 8. Responsive
+### Spacing
+- Base unit 4px
+- Card padding 20px desktop, 16px mobile
+- Card gap 16-20px
+- Above-the-fold: Header → Create-market button → Featured market →
+  Sort tabs → Category + search → Grid. **No StatsBar above the fold;**
+  it lives below the grid as quick context.
 
-Identical to the root system except:
-- **Shadows**: warm tinted, not purple. Hover glow is
-  `0 0 24px -6px rgba(230, 57, 70, 0.15)` (vermillion).
-- **Don't** use vermillion as a large background fill — it's for accents,
-  glows, and the brand mark only; large vermillion fills overwhelm the
-  shrine atmosphere.
-- **Don't** use dark mode overrides — Kannagi is a daylight system.
+## 6. Motion
+
+Default: nothing animates. Specifically excluded:
+- No constant background drift (no falling petals as wallpaper)
+- No hover lifts on cards
+- No glow shadows
+- No entrance animations
+
+Allowed:
+- Probability bar width transition on data change (500ms)
+- PriceChart line width / range-selector pill state change
+- **Sakura burst** — fired once when (a) `placeBetMutation.isSuccess` or
+  (b) market `status` transitions to `resolved_*`. 36 petals fall over
+  ~9s, then unmount. This is the brand's only ambient motion, and it earns
+  its presence by mapping to a meaningful event.
+- `prefers-reduced-motion` disables the sakura burst entirely
+
+## 7. Do's and Don'ts
+
+### Do
+- Render every numeric value in `font-mono`
+- Use `bg-foreground text-background` for active sort/category pills
+- Use `bg-yes` / `bg-no` only for prediction outcomes (buttons, badges,
+  resolved states, sparkline trend color)
+- Truncate hashes / pubkeys with `…` and surface full value in `title`
+- Land the user on the Featured market — let it carry the hero
+
+### Don't
+- Don't add a coral hover glow, coral pill background, or coral underline
+- Don't render numbers in Inter (use Geist Mono)
+- Don't run sakura petals on the page background
+- Don't use `rounded-2xl` / `rounded-3xl` on cards (15px is the cap)
+- Don't add "Verified by TLSNotary" or other technical chrome to user-facing
+  copy unless the user is acting on it
+- Don't put a Page Title above the Featured market — Kannagi *is* the
+  prediction-market platform; the header already says that
+
+## 8. Mobile
+
+Phones are the primary surface (60%+ of prediction-market traffic).
+- Header height 56px, pubkey pill hidden under `md`
+- Cards 1-up at all mobile widths
+- Bet panel reorder on detail (described in §5) is the most important
+  conversion fix — it puts the CTA in the user's first scroll
+- All tap targets ≥ 36px (sort tabs h-9, buttons h-10/h-11, side
+  selectors h-11)
+- Category pill row scrolls horizontally; bleed past page padding via
+  `-mx-4 px-4` so the first/last pill don't get clipped
 
 ## 9. Decision Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-04-27 | Rebrand prediction-market app from Anchr → Kannagi | The user wanted a distinct identity for the prediction-market surface, separate from the underlying Anchr protocol. Kannagi (the anime) gives a clear, evocative palette + name. |
-| 2026-04-27 | Adopt anime かんなぎ as design-token reference | Color story (vermillion / Nagi mint / sakura / sakaki) is iconic and well-suited to "shrine = oracle = TLSNotary verifier" metaphor. |
-| 2026-04-27 | Light theme as default and only mode | The anime's atmosphere is explicitly daylight; a dark mode would betray the source material. Kalshi precedent shows light theme works for prediction markets. |
-| 2026-04-27 | Shippori Mincho restricted to brand wordmark | Mincho is too heavy for body UI, but invokes shrine signage when used sparingly on the logo. Inter remains the workhorse. |
+| 2026-04-27 | Rebrand from Anchr → Kannagi | Distinct identity for the prediction-market surface, separate from the underlying protocol. |
+| 2026-04-27 | Light theme as the only mode | The anime's atmosphere is daylight; dark mode would betray the source. Kalshi precedent shows light works for prediction markets. |
+| 2026-04-27 | Klee One restricted to the brand wordmark | Mincho is too heavy for body UI; Inter does the dense work. Klee earns its presence by appearing twice (header + footer). |
+| 2026-04-27 | Sakura coral `#FF6B85` as the only brand color | Replaces the earlier vermillion. Softer, less ceremonial; pairs with the kawaii-but-not-noisy direction. |
+| 2026-04-27 | Sakura on background → resolve / bet-fill moment | Designer review: the field was visual noise. Resolving the brand to an event-triggered burst maps the petal motif to its meaning (神和ぎ = ritual completion). |
+| 2026-04-27 | Card radius 15px | Designer review: Polymarket 8 felt cheap, Kalshi 6 felt banky. 15 keeps Kannagi's softness without infantilizing. |
+| 2026-04-27 | Mobile bet-panel reorder | Designer flagged "audit at 390px before touching anything else." Bet panel was at the bottom of the mobile detail page, killing conversion. Reordered grid placement so it sits right after the chart on mobile, sticky right-column on desktop. |
+| 2026-04-27 | Drop hero "Prediction Markets / 予想市場" subtitle | Kannagi *is* the platform; the header already names it. Page lands on the create-market CTA, then Featured. |

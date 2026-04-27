@@ -290,11 +290,232 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left — Chart, odds, activity, holders */}
-        <div className="lg:col-span-2 space-y-5">
+        {/* Chart — top of mobile, top-left on desktop */}
+        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1">
           <PriceChart data={history} />
+        </div>
 
-          <div className="rounded-2xl border border-border bg-card p-6">
+        {/* Bet panel + sidebar — second on mobile (right after Chart),
+         * right column rows 1–2 on desktop. Inner wrapper sticks on lg. */}
+        <div className="lg:col-start-3 lg:row-start-1 lg:row-span-2">
+          <div className="space-y-5 lg:sticky lg:top-20">
+          {isOpen ? (
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-4">Place a Bet</h2>
+
+              {betFeedback && (
+                <div
+                  className={cn(
+                    "rounded-md p-3 mb-4 text-xs flex items-start justify-between gap-2",
+                    betFeedback.tone === "success" && "bg-yes/10 text-yes border border-yes/20",
+                    betFeedback.tone === "error" && "bg-destructive/10 text-destructive border border-destructive/30",
+                  )}
+                >
+                  <span>{betFeedback.message}</span>
+                  <button
+                    onClick={() => setBetDismissed(true)}
+                    className="shrink-0 opacity-60 hover:opacity-100"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
+              {/* Side selector */}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <button
+                  onClick={() => setSide("yes")}
+                  className={cn(
+                    "h-11 rounded-md font-bold text-sm transition-colors",
+                    side === "yes"
+                      ? "bg-yes text-yes-foreground"
+                      : "bg-yes/8 text-yes hover:bg-yes/15",
+                  )}
+                >
+                  Yes · {yesPercent}%
+                </button>
+                <button
+                  onClick={() => setSide("no")}
+                  className={cn(
+                    "h-11 rounded-md font-bold text-sm transition-colors",
+                    side === "no"
+                      ? "bg-no text-no-foreground"
+                      : "bg-no/8 text-no hover:bg-no/15",
+                  )}
+                >
+                  No · {noPercent}%
+                </button>
+              </div>
+
+              {/* Amount */}
+              <label className="text-xs text-muted-foreground block mb-1.5">
+                Amount
+              </label>
+              <div className="relative mb-3">
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder={`Min ${market.min_bet_sats}`}
+                  min={market.min_bet_sats}
+                  max={market.max_bet_sats || undefined}
+                  disabled={placeBetMutation.isPending}
+                  className="w-full h-11 rounded-md border border-border bg-muted px-3 pr-12 text-base font-mono font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-50"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground">
+                  sats
+                </span>
+              </div>
+
+              {/* Quick amounts */}
+              <div className="grid grid-cols-4 gap-1.5 mb-4">
+                {[100, 1000, 5000, 10000].map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setAmount(String(v))}
+                    disabled={placeBetMutation.isPending}
+                    className="h-8 rounded-full border border-border text-[11px] font-mono font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+                  >
+                    {v >= 1000 ? `${v / 1000}K` : v}
+                  </button>
+                ))}
+              </div>
+
+              {/* Payout summary */}
+              {amountNum > 0 && (
+                <div className="rounded-md bg-muted p-3 mb-4 space-y-1.5">
+                  <Row label="Avg price" value={`${sidePercent}¢`} />
+                  <Row label="Shares" value={`~${formatSats(sharesEstimate)}`} />
+                  <Row
+                    label="Max payout"
+                    value={`${formatSats(potentialPayout)} sats`}
+                    highlight
+                  />
+                  <Row
+                    label="Return"
+                    value={`+${(((potentialPayout / Math.max(amountNum, 1)) - 1) * 100).toFixed(0)}%`}
+                    color={potentialPayout > amountNum ? "text-yes" : "text-no"}
+                  />
+                </div>
+              )}
+
+              <button
+                onClick={() => placeBetMutation.mutate({ side, amount: amountNum })}
+                disabled={amountNum < market.min_bet_sats || placeBetMutation.isPending}
+                className={cn(
+                  "w-full h-11 rounded-md font-bold text-sm transition-colors",
+                  "disabled:opacity-40 disabled:cursor-not-allowed",
+                  side === "yes"
+                    ? "bg-yes text-yes-foreground hover:brightness-105"
+                    : "bg-no text-no-foreground hover:brightness-105",
+                )}
+              >
+                {placeBetMutation.isPending
+                  ? "Placing…"
+                  : amountNum < market.min_bet_sats
+                    ? `Enter at least ${market.min_bet_sats} sats`
+                    : `Buy ${side.toUpperCase()} · ${formatSats(amountNum)} sats`}
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-3">Market Closed</h2>
+              {isResolved && (
+                <div
+                  className={cn(
+                    "rounded-md p-4 text-center mb-4",
+                    market.status === "resolved_yes" ? "bg-yes/10" : "bg-no/10",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "font-mono text-3xl font-bold",
+                      market.status === "resolved_yes" ? "text-yes" : "text-no",
+                    )}
+                  >
+                    {market.status === "resolved_yes" ? "YES" : "NO"}
+                  </span>
+                </div>
+              )}
+
+              {isResolved && (
+                <>
+                  {redeemFeedback && (
+                    <div
+                      className={cn(
+                        "rounded-md p-3 mb-3 text-xs",
+                        redeemFeedback.tone === "success" && "bg-yes/10 text-yes border border-yes/20",
+                        redeemFeedback.tone === "error" && "bg-destructive/10 text-destructive border border-destructive/30",
+                      )}
+                    >
+                      {redeemFeedback.message}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => redeemMutation.mutate()}
+                    disabled={redeemMutation.isPending || redeemMutation.isSuccess}
+                    className="w-full h-11 rounded-full font-bold text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {redeemMutation.isPending
+                      ? "Redeeming…"
+                      : redeemMutation.isSuccess
+                        ? "Redeemed"
+                        : "Redeem winnings"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Time remaining */}
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
+              {isOpen ? "Time Remaining" : "Ended"}
+            </div>
+            <div className="font-mono text-2xl font-bold text-foreground">
+              {formatTimeLeft(market.resolution_deadline)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {formatDate(market.resolution_deadline)}
+            </div>
+          </div>
+
+          {/* Held tokens — compact, technical details hidden */}
+          {heldTokens.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Your Positions
+              </h3>
+              <ul className="space-y-2">
+                {heldTokens.map((t) => (
+                  <li
+                    key={t.pair_id}
+                    className="flex items-center justify-between rounded-md bg-muted px-3 py-2"
+                  >
+                    <span
+                      className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                        t.my_side === "yes" ? "bg-yes/18 text-yes" : "bg-no/18 text-no",
+                      )}
+                    >
+                      {t.my_side}
+                    </span>
+                    <span className="font-mono text-sm font-semibold text-foreground">
+                      {formatSats(t.amount_sats)} sats
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          </div>
+        </div>
+
+        {/* Rest of left column — Odds, Activity, Holders, About — below
+         * the Chart on desktop, below the Bet panel on mobile. */}
+        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-2 space-y-5">
+          <div className="rounded-lg border border-border bg-card p-5">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
               Current Odds
             </h2>
@@ -323,9 +544,8 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
           <ActivityFeed events={activity} limit={8} />
           <TopHolders rows={holders} limit={8} />
 
-          {/* About — short description, no technical hash/json/oracle dump */}
           {market.description && (
-            <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="rounded-lg border border-border bg-card p-5">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                 About
               </h2>
@@ -337,226 +557,12 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
                     href={market.resolution_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline break-all"
+                    className="text-foreground hover:underline break-all"
                   >
                     {market.resolution_url}
                   </a>
                 </p>
               )}
-            </div>
-          )}
-        </div>
-
-        {/* Right — Buy panel + held tokens (compact) */}
-        <div className="space-y-5">
-          {isOpen ? (
-            <div className="rounded-2xl border border-border bg-card p-6 sticky top-20">
-              <h2 className="text-sm font-semibold text-foreground mb-4">Place a Bet</h2>
-
-              {betFeedback && (
-                <div
-                  className={cn(
-                    "rounded-xl p-3 mb-4 text-xs flex items-start justify-between gap-2",
-                    betFeedback.tone === "success" && "bg-yes/10 text-yes border border-yes/20",
-                    betFeedback.tone === "error" && "bg-destructive/10 text-destructive border border-destructive/30",
-                  )}
-                >
-                  <span>{betFeedback.message}</span>
-                  <button
-                    onClick={() => setBetDismissed(true)}
-                    className="shrink-0 opacity-60 hover:opacity-100"
-                    aria-label="Dismiss"
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-
-              {/* Side selector */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <button
-                  onClick={() => setSide("yes")}
-                  className={cn(
-                    "h-12 rounded-xl font-bold text-sm transition-all duration-200",
-                    side === "yes"
-                      ? "bg-yes text-yes-foreground shadow-[0_0_18px_-4px_hsl(var(--yes)/0.45)]"
-                      : "bg-yes/8 text-yes hover:bg-yes/15",
-                  )}
-                >
-                  Yes · {yesPercent}%
-                </button>
-                <button
-                  onClick={() => setSide("no")}
-                  className={cn(
-                    "h-12 rounded-xl font-bold text-sm transition-all duration-200",
-                    side === "no"
-                      ? "bg-no text-no-foreground shadow-[0_0_18px_-4px_hsl(var(--no)/0.45)]"
-                      : "bg-no/8 text-no hover:bg-no/15",
-                  )}
-                >
-                  No · {noPercent}%
-                </button>
-              </div>
-
-              {/* Amount */}
-              <label className="text-xs text-muted-foreground block mb-1.5">
-                Amount
-              </label>
-              <div className="relative mb-3">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder={`Min ${market.min_bet_sats}`}
-                  min={market.min_bet_sats}
-                  max={market.max_bet_sats || undefined}
-                  disabled={placeBetMutation.isPending}
-                  className="w-full h-12 rounded-xl border border-border bg-muted px-4 pr-14 text-base font-mono font-semibold text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-50"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-mono text-muted-foreground">
-                  sats
-                </span>
-              </div>
-
-              {/* Quick amounts */}
-              <div className="grid grid-cols-4 gap-1.5 mb-4">
-                {[100, 1000, 5000, 10000].map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setAmount(String(v))}
-                    disabled={placeBetMutation.isPending}
-                    className="h-8 rounded-full border border-border text-[11px] font-mono font-semibold text-muted-foreground hover:border-primary/40 hover:text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-                  >
-                    {v >= 1000 ? `${v / 1000}K` : v}
-                  </button>
-                ))}
-              </div>
-
-              {/* Payout summary */}
-              {amountNum > 0 && (
-                <div className="rounded-xl bg-muted p-3 mb-4 space-y-1.5">
-                  <Row label="Avg price" value={`${sidePercent}¢`} />
-                  <Row label="Shares" value={`~${formatSats(sharesEstimate)}`} />
-                  <Row
-                    label="Max payout"
-                    value={`${formatSats(potentialPayout)} sats`}
-                    highlight
-                  />
-                  <Row
-                    label="Return"
-                    value={`+${(((potentialPayout / Math.max(amountNum, 1)) - 1) * 100).toFixed(0)}%`}
-                    color={potentialPayout > amountNum ? "text-yes" : "text-no"}
-                  />
-                </div>
-              )}
-
-              <button
-                onClick={() => placeBetMutation.mutate({ side, amount: amountNum })}
-                disabled={amountNum < market.min_bet_sats || placeBetMutation.isPending}
-                className={cn(
-                  "w-full h-12 rounded-full font-bold text-sm transition-all duration-200",
-                  "disabled:opacity-40 disabled:cursor-not-allowed",
-                  side === "yes"
-                    ? "bg-yes text-yes-foreground hover:brightness-110 shadow-[0_8px_24px_-12px_hsl(var(--yes)/0.6)]"
-                    : "bg-no text-no-foreground hover:brightness-110 shadow-[0_8px_24px_-12px_hsl(var(--no)/0.6)]",
-                )}
-              >
-                {placeBetMutation.isPending
-                  ? "Placing…"
-                  : amountNum < market.min_bet_sats
-                    ? `Enter at least ${market.min_bet_sats} sats`
-                    : `Buy ${side.toUpperCase()} · ${formatSats(amountNum)} sats`}
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-border bg-card p-6 sticky top-20">
-              <h2 className="text-sm font-semibold text-foreground mb-3">Market Closed</h2>
-              {isResolved && (
-                <div
-                  className={cn(
-                    "rounded-xl p-4 text-center mb-4",
-                    market.status === "resolved_yes" ? "bg-yes/10" : "bg-no/10",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "font-mono text-3xl font-bold",
-                      market.status === "resolved_yes" ? "text-yes" : "text-no",
-                    )}
-                  >
-                    {market.status === "resolved_yes" ? "YES" : "NO"}
-                  </span>
-                </div>
-              )}
-
-              {isResolved && (
-                <>
-                  {redeemFeedback && (
-                    <div
-                      className={cn(
-                        "rounded-xl p-3 mb-3 text-xs",
-                        redeemFeedback.tone === "success" && "bg-yes/10 text-yes border border-yes/20",
-                        redeemFeedback.tone === "error" && "bg-destructive/10 text-destructive border border-destructive/30",
-                      )}
-                    >
-                      {redeemFeedback.message}
-                    </div>
-                  )}
-                  <button
-                    onClick={() => redeemMutation.mutate()}
-                    disabled={redeemMutation.isPending || redeemMutation.isSuccess}
-                    className="w-full h-11 rounded-full font-bold text-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    {redeemMutation.isPending
-                      ? "Redeeming…"
-                      : redeemMutation.isSuccess
-                        ? "Redeemed"
-                        : "Redeem winnings"}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Time remaining */}
-          <div className="rounded-2xl border border-border bg-card p-5">
-            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
-              {isOpen ? "Time Remaining" : "Ended"}
-            </div>
-            <div className="font-mono text-2xl font-bold text-foreground">
-              {formatTimeLeft(market.resolution_deadline)}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {formatDate(market.resolution_deadline)}
-            </div>
-          </div>
-
-          {/* Held tokens — compact, technical details hidden */}
-          {heldTokens.length > 0 && (
-            <div className="rounded-2xl border border-border bg-card p-5">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                Your Positions
-              </h3>
-              <ul className="space-y-2">
-                {heldTokens.map((t) => (
-                  <li
-                    key={t.pair_id}
-                    className="flex items-center justify-between rounded-xl bg-muted px-3 py-2"
-                  >
-                    <span
-                      className={cn(
-                        "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                        t.my_side === "yes" ? "bg-yes/18 text-yes" : "bg-no/18 text-no",
-                      )}
-                    >
-                      {t.my_side}
-                    </span>
-                    <span className="font-mono text-sm font-semibold text-foreground">
-                      {formatSats(t.amount_sats)} sats
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
         </div>

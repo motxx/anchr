@@ -77,7 +77,7 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
 
   if (filtered.length < 2) {
     return (
-      <div className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+      <div className="rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">
         Not enough history to chart yet.
       </div>
     );
@@ -93,7 +93,7 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
   });
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
+    <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
         <div>
           <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">

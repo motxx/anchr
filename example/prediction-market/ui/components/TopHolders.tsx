@@ -27,7 +27,7 @@ export function TopHolders({ rows, limit = 8 }: TopHoldersProps) {
   const max = visible.length > 0 ? visible[0].shares_sats : 1;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6">
+    <div className="rounded-lg border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-foreground">Top Holders</h2>
         <span className="text-[11px] text-muted-foreground font-mono">

@@ -104,7 +104,7 @@ export function WalletButton() {
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
-          <div className="fixed right-5 top-16 z-50 w-80 rounded-2xl border border-border bg-card p-5 shadow-sakura">
+          <div className="fixed right-4 sm:right-5 top-16 z-50 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-5 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.18)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground">Wallet</h3>
               <button
@@ -116,7 +116,7 @@ export function WalletButton() {
               </button>
             </div>
 
-            <div className="rounded-xl bg-muted p-4 mb-4">
+            <div className="rounded-md bg-muted p-4 mb-4">
               <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">
                 Balance
               </div>
