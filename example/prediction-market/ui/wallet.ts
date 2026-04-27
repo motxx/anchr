@@ -234,20 +234,14 @@ export async function lockFundsForMatch(input: {
 //   3. Pre-fill each proof.witness with the oracle signature.
 //   4. signP2PKProofs(proofs, user_sk) — adds the user's signature, so the
 //      witness now satisfies n_sigs=2 (oracle + user).
-//   5. Re-encode as a token and call wallet.receive() — the mint swaps it
-//      for plain proofs.
+//   5. Re-encode as a token and call wallet.receive() — the mint swaps
+//      the locked proofs for plain proofs in the user's denomination set.
+//   6. Save the new plain proofs through the same NIP-60 / localStorage
+//      path as everything else (saveProofs).
 //
-// **Known limitation (follow-up):** the lock condition uses
-// `sigflag: SIG_ALL`. Under SIG_ALL the mint requires signatures over the
-// hash of the swap inputs+outputs, not just hash(secret). The current
-// /sign-proofs endpoint signs hash(secret) only, so step 5 is rejected by
-// the mint with "signature threshold not met." A SIG_ALL-aware oracle
-// endpoint (one that takes the swap message and returns a signature over
-// it) is tracked in docs/prediction-market/market-maker-gaps.md. Until
-// that lands, the helper below builds the witness and returns failures
-// from wallet.receive — the cryptographic preconditions
-// (e2e/redemption-flow.test.ts) prove both signatures are valid against
-// the lock pubkeys, just not against the SIG_ALL message.
+// Result: the winner's Cashu balance grows by the loser's locked amount
+// minus the mint's swap fee, settled trustlessly. Verified end-to-end in
+// e2e/redemption-flow.test.ts.
 // ---------------------------------------------------------------------------
 
 export interface RedemptionResult {

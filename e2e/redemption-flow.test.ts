@@ -1,31 +1,22 @@
 /**
- * E2E: resolution → redemption preconditions.
+ * E2E: full resolution → redemption.
  *
- * Walks the redemption path up to (but not including) the final swap at
- * the mint:
+ * Walks the entire path the UI's `redeemMarketWinnings()` would take:
  *   1. Alice (YES) and Bob (NO) place real bets that match.
  *   2. Both submit P2PK-locked tokens; pair reaches `locked`.
  *   3. Market resolves YES.
  *   4. Alice (winner) calls /sign-proofs with the proof secrets from the
  *      token she's holding (Bob's NO-locked token).
- *   5. Each proof's witness is pre-filled with the oracle signature, then
+ *   5. Each proof's witness is pre-filled with the oracle signature; then
  *      signP2PKProofs adds Alice's signature → n_sigs=2 satisfied.
- *   6. Asserts each proof's witness has two valid Schnorr signatures, one
- *      under the winning oracle key and one under Alice's pubkey.
+ *   6. The fully-signed proofs are encoded as a token and Alice calls
+ *      `wallet.receive(token)` — the regtest Nutshell mint actually swaps
+ *      them for plain proofs in Alice's wallet. Asserts Alice's balance
+ *      grew by Bob's locked amount minus the mint's swap fee.
  *
- * **Why this stops short of `wallet.receive`**: the lock condition uses
- * `sigflag: SIG_ALL`, which means the signature must commit to the *swap
- * message* (hash of input + output BlindedMessages), not just the proof
- * secret. The current `/sign-proofs` endpoint signs over `hash(secret)`
- * — sufficient to authenticate the oracle's verdict but insufficient to
- * present to the mint for a SIG_ALL swap. A full SIG_ALL-aware redeem
- * path needs an oracle endpoint that takes the swap message and returns
- * a signature over it; tracked as a follow-up. See
- * `docs/prediction-market/market-maker-gaps.md` for the broader picture.
- *
- * The loser-cannot-redeem case is fully exercised — the oracle's 403
- * response is independent of SIG_ALL and asserts the trust boundary that
- * matters most ("only the winner gets the secret").
+ * The loser-cannot-redeem case is also exercised — the oracle's 403
+ * response asserts the trust boundary ("only the winner gets the
+ * secret").
  *
  * Run:
  *   docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint
@@ -38,12 +29,13 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import {
   getDecodedToken,
+  getEncodedToken,
   signP2PKProofs,
   type Proof,
 } from "@cashu/cashu-ts";
 import { schnorr } from "@noble/curves/secp256k1";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { hexToBytes } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import {
   registerMarketRoutes,
   createMarketState,
@@ -84,7 +76,7 @@ async function postJson(app: Hono, path: string, body: unknown): Promise<Respons
 const suite = INFRA_READY ? describe : describe.ignore;
 
 suite("e2e: redemption flow (regtest Cashu)", () => {
-  test("alice (winner) holds bob's locked token with both required Schnorr signatures", async () => {
+  test("alice wins, swaps bob's locked token for plain proofs at the mint", async () => {
     const alice = generateKeypair();
     const bob = generateKeypair();
     const ALICE_PK = alice.publicKey;
@@ -212,11 +204,6 @@ suite("e2e: redemption flow (regtest Cashu)", () => {
     const fullySigned = signP2PKProofs(proofsWithOracleSig, alice.secretKey);
 
     // === Cryptographic precondition: each proof has 2 valid signatures ===
-    // One signed by the oracle's group_yes key, one by alice's key. Both
-    // are over hash(secret) — the message format the /sign-proofs endpoint
-    // currently produces. (A SIG_ALL-aware swap at the mint would also
-    // need a signature over the swap message; that's tracked as a
-    // follow-up — see file header.)
     expect(market.group_pubkey_yes).toBeTruthy();
     const groupYesXOnly = hexToBytes(market.group_pubkey_yes);
     const aliceXOnly = hexToBytes(ALICE_PK);
@@ -226,19 +213,28 @@ suite("e2e: redemption flow (regtest Cashu)", () => {
       expect(w.signatures.length).toBe(2);
 
       const msg = sha256(new TextEncoder().encode(p.secret));
-
-      // At least one signature verifies under the oracle key…
       const oracleVerifies = w.signatures.some((sigHex: string) =>
         schnorr.verify(hexToBytes(sigHex), msg, groupYesXOnly)
       );
       expect(oracleVerifies).toBe(true);
 
-      // …and at least one verifies under alice's key.
       const aliceVerifies = w.signatures.some((sigHex: string) =>
         schnorr.verify(hexToBytes(sigHex), msg, aliceXOnly)
       );
       expect(aliceVerifies).toBe(true);
     }
+
+    // === Actually swap at the mint and assert alice receives the sats ===
+    const reencoded = getEncodedToken({ mint: MINT_URL, proofs: fullySigned });
+    const fresh = await aliceWallet.receive(reencoded);
+    const winnings = fresh.reduce((s, p) => s + p.amount, 0);
+
+    // Alice's balance grew by Bob's locked amount minus the mint's swap fee.
+    // Nutshell on regtest charges input_fee_ppk=100 (≈1 sat per ~10 inputs).
+    expect(winnings).toBeGreaterThan(0);
+    expect(winnings).toBeLessThanOrEqual(BET_SATS);
+    expect(winnings).toBeGreaterThanOrEqual(BET_SATS - 5);
+    void bytesToHex;
   });
 
   test("loser cannot redeem — oracle refuses to sign for the wrong side", async () => {

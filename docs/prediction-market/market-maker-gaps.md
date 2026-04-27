@@ -2,8 +2,7 @@
 
 What the bot fleet under `scripts/bot-fleet/` exercised against the current
 Kannagi (巫) prediction-market platform, and which Polymarket-style
-liquidity behaviors are not yet expressible. Captured 2026-04-28 against
-commit-tip `e457e3d`.
+liquidity behaviors are not yet expressible. Captured 2026-04-28.
 
 The fleet runs real Cashu wallets on a regtest Lightning + Cashu mint and
 posts P2PK-locked exchange tokens through the actual `POST /markets/:id

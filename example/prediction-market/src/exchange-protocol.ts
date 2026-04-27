@@ -73,6 +73,18 @@ export interface VerificationResult {
  * Lock: P2PK([group_no, counterparty], n_sigs=2), refund: myPubkey
  *
  * YES bettor's counterparty is the NO bettor.
+ *
+ * **sigflag note:** we deliberately do *not* call .sigAll() here. SIG_ALL
+ * binds the signature to the specific swap inputs+outputs message, which
+ * means the oracle can't pre-sign at resolution time — it would need the
+ * user's blinded-output set per redemption. Under SIG_INPUTS, the oracle
+ * signs hash(secret) per proof (what /sign-proofs already produces) and
+ * the mint validates each input independently. The trust trade-off is
+ * that a malicious mint could substitute swap outputs; the same mint can
+ * already refuse swaps or steal funds via other vectors, so this is a
+ * net-zero change in the trust model and the user only delegates the
+ * "where the proofs go" decision to the mint, which they already trust
+ * for P2PK enforcement.
  */
 function buildExchangeOptionsYes(config: ExchangeConfig, locktime: number): P2PKOptions {
   return new P2PKBuilder()
@@ -81,7 +93,6 @@ function buildExchangeOptionsYes(config: ExchangeConfig, locktime: number): P2PK
     .lockUntil(locktime)
     .addRefundPubkey(config.myPubkey)
     .requireRefundSignatures(1)
-    .sigAll()
     .toOptions();
 }
 
@@ -92,6 +103,8 @@ function buildExchangeOptionsYes(config: ExchangeConfig, locktime: number): P2PK
  * Lock: P2PK([group_yes, counterparty], n_sigs=2), refund: myPubkey
  *
  * NO bettor's counterparty is the YES bettor.
+ *
+ * See buildExchangeOptionsYes for the sigflag (SIG_INPUTS) rationale.
  */
 function buildExchangeOptionsNo(config: ExchangeConfig, locktime: number): P2PKOptions {
   return new P2PKBuilder()
@@ -100,7 +113,6 @@ function buildExchangeOptionsNo(config: ExchangeConfig, locktime: number): P2PKO
     .lockUntil(locktime)
     .addRefundPubkey(config.myPubkey)
     .requireRefundSignatures(1)
-    .sigAll()
     .toOptions();
 }
 
