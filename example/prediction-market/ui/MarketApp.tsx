@@ -161,7 +161,7 @@ export function MarketApp() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-clip">
       <SakuraBurst trigger={sakuraTrigger} />
       <Header />
 
