@@ -1,5 +1,5 @@
 /**
- * Airdrop Bot Shield — Claim Verifier
+ * 形代(Katashiro) — Claim Verifier
  *
  * Verifies a claimant's TLSNotary proofs against airdrop criteria.
  * Each proof is evaluated for:

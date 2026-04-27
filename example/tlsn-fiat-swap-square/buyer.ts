@@ -1,8 +1,8 @@
 /**
- * TLSNotary Fiat Swap (Square) — Buyer (has fiat, wants BTC)
+ * 渡(Watari) — Buyer (has fiat, wants BTC)
  *
- * The buyer:
- *   1. Discovers open on-ramp orders on the Anchr network
+ * Watari is the trustless fiat ↔ BTC crossing. The buyer:
+ *   1. Discovers open 渡(Watari) orders on the Anchr network
  *   2. Pays via the seller's Square Payment Link
  *   3. Receives the Square access token + Payment ID from the seller
  *      (via NIP-44 encrypted_context in the Nostr selection event)
@@ -25,32 +25,32 @@ const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
 
-console.log("=== TLSNotary Fiat Swap (Square) — Buyer ===\n");
+console.log("=== 渡(Watari) — Buyer ===\n");
 console.log(`Server: ${SERVER_URL}\n`);
 
-// --- Step 1: Discover open on-ramp orders ---
+// --- Step 1: Discover open 渡(Watari) orders ---
 
-console.log("Step 1: Finding open on-ramp orders...\n");
+console.log("Step 1: Finding open 渡(Watari) orders...\n");
 
 const orders = await anchr.listOpenQueries();
-const onramp = orders.find((o) => o.description.includes("Square payment"));
+const watari = orders.find((o) => o.description.includes("Square payment"));
 
-if (!onramp) {
-  console.log("No open on-ramp orders found.");
+if (!watari) {
+  console.log("No open 渡(Watari) orders found.");
   console.log("Run seller.ts first to create one.");
   process.exit(0);
 }
 
-console.log(`Found order: ${onramp.id}`);
-console.log(`  Description: ${onramp.description}`);
-console.log(`  Bounty: ${onramp.bounty?.amount_sats ?? 0} sats`);
+console.log(`Found order: ${watari.id}`);
+console.log(`  Description: ${watari.description}`);
+console.log(`  Bounty: ${watari.bounty?.amount_sats ?? 0} sats`);
 
-if (onramp.tlsn_requirements) {
-  const domain = onramp.tlsn_requirements.domain_hint ?? onramp.tlsn_requirements.target_url;
+if (watari.tlsn_requirements) {
+  const domain = watari.tlsn_requirements.domain_hint ?? watari.tlsn_requirements.target_url;
   console.log(`  Domain: ${domain}`);
-  if (onramp.tlsn_requirements.conditions) {
+  if (watari.tlsn_requirements.conditions) {
     console.log("  Conditions:");
-    for (const cond of onramp.tlsn_requirements.conditions) {
+    for (const cond of watari.tlsn_requirements.conditions) {
       console.log(`    - [${cond.type}] "${cond.expression}" — ${cond.description ?? ""}`);
     }
   }
@@ -95,11 +95,11 @@ console.log("  2. Open DevConsole → paste plugin code from RUNBOOK Step 6b");
 console.log("  3. Run Code → Allow → proof copied to clipboard\n");
 
 console.log("=== Submit to Anchr ===\n");
-console.log(`  curl -X POST ${SERVER_URL}/queries/${onramp.id}/result \\`);
+console.log(`  curl -X POST ${SERVER_URL}/queries/${watari.id}/result \\`);
 console.log('    -H "Content-Type: application/json" \\');
 console.log('    -d \'{"worker_pubkey": "<your-pubkey>", "tlsn_presentation": "<base64-of-proof>"}\'');
 console.log();
 console.log("After successful verification:");
 console.log("  - Oracle releases HTLC preimage");
 console.log("  - Buyer redeems Cashu HTLC token with preimage + signature");
-console.log(`  - ${onramp.bounty?.amount_sats ?? "100,000"} sats transferred trustlessly`);
+console.log(`  - ${watari.bounty?.amount_sats ?? "100,000"} sats transferred trustlessly`);

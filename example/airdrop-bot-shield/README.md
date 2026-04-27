@@ -1,4 +1,8 @@
-# Airdrop Bot Shield
+# 形代(Katashiro)
+
+> *Katashiro* — a paper effigy in Japanese tradition that absorbs a person's impurities so the person stays anonymous. Here: a cryptographic stand-in for identity.
+
+**Airdrop bot shield.**
 
 TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are.
 

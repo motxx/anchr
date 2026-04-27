@@ -1,7 +1,7 @@
 /**
- * TLSNotary Fiat Swap (Square) — Seller (has BTC, wants fiat)
+ * 渡(Watari) — Seller (has BTC, wants fiat)
  *
- * The seller creates an on-ramp order:
+ * Watari is the trustless fiat ↔ BTC crossing. The seller creates a 渡(Watari) order:
  *   1. Creates a Square Payment Link for the fiat amount
  *   2. Creates an Anchr query with TLSNotary requirements
  *      - Public: domain_hint = "connect.squareupsandbox.com" (visible to all Workers)
@@ -35,7 +35,7 @@ if (!SQUARE_ACCESS_TOKEN) {
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
 
-console.log("=== TLSNotary Fiat Swap (Square) — Seller ===\n");
+console.log("=== 渡(Watari) — Seller ===\n");
 console.log(`Server: ${SERVER_URL}`);
 
 // Step 1: Create a Square Payment Link (or use an existing one)

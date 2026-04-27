@@ -1,4 +1,6 @@
-# TLSNotary Fiat Swap (Square) — Runbook
+# 渡(Watari) — Runbook
+
+> *Watari* — a crossing or ferry. Here: trustless fiat ↔ BTC crossing via Square.
 
 Square テスト決済を TLSNotary で証明し、Anchr 経由で BTC と trustless に交換する E2E 手順。
 
