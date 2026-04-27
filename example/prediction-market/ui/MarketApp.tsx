@@ -52,20 +52,20 @@ function pickFeatured(markets: Market[]): Market | null {
 /** Read the market id from the current URL (`/m/<id>`), or null for list. */
 function readMarketIdFromPath(): string | null {
   if (typeof window === "undefined") return null;
-  const m = window.location.pathname.match(/^\/m\/([^/?#]+)/);
+  const m = globalThis.location.pathname.match(/^\/m\/([^/?#]+)/);
   return m ? decodeURIComponent(m[1]) : null;
 }
 
 function pushList() {
-  if (window.location.pathname !== "/") {
-    window.history.pushState(null, "", "/");
+  if (globalThis.location.pathname !== "/") {
+    globalThis.history.pushState(null, "", "/");
   }
 }
 
 function pushMarket(id: string) {
   const target = `/m/${encodeURIComponent(id)}`;
-  if (window.location.pathname !== target) {
-    window.history.pushState(null, "", target);
+  if (globalThis.location.pathname !== target) {
+    globalThis.history.pushState(null, "", target);
   }
 }
 
@@ -87,8 +87,8 @@ export function MarketApp() {
   // so useEffect is the right tool.
   useEffect(() => {
     const onPopState = () => setSelectedMarketId(readMarketIdFromPath());
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    globalThis.addEventListener("popstate", onPopState);
+    return () => globalThis.removeEventListener("popstate", onPopState);
   }, []);
 
   const openMarket = (id: string) => {

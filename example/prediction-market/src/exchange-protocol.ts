@@ -46,8 +46,15 @@ export interface ExchangeConfig {
 export interface TokenResult {
   /** cashuB-encoded token string. */
   token: string;
-  /** The P2PK-locked proofs. */
+  /** The P2PK-locked proofs (the ones encoded in `token`). */
   proofs: Proof[];
+  /**
+   * Change proofs the wallet kept back (input value − bet amount). Callers
+   * that hold a long-running proof pool (e.g., bots placing many bets) MUST
+   * thread these into the next send op, otherwise their local view of
+   * available balance drifts from the wallet's actual state.
+   */
+  keepProofs: Proof[];
 }
 
 export interface VerificationResult {
@@ -111,10 +118,14 @@ function buildOptionsForSide(config: ExchangeConfig, locktime: number): P2PKOpti
 // ---------------------------------------------------------------------------
 
 /**
- * Create a P2PK-locked token for the exchange phase.
+ * Create a P2PK-locked bet token. The token locks until **`marketLocktime`**
+ * (resolution deadline + buffer) so it remains valid through the entire
+ * market duration; if the counterparty never produces a matching token, the
+ * refund pubkey path activates after the locktime.
  *
- * Uses a short locktime (e.g., 10 minutes) so if the counterparty
- * never shows up, the token refunds quickly.
+ * `exchangeLocktime` on `ExchangeConfig` is reserved for future use (an
+ * earlier two-phase design that is not currently implemented end-to-end);
+ * production callers should use this single-phase function and ignore it.
  *
  * @param wallet - Cashu wallet instance (works in browser)
  * @param proofs - Plain proofs to lock
@@ -125,14 +136,14 @@ export async function createLockedToken(
   proofs: Proof[],
   config: ExchangeConfig,
 ): Promise<TokenResult> {
-  const options = buildOptionsForSide(config, config.exchangeLocktime);
+  const options = buildOptionsForSide(config, config.marketLocktime);
 
   // Force-refresh the mint's keyset cache. By default cashu-ts's loadMint
   // re-uses cached keysets, but the proofs we are about to swap may reference
   // a keyset the wallet picked up only after its initial load (e.g. mint
   // rotated keysets between createWallet() and this call).
   await wallet.loadMint(true);
-  const { send } = await wallet.ops
+  const { send, keep } = await wallet.ops
     .send(config.amountSats, proofs)
     .asP2PK(options)
     .run();
@@ -140,46 +151,31 @@ export async function createLockedToken(
   return {
     token: getEncodedToken({ mint: config.mintUrl, proofs: send }),
     proofs: send,
+    keepProofs: keep ?? [],
   };
 }
 
+// ---------------------------------------------------------------------------
+// Pubkey normalization
+// ---------------------------------------------------------------------------
+
 /**
- * Create a long-locktime replacement token after exchange is confirmed.
+ * Reduce a hex secp256k1 pubkey to its 32-byte x-only form. Accepts:
+ *   - 64 chars (already x-only / BIP-340 / FROST aggregate)
+ *   - 66 chars with `02` or `03` prefix (compressed secp256k1 / Cashu P2PK)
  *
- * After both parties have exchanged short-locktime tokens and verified them,
- * each party creates a new token with the market locktime (deadline + buffer).
- *
- * In practice, this means:
- * 1. Receive short-locktime token from counterparty
- * 2. Swap it at the mint for plain proofs (using privkey for P2PK unlock)
- * 3. Re-lock with long market locktime
- *
- * For the demo flow where the server relays tokens, this step happens
- * automatically — the server verifies short-locktime tokens and the
- * client creates market-duration tokens.
- *
- * @param wallet - Cashu wallet instance
- * @param proofs - Plain proofs to lock with market locktime
- * @param config - Exchange configuration
+ * The market stores its FROST keys as x-only; cashu-ts's P2PKBuilder stores
+ * lock conditions in compressed form (always `02`-prefixed when given
+ * x-only input). Comparing the two requires normalization, otherwise the
+ * same key looks unequal as a string.
  */
-export async function createMarketToken(
-  wallet: Wallet,
-  proofs: Proof[],
-  config: ExchangeConfig,
-): Promise<TokenResult> {
-  const options = buildOptionsForSide(config, config.marketLocktime);
-
-  // See createLockedToken for why we force-refresh.
-  await wallet.loadMint(true);
-  const { send } = await wallet.ops
-    .send(config.amountSats, proofs)
-    .asP2PK(options)
-    .run();
-
-  return {
-    token: getEncodedToken({ mint: config.mintUrl, proofs: send }),
-    proofs: send,
-  };
+function toXOnlyPubkey(hex: string): string {
+  const lower = hex.toLowerCase();
+  if (lower.length === 64) return lower;
+  if (lower.length === 66 && (lower.startsWith("02") || lower.startsWith("03"))) {
+    return lower.slice(2);
+  }
+  return lower;
 }
 
 // ---------------------------------------------------------------------------
@@ -232,6 +228,8 @@ export function verifyReceivedToken(
   }
 
   // 3-6. Verify each proof's P2PK conditions
+  const expectedGroupX = toXOnlyPubkey(expected.groupPubkey);
+  const expectedMineX = toXOnlyPubkey(expected.myPubkey);
   for (const proof of proofs) {
     const secretResult = parseP2PKSecret(proof.secret);
     if (!secretResult.valid) {
@@ -239,15 +237,20 @@ export function verifyReceivedToken(
     }
 
     const { pubkeys, nSigs, locktime } = secretResult;
+    // Cashu NUT-11 stores compressed (33-byte, `02`/`03`-prefixed) pubkeys;
+    // FROST/Anchr state holds 32-byte x-only (BIP-340) pubkeys. Normalize both
+    // sides to x-only before comparing so the same key isn't rejected over a
+    // representation difference.
+    const lockKeysX = pubkeys.map(toXOnlyPubkey);
 
     // 4. Check lock pubkeys include group pubkey AND my pubkey
-    if (!pubkeys.includes(expected.groupPubkey)) {
+    if (!lockKeysX.includes(expectedGroupX)) {
       return {
         valid: false,
         error: `Missing group pubkey in lock conditions: ${expected.groupPubkey}`,
       };
     }
-    if (!pubkeys.includes(expected.myPubkey)) {
+    if (!lockKeysX.includes(expectedMineX)) {
       return {
         valid: false,
         error: `Missing my pubkey in lock conditions: ${expected.myPubkey}`,

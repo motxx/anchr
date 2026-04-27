@@ -297,6 +297,62 @@ describe("verifyReceivedToken", () => {
     expect(result.valid).toBe(true);
   });
 
+  test("accepts compressed (02-prefixed) lock pubkeys against x-only expected pubkeys", () => {
+    // Regression: cashu-ts's P2PKBuilder writes compressed (33-byte) pubkeys
+    // into NUT-11 secrets, but the market state holds 32-byte x-only / FROST
+    // aggregate pubkeys. verifyReceivedToken must normalize both sides before
+    // comparing, otherwise the same key is rejected over a representation
+    // difference.
+    const xOnlyGroup = makeKeypair().pubkey;       // 64 hex chars
+    const xOnlyMine = makeKeypair().pubkey;        // 64 hex chars
+    const compressedGroup = "02" + xOnlyGroup;     // 66 hex chars
+    const compressedMine = "02" + xOnlyMine;       // 66 hex chars
+
+    const proof = mockP2PKProof({
+      amount: 64,
+      primaryPubkey: compressedGroup,
+      additionalPubkeys: [compressedMine],
+      nSigs: 2,
+      locktime,
+    });
+
+    const token = encodeProofs([proof]);
+    const result = verifyReceivedToken(token, {
+      groupPubkey: xOnlyGroup,
+      myPubkey: xOnlyMine,
+      amount: 64,
+      minLocktime: locktime,
+    });
+
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  test("accepts 03-prefixed compressed lock pubkeys (odd-Y secp256k1 form)", () => {
+    const xOnlyGroup = makeKeypair().pubkey;
+    const xOnlyMine = makeKeypair().pubkey;
+    const compressedGroup = "03" + xOnlyGroup;
+    const compressedMine = "03" + xOnlyMine;
+
+    const proof = mockP2PKProof({
+      amount: 64,
+      primaryPubkey: compressedGroup,
+      additionalPubkeys: [compressedMine],
+      nSigs: 2,
+      locktime,
+    });
+
+    const token = encodeProofs([proof]);
+    const result = verifyReceivedToken(token, {
+      groupPubkey: xOnlyGroup,
+      myPubkey: xOnlyMine,
+      amount: 64,
+      minLocktime: locktime,
+    });
+
+    expect(result.valid).toBe(true);
+  });
+
   test("accepts token with excess amount", () => {
     const proof = mockP2PKProof({
       amount: 128,

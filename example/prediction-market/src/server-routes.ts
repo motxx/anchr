@@ -384,12 +384,14 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
           .filter((p) => p.yes_pubkey === queryPubkey || p.no_pubkey === queryPubkey)
           .map((p) => {
             const userSide = p.yes_pubkey === queryPubkey ? "yes" : "no";
+            const counterpartyPubkey = userSide === "yes" ? p.no_pubkey : p.yes_pubkey;
             const won =
               (market.status === "resolved_yes" && userSide === "yes") ||
               (market.status === "resolved_no" && userSide === "no");
             return {
               pair_id: p.pair_id,
               side: userSide,
+              counterparty_pubkey: counterpartyPubkey,
               amount_sats: p.amount_sats,
               status: p.status,
               won,
