@@ -31,6 +31,12 @@ import {
   type Nip60Wallet,
   type TokenEntry,
 } from "../src/nip60.ts";
+import {
+  fetchIncomingNutzaps,
+  redeemNutzap,
+  sendNutzap as sendNutzapPrimitive,
+  type IncomingNutzap,
+} from "../src/nip61.ts";
 import { signProofs } from "./api.ts";
 
 const PROOF_STORAGE_KEY = "anchr_market_proofs";
@@ -343,6 +349,119 @@ function bytesToHex(bytes: Uint8Array): string {
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+// ---------------------------------------------------------------------------
+// NIP-61 nutzaps — funding & sending
+// ---------------------------------------------------------------------------
+
+export interface NutzapReceiveResult {
+  /** How many nutzaps successfully redeemed and added to the wallet. */
+  redeemed: number;
+  /** Total sats added across the redeemed nutzaps (after mint swap fee). */
+  total_sats: number;
+  /** Per-nutzap detail for the UI to show "+1,000 sats from <pubkey>". */
+  redemptions: Array<{ event_id: string; sender_pubkey: string; amount_sats: number; comment?: string }>;
+  /** Nutzaps that failed to redeem (already-spent, wrong mint, etc.). */
+  failures: Array<{ event_id: string; error: string }>;
+}
+
+/**
+ * Pull all unredeemed NIP-61 nutzaps targeting this user's pubkey from
+ * the configured relays, swap each at the mint, and persist the
+ * resulting plain proofs through the same NIP-60 / localStorage path.
+ *
+ * Idempotency is delegated to the mint — already-spent locks reject the
+ * second swap, so calling twice is safe (the second call just records
+ * failures).
+ */
+export async function receiveIncomingNutzaps(
+  mintUrl: string,
+): Promise<NutzapReceiveResult> {
+  const wallet = await initWallet(mintUrl, _relays);
+  const { secretKey, publicKey } = getOrCreateKeypair();
+  if (_relays.length === 0) {
+    return { redeemed: 0, total_sats: 0, redemptions: [], failures: [] };
+  }
+  if (_nip60 === null) {
+    // Defensive — initWallet sets _nip60 when relays are configured, but
+    // a misconfiguration shouldn't crash the wallet.
+    return { redeemed: 0, total_sats: 0, redemptions: [], failures: [] };
+  }
+
+  const nutzaps = await fetchIncomingNutzaps(_nip60.pool, _relays, publicKey);
+
+  let totalSats = 0;
+  const redemptions: NutzapReceiveResult["redemptions"] = [];
+  const failures: NutzapReceiveResult["failures"] = [];
+
+  for (const nz of nutzaps) {
+    if (nz.mintUrl !== mintUrl) {
+      failures.push({ event_id: nz.eventId, error: `Wrong mint: ${nz.mintUrl}` });
+      continue;
+    }
+    try {
+      const fresh = await redeemNutzap({
+        recipientWallet: wallet,
+        recipientSecret: secretKey,
+        nutzap: nz,
+      });
+      const sats = fresh.reduce((s, p) => s + p.amount, 0);
+      await addProofs(fresh);
+      totalSats += sats;
+      redemptions.push({
+        event_id: nz.eventId,
+        sender_pubkey: nz.senderPubkey,
+        amount_sats: sats,
+        comment: nz.comment,
+      });
+    } catch (err) {
+      failures.push({
+        event_id: nz.eventId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { redeemed: redemptions.length, total_sats: totalSats, redemptions, failures };
+}
+
+/**
+ * Send a NIP-61 nutzap to `recipientPubkey`. Locks `amountSats` from the
+ * wallet's plain proofs and publishes a kind:9321 event tagged with the
+ * recipient. Wallet's proof pool is updated with the change.
+ */
+export async function sendNutzap(input: {
+  mintUrl: string;
+  recipientPubkey: string;
+  amountSats: number;
+  comment?: string;
+}): Promise<{ event_id: string }> {
+  const wallet = await initWallet(input.mintUrl, _relays);
+  const { secretKey } = getOrCreateKeypair();
+  if (_relays.length === 0 || _nip60 === null) {
+    throw new Error("Nutzap requires NOSTR_RELAYS to be configured on the server");
+  }
+
+  const senderProofs = await loadProofs();
+  const result = await sendNutzapPrimitive({
+    senderSecret: secretKey,
+    recipientPubkey: input.recipientPubkey,
+    mintUrl: input.mintUrl,
+    senderWallet: wallet,
+    senderProofs,
+    amountSats: input.amountSats,
+    relays: _relays,
+    comment: input.comment,
+    pool: _nip60.pool,
+  });
+
+  // Replace the wallet's plain proofs with the change keepProofs.
+  await saveProofs(result.keepProofs);
+  return { event_id: result.eventId };
+}
+
+// Tag for IDEs that don't see the IncomingNutzap re-export.
+export type { IncomingNutzap };
 
 // ---------------------------------------------------------------------------
 // Held tokens (locked tokens the user holds against a counterparty)
