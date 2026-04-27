@@ -12,6 +12,7 @@ import {
 import { cn } from "../lib/utils.ts";
 import { getUserPubkey } from "../keypair.ts";
 import {
+  initWallet,
   lockFundsForMatch,
   saveHeldToken,
   loadHeldTokensForMarket,
@@ -191,6 +192,7 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
     queryFn: fetchWalletConfig,
   });
   const mintUrl = walletConfigQuery.data?.mint_url ?? null;
+  const relays = walletConfigQuery.data?.nostr_relays ?? [];
 
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesPercent = total > 0 ? Math.round((market.yes_pool_sats / total) * 100) : 50;
@@ -214,6 +216,11 @@ export function MarketDetail({ market, onBack, onBetPlaced }: MarketDetailProps)
 
   const placeBetMutation = useMutation({
     mutationFn: async (input: { side: "yes" | "no"; amount: number }) => {
+      // Ensure the wallet is initialized with the right mint + NIP-60 relays
+      // before any P2PK lock so /submit-token gets a valid cashuB token.
+      if (mintUrl) {
+        await initWallet(mintUrl, relays);
+      }
       const result = await placeBet(market.id, input.side, input.amount, userPubkey);
       const lockOutcome = await lockMatches(result.matches, {
         mintUrl,

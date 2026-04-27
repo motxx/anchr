@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchWalletConfig,
   requestFaucet,
@@ -7,6 +7,7 @@ import {
 import {
   initWallet,
   getBalance,
+  isNostrBacked,
   receiveToken,
 } from "../wallet.ts";
 import { cn } from "../lib/utils.ts";
@@ -28,28 +29,36 @@ import { cn } from "../lib/utils.ts";
 export function WalletButton() {
   const [open, setOpen] = useState(false);
   const [tokenInput, setTokenInput] = useState("");
-  const [walletVersion, setWalletVersion] = useState(0);
+  const [walletReady, setWalletReady] = useState(false);
+  const queryClient = useQueryClient();
 
   const walletConfig = useQuery({
     queryKey: ["wallet-config"],
     queryFn: fetchWalletConfig,
   });
   const mintUrl = walletConfig.data?.mint_url ?? null;
+  const relays = walletConfig.data?.nostr_relays ?? [];
 
-  // Re-derive on every walletVersion bump; cheap localStorage read.
-  const balance = React.useMemo(() => getBalance(), [walletVersion]);
-  // After a successful connect mutation we set this; the wallet module
-  // doesn't expose change events, so we drive readiness from mutation success.
-  const [walletReady, setWalletReady] = useState(false);
+  // Balance is owned by the wallet module (NIP-60 events or localStorage).
+  // useQuery handles the async fetch and re-renders when invalidated.
+  const balanceQuery = useQuery({
+    queryKey: ["wallet-balance"],
+    queryFn: () => getBalance(),
+    enabled: walletReady,
+    initialData: 0,
+  });
+  const balance = balanceQuery.data ?? 0;
+  const refreshBalance = () =>
+    queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
 
   const connectMutation = useMutation({
     mutationFn: async () => {
       if (!mintUrl) throw new Error("Mint not configured");
-      await initWallet(mintUrl);
+      await initWallet(mintUrl, relays);
     },
     onSuccess: () => {
       setWalletReady(true);
-      setWalletVersion((v) => v + 1);
+      refreshBalance();
     },
   });
 
@@ -57,23 +66,23 @@ export function WalletButton() {
     mutationFn: async () => {
       if (!mintUrl) throw new Error("Mint not configured");
       const result = await requestFaucet(1000);
-      const wallet = await initWallet(mintUrl);
+      const wallet = await initWallet(mintUrl, relays);
       await receiveToken(wallet, result.cashu_token);
       return result.amount_sats;
     },
-    onSuccess: () => setWalletVersion((v) => v + 1),
+    onSuccess: () => refreshBalance(),
   });
 
   const receiveMutation = useMutation({
     mutationFn: async (token: string) => {
       if (!mintUrl) throw new Error("Mint not configured");
-      const wallet = await initWallet(mintUrl);
+      const wallet = await initWallet(mintUrl, relays);
       const proofs = await receiveToken(wallet, token);
       return proofs.reduce((sum, p) => sum + p.amount, 0);
     },
     onSuccess: () => {
       setTokenInput("");
-      setWalletVersion((v) => v + 1);
+      refreshBalance();
     },
   });
 

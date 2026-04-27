@@ -47,8 +47,35 @@ if (frostConfigPath) {
   }
 }
 
+// Resolve Nostr relay set from env so the wallet/config endpoint can hand
+// it to the browser-side NIP-60 client. Comma-separated list of ws(s)://
+// URLs; empty/unset disables NIP-60 persistence and falls the UI back to
+// localStorage.
+function resolveNostrRelaysFromEnv(): string[] {
+  const raw = Deno.env.get("NOSTR_RELAYS")?.trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((url) => url.trim())
+    .filter((url) => {
+      if (!url) return false;
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === "ws:" || parsed.protocol === "wss:";
+      } catch {
+        return false;
+      }
+    });
+}
+const nostrRelays = resolveNostrRelaysFromEnv();
+if (nostrRelays.length > 0) {
+  console.log(`[market] NIP-60 wallet relays: ${nostrRelays.join(", ")}`);
+} else {
+  console.log("[market] NOSTR_RELAYS not set — UI wallet uses localStorage only.");
+}
+
 // Construct state explicitly so we can also hand it to the auto-resolver.
-const state = createMarketState({ frostConfig });
+const state = createMarketState({ frostConfig, nostrRelays });
 
 registerMarketRoutes(app, {
   writeAuth: noopMiddleware,

@@ -178,6 +178,8 @@ export async function submitToken(
 
 export interface WalletConfig {
   mint_url: string | null;
+  /** Nostr relays the NIP-60 wallet client uses for kind:7375 token events. */
+  nostr_relays: string[];
 }
 
 export async function fetchWalletConfig(): Promise<WalletConfig> {

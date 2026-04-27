@@ -319,7 +319,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
   mkt.get("/wallet/config", (c) => {
     const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
-    return c.json({ mint_url: mintUrl });
+    // Surface the same relay set the server publishes markets to. The
+    // browser-side NIP-60 wallet uses these to persist Cashu proofs as
+    // encrypted kind:7375 token events.
+    return c.json({ mint_url: mintUrl, nostr_relays: s.nostrRelays });
   });
 
   mkt.post("/wallet/faucet", rateLimit, async (c) => {

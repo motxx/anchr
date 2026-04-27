@@ -1,15 +1,30 @@
 /**
  * Browser-side Cashu wallet for non-custodial prediction market.
  *
- * Proofs are stored in localStorage. The browser holds its own balance
- * and creates P2PK-locked tokens directly — the server never touches them.
+ * When the server advertises Nostr relays in `/markets/wallet/config`, the
+ * wallet stores Cashu proofs as encrypted NIP-60 `kind:7375` events on
+ * those relays. The user's nsec (from `keypair.ts`) signs the events; only
+ * the user can decrypt them. State persists across browsers as long as the
+ * same nsec is configured.
  *
- * The wallet uses the same @cashu/cashu-ts Wallet class as the server,
- * since it works in the browser.
+ * When no relays are configured, the wallet falls back to localStorage so
+ * a single-browser demo flow still works without any Nostr setup.
+ *
+ * The wallet uses `@cashu/cashu-ts` for the actual mint interaction —
+ * minting, swapping, locking via P2PK — and delegates persistence to NIP-60
+ * (or localStorage) on top.
  */
 
-import { Wallet, type Proof, getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
+import { type Proof, type Wallet } from "@cashu/cashu-ts";
 import { createLockedToken, type ExchangeConfig } from "../src/exchange-protocol.ts";
+import { getOrCreateKeypair } from "./keypair.ts";
+import {
+  createNip60Wallet,
+  loadProofs as loadNip60Proofs,
+  publishProofs as publishNip60Proofs,
+  type Nip60Wallet,
+  type TokenEntry,
+} from "../src/nip60.ts";
 
 const PROOF_STORAGE_KEY = "anchr_market_proofs";
 const RECEIVED_TOKENS_KEY = "anchr_market_received_tokens";
@@ -20,43 +35,65 @@ const RECEIVED_TOKENS_KEY = "anchr_market_received_tokens";
 
 let _wallet: Wallet | null = null;
 let _mintUrl: string | null = null;
+let _nip60: Nip60Wallet | null = null;
+let _relays: string[] = [];
 
 /**
- * Initialize the browser-side Cashu wallet.
+ * Initialize the browser-side Cashu wallet. Call this once at app startup
+ * with the values from `/markets/wallet/config`.
  *
- * In the browser, the mint URL comes from the server (via /markets config or env).
- * For the demo, we use a default that can be overridden.
+ * `relays = []` keeps the wallet in localStorage-only mode.
  */
-export async function initWallet(mintUrl: string): Promise<Wallet> {
-  if (_wallet && _mintUrl === mintUrl) return _wallet;
-  _wallet = new Wallet(mintUrl, { unit: "sat" });
+export async function initWallet(
+  mintUrl: string,
+  relays: string[] = [],
+): Promise<Wallet> {
+  if (_wallet && _mintUrl === mintUrl && relays.join(",") === _relays.join(",")) {
+    return _wallet;
+  }
+  // Dynamic import keeps the cashu-ts bundle lazy in case the wallet path
+  // is never used.
+  const { Wallet: CashuWallet } = await import("@cashu/cashu-ts");
+  _wallet = new CashuWallet(mintUrl, { unit: "sat" });
   _mintUrl = mintUrl;
   await _wallet.loadMint();
+
+  _relays = relays;
+  if (relays.length > 0) {
+    const { secretKey } = getOrCreateKeypair();
+    _nip60 = await createNip60Wallet({ secretKey, relays, mintUrl });
+  } else {
+    _nip60 = null;
+  }
   return _wallet;
 }
 
-/**
- * Get the current wallet instance, or null if not initialized.
- */
 export function getWallet(): Wallet | null {
   return _wallet;
 }
 
-/**
- * Get the current mint URL.
- */
 export function getMintUrl(): string | null {
   return _mintUrl;
 }
 
+/** True if the wallet is persisting to a Nostr relay (NIP-60 mode). */
+export function isNostrBacked(): boolean {
+  return _nip60 !== null;
+}
+
 // ---------------------------------------------------------------------------
-// Proof storage (localStorage)
+// Proof storage — NIP-60 if available, localStorage fallback
 // ---------------------------------------------------------------------------
 
-/**
- * Load proofs from localStorage.
- */
-export function loadProofs(): Proof[] {
+/** All live token entries for this wallet (NIP-60 form). */
+async function loadEntries(): Promise<TokenEntry[]> {
+  if (_nip60) return loadNip60Proofs(_nip60);
+  // localStorage fallback wraps the flat proof list as a single synthetic
+  // entry. The eventId is empty — there's nothing to supersede in this mode.
+  return [{ eventId: "", mint: _mintUrl ?? "", proofs: loadProofsLocal() }];
+}
+
+function loadProofsLocal(): Proof[] {
   try {
     const raw = localStorage.getItem(PROOF_STORAGE_KEY);
     if (!raw) return [];
@@ -66,89 +103,54 @@ export function loadProofs(): Proof[] {
   }
 }
 
-/**
- * Save proofs to localStorage.
- */
-export function saveProofs(proofs: Proof[]): void {
+function saveProofsLocal(proofs: Proof[]): void {
   localStorage.setItem(PROOF_STORAGE_KEY, JSON.stringify(proofs));
 }
 
-/**
- * Get current balance from stored proofs.
- */
-export function getBalance(): number {
-  return loadProofs().reduce((sum, p) => sum + p.amount, 0);
+/** Read all proofs the wallet considers spendable right now. */
+export async function loadProofs(): Promise<Proof[]> {
+  const entries = await loadEntries();
+  return entries.flatMap((e) => e.proofs);
 }
 
-/**
- * Add proofs to the stored balance.
- */
-export function addProofs(newProofs: Proof[]): void {
-  const existing = loadProofs();
-  saveProofs([...existing, ...newProofs]);
+/** Replace the wallet's proof set. NIP-60 mode supersedes prior events. */
+export async function saveProofs(proofs: Proof[]): Promise<void> {
+  if (_nip60) {
+    const entries = await loadNip60Proofs(_nip60);
+    await publishNip60Proofs(_nip60, proofs, entries.map((e) => e.eventId));
+  } else {
+    saveProofsLocal(proofs);
+  }
 }
 
-/**
- * Remove specific proofs from storage (after spending).
- */
-export function removeProofs(spentProofs: Proof[]): void {
-  const existing = loadProofs();
+export async function getBalance(): Promise<number> {
+  const proofs = await loadProofs();
+  return proofs.reduce((sum, p) => sum + p.amount, 0);
+}
+
+export async function addProofs(newProofs: Proof[]): Promise<void> {
+  const existing = await loadProofs();
+  await saveProofs([...existing, ...newProofs]);
+}
+
+export async function removeProofs(spentProofs: Proof[]): Promise<void> {
+  const existing = await loadProofs();
   const spentCs = new Set(spentProofs.map((p) => p.C));
-  saveProofs(existing.filter((p) => !spentCs.has(p.C)));
+  await saveProofs(existing.filter((p) => !spentCs.has(p.C)));
 }
 
 // ---------------------------------------------------------------------------
 // Token operations
 // ---------------------------------------------------------------------------
 
-/**
- * Receive a cashuB token and swap it at the mint.
- *
- * Swapping invalidates the sender's copy of the proofs, ensuring
- * only the receiver can spend them. The resulting proofs are stored
- * in localStorage.
- */
+/** Receive a cashuB token, swap it at the mint, and add the proofs to the wallet. */
 export async function receiveToken(
   wallet: Wallet,
   cashuToken: string,
 ): Promise<Proof[]> {
   const proofs = await wallet.receive(cashuToken);
-  addProofs(proofs);
+  await addProofs(proofs);
   return proofs;
-}
-
-/**
- * Encode stored proofs as a cashuB token string.
- * Useful for displaying the balance as a shareable token.
- */
-export function encodeBalance(mintUrl: string): string | null {
-  const proofs = loadProofs();
-  if (proofs.length === 0) return null;
-  return getEncodedToken({ mint: mintUrl, proofs });
-}
-
-/**
- * Select proofs for a given amount (greedy largest-first).
- * Returns selected proofs and updates storage to remove them.
- */
-export function selectProofs(amountSats: number): Proof[] | null {
-  const proofs = loadProofs();
-  const sorted = [...proofs].sort((a, b) => b.amount - a.amount);
-
-  const selected: Proof[] = [];
-  let total = 0;
-
-  for (const p of sorted) {
-    if (total >= amountSats) break;
-    selected.push(p);
-    total += p.amount;
-  }
-
-  if (total < amountSats) return null;
-
-  // Remove selected from storage
-  removeProofs(selected);
-  return selected;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,12 +158,11 @@ export function selectProofs(amountSats: number): Proof[] | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the exchange-locked Cashu token for a matched bet pair.
+ * Build the P2PK-locked Cashu token for a matched bet pair.
  *
- * The browser owns the proofs; the server only relays the resulting
- * cashuB token between matched bettors. The token is locked so the
- * counterparty (and the market group) need to co-sign to spend it,
- * with a refund-after-locktime path back to the user.
+ * The browser owns the proofs; the server only relays the resulting cashuB
+ * token between matched bettors. The token locks until the market deadline
+ * + buffer, with a refund-after-locktime path back to the user.
  */
 export async function lockFundsForMatch(input: {
   mintUrl: string;
@@ -174,11 +175,13 @@ export async function lockFundsForMatch(input: {
   marketLocktime: number;
   amountSats: number;
 }): Promise<{ token: string }> {
-  const wallet = await initWallet(input.mintUrl);
-  const proofs = selectProofs(input.amountSats);
-  if (!proofs) {
+  const wallet = await initWallet(input.mintUrl, _relays);
+  const entries = await loadEntries();
+  const allProofs = entries.flatMap((e) => e.proofs);
+  const balance = allProofs.reduce((s, p) => s + p.amount, 0);
+  if (balance < input.amountSats) {
     throw new Error(
-      `Insufficient balance: need ${input.amountSats} sats, have ${getBalance()}`,
+      `Insufficient balance: need ${input.amountSats} sats, have ${balance}`,
     );
   }
 
@@ -194,18 +197,31 @@ export async function lockFundsForMatch(input: {
     marketLocktime: input.marketLocktime,
   };
 
-  try {
-    const result = await createLockedToken(wallet, proofs, config);
-    return { token: result.token };
-  } catch (err) {
-    // Restore proofs on failure so the user doesn't lose their balance.
-    addProofs(proofs);
-    throw err;
+  // The lock op may throw if cashu-ts can't make the math work; in that
+  // case we leave proofs untouched. On success, the wallet's `keep` set
+  // becomes the new spendable balance.
+  const result = await createLockedToken(wallet, allProofs, config);
+
+  if (_nip60) {
+    await publishNip60Proofs(
+      _nip60,
+      result.keepProofs,
+      entries.map((e) => e.eventId),
+    );
+  } else {
+    saveProofsLocal(result.keepProofs);
   }
+
+  return { token: result.token };
 }
 
 // ---------------------------------------------------------------------------
-// Received tokens (locked tokens the user holds against a counterparty)
+// Held tokens (locked tokens the user holds against a counterparty)
+//
+// Held tokens are large strings (cashuB-encoded) and would bloat the kind
+// :7375 event. They live in localStorage for now; the resolution-redemption
+// path will pick them up, swap to plain proofs, and write the proofs back
+// via the regular saveProofs() above.
 // ---------------------------------------------------------------------------
 
 export interface HeldToken {
@@ -231,7 +247,6 @@ export function loadHeldTokens(): HeldToken[] {
 
 export function saveHeldToken(token: HeldToken): void {
   const existing = loadHeldTokens();
-  // Replace any prior entry for the same pair (e.g. retry).
   const filtered = existing.filter((t) => t.pair_id !== token.pair_id);
   filtered.push(token);
   localStorage.setItem(RECEIVED_TOKENS_KEY, JSON.stringify(filtered));
