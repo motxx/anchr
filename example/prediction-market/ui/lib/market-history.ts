@@ -115,3 +115,53 @@ export function formatRelativeTime(ts: number): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
   return `${Math.floor(diff / 86400)}d`;
 }
+
+/** Stable per-market 24h volume share (0.05–0.45 of total). */
+export function volume24h(market: Market): number {
+  const rand = rng(hashId(market.id) ^ 0x24CAFE);
+  const share = 0.08 + rand() * 0.32;
+  return Math.floor(market.volume_sats * share);
+}
+
+export interface HolderRow {
+  pubkey: string;
+  side: ActivitySide;
+  shares_sats: number;
+}
+
+/**
+ * Generate a deterministic top-holders ranking. Distribution is biased
+ * toward the side with the larger pool (= the side with more conviction).
+ * Returns sorted, largest first, capped at `count`.
+ */
+export function generateHolders(market: Market, count = 8): HolderRow[] {
+  const rand = rng(hashId(market.id) ^ 0xC1A05);
+  const total = market.yes_pool_sats + market.no_pool_sats;
+  const yesBias = total > 0 ? market.yes_pool_sats / total : 0.5;
+  const totalDistributable = Math.max(market.volume_sats, market.min_bet_sats * 100);
+
+  const rows: HolderRow[] = [];
+  let remaining = totalDistributable;
+  for (let i = 0; i < count; i++) {
+    const decay = 0.55 - i * 0.05;
+    const stake = Math.max(
+      market.min_bet_sats,
+      Math.floor(remaining * Math.max(0.08, decay) * (0.6 + rand() * 0.7)),
+    );
+    remaining = Math.max(market.min_bet_sats, remaining - stake);
+    const side: ActivitySide = rand() < yesBias ? "yes" : "no";
+    rows.push({
+      pubkey: SAMPLE_PUBKEYS[Math.floor(rand() * SAMPLE_PUBKEYS.length)],
+      side,
+      shares_sats: stake,
+    });
+  }
+  rows.sort((a, b) => b.shares_sats - a.shares_sats);
+  return rows;
+}
+
+/** "Trending score" = recent volume × inverse-age. Used by sort=trending. */
+export function trendingScore(market: Market): number {
+  const ageHours = Math.max(1, (Date.now() / 1000 - market.created_at) / 3600);
+  return market.volume_sats / Math.pow(ageHours, 0.6);
+}

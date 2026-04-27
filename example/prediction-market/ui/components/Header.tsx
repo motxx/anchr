@@ -1,6 +1,7 @@
 import React from "react";
 import { getUserPubkey, truncatePubkey } from "../keypair.ts";
 import { SakuraIcon, SparkleIcon, ToriiIcon } from "./Motifs.tsx";
+import { WalletButton } from "./WalletButton.tsx";
 
 export { getUserPubkey } from "../keypair.ts";
 
@@ -29,10 +30,12 @@ export function Header() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Pubkey — soft pill with rosy ring */}
+        <div className="flex items-center gap-2">
+          <WalletButton />
+
+          {/* Pubkey */}
           <div
-            className="flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 h-8"
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-border bg-card px-3 h-9"
             title={pubkey}
           >
             <svg
@@ -53,10 +56,10 @@ export function Header() {
             </span>
           </div>
 
-          {/* Status — sparkle replaces the boring dot */}
-          <div className="flex items-center gap-1.5 rounded-full bg-yes/12 px-3 h-8">
+          {/* Live indicator */}
+          <div className="flex items-center gap-1.5 rounded-full bg-yes/12 px-3 h-9">
             <SparkleIcon size={12} className="text-yes animate-sparkle" />
-            <span className="text-xs font-medium text-yes">regtest</span>
+            <span className="text-xs font-semibold text-yes">live</span>
           </div>
         </div>
       </div>

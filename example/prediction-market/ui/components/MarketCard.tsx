@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import type { Market } from "../mock-data.ts";
 import { cn } from "../lib/utils.ts";
-import { generateHistory } from "../lib/market-history.ts";
+import { generateHistory, volume24h } from "../lib/market-history.ts";
 import { Sparkline } from "./Sparkline.tsx";
 
 function formatSats(sats: number): string {
@@ -99,14 +99,21 @@ export function MarketCard({ market, onClick }: MarketCardProps) {
         </div>
       </div>
 
-      {/* Footer stats */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="font-mono">{formatSats(market.volume_sats)} sats</span>
-        <span className="text-border">|</span>
-        <span>{market.num_bettors} bettors</span>
-        <span className="text-border">|</span>
-        <span>Pool: {formatSats(total)} sats</span>
+      {/* Footer — Polymarket-style 3-metric */}
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        <FooterMetric label="Vol" value={`${formatSats(market.volume_sats)} sats`} />
+        <FooterMetric label="24h" value={`${formatSats(volume24h(market))} sats`} />
+        <FooterMetric label="Bettors" value={String(market.num_bettors)} />
       </div>
     </button>
+  );
+}
+
+function FooterMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="font-mono text-xs font-semibold text-foreground truncate">{value}</div>
+    </div>
   );
 }

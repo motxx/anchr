@@ -1,14 +1,23 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { CATEGORIES, type Market, type MarketCategory } from "./mock-data.ts";
 import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api.ts";
 import { Header } from "./components/Header.tsx";
 import { StatsBar } from "./components/StatsBar.tsx";
 import { MarketCard } from "./components/MarketCard.tsx";
 import { MarketDetail } from "./components/MarketDetail.tsx";
-import { WalletPanel } from "./components/WalletPanel.tsx";
+import { FeaturedMarket } from "./components/FeaturedMarket.tsx";
+import { trendingScore } from "./lib/market-history.ts";
 import { cn } from "./lib/utils.ts";
 
-type SortMode = "volume" | "newest" | "ending_soon" | "bettors";
+type SortMode = "trending" | "popular" | "newest" | "ending_soon" | "volume";
+
+const SORT_TABS: { key: SortMode; label: string }[] = [
+  { key: "trending", label: "Trending" },
+  { key: "popular", label: "Popular" },
+  { key: "newest", label: "New" },
+  { key: "ending_soon", label: "Ending Soon" },
+  { key: "volume", label: "Volume" },
+];
 
 export function MarketApp() {
   const [markets, setMarkets] = useState<Market[]>([]);
@@ -16,7 +25,7 @@ export function MarketApp() {
   const [error, setError] = useState<string | null>(null);
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [category, setCategory] = useState<MarketCategory | "all">("all");
-  const [sort, setSort] = useState<SortMode>("volume");
+  const [sort, setSort] = useState<SortMode>("trending");
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
@@ -56,25 +65,33 @@ export function MarketApp() {
     loadMarkets();
   }, [loadMarkets]);
 
-  const filtered = markets
-    .filter((m) => category === "all" || m.category === category)
-    .filter((m) => search === "" || m.title.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      switch (sort) {
-        case "volume": return b.volume_sats - a.volume_sats;
-        case "newest": return b.created_at - a.created_at;
-        case "ending_soon": return a.resolution_deadline - b.resolution_deadline;
-        case "bettors": return b.num_bettors - a.num_bettors;
-        default: return 0;
-      }
-    });
+  const filtered = useMemo(() => {
+    return markets
+      .filter((m) => category === "all" || m.category === category)
+      .filter((m) => search === "" || m.title.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        switch (sort) {
+          case "trending": return trendingScore(b) - trendingScore(a);
+          case "popular": return b.num_bettors - a.num_bettors;
+          case "newest": return b.created_at - a.created_at;
+          case "ending_soon": return a.resolution_deadline - b.resolution_deadline;
+          case "volume": return b.volume_sats - a.volume_sats;
+          default: return 0;
+        }
+      });
+  }, [markets, category, search, sort]);
+
+  const featured = useMemo(() => {
+    const open = markets.filter((m) => m.status === "open");
+    if (open.length === 0) return null;
+    return [...open].sort((a, b) => trendingScore(b) - trendingScore(a))[0];
+  }, [markets]);
 
   if (selectedMarket) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-6xl mx-auto px-5 py-8">
-          <WalletPanel />
           <MarketDetail
             market={selectedMarket}
             onBack={handleBack}
@@ -90,10 +107,8 @@ export function MarketApp() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-5 py-8">
-        <WalletPanel />
-
         {/* Hero */}
-        <div className="flex items-start justify-between mb-8 gap-4">
+        <div className="flex items-start justify-between mb-6 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">
               Prediction Markets
@@ -102,7 +117,7 @@ export function MarketApp() {
               </span>
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Bet on real-world outcomes with sats. No KYC. No bridges. Verified by TLSNotary.
+              Bet on real-world outcomes with sats.
             </p>
           </div>
           <button
@@ -123,19 +138,41 @@ export function MarketApp() {
 
         <StatsBar markets={markets} />
 
-        {/* Filters */}
+        {/* Featured */}
+        {featured && !showCreateForm && (
+          <FeaturedMarket market={featured} onClick={() => handleSelectMarket(featured)} />
+        )}
+
+        {/* Sort tabs (Polymarket-style) */}
+        <div className="flex items-center gap-1.5 mb-4 overflow-x-auto pb-1 -mb-1">
+          {SORT_TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setSort(t.key)}
+              className={cn(
+                "shrink-0 px-4 h-9 rounded-full text-sm font-semibold transition-all duration-200",
+                sort === t.key
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Category + search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-          {/* Category tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.value}
                 onClick={() => setCategory(cat.value)}
                 className={cn(
-                  "shrink-0 px-3.5 h-9 rounded-full text-xs font-semibold transition-all duration-200",
+                  "shrink-0 px-3 h-8 rounded-full text-xs font-semibold transition-all duration-200",
                   category === cat.value
-                    ? "bg-primary text-primary-foreground shadow-sakura"
-                    : "text-muted-foreground bg-card border border-border hover:text-primary hover:border-primary/40"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground bg-card border border-border hover:text-primary hover:border-primary/40",
                 )}
               >
                 {cat.label}
@@ -143,32 +180,17 @@ export function MarketApp() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2 sm:ml-auto w-full sm:w-auto">
-            {/* Search */}
-            <div className="relative flex-1 sm:flex-initial">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-              </svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search markets…"
-                className="h-9 w-full sm:w-52 rounded-full border border-border bg-card pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-              />
-            </div>
-
-            {/* Sort */}
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortMode)}
-              className="h-9 rounded-full border border-border bg-card px-3 pr-7 text-xs font-medium text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
-            >
-              <option value="volume">Volume</option>
-              <option value="newest">Newest</option>
-              <option value="ending_soon">Ending Soon</option>
-              <option value="bettors">Most Bettors</option>
-            </select>
+          <div className="relative flex-1 sm:flex-initial sm:ml-auto">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search markets…"
+              className="h-9 w-full sm:w-64 rounded-full border border-border bg-card pl-9 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+            />
           </div>
         </div>
 
@@ -219,13 +241,11 @@ export function MarketApp() {
 
         {/* Footer */}
         <footer className="mt-16 pt-6 border-t border-border text-center text-xs text-muted-foreground">
-          <p className="mb-1 flex items-center justify-center gap-1.5">
+          <p className="flex items-center justify-center gap-1.5">
             <span className="text-sakura">✿</span>
             <span className="font-shrine text-primary font-semibold">Kannagi</span>
-            <span>— Cashu HTLC · Nostr · TLSNotary</span>
             <span className="text-sakura">✿</span>
           </p>
-          <p>No Polygon. No USDC. No KYC. Just sats and math.</p>
         </footer>
       </main>
     </div>
