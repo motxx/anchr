@@ -7,6 +7,7 @@ import { StatsBar } from "./components/StatsBar.tsx";
 import { MarketCard } from "./components/MarketCard.tsx";
 import { MarketDetail } from "./components/MarketDetail.tsx";
 import { FeaturedMarket } from "./components/FeaturedMarket.tsx";
+import { SakuraField } from "./components/SakuraField.tsx";
 import { trendingScore } from "./lib/market-history.ts";
 import { cn } from "./lib/utils.ts";
 
@@ -76,40 +77,38 @@ export function MarketApp() {
 
   if (selectedMarket) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="max-w-6xl mx-auto px-5 py-8">
-          <MarketDetail
-            market={selectedMarket}
-            onBack={() => {
-              setSelectedMarketId(null);
-              invalidateMarkets();
-            }}
-            onBetPlaced={invalidateMarkets}
-          />
-        </main>
+      <div className="min-h-screen bg-background relative">
+        <SakuraField />
+        <div className="relative z-10">
+          <Header />
+          <main className="max-w-6xl mx-auto px-5 py-8">
+            <MarketDetail
+              market={selectedMarket}
+              onBack={() => {
+                setSelectedMarketId(null);
+                invalidateMarkets();
+              }}
+              onBetPlaced={invalidateMarkets}
+            />
+          </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      <SakuraField />
+      <div className="relative z-10">
       <Header />
 
       <main className="max-w-6xl mx-auto px-5 py-8">
-        {/* Hero */}
-        <div className="flex items-start justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">
-              Prediction Markets
-              <span className="font-shrine text-base text-muted-foreground ml-2 align-middle">
-                予想市場
-              </span>
-            </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Bet on real-world outcomes with sats.
-            </p>
-          </div>
+        {/* Hero — Kannagi is the platform; the brand is established in the
+         * header, so the page lands directly on a tagline + the create CTA. */}
+        <div className="flex items-end justify-between mb-6 gap-4">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Bet on real-world outcomes with sats. Verified by TLSNotary.
+          </p>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
             className="shrink-0 h-10 px-5 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all hover:-translate-y-0.5 shadow-sakura"
@@ -243,6 +242,7 @@ export function MarketApp() {
           </p>
         </footer>
       </main>
+      </div>
     </div>
   );
 }
