@@ -26,7 +26,7 @@ double as integration tests and are exercised in CI.
 
 | Example | What it shows |
 |---|---|
-| **[Prediction market](example/prediction-market/)** ([live: anchr-market.fly.dev](https://anchr-market.fly.dev)) | Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
+| **[巫(Kannagi)](example/prediction-market/)** ([live: anchr-market.fly.dev](https://anchr-market.fly.dev)) | Bitcoin-native prediction market. Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
 | **[Auto-claim](example/auto-claim/)** | "Install the extension. Browse normally. Money you're owed comes back automatically." |
 | **[形代(Katashiro)](example/airdrop-bot-shield/)** | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
 | **[渡(Watari)](example/tlsn-fiat-swap-square/)** | Trustless fiat ↔ BTC crossing: counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC. |

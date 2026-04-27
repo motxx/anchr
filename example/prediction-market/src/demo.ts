@@ -1,5 +1,5 @@
 /**
- * Prediction Market Demo — N:M Conditional Swap
+ * 巫(Kannagi) — Prediction Market Demo (N:M Conditional Swap)
  *
  * Demonstrates the full lifecycle using the protocol layer:
  *
@@ -47,7 +47,7 @@ const RESOLUTION_DEADLINE = Math.floor(Date.now() / 1000) + 86400; // 24h from n
 const ORACLE_FEE_PPM = 5_000;  // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
 
-console.log("=== Bitcoin-Native Prediction Market Demo (N:M Conditional Swap) ===\n");
+console.log("=== 巫(Kannagi) — Bitcoin-Native Prediction Market Demo (N:M Conditional Swap) ===\n");
 console.log("Powered by Anchr: FROST P2PK Conditional Swap + Nostr + TLSNotary\n");
 console.log("\u2501".repeat(60));
 

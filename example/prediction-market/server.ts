@@ -1,5 +1,5 @@
 /**
- * Standalone Prediction Market server.
+ * Standalone 巫(Kannagi) prediction market server.
  *
  * Runs the prediction market as an independent application,
  * separate from the Anchr protocol server.
@@ -82,5 +82,5 @@ app.get("/main.js.map", serveStatic({ path: "./example/prediction-market/ui/main
 app.get("*", serveStatic({ path: "./example/prediction-market/ui/index.html" }));
 
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
-console.log(`Prediction Market server on http://localhost:${port}`);
+console.log(`巫(Kannagi) prediction market server on http://localhost:${port}`);
 Deno.serve({ port }, app.fetch);

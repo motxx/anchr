@@ -1,5 +1,5 @@
 /**
- * Prediction Market HTTP route registration.
+ * 巫(Kannagi) — Prediction Market HTTP route registration.
  *
  * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
  * pattern from worker-api-routes.ts. In-memory market store + order book +

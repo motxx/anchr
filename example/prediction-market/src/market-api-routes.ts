@@ -1,5 +1,5 @@
 /**
- * Prediction Market API Routes -- Hono HTTP server for market operations.
+ * 巫(Kannagi) — Prediction Market API Routes (Hono HTTP server for market operations).
  *
  * Supports two resolution modes:
  * - Single-key (demo): Local Schnorr signing via DualKeyStore

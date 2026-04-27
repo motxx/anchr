@@ -1,5 +1,5 @@
 /**
- * Prediction Market Types
+ * 巫(Kannagi) — Prediction Market Types
  *
  * Core types for a Bitcoin-native prediction market built on
  * Cashu HTLC + Nostr + TLSNotary. No Ethereum, no bridges, no KYC.

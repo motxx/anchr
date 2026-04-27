@@ -1,4 +1,8 @@
-# Prediction Market Example
+# 巫(Kannagi)
+
+> *Kannagi* (神和ぎ) — "spirit-pacifying"; in folk religion, the medium who consults the oracle and pacifies the verdict. Here: a Bitcoin-native prediction market settled by oracle attestation.
+
+**Prediction market.**
 
 A demo application using Anchr's Oracle + TLSNotary verification + Cashu
 HTLC (or FROST P2PK) atomic settlement for prediction-market resolution.

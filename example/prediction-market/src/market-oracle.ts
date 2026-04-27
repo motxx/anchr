@@ -1,5 +1,5 @@
 /**
- * Prediction Market Oracle — Resolution Logic
+ * 巫(Kannagi) — Prediction Market Oracle (Resolution Logic)
  *
  * The oracle resolves markets by generating a TLSNotary proof from an
  * authoritative URL and evaluating the resolution condition against the

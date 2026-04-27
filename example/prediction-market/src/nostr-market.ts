@@ -1,5 +1,5 @@
 /**
- * Nostr Integration for Prediction Market Discovery
+ * 巫(Kannagi) — Nostr Integration for Prediction Market Discovery
  *
  * Markets are published as Nostr events so anyone can discover and
  * participate without a centralized server. Uses kind 30078
