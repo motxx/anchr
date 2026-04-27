@@ -60,10 +60,12 @@
       system-ui,
       sans-serif;
     font-feature-settings: "palt" 1;
+    /* Calm shoji-paper cream — sakura pink stays an accent (CTAs, badges,
+     * hover glows) and never floods the canvas. A very light radial wash
+     * at the corners keeps the surface warm without pinking it up. */
     background-image:
-      radial-gradient(circle at 12% 18%, rgba(255, 183, 197, 0.18), transparent 38%),
-      radial-gradient(circle at 88% 8%, rgba(168, 197, 232, 0.16), transparent 42%),
-      radial-gradient(circle at 70% 92%, rgba(201, 181, 220, 0.14), transparent 45%);
+      radial-gradient(circle at 100% 0%, rgba(255, 183, 197, 0.06), transparent 55%),
+      radial-gradient(circle at 0% 100%, rgba(168, 197, 232, 0.05), transparent 55%);
     background-attachment: fixed;
   }
   /* Tabular numerals for any data the user compares vertically */
@@ -80,23 +82,25 @@
    * states only. Tokens documented in DESIGN.md Section 2.
    */
 
-  /* Neutrals — sakura-mochi paper progression */
-  --background: 12 100% 98%;       /* #FFF8F4 — soft peach cream */
-  --foreground: 320 18% 22%;       /* #4A3142 — warm plum-dark */
+  /* Neutrals — calm shoji-paper cream (no pink tint).
+   * Sakura coral lives only on accents (--primary, --sakura) so the canvas
+   * stays restful for long sessions. */
+  --background: 42 50% 96%;        /* #FBF6EC — shoji washi paper */
+  --foreground: 25 22% 12%;        /* #251F18 — sumi ink, warm but neutral */
   --card: 0 0% 100%;
-  --card-foreground: 320 18% 22%;
+  --card-foreground: 25 22% 12%;
   --popover: 0 0% 100%;
-  --popover-foreground: 320 18% 22%;
+  --popover-foreground: 25 22% 12%;
 
   /* Brand — Sakura coral (桜珊瑚) — softer, kawaii vermillion */
   --primary: 350 100% 71%;         /* #FF6B85 */
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 350 100% 92%;       /* #FFD9DF — soft rose */
-  --secondary-foreground: 320 14% 36%;
+  --secondary: 42 28% 86%;         /* #E5DCC4 — parchment */
+  --secondary-foreground: 30 18% 31%;
 
-  --muted: 350 100% 96%;           /* #FFEEF1 — pink tint */
-  --muted-foreground: 320 13% 52%; /* #9B7E92 */
+  --muted: 42 38% 92%;             /* #F1ECDF — light cream */
+  --muted-foreground: 30 12% 46%;  /* #837A6F */
 
   /* Accent — Nagi (ナギ) blue — her signature hair color */
   --accent: 211 60% 82%;           /* #A8C5E8 */
@@ -105,8 +109,8 @@
   --destructive: 354 78% 56%;      /* #E63946 — ceremonial vermillion */
   --destructive-foreground: 0 0% 100%;
 
-  --border: 350 100% 92%;          /* #FFD9DF */
-  --input: 350 100% 96%;
+  --border: 42 28% 86%;            /* #E5DCC4 — soft parchment */
+  --input: 42 38% 92%;
   --ring: 350 100% 71%;            /* sakura coral focus */
 
   /* Prediction outcomes — pastel sakaki / vermillion */
