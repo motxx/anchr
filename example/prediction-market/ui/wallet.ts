@@ -15,7 +15,13 @@
  * (or localStorage) on top.
  */
 
-import { type Proof, type Wallet } from "@cashu/cashu-ts";
+import {
+  type Proof,
+  type Wallet,
+  getDecodedToken,
+  getEncodedToken,
+  signP2PKProofs,
+} from "@cashu/cashu-ts";
 import { createLockedToken, type ExchangeConfig } from "../src/exchange-protocol.ts";
 import { getOrCreateKeypair } from "./keypair.ts";
 import {
@@ -25,6 +31,7 @@ import {
   type Nip60Wallet,
   type TokenEntry,
 } from "../src/nip60.ts";
+import { signProofs } from "./api.ts";
 
 const PROOF_STORAGE_KEY = "anchr_market_proofs";
 const RECEIVED_TOKENS_KEY = "anchr_market_received_tokens";
@@ -213,6 +220,134 @@ export async function lockFundsForMatch(input: {
   }
 
   return { token: result.token };
+}
+
+// ---------------------------------------------------------------------------
+// Resolution → redemption
+//
+// After the market resolves, the winner holds the LOSER's P2PK-locked
+// token (received at match time and stored in HeldTokens). The path to
+// take the sats:
+//   1. Decode the held cashuB token → proofs.
+//   2. Submit proof.secret values to /sign-proofs — server returns one
+//      Schnorr signature per secret signed with the winning outcome's key.
+//   3. Pre-fill each proof.witness with the oracle signature.
+//   4. signP2PKProofs(proofs, user_sk) — adds the user's signature, so the
+//      witness now satisfies n_sigs=2 (oracle + user).
+//   5. Re-encode as a token and call wallet.receive() — the mint swaps it
+//      for plain proofs.
+//
+// **Known limitation (follow-up):** the lock condition uses
+// `sigflag: SIG_ALL`. Under SIG_ALL the mint requires signatures over the
+// hash of the swap inputs+outputs, not just hash(secret). The current
+// /sign-proofs endpoint signs hash(secret) only, so step 5 is rejected by
+// the mint with "signature threshold not met." A SIG_ALL-aware oracle
+// endpoint (one that takes the swap message and returns a signature over
+// it) is tracked in docs/prediction-market/market-maker-gaps.md. Until
+// that lands, the helper below builds the witness and returns failures
+// from wallet.receive — the cryptographic preconditions
+// (e2e/redemption-flow.test.ts) prove both signatures are valid against
+// the lock pubkeys, just not against the SIG_ALL message.
+// ---------------------------------------------------------------------------
+
+export interface RedemptionResult {
+  /** How many of the user's pairs in this market settled to plain proofs. */
+  redeemed_pairs: number;
+  /** Total sats added back to the wallet across all redeemed pairs. */
+  total_sats: number;
+  /** Per-pair details for the UI to show "+1,000 sats from pair X". */
+  redemptions: Array<{ pair_id: string; amount_sats: number }>;
+  /** Pairs that this user holds tokens for but the wallet/oracle couldn't redeem. */
+  failures: Array<{ pair_id: string; error: string }>;
+}
+
+/**
+ * Redeem all of this user's winning pairs in `marketId` and add the
+ * resulting plain proofs to the wallet.
+ *
+ * Idempotent only at the wallet level — calling twice may double-spend
+ * proofs that are already swapped, so the UI should clear HeldTokens for
+ * pairs that succeeded. (The mint will reject the second swap, so funds
+ * aren't at risk; the call just returns failures.)
+ */
+export async function redeemMarketWinnings(
+  marketId: string,
+  mintUrl: string,
+): Promise<RedemptionResult> {
+  const wallet = await initWallet(mintUrl, _relays);
+  const { secretKey, publicKey: userPubkey } = getOrCreateKeypair();
+  const skHex = bytesToHex(secretKey);
+
+  const held = loadHeldTokensForMarket(marketId);
+  if (held.length === 0) {
+    return { redeemed_pairs: 0, total_sats: 0, redemptions: [], failures: [] };
+  }
+
+  const knownKeysetIds = wallet.keyChain?.getAllKeysetIds?.() ?? [];
+
+  let totalSats = 0;
+  const redemptions: Array<{ pair_id: string; amount_sats: number }> = [];
+  const failures: Array<{ pair_id: string; error: string }> = [];
+
+  for (const tok of held) {
+    try {
+      const decoded = getDecodedToken(tok.cashu_token, knownKeysetIds);
+      const proofs = decoded.proofs;
+      if (proofs.length === 0) {
+        failures.push({ pair_id: tok.pair_id, error: "Held token has no proofs" });
+        continue;
+      }
+
+      // Ask the oracle to sign each proof's secret with the winning outcome's key.
+      const secrets = proofs.map((p) => p.secret);
+      const signResult = await signProofs(marketId, userPubkey, secrets);
+      if (signResult.signed_count < secrets.length) {
+        failures.push({
+          pair_id: tok.pair_id,
+          error: `Oracle signed only ${signResult.signed_count}/${secrets.length} proofs`,
+        });
+        continue;
+      }
+
+      // Pre-fill witness with the oracle's signature; signP2PKProofs appends
+      // the user's signature → n_sigs=2 satisfied.
+      const proofsWithOracleSig = proofs.map((p) => ({
+        ...p,
+        witness: JSON.stringify({
+          signatures: [signResult.oracle_signatures[p.secret]],
+        }),
+      }));
+      const fullySigned = signP2PKProofs(proofsWithOracleSig, skHex);
+
+      // Re-encode and have the wallet swap at the mint. wallet.receive
+      // returns the freshly-swapped plain proofs.
+      const reencoded = getEncodedToken({ mint: mintUrl, proofs: fullySigned });
+      const fresh = await wallet.receive(reencoded);
+      const sats = fresh.reduce((s, p) => s + p.amount, 0);
+
+      // Persist the new plain proofs through the same path as everything else.
+      await addProofs(fresh);
+      removeHeldToken(tok.pair_id);
+
+      totalSats += sats;
+      redemptions.push({ pair_id: tok.pair_id, amount_sats: sats });
+    } catch (err) {
+      failures.push({
+        pair_id: tok.pair_id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return { redeemed_pairs: redemptions.length, total_sats: totalSats, redemptions, failures };
+}
+
+// Local hex helper — keypair.ts has its own; duplicated here to avoid a
+// circular import (this file imports keypair, keypair imports nothing).
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // ---------------------------------------------------------------------------
