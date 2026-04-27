@@ -192,8 +192,13 @@ export class Nip60UserBot {
     };
   }
 
-  /** Poll for matches the matchmaker only announced to a later bet, and submit. */
-  async submitPendingMatches(marketId: string, side: "yes" | "no"): Promise<number> {
+  /**
+   * Poll for matches the matchmaker only announced to a later bet, and submit.
+   *
+   * Side per-pair comes from the server, not the caller — see
+   * MarketMakerBot.submitPendingMatches for the rationale.
+   */
+  async submitPendingMatches(marketId: string, _legacySideHint?: "yes" | "no"): Promise<number> {
     const detailRes = await fetch(
       `${this.serverUrl}/markets/${marketId}?pubkey=${this.nostrPubkey}`,
     );
@@ -214,6 +219,7 @@ export class Nip60UserBot {
         status: string;
       }>;
     };
+    void _legacySideHint;
     if (!detail.user_pairs) return 0;
 
     let submittedCount = 0;
@@ -234,7 +240,7 @@ export class Nip60UserBot {
         marketGroupPubkeyYes: detail.group_pubkey_yes,
         marketGroupPubkeyNo: detail.group_pubkey_no,
         myPubkey: this.nostrPubkey,
-        mySide: side,
+        mySide: userPair.side,
         counterpartyPubkey: userPair.counterparty_pubkey,
         amountSats: userPair.amount_sats,
         exchangeLocktime: Math.floor(Date.now() / 1000) + 600,

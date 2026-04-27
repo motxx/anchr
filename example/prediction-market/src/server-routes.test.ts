@@ -532,6 +532,51 @@ describe("Market API: matching", () => {
     const res = await app.request(`${BASE}/markets/nonexistent/orders`);
     expect(res.status).toBe(404);
   });
+
+  test("DELETE /markets/:id/orders/:orderId cancels owner's open order", async () => {
+    const betRes = await placeBet(app, marketId, "yes", 100, "alice");
+    const orderId = betRes.order_id as string;
+    expect(orderId).toMatch(/^ord_/);
+
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/${orderId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bettor_pubkey: "alice" }),
+    });
+    expect(cancelRes.status).toBe(200);
+    const body = await cancelRes.json() as { refunded_sats: number; market: { yes_pool_sats: number } };
+    expect(body.refunded_sats).toBe(100);
+    expect(body.market.yes_pool_sats).toBe(0);
+
+    // Order is gone from the book.
+    const openOrders = state.orderBook.getOpenOrders(marketId, "yes");
+    expect(openOrders).toHaveLength(0);
+  });
+
+  test("DELETE rejects non-owner", async () => {
+    const betRes = await placeBet(app, marketId, "yes", 100, "alice");
+    const orderId = betRes.order_id as string;
+
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/${orderId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bettor_pubkey: "mallory" }),
+    });
+    expect(cancelRes.status).toBe(403);
+
+    // Order remains in the book.
+    const openOrders = state.orderBook.getOpenOrders(marketId, "yes");
+    expect(openOrders).toHaveLength(1);
+  });
+
+  test("DELETE returns 404 for unknown order", async () => {
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/ord_nonexistent`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bettor_pubkey: "alice" }),
+    });
+    expect(cancelRes.status).toBe(404);
+  });
 });
 
 // ---------------------------------------------------------------------------

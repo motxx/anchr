@@ -213,11 +213,18 @@ export class MarketMakerBot {
    * counterparty are never notified. Until the platform grows a push
    * channel (Nostr event / SSE / WebSocket), bots must poll.
    *
+   * The side per-pair comes from the server (which knows whether this
+   * pubkey was the yes_pubkey or no_pubkey on each pair) — not from the
+   * caller. A bot that bet YES in round 1 and NO in round 2 on the same
+   * market will have pending pairs of *different* sides; using the
+   * caller-supplied side for all of them produces tokens with the wrong
+   * P2PK lock conditions.
+   *
    * Tracks which pair_ids have already been processed to avoid re-submitting.
    */
   async submitPendingMatches(
     marketId: string,
-    side: "yes" | "no",
+    _legacySideHint?: "yes" | "no",
   ): Promise<number> {
     const detailRes = await fetch(
       `${this.serverUrl}/markets/${marketId}?pubkey=${this.identity.pubkey}`,
@@ -257,10 +264,11 @@ export class MarketMakerBot {
         locktime_exchange: Math.floor(Date.now() / 1000) + 600,
         locktime_market: marketLocktime,
         amount_sats: userPair.amount_sats,
-      }, side);
+      }, userPair.side);
       if (ok) submitted++;
       this.processedPairs.add(userPair.pair_id);
     }
+    void _legacySideHint;
     return submitted;
   }
 

@@ -1036,6 +1036,64 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   });
 
   // -----------------------------------------------------------------------
+  // DELETE /markets/:id/orders/:orderId — cancel an open order
+  //
+  // Closes a #3 gap from docs/prediction-market/market-maker-gaps.md so
+  // bots / users can replace orders instead of waiting for fill or expiry.
+  // The caller's pubkey must match the order's bettor_pubkey — the server
+  // can't sign for them, so this is the trust boundary. Body:
+  //   { "bettor_pubkey": "<hex>" }
+  //
+  // Idempotent: cancelling a non-existent or already-cancelled order
+  // returns 404 once and 404 thereafter (the order is gone either way).
+  // -----------------------------------------------------------------------
+
+  mkt.delete("/:id/orders/:orderId", rateLimit, writeAuth, async (c) => {
+    const id = c.req.param("id");
+    const orderId = c.req.param("orderId");
+    if (!id || !orderId) return c.json({ error: "Market id and order id are required" }, 400);
+    if (!s.markets.has(id)) return c.json({ error: "Market not found" }, 404);
+
+    let body: Record<string, unknown>;
+    try {
+      body = (await c.req.json()) as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+    const bettorPubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
+    if (!bettorPubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
+
+    // Look up the order to enforce ownership and recover the unmatched
+    // amount we owe back to the pool aggregates.
+    const orders = s.orderBook.getOpenOrders(id);
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return c.json({ error: "Order not found or already filled" }, 404);
+    if (order.bettor_pubkey !== bettorPubkey) {
+      return c.json({ error: "You are not the owner of this order" }, 403);
+    }
+
+    // Subtract the still-open portion from the displayed pool. Already-
+    // matched (committed) sats stay — those represent live escrow pairs.
+    const refundedSats = order.remaining_sats;
+    const market = s.markets.get(id)!;
+    if (order.side === "yes") {
+      market.yes_pool_sats = Math.max(0, market.yes_pool_sats - refundedSats);
+    } else {
+      market.no_pool_sats = Math.max(0, market.no_pool_sats - refundedSats);
+    }
+
+    const removed = s.orderBook.cancelOrder(orderId);
+    if (!removed) return c.json({ error: "Order not found or already filled" }, 404);
+
+    return c.json({
+      order_id: orderId,
+      side: order.side,
+      refunded_sats: refundedSats,
+      market: { yes_pool_sats: market.yes_pool_sats, no_pool_sats: market.no_pool_sats },
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // POST /markets/:id/sign-proofs — client submits proof secrets for Oracle signing
   //
   // Non-custodial: the client holds their locked tokens. At resolution time,
