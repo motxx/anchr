@@ -77,7 +77,7 @@ export function MarketApp() {
 
   if (selectedMarket) {
     return (
-      <div className="min-h-screen bg-background relative">
+      <div className="min-h-screen relative">
         <SakuraField />
         <div className="relative z-10">
           <Header />
@@ -97,7 +97,7 @@ export function MarketApp() {
   }
 
   return (
-    <div className="min-h-screen bg-background relative">
+    <div className="min-h-screen relative">
       <SakuraField />
       <div className="relative z-10">
       <Header />
