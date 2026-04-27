@@ -75,6 +75,12 @@ app.get("/generated.css", serveStatic({ path: "./example/prediction-market/ui/ge
 app.get("/main.js", serveStatic({ path: "./example/prediction-market/ui/main.js" }));
 app.get("/main.js.map", serveStatic({ path: "./example/prediction-market/ui/main.js.map" }));
 
+// SPA catch-all — anything that isn't an API route or a known asset falls
+// through to index.html so deep links like /m/<market-id> hydrate the React
+// app. registerMarketRoutes mounts /markets/* before this, so API requests
+// still take precedence.
+app.get("*", serveStatic({ path: "./example/prediction-market/ui/index.html" }));
+
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
 console.log(`Prediction Market server on http://localhost:${port}`);
 Deno.serve({ port }, app.fetch);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CATEGORIES, type Market, type MarketCategory } from "./mock-data.ts";
 import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api.ts";
@@ -49,15 +49,56 @@ function pickFeatured(markets: Market[]): Market | null {
   return [...open].sort((a, b) => trendingScore(b) - trendingScore(a))[0];
 }
 
+/** Read the market id from the current URL (`/m/<id>`), or null for list. */
+function readMarketIdFromPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const m = window.location.pathname.match(/^\/m\/([^/?#]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function pushList() {
+  if (window.location.pathname !== "/") {
+    window.history.pushState(null, "", "/");
+  }
+}
+
+function pushMarket(id: string) {
+  const target = `/m/${encodeURIComponent(id)}`;
+  if (window.location.pathname !== target) {
+    window.history.pushState(null, "", target);
+  }
+}
+
 export function MarketApp() {
   const queryClient = useQueryClient();
-  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
+  // Initialize from URL so deep links (and reloads) land in the right view.
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(
+    () => readMarketIdFromPath(),
+  );
   const [category, setCategory] = useState<MarketCategory | "all">("all");
   const [sort, setSort] = useState<SortMode>("trending");
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   // Bumped each time a bet is placed or a market resolves — fires SakuraBurst.
   const [sakuraTrigger, setSakuraTrigger] = useState(0);
+
+  // Sync with the browser URL — back/forward buttons + swipe-back on
+  // mobile both fire popstate. This is a genuine external-system sync,
+  // so useEffect is the right tool.
+  useEffect(() => {
+    const onPopState = () => setSelectedMarketId(readMarketIdFromPath());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const openMarket = (id: string) => {
+    pushMarket(id);
+    setSelectedMarketId(id);
+  };
+  const closeMarket = () => {
+    pushList();
+    setSelectedMarketId(null);
+  };
 
   // Markets are an external resource — React Query owns the cache, retries,
   // refetch-on-focus, and re-renders. No useEffect needed.
@@ -77,23 +118,43 @@ export function MarketApp() {
     ? markets.find((m) => m.id === selectedMarketId) ?? null
     : null;
 
-  if (selectedMarket) {
+  if (selectedMarketId) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen overflow-x-clip">
         <SakuraBurst trigger={sakuraTrigger} />
-        <Header />
+        <Header onLogoClick={closeMarket} />
         <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-          <MarketDetail
-            market={selectedMarket}
-            onBack={() => {
-              setSelectedMarketId(null);
-              invalidateMarkets();
-            }}
-            onBetPlaced={() => {
-              invalidateMarkets();
-              setSakuraTrigger((v) => v + 1);
-            }}
-          />
+          {selectedMarket ? (
+            <MarketDetail
+              market={selectedMarket}
+              onBack={() => {
+                closeMarket();
+                invalidateMarkets();
+              }}
+              onBetPlaced={() => {
+                invalidateMarkets();
+                setSakuraTrigger((v) => v + 1);
+              }}
+            />
+          ) : marketsQuery.isPending ? (
+            <div className="text-center py-16">
+              <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-muted-foreground text-sm">Loading…</p>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <p className="text-lg text-foreground mb-2">Market not found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                <span className="font-mono">{selectedMarketId}</span> doesn't match any open market.
+              </p>
+              <button
+                onClick={closeMarket}
+                className="h-9 px-4 rounded-md border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+              >
+                ← All markets
+              </button>
+            </div>
+          )}
         </main>
       </div>
     );
@@ -129,7 +190,7 @@ export function MarketApp() {
 
         {/* Featured */}
         {featured && !showCreateForm && (
-          <FeaturedMarket market={featured} onClick={() => setSelectedMarketId(featured.id)} />
+          <FeaturedMarket market={featured} onClick={() => openMarket(featured.id)} />
         )}
 
         {/* Sort tabs (Polymarket-style) */}
@@ -152,7 +213,7 @@ export function MarketApp() {
 
         {/* Category + search */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1 min-w-0 max-w-full">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.value}
@@ -213,7 +274,7 @@ export function MarketApp() {
               <MarketCard
                 key={market.id}
                 market={market}
-                onClick={() => setSelectedMarketId(market.id)}
+                onClick={() => openMarket(market.id)}
               />
             ))}
           </div>

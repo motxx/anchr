@@ -5,17 +5,27 @@ import { WalletButton } from "./WalletButton.tsx";
 
 export { getUserPubkey } from "../keypair.ts";
 
-export function Header() {
+interface HeaderProps {
+  /** Click on the brand mark sends the user back to the markets list. */
+  onLogoClick?: () => void;
+}
+
+export function Header({ onLogoClick }: HeaderProps) {
   const pubkey = getUserPubkey();
   return (
     <header className="border-b border-border bg-card/85 backdrop-blur-md sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-5 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-5 h-14 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onLogoClick}
+          className="flex items-center gap-2.5 min-w-0 rounded-md -mx-1 px-1 py-0.5 hover:bg-foreground/5 transition-colors"
+          aria-label="Go to markets list"
+        >
           {/* Brand mark — torii in a sumi square. No decorative ornaments. */}
-          <div className="w-8 h-8 rounded-lg bg-foreground/5 ring-1 ring-foreground/10 flex items-center justify-center">
+          <div className="shrink-0 w-8 h-8 rounded-lg bg-foreground/5 ring-1 ring-foreground/10 flex items-center justify-center">
             <ToriiIcon className="text-foreground" size={16} />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 min-w-0">
             <span className="font-shrine text-xl font-semibold text-foreground tracking-tight leading-none">
               Kannagi
             </span>
@@ -23,7 +33,7 @@ export function Header() {
               かんなぎ
             </span>
           </div>
-        </div>
+        </button>
 
         <div className="flex items-center gap-2">
           <WalletButton />

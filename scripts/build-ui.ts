@@ -34,56 +34,76 @@ const ENTRIES: EntryPoint[] = [
   { name: "market",    srcDir: MARKET_UI,                    outDir: MARKET_UI,                        entryTsx: "main.tsx", html: "index.html" },
 ];
 
-async function buildEntry(entry: EntryPoint) {
-  const srcDir = entry.srcDir;
-  const outDir = entry.outDir;
-  await mkdir(outDir, { recursive: true });
+const WATCH = Deno.args.includes("--watch");
 
-  // Bundle TSX → JS
-  await esbuild.build({
-    entryPoints: [join(srcDir, entry.entryTsx)],
-    bundle: true,
-    outfile: join(outDir, "main.js"),
-    format: "esm",
-    platform: "browser",
-    target: "es2022",
-    jsx: "automatic",
-    jsxImportSource: "react",
-    loader: { ".tsx": "tsx", ".ts": "ts", ".css": "css" },
-    minify: true,
-    sourcemap: true,
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
-  });
-
-  // Copy + rewrite HTML. Skip the write when we're emitting in-place
-  // (src == out) and the file already references main.js — otherwise
-  // we'd churn the source file on every build.
-  const htmlSrc = join(srcDir, entry.html);
+async function copyHtmlAndCss(entry: EntryPoint) {
+  const { srcDir, outDir, html: htmlName } = entry;
+  const htmlSrc = join(srcDir, htmlName);
   let html = await readFile(htmlSrc, "utf-8");
   const rewritten = html.replace(/src="\.\/main\.tsx"/g, 'src="./main.js"');
   if (rewritten !== html || srcDir !== outDir) {
     html = rewritten;
-    await writeFile(join(outDir, entry.html), html);
+    await writeFile(join(outDir, htmlName), html);
   }
-
-  // Copy generated.css when emitting to a separate output dir. node:fs's
-  // copyFile *truncates* the destination when source and dest are the same
-  // path, so skip the self-copy for in-place builds.
   if (srcDir !== outDir) {
     try {
       await copyFile(join(srcDir, "generated.css"), join(outDir, "generated.css"));
     } catch {
-      // generated.css may not exist yet — will be created by build:css
+      // generated.css may not exist yet — created by build:css.
     }
   }
+}
 
-  console.log(`[build-ui] ${entry.name}: ${outDir}`);
+async function buildEntry(entry: EntryPoint) {
+  const { srcDir, outDir, entryTsx, name } = entry;
+  await mkdir(outDir, { recursive: true });
+
+  const buildOptions = {
+    entryPoints: [join(srcDir, entryTsx)],
+    bundle: true,
+    outfile: join(outDir, "main.js"),
+    format: "esm" as const,
+    platform: "browser" as const,
+    target: "es2022",
+    jsx: "automatic" as const,
+    jsxImportSource: "react",
+    loader: { ".tsx": "tsx" as const, ".ts": "ts" as const, ".css": "css" as const },
+    minify: !WATCH,
+    sourcemap: true,
+    define: {
+      "process.env.NODE_ENV": WATCH ? '"development"' : '"production"',
+    },
+  };
+
+  if (WATCH) {
+    const ctx = await esbuild.context({
+      ...buildOptions,
+      plugins: [
+        {
+          name: "kannagi-watch-log",
+          setup(build) {
+            build.onEnd(async (result) => {
+              if (result.errors.length > 0) {
+                console.error(`[build-ui:${name}] ${result.errors.length} error(s)`);
+              } else {
+                await copyHtmlAndCss(entry);
+                console.log(`[build-ui:${name}] rebuilt → ${outDir}/main.js`);
+              }
+            });
+          },
+        },
+      ],
+    });
+    await ctx.watch();
+  } else {
+    await esbuild.build(buildOptions);
+    await copyHtmlAndCss(entry);
+    console.log(`[build-ui] ${name}: ${outDir}`);
+  }
 }
 
 async function main() {
-  console.log("[build-ui] Building UI bundles...");
+  console.log(WATCH ? "[build-ui] Watching..." : "[build-ui] Building UI bundles...");
   await mkdir(DIST_UI, { recursive: true });
 
   await Promise.all(ENTRIES.map(buildEntry));
@@ -95,8 +115,14 @@ async function main() {
     // No assets directory
   }
 
-  await esbuild.stop();
-  console.log("[build-ui] Done.");
+  if (WATCH) {
+    console.log("[build-ui] Watching all entries — Ctrl+C to stop.");
+    // Keep the process alive — esbuild contexts are watching.
+    await new Promise(() => {});
+  } else {
+    await esbuild.stop();
+    console.log("[build-ui] Done.");
+  }
 }
 
 await main();
