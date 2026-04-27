@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CATEGORIES, type Market, type MarketCategory } from "./mock-data.ts";
 import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api.ts";
 import { Header } from "./components/Header.tsx";
@@ -19,73 +20,59 @@ const SORT_TABS: { key: SortMode; label: string }[] = [
   { key: "volume", label: "Volume" },
 ];
 
+function filterAndSort(
+  markets: Market[],
+  category: MarketCategory | "all",
+  search: string,
+  sort: SortMode,
+): Market[] {
+  const q = search.trim().toLowerCase();
+  const matched = markets
+    .filter((m) => category === "all" || m.category === category)
+    .filter((m) => q === "" || m.title.toLowerCase().includes(q));
+  return matched.sort((a, b) => {
+    switch (sort) {
+      case "trending": return trendingScore(b) - trendingScore(a);
+      case "popular": return b.num_bettors - a.num_bettors;
+      case "newest": return b.created_at - a.created_at;
+      case "ending_soon": return a.resolution_deadline - b.resolution_deadline;
+      case "volume": return b.volume_sats - a.volume_sats;
+      default: return 0;
+    }
+  });
+}
+
+function pickFeatured(markets: Market[]): Market | null {
+  const open = markets.filter((m) => m.status === "open");
+  if (open.length === 0) return null;
+  return [...open].sort((a, b) => trendingScore(b) - trendingScore(a))[0];
+}
+
 export function MarketApp() {
-  const [markets, setMarkets] = useState<Market[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
+  const queryClient = useQueryClient();
+  const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
   const [category, setCategory] = useState<MarketCategory | "all">("all");
   const [sort, setSort] = useState<SortMode>("trending");
   const [search, setSearch] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
 
-  const loadMarkets = useCallback(async () => {
-    try {
-      setError(null);
-      const data = await fetchMarkets();
-      setMarkets(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load markets");
-      setMarkets([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Markets are an external resource — React Query owns the cache, retries,
+  // refetch-on-focus, and re-renders. No useEffect needed.
+  const marketsQuery = useQuery({
+    queryKey: ["markets"],
+    queryFn: () => fetchMarkets(),
+  });
+  const markets = marketsQuery.data ?? [];
 
-  useEffect(() => {
-    loadMarkets();
-  }, [loadMarkets]);
+  const invalidateMarkets = () =>
+    queryClient.invalidateQueries({ queryKey: ["markets"] });
 
-  const handleMarketCreated = useCallback(() => {
-    setShowCreateForm(false);
-    loadMarkets();
-  }, [loadMarkets]);
-
-  const handleBetPlaced = useCallback(() => {
-    loadMarkets();
-  }, [loadMarkets]);
-
-  const handleSelectMarket = useCallback((market: Market) => {
-    setSelectedMarket(market);
-  }, []);
-
-  // When returning from detail, refresh to get latest data
-  const handleBack = useCallback(() => {
-    setSelectedMarket(null);
-    loadMarkets();
-  }, [loadMarkets]);
-
-  const filtered = useMemo(() => {
-    return markets
-      .filter((m) => category === "all" || m.category === category)
-      .filter((m) => search === "" || m.title.toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => {
-        switch (sort) {
-          case "trending": return trendingScore(b) - trendingScore(a);
-          case "popular": return b.num_bettors - a.num_bettors;
-          case "newest": return b.created_at - a.created_at;
-          case "ending_soon": return a.resolution_deadline - b.resolution_deadline;
-          case "volume": return b.volume_sats - a.volume_sats;
-          default: return 0;
-        }
-      });
-  }, [markets, category, search, sort]);
-
-  const featured = useMemo(() => {
-    const open = markets.filter((m) => m.status === "open");
-    if (open.length === 0) return null;
-    return [...open].sort((a, b) => trendingScore(b) - trendingScore(a))[0];
-  }, [markets]);
+  // Derived during render — no state, no effect.
+  const filtered = filterAndSort(markets, category, search, sort);
+  const featured = pickFeatured(markets);
+  const selectedMarket = selectedMarketId
+    ? markets.find((m) => m.id === selectedMarketId) ?? null
+    : null;
 
   if (selectedMarket) {
     return (
@@ -94,8 +81,11 @@ export function MarketApp() {
         <main className="max-w-6xl mx-auto px-5 py-8">
           <MarketDetail
             market={selectedMarket}
-            onBack={handleBack}
-            onBetPlaced={handleBetPlaced}
+            onBack={() => {
+              setSelectedMarketId(null);
+              invalidateMarkets();
+            }}
+            onBetPlaced={invalidateMarkets}
           />
         </main>
       </div>
@@ -131,7 +121,10 @@ export function MarketApp() {
         {/* Create Market Form */}
         {showCreateForm && (
           <CreateMarketForm
-            onCreated={handleMarketCreated}
+            onCreated={() => {
+              setShowCreateForm(false);
+              invalidateMarkets();
+            }}
             onCancel={() => setShowCreateForm(false)}
           />
         )}
@@ -140,7 +133,7 @@ export function MarketApp() {
 
         {/* Featured */}
         {featured && !showCreateForm && (
-          <FeaturedMarket market={featured} onClick={() => handleSelectMarket(featured)} />
+          <FeaturedMarket market={featured} onClick={() => setSelectedMarketId(featured.id)} />
         )}
 
         {/* Sort tabs (Polymarket-style) */}
@@ -195,19 +188,21 @@ export function MarketApp() {
         </div>
 
         {/* Loading state */}
-        {loading && (
+        {marketsQuery.isPending && (
           <div className="text-center py-16">
             <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-muted-foreground text-sm">Loading markets...</p>
+            <p className="text-muted-foreground text-sm">Loading markets…</p>
           </div>
         )}
 
         {/* Error state */}
-        {error && !loading && (
+        {marketsQuery.isError && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 mb-6 text-center">
-            <p className="text-sm text-destructive mb-3">{error}</p>
+            <p className="text-sm text-destructive mb-3">
+              {marketsQuery.error instanceof Error ? marketsQuery.error.message : "Failed to load markets"}
+            </p>
             <button
-              onClick={() => { setLoading(true); loadMarkets(); }}
+              onClick={() => marketsQuery.refetch()}
               className="h-8 px-4 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
             >
               Retry
@@ -216,19 +211,19 @@ export function MarketApp() {
         )}
 
         {/* Market grid */}
-        {!loading && (
+        {marketsQuery.isSuccess && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filtered.map((market) => (
               <MarketCard
                 key={market.id}
                 market={market}
-                onClick={() => handleSelectMarket(market)}
+                onClick={() => setSelectedMarketId(market.id)}
               />
             ))}
           </div>
         )}
 
-        {!loading && !error && filtered.length === 0 && (
+        {marketsQuery.isSuccess && filtered.length === 0 && (
           <div className="text-center py-16 text-muted-foreground">
             <p className="text-lg mb-2">No markets found</p>
             <p className="text-sm">
@@ -272,20 +267,21 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
   const [threshold, setThreshold] = useState("");
   const [expectedText, setExpectedText] = useState("");
   const [minBetSats, setMinBetSats] = useState("100");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const needsJsonpath = ["jsonpath_gt", "jsonpath_lt", "jsonpath_equals", "price_above", "price_below"].includes(conditionType);
   const needsThreshold = ["jsonpath_gt", "jsonpath_lt", "price_above", "price_below"].includes(conditionType);
   const needsExpectedText = ["jsonpath_equals", "contains_text"].includes(conditionType);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const createMutation = useMutation({
+    mutationFn: createMarket,
+    onSuccess: () => onCreated(),
+  });
+  const submitting = createMutation.isPending;
+  const submitError = createMutation.error instanceof Error ? createMutation.error.message : null;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !resolutionUrl.trim() || !deadlineDate) return;
-
-    setSubmitting(true);
-    setSubmitError(null);
-
     const params: CreateMarketParams = {
       title: title.trim(),
       description: description.trim(),
@@ -301,15 +297,7 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
       resolution_deadline: Math.floor(new Date(deadlineDate).getTime() / 1000),
       min_bet_sats: parseInt(minBetSats) || 100,
     };
-
-    try {
-      await createMarket(params);
-      onCreated();
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Failed to create market");
-    } finally {
-      setSubmitting(false);
-    }
+    createMutation.mutate(params);
   };
 
   return (

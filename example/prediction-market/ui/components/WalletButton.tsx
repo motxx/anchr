@@ -1,115 +1,89 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   fetchWalletConfig,
   requestFaucet,
-  type FaucetResult,
 } from "../api.ts";
 import {
   initWallet,
-  getMintUrl,
   getBalance,
   receiveToken,
 } from "../wallet.ts";
 import { cn } from "../lib/utils.ts";
 
-type Status = "idle" | "loading" | "success" | "error";
-
 /**
  * Compact wallet entry point — replaces the full-width banner. Renders as a
  * pill in the page header with current balance; clicking opens a drawer
- * with connect/faucet/receive actions. Out of the way until the user
+ * with connect / faucet / receive actions. Out of the way until the user
  * actually wants to spend.
+ *
+ * State model (Dan Abramov style):
+ *   - Wallet config (mint URL) → useQuery
+ *   - Connect / faucet / receive → useMutation
+ *   - Balance is owned by the wallet module (localStorage); we re-read on
+ *     each render via a "version" counter that mutations bump.
+ *   - No useEffect — there's no external system to *subscribe to*; mutations
+ *     write, then bump the version, then derive everything during render.
  */
 export function WalletButton() {
   const [open, setOpen] = useState(false);
-  const [mintUrl, setMintUrl] = useState<string | null>(null);
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [walletReady, setWalletReady] = useState(false);
-  const [balance, setBalance] = useState(0);
-  const [faucetStatus, setFaucetStatus] = useState<Status>("idle");
-  const [faucetMsg, setFaucetMsg] = useState<string | null>(null);
-  const [receiveStatus, setReceiveStatus] = useState<Status>("idle");
-  const [receiveMsg, setReceiveMsg] = useState<string | null>(null);
   const [tokenInput, setTokenInput] = useState("");
-  const [connectError, setConnectError] = useState<string | null>(null);
+  const [walletVersion, setWalletVersion] = useState(0);
 
-  const refreshBalance = useCallback(() => setBalance(getBalance()), []);
+  const walletConfig = useQuery({
+    queryKey: ["wallet-config"],
+    queryFn: fetchWalletConfig,
+  });
+  const mintUrl = walletConfig.data?.mint_url ?? null;
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchWalletConfig()
-      .then((cfg) => {
-        if (cancelled) return;
-        setMintUrl(cfg.mint_url);
-        setConfigLoaded(true);
-        if (getMintUrl()) setWalletReady(true);
-        refreshBalance();
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setConfigLoaded(true);
-      });
-    return () => { cancelled = true; };
-  }, [refreshBalance]);
+  // Re-derive on every walletVersion bump; cheap localStorage read.
+  const balance = React.useMemo(() => getBalance(), [walletVersion]);
+  // After a successful connect mutation we set this; the wallet module
+  // doesn't expose change events, so we drive readiness from mutation success.
+  const [walletReady, setWalletReady] = useState(false);
 
-  const handleConnect = useCallback(async () => {
-    if (!mintUrl) return;
-    setConnectError(null);
-    try {
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      if (!mintUrl) throw new Error("Mint not configured");
       await initWallet(mintUrl);
+    },
+    onSuccess: () => {
       setWalletReady(true);
-      refreshBalance();
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : "Failed to connect");
-    }
-  }, [mintUrl, refreshBalance]);
+      setWalletVersion((v) => v + 1);
+    },
+  });
 
-  const handleFaucet = useCallback(async () => {
-    if (!walletReady || !mintUrl) return;
-    setFaucetStatus("loading");
-    setFaucetMsg(null);
-    try {
-      const result: FaucetResult = await requestFaucet(1000);
+  const faucetMutation = useMutation({
+    mutationFn: async () => {
+      if (!mintUrl) throw new Error("Mint not configured");
+      const result = await requestFaucet(1000);
       const wallet = await initWallet(mintUrl);
       await receiveToken(wallet, result.cashu_token);
-      refreshBalance();
-      setFaucetStatus("success");
-      setFaucetMsg(`+${result.amount_sats.toLocaleString()} sats`);
-    } catch (err) {
-      setFaucetStatus("error");
-      setFaucetMsg(err instanceof Error ? err.message : "Faucet failed");
-    }
-  }, [walletReady, mintUrl, refreshBalance]);
+      return result.amount_sats;
+    },
+    onSuccess: () => setWalletVersion((v) => v + 1),
+  });
 
-  const handleReceive = useCallback(async () => {
-    if (!walletReady || !mintUrl) return;
-    const trimmed = tokenInput.trim();
-    if (!trimmed) return;
-    setReceiveStatus("loading");
-    setReceiveMsg(null);
-    try {
+  const receiveMutation = useMutation({
+    mutationFn: async (token: string) => {
+      if (!mintUrl) throw new Error("Mint not configured");
       const wallet = await initWallet(mintUrl);
-      const proofs = await receiveToken(wallet, trimmed);
-      const total = proofs.reduce((sum, p) => sum + p.amount, 0);
-      refreshBalance();
+      const proofs = await receiveToken(wallet, token);
+      return proofs.reduce((sum, p) => sum + p.amount, 0);
+    },
+    onSuccess: () => {
       setTokenInput("");
-      setReceiveStatus("success");
-      setReceiveMsg(`+${total.toLocaleString()} sats`);
-    } catch (err) {
-      setReceiveStatus("error");
-      setReceiveMsg(err instanceof Error ? err.message : "Receive failed");
-    }
-  }, [walletReady, mintUrl, tokenInput, refreshBalance]);
+      setWalletVersion((v) => v + 1);
+    },
+  });
 
-  if (!configLoaded) return null;
+  if (walletConfig.isPending) return null;
 
   return (
     <>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "h-9 px-3.5 rounded-full bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center gap-2",
-        )}
+        className="h-9 px-3.5 rounded-full bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center gap-2"
         title="Wallet"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
@@ -125,7 +99,6 @@ export function WalletButton() {
 
       {open && (
         <>
-          {/* click-away backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={() => setOpen(false)}
@@ -154,21 +127,22 @@ export function WalletButton() {
             </div>
 
             {!mintUrl && (
-              <p className="text-xs text-muted-foreground">
-                Mint not configured.
-              </p>
+              <p className="text-xs text-muted-foreground">Mint not configured.</p>
             )}
 
             {mintUrl && !walletReady && (
               <div>
                 <button
-                  onClick={handleConnect}
-                  className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  onClick={() => connectMutation.mutate()}
+                  disabled={connectMutation.isPending}
+                  className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
                 >
-                  Connect to mint
+                  {connectMutation.isPending ? "Connecting…" : "Connect to mint"}
                 </button>
-                {connectError && (
-                  <p className="text-xs text-destructive mt-2">{connectError}</p>
+                {connectMutation.isError && (
+                  <p className="text-xs text-destructive mt-2">
+                    {connectMutation.error instanceof Error ? connectMutation.error.message : "Failed to connect"}
+                  </p>
                 )}
               </div>
             )}
@@ -176,15 +150,18 @@ export function WalletButton() {
             {walletReady && (
               <div className="space-y-3">
                 <button
-                  onClick={handleFaucet}
-                  disabled={faucetStatus === "loading"}
+                  onClick={() => faucetMutation.mutate()}
+                  disabled={faucetMutation.isPending}
                   className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
                 >
-                  {faucetStatus === "loading" ? "Minting…" : "Faucet · +1,000 sats"}
+                  {faucetMutation.isPending ? "Minting…" : "Faucet · +1,000 sats"}
                 </button>
-                {faucetMsg && (
-                  <p className={cn("text-xs", faucetStatus === "success" ? "text-yes" : "text-destructive")}>
-                    {faucetMsg}
+                {faucetMutation.isSuccess && (
+                  <p className="text-xs text-yes">+{faucetMutation.data?.toLocaleString()} sats</p>
+                )}
+                {faucetMutation.isError && (
+                  <p className="text-xs text-destructive">
+                    {faucetMutation.error instanceof Error ? faucetMutation.error.message : "Faucet failed"}
                   </p>
                 )}
 
@@ -201,16 +178,19 @@ export function WalletButton() {
                       className="flex-1 h-9 rounded-full border border-border bg-muted px-3 text-xs font-mono text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                     />
                     <button
-                      onClick={handleReceive}
-                      disabled={receiveStatus === "loading" || !tokenInput.trim()}
+                      onClick={() => receiveMutation.mutate(tokenInput.trim())}
+                      disabled={receiveMutation.isPending || !tokenInput.trim()}
                       className="h-9 px-3 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors disabled:opacity-40"
                     >
                       Receive
                     </button>
                   </div>
-                  {receiveMsg && (
-                    <p className={cn("text-xs mt-1.5", receiveStatus === "success" ? "text-yes" : "text-destructive")}>
-                      {receiveMsg}
+                  {receiveMutation.isSuccess && (
+                    <p className="text-xs text-yes mt-1.5">+{receiveMutation.data?.toLocaleString()} sats</p>
+                  )}
+                  {receiveMutation.isError && (
+                    <p className="text-xs text-destructive mt-1.5">
+                      {receiveMutation.error instanceof Error ? receiveMutation.error.message : "Receive failed"}
                     </p>
                   )}
                 </div>
