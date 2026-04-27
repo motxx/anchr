@@ -7,15 +7,20 @@ interface Petal {
   size: number;
   /** Hue around sakura pink. */
   hue: number;
-  opacity: number;
+  lightness: number;
+  /** Alpha multiplier 0–1 — entire petal stays atmospheric, never loud. */
+  alpha: number;
   /** Fall duration in seconds. */
   duration: number;
-  /** Negative animation-delay so each petal starts mid-fall on mount. */
   delay: number;
-  /** Horizontal sway amplitude in px (drift left/right while falling). */
+  /** Horizontal sway amplitude in px. */
   sway: number;
   /** Total rotation across one fall in degrees. */
   spin: number;
+  /** Which of 3 petal shapes to render. */
+  shape: 0 | 1 | 2;
+  /** Mirror horizontally — keeps asymmetric shapes from looking cloned. */
+  mirror: boolean;
 }
 
 function rng(seed: number): () => number {
@@ -33,39 +38,91 @@ function buildField(seed: number, count: number): Petal[] {
   const r = rng(seed);
   const petals: Petal[] = [];
   for (let i = 0; i < count; i++) {
-    const duration = 11 + r() * 14;       // 11–25s — slow, lazy fall
+    const duration = 18 + r() * 14; // 18–32s
     petals.push({
       x: r() * 100,
-      size: 22 + r() * 26,                // 22–48px (bigger, easier to see)
-      hue: 345 + r() * 18,                // 345–363 (sakura pink)
-      opacity: 0.55 + r() * 0.40,         // 55–95%
+      size: 22 + r() * 22,                   // 22–44px
+      hue: 348 + r() * 12,                   // 348–360 (sakura pink)
+      lightness: 76 + r() * 8,               // 76–84%
+      alpha: 0.32 + r() * 0.30,              // 32–62% — atmospheric
       duration,
-      delay: r() * duration,              // staggered so the field is full at t=0
-      sway: 40 + r() * 110,               // 40–150px lateral drift
-      spin: (r() < 0.5 ? -1 : 1) * (240 + r() * 540), // ±240–780° per fall
+      delay: r() * duration,
+      sway: 28 + r() * 56,                   // 28–84px
+      spin: (r() < 0.5 ? -1 : 1) * (60 + r() * 220), // ±60–280° (gentle tumble)
+      shape: Math.floor(r() * 3) as 0 | 1 | 2,
+      mirror: r() < 0.5,
     });
   }
   return petals;
 }
 
+/**
+ * Petal silhouettes — front view, side view, and an asymmetric "leaning"
+ * variant. Each shape includes a body outline and a smaller inner curve
+ * used as a specular highlight reference.
+ */
+const PETAL_SHAPES: Array<{ body: string; specular: string }> = [
+  {
+    // 1. Front bloom — symmetric oval with a soft V-notch tip.
+    body:
+      "M32 4 C 46 6 54 18 52 32 C 50 46 42 56 32 60 " +
+      "C 22 56 14 46 12 32 C 10 18 18 6 32 4 Z " +
+      "M27 55 L 32 60 L 37 55 Z",
+    specular:
+      "M28 12 C 34 12 40 16 40 24 C 40 30 36 36 30 36 " +
+      "C 25 36 22 30 22 24 C 22 16 24 12 28 12 Z",
+  },
+  {
+    // 2. Side / 3-quarter view — narrower, more elongated.
+    body:
+      "M32 5 C 41 6 47 16 46 28 C 45 42 41 54 32 60 " +
+      "C 23 54 19 42 18 28 C 17 16 23 6 32 5 Z " +
+      "M28 55 L 32 60 L 36 55 Z",
+    specular:
+      "M28 14 C 33 14 38 18 38 26 C 38 34 35 42 30 42 " +
+      "C 26 42 23 34 23 26 C 23 18 25 14 28 14 Z",
+  },
+  {
+    // 3. Leaning petal — asymmetric, caught mid-flutter.
+    body:
+      "M28 5 C 42 6 52 18 50 32 C 48 46 38 58 26 60 " +
+      "C 17 54 12 42 14 28 C 16 14 22 6 28 5 Z " +
+      "M22 55 L 26 60 L 31 56 Z",
+    specular:
+      "M26 14 C 36 16 42 22 40 30 C 38 38 32 44 26 44 " +
+      "C 21 42 19 34 21 26 C 22 18 24 14 26 14 Z",
+  },
+];
+
+function hsl(h: number, s: number, l: number, a = 1): string {
+  return `hsla(${h.toFixed(0)} ${s}% ${l.toFixed(0)}% / ${a})`;
+}
+
 interface SakuraFieldProps {
-  /** Number of petals (default 70). */
+  /** Default 18 — quiet enough to never become visual noise. */
   count?: number;
   /** Deterministic seed (default fixed). */
   seed?: number;
 }
 
 /**
- * Falling sakura — a fixed full-viewport layer of petals that descend from
- * above the screen, drift sideways with the wind, and rotate as they fall.
- * Pure CSS animation: each petal has its own duration / delay / sway / spin
- * baked in via custom properties, all driven by one shared keyframe so the
- * compositor handles the work.
+ * Falling sakura — illustrated, shaded petals descending slowly with sway
+ * and gentle tumble.
  *
- * Sits at z-index -10 behind everything (content gets `relative z-10`).
- * Honors `prefers-reduced-motion` by holding petals in place.
+ * Each petal renders as a 64×64 SVG with three layers:
+ *   1. A radial gradient body that simulates light falling on a curved
+ *      surface — base hue at the lit edge, +8% lightness inside, –18%
+ *      lightness at the shadow side.
+ *   2. A soft specular highlight (white radial-fade ellipse) near the
+ *      lit edge, suggesting a glossy petal surface.
+ *   3. A drop-shadow filter for ambient occlusion against the page.
+ *
+ * Three shape variants × hue × scale × mirror keep 18 petals from
+ * looking cloned. Per-petal motion is baked into CSS custom properties
+ * (--sway, --spin) plus animation-duration / -delay; one shared keyframe
+ * handles the descent, and the compositor does the work.
  */
-export function SakuraField({ count = 70, seed = 0xCAFE_F10 }: SakuraFieldProps) {
+export function SakuraField({ count = 18, seed = 0xCAFE_F10 }: SakuraFieldProps) {
   const petals = useMemo(() => buildField(seed, count), [seed, count]);
 
   return (
@@ -73,50 +130,69 @@ export function SakuraField({ count = 70, seed = 0xCAFE_F10 }: SakuraFieldProps)
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
     >
-      {petals.map((p, i) => (
-        <span
-          key={i}
-          className="sakura-petal absolute block"
-          style={{
-            left: `${p.x}vw`,
-            width: p.size,
-            height: p.size,
-            color: `hsl(${p.hue.toFixed(0)} 95% 80%)`,
-            opacity: p.opacity,
-            animationDuration: `${p.duration.toFixed(2)}s`,
-            animationDelay: `-${p.delay.toFixed(2)}s`,
-            ["--sway" as string]: `${p.sway.toFixed(0)}px`,
-            ["--spin" as string]: `${p.spin.toFixed(0)}deg`,
-            filter: "drop-shadow(0 1px 2px rgba(255, 110, 140, 0.18))",
-          }}
-        >
-          <svg
-            viewBox="0 0 32 32"
-            width="100%"
-            height="100%"
-            className="block"
+      {petals.map((p, i) => {
+        const shape = PETAL_SHAPES[p.shape];
+        const baseColor = hsl(p.hue, 88, p.lightness);
+        const lightColor = hsl(p.hue, 95, Math.min(96, p.lightness + 10));
+        const darkColor = hsl(p.hue, 70, Math.max(54, p.lightness - 18));
+        const fillId = `sakura-fill-${i}`;
+        const specId = `sakura-spec-${i}`;
+
+        return (
+          <span
+            key={i}
+            className="sakura-petal absolute block"
+            style={{
+              left: `${p.x}vw`,
+              width: p.size,
+              height: p.size,
+              opacity: p.alpha,
+              animationDuration: `${p.duration.toFixed(2)}s`,
+              animationDelay: `-${p.delay.toFixed(2)}s`,
+              ["--sway" as string]: `${p.sway.toFixed(0)}px`,
+              ["--spin" as string]: `${p.spin.toFixed(0)}deg`,
+              filter: "drop-shadow(0 2px 3px rgba(220, 90, 130, 0.18))",
+            }}
           >
-            {/* Sakura petal — rounded teardrop filling the viewBox, with a
-             * subtle V-notch at the tip. Inner darker outline gives volume. */}
-            <path
-              d="
-                M16 1.5
-                C 23 2 29 8 28 16
-                C 27.4 22 22.5 28 16 30
-                C 9.5 28 4.6 22 4 16
-                C 3 8 9 2 16 1.5 Z
-                M13.4 27.4 L 16 30 L 18.6 27.4 Z"
-              fill="currentColor"
-              fillRule="evenodd"
-            />
-            {/* Inner highlight — slightly lighter, gives a sense of volume. */}
-            <path
-              d="M16 5 C 20 5.5 24 9 23 14 C 22 17 19 19 16 19 C 13 19 10 17 9 14 C 8 9 12 5.5 16 5 Z"
-              fill="rgba(255, 255, 255, 0.32)"
-            />
-          </svg>
-        </span>
-      ))}
+            <svg
+              viewBox="0 0 64 64"
+              width="100%"
+              height="100%"
+              className="block"
+              style={p.mirror ? { transform: "scaleX(-1)" } : undefined}
+            >
+              <defs>
+                {/* Body — radial gradient: light center → base → dark rim.
+                  * cx/cy off-center to simulate side-lighting. */}
+                <radialGradient id={fillId} cx="38%" cy="34%" r="70%">
+                  <stop offset="0%" stopColor={lightColor} />
+                  <stop offset="55%" stopColor={baseColor} />
+                  <stop offset="100%" stopColor={darkColor} />
+                </radialGradient>
+                {/* Specular highlight — small bright radial-fade. */}
+                <radialGradient id={specId} cx="42%" cy="30%" r="40%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.78)" />
+                  <stop offset="60%" stopColor="rgba(255,255,255,0.20)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </radialGradient>
+              </defs>
+
+              {/* Petal body — 3D-shaded fill */}
+              <path d={shape.body} fill={`url(#${fillId})`} fillRule="evenodd" />
+              {/* Specular highlight — sits inside the petal, suggests gloss */}
+              <path d={shape.specular} fill={`url(#${specId})`} />
+              {/* Subtle rim line — adds definition, very faint */}
+              <path
+                d={shape.body}
+                fill="none"
+                stroke={hsl(p.hue, 60, Math.max(48, p.lightness - 22), 0.28)}
+                strokeWidth={0.6}
+                fillRule="evenodd"
+              />
+            </svg>
+          </span>
+        );
+      })}
     </div>
   );
 }
