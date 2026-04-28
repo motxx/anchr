@@ -56,9 +56,6 @@ primitive, oracle registry. Per-package implementation guides live in
 each package's `SPEC.md` (e.g.
 [`packages/core-cashu/SPEC.md`](packages/core-cashu/SPEC.md),
 [`packages/tlsn-toolkit/SPEC.md`](packages/tlsn-toolkit/SPEC.md)).
-Each layer is pluggable — Cashu can be replaced with Fedimint,
-TLSNotary with another zkTLS provider, etc.; see the `EscrowProvider`
-and `verify()` interfaces.
 
 ## Use it as a library
 
@@ -117,8 +114,6 @@ on the SDK or HTTP API.
 | C2PA / ProofMode / GPS / EXIF | Implemented |
 | Nostr DVM (NIP-90) discovery | Implemented |
 | Blossom (NIP-44 + AES-256-GCM) | Implemented |
-| Fedimint escrow | Adapter scaffolded; not implemented |
-| DLC settlement | Not planned (incompatible with pool betting) |
 
 Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model.md).
 

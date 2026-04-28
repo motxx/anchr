@@ -73,10 +73,9 @@ Bettor B's proofs:  P2PK([group_pubkey_a, A_pubkey], n_sigs=2) + refund(B) + loc
 | t-of-n FROST nodes collude on *both* keys | Each bettor can redeem the counterparty's token. Net wash — no theft, just bilateral payout. |
 | Single-sig (demo) DualKeyStore reveals both | Same wash result; loser side's secret key is permanently deleted on first sign (`packages/cashu-conditional-swap/src/frost-conditional-swap.ts`). |
 
-The mint is still a trust point (it executes the swap); Anchr can swap to
-DLC NUT (`cashubtc/nuts#128`) for atomic mint-side conditional payouts
-once that PR lands, or to DLC on Bitcoin L1 for fully on-chain
-settlement, without changing the Oracle code.
+The mint is still a trust point (it executes the swap), but it can't
+unilaterally pick the winner — it only enforces the P2PK signatures the
+oracle and bettor provide.
 
 ## How tests verify this
 
@@ -135,8 +134,6 @@ stack).
 | Secondary market — exit a position before resolution | Not implemented |
 | Multi-outcome markets (>2 outcomes) | Not implemented; binary YES / NO only |
 | Subjective resolution (UMA-style human dispute) | Not in scope; only deterministic HTTPS conditions |
-| Mint-side conditional payouts (DLC NUT) | Pending [`cashubtc/nuts#128`](https://github.com/cashubtc/nuts/pull/128) |
-| On-chain DLC settlement | Out of scope for this example |
 
 ## Running
 
