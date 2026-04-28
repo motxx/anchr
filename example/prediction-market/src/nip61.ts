@@ -22,9 +22,15 @@ import {
   getEncodedToken,
 } from "@cashu/cashu-ts";
 import { finalizeEvent, getPublicKey } from "nostr-tools/pure";
-import { bytesToHex } from "@noble/hashes/utils.js";
 import type { Filter } from "nostr-tools/filter";
 import { SimplePool } from "nostr-tools/pool";
+
+/** Local hex encoder — avoids pulling @noble/hashes into the browser bundle. */
+function bytesToHex(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += bytes[i]!.toString(16).padStart(2, "0");
+  return s;
+}
 
 export const NIP61_NUTZAP_KIND = 9321;
 

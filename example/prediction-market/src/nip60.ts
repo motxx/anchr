@@ -20,7 +20,7 @@ import { type Proof } from "@cashu/cashu-ts";
 import { finalizeEvent, getPublicKey } from "nostr-tools/pure";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { encryptNip44, decryptNip44, deriveConversationKey } from "../../../src/infrastructure/nostr/encryption.ts";
+import { nip44 } from "nostr-tools";
 import { SimplePool } from "nostr-tools/pool";
 
 export const NIP60_WALLET_KIND = 17375;
@@ -173,13 +173,13 @@ export async function getBalance(wallet: Nip60Wallet): Promise<number> {
 // ---------------------------------------------------------------------------
 
 function encryptToSelf(wallet: Nip60Wallet, plaintext: string): string {
-  const key = deriveConversationKey(wallet.secretKey, wallet.pubkey);
-  return encryptNip44(plaintext, key);
+  const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
+  return nip44.v2.encrypt(plaintext, key);
 }
 
 function decryptToSelf(wallet: Nip60Wallet, ciphertext: string): string {
-  const key = deriveConversationKey(wallet.secretKey, wallet.pubkey);
-  return decryptNip44(ciphertext, key);
+  const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
+  return nip44.v2.decrypt(ciphertext, key);
 }
 
 // ---------------------------------------------------------------------------
