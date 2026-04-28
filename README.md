@@ -7,16 +7,18 @@
 **Buy cryptographically verified data with sats. No trusted middleman.**
 
 When you buy data online today, you have to trust the seller — that the
-number they returned really came from the source they claim, that they
-didn't tamper with it on the way, that they won't take your money and
-disappear. Every API key, every paid feed, every "we promise this is
-real" notice is a stand-in for that trust.
+number came from the claimed source, that they didn't tamper with it on
+the way, that they won't take your money and disappear. Every API key,
+every paid feed, every "we promise this is real" notice is a stand-in
+for that trust.
 
 Anchr replaces it. The seller produces a proof you can check yourself,
 and the Bitcoin escrow only releases against that proof. The buyer
 can't take the data without paying. The seller can't get paid without
 producing a verifiable answer. Nobody in the middle can pocket the
-money. The reference server runs at
+money.
+
+The reference server runs at
 [`anchr-app.fly.dev`](https://anchr-app.fly.dev/health); the wire
 specs are CC0 so anyone can implement an alternative.
 
@@ -42,7 +44,7 @@ Worker   ─ redeems ────────► Requester gets the data
 1. **Requester** posts a query and locks payment in a Cashu HTLC.
 2. **Worker** discovers the query over Nostr (NIP-90 DVM), fetches the
    data, and produces a cryptographic proof. The proof type depends on
-   what's being proved: TLSNotary for HTTPS responses, C2PA for photos,
+   the data source: TLSNotary for HTTPS responses, C2PA for photos,
    ProofMode for mobile capture, GPS for location.
 3. **Oracle** verifies the proof. If valid, it releases the HTLC
    preimage; for high-value queries, t-of-n independent oracles each
@@ -51,12 +53,13 @@ Worker   ─ redeems ────────► Requester gets the data
    receives the verified result. If anything fails, the locktime
    refunds the requester.
 
-Three properties hold without any single party being trusted:
-requesters can't revoke payment once work has begun; workers can't
-forge proofs because verification is cryptographic; oracles can't
-steal funds because the escrow only releases against the worker's own
-signature. Each property is pinned by an attack test; full enumeration
-in [`docs/threat-model.md`](docs/threat-model.md).
+Three properties hold without trusting any single party: requesters
+can't revoke payment once work has begun; workers can't forge proofs
+because verification is cryptographic; oracles can't steal funds
+because the escrow only releases against the worker's own signature.
+An attack test pins each property — see
+[`docs/threat-model.md`](docs/threat-model.md) for the full
+enumeration.
 
 ## Use it
 
@@ -97,13 +100,12 @@ in Docker — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### As a contributor
 
-`./scripts/test-all.sh --local` runs the same gate CI does. Test
+`./scripts/test-all.sh --local` runs the same gate as CI. Test
 commands and the quality bar live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Built with it
 
-Six runnable applications under [`example/`](example/). Each is real
-working code that ships in CI.
+Six runnable applications under [`example/`](example/). Each ships in CI.
 
 | Example | What it shows |
 |---|---|
@@ -118,8 +120,8 @@ working code that ships in CI.
 
 Seven independently typecheckable packages on top of a Hono / Deno
 reference server, plus Rust crates for the TLSNotary and FROST primitives.
-Layout, package responsibilities, and current implementation status are
-in [`docs/architecture.md`](docs/architecture.md).
+See [`docs/architecture.md`](docs/architecture.md) for layout, package
+responsibilities, and implementation status.
 
 ## Reference
 
