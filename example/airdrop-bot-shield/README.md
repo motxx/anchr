@@ -8,7 +8,7 @@ TLSNotary-based Sybil resistance for token airdrops — prove you're human witho
 
 ## Problem
 
-Token airdrops are one of the most effective mechanisms for distributing governance tokens to real users. They're also one of the most exploited.
+Token airdrops distribute governance tokens to real users — and they're heavily exploited.
 
 **Real-world damage:**
 
@@ -21,7 +21,7 @@ The core issue: **on-chain behavior is trivially faked**. A bot can bridge token
 
 ## Solution
 
-Anchr provides a TLSNotary-based proof system where airdrop claimants cryptographically prove attributes from existing Web2 accounts (GitHub, Twitter, etc.) without revealing their identity. Combined with Cashu HTLC escrow for trustless token distribution, this creates a Sybil-resistant airdrop pipeline.
+Anchr's TLSNotary proof system lets airdrop claimants cryptographically prove attributes from existing Web2 accounts (GitHub, Twitter, etc.) without revealing their identity. Combined with Cashu HTLC escrow, this creates a Sybil-resistant pipeline for trustless token distribution.
 
 **Key insight:** A GitHub account with 3 years of history, 50+ repos, and 500+ contributions is economically impractical to fake. A Twitter account with 1,000+ organic followers costs far more than an airdrop allocation is worth. TLSNotary lets us verify these attributes cryptographically without requiring users to link their Web2 identity to their wallet.
 
@@ -47,8 +47,10 @@ Anchr provides a TLSNotary-based proof system where airdrop claimants cryptograp
 |------------|-----------|----------|----------------|
 | GitHub account age | `https://api.github.com/users/{user}` | `created_at` | Account existed before a date |
 | GitHub repos | `https://api.github.com/users/{user}` | `public_repos` | User has N+ public repos |
-| GitHub contributions | `https://api.github.com/users/{user}` | `public_gists` + commit activity | Active developer |
+| GitHub followers | `https://api.github.com/users/{user}` | `followers` | N+ followers (social proof) |
 | Twitter followers | `https://api.x.com/2/users/{id}?user.fields=public_metrics` | `data.public_metrics.followers_count` | Social proof (N+ followers) |
+
+> Note: per-user contributions count is not in the `/users/{user}` REST response — it requires the GraphQL API or contributions calendar scrape, which is out of scope for the basic flow shown here.
 
 ### Architecture
 
@@ -110,9 +112,9 @@ Project                     Cashu Mint                    Claimant
 | | Gitcoin Passport | WorldCoin | On-chain Analysis | **Anchr Bot Shield** |
 |---|---|---|---|---|
 | **Mechanism** | Stamp collection (social accounts, on-chain) | Iris biometric scan | Wallet clustering, ML | TLSNotary cryptographic proofs |
-| **Privacy** | Links Web2 accounts to wallet address | Stores iris hash on-chain | Passive observation | Zero-knowledge: proves attributes without linking identity |
+| **Privacy** | Links Web2 accounts to wallet address | Stores iris hash on-chain | Passive observation | Selective: oracle verifies the named attribute (the URL is visible) but doesn't persist the full response |
 | **Sybil cost** | ~$5 per fake passport (buy aged accounts) | Requires physical presence at Orb | Free (just create more wallets) | Cost of maintaining genuine Web2 accounts |
-| **Decentralization** | Gitcoin's stamp servers | WorldCoin Foundation Orbs | Centralized analysis firms | Any TLSNotary verifier + Cashu mint |
+| **Decentralization** | Gitcoin's stamp servers | WorldCoin Foundation Orbs | Centralized analysis firms | Federated — campaign chooses any TLSNotary verifier + Cashu mint (or t-of-n FROST oracle set for higher stakes) |
 | **User experience** | Connect wallet + social accounts | Visit an Orb location | No action required | Generate proof in browser extension |
 | **Forgery resistance** | Moderate (stamps can be farmed) | High (biometric) | Low (behavior is fakeable) | High (TLS certificate chain verification) |
 

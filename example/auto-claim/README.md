@@ -1,6 +1,8 @@
-# Auto-Claim: Automatic Money Recovery
+# Auto-Claim
 
 "Install the extension. Browse normally. Money you're owed comes back automatically."
+
+> The browser extension is the target UX. The demo below runs the same agent logic as a Deno script — no extension is shipping yet.
 
 ## Concept
 

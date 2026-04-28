@@ -1,6 +1,6 @@
 # Supply Chain Proof
 
-Tamper-proof supply chain records using Anchr's GPS verification, C2PA, TLSNotary, and Cashu HTLC technology.
+Tamper-proof supply chain records via GPS, C2PA, TLSNotary, and Cashu HTLC.
 
 ## Problem
 
@@ -10,7 +10,7 @@ Global supply chain fraud is a trillion-dollar problem:
 - **Counterfeit goods** exceed **$500 billion/year** (OECD). Luxury goods, electronics, and pharmaceuticals are routinely counterfeited, with fakes entering legitimate supply chains undetected.
 - **Pharmaceutical cold chain** failures cause **$35 billion/year** in losses (IQVIA). Temperature-sensitive drugs like vaccines and biologics lose efficacy when the cold chain breaks, but paper-based temperature logs are easily falsified.
 
-The core issue: every existing supply chain verification system relies on **self-reported data** and **trusted intermediaries**. There is no cryptographic guarantee that a product was actually at the claimed location, that the logistics API data was not fabricated, or that the payments were conditional on verification.
+The core issue: existing systems rely on **self-reported data** and **trusted intermediaries**. No cryptographic guarantee that the product was at the claimed location, that logistics data wasn't fabricated, or that payments hinged on verification.
 
 ## Solution
 
@@ -36,7 +36,7 @@ Farm (Sao Paulo) -> Port (Santos) -> Ship -> Port (Yokohama) -> Roaster (Kawasak
 At each step:
 - The **farmer** photographs the harvest with a C2PA camera. GPS proves the beans came from the claimed farm, not a cheaper plantation.
 - The **exporter** proves via TLSNotary that the Maersk tracking API shows the correct container was loaded at Santos.
-- The **roaster** photographs arrival at the Kawasaki facility (GPS + C2PA) and proves via TLSNotary that the SCA cupping score exceeds 80 (specialty grade).
+- The **roaster** photographs arrival at the Kawasaki facility (GPS + C2PA) and proves via TLSNotary that the import customs API logged the container's arrival with the matching origin and HS code.
 - The **cafe** confirms final delivery with a GPS-verified photo in Shibuya.
 
 Each step releases a Cashu HTLC payment to the previous actor. The farmer gets paid only after the exporter verifies receipt; the exporter gets paid only after the roaster verifies quality.
@@ -48,7 +48,7 @@ Factory (Basel) -> Cold Storage (Frankfurt) -> Air Freight -> Distribution (Toky
 ```
 
 - **C2PA** photos prove physical handling at each facility.
-- **TLSNotary** proves temperature sensor API logs stayed within 2-8C throughout cold storage and transport. If the cold chain broke, the proof fails and payment is withheld.
+- **TLSNotary** proves temperature sensor API logs stayed within 2-8C throughout cold storage and transport. If the cold chain broke, the proof fails and payment never releases.
 - **Cashu HTLC** ensures the distribution company only gets paid if temperature conditions were maintained.
 
 ### 3. Luxury Goods: Workshop to Retail
@@ -132,6 +132,9 @@ Actor Device                   Anchr Server              Cashu Mint
 ```
 
 ## API Design
+
+<details>
+<summary>Endpoints — create / submit / verify / events</summary>
 
 ### Create a supply chain product
 
@@ -246,6 +249,8 @@ GET /supply-chain/products/{product_id}/events
 
 Returns all Nostr event IDs for independent verification by any relay client.
 
+</details>
+
 ## Economic Analysis
 
 ### Cost of fraud vs. cost of verification
@@ -312,10 +317,10 @@ This runs a simulated coffee supply chain (Sao Paulo -> Santos -> Kawasaki -> Sh
 
 ## Files
 
-- **src/supply-chain-types.ts** -- Type definitions for supply chain steps, proofs, products, requirements, and verification reports
-- **src/chain-verifier.ts** -- Verification engine: checks proofs, chain integrity, time ordering, and calculates trust scores
-- **src/demo-coffee.ts** -- Runnable demo tracing a coffee lot from a Sao Paulo farm to a Shibuya cafe
-- **deno.json** -- Deno configuration with tasks
+- **src/supply-chain-types.ts** — Type definitions for supply chain steps, proofs, products, requirements, and verification reports
+- **src/chain-verifier.ts** — Verification engine: checks proofs, chain integrity, time ordering, and calculates trust scores
+- **src/demo-coffee.ts** — Runnable demo tracing a coffee lot from a Sao Paulo farm to a Shibuya cafe
+- **deno.json** — Deno configuration with tasks
 
 ## How This Maps to Anchr's Core
 

@@ -8,7 +8,7 @@ AI-generated images are now indistinguishable from real photographs. News desks 
 
 ## Solution
 
-Anchr combines **C2PA hardware-rooted signatures** with **GPS proximity checks** and **AI-generation detection** to provide cryptographic proof that a photo is authentic.
+Anchr combines **C2PA hardware-rooted signatures** with **GPS proximity checks** for cryptographic proof of camera capture, plus an **AI-generation heuristic** as a soft filter.
 
 A news desk posts a bounty requesting a photo from a specific location. An on-ground journalist takes the photo with a C2PA-enabled camera, which embeds a hardware-signed Content Credential. Anchr's oracle verifies the credential chain, GPS proximity, and absence of AI generation markers before releasing payment.
 
@@ -39,9 +39,9 @@ News Desk (Requester)                    On-ground Journalist (Worker)
 
 ## Verification Flow
 
-1. **C2PA Signature Verification** — The oracle runs `c2patool` to validate the Content Credential chain. The signature is rooted in the camera's hardware key (TPM/secure enclave), making it unforgeable.
+1. **C2PA Signature Verification** — The oracle runs `c2patool` to validate the Content Credential chain. The signature is rooted in the camera's signing key — typically a hardware key in the TPM or secure enclave for compliant cameras. Forgery requires physical access to the device or a compromised software signer.
 
-2. **GPS Proximity Check** — GPS coordinates are extracted from the C2PA EXIF assertion (not from user-supplied metadata). The Haversine distance to the requested location must be within `max_gps_distance_km`.
+2. **GPS Proximity Check** — The oracle extracts GPS coordinates from the C2PA EXIF assertion (not from user-supplied metadata). The Haversine distance to the requested location must be within `max_gps_distance_km`.
 
 3. **AI Generation Check** — Real camera photos contain EXIF fields like `Make` and `Model`. AI-generated images lack these. The oracle checks for their presence as a heuristic filter.
 
@@ -51,23 +51,23 @@ News Desk (Requester)                    On-ground Journalist (Worker)
 
 | Component | Trust Assumption |
 |-----------|-----------------|
-| C2PA signature | Rooted in camera hardware key — cannot be forged without physical access to the device |
+| C2PA signature | Rooted in the camera's signing key (typically hardware-protected on compliant cameras). Forgery requires either physical access or a compromised software signer |
 | GPS coordinates | Extracted from C2PA-signed EXIF assertion — Worker cannot spoof without breaking the signature |
-| AI detection | Heuristic (EXIF camera model presence). Not a cryptographic guarantee, but raises the bar significantly |
+| AI detection | Heuristic only (EXIF camera model presence) — raises the bar but offers no cryptographic guarantee |
 | Timestamp | Signed by the camera at capture time. Replay is bounded by freshness checks |
-| Privacy | EXIF is verified on upload, then stripped before storage. Only the verification result is persisted |
+| Privacy | Server verifies EXIF on upload, strips it before storage, and persists only the result |
 
 ## Running the Example
 
 ```bash
-# Start the Anchr server
-bun run dev
+# Start the Anchr server (from repo root)
+deno task dev
 
 # Terminal 1: News desk creates a photo request
-bun run example/c2pa-media-verification/requester.ts
+deno task requester
 
 # Terminal 2: Journalist uploads and submits a photo
-bun run example/c2pa-media-verification/worker.ts
+deno task worker
 ```
 
 ### Prerequisites

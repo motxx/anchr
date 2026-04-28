@@ -2,12 +2,10 @@
 
 > *Kannagi* (神和ぎ) — "spirit-pacifying"; in folk religion, the medium who consults the oracle and pacifies the verdict. Here: a Bitcoin-native prediction market settled by oracle attestation.
 
-**Prediction market.**
-
-A demo application using Anchr's Oracle + TLSNotary verification + Cashu
-HTLC (or FROST P2PK) atomic settlement for prediction-market resolution.
+**Prediction market.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
 
 > **Live testnet deploy:** <https://anchr-market.fly.dev>
+> Funds are testnut ecash — *not real BTC*. Do not bridge mainnet sats in.
 > Backed by FROST 2-of-3 threshold signing on Fly.io (region `sin`),
 > the public testnut Cashu mint (<https://testnut.cashu.space>), the
 > Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
@@ -16,12 +14,6 @@ HTLC (or FROST P2PK) atomic settlement for prediction-market resolution.
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
 > the running UI live in [`docs/prediction-market/screenshots/`](../../docs/prediction-market/screenshots/).
-
-## What this is
-
-This example demonstrates Anchr's Oracle capabilities — TLSNotary-verified
-data feeds, FROST threshold signing, and condition evaluation — applied
-to a prediction-market use case.
 
 ## Settlement model — funds are *not* held by the Oracle
 
@@ -69,6 +61,7 @@ Bettor B's proofs:  P2PK([group_pubkey_a, A_pubkey], n_sigs=2) + refund(B) + loc
 |---|---|
 | Oracle signs / reveals correctly | Winner redeems the loser's token; loser refunds nothing. |
 | Oracle never responds | Both bettors refund their own original proofs after `locktime`. No theft. |
+| Oracle (HTLC) reveals the *wrong* preimage | The wrong bettor wins. The HTLC's second factor (counterparty signature, see `cross-htlc.ts:33-71`) doesn't prevent this — revealing the *opposite* preimage routes redemption to the counterparty whose pubkey is on the wrong-side lock, who has every incentive to sign. Use **FROST mode** when stakes warrant a t-of-n trust assumption that is geometrically bound to the outcome key. |
 | Oracle (FROST) signs the *wrong* outcome's key | Loser-as-redeemer still needs the loser's own personal sig (which is on the wrong side of the lock). The Oracle's lone share doesn't unlock anything. |
 | t-of-n FROST nodes collude on *both* keys | Each bettor can redeem the counterparty's token. Net wash — no theft, just bilateral payout. |
 | Single-sig (demo) DualKeyStore reveals both | Same wash result; loser side's secret key is permanently deleted on first sign (`packages/cashu-conditional-swap/src/frost-conditional-swap.ts`). |

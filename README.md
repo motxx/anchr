@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-**Buy cryptographically verified data with sats. No trusted middleman.**
+**Buy cryptographically verified data with sats. No middleman holds your money.**
 
 When you buy data online today, you have to trust the seller — that the
 number came from the claimed source, that they didn't tamper with it on
