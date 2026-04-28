@@ -12,6 +12,8 @@ for photos, GPS for location, ProofMode for mobile capture) and *Bitcoin
 payments* (Cashu HTLC, optionally backed by FROST t-of-n threshold
 oracles).
 
+Three properties hold without a trusted middleman:
+
 - **Requesters can't revoke payment** — sats lock in escrow before work begins ([INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)).
 - **Workers can't forge proofs** — verification is cryptographic ([INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)).
 - **Oracles can't steal funds** — escrow only releases against the worker's signature ([INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)).
@@ -19,10 +21,10 @@ oracles).
 For high-value queries, t-of-n independent oracles can verify in parallel
 via FROST; below threshold, no party can produce a valid release signature.
 
-## What you can build with it
+## Examples
 
-Each example below is runnable code under [`example/`](example/) — they
-double as integration tests and are exercised in CI.
+Each example is runnable code under [`example/`](example/) — they double as
+integration tests and run in CI.
 
 | Example | What it shows |
 |---|---|
@@ -51,13 +53,16 @@ Worker ─ redeems token at Cashu Mint ──► Requester gets the verified dat
 ```
 
 Wire-format specs needed for an alternative implementation live in
-[`specs/`](specs/) (CC0): Nostr DVM messaging, conditional-swap
-primitive, oracle registry. Per-package implementation guides live in
-each package's `SPEC.md` (e.g.
-[`packages/core-cashu/SPEC.md`](packages/core-cashu/SPEC.md),
+[`specs/`](specs/) (CC0): Nostr DVM messaging, conditional-swap primitive,
+oracle registry. Per-package implementation guides live in each package's
+`SPEC.md` (e.g. [`packages/core-cashu/SPEC.md`](packages/core-cashu/SPEC.md),
 [`packages/tlsn-toolkit/SPEC.md`](packages/tlsn-toolkit/SPEC.md)).
 
-## Use it as a library
+## Quick start
+
+Pick a path. Each is independent — you don't need the others.
+
+### As a library
 
 ```typescript
 import { Anchr } from "anchr-sdk";
@@ -79,7 +84,7 @@ console.log(result.proof);      // base64 TLSNotary presentation, independently 
 
 Install: `bun add anchr-sdk` (or `npm i anchr-sdk`).
 
-## Run the server locally
+### As a server
 
 ```bash
 deno install
@@ -98,48 +103,7 @@ See the [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
 [`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks for the deep
 local-CI flow.
 
-## Project state
-
-**Active development. Baseline tests are green and threat-model invariants
-are tracked.** The reference server runs in production at
-[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). API stability is
-not guaranteed yet — pin versions and follow the changelog if you depend
-on the SDK or HTTP API.
-
-| Surface | State |
-|---|---|
-| Cashu HTLC payment + escrow | Implemented, fuzzed (`e2e/regtest-htlc-attacks.test.ts`) |
-| TLSNotary proof verification | Implemented (replay-protected, ReDoS-safe conditions) |
-| FROST t-of-n threshold oracles | Implemented (`crates/frost-signer`, BIP-340 Schnorr) |
-| C2PA / ProofMode / GPS / EXIF | Implemented |
-| Nostr DVM (NIP-90) discovery | Implemented |
-| Blossom (NIP-44 + AES-256-GCM) | Implemented |
-
-Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model.md).
-
-## Architecture
-
-```
-packages/
-├── core-runtime/              Bun ↔ Deno runtime helpers (spawn, fs, which, logger, env)
-├── core-cashu/                Cashu HTLC escrow + preimage store
-├── tlsn-toolkit/              TLSNotary application layer (validation, replay defence, ReDoS guard)
-├── photo-bounty/              C2PA + EXIF + ProofMode + AI content check + GPS Haversine
-├── cashu-frost-oracle/        FROST t-of-n cluster wrapper for Cashu P2PK threshold signing
-├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
-└── sdk/                       anchr-sdk: HTTP / MCP client for AI agents
-
-src/                           Reference host server (Hono on Deno) — composes the packages above
-example/                       Worked, runnable examples; each is its own `deno.json`
-crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-specs/                         Wire-format specs (CC0): Nostr DVM, conditional swap, oracle registry
-docs/                          Host implementation guides (lifecycle, storage) + threat-model invariants
-```
-
-Each `packages/*` is independently typecheckable and testable
-(`deno task test:packages`). No package depends on host-side code.
-
-## Develop
+### As a contributor
 
 ```bash
 deno task lint:strict          # deno lint + arch + invariants + paths + types
@@ -164,10 +128,51 @@ Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
 - `console.*` in non-UI code routes through logTape via
   `@anchr/core-runtime/logger`.
 
-## HTTP API (reference server)
+## Architecture
+
+```
+packages/
+├── core-runtime/              Bun ↔ Deno runtime helpers (spawn, fs, which, logger, env)
+├── core-cashu/                Cashu HTLC escrow + preimage store
+├── tlsn-toolkit/              TLSNotary application layer (validation, replay defence, ReDoS guard)
+├── photo-bounty/              C2PA + EXIF + ProofMode + AI content check + GPS Haversine
+├── cashu-frost-oracle/        FROST t-of-n cluster wrapper for Cashu P2PK threshold signing
+├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
+└── sdk/                       anchr-sdk: HTTP / MCP client for AI agents
+
+src/                           Reference host server (Hono on Deno) — composes the packages above
+example/                       Worked, runnable examples; each is its own `deno.json`
+crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
+specs/                         Wire-format specs (CC0): Nostr DVM, conditional swap, oracle registry
+docs/                          Host implementation guides (lifecycle, storage) + threat-model invariants
+```
+
+Each `packages/*` is independently typecheckable and testable
+(`deno task test:packages`). No package depends on host-side code.
+
+## Project state
+
+**Active development. Baseline tests are green and threat-model invariants
+are tracked.** The reference server runs in production at
+[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). API stability is
+not guaranteed yet — pin versions and follow the changelog if you depend
+on the SDK or HTTP API.
+
+| Surface | State |
+|---|---|
+| Cashu HTLC payment + escrow | Implemented, fuzzed (`e2e/regtest-htlc-attacks.test.ts`) |
+| TLSNotary proof verification | Implemented (replay-protected, ReDoS-safe conditions) |
+| FROST t-of-n threshold oracles | Implemented (`crates/frost-signer`, BIP-340 Schnorr) |
+| C2PA / ProofMode / GPS / EXIF | Implemented |
+| Nostr DVM (NIP-90) discovery | Implemented |
+| Blossom (NIP-44 + AES-256-GCM) | Implemented |
+
+Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model.md).
+
+## Reference
 
 <details>
-<summary>Query / oracle endpoints</summary>
+<summary>HTTP API — query / oracle endpoints</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -188,7 +193,7 @@ Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
 </details>
 
 <details>
-<summary>Marketplace endpoints</summary>
+<summary>HTTP API — marketplace endpoints</summary>
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -218,12 +223,10 @@ Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
 
 </details>
 
-## Contributing
+## Contributing & License
 
 Issues and PRs welcome. Run `./scripts/test-all.sh --local` before pushing;
 the CI gate enforces the quality bar above plus `test:all:docker` for the
 relay + regtest phases.
 
-## License
-
-Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) (anyone may implement them)
+Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) (anyone may implement them).
