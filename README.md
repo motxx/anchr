@@ -6,75 +6,61 @@
 
 **Buy cryptographically verified data with sats. No trusted middleman.**
 
-Ask Anchr for the BTC/USD price on CoinGecko and you don't get the
-number Anchr *says* CoinGecko returned. You get a TLSNotary proof that
-CoinGecko returned that exact number at that exact time — verifiable
-without trusting Anchr, the worker who fetched it, or the oracle who
-checked it. Payment is in Bitcoin, atomic with verification. The same
-shape works for C2PA-stamped photos, GPS-stamped locations, and
-ProofMode mobile capture.
+When you buy data online today, you have to trust the seller — that the
+number they returned really came from the source they claim, that they
+didn't tamper with it on the way, that they won't take your money and
+disappear. Every API key, every paid feed, every "we promise this is
+real" notice is a stand-in for that trust.
 
-The reference server runs in production at
-[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). Specs are CC0.
-Anyone can implement an alternative.
+Anchr replaces it. The seller produces a proof you can check yourself,
+and the Bitcoin escrow only releases against that proof. The buyer
+can't take the data without paying. The seller can't get paid without
+producing a verifiable answer. Nobody in the middle can pocket the
+money. The reference server runs at
+[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health); the wire
+specs are CC0 so anyone can implement an alternative.
 
 ## How it works
 
-Three actors. One Bitcoin escrow. One Nostr message bus. Four steps.
+Three actors. One Bitcoin escrow. One message bus. Four steps.
 
 ```
-Requester ─ locks escrow ──► posts query (Nostr DVM)
+Requester ─ locks escrow ──► posts query
                                       │
                                       ▼
-Worker ─ discovers ────────► produces proof  (TLSNotary / C2PA / ProofMode / GPS)
+Worker   ─ discovers ──────► produces proof
                                       │
                                       ▼
-Oracle ─ verifies cryptographically ──► reveals HTLC preimage  (or FROST t-of-n signs)
+Oracle   ─ verifies ───────► releases escrow
                                       │
                                       ▼
-Worker ─ redeems token at Cashu Mint ──► Requester gets the verified data
+Worker   ─ redeems ────────► Requester gets the data
 
-                                                  timeout? ─► escrow refunds
+                                      timeout? ─► escrow refunds
 ```
 
-1. **Requester** posts a query on Nostr (NIP-90 DVM) and locks payment
-   in a Cashu HTLC.
-2. **Worker** discovers the query, fetches the data, and produces a
-   cryptographic proof — TLSNotary for HTTPS responses, C2PA for photos,
-   GPS for location, ProofMode for mobile capture.
+1. **Requester** posts a query and locks payment in a Cashu HTLC.
+2. **Worker** discovers the query over Nostr (NIP-90 DVM), fetches the
+   data, and produces a cryptographic proof. The proof type depends on
+   what's being proved: TLSNotary for HTTPS responses, C2PA for photos,
+   ProofMode for mobile capture, GPS for location.
 3. **Oracle** verifies the proof. If valid, it releases the HTLC
-   preimage (or, for high-value queries, t-of-n independent oracles each
-   sign via FROST).
+   preimage; for high-value queries, t-of-n independent oracles each
+   sign in parallel via FROST and a single party can't release alone.
 4. **Worker** redeems the Cashu token at the mint and the requester
    receives the verified result. If anything fails, the locktime
    refunds the requester.
 
 Three properties hold without any single party being trusted:
-
-- **Requesters can't revoke payment** — sats lock before work begins ([INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)).
-- **Workers can't forge proofs** — verification is cryptographic ([INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)).
-- **Oracles can't steal funds** — escrow only releases against the worker's signature ([INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)).
-
-The full enumeration of invariants and the attack tests that pin them
-live in [`docs/threat-model.md`](docs/threat-model.md).
-
-## Built with it
-
-Six runnable applications under [`example/`](example/). Each exists as
-real working code that ships in CI — they double as integration tests.
-
-| Example | What it shows |
-|---|---|
-| **[巫(Kannagi)](example/prediction-market/)** ([live: anchr-market.fly.dev](https://anchr-market.fly.dev)) | Bitcoin-native prediction market. Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
-| **[Auto-claim](example/auto-claim/)** | "Install the extension. Browse normally. Money you're owed comes back automatically." |
-| **[形代(Katashiro)](example/airdrop-bot-shield/)** | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
-| **[渡(Watari)](example/tlsn-fiat-swap-square/)** | Trustless fiat ↔ BTC crossing: counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC. |
-| **[C2PA photo verification](example/c2pa-media-verification/)** | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
-| **[Supply-chain proof](example/supply-chain-proof/)** | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
+requesters can't revoke payment once work has begun; workers can't
+forge proofs because verification is cryptographic; oracles can't
+steal funds because the escrow only releases against the worker's own
+signature. Each property is pinned by an attack test; full enumeration
+in [`docs/threat-model.md`](docs/threat-model.md).
 
 ## Use it
 
-Three independent paths — pick the one that matches what you're doing.
+Three independent paths.
 
 ### As a library
 
@@ -92,7 +78,7 @@ const result = await anchr.query({
 
 console.log(result.verified);   // true
 console.log(result.data);       // { bitcoin: { usd: 71000 } }
-console.log(result.serverName); // "api.coingecko.com" (cryptographically verified)
+console.log(result.serverName); // "api.coingecko.com" — cryptographically verified
 console.log(result.proof);      // base64 TLSNotary presentation, independently verifiable
 ```
 
@@ -103,85 +89,37 @@ Install: `bun add anchr-sdk` (or `npm i anchr-sdk`).
 ```bash
 deno install
 deno task build:ui && deno task build:css
-deno task dev                        # http://localhost:3000
+deno task dev                  # http://localhost:3000
 ```
 
-With Bitcoin regtest + Cashu mint + Nostr relay + Blossom storage in
-Docker:
-
-```bash
-docker compose up -d && sleep 25 && ./scripts/init-regtest.sh
-deno task test:regtest               # full E2E against regtest
-```
-
-The [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
-[`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks document the
-deep local-CI flow.
+Full local stack (regtest Bitcoin + Cashu mint + Nostr relay + Blossom)
+in Docker — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ### As a contributor
 
-```bash
-deno task lint:strict          # deno lint + arch + invariants + paths + types
-deno task test:unit            # 217 unit tests
-deno task test:packages        # 71 per-package tests, each in isolation
-deno task test:protocol        # protocol invariants (trustless / attacks / quorum)
-deno task test:frost           # FROST threshold signing
-deno task test:regtest         # full Cashu + Lightning E2E (Docker)
-deno task test:pentest         # penetration tests
-deno task test:example         # all example apps
-./scripts/test-all.sh --local  # what CI runs in Phase 1
-```
+`./scripts/test-all.sh --local` runs the same gate CI does. Test
+commands and the quality bar live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-The CI quality bar (full detail in [`CLAUDE.md`](CLAUDE.md)):
+## Built with it
 
-- Full TypeScript strict; no `--no-check` anywhere in test tasks.
-- No `as` casts or `any` in `src/` or `packages/`. `unknown` only at
-  HTTP/JSON boundaries, with a `// type-lint-allow:` reason.
-- Architecture lint enforces a single shared root (`core-runtime`); no
-  other inter-package dependencies.
-- Every threat-model invariant must have a test
-  (`deno task lint:invariants`).
-- `console.*` in non-UI code routes through logTape via
-  `@anchr/core-runtime/logger`.
+Six runnable applications under [`example/`](example/). Each is real
+working code that ships in CI.
+
+| Example | What it shows |
+|---|---|
+| [Prediction market (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
+| [Auto-claim](example/auto-claim/) | "Install the extension. Browse normally. Money you're owed comes back automatically." |
+| [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
+| [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC trustlessly. |
+| [C2PA photo verification](example/c2pa-media-verification/) | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
+| [Supply-chain proof](example/supply-chain-proof/) | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
 
 ## Inside
 
-Anchr is seven independently typecheckable packages on top of a Hono /
-Deno reference server. No package depends on host-side code, so any
-piece can be lifted out and used on its own (`deno task test:packages`
-runs each one in isolation).
-
-```
-packages/
-├── core-runtime/              Bun ↔ Deno runtime helpers (spawn, fs, which, logger, env)
-├── core-cashu/                Cashu HTLC escrow + preimage store
-├── tlsn-toolkit/              TLSNotary application layer (validation, replay defence, ReDoS guard)
-├── photo-bounty/              C2PA + EXIF + ProofMode + AI content check + GPS Haversine
-├── cashu-frost-oracle/        FROST t-of-n cluster wrapper for Cashu P2PK threshold signing
-├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
-└── sdk/                       anchr-sdk: HTTP / MCP client for AI agents
-
-src/                           Reference host server (Hono on Deno) — composes the packages above
-example/                       Runnable examples; each has its own `deno.json`
-crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-specs/                         Wire-format specs (CC0)
-docs/                          Host implementation guides + threat-model invariants
-```
-
-The current state of each surface:
-
-| Surface | State |
-|---|---|
-| Cashu HTLC payment + escrow | Implemented, fuzzed (`e2e/regtest-htlc-attacks.test.ts`) |
-| TLSNotary proof verification | Implemented (replay-protected, ReDoS-safe conditions) |
-| FROST t-of-n threshold oracles | Implemented (`crates/frost-signer`, BIP-340 Schnorr) |
-| C2PA / ProofMode / GPS / EXIF | Implemented |
-| Nostr DVM (NIP-90) discovery | Implemented |
-| Blossom (NIP-44 + AES-256-GCM) | Implemented |
-
-Active development. Baseline tests are green and threat-model
-invariants are tracked. API stability is not yet guaranteed — pin
-versions and watch the changelog if you depend on the SDK or HTTP API.
+Seven independently typecheckable packages on top of a Hono / Deno
+reference server, plus Rust crates for the TLSNotary and FROST primitives.
+Layout, package responsibilities, and current implementation status are
+in [`docs/architecture.md`](docs/architecture.md).
 
 ## Reference
 
@@ -237,11 +175,7 @@ versions and watch the changelog if you depend on the SDK or HTTP API.
 
 </details>
 
-## Contributing & License
-
-Issues and PRs welcome. Run `./scripts/test-all.sh --local` before
-pushing; CI gates the quality bar above plus `test:all:docker` for the
-relay + regtest phases.
+## License
 
 Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) — anyone may
 implement them.
