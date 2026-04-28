@@ -30,6 +30,8 @@ export interface FleetConfig {
   noLeaningBots: number;
   /** Initial sats per bot. Should comfortably cover sum of bets across all markets. */
   fundingSatsPerBot: number;
+  /** Funding strategy — "regtest" (default) or "fakewallet" (for testnut). */
+  funding?: "regtest" | "fakewallet";
   /** Multiplier on each market's typical_bet_sats. 1.0 = exactly typical. */
   betSizeFactor?: number;
   /** Deterministic RNG seed for reproducibility. */
@@ -107,6 +109,7 @@ export async function fundFleet(config: FleetConfig): Promise<BotProfile[]> {
       serverUrl: config.serverUrl,
       mintUrl: config.mintUrl,
       initialFundingSats: config.fundingSatsPerBot,
+      funding: config.funding,
       label: `yes-bot-${i}`,
     });
     profiles.push({ bot, ownYesBias: 0.7 });
@@ -116,6 +119,7 @@ export async function fundFleet(config: FleetConfig): Promise<BotProfile[]> {
       serverUrl: config.serverUrl,
       mintUrl: config.mintUrl,
       initialFundingSats: config.fundingSatsPerBot,
+      funding: config.funding,
       label: `no-bot-${i}`,
     });
     profiles.push({ bot, ownYesBias: 0.3 });

@@ -27,6 +27,21 @@ import {
 } from "../../e2e/helpers/regtest.ts";
 import { createLockedToken } from "../../example/prediction-market/src/exchange-protocol.ts";
 
+/**
+ * Mint proofs against a fakewallet-mode mint (e.g. testnut.cashu.space).
+ * The mint creates a quote, marks it auto-paid, and mints proofs without
+ * any real Lightning payment. Production-friendly because regtest LND is
+ * not available outside the local docker stack.
+ */
+async function mintProofsFakeWallet(wallet: Wallet, amountSats: number): Promise<Proof[]> {
+  await wallet.loadMint(true);
+  const quote = await wallet.createMintQuote(amountSats);
+  // Brief delay so the mint can register the quote internally; testnut
+  // is fast but not synchronous.
+  await new Promise((r) => setTimeout(r, 200));
+  return wallet.mintProofs(amountSats, quote.quote);
+}
+
 export interface BotIdentity {
   /** Hex-encoded x-only public key. */
   pubkey: string;
@@ -41,8 +56,17 @@ export interface BotConfig {
   mintUrl: string;
   /** Bot's identity (keypair). Generated automatically if omitted. */
   identity?: BotIdentity;
-  /** Initial proof budget in sats. Minted upfront via Lightning. */
+  /** Initial proof budget in sats. Minted upfront. */
   initialFundingSats: number;
+  /**
+   * Funding strategy.
+   *  - "regtest" (default): pay the mint quote via lncli inside
+   *    docker compose. Requires the local regtest stack.
+   *  - "fakewallet": skip Lightning entirely; mints that run in
+   *    fakewallet mode (e.g. testnut.cashu.space) auto-pay quotes.
+   *    Required when the bot fleet runs against a public testnet mint.
+   */
+  funding?: "regtest" | "fakewallet";
   /** Optional human label for logs. */
   label?: string;
 }
@@ -85,11 +109,13 @@ export class MarketMakerBot {
     this.initialFundingSats = config.initialFundingSats;
   }
 
-  /** Create a bot, fund it from the regtest Lightning faucet, and return it. */
+  /** Create a bot, fund it, and return it. */
   static async fund(config: BotConfig): Promise<MarketMakerBot> {
     const bot = new MarketMakerBot(config);
     bot.wallet = await createWallet(bot.mintUrl);
-    bot.proofs = await throttledMintProofs(bot.wallet, bot.initialFundingSats);
+    bot.proofs = config.funding === "fakewallet"
+      ? await mintProofsFakeWallet(bot.wallet, bot.initialFundingSats)
+      : await throttledMintProofs(bot.wallet, bot.initialFundingSats);
     return bot;
   }
 
