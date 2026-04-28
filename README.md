@@ -6,36 +6,21 @@
 
 **Buy cryptographically verified data with sats. No trusted middleman.**
 
-Anchr is a TypeScript / Deno toolkit and reference server for atomic
-exchanges of *cryptographic proofs* (TLSNotary for HTTPS responses, C2PA
-for photos, GPS for location, ProofMode for mobile capture) and *Bitcoin
-payments* (Cashu HTLC, optionally backed by FROST t-of-n threshold
-oracles).
+Ask Anchr for the BTC/USD price on CoinGecko and you don't get the
+number Anchr *says* CoinGecko returned. You get a TLSNotary proof that
+CoinGecko returned that exact number at that exact time — verifiable
+without trusting Anchr, the worker who fetched it, or the oracle who
+checked it. Payment is in Bitcoin, atomic with verification. The same
+shape works for C2PA-stamped photos, GPS-stamped locations, and
+ProofMode mobile capture.
 
-Three properties hold without a trusted middleman:
-
-- **Requesters can't revoke payment** — sats lock in escrow before work begins ([INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)).
-- **Workers can't forge proofs** — verification is cryptographic ([INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)).
-- **Oracles can't steal funds** — escrow only releases against the worker's signature ([INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)).
-
-For high-value queries, t-of-n independent oracles can verify in parallel
-via FROST; below threshold, no party can produce a valid release signature.
-
-## Examples
-
-Each example is runnable code under [`example/`](example/) — they double as
-integration tests and run in CI.
-
-| Example | What it shows |
-|---|---|
-| **[巫(Kannagi)](example/prediction-market/)** ([live: anchr-market.fly.dev](https://anchr-market.fly.dev)) | Bitcoin-native prediction market. Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
-| **[Auto-claim](example/auto-claim/)** | "Install the extension. Browse normally. Money you're owed comes back automatically." |
-| **[形代(Katashiro)](example/airdrop-bot-shield/)** | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
-| **[渡(Watari)](example/tlsn-fiat-swap-square/)** | Trustless fiat ↔ BTC crossing: counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC. |
-| **[C2PA photo verification](example/c2pa-media-verification/)** | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
-| **[Supply-chain proof](example/supply-chain-proof/)** | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
+The reference server runs in production at
+[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). Specs are CC0.
+Anyone can implement an alternative.
 
 ## How it works
+
+Three actors. One Bitcoin escrow. One Nostr message bus. Four steps.
 
 ```
 Requester ─ locks escrow ──► posts query (Nostr DVM)
@@ -52,15 +37,44 @@ Worker ─ redeems token at Cashu Mint ──► Requester gets the verified dat
                                                   timeout? ─► escrow refunds
 ```
 
-Wire-format specs needed for an alternative implementation live in
-[`specs/`](specs/) (CC0): Nostr DVM messaging, conditional-swap primitive,
-oracle registry. Per-package implementation guides live in each package's
-`SPEC.md` (e.g. [`packages/core-cashu/SPEC.md`](packages/core-cashu/SPEC.md),
-[`packages/tlsn-toolkit/SPEC.md`](packages/tlsn-toolkit/SPEC.md)).
+1. **Requester** posts a query on Nostr (NIP-90 DVM) and locks payment
+   in a Cashu HTLC.
+2. **Worker** discovers the query, fetches the data, and produces a
+   cryptographic proof — TLSNotary for HTTPS responses, C2PA for photos,
+   GPS for location, ProofMode for mobile capture.
+3. **Oracle** verifies the proof. If valid, it releases the HTLC
+   preimage (or, for high-value queries, t-of-n independent oracles each
+   sign via FROST).
+4. **Worker** redeems the Cashu token at the mint and the requester
+   receives the verified result. If anything fails, the locktime
+   refunds the requester.
 
-## Quick start
+Three properties hold without any single party being trusted:
 
-Pick a path. Each is independent — you don't need the others.
+- **Requesters can't revoke payment** — sats lock before work begins ([INV-03](docs/threat-model.md#inv-03-requester-cant-unlock-escrow-before-timeout)).
+- **Workers can't forge proofs** — verification is cryptographic ([INV-01](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs)).
+- **Oracles can't steal funds** — escrow only releases against the worker's signature ([INV-02](docs/threat-model.md#inv-02-oracle-cant-release-preimage-without-valid-proof)).
+
+The full enumeration of invariants and the attack tests that pin them
+live in [`docs/threat-model.md`](docs/threat-model.md).
+
+## Built with it
+
+Six runnable applications under [`example/`](example/). Each exists as
+real working code that ships in CI — they double as integration tests.
+
+| Example | What it shows |
+|---|---|
+| **[巫(Kannagi)](example/prediction-market/)** ([live: anchr-market.fly.dev](https://anchr-market.fly.dev)) | Bitcoin-native prediction market. Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
+| **[Auto-claim](example/auto-claim/)** | "Install the extension. Browse normally. Money you're owed comes back automatically." |
+| **[形代(Katashiro)](example/airdrop-bot-shield/)** | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
+| **[渡(Watari)](example/tlsn-fiat-swap-square/)** | Trustless fiat ↔ BTC crossing: counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC. |
+| **[C2PA photo verification](example/c2pa-media-verification/)** | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
+| **[Supply-chain proof](example/supply-chain-proof/)** | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
+
+## Use it
+
+Three independent paths — pick the one that matches what you're doing.
 
 ### As a library
 
@@ -92,16 +106,17 @@ deno task build:ui && deno task build:css
 deno task dev                        # http://localhost:3000
 ```
 
-With Bitcoin regtest + Cashu mint + Nostr relay + Blossom storage in Docker:
+With Bitcoin regtest + Cashu mint + Nostr relay + Blossom storage in
+Docker:
 
 ```bash
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh
 deno task test:regtest               # full E2E against regtest
 ```
 
-See the [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
-[`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks for the deep
-local-CI flow.
+The [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
+[`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks document the
+deep local-CI flow.
 
 ### As a contributor
 
@@ -109,26 +124,32 @@ local-CI flow.
 deno task lint:strict          # deno lint + arch + invariants + paths + types
 deno task test:unit            # 217 unit tests
 deno task test:packages        # 71 per-package tests, each in isolation
-deno task test:protocol        # protocol-level invariants (trustless / attacks / exploits / quorum)
+deno task test:protocol        # protocol invariants (trustless / attacks / quorum)
 deno task test:frost           # FROST threshold signing
 deno task test:regtest         # full Cashu + Lightning E2E (Docker)
 deno task test:pentest         # penetration tests
-deno task test:example         # all 7 example apps
+deno task test:example         # all example apps
 ./scripts/test-all.sh --local  # what CI runs in Phase 1
 ```
 
-Quality bar (enforced by CI — see [`CLAUDE.md`](CLAUDE.md)):
+The CI quality bar (full detail in [`CLAUDE.md`](CLAUDE.md)):
 
-- No `--no-check` in test tasks; full TypeScript strict.
-- No `as` casts or `any` in `src/` or `packages/`. `unknown` only at HTTP/JSON
-  boundaries with a `// type-lint-allow:` reason.
-- Architecture lint enforces a single shared root (`core-runtime`); no other
-  inter-package dependencies (`deno task lint:arch`).
-- Threat-model invariants must each have a test (`deno task lint:invariants`).
+- Full TypeScript strict; no `--no-check` anywhere in test tasks.
+- No `as` casts or `any` in `src/` or `packages/`. `unknown` only at
+  HTTP/JSON boundaries, with a `// type-lint-allow:` reason.
+- Architecture lint enforces a single shared root (`core-runtime`); no
+  other inter-package dependencies.
+- Every threat-model invariant must have a test
+  (`deno task lint:invariants`).
 - `console.*` in non-UI code routes through logTape via
   `@anchr/core-runtime/logger`.
 
-## Architecture
+## Inside
+
+Anchr is seven independently typecheckable packages on top of a Hono /
+Deno reference server. No package depends on host-side code, so any
+piece can be lifted out and used on its own (`deno task test:packages`
+runs each one in isolation).
 
 ```
 packages/
@@ -141,22 +162,13 @@ packages/
 └── sdk/                       anchr-sdk: HTTP / MCP client for AI agents
 
 src/                           Reference host server (Hono on Deno) — composes the packages above
-example/                       Worked, runnable examples; each is its own `deno.json`
+example/                       Runnable examples; each has its own `deno.json`
 crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-specs/                         Wire-format specs (CC0): Nostr DVM, conditional swap, oracle registry
-docs/                          Host implementation guides (lifecycle, storage) + threat-model invariants
+specs/                         Wire-format specs (CC0)
+docs/                          Host implementation guides + threat-model invariants
 ```
 
-Each `packages/*` is independently typecheckable and testable
-(`deno task test:packages`). No package depends on host-side code.
-
-## Project state
-
-**Active development. Baseline tests are green and threat-model invariants
-are tracked.** The reference server runs in production at
-[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health). API stability is
-not guaranteed yet — pin versions and follow the changelog if you depend
-on the SDK or HTTP API.
+The current state of each surface:
 
 | Surface | State |
 |---|---|
@@ -167,7 +179,9 @@ on the SDK or HTTP API.
 | Nostr DVM (NIP-90) discovery | Implemented |
 | Blossom (NIP-44 + AES-256-GCM) | Implemented |
 
-Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model.md).
+Active development. Baseline tests are green and threat-model
+invariants are tracked. API stability is not yet guaranteed — pin
+versions and watch the changelog if you depend on the SDK or HTTP API.
 
 ## Reference
 
@@ -225,8 +239,9 @@ Full enumeration with attack tests in [`docs/threat-model.md`](docs/threat-model
 
 ## Contributing & License
 
-Issues and PRs welcome. Run `./scripts/test-all.sh --local` before pushing;
-the CI gate enforces the quality bar above plus `test:all:docker` for the
+Issues and PRs welcome. Run `./scripts/test-all.sh --local` before
+pushing; CI gates the quality bar above plus `test:all:docker` for the
 relay + regtest phases.
 
-Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) (anyone may implement them).
+Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) — anyone may
+implement them.
