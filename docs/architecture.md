@@ -46,6 +46,32 @@ are tracked. API stability is not yet guaranteed.
 - Threat-model invariants and the attack tests pinning them are in
   [`docs/threat-model.md`](threat-model.md).
 
+## Relation to NIP-90
+
+Anchr is, in one line: **NIP-90 (Nostr DVM) + Cashu HTLC settlement +
+Oracle-verified proofs**. Three concrete additions to what NIP-90
+already provides:
+
+| Layer | What NIP-90 provides | What Anchr adds |
+|---|---|---|
+| Transport | Request/Result/Feedback events (kinds 5xxx/6xxx/7000), provider competition, encrypted parameters via NIP-44, capability advertisement via NIP-89 | (uses NIP-90 as is) |
+| Settlement | "money in, data out" loosely via Lightning zap — post-delivery, trust-based | **Cashu HTLC pre-lock with locktime refund** (`packages/cashu-conditional-swap`) — atomic settlement, escrow guarantees |
+| Verification | None — the customer trusts the provider | **Standardized proof types** (`packages/photo-bounty` for C2PA/GPS/ProofMode; `packages/tlsn-toolkit` for TLSNotary) |
+| Trust topology | Bilateral (customer ↔ provider) | **Oracle as a third role** that verifies the proof and gates the HTLC release. t-of-n FROST (`packages/cashu-frost-oracle`) for higher-stakes queries |
+
+Anchr is not strictly NIP-90-conformant: it uses NIP-90 kind ranges
+with custom semantics (e.g. kind 5300 is reserved for "Nostr Content
+Discovery" in the public DVM kind registry; Anchr currently overloads
+it for verifiable data queries). Treat NIP-90 here as the **transport
+choice**, not a strict-compatibility claim — Anchr could in principle
+run over a different transport (HTTP, MQTT) and would still be Anchr.
+
+NIP-90 was chosen because the request/quote/result/feedback flow is
+already designed for competing providers, NIP-89 advertises capability
+discovery, and NIP-44 covers encrypted parameters. Reusing this saves
+inventing a parallel transport — which is the umbrella point: Anchr
+borrows where standards exist, adds where they don't.
+
 ## Composition patterns
 
 Anchr is a set of independent packages that compose into different
@@ -129,9 +155,23 @@ flowchart LR
   Hop2 -.fiat or off-protocol settlement.- Hop3
 ```
 
-Used by: supply-chain-proof (`example/supply-chain-proof/`). Designed
-to use `@anchr/photo-bounty` + `@anchr/tlsn-toolkit`; **does not use**
-`cashu-conditional-swap`.
+Used by:
+
+- **`example/royalty-distribution/`** — recursive R/W/O across the
+  edges of a content rights graph (composer / lyricist / performer /
+  producer; sample / derivative chains). Designed to use
+  `@anchr/tlsn-toolkit` + Nostr event conventions. Per-edge atomic
+  settlement in sats is opt-in. The cleanest fit for the
+  verification-only chain pattern: fully digital, no physical-binding
+  gap.
+- **`example/supply-chain-proof/`** — recursive R/W/O along a
+  physical multi-hop supply chain. Designed to use
+  `@anchr/photo-bounty` + `@anchr/tlsn-toolkit`. Same pattern as
+  royalty-distribution, but in the physical domain — useful precisely
+  because it surfaces the photo-to-shipment binding gap that
+  fully-digital verification chains don't have.
+
+Both **do not use** `cashu-conditional-swap`.
 
 **Why the three-way distinction matters**: it makes Anchr's umbrella
 nature explicit. Bounty and Market are settlement compositions

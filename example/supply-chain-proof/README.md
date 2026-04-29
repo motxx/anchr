@@ -322,7 +322,8 @@ Returns Nostr event IDs for independent verification by any relay client.
 
 ## See also
 
-- [`docs/architecture.md`](../../docs/architecture.md) — Anchr's two trust shapes (Bounty, Market) at the protocol level
-- [`packages/cashu-conditional-swap/README.md`](../../packages/cashu-conditional-swap/README.md) — bilateral cross-lock primitive
-- [`packages/photo-bounty/`](../../packages/photo-bounty/) — C2PA + GPS verification primitives
-- [`packages/tlsn-toolkit/`](../../packages/tlsn-toolkit/) — TLSNotary verification primitives
+- [`example/royalty-distribution/`](../royalty-distribution/) — sister verification-only chain example. Same pattern (recursive R/W/O along chain/graph edges, no Cashu settlement) but in the *fully digital* domain, where the physical-binding gap doesn't exist. Useful as the contrast — royalty fits the pattern more cleanly; supply-chain shows where the pattern hits its physical limit.
+- [`docs/architecture.md`](../../docs/architecture.md) — composition patterns (Bounty, Market, Verification-only chain).
+- [`packages/cashu-conditional-swap/README.md`](../../packages/cashu-conditional-swap/README.md) — bilateral cross-lock primitive (not used here).
+- [`packages/photo-bounty/`](../../packages/photo-bounty/) — C2PA + GPS verification primitives.
+- [`packages/tlsn-toolkit/`](../../packages/tlsn-toolkit/) — TLSNotary verification primitives.

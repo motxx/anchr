@@ -25,6 +25,7 @@ specs are CC0 so anyone can implement an alternative.
 ## How it works
 
 Three actors. One Bitcoin escrow. One message bus. Four steps.
+Equivalently: **NIP-90 (Nostr DVM) + Cashu HTLC settlement + Oracle-verified proofs.**
 
 ```
 Requester ─ locks escrow ──► posts query
@@ -107,8 +108,8 @@ commands and the quality bar live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Built with it
 
-Six examples under [`example/`](example/) — five runnable, one a
-conceptual sketch. All are exercised in CI.
+Seven examples under [`example/`](example/) — five runnable, two
+conceptual sketches. All are exercised in CI.
 
 | Example | What it shows |
 |---|---|
@@ -117,7 +118,8 @@ conceptual sketch. All are exercised in CI.
 | [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — proves Web2 attributes without persisting the underlying credential. |
 | [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; the Cashu HTLC releases BTC against that proof. |
 | [C2PA photo verification](example/c2pa-media-verification/) | News desks pay sats for photos that carry hardware-signed Content Credentials (camera, timestamp, GPS) plus an AI-generation heuristic. |
-| [Supply-chain proof](example/supply-chain-proof/) | Conceptual sketch: how Anchr's primitives compose recursively along a multi-hop supply chain, plus what they cannot solve alone. |
+| [Royalty distribution](example/royalty-distribution/) | Conceptual sketch: recursive R/W/O across the edges of a content rights graph — every payment gated on verifiable proof, every distribution publicly auditable. The verification-only chain pattern at its cleanest (no physical-binding gap). |
+| [Supply-chain proof](example/supply-chain-proof/) | Conceptual sketch: same verification-only chain pattern in the *physical* domain. Demonstrates Anchr's value as well as its limit (the photo-to-shipment binding gap). |
 
 ## The pieces
 
