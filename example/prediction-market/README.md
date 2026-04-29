@@ -4,6 +4,9 @@
 
 **Prediction market.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
 
+> **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
+> **Pattern:** bilateral market (two counterparties cross-lock; Oracle reveals outcome).
+
 > **Live testnet deploy:** <https://anchr-market.fly.dev>
 > Funds are testnut ecash — *not real BTC*. Do not bridge mainnet sats in.
 > Backed by FROST 2-of-3 threshold signing on Fly.io (region `sin`),
@@ -17,10 +20,12 @@
 
 ## Settlement model — funds are *not* held by the Oracle
 
-Funds stay between the bettors at all times via cross-locked Cashu
-tokens. The Oracle's role is to release a single secret (preimage or
-signature share) that lets the *winner* unlock the *loser's*
-counterparty token. No money ever flows into an Oracle wallet.
+Funds stay between the bettors at all times via a **bilateral
+cross-lock** at the Cashu Mint — each bettor's tokens are locked under
+the *counterparty's* pubkey and the *opposite outcome's* hash. The
+Oracle's role is to release a single secret (preimage or signature
+share) that lets the *winner* unlock the *loser's* counterparty token.
+No money ever flows into an Oracle wallet.
 
 There are two settlement modes, both audited end-to-end against a real
 Cashu mint on regtest. They differ only in what kind of secret the
@@ -128,6 +133,31 @@ stack).
 | Multi-outcome markets (>2 outcomes) | Not implemented; binary YES / NO only |
 | Subjective resolution (UMA-style human dispute) | Not in scope; only deterministic HTTPS conditions |
 
+## Persistence
+
+The order book is in-memory by default — fine for tests and demos, but
+**open orders are lost on server restart**. For any deployment that
+matters, point the server at a Postgres database via `DATABASE_URL`:
+
+```bash
+# 1. Create the schema (idempotent)
+psql "$DATABASE_URL" -f example/prediction-market/migrations/001_create_orders.sql
+
+# 2. Start the server with persistence on
+DATABASE_URL=postgres://user:pass@host:5432/anchr_market \
+  deno run --allow-all example/prediction-market/server.ts
+```
+
+When `DATABASE_URL` is unset, the server falls back to the in-memory book
+and logs a warning. When set, FIFO matching runs inside a single Postgres
+transaction with `SELECT ... FOR UPDATE` locks on the open orders, which
+serializes concurrent matchers correctly.
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | unset | Postgres connection string. If unset, in-memory. |
+| `DATABASE_POOL_SIZE` | `10` | Max Postgres connections in the pool. |
+
 ## Running
 
 ```bash
@@ -155,7 +185,8 @@ src/
   server-routes.ts          — Market HTTP API (order book, matching, resolution)
   market-types.ts           — Type definitions
   market-oracle.ts          — Condition evaluation, payout calculation
-  order-book.ts             — FIFO matching with partial fills
+  order-book.ts             — FIFO matching interface + in-memory impl
+  order-book-postgres.ts    — Postgres-backed impl (used when DATABASE_URL set)
   resolution.ts             — DualPreimageStore (HTLC) / DualKeyStore (FROST) resolution
   match-coordinator.ts      — Cross-HTLC match execution via @anchr/cashu-conditional-swap
   market-api-routes.ts      — REST endpoints

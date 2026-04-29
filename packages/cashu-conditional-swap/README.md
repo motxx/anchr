@@ -16,6 +16,8 @@ N:M binary outcome conditional swap primitive on Cashu. Brand-neutral — usable
 
 ## Two complementary swap mechanisms
 
+Each matched pair forms a **bilateral cross-lock**: each side's tokens are locked under the *counterparty's* pubkey and the *opposite outcome's* hash (or outcome group key in FROST mode). Neither side can redeem alone, the matchmaker never custodies funds, and the Oracle holds only the secret that selects the winner — not the funds themselves.
+
 ### 1. HTLC dual-preimage
 
 Oracle generates two preimages, one per outcome. Tokens are locked with `hashlock(outcome_hash) + P2PK(counterparty) + locktime + refund(self)`. Oracle reveals the winning preimage; the loser's preimage is destroyed (one-time semantics).

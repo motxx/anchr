@@ -1,67 +1,221 @@
 # Supply Chain Proof
 
-Tamper-proof supply chain records via GPS, C2PA, TLSNotary, and Cashu HTLC.
+> **Uses:** `@anchr/photo-bounty` + `@anchr/tlsn-toolkit` (designed; current code is a simulation).
+> **Does not use:** `@anchr/cashu-conditional-swap` — supply-chain settlement is off-protocol (fiat invoices, bank transfers).
+> **Pattern:** verification-only evidence chain (third composition, see [`docs/architecture.md`](../../docs/architecture.md)).
 
-## Problem
+> Conceptual foundation: what problem class this addresses, how Anchr's
+> primitives compose recursively, what the combination with adjacent
+> attestation tech (C2PA, ProofMode, hardware-signed sensors, per-item
+> IDs) achieves, and what Anchr alone fundamentally cannot solve.
 
-Global supply chain fraud is a trillion-dollar problem:
+> **Status — implementation deferred.** `src/` contains a typed
+> verification engine and a runnable demo with **simulated proofs**
+> (no real C2PA capture, TLSNotary fetch, or Nostr publish). The
+> conceptual structure described below is what the wired-up version
+> aims to demonstrate; runnable end-to-end code will follow once the
+> conceptual framing stabilises.
 
-- **Food fraud** costs an estimated **$40 billion/year** globally (FDA, Europol). Olive oil, honey, coffee, and seafood are the most commonly adulterated products. Consumers and importers have no way to independently verify origin claims.
-- **Counterfeit goods** exceed **$500 billion/year** (OECD). Luxury goods, electronics, and pharmaceuticals are routinely counterfeited, with fakes entering legitimate supply chains undetected.
-- **Pharmaceutical cold chain** failures cause **$35 billion/year** in losses (IQVIA). Temperature-sensitive drugs like vaccines and biologics lose efficacy when the cold chain breaks, but paper-based temperature logs are easily falsified.
+## The shape this addresses
 
-The core issue: existing systems rely on **self-reported data** and **trusted intermediaries**. No cryptographic guarantee that the product was at the claimed location, that logistics data wasn't fabricated, or that payments hinged on verification.
+"Multi-step, multi-actor chain of attestations" — every step in a
+process is claimed by some actor, each claim could be wrong or forged,
+and the next step depends on the previous step being trustworthy.
 
-## Solution
+Today these chains run on self-reported data routed through trusted
+intermediaries (auditors, regulators, brand inspectors, paper trails).
+Each hop is forgeable on its own, and verification is partial,
+expensive, and after the fact.
 
-Anchr's technology stack maps directly to the four trust problems in supply chains:
+Physical goods are the obvious case (farm → port → roaster → cafe), but
+the same shape recurs in:
 
-| Trust Problem | Anchr Technology | What It Proves |
+- **News provenance** — photographer → desk → editor → publication
+- **Digital media licensing** — creator → DAM → distributor → consumer
+- **Document authenticity chains** — notary → registrar → counterparty
+- **Conditional delivery contracts** — logistics, energy, agriculture
+- **Compliance audit trails** — production → testing → certification → shipment
+
+Anchr addresses the **cryptographic verification layer** of this shape:
+making each hop produce an unforgeable attestation and gating payment
+on its validity.
+
+## What Anchr brings
+
+### 1. The Requester / Worker / Oracle triple — applied recursively
+
+At every hop in the chain, the same triple appears:
+
+- **Requester** — the *next* (downstream) actor; they want proof that
+  the previous step happened correctly
+- **Worker** — the *previous* (upstream) actor; they produce the proof
+- **Oracle** — verifies the proof and releases the HTLC preimage
+
+A 6-step coffee chain (farm → port → ship → port → roaster → cafe) is
+just **5 instances of the same triple stacked**, with each hop's Nostr
+event linking to the previous hop's verification. The same primitive is
+reused at every layer; the chain auditability is emergent.
+
+```
+[Farmer]──proof──►[Exporter]──proof──►[Carrier]──proof──►[Roaster]──proof──►[Cafe]
+   │         ▲       │           ▲       │          ▲        │         ▲
+   └─Oracle──┘       └──Oracle───┘       └──Oracle──┘        └─Oracle──┘
+   (verify hop 1)    (verify hop 2)      (verify hop 3)      (verify hop 4)
+```
+
+### 2. The bilateral cross-lock for atomic hop-by-hop settlement
+
+Each hop's payment is locked at the Cashu Mint with the downstream
+actor's pubkey and the verification's outcome hash. Payment releases
+only when verification passes. Funds never enter Anchr's wallet.
+
+### 3. The Nostr event log for chain audit
+
+Each hop publishes a Nostr event referencing the previous hop's event.
+Anyone holding the chain's product ID can walk back through the events
+and verify each one independently. No central registry to capture,
+censor, or rewrite.
+
+## What the composition with adjacent attestation tech achieves
+
+Anchr's primitives are deliberately **weak on their own**. TLSNotary
+proves an API returned a value. Cashu HTLC gates payment on a preimage.
+Nostr stores events. None of these touch the physical world.
+
+The power comes from **composition with attestation tech that *does*
+touch the physical world** — and Anchr's role is the verification +
+settlement layer that ties them together:
+
+| When Anchr is composed with… | The chain can prove… |
+|---|---|
+| **C2PA hardware-rooted cameras** (Sony A1, Nikon Z6III, Leica M11-P, Samsung) | "A signing camera captured this scene at this GPS at this signed timestamp" — the photo itself becomes a tamper-evident attestation, and Anchr's cross-lock binds payment to its on-Oracle verification |
+| **ProofMode** (Guardian Project) | Brings C2PA-equivalent attestation to commodity Android phones — every field worker becomes a verifiable Worker without specialised hardware |
+| **TLSNotary on first-party APIs** (where the actor has legitimate API access) | The actor's own carrier/customs/sensor API responses become verifiable to any third-party Oracle, **without the API owner needing to integrate with Anchr** |
+| **Hardware-signed sensors** (TPM-backed, secure-enclave-attested) | Temperature/humidity/shock readings signed by hardware → composed proof binds *physical state* (not just *reported state*) to payment |
+| **Per-item physical IDs** (NFC, RFID, tamper-evident seals, DNA / isotope markers) bound cryptographically to the proof | Closes the photo-to-shipment binding gap: the C2PA photo includes the per-item ID, the Oracle verifies *both* the photo signature *and* the ID's attestation, payment releases only when both match |
+
+The multiplicative claim, summarised:
+
+> Anchr alone proves *"some actor produced this data"*. Combined with
+> hardware-rooted attestation, the chain proves *"this physical event
+> happened in this physical world"*, with **payment cryptographically
+> gated on the proof** and **independent audit by anyone who knows the
+> product ID**. No single primitive does this; the composition does.
+
+## What Anchr can solve in supply chains
+
+Within the verification + settlement layer, Anchr provides:
+
+- **Per-hop attestation verification** — C2PA chain validation, GPS
+  Haversine proximity, TLSNotary cert-chain + body matching, freshness
+- **Conditional hop payment** — Cashu HTLC release on verification pass,
+  refund on locktime expiry
+- **Decentralised audit trail** — Nostr events form an append-only,
+  censorship-resistant log queryable by product ID
+- **t-of-n Oracle attestation** — FROST threshold signing for high-value
+  hops where a single Oracle is too much trust
+- **Recursive chain composition** — same primitive reused at every
+  layer, no special framework per industry
+
+## What Anchr does NOT solve, even with adjacent crypto wired in
+
+These remain out of reach regardless of how much attestation tech is
+composed in. They are not Anchr's failures — they are properties of the
+problem that need adjacent infrastructure:
+
+| Gap | Why it remains |
+|---|---|
+| **Physical-to-digital binding when no per-item ID exists** | A C2PA photo proves "a camera was at this GPS" — not "*this specific* shipment was here". Without a per-item cryptographic identifier (NFC chip with attested key, sealed RFID, isotope/DNA marker), an attacker can photograph the *wrong* (cheaper) bag at the *right* place and pass verification. Issuing and binding identifiers is hardware infrastructure outside Anchr. |
+| **Sensor placement** | A hardware-signed temperature sensor proves the *sensor* was at 4 °C — not that the *cargo* was. A malicious actor can keep the sensor in a fridge while the cargo cooks. Sealed-compartment hardware solves this; Anchr cannot. |
+| **Workflow primitives beyond bilateral matching** | Anchr's bilateral cross-lock handles 1:1 hops. Real chains have one-to-many splits (1 container → N retailers), many-to-one merges (5 farms → 1 batch), returns, partial fulfillment, dispute arbitration. These need different primitives. |
+| **Compliance bridges** | FSMA 204, EUDR, GS1 EPCIS, GS1 Digital Link, ISO 22005, industry-specific standards. Anchr produces cryptographic events; translation to compliance-shaped reports is a separate layer. |
+| **API access negotiation** | TLSNotary on Maersk's API requires Maersk credentials. Anchr can verify the proof; getting access is the actor's problem. |
+| **Settlement currency mismatch** | Supply-chain finance runs on USD/EUR via banks. Anchr settles in sats. Conversion to fiat for the actual paying parties is off-protocol. |
+| **Adoption / network effect** | Even a perfect technical stack needs every party in the chain to participate. Network effect is the binding constraint for most real deployments — not technology. |
+
+## Use case sketches
+
+> Brief illustrative sketches. Each assumes the gaps above are filled
+> by adjacent infrastructure.
+
+### Coffee: Farm to Cup
+
+```
+Farm (Sao Paulo) → Port (Santos) → Ship → Port (Yokohama) → Roaster (Kawasaki) → Cafe (Shibuya)
+```
+
+- **Farmer** photographs the harvest with a C2PA camera; GPS in the
+  signed EXIF binds the bag to the claimed farm
+- **Exporter** TLSNotary-proves the carrier's tracking API showed the
+  container loaded at Santos
+- **Roaster** photographs arrival at Kawasaki (GPS + C2PA) and
+  TLSNotary-proves the import customs API logged matching origin / HS
+  code
+- **Cafe** confirms final delivery with a GPS-verified photo in Shibuya
+
+Each hop releases a Cashu HTLC payment to the previous actor.
+
+### Pharmaceuticals: Cold-Chain Manufacturing to Pharmacy
+
+```
+Factory (Basel) → Cold Storage (Frankfurt) → Air Freight → Distribution (Tokyo) → Pharmacy (Osaka)
+```
+
+- **C2PA** photos prove physical handling at each facility
+- **TLSNotary** on the temperature sensor's attested API proves the
+  cold chain stayed within 2–8 °C throughout
+- If the cold chain broke, the proof fails and payment never releases
+
+### Luxury Goods: Workshop to Retail
+
+```
+Workshop (Florence) → Authentication Center (Milan) → Shipping → Retail (Ginza, Tokyo)
+```
+
+- **C2PA** photos with serial-number close-ups prove physical
+  inspection at the authentication centre
+- **TLSNotary** on the brand's authentication API confirms the serial
+  number is genuine and not previously flagged
+- **GPS** in C2PA EXIF prevents "ghost routing" through cheaper
+  jurisdictions
+
+## How this maps to Anchr's core
+
+| Example concept | Anchr Core | Purpose |
 |---|---|---|
-| "Was the product physically here?" | **GPS + C2PA** | Hardware-signed photo with embedded GPS coordinates. The camera's secure enclave signs the image — GPS cannot be spoofed without breaking the cryptographic signature. |
-| "Is the logistics data real?" | **TLSNotary** | MPC-TLS proof that the shipping API, customs system, or temperature sensor returned specific data. The proof is cryptographically bound to the TLS session — the data cannot be fabricated after the fact. |
-| "Will payment happen fairly?" | **Cashu HTLC** | Hash Time-Locked Contract escrow on Bitcoin/Lightning via ecash. Payment releases only when the oracle verifies the next step's proofs. No trusted escrow agent needed. |
-| "Can anyone audit the chain?" | **Nostr** | Every step is published as a Nostr event. Anyone with the product ID can reconstruct and verify the full chain. No central database to tamper with. |
+| Per-hop GPS check | `GpsCoord` + `haversineKm()` in `src/domain/` | Proximity verification |
+| Per-hop C2PA check | `packages/photo-bounty/` | Content Credential chain validation |
+| Per-hop API attestation | `packages/tlsn-toolkit/` | TLSNotary proof verification |
+| Per-hop conditional payment | `packages/cashu-conditional-swap/` | Cross-lock HTLC release |
+| Chain audit log | Nostr relay integration | Decentralised event trail |
+| Threshold Oracle | `packages/cashu-frost-oracle/` | FROST t-of-n signing |
 
-## Use Cases
+## Implementation status
 
-### 1. Coffee: Farm to Cup
+The `src/` directory:
 
-A specialty coffee lot travels from Brazil to Japan:
+- `supply-chain-types.ts` — type definitions for steps, proofs,
+  products, requirements, verification reports
+- `chain-verifier.ts` — verification engine: per-proof checks, chain
+  integrity, time ordering, trust-score calculation
+- `demo-coffee.ts` — runnable demo with **simulated** proofs
 
-```
-Farm (Sao Paulo) -> Port (Santos) -> Ship -> Port (Yokohama) -> Roaster (Kawasaki) -> Cafe (Shibuya)
-```
+The demo exercises the verification engine against pre-populated proof
+objects (no real capture, no real mint, no real relay). Run it with:
 
-At each step:
-- The **farmer** photographs the harvest with a C2PA camera. GPS proves the beans came from the claimed farm, not a cheaper plantation.
-- The **exporter** proves via TLSNotary that the Maersk tracking API shows the correct container was loaded at Santos.
-- The **roaster** photographs arrival at the Kawasaki facility (GPS + C2PA) and proves via TLSNotary that the import customs API logged the container's arrival with the matching origin and HS code.
-- The **cafe** confirms final delivery with a GPS-verified photo in Shibuya.
-
-Each step releases a Cashu HTLC payment to the previous actor. The farmer gets paid only after the exporter verifies receipt; the exporter gets paid only after the roaster verifies quality.
-
-### 2. Pharmaceuticals: Manufacturing to Pharmacy
-
-```
-Factory (Basel) -> Cold Storage (Frankfurt) -> Air Freight -> Distribution (Tokyo) -> Pharmacy (Osaka)
+```bash
+deno run --allow-all example/supply-chain-proof/src/demo-coffee.ts
 ```
 
-- **C2PA** photos prove physical handling at each facility.
-- **TLSNotary** proves temperature sensor API logs stayed within 2-8C throughout cold storage and transport. If the cold chain broke, the proof fails and payment never releases.
-- **Cashu HTLC** ensures the distribution company only gets paid if temperature conditions were maintained.
+The output is a verification report showing each hop's checks and the
+trust score. It is enough to inspect the composition; not enough to
+evaluate operational behaviour or real-world performance.
 
-### 3. Luxury Goods: Workshop to Retail
+A wired-up implementation (real C2PA capture, real TLSNotary fetches,
+real Cashu mint integration, real Nostr publish) is deferred until the
+conceptual structure above is settled.
 
-```
-Workshop (Florence) -> Authentication Center (Milan) -> Shipping -> Retail (Ginza, Tokyo)
-```
-
-- **C2PA** photos with serial number close-ups prove physical inspection at the authentication center.
-- **TLSNotary** proves the brand's authentication API confirms the serial number is genuine and not previously flagged.
-- **GPS** proves the item was physically at each claimed location, preventing "ghost routing" through cheaper jurisdictions.
-
-## Architecture
+## Architecture (conceptual)
 
 ```
 Producer                 Logistics               Processor               Retailer
@@ -84,57 +238,22 @@ Producer                 Logistics               Processor               Retaile
      |                       |                        |                       |
      v                       v                        v                       v
 +--------------------------------------------------------------------------+
-|                     Anchr Oracle Verification                             |
-|   - C2PA signature chain valid?                                          |
-|   - GPS within expected range?                                           |
-|   - TLSNotary attestation valid? (domain, body, freshness)              |
-|   - Temperature within bounds?                                           |
+|              Anchr Oracle Verification (per hop)                          |
+|   - C2PA signature chain valid?                                           |
+|   - GPS within expected range?                                            |
+|   - TLSNotary attestation valid? (domain, body, freshness)                |
+|   - Sensor reading within bounds?                                         |
 +--------------------------------------------------------------------------+
      |                       |                        |                       |
      v                       v                        v                       v
 +--------------------------------------------------------------------------+
 |                     Cashu HTLC Settlement                                 |
-|   Step verified -> preimage released -> actor redeems sats from mint     |
+|   Hop verified → preimage released → previous actor redeems sats          |
 +--------------------------------------------------------------------------+
 ```
 
-## Data Flow for a Single Step
-
-```
-Actor Device                   Anchr Server              Cashu Mint
-     |                              |                         |
-     |  1. Take C2PA photo          |                         |
-     |  2. Collect GPS coords       |                         |
-     |  3. (optional) TLSNotary     |                         |
-     |     proof of API data        |                         |
-     |                              |                         |
-     |  POST /steps                 |                         |
-     |  { proofs, previous_step }   |                         |
-     |----------------------------->|                         |
-     |                              |                         |
-     |                              |  Oracle verifies:       |
-     |                              |  - C2PA chain           |
-     |                              |  - GPS haversine        |
-     |                              |  - TLSNotary sig        |
-     |                              |  - Time ordering        |
-     |                              |                         |
-     |                              |  If passed:             |
-     |                              |  Release HTLC preimage  |
-     |                              |------------------------>|
-     |                              |                         |  Unlock sats
-     |  { verified: true,           |                         |
-     |    preimage: "abc123..." }   |                         |
-     |<-----------------------------|                         |
-     |                              |                         |
-     |  Redeem HTLC token           |                         |
-     |----------------------------------------------->------->|
-     |                              |                         |  Sats sent
-```
-
-## API Design
-
 <details>
-<summary>Endpoints — create / submit / verify / events</summary>
+<summary>HTTP API design (sketch — not implemented yet)</summary>
 
 ### Create a supply chain product
 
@@ -156,15 +275,9 @@ POST /supply-chain/products
             { "field": "distance_km", "operator": "within_km", "value": 50 }
           ]
         },
-        {
-          "proof_type": "c2pa_media",
-          "conditions": []
-        }
+        { "proof_type": "c2pa_media", "conditions": [] }
       ],
-      "payment_condition": {
-        "amount_sats": 5000,
-        "release_on_verification": true
-      }
+      "payment_condition": { "amount_sats": 5000, "release_on_verification": true }
     }
   ]
 }
@@ -179,31 +292,11 @@ POST /supply-chain/products/{product_id}/steps
 ```json
 {
   "step_type": "origin",
-  "actor": {
-    "name": "Fazenda Boa Vista",
-    "pubkey": "a1b2c3..."
-  },
-  "location": {
-    "lat": -23.5505,
-    "lon": -46.6333,
-    "name": "Coffee Farm, Sao Paulo"
-  },
+  "actor": { "name": "Fazenda Boa Vista", "pubkey": "a1b2c3..." },
+  "location": { "lat": -23.5505, "lon": -46.6333, "name": "Coffee Farm, Sao Paulo" },
   "proofs": [
-    {
-      "type": "gps_photo",
-      "data": {
-        "lat": -23.5510,
-        "lon": -46.6340,
-        "photo_hash": "sha256:a3f8c0d1..."
-      }
-    },
-    {
-      "type": "c2pa_media",
-      "data": {
-        "signer": "ProofMode Camera",
-        "signature_time": 1743724800
-      }
-    }
+    { "type": "gps_photo", "data": { "lat": -23.5510, "lon": -46.6340, "photo_hash": "sha256:..." } },
+    { "type": "c2pa_media", "data": { "signer": "ProofMode Camera", "signature_time": 1743724800 } }
   ],
   "previous_step_id": null
 }
@@ -215,31 +308,7 @@ POST /supply-chain/products/{product_id}/steps
 GET /supply-chain/products/{product_id}/verify
 ```
 
-Response:
-
-```json
-{
-  "product_id": "coffee-fazenda-lot-2026-03",
-  "trust_score": 100,
-  "chain_intact": true,
-  "time_ordered": true,
-  "step_results": [
-    {
-      "step_id": "step-001-origin",
-      "step_type": "origin",
-      "verdict": "pass",
-      "proof_results": [
-        {
-          "proof_type": "gps_photo",
-          "passed": true,
-          "details": "GPS verified: -23.5510, -46.6340 is 0.1km from farm"
-        }
-      ]
-    }
-  ],
-  "total_sats_released": 11000
-}
-```
+Returns per-step verdicts, chain integrity, time ordering, and total sats released.
 
 ### Get a product's Nostr event trail
 
@@ -247,87 +316,13 @@ Response:
 GET /supply-chain/products/{product_id}/events
 ```
 
-Returns all Nostr event IDs for independent verification by any relay client.
+Returns Nostr event IDs for independent verification by any relay client.
 
 </details>
 
-## Economic Analysis
+## See also
 
-### Cost of fraud vs. cost of verification
-
-| | Food Fraud (coffee) | Pharma Cold Chain | Luxury Counterfeit |
-|---|---|---|---|
-| **Annual fraud cost** | $40B globally | $35B globally | $500B+ globally |
-| **Per-unit fraud cost** | $2-50/kg (adulteration margin) | $100-10,000/unit (spoiled drugs) | $50-5,000/unit (fake margin) |
-| **Anchr verification cost** | ~100 sats/step (~$0.07) | ~100 sats/step (~$0.07) | ~100 sats/step (~$0.07) |
-| **Steps per product** | 4-6 | 4-8 | 3-5 |
-| **Total verification cost** | $0.28-0.42/product | $0.28-0.56/product | $0.21-0.35/product |
-| **ROI** | 100-1,000x | 1,000-100,000x | 500-50,000x |
-
-At current Bitcoin prices (~$70,000), 100 sats is approximately $0.07 USD. A full 4-step coffee supply chain verification costs under $0.30 — less than 0.1% of the retail price of specialty coffee ($15-30/bag).
-
-### Why this works economically
-
-1. **Proof cost is near-zero** compared to fraud cost. Cryptographic verification on commodity hardware costs fractions of a cent.
-2. **Cashu HTLC eliminates escrow counterparty risk**. No bank, no PayPal, no intermediary taking 2-5% — just math.
-3. **Nostr relay hosting is cheap**. A single relay can store millions of supply chain events for under $20/month.
-4. **C2PA cameras are shipping now**. Samsung, Sony, Nikon, and Leica all ship C2PA-capable devices. ProofMode (Guardian Project) makes any Android phone a C2PA camera.
-
-## Running the Demo
-
-### Prerequisites
-
-- [Deno](https://deno.land/) v2+
-
-### Run the coffee demo
-
-```bash
-deno task demo:coffee
-```
-
-This runs a simulated coffee supply chain (Sao Paulo -> Santos -> Kawasaki -> Shibuya) with pre-populated proofs and prints a full verification report.
-
-### Example output
-
-```
-  Supply Chain Proof — Coffee Demo
-  Sao Paulo -> Santos -> Kawasaki -> Shibuya
-
-  [ORIGIN    ] Coffee Farm, Sao Paulo, Brazil
-    Actor:  Fazenda Boa Vista
-    Proofs: gps_photo, c2pa_media
-
-  [TRANSPORT ] Port of Santos, Brazil
-    Actor:  Santos Export Co.
-    Proofs: tlsn_api
-
-  [PROCESSING] Roastery, Kawasaki, Japan
-    Actor:  Tokyo Roast Lab
-    Proofs: gps_photo, tlsn_api
-
-  [RETAIL    ] Cafe, Shibuya, Tokyo, Japan
-    Actor:  Shibuya Coffee Stand
-    Proofs: gps_photo
-
-  Trust Score:    100/100
-  Chain Intact:   YES
-  Time Ordered:   YES
-  Sats Released:  11,000
-```
-
-## Files
-
-- **src/supply-chain-types.ts** — Type definitions for supply chain steps, proofs, products, requirements, and verification reports
-- **src/chain-verifier.ts** — Verification engine: checks proofs, chain integrity, time ordering, and calculates trust scores
-- **src/demo-coffee.ts** — Runnable demo tracing a coffee lot from a Sao Paulo farm to a Shibuya cafe
-- **deno.json** — Deno configuration with tasks
-
-## How This Maps to Anchr's Core
-
-| Example Module | Anchr Core Module | Purpose |
-|---|---|---|
-| `StepProof.gps_photo` | `GpsCoord` + `haversineKm()` in `src/domain/` | GPS proximity verification |
-| `StepProof.c2pa_media` | C2PA validation in `src/infrastructure/verification/` | Content Credential chain verification |
-| `StepProof.tlsn_api` | `TlsnVerifiedData` + oracle in `src/infrastructure/oracle/` | TLSNotary MPC-TLS proof verification |
-| `PaymentCondition` | `EscrowInfo` + Cashu in `src/infrastructure/` | Conditional HTLC payment release |
-| `nostr_event_id` | Nostr relay integration in `src/infrastructure/` | Decentralized audit log |
+- [`docs/architecture.md`](../../docs/architecture.md) — Anchr's two trust shapes (Bounty, Market) at the protocol level
+- [`packages/cashu-conditional-swap/README.md`](../../packages/cashu-conditional-swap/README.md) — bilateral cross-lock primitive
+- [`packages/photo-bounty/`](../../packages/photo-bounty/) — C2PA + GPS verification primitives
+- [`packages/tlsn-toolkit/`](../../packages/tlsn-toolkit/) — TLSNotary verification primitives

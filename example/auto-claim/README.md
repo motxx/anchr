@@ -1,6 +1,11 @@
 # Auto-Claim
 
+> **Uses:** `anchr-sdk` + `@anchr/core-runtime` → reference server (`@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap`).
+> **Pattern:** bounty (Insurer pays Claimant on verified TLSN proof of triggering event).
+
 "Install the extension. Browse normally. Money you're owed comes back automatically."
+
+> **Anchr role mapping.** The bounty creator (Insurer) is the **Requester**; the **Claimant** — anyone owed money under that policy — is the **Worker** who proves the trigger occurred. The Oracle verifies and releases the HTLC.
 
 > The browser extension is the target UX. The demo below runs the same agent logic as a Deno script — no extension is shipping yet.
 
@@ -107,4 +112,4 @@ No code changes needed — only the bounty definition changes.
 | How you earn | Click ads, fill surveys | **Browse normally** |
 | Who pays | Advertisers | **Entities that already owe you** |
 | Trust model | Platform self-reports | **TLSNotary proof** |
-| User effort | Active tasks | **Zero** (extension handles it) |
+| Claimant effort | Active tasks | **Zero** (extension handles it) |

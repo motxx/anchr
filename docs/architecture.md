@@ -45,3 +45,97 @@ are tracked. API stability is not yet guaranteed.
   [`packages/tlsn-toolkit/SPEC.md`](../packages/tlsn-toolkit/SPEC.md)).
 - Threat-model invariants and the attack tests pinning them are in
   [`docs/threat-model.md`](threat-model.md).
+
+## Composition patterns
+
+Anchr is a set of independent packages that compose into different
+patterns depending on the use case. Three patterns are demonstrated in
+`example/`. The first two share the same invariant — **the Cashu Mint
+is the only party that moves money; the Oracle only reveals secrets** —
+the third skips Cashu entirely.
+
+### Bounty (asymmetric: one buyer, competing workers)
+
+A Requester locks payment in escrow and competing Workers race to
+fulfill the query. The Oracle verifies the submitted proof and reveals
+the preimage that lets the winning Worker redeem.
+
+```mermaid
+sequenceDiagram
+  participant C as Requester
+  participant W as Worker
+  participant M as Cashu Mint
+  participant O as Oracle
+  C->>M: lock proofs<br/>HTLC: hash + P2PK + refund + locktime
+  C->>W: NIP-90 query (over Nostr)
+  W->>W: fetch + produce proof
+  W->>O: submit proof for verification
+  alt proof valid
+    O-->>W: reveal preimage
+    W->>M: redeem (preimage + W's sig)
+    M-->>W: payout
+  else timeout (Oracle silent)
+    Note over C,M: locktime expires
+    C->>M: refund (C's refund sig)
+  end
+```
+
+Used by: query/data examples (C2PA, supply-chain, auto-claim, fiat-swap).
+
+### Market (symmetric: two counterparties, matched bilaterally)
+
+Two bettors take opposite sides of a binary outcome. A matchmaker pairs
+them but never touches funds. Each bettor performs a **bilateral
+cross-lock** at the Mint: their tokens are locked under the
+*counterparty's* pubkey and the *opposite outcome's* hash. The Oracle
+reveals one preimage (or FROST signature) — the winner uses it plus
+their own signature to redeem the loser's locked token.
+
+```mermaid
+flowchart LR
+  Maker -->|YES order| OB[Matchmaker<br/>order book]
+  Taker -->|NO order| OB
+  OB -.match announcement.-> Maker
+  OB -.match announcement.-> Taker
+  Maker -->|cross-lock proofs<br/>hashlock_b + P2PK_taker| Mint[(Cashu Mint)]
+  Taker -->|cross-lock proofs<br/>hashlock_a + P2PK_maker| Mint
+  Oracle -->|reveal preimage<br/>or FROST sig| Winner((Winner))
+  Winner -->|redeem<br/>preimage + own sig| Mint
+  Mint -->|payout| Winner
+```
+
+Used by: prediction-market (`example/prediction-market/`). Imports
+`@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` directly
+(no SDK).
+
+### Verification-only chain (no Cashu)
+
+Some use cases want Anchr's verification primitives without on-protocol
+settlement. A multi-hop evidence chain — supply-chain audit, news
+provenance, document authenticity — uses `photo-bounty` and
+`tlsn-toolkit` to produce per-hop attestations linked through Nostr,
+but settlement happens off-protocol (typically fiat invoices in
+supply-chain finance, or no settlement at all in pure audit chains).
+
+```mermaid
+flowchart LR
+  Hop1[Step 1<br/>Worker A] -->|C2PA + GPS proof| O1[Oracle verify]
+  Hop2[Step 2<br/>Worker B] -->|TLSN API proof| O2[Oracle verify]
+  Hop3[Step 3<br/>Worker C] -->|C2PA + TLSN proof| O3[Oracle verify]
+  O1 -->|Nostr event| Log[(Nostr event log<br/>chain audit trail)]
+  O2 -->|Nostr event| Log
+  O3 -->|Nostr event| Log
+  Hop1 -.fiat or off-protocol settlement.- Hop2
+  Hop2 -.fiat or off-protocol settlement.- Hop3
+```
+
+Used by: supply-chain-proof (`example/supply-chain-proof/`). Designed
+to use `@anchr/photo-bounty` + `@anchr/tlsn-toolkit`; **does not use**
+`cashu-conditional-swap`.
+
+**Why the three-way distinction matters**: it makes Anchr's umbrella
+nature explicit. Bounty and Market are settlement compositions
+(payment is on-protocol via Cashu); Verification-only is a
+non-settlement composition (Anchr provides only the verification
+layer). Future use cases will likely be variations on these three
+shapes, mixing the same primitives differently.

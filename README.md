@@ -42,10 +42,12 @@ Worker   ─ redeems ────────► Requester gets the data
 ```
 
 1. **Requester** posts a query and locks payment in a Cashu HTLC.
-2. **Worker** discovers the query over Nostr (NIP-90 DVM), fetches the
-   data, and produces a cryptographic proof. The proof type depends on
-   the data source: TLSNotary for HTTPS responses, C2PA for photos,
-   ProofMode for mobile capture, GPS for location.
+2. **Worker** discovers the query over Nostr (NIP-90 DVM), gathers the
+   data, and either generates a cryptographic proof (TLSNotary on
+   HTTPS responses) or relays an attestation produced upstream by a
+   signing device (C2PA from a hardware-signed camera, ProofMode from
+   an attested mobile capture). GPS coordinates inside a C2PA EXIF
+   assertion are verified within the same proof.
 3. **Oracle** verifies the proof. If valid, it releases the HTLC
    preimage; for high-value queries, t-of-n independent oracles each
    sign in parallel via FROST and a single party can't release alone.
@@ -81,7 +83,7 @@ const result = await anchr.query({
 
 console.log(result.verified);   // true
 console.log(result.data);       // { bitcoin: { usd: 71000 } }
-console.log(result.serverName); // "api.coingecko.com" — cryptographically verified
+console.log(result.serverName); // "api.coingecko.com" — TLS session cryptographically bound to this server name (does not assert the data is "true")
 console.log(result.proof);      // base64 TLSNotary presentation, independently verifiable
 ```
 
@@ -105,23 +107,47 @@ commands and the quality bar live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Built with it
 
-Six runnable applications under [`example/`](example/). Each ships in CI.
+Six examples under [`example/`](example/) — five runnable, one a
+conceptual sketch. All are exercised in CI.
 
 | Example | What it shows |
 |---|---|
-| [Prediction market (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Pool-bet on real-world outcomes (e.g. "Will BTC clear $100k by year-end?") with non-custodial payouts settled by oracle attestation. |
+| [Prediction market (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Bilateral binary bets matched 1:1 via cross-lock, non-custodial payouts settled by oracle attestation. |
 | [Auto-claim](example/auto-claim/) | "Install the extension. Browse normally. Money you're owed comes back automatically." |
-| [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are. |
-| [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; Anchr swaps the proof for BTC trustlessly. |
-| [C2PA photo verification](example/c2pa-media-verification/) | News desks pay sats for photos that prove "real camera, real time, real location" via Content Credentials. |
-| [Supply-chain proof](example/supply-chain-proof/) | GPS + C2PA + ProofMode evidence that a shipment was at a specific location at a specific time. |
+| [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — proves Web2 attributes without persisting the underlying credential. |
+| [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; the Cashu HTLC releases BTC against that proof. |
+| [C2PA photo verification](example/c2pa-media-verification/) | News desks pay sats for photos that carry hardware-signed Content Credentials (camera, timestamp, GPS) plus an AI-generation heuristic. |
+| [Supply-chain proof](example/supply-chain-proof/) | Conceptual sketch: how Anchr's primitives compose recursively along a multi-hop supply chain, plus what they cannot solve alone. |
 
-## Inside
+## The pieces
 
-Seven independently typecheckable packages on top of a Hono / Deno
-reference server, plus Rust crates for the TLSNotary and FROST primitives.
-See [`docs/architecture.md`](docs/architecture.md) for layout, package
-responsibilities, and implementation status.
+Anchr is **independently usable packages**. Most users only need the
+canonical composition above — but each piece can be picked up
+standalone for other patterns:
+
+| Package | Purpose | Used by |
+|---|---|---|
+| [`packages/photo-bounty`](packages/photo-bounty/) | C2PA + GPS + ProofMode + EXIF + AI heuristic | c2pa-media, supply-chain |
+| [`packages/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary verification (replay-protected, ReDoS-safe) | auto-claim, airdrop, fiat-swap, supply-chain |
+| [`packages/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Bilateral cross-lock for binary outcomes (HTLC + FROST P2PK) | prediction-market, fiat-swap, auto-claim, airdrop |
+| [`packages/cashu-frost-oracle`](packages/cashu-frost-oracle/) | FROST t-of-n threshold signing wrapper | prediction-market |
+| [`packages/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow + preimage store | (used by conditional-swap) |
+| [`packages/core-runtime`](packages/core-runtime/) | Bun ↔ Deno compatibility helpers | (used by host server) |
+| [`packages/sdk`](packages/sdk/) | High-level HTTP / MCP client for the canonical bounty flow | c2pa-media, auto-claim, fiat-swap |
+
+Plus Rust crates (`crates/frost-signer`, `crates/tlsn-*`) for the
+underlying primitives. See [`docs/architecture.md`](docs/architecture.md)
+for layer dependencies and composition patterns.
+
+## Other compositions
+
+The bounty flow is the canonical use, but Anchr's packages can be
+combined differently:
+
+- **Bilateral market** ([`prediction-market`](example/prediction-market/)) — two counterparties cross-lock at the Mint, an Oracle reveals the winning outcome via preimage or FROST signature. *No external data fetch — the bettors are the data source.* Uses `cashu-conditional-swap` + `cashu-frost-oracle` directly, no SDK.
+- **Verification-only chain** ([`supply-chain-proof`](example/supply-chain-proof/)) — multi-hop evidence chain using `photo-bounty` + `tlsn-toolkit` only. *No Cashu HTLC — settlement is off-protocol (typically fiat invoices).* Anchr's value here is the verifiable evidence chain, not the BTC flow.
+
+Detail in [`docs/architecture.md`](docs/architecture.md).
 
 ## Reference
 

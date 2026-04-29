@@ -4,6 +4,9 @@
 
 **Airdrop bot shield.**
 
+> **Uses:** `@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap` (designed; current code is a simulation).
+> **Pattern:** bounty (Project pays each verified Claimant on TLSN-attested Web2 attribute).
+
 TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are.
 
 ## Problem
@@ -40,6 +43,21 @@ Anchr's TLSNotary proof system lets airdrop claimants cryptographically prove at
 3. VERIFIED CLAIM releases tokens via Cashu HTLC
    Oracle verifies proof → releases preimage → claimant redeems escrowed tokens
 ```
+
+```mermaid
+flowchart LR
+  Dist[Distributor] -->|① lock budget<br/>per-claim HTLC pool| Mint[(Cashu Mint)]
+  Dist -.publish criteria.-> Recipient
+  Recipient -->|② TLSNotary proof of attribute<br/>e.g. GitHub age > 1y| Oracle
+  Oracle -->|③ verify + reveal preimage| Recipient
+  Recipient -->|④ redeem<br/>preimage + own sig| Mint
+  Mint -->|sats| Recipient
+```
+
+The Oracle never holds budget; the Mint releases tokens only against a
+preimage the Distributor pre-committed at lock time. If the Oracle goes
+silent or the Distributor walks away, the Distributor recovers the pool
+via the locktime refund path.
 
 ### Supported Proof Types
 
