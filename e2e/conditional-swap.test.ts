@@ -35,7 +35,7 @@ import {
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { createOrderBook } from "../example/prediction-market/src/order-book.ts";
+import { createInMemoryOrderBook } from "../example/prediction-market/src/order-book.ts";
 import { resolveMarket } from "../example/prediction-market/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
 import type { OpenOrder, MatchProposal, MatchedBetPair } from "../example/prediction-market/src/market-types.ts";
@@ -163,7 +163,7 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
   // Shared state across the lifecycle tests
   const marketId = "market_btc_100k_2026";
   const dualStore = createDualPreimageStore();
-  const orderBook = createOrderBook();
+  const orderBook = createInMemoryOrderBook();
 
   let yesBettor: { secretKey: string; publicKey: string };
   let noBettor: { secretKey: string; publicKey: string };
@@ -227,7 +227,7 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
   // Step 3: Both place orders in the order book
   // -------------------------------------------------------------------------
 
-  test("3. both bettors place orders in the order book (YES and NO)", () => {
+  test("3. both bettors place orders in the order book (YES and NO)", async () => {
     const yesOrder: OpenOrder = {
       id: "order_yes_1",
       market_id: marketId,
@@ -248,15 +248,15 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
       timestamp: Date.now() + 1, // slightly after YES order
     };
 
-    const addedYes = orderBook.addOrder(yesOrder);
-    const addedNo = orderBook.addOrder(noOrder);
+    const addedYes = await orderBook.addOrder(yesOrder);
+    const addedNo = await orderBook.addOrder(noOrder);
 
     expect(addedYes.remaining_sats).toBe(BET_SATS);
     expect(addedNo.remaining_sats).toBe(BET_SATS);
 
     // Verify orders appear in the book
-    const yesOrders = orderBook.getOpenOrders(marketId, "yes");
-    const noOrders = orderBook.getOpenOrders(marketId, "no");
+    const yesOrders = await orderBook.getOpenOrders(marketId, "yes");
+    const noOrders = await orderBook.getOpenOrders(marketId, "no");
     expect(yesOrders).toHaveLength(1);
     expect(noOrders).toHaveLength(1);
   });
@@ -265,8 +265,8 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
   // Step 4: Order book matches them -> MatchProposal
   // -------------------------------------------------------------------------
 
-  test("4. order book matches YES and NO orders into MatchProposal", () => {
-    matchProposals = orderBook.matchOrders(marketId);
+  test("4. order book matches YES and NO orders into MatchProposal", async () => {
+    matchProposals = await orderBook.matchOrders(marketId);
 
     expect(matchProposals).toHaveLength(1);
     expect(matchProposals[0]!.yes_order_id).toBe("order_yes_1");
@@ -274,8 +274,8 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
     expect(matchProposals[0]!.amount_sats).toBe(BET_SATS);
 
     // After matching, remaining_sats should be 0
-    const yesOrders = orderBook.getOpenOrders(marketId, "yes");
-    const noOrders = orderBook.getOpenOrders(marketId, "no");
+    const yesOrders = await orderBook.getOpenOrders(marketId, "yes");
+    const noOrders = await orderBook.getOpenOrders(marketId, "no");
     // Orders with 0 remaining are excluded from getOpenOrders
     expect(yesOrders.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
     expect(noOrders.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
@@ -441,12 +441,12 @@ suite("e2e: the conditional-swap spec — Conditional Swap full prediction marke
 suite("e2e: the conditional-swap spec — Order book partial matching", () => {
   const wallet = sharedWallet!;
 
-  test("order book handles partial matches correctly", () => {
-    const ob = createOrderBook();
+  test("order book handles partial matches correctly", async () => {
+    const ob = createInMemoryOrderBook();
     const marketId = "market_partial_test";
 
     // YES bettor bets 100 sats, two NO bettors bet 40 and 60 sats
-    ob.addOrder({
+    await ob.addOrder({
       id: "big_yes",
       market_id: marketId,
       bettor_pubkey: "pk_yes",
@@ -455,7 +455,7 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       remaining_sats: 100,
       timestamp: 1,
     });
-    ob.addOrder({
+    await ob.addOrder({
       id: "small_no_1",
       market_id: marketId,
       bettor_pubkey: "pk_no_1",
@@ -464,7 +464,7 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       remaining_sats: 40,
       timestamp: 2,
     });
-    ob.addOrder({
+    await ob.addOrder({
       id: "small_no_2",
       market_id: marketId,
       bettor_pubkey: "pk_no_2",
@@ -474,7 +474,7 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       timestamp: 3,
     });
 
-    const proposals = ob.matchOrders(marketId);
+    const proposals = await ob.matchOrders(marketId);
 
     // Should produce two match proposals
     expect(proposals).toHaveLength(2);
