@@ -493,7 +493,7 @@ describe("Market API: matching", () => {
     await placeBet(app, marketId, "no", 50, "bob");
 
     // alice's order fully matched, charlie's still open
-    const openOrders = state.orderBook.getOpenOrders(marketId, "yes");
+    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
     expect(openOrders).toHaveLength(1);
     expect(openOrders[0]!.remaining_sats).toBe(50);
   });
@@ -549,7 +549,7 @@ describe("Market API: matching", () => {
     expect(body.market.yes_pool_sats).toBe(0);
 
     // Order is gone from the book.
-    const openOrders = state.orderBook.getOpenOrders(marketId, "yes");
+    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
     expect(openOrders).toHaveLength(0);
   });
 
@@ -565,7 +565,7 @@ describe("Market API: matching", () => {
     expect(cancelRes.status).toBe(403);
 
     // Order remains in the book.
-    const openOrders = state.orderBook.getOpenOrders(marketId, "yes");
+    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
     expect(openOrders).toHaveLength(1);
   });
 

@@ -28,6 +28,7 @@
     "npm:lucide-react@0.577": "0.577.0_react@19.2.4",
     "npm:nostr-tools@2": "2.23.3",
     "npm:playwright@^1.58.0": "1.59.1",
+    "npm:postgres@3": "3.4.9",
     "npm:puppeteer@24": "24.40.0_devtools-protocol@0.0.1581282",
     "npm:radix-ui@1": "1.4.3_react@19.2.4_react-dom@19.2.4__react@19.2.4",
     "npm:react-dom@19": "19.2.4_react@19.2.4",
@@ -2140,6 +2141,9 @@
       ],
       "bin": true
     },
+    "postgres@3.4.9": {
+      "integrity": "sha512-GD3qdB0x1z9xgFI6cdRD6xu2Sp2WCOEoe3mtnyB5Ee0XrrL5Pe+e4CCnJrRMnL1zYtRDZmQQVbvOttLnKDLnaw=="
+    },
     "progress@2.0.3": {
       "integrity": "sha512-7PiHtLll5LdnKIMw100I+8xJXR5gW2QwWYkT6iJva0bXitZKa/XMrSbdmg3r2Xnaidz9Qumd0VPaMrZlF9V9sA=="
     },
@@ -2636,6 +2640,7 @@
       "npm:lucide-react@0.577",
       "npm:nostr-tools@2",
       "npm:playwright@^1.58.0",
+      "npm:postgres@3",
       "npm:puppeteer@24",
       "npm:radix-ui@1",
       "npm:react-dom@19",

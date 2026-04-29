@@ -19,7 +19,7 @@ import type {
   MatchedBetPair,
   MarketStatus,
 } from "./market-types.ts";
-import { createOrderBook, type OrderBook } from "./order-book.ts";
+import { createInMemoryOrderBook, type OrderBook } from "./order-book.ts";
 import {
   type DualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
@@ -120,6 +120,8 @@ export function createMarketState(opts?: {
   nostrIdentity?: MarketIdentity;
   nostrRelays?: string[];
   publishMarket?: MarketState["publishMarket"];
+  /** Inject a Postgres-backed (or other) order book. Defaults to in-memory. */
+  orderBook?: OrderBook;
 }): MarketState {
   const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
   return {
@@ -131,7 +133,7 @@ export function createMarketState(opts?: {
     pendingExchangeTokens: new Map(),
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
-    orderBook: createOrderBook(),
+    orderBook: opts?.orderBook ?? createInMemoryOrderBook(),
     frostMode,
     frostConfig: opts?.frostConfig,
     nostrIdentity: opts?.nostrIdentity,
@@ -371,13 +373,13 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // GET /markets/:id — market detail
   // -----------------------------------------------------------------------
 
-  mkt.get("/:id", (c) => {
+  mkt.get("/:id", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
     const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
-    const openOrders = s.orderBook.getOpenOrders(id);
+    const openOrders = await s.orderBook.getOpenOrders(id);
     const matchedPairs = Array.from(s.matchedPairs.values()).filter((b) => b.market_id === id);
 
     // If a pubkey is provided, include that user's matched pairs with win status
@@ -606,7 +608,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       remaining_sats: amount_sats,
       timestamp: Math.floor(Date.now() / 1000),
     };
-    s.orderBook.addOrder(order);
+    await s.orderBook.addOrder(order);
 
     // Update market pool totals
     if (side === "yes") {
@@ -616,15 +618,15 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     // Snapshot order pubkeys BEFORE matching (matching may zero remaining_sats)
-    const allYes = s.orderBook.getOpenOrders(id, "yes");
-    const allNo = s.orderBook.getOpenOrders(id, "no");
+    const allYes = await s.orderBook.getOpenOrders(id, "yes");
+    const allNo = await s.orderBook.getOpenOrders(id, "no");
     const orderPubkeys = new Map<string, string>();
     for (const o of [...allYes, ...allNo]) {
       orderPubkeys.set(o.id, o.bettor_pubkey);
     }
 
     // Run matching — pure announcement, no token creation
-    const proposals = s.orderBook.matchOrders(id);
+    const proposals = await s.orderBook.matchOrders(id);
     const newPairs: MatchedBetPair[] = [];
 
     // Compute locktimes for the match response
@@ -1014,14 +1016,16 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // GET /markets/:id/orders — open orders for a market
   // -----------------------------------------------------------------------
 
-  mkt.get("/:id/orders", (c) => {
+  mkt.get("/:id/orders", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
     if (!s.markets.has(id)) return c.json({ error: "Market not found" }, 404);
 
-    const side = c.req.query("side") as "yes" | "no" | undefined;
-    const orders = s.orderBook.getOpenOrders(id, side);
+    const sideParam = c.req.query("side");
+    const side: "yes" | "no" | undefined =
+      sideParam === "yes" || sideParam === "no" ? sideParam : undefined;
+    const orders = await s.orderBook.getOpenOrders(id, side);
 
     return c.json(
       orders.map((o) => ({
@@ -1065,7 +1069,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
     // Look up the order to enforce ownership and recover the unmatched
     // amount we owe back to the pool aggregates.
-    const orders = s.orderBook.getOpenOrders(id);
+    const orders = await s.orderBook.getOpenOrders(id);
     const order = orders.find((o) => o.id === orderId);
     if (!order) return c.json({ error: "Order not found or already filled" }, 404);
     if (order.bettor_pubkey !== bettorPubkey) {
@@ -1082,7 +1086,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       market.no_pool_sats = Math.max(0, market.no_pool_sats - refundedSats);
     }
 
-    const removed = s.orderBook.cancelOrder(orderId);
+    const removed = await s.orderBook.cancelOrder(orderId);
     if (!removed) return c.json({ error: "Order not found or already filled" }, 404);
 
     return c.json({

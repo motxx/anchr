@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { createOrderBook, type OrderBook } from "./order-book.ts";
+import { createInMemoryOrderBook, type OrderBook } from "./order-book.ts";
 import { createDualPreimageStore, type DualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import type { DualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
@@ -87,7 +87,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
   const state: MarketApiState = {
     markets: new Map(),
     bets: new Map(),
-    orderBook: createOrderBook(),
+    orderBook: createInMemoryOrderBook(),
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
     mode,

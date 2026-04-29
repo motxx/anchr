@@ -24,6 +24,7 @@
     "@std/testing/mock": "jsr:@std/testing@^1/mock",
     "@std/expect": "jsr:@std/expect@^1",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
+    "postgres": "npm:postgres@^3",
     "nostr-tools": "npm:nostr-tools@^2",
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",
     "nostr-tools/filter": "npm:nostr-tools@^2/filter",

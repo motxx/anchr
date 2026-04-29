@@ -15,9 +15,11 @@
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "nostr-tools": "npm:nostr-tools@^2",
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
-    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3"
+    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
+    "postgres": "npm:postgres@^3"
   },
   "tasks": {
-    "demo": "deno run --allow-all src/demo.ts"
+    "demo": "deno run --allow-all src/demo.ts",
+    "migrate": "psql \"$DATABASE_URL\" -f migrations/001_create_orders.sql"
   }
 }

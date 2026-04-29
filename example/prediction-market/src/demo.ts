@@ -22,7 +22,7 @@ import {
   buildFrostSwapForPartyB,
   createDualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
-import { createOrderBook } from "./order-book.ts";
+import { createInMemoryOrderBook } from "./order-book.ts";
 import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,
@@ -130,7 +130,7 @@ console.log(`  Deadline:       ${new Date(RESOLUTION_DEADLINE * 1000).toISOStrin
 
 console.log("\n--- Step 3: Bettors place orders via order book ---\n");
 
-const orderBook = createOrderBook();
+const orderBook = createInMemoryOrderBook();
 
 const aliceOrder: OpenOrder = {
   id: bytesToHex(randomBytes(16)),
@@ -152,12 +152,12 @@ const bobOrder: OpenOrder = {
   timestamp: Math.floor(Date.now() / 1000),
 };
 
-orderBook.addOrder(aliceOrder);
-orderBook.addOrder(bobOrder);
+await orderBook.addOrder(aliceOrder);
+await orderBook.addOrder(bobOrder);
 
 console.log("  Alice (YES): 100 sats");
 console.log("  Bob   (NO):  100 sats");
-console.log(`  Open orders: ${orderBook.getOpenOrders(marketId).length}`);
+console.log(`  Open orders: ${(await orderBook.getOpenOrders(marketId)).length}`);
 
 // ============================================================
 // Step 4: Order book matches → Cross-HTLC
@@ -165,7 +165,7 @@ console.log(`  Open orders: ${orderBook.getOpenOrders(marketId).length}`);
 
 console.log("\n--- Step 4: Order book matching + FROST P2PK ---\n");
 
-const matches = orderBook.matchOrders(marketId);
+const matches = await orderBook.matchOrders(marketId);
 console.log(`  Matches found: ${matches.length}`);
 
 for (const m of matches) {
