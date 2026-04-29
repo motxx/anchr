@@ -35,6 +35,40 @@ docs/                          Implementation guides + threat model
 Active development; baseline tests are green and threat-model invariants
 are tracked. API stability is not yet guaranteed.
 
+## Attachment registry (Blossom integration)
+
+The reference host bundles a Blossom client (`src/infrastructure/blossom/`,
+~540 LOC) as the **encrypted attachment registry** for proofs that
+don't fit in Nostr events. Without it, the canonical bounty flow can
+still carry small inline data, but anything photo-sized, large TLSN
+presentations, or ProofMode bundles needs an out-of-event store.
+
+What it provides:
+
+- **Content-addressed storage** — SHA-256 of ciphertext is the address;
+  same content has the same hash on any Blossom server
+- **Server-blind encryption** — AES-256-GCM with random per-blob key
+  and IV; Blossom servers see only ciphertext
+- **Key delivery via NIP-44** — the decryption key is encrypted to the
+  Oracle and the Requester (per `blossom_keys` field in the QueryResponse
+  payload, see [`specs/messaging.md`](../specs/messaging.md))
+- **Multi-server redundancy** — `blossom_servers` lists every server
+  the blob was uploaded to; download tries them in order
+
+Used by every example that ships large proof bytes (c2pa-media,
+fiat-swap, the e2e regtest tests). Future verification-only chains
+(royalty distribution, supply-chain) will store per-edge TLSN
+presentations the same way, so anyone holding the chain's product /
+content ID can later fetch the proof bytes from Blossom and re-verify
+without privileged access.
+
+**Pluggability:** the wire spec uses `storage_kind: "blossom" | "external"`,
+so a host can implement an alternative attachment backend (S3, IPFS,
+custom) and stay protocol-compatible. The reference host's choice is
+Blossom because it is content-addressed, NIP-44-friendly, and already
+deployed in the Nostr ecosystem. Spec details:
+[`docs/host-storage.md`](host-storage.md).
+
 ## Specs and threat model
 
 - Wire-format specs (Nostr DVM messaging, conditional-swap primitive,

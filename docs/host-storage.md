@@ -1,9 +1,18 @@
-# Host: Encrypted Blob Storage via Blossom
+# Attachment Registry — Blossom Integration
 
-> **Scope:** the reference host server in `src/infrastructure/blossom/`.
-> Blossom itself is specified externally in [BUD-01–06](https://github.com/hzrd149/blossom).
-> This document describes how the host wires Blossom together with NIP-44
-> key delivery — not a re-spec of Blossom.
+> **Role.** The encrypted attachment registry for proofs and media
+> that don't fit in Nostr events (photos, large TLSN presentations,
+> ProofMode bundles). Used by every example that ships large proof
+> bytes; future verification-only chains (royalty distribution,
+> supply-chain) will store per-edge TLSN presentations here so the
+> chain remains independently re-verifiable from the audit trail.
+
+> **Scope.** This document describes the reference host's wiring
+> (`src/infrastructure/blossom/`) of Blossom + NIP-44 key delivery.
+> Blossom itself is specified externally in
+> [BUD-01–06](https://github.com/hzrd149/blossom); this is not a
+> re-spec. The protocol-level alternative `storage_kind: "external"`
+> lets a non-Blossom backend stay wire-compatible.
 
 ## Encryption Scheme
 

@@ -141,6 +141,18 @@ Plus Rust crates (`crates/frost-signer`, `crates/tlsn-*`) for the
 underlying primitives. See [`docs/architecture.md`](docs/architecture.md)
 for layer dependencies and composition patterns.
 
+The reference host also bundles an **attachment registry** at
+[`src/infrastructure/blossom/`](src/infrastructure/blossom/) — a Blossom
+([BUD-01–06](https://github.com/hzrd149/blossom)) integration that
+stores AES-256-GCM-encrypted proof attachments (photos, large TLSN
+presentations, ProofMode bundles) addressed by SHA-256 hash, with the
+decryption key delivered separately via NIP-44. Used wherever a proof
+exceeds the Nostr event size budget (c2pa-media, fiat-swap, future
+verification-only chains). The wire spec leaves `storage_kind` as
+`"blossom" | "external"` so alternative backends can be wired in;
+[`docs/host-storage.md`](docs/host-storage.md) documents the bundled
+choice.
+
 ## Other compositions
 
 The bounty flow is the canonical use, but Anchr's packages can be
