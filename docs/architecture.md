@@ -69,6 +69,15 @@ Blossom because it is content-addressed, NIP-44-friendly, and already
 deployed in the Nostr ecosystem. Spec details:
 [`docs/host-storage.md`](host-storage.md).
 
+The integration lives at `src/infrastructure/blossom/` rather than in
+its own package because every current consumer reaches it through the
+reference host — either via the HTTP routes (`/queries/:id/upload`,
+`/queries/:id/attachments`) or the SDK that wraps them. A future use
+case that wants the encrypted Blossom primitive without the
+surrounding bounty / oracle wiring — a standalone uploader publishing
+proofs directly to Blossom and a Nostr relay, for example — would be
+the natural moment to lift it into `packages/`.
+
 ## Specs and threat model
 
 - Wire-format specs (Nostr DVM messaging, conditional-swap primitive,
