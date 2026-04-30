@@ -158,6 +158,15 @@ serializes concurrent matchers correctly.
 | `DATABASE_URL` | unset | Postgres connection string. If unset, in-memory. |
 | `DATABASE_POOL_SIZE` | `10` | Max Postgres connections in the pool. |
 
+For local dev the `postgres` service in `docker-compose.yml` provisions a
+ready-to-use database (`postgres://anchr:anchr@localhost:5432/anchr_market`)
+and auto-applies the migration on first start. CI runs the regtest test
+suite with `DATABASE_URL` pointed at it, so both
+`prediction-market-orderbook-pg.test.ts` (direct PG order-book coverage:
+CRUD, FIFO, partial matches, concurrent `FOR UPDATE` matchers) and
+`prediction-market-lifecycle.test.ts` (full Cashu lifecycle on Postgres)
+exercise the production code path.
+
 ## Running
 
 ```bash

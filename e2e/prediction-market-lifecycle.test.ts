@@ -26,7 +26,7 @@
  *     deno test e2e/prediction-market-lifecycle.test.ts --allow-all
  */
 
-import { describe, test } from "@std/testing/bdd";
+import { afterAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
@@ -37,6 +37,11 @@ import {
   type MarketRouteContext,
   type MarketState,
 } from "../example/prediction-market/src/server-routes.ts";
+import {
+  createPostgresOrderBook,
+  type PostgresOrderBook,
+} from "../example/prediction-market/src/order-book-postgres.ts";
+import type { OrderBook } from "../example/prediction-market/src/order-book.ts";
 import { createLockedToken } from "../example/prediction-market/src/exchange-protocol.ts";
 import {
   checkInfraReady,
@@ -47,6 +52,7 @@ import {
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
+const DATABASE_URL = process.env.DATABASE_URL;
 const INFRA_READY = await checkInfraReady(MINT_URL);
 
 const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
@@ -92,7 +98,22 @@ async function expectJson<T>(res: Response, status: number): Promise<T> {
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
+// When DATABASE_URL is set we run the lifecycle against the Postgres-backed
+// OrderBook (the production code path). Otherwise we fall back to the
+// in-memory implementation, which is what `createMarketState()` defaults to.
+// Either way the test asserts the same external behavior.
+let pgOrderBook: PostgresOrderBook | undefined;
+async function buildOrderBook(): Promise<OrderBook | undefined> {
+  if (!DATABASE_URL) return undefined;
+  pgOrderBook = await createPostgresOrderBook({ connectionUrl: DATABASE_URL });
+  return pgOrderBook;
+}
+
 suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
+  afterAll(async () => {
+    if (pgOrderBook) await pgOrderBook.close();
+  });
+
   test("alice (YES) + bob (NO) bet → match → P2PK lock → YES resolve → alice signs proofs", async () => {
     // === Phase 1: Setup ===
     // Real secp256k1 pubkeys — cashu-ts' P2PKBuilder validates the key format
@@ -123,7 +144,13 @@ suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
     // Wire the in-process market server with a wallet so /submit-token can
     // decode real cashuB tokens. The market server only needs decode/verify,
     // not signing power, so an independent wallet handle is fine.
-    const state = createMarketState();
+    //
+    // When DATABASE_URL is set, the OrderBook is the Postgres-backed
+    // implementation — the same code path production uses — so this test
+    // exercises the full SQL stack (insert, partial-index scan, FOR UPDATE
+    // matching) on top of the Cashu/HTLC machinery.
+    const orderBook = await buildOrderBook();
+    const state = createMarketState({ orderBook });
     state.getCashuWallet = async () => serverWallet;
     const app = buildMarketApp(state);
 
