@@ -1,11 +1,28 @@
 # 巫(Kannagi)
 
-> *Kannagi* (神和ぎ) — "spirit-pacifying"; in folk religion, the medium who consults the oracle and pacifies the verdict. Here: a Bitcoin-native prediction market settled by oracle attestation.
+> *Kannagi* (神和ぎ) — "spirit-pacifying"; in folk religion, the medium who consults the oracle and pacifies the verdict. Here: a Bitcoin-native two-party bet settled by oracle attestation.
 
-**Prediction market.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
+**Two-party binary bet, settled by oracle attestation.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
 
 > **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
-> **Pattern:** bilateral market (two counterparties cross-lock; Oracle reveals outcome).
+> **Pattern:** two-party bet (two counterparties cross-lock; Oracle reveals outcome).
+
+> **What this is**
+> - Two-party binary bet with non-custodial settlement
+> - Oracle releases a single secret (HTLC preimage or FROST signature share);
+>   funds never enter the Oracle's wallet
+>
+> **What this is not**
+> - Not a Polymarket / Kalshi replacement — no CLOB, no continuous pricing
+> - Not tradable — once matched, positions are terminal until resolution
+>   or locktime refund
+> - Not multi-outcome — binary YES / NO only
+> - Not for subjective questions — only deterministic HTTPS conditions
+>
+> **Status: experimental.** Whether this primitive fits real
+> two-party betting, niche prediction questions, or conditional contracts is open.
+> See [What you can build](#what-you-can-build-with-this-primitive) for the
+> use cases the current primitive supports.
 
 > **Live testnet deploy:** <https://anchr-market.fly.dev>
 > Funds are testnut ecash — *not real BTC*. Do not bridge mainnet sats in.
@@ -17,6 +34,23 @@
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
 > the running UI live in [`docs/prediction-market/screenshots/`](../../docs/prediction-market/screenshots/).
+
+## What you can build with this primitive
+
+If a question can be decided by a single HTTPS GET, two parties can
+wager sats on it with no custodian holding the funds. Kannagi supports
+`jsonpath_gt`, `jsonpath_lt`, `jsonpath_equals`, and `contains_text` —
+anything that fits that shape works. Concrete examples:
+
+| Use case | Source | Condition | Example bet |
+|---|---|---|---|
+| Sports score | ESPN / sports-data JSON | `jsonpath_equals` / `contains_text` | "Team A wins the final" — resolve from box-score |
+| Project ship date | GitHub release API | `jsonpath_equals` | "Project X ships v1.0 before 2026-12-31" — resolve from `/releases/latest` |
+| Price cross | CoinGecko / exchange API | `jsonpath_gt` | "BTC > 15,000,000 JPY at 2026-12-31 12:00 UTC" — resolve from `/simple/price` |
+| Parametric insurance | Weather / flight-status API | `jsonpath_*` | "Flight ABC123 delayed > 60 min" — resolve from carrier JSON |
+
+For what the primitive does **not** support, see
+[Limitations](#limitations-of-the-current-primitive).
 
 ## Settlement model — funds are *not* held by the Oracle
 
@@ -124,14 +158,15 @@ stack).
 | `contains_text` | Response contains text | "winner: Team A" |
 | `jsonpath_equals` | JSON value = expected | `status` == "completed" |
 
-## Known constraints (versus Polymarket / Kalshi / Manifold)
+## Limitations of the current primitive
 
 | Item | Status |
 |---|---|
 | 1:1 matched orders only (no CLOB / arbitrary probability pricing) | Not implemented |
-| Secondary market — exit a position before resolution | Not implemented |
+| Secondary market — exit a position before resolution | Not implemented; once matched, the cross-lock binds redemption to specific pubkeys, so positions are terminal until resolution or locktime refund |
 | Multi-outcome markets (>2 outcomes) | Not implemented; binary YES / NO only |
 | Subjective resolution (UMA-style human dispute) | Not in scope; only deterministic HTTPS conditions |
+| Bookmaker-style 1:N matching | Not supported; current order book is FIFO 1:1 |
 
 ## Persistence
 

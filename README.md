@@ -113,7 +113,7 @@ conceptual sketches. All are exercised in CI.
 
 | Example | What it shows |
 |---|---|
-| [Prediction market (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Bilateral binary bets matched 1:1 via cross-lock, non-custodial payouts settled by oracle attestation. |
+| [Two-party binary bet (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Two-party binary bet settled by oracle attestation; experimental — 1:1 matching, no CLOB or position transfer. |
 | [Auto-claim](example/auto-claim/) | "Install the extension. Browse normally. Money you're owed comes back automatically." |
 | [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — proves Web2 attributes without persisting the underlying credential. |
 | [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; the Cashu HTLC releases BTC against that proof. |
@@ -158,7 +158,7 @@ choice.
 The bounty flow is the canonical use, but Anchr's packages can be
 combined differently:
 
-- **Bilateral market** ([`prediction-market`](example/prediction-market/)) — two counterparties cross-lock at the Mint, an Oracle reveals the winning outcome via preimage or FROST signature. *No external data fetch — the bettors are the data source.* Uses `cashu-conditional-swap` + `cashu-frost-oracle` directly, no SDK.
+- **Two-party bet** ([`prediction-market`](example/prediction-market/)) — two counterparties cross-lock at the Mint, an Oracle reveals the winning outcome via preimage or FROST signature. *Oracle fetches the resolution URL directly via TLSNotary — no separate Worker layer.* Uses `cashu-conditional-swap` + `cashu-frost-oracle` directly, no SDK.
 - **Verification-only chain** ([`supply-chain-proof`](example/supply-chain-proof/)) — multi-hop evidence chain using `photo-bounty` + `tlsn-toolkit` only. *No Cashu HTLC — settlement is off-protocol (typically fiat invoices).* Anchr's value here is the verifiable evidence chain, not the BTC flow.
 
 Detail in [`docs/architecture.md`](docs/architecture.md).
