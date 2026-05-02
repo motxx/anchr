@@ -112,6 +112,55 @@ export interface MarketState {
     identity: MarketIdentity,
     relayUrls: string[],
   ) => Promise<string>;
+  /**
+   * Override for exchange-token P2PK verification.
+   *
+   * Default: real `verifyReceivedToken` from `./exchange-protocol.ts`,
+   * which decodes the cashuB token and checks group pubkey, counterparty
+   * pubkey, amount, and locktime. Tests that exercise pair-storage logic
+   * without minting real proofs inject a stub that always returns
+   * `{ valid: true }`.
+   */
+  verifyExchangeToken?: (
+    cashuToken: string,
+    expected: {
+      groupPubkey: string;
+      myPubkey: string;
+      amount: number;
+      minLocktime: number;
+    },
+  ) => { valid: boolean; error?: string };
+}
+
+/**
+ * Production-default exchange-token verifier — decodes the cashuB token
+ * and runs `verifyReceivedToken` against the supplied expectations.
+ *
+ * Returns `{ valid: false, error }` on any decode failure or P2PK
+ * mismatch so the route can respond with a 400.
+ */
+function defaultVerifyExchangeToken(
+  cashuToken: string,
+  expected: {
+    groupPubkey: string;
+    myPubkey: string;
+    amount: number;
+    minLocktime: number;
+  },
+): { valid: boolean; error?: string } {
+  let decoded;
+  try {
+    decoded = getDecodedToken(cashuToken);
+  } catch (err) {
+    return {
+      valid: false,
+      error: `cashu_token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
+    };
+  }
+  if (!decoded.proofs || decoded.proofs.length === 0) {
+    return { valid: false, error: "cashu_token has no proofs" };
+  }
+  return verifyReceivedToken(cashuToken, expected);
 }
 
 /** Create a fresh MarketState. Used for tests and as default state. */
@@ -122,6 +171,8 @@ export function createMarketState(opts?: {
   publishMarket?: MarketState["publishMarket"];
   /** Inject a Postgres-backed (or other) order book. Defaults to in-memory. */
   orderBook?: OrderBook;
+  /** Inject a custom exchange-token verifier (tests use this). */
+  verifyExchangeToken?: MarketState["verifyExchangeToken"];
 }): MarketState {
   const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
   return {
@@ -139,6 +190,7 @@ export function createMarketState(opts?: {
     nostrIdentity: opts?.nostrIdentity,
     nostrRelays: opts?.nostrRelays ?? [],
     publishMarket: opts?.publishMarket,
+    verifyExchangeToken: opts?.verifyExchangeToken,
   };
 }
 
@@ -727,26 +779,39 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       : (market.group_pubkey_yes ?? "");
     const expectedCounterpartyPubkey = side === "yes" ? pair.no_pubkey : pair.yes_pubkey;
 
-    // Verify the token has correct P2PK conditions.
-    // Only verify if token looks like a real cashuB token (decodes successfully).
-    // In demo mode (no Cashu mint), tokens may be placeholder strings.
-    if (expectedGroupPubkey && cashu_token.startsWith("cashuB")) {
-      try {
-        const decoded = getDecodedToken(cashu_token);
-        if (decoded.proofs && decoded.proofs.length > 0) {
-          const verification = verifyReceivedToken(cashu_token, {
-            groupPubkey: expectedGroupPubkey,
-            myPubkey: expectedCounterpartyPubkey,
-            amount: pair.amount_sats,
-            minLocktime: market.resolution_deadline,
-          });
-
-          if (!verification.valid) {
-            return c.json({ error: `Token verification failed: ${verification.error}` }, 400);
-          }
-        }
-      } catch {
-        // Token doesn't decode as cashuB — demo mode, accept without deep verification
+    // Verify the token has correct P2PK conditions when the market is
+    // using a FROST-signed group pubkey (real Cashu deployment).
+    //
+    // When `expectedGroupPubkey` is empty, the market has no FROST group
+    // wired up — there is nothing meaningful to verify against, so we
+    // skip the check.
+    //
+    // When `expectedGroupPubkey` is set, the token MUST decode as a real
+    // cashuB token and pass deep P2PK verification. We do NOT accept
+    // malformed tokens silently: that would let an attacker submit any
+    // string and bypass the P2PK + locktime + group-pubkey checks.
+    //
+    // Tests inject `state.verifyExchangeToken` with a stub when they
+    // exercise pair-storage without minting real proofs.
+    if (expectedGroupPubkey) {
+      if (!cashu_token.startsWith("cashuB")) {
+        return c.json(
+          { error: "cashu_token must be a real cashuB-encoded token" },
+          400,
+        );
+      }
+      const verifyFn = s.verifyExchangeToken ?? defaultVerifyExchangeToken;
+      const verification = verifyFn(cashu_token, {
+        groupPubkey: expectedGroupPubkey,
+        myPubkey: expectedCounterpartyPubkey,
+        amount: pair.amount_sats,
+        minLocktime: market.resolution_deadline,
+      });
+      if (!verification.valid) {
+        return c.json(
+          { error: `Token verification failed: ${verification.error}` },
+          400,
+        );
       }
     }
 

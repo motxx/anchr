@@ -30,7 +30,14 @@ import {
 const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
 
 function makeTestApp(state?: MarketState) {
-  const st = state ?? createMarketState();
+  // Tests exercise pair-storage logic with placeholder cashuB tokens that
+  // don't decode as real proofs. Inject a passthrough verifier so the
+  // route's P2PK check (added to close a demo-mode bypass) doesn't reject
+  // the test's fake tokens. Tests that exercise the verification path
+  // proper supply their own MarketState with the production verifier.
+  const st = state ?? createMarketState({
+    verifyExchangeToken: () => ({ valid: true }),
+  });
   // deno-lint-ignore no-explicit-any
   const app = new Hono<any>();
   const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
@@ -872,6 +879,65 @@ describe("Market API: submit-token", () => {
     expect(pair!.status).toBe("locked");
     expect(pair!.token_yes_to_no).toBe("cashuBfake_yes_token");
     expect(pair!.token_no_to_yes).toBe("cashuBfake_no_token");
+  });
+
+  test("submit-token rejects non-cashuB tokens when group pubkey is set (production verifier)", async () => {
+    // Build a state that uses the PRODUCTION verifier (no test stub).
+    // Existing makeTestApp injects a passthrough verifier; here we want
+    // the real one to confirm the demo-mode bypass is closed.
+    const state = createMarketState();
+    // deno-lint-ignore no-explicit-any
+    const app = new Hono<any>();
+    const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+    registerMarketRoutes(app, ctx, state);
+
+    const created = await createMarket(app);
+    const marketIdLocal = created.id as string;
+    // Force the market to look like it has a FROST group so the verifier
+    // path is taken (production paths set this from the FROST config).
+    const market = state.markets.get(marketIdLocal)!;
+    market.group_pubkey_yes =
+      "02" + "11".repeat(32);
+    market.group_pubkey_no =
+      "02" + "22".repeat(32);
+
+    await placeBet(app, marketIdLocal, "yes", 100, "alice");
+    const betJson = await placeBet(app, marketIdLocal, "no", 100, "bob");
+    const localPairId = betJson.matches[0]!.pair_id;
+
+    // Non-cashuB string must be rejected outright.
+    const res1 = await app.request(
+      `${BASE}/markets/${marketIdLocal}/submit-token`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pair_id: localPairId,
+          cashu_token: "(placeholder)",
+          bettor_pubkey: "alice",
+        }),
+      },
+    );
+    expect(res1.status).toBe(400);
+    const err1 = await res1.json() as { error: string };
+    expect(err1.error).toContain("cashuB");
+
+    // cashuB-prefixed but undecodable string must be rejected too.
+    const res2 = await app.request(
+      `${BASE}/markets/${marketIdLocal}/submit-token`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pair_id: localPairId,
+          cashu_token: "cashuBnot_a_real_token",
+          bettor_pubkey: "alice",
+        }),
+      },
+    );
+    expect(res2.status).toBe(400);
+    const err2 = await res2.json() as { error: string };
+    expect(err2.error).toContain("decode");
   });
 });
 
