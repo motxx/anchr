@@ -129,7 +129,7 @@ async function main() {
     tag: "market-server",
     cmd: [
       "deno", "run", "--allow-all", "--config", "deno.json",
-      "example/prediction-market/server.ts",
+      "example/two-party-binary-bet/server.ts",
     ],
     env: marketEnv,
   }));

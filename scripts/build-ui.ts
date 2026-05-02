@@ -14,7 +14,7 @@ import { copyFile, mkdir, readFile, writeFile, cp } from "node:fs/promises";
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
 const SRC_UI = join(PROJECT_ROOT, "src/ui");
 const DIST_UI = join(PROJECT_ROOT, "dist/ui");
-const MARKET_UI = join(PROJECT_ROOT, "example/prediction-market/ui");
+const MARKET_UI = join(PROJECT_ROOT, "example/two-party-binary-bet/ui");
 
 interface EntryPoint {
   name: string;

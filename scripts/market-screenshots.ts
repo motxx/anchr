@@ -36,7 +36,7 @@ const serverProc = new Deno.Command("deno", {
     "--config",
     join(PROJECT_ROOT, "deno.json"),
     "--allow-all",
-    join(PROJECT_ROOT, "example/prediction-market/server.ts"),
+    join(PROJECT_ROOT, "example/two-party-binary-bet/server.ts"),
   ],
   env: {
     "MARKET_PORT": String(PORT),

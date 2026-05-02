@@ -152,7 +152,7 @@ implementation — see each example's README for what runs today.
 |---|---|
 | Airdrop sybil resistance ([Katashiro](example/airdrop-bot-shield/)) | Simulation |
 | Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/)) | Testnet |
-| 2-party binary bet ([Kannagi](example/prediction-market/)) | Testnet |
+| 2-party binary bet ([Kannagi](example/two-party-binary-bet/)) | Testnet |
 | Browser auto-claim ([Auto-claim](example/auto-claim/)) | Concept |
 | Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Concept (TLSN-on-Square compatibility risk) |
 

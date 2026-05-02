@@ -29,14 +29,14 @@ import {
   createWallet,
   throttledMintProofs,
 } from "../../e2e/helpers/regtest.ts";
-import { createLockedToken } from "../../example/prediction-market/src/exchange-protocol.ts";
+import { createLockedToken } from "../../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   closeNip60Wallet,
   createNip60Wallet,
   loadProofs as loadNip60Proofs,
   publishProofs as publishNip60Proofs,
   type Nip60Wallet,
-} from "../../example/prediction-market/src/nip60.ts";
+} from "../../example/two-party-binary-bet/src/nip60.ts";
 
 export interface Nip60UserConfig {
   /** Server base URL, e.g. http://localhost:3001. */

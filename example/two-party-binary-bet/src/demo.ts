@@ -11,7 +11,7 @@
  *   6. Winner redeems loser's tokens with the preimage
  *
  * Usage:
- *   deno run --allow-all example/prediction-market/src/demo.ts
+ *   deno run --allow-all example/two-party-binary-bet/src/demo.ts
  */
 
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";

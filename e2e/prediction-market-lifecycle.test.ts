@@ -36,13 +36,13 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/prediction-market/src/server-routes.ts";
+} from "../example/two-party-binary-bet/src/server-routes.ts";
 import {
   createPostgresOrderBook,
   type PostgresOrderBook,
-} from "../example/prediction-market/src/order-book-postgres.ts";
-import type { OrderBook } from "../example/prediction-market/src/order-book.ts";
-import { createLockedToken } from "../example/prediction-market/src/exchange-protocol.ts";
+} from "../example/two-party-binary-bet/src/order-book-postgres.ts";
+import type { OrderBook } from "../example/two-party-binary-bet/src/order-book.ts";
+import { createLockedToken } from "../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
   createWallet,

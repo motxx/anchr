@@ -2,7 +2,7 @@ app = "anchr-market"
 primary_region = "sin"
 
 [build]
-  dockerfile = "example/prediction-market/Dockerfile"
+  dockerfile = "example/two-party-binary-bet/Dockerfile"
 
 [deploy]
   wait_timeout = "10m"

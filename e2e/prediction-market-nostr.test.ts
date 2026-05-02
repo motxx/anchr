@@ -23,13 +23,13 @@ import {
   publishMarket,
   discoverMarkets,
   type MarketIdentity,
-} from "../example/prediction-market/src/nostr-market.ts";
-import { createMarketHtlc } from "../example/prediction-market/src/market-oracle.ts";
+} from "../example/two-party-binary-bet/src/nostr-market.ts";
+import { createMarketHtlc } from "../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
   PredictionMarket,
   MarketResolution,
   BetEventContent,
-} from "../example/prediction-market/src/market-types.ts";
+} from "../example/two-party-binary-bet/src/market-types.ts";
 
 // ---------------------------------------------------------------------------
 // Relay connectivity

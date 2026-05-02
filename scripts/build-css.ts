@@ -32,8 +32,8 @@ const BUILDS: CssBuild[] = [
   },
   {
     label: "market",
-    input: join(PROJECT_ROOT, "example/prediction-market/ui/globals.css"),
-    output: join(PROJECT_ROOT, "example/prediction-market/ui/generated.css"),
+    input: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/globals.css"),
+    output: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/generated.css"),
   },
 ];
 

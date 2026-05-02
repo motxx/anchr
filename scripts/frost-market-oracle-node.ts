@@ -13,7 +13,7 @@
  */
 
 import { loadMarketFrostNodeConfigAsync } from "@anchr/cashu-frost-oracle/market-frost-config";
-import { buildMarketApiRoutes } from "../example/prediction-market/src/market-api-routes.ts";
+import { buildMarketApiRoutes } from "../example/two-party-binary-bet/src/market-api-routes.ts";
 
 const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "market-oracle";
 const ORACLE_PORT = Number(Deno.env.get("ORACLE_PORT")) || 4001;

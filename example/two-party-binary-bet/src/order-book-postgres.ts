@@ -2,7 +2,7 @@
  * PostgreSQL-backed order book for prediction-market FIFO matching.
  *
  * Schema lives in `migrations/001_create_orders.sql` (alongside this file's
- * directory in `example/prediction-market/migrations/`). Run that file
+ * directory in `example/two-party-binary-bet/migrations/`). Run that file
  * against your Postgres before pointing the server at `DATABASE_URL`.
  *
  * Concurrency model

@@ -178,11 +178,11 @@ matters, point the server at a Postgres database via `DATABASE_URL`:
 
 ```bash
 # 1. Create the schema (idempotent)
-psql "$DATABASE_URL" -f example/prediction-market/migrations/001_create_orders.sql
+psql "$DATABASE_URL" -f example/two-party-binary-bet/migrations/001_create_orders.sql
 
 # 2. Start the server with persistence on
 DATABASE_URL=postgres://user:pass@host:5432/anchr_market \
-  deno run --allow-all example/prediction-market/server.ts
+  deno run --allow-all example/two-party-binary-bet/server.ts
 ```
 
 When `DATABASE_URL` is unset, the server falls back to the in-memory book
@@ -208,13 +208,13 @@ exercise the production code path.
 
 ```bash
 # Demo (mock data)
-deno run --allow-all example/prediction-market/src/demo.ts
+deno run --allow-all example/two-party-binary-bet/src/demo.ts
 
 # Server
-deno run --allow-all example/prediction-market/server.ts
+deno run --allow-all example/two-party-binary-bet/server.ts
 
 # All example tests (no Docker required)
-deno test --allow-all example/prediction-market/
+deno test --allow-all example/two-party-binary-bet/
 
 # Real Cashu mint E2E (requires `docker compose up -d` + init-regtest.sh)
 deno task test:regtest

@@ -2,7 +2,7 @@ name: Deploy Prediction Market
 
 # Auto-deploys the 巫(Kannagi) prediction market to Fly when:
 #   - push to main, AND
-#   - the change touches example/prediction-market/, the src/ &
+#   - the change touches example/two-party-binary-bet/, the src/ &
 #     packages/ paths the market server depends on at build time,
 #     or the deploy config / Dockerfile.
 #
@@ -17,7 +17,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "example/prediction-market/**"
+      - "example/two-party-binary-bet/**"
       - "packages/cashu-conditional-swap/**"
       - "packages/cashu-frost-oracle/**"
       - "packages/core-cashu/**"
@@ -67,13 +67,13 @@ jobs:
       - name: Type-check market sources
         run: |
           deno check \
-            example/prediction-market/server.ts \
-            example/prediction-market/src/server-routes.ts \
-            example/prediction-market/src/exchange-protocol.ts \
-            example/prediction-market/src/nip60.ts \
-            example/prediction-market/src/nip61.ts
+            example/two-party-binary-bet/server.ts \
+            example/two-party-binary-bet/src/server-routes.ts \
+            example/two-party-binary-bet/src/exchange-protocol.ts \
+            example/two-party-binary-bet/src/nip60.ts \
+            example/two-party-binary-bet/src/nip61.ts
       - name: Unit tests (market + bot fleet)
-        run: deno test example/prediction-market/src/ scripts/bot-fleet/ --allow-all --no-check
+        run: deno test example/two-party-binary-bet/src/ scripts/bot-fleet/ --allow-all --no-check
       - name: Build UI
         run: deno task build:ui
 

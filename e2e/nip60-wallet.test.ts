@@ -22,7 +22,7 @@ import {
   getBalance,
   loadProofs,
   publishProofs,
-} from "../example/prediction-market/src/nip60.ts";
+} from "../example/two-party-binary-bet/src/nip60.ts";
 import {
   checkInfraReady,
   createWallet,

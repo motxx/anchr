@@ -3,7 +3,7 @@
  *
  * Exercises createPostgresOrderBook against a real Postgres instance —
  * the production storage path. The in-memory implementation is covered
- * by the unit tests under example/prediction-market/src/order-book.test.ts;
+ * by the unit tests under example/two-party-binary-bet/src/order-book.test.ts;
  * this file proves the SQL paths (insert, partial-index scan, transactional
  * matching with FOR UPDATE locks) actually behave the same way.
  *
@@ -23,8 +23,8 @@ import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import {
   createPostgresOrderBook,
   type PostgresOrderBook,
-} from "../example/prediction-market/src/order-book-postgres.ts";
-import type { OpenOrder } from "../example/prediction-market/src/market-types.ts";
+} from "../example/two-party-binary-bet/src/order-book-postgres.ts";
+import type { OpenOrder } from "../example/two-party-binary-bet/src/market-types.ts";
 
 const DATABASE_URL = Deno.env.get("DATABASE_URL");
 

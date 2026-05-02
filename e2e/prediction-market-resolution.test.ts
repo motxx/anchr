@@ -18,7 +18,7 @@ import { expect } from "@std/expect";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { resolveMarket as resolveMarketDual } from "../example/prediction-market/src/resolution.ts";
+import { resolveMarket as resolveMarketDual } from "../example/two-party-binary-bet/src/resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,
   evaluateCondition,
@@ -27,11 +27,11 @@ import {
   calculateOracleFee,
   verifyPreimage,
   OracleError,
-} from "../example/prediction-market/src/market-oracle.ts";
+} from "../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
   PredictionMarket,
   ResolutionCondition,
-} from "../example/prediction-market/src/market-types.ts";
+} from "../example/two-party-binary-bet/src/market-types.ts";
 
 // ---------------------------------------------------------------------------
 // Constants

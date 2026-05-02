@@ -22,7 +22,7 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/prediction-market/src/server-routes.ts";
+} from "../example/two-party-binary-bet/src/server-routes.ts";
 import { checkInfraReady, createWallet } from "./helpers/regtest.ts";
 import { MarketMakerBot } from "../scripts/bot-fleet/bot.ts";
 import { POLYMARKET_SEED_MARKETS } from "../scripts/bot-fleet/markets.ts";

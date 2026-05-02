@@ -5,12 +5,12 @@
  * separate from the Anchr protocol server.
  *
  * Usage:
- *   deno run --allow-all example/prediction-market/server.ts
+ *   deno run --allow-all example/two-party-binary-bet/server.ts
  *
  * With FROST threshold Oracle:
  *   FROST_MARKET_CONFIG_PATH=.frost-market/signer-1.json \
  *   CASHU_MINT_URL=http://localhost:3338 \
- *   deno run --allow-all example/prediction-market/server.ts
+ *   deno run --allow-all example/two-party-binary-bet/server.ts
  */
 
 import { Hono } from "hono";
@@ -122,16 +122,16 @@ if (Deno.env.get("AUTO_RESOLVE_DISABLED") !== "1") {
 }
 
 // Serve UI static files
-app.get("/", serveStatic({ path: "./example/prediction-market/ui/index.html" }));
-app.get("/generated.css", serveStatic({ path: "./example/prediction-market/ui/generated.css" }));
-app.get("/main.js", serveStatic({ path: "./example/prediction-market/ui/main.js" }));
-app.get("/main.js.map", serveStatic({ path: "./example/prediction-market/ui/main.js.map" }));
+app.get("/", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
+app.get("/generated.css", serveStatic({ path: "./example/two-party-binary-bet/ui/generated.css" }));
+app.get("/main.js", serveStatic({ path: "./example/two-party-binary-bet/ui/main.js" }));
+app.get("/main.js.map", serveStatic({ path: "./example/two-party-binary-bet/ui/main.js.map" }));
 
 // SPA catch-all — anything that isn't an API route or a known asset falls
 // through to index.html so deep links like /m/<market-id> hydrate the React
 // app. registerMarketRoutes mounts /markets/* before this, so API requests
 // still take precedence.
-app.get("*", serveStatic({ path: "./example/prediction-market/ui/index.html" }));
+app.get("*", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
 
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
 console.log(`巫(Kannagi) prediction market server on http://localhost:${port}`);

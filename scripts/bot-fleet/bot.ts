@@ -25,7 +25,7 @@ import {
   createWallet,
   throttledMintProofs,
 } from "../../e2e/helpers/regtest.ts";
-import { createLockedToken } from "../../example/prediction-market/src/exchange-protocol.ts";
+import { createLockedToken } from "../../example/two-party-binary-bet/src/exchange-protocol.ts";
 
 /**
  * Mint proofs against a fakewallet-mode mint (e.g. testnut.cashu.space).

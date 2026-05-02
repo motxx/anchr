@@ -29,7 +29,7 @@ import {
   fetchIncomingNutzaps,
   redeemNutzap,
   sendNutzap,
-} from "../example/prediction-market/src/nip61.ts";
+} from "../example/two-party-binary-bet/src/nip61.ts";
 import {
   checkInfraReady,
   createWallet,

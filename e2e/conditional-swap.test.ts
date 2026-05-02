@@ -35,10 +35,10 @@ import {
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { createInMemoryOrderBook } from "../example/prediction-market/src/order-book.ts";
-import { resolveMarket } from "../example/prediction-market/src/resolution.ts";
+import { createInMemoryOrderBook } from "../example/two-party-binary-bet/src/order-book.ts";
+import { resolveMarket } from "../example/two-party-binary-bet/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
-import type { OpenOrder, MatchProposal, MatchedBetPair } from "../example/prediction-market/src/market-types.ts";
+import type { OpenOrder, MatchProposal, MatchedBetPair } from "../example/two-party-binary-bet/src/market-types.ts";
 import {
   checkInfraReady,
   createWallet,

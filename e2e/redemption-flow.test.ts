@@ -41,8 +41,8 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/prediction-market/src/server-routes.ts";
-import { createLockedToken } from "../example/prediction-market/src/exchange-protocol.ts";
+} from "../example/two-party-binary-bet/src/server-routes.ts";
+import { createLockedToken } from "../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
   createWallet,

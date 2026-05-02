@@ -1,7 +1,7 @@
 # Design System — Kannagi (かんなぎ)
 
 > Scope: this file governs the visual identity of the Prediction Market app
-> at `example/prediction-market/`. It supersedes the root `DESIGN.md` for
+> at `example/two-party-binary-bet/`. It supersedes the root `DESIGN.md` for
 > this directory only.
 
 ## 1. Atmosphere

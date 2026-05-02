@@ -61,7 +61,7 @@ docker compose restart cashu-mint
 CASHU_MINT_URL=http://localhost:3338 \
 NOSTR_RELAYS=ws://localhost:7777 \
 MARKET_PORT=3001 \
-deno run --config deno.json --allow-all example/prediction-market/server.ts
+deno run --config deno.json --allow-all example/two-party-binary-bet/server.ts
 ```
 
 Open <http://localhost:3001>. You should see the empty-market home page
@@ -92,7 +92,7 @@ deno run --allow-all scripts/frost-market-oracle-cluster.ts
 FROST_MARKET_CONFIG_PATH=.frost-market/signer-1.json \
 FROST_KEY_PASSPHRASE='same-passphrase-as-above' \
 CASHU_MINT_URL=http://localhost:3338 \
-deno run --config deno.json --allow-all example/prediction-market/server.ts
+deno run --config deno.json --allow-all example/two-party-binary-bet/server.ts
 ```
 
 What changes for the user: tokens are P2PK-locked to a 2-of-2 multisig
