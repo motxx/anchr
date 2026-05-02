@@ -61,6 +61,10 @@ export interface CustomerOptions {
   relays: string[];
   /** Cashu mint URL (must support HTLC / NUT-14). */
   mint: string;
+  /** Adapter for talking to the oracle (HTTP, Nostr DM, FROST cluster, etc.). */
+  oracleClient: import("./oracle.ts").OracleClient;
+  /** Adapter for talking to the Cashu mint. */
+  cashuClient: import("./cashu.ts").CashuClient;
   /** Optional: how to choose among provider quotes. Default: cheapest within `payment.maxAmount`. */
   quoteSelector?: QuoteSelector;
   /** Optional: how long to wait for quotes before selecting (default: 30000 ms). */
@@ -121,6 +125,8 @@ export type SchemaVerifier = (
 export interface RequestOptions {
   spec: Spec;
   payment: Payment;
+  /** Source proofs to lock at the Cashu mint (from the customer's wallet). */
+  sourceProofs: import("./cashu.ts").CashuProof[];
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;
 }

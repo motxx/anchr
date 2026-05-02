@@ -462,7 +462,10 @@ export {
   selectCheapestQuote,
   pickOracleForRequest,
   validateCustomerOptions,
+  generateQueryId,
   CustomerConfigError,
+  OracleWhitelistMismatchError,
+  DEFAULT_LOCKTIME_SECONDS,
   DEFAULT_QUOTE_WINDOW_MS,
   type Customer,
 } from "./customer.ts";

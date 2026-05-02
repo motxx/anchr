@@ -7,27 +7,34 @@
  * response, optionally verifies the proof locally, and returns the
  * verified data.
  *
- * Status: the API surface and configuration validation are stable in
- * v0.0.1. The actual Nostr / Cashu wire flow inside `request()` is
- * implemented incrementally — see TODO markers.
+ * Status (v0.0.1): the API surface, configuration validation, and the
+ * first three wire-flow steps (oracle hash retrieval → ephemeral
+ * identity → Cashu HTLC lock) are implemented. The remaining steps
+ * (Nostr publish, quote subscription, selection, result decryption,
+ * local verification) land in subsequent milestones.
  */
 
+import type { CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
+  Quote,
   RequestOptions,
   RequestResult,
-  Quote,
 } from "./types.ts";
 import {
   isSchemaUri,
   InvalidSchemaUriError,
 } from "./schema.ts";
+import { generateKeypair, type Keypair } from "./nostr.ts";
 
 /**
  * Default quote-window in milliseconds. The SDK waits this long for
  * provider quotes before selecting one.
  */
 export const DEFAULT_QUOTE_WINDOW_MS = 30_000;
+
+/** Default locktime offset (1 hour) for HTLC-locked tokens. */
+export const DEFAULT_LOCKTIME_SECONDS = 3600;
 
 /** Default selector: cheapest quote within the customer's `payment.maxAmount`. */
 export function selectCheapestQuote(quotes: Quote[]): Quote | null {
@@ -55,6 +62,14 @@ export class CustomerConfigError extends Error {
   }
 }
 
+/** Thrown when the oracle returns a pubkey that doesn't match the customer's whitelist. */
+export class OracleWhitelistMismatchError extends Error {
+  constructor(public readonly expected: string, public readonly received: string) {
+    super(`Oracle pubkey mismatch: expected ${expected}, got ${received}`);
+    this.name = "OracleWhitelistMismatchError";
+  }
+}
+
 /**
  * Pick one oracle from the customer's whitelist for this request.
  *
@@ -71,22 +86,42 @@ export function pickOracleForRequest(oracles: readonly string[]): string {
 /**
  * Validate a CustomerOptions instance. Throws CustomerConfigError on
  * any structural issue (empty oracles, no relays, missing mint, etc.).
+ *
+ * Accepts `unknown` and narrows to `CustomerOptions` on success so
+ * runtime negative tests can pass arbitrary shapes without `as` casts.
  */
-export function validateCustomerOptions(options: CustomerOptions): void {
-  if (!Array.isArray(options.oracles) || options.oracles.length === 0) {
+export function validateCustomerOptions(options: unknown): asserts options is CustomerOptions {
+  if (typeof options !== "object" || options === null) {
+    throw new CustomerConfigError("options must be an object");
+  }
+  const o = options as Record<string, unknown>;
+  if (!Array.isArray(o.oracles) || o.oracles.length === 0) {
     throw new CustomerConfigError("oracles must be a non-empty string array");
   }
-  for (const o of options.oracles) {
-    if (typeof o !== "string" || o.length === 0) {
+  for (const entry of o.oracles) {
+    if (typeof entry !== "string" || entry.length === 0) {
       throw new CustomerConfigError("oracles entries must be non-empty strings");
     }
   }
-  if (!Array.isArray(options.relays) || options.relays.length === 0) {
+  if (!Array.isArray(o.relays) || o.relays.length === 0) {
     throw new CustomerConfigError("relays must be a non-empty string array");
   }
-  if (typeof options.mint !== "string" || options.mint.length === 0) {
+  if (typeof o.mint !== "string" || o.mint.length === 0) {
     throw new CustomerConfigError("mint must be a non-empty string");
   }
+  if (o.oracleClient === undefined || o.oracleClient === null) {
+    throw new CustomerConfigError("oracleClient is required");
+  }
+  if (o.cashuClient === undefined || o.cashuClient === null) {
+    throw new CustomerConfigError("cashuClient is required");
+  }
+}
+
+/** Generate a unique query identifier for a single request. */
+export function generateQueryId(): string {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 10);
+  return `query_${ts}_${rand}`;
 }
 
 /**
@@ -100,6 +135,8 @@ export function createCustomer(options: CustomerOptions): Customer {
   const oracles = [...options.oracles];
   const relays = [...options.relays];
   const mint = options.mint;
+  const oracleClient = options.oracleClient;
+  const cashuClient = options.cashuClient;
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
   const verifiers = options.schemaVerifiers ?? {};
@@ -110,38 +147,66 @@ export function createCustomer(options: CustomerOptions): Customer {
     mint,
 
     async request(req: RequestOptions): Promise<RequestResult> {
-      // Validate the schema URI shape eagerly.
+      // [step 0] Validate the schema URI shape eagerly.
       if (!isSchemaUri(req.spec.schema)) {
         throw new InvalidSchemaUriError(req.spec.schema);
       }
       if (typeof req.payment.maxAmount !== "number" || req.payment.maxAmount <= 0) {
         throw new CustomerConfigError("payment.maxAmount must be a positive number");
       }
+      if (!Array.isArray(req.sourceProofs)) {
+        throw new CustomerConfigError("sourceProofs must be an array of Cashu proofs");
+      }
 
-      // Pick an oracle from the whitelist for this query (v0: first).
-      const _oraclePubkey = pickOracleForRequest(oracles);
+      // [step 1] Pick an oracle from the whitelist.
+      const expectedOracle = pickOracleForRequest(oracles);
 
-      // Reference: quoteWindowMs and selector are used by the wire flow
-      // implemented in the next milestone (P2). They're captured here so
-      // that consumers can already construct + introspect Customer objects.
+      // [step 2] Generate ephemeral identity + query id for this request.
+      const identity: Keypair = generateKeypair();
+      const queryId = generateQueryId();
+
+      // [step 3] Get hash from oracle. Verify the response carries the
+      // pubkey we picked; reject if it differs (defense against a
+      // mis-configured oracleClient pointing at a different oracle).
+      const { hash, oraclePubkey } = await oracleClient.requestHash(queryId);
+      if (oraclePubkey !== expectedOracle) {
+        throw new OracleWhitelistMismatchError(expectedOracle, oraclePubkey);
+      }
+
+      // [step 4] Build the Phase-1 HTLC lock. The provider is unknown
+      // at this point; the swap that binds the provider happens after
+      // quote selection.
+      const locktimeSeconds = Math.floor(Date.now() / 1000) +
+        (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
+      const initialLock: CashuToken = await cashuClient.buildHtlcLock({
+        amountSats: req.payment.maxAmount,
+        hashHex: hash,
+        customerPubkey: identity.publicKey,
+        locktimeSeconds,
+        sourceProofs: req.sourceProofs,
+      });
+
+      // Captured for the next-milestone wire-flow steps; explicitly
+      // referenced so static analysis treats them as used.
       void quoteWindowMs;
       void selector;
       void verifiers;
       void req.provider;
+      void initialLock;
+      void mint;
 
-      // TODO(P2): implement the wire flow:
-      //   1. Request hash H from oracle (HTTP or Nostr DM)
-      //   2. Lock Cashu HTLC at mint with hashlock H
-      //   3. Publish kind 5300 Job Request to relays
-      //   4. Subscribe to kind 7000 quotes for quoteWindowMs
-      //   5. Select via selector(quotes), bind HTLC to provider pubkey
-      //   6. Subscribe to kind 6300 result event
-      //   7. Decrypt response payload via NIP-44
-      //   8. Optionally call verifiers[req.spec.schema] for local verification
-      //   9. Return RequestResult
+      // TODO(P2 chunk 4-7): implement remaining wire flow:
+      //   5. Publish kind 5300 Job Request (relays + bounty token)
+      //   6. Subscribe to kind 7000 quotes for quoteWindowMs
+      //   7. Select via selector(quotes), bind HTLC to provider pubkey
+      //   8. Subscribe to kind 6300 result event
+      //   9. Decrypt response payload via NIP-44
+      //  10. Optionally call verifiers[req.spec.schema] for local verification
+      //  11. Return RequestResult
       throw new Error(
-        "Customer.request: wire flow not implemented in v0.0.1. " +
-          "Tracked as P2 in the SDK rewrite plan.",
+        "Customer.request: wire flow steps 5-11 not implemented in v0.0.1. " +
+          "Hash retrieved (oracle " + oraclePubkey + "), HTLC built. " +
+          "Remaining steps tracked as P2 chunks 4-7.",
       );
     },
   };
