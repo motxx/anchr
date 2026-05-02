@@ -243,5 +243,102 @@ export function parseSelectionFeedbackEvent(event: Event): SelectionFeedbackPayl
   };
 }
 
+// --- kind 6300: result (provider → customer, NIP-44-encrypted) ---
+
+import { decryptNip44, encryptNip44 } from "./nostr.ts";
+
+/** Plaintext payload that travels NIP-44-encrypted in the kind 6300 content. */
+export interface QueryResponsePayload {
+  /** Schema URI under which the proof was produced. */
+  schema: string;
+  /** Verified response payload (shape defined by the schema). */
+  data: unknown;
+  /** Proof bytes (format defined by the schema). Encoded as base64 or hex by the schema. */
+  proof: Uint8Array | string;
+}
+
+/**
+ * Build a signed kind 6300 result event. The content is NIP-44 v2-
+ * encrypted to the customer's pubkey so only the customer can read it.
+ *
+ * @param identity - the provider's keypair
+ * @param requestEventId - id of the customer's kind 5300 request event
+ * @param customerPubkey - recipient pubkey for NIP-44 encryption
+ * @param payload - QueryResponsePayload to deliver
+ */
+export function buildQueryResponseEvent(
+  identity: Keypair,
+  requestEventId: string,
+  customerPubkey: string,
+  payload: QueryResponsePayload,
+): Event {
+  const proofForJson = payload.proof instanceof Uint8Array
+    ? base64Encode(payload.proof)
+    : payload.proof;
+  const plaintext = JSON.stringify({
+    schema: payload.schema,
+    data: payload.data,
+    proof: proofForJson,
+  });
+  const ciphertext = encryptNip44(plaintext, identity.secretKey, customerPubkey);
+  const tags: string[][] = [
+    ["e", requestEventId, "", "request"],
+    ["p", customerPubkey],
+  ];
+  return signEvent(
+    {
+      kind: KIND_QUERY_RESPONSE,
+      created_at: Math.floor(Date.now() / 1000),
+      content: ciphertext,
+      tags,
+    },
+    identity.secretKey,
+  );
+}
+
+/**
+ * Decrypt + parse a kind 6300 result event. Returns null if decryption
+ * fails (event was not encrypted to us) or the payload shape is wrong.
+ */
+export function parseQueryResponseEvent(
+  event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
+): QueryResponsePayload | null {
+  if (event.kind !== KIND_QUERY_RESPONSE) return null;
+  let plaintext: string;
+  try {
+    plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const p = parsed as Record<string, unknown>;
+  if (
+    typeof p.schema !== "string" ||
+    !("data" in p) ||
+    typeof p.proof !== "string"
+  ) {
+    return null;
+  }
+  return {
+    schema: p.schema,
+    data: p.data,
+    proof: p.proof,
+  };
+}
+
+function base64Encode(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+
 // Re-export the kinds so consumers don't need to import nostr.ts just for these.
 export { KIND_QUERY_FEEDBACK, KIND_QUERY_REQUEST, KIND_QUERY_RESPONSE };

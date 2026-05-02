@@ -467,19 +467,25 @@ export {
   NoQuotesReceivedError,
   OracleWhitelistMismatchError,
   RelayPublishError,
+  ResultTimeoutError,
+  SchemaVerificationError,
   DEFAULT_LOCKTIME_SECONDS,
   DEFAULT_QUOTE_WINDOW_MS,
+  DEFAULT_RESULT_TIMEOUT_MS,
   type Customer,
 } from "./customer.ts";
 
 export {
   buildQueryRequestEvent,
+  buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
   parseQueryRequestEvent,
+  parseQueryResponseEvent,
   parseQuoteFeedbackEvent,
   parseSelectionFeedbackEvent,
   type QueryRequestPayload,
+  type QueryResponsePayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events.ts";

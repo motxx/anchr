@@ -28,6 +28,7 @@ import {
 import {
   createRelayClient,
   generateKeypair,
+  type Event as NostrEvent,
   type Keypair,
   type PublishResult,
   type RelayClient,
@@ -35,6 +36,7 @@ import {
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
+  parseQueryResponseEvent,
   parseQuoteFeedbackEvent,
   type QueryRequestPayload,
   type SelectionFeedbackPayload,
@@ -48,6 +50,9 @@ export const DEFAULT_QUOTE_WINDOW_MS = 30_000;
 
 /** Default locktime offset (1 hour) for HTLC-locked tokens. */
 export const DEFAULT_LOCKTIME_SECONDS = 3600;
+
+/** Default result-event timeout (5 minutes). */
+export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 
 /** Default selector: cheapest quote within the customer's `payment.maxAmount`. */
 export function selectCheapestQuote(quotes: Quote[]): Quote | null {
@@ -102,6 +107,25 @@ export class NoQuotesReceivedError extends Error {
         `(received ${receivedCount} candidate quote(s) total).`,
     );
     this.name = "NoQuotesReceivedError";
+  }
+}
+
+/** Thrown when the selected provider did not deliver a result before the timeout elapsed. */
+export class ResultTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number, public readonly providerPubkey: string) {
+    super(
+      `Provider ${providerPubkey.slice(0, 16)}… did not deliver a kind 6300 result ` +
+        `within ${timeoutMs}ms.`,
+    );
+    this.name = "ResultTimeoutError";
+  }
+}
+
+/** Thrown when a registered SchemaVerifier rejects the proof + data the provider returned. */
+export class SchemaVerificationError extends Error {
+  constructor(public readonly schema: string) {
+    super(`Local schema verifier rejected the proof for schema ${schema}.`);
+    this.name = "SchemaVerificationError";
   }
 }
 
@@ -173,6 +197,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const oracleClient = options.oracleClient;
   const cashuClient = options.cashuClient;
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
+  const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
   const verifiers = options.schemaVerifiers ?? {};
 
@@ -309,20 +334,62 @@ export function createCustomer(options: CustomerOptions): Customer {
         );
         await relayClient.publish(selectionEvent);
 
-        // Captured for the next-milestone wire-flow steps; explicitly
-        // referenced so static analysis treats them as used.
-        void verifiers;
+        // [step 8] Subscribe to the kind 6300 result event from the
+        // selected provider, referencing our request event id.
+        const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
+          // Mutable holder so the subscribe callback can reach the
+          // eventually-set timeout id (and vice versa).
+          const handles: {
+            sub?: { close(): void };
+            timeoutId?: ReturnType<typeof setTimeout>;
+          } = {};
+          handles.sub = relayClient.subscribe(
+            {
+              kinds: [6300],
+              "#e": [requestEvent.id],
+              authors: [selected.providerPubkey],
+            },
+            (event) => {
+              handles.sub?.close();
+              if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
+              resolve(event);
+            },
+          );
+          handles.timeoutId = setTimeout(() => {
+            handles.sub?.close();
+            reject(new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey));
+          }, resultTimeoutMs);
+        });
 
-        // TODO(P2 chunk 6-7): implement remaining wire flow:
-        //   8. Subscribe to kind 6300 result event from `selected.providerPubkey`
-        //   9. Decrypt response payload via NIP-44
-        //  10. Optionally call verifiers[req.spec.schema] for local verification
-        //  11. Return RequestResult
-        throw new Error(
-          "Customer.request: wire flow steps 8-11 not implemented in v0.0.1. " +
-            `Selected provider ${selected.providerPubkey.slice(0, 16)}…, ` +
-            `bound token issued, selection event ${selectionEvent.id.slice(0, 16)}… published.`,
+        // [step 9] Decrypt the NIP-44-encrypted response with our
+        // ephemeral secret + provider pubkey.
+        const response = parseQueryResponseEvent(
+          resultEvent,
+          identity.secretKey,
+          selected.providerPubkey,
         );
+        if (response === null) {
+          throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
+        }
+
+        // [step 10] Optional schema-specific local verification.
+        const verifier = verifiers[req.spec.schema];
+        if (verifier !== undefined) {
+          const ok = await Promise.resolve(
+            verifier(response.proof, req.spec.predicate, response.data),
+          );
+          if (!ok) {
+            throw new SchemaVerificationError(req.spec.schema);
+          }
+        }
+
+        // [step 11] Return the verified result.
+        return {
+          data: response.data,
+          proof: response.proof,
+          providerPubkey: selected.providerPubkey,
+          schema: response.schema,
+        };
       } finally {
         if (ownsRelayClient) {
           relayClient.close();

@@ -74,6 +74,8 @@ export interface CustomerOptions {
   quoteSelector?: QuoteSelector;
   /** Optional: how long to wait for quotes before selecting (default: 30000 ms). */
   quoteWindowMs?: number;
+  /** Optional: how long to wait for the kind 6300 result event before timing out (default: 300000 ms / 5 min). */
+  resultTimeoutMs?: number;
   /** Optional: schema verifier handlers, keyed by schema URI. The SDK calls these to verify a proof locally. */
   schemaVerifiers?: Record<string, SchemaVerifier>;
 }

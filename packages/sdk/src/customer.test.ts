@@ -13,9 +13,14 @@ import {
   validateCustomerOptions,
 } from "./customer.ts";
 import {
+  buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
 } from "./events.ts";
 import { generateKeypair } from "./nostr.ts";
+import {
+  ResultTimeoutError,
+  SchemaVerificationError,
+} from "./customer.ts";
 import { CashuMintError } from "./cashu.ts";
 import { InvalidSchemaUriError } from "./schema.ts";
 import type { OracleClient } from "./oracle.ts";
@@ -313,6 +318,225 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
   expect(recorder.event.id).toMatch(/^[0-9a-f]{64}$/);
 });
 
+test("Customer.request happy path: returns the verified data + proof from a provider", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const customerEphemeralPubkey: { value: string | null } = { value: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) {
+        requestEventId.id = event.id;
+        // Sniff the customer's ephemeral pubkey from the request event.
+        customerEphemeralPubkey.value = event.pubkey;
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const filterKinds = filter.kinds ?? [];
+      if (filterKinds.includes(7000)) {
+        // Quote subscription — deliver one quote.
+        queueMicrotask(() => {
+          const id = requestEventId.id ?? "unknown";
+          onEvent(buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 500,
+          }));
+        });
+      } else if (filterKinds.includes(6300)) {
+        // Result subscription — deliver an encrypted-to-customer result.
+        queueMicrotask(() => {
+          const id = requestEventId.id ?? "unknown";
+          const customerPub = customerEphemeralPubkey.value ?? "00".repeat(32);
+          const result = buildQueryResponseEvent(provider, id, customerPub, {
+            schema: "io.anchr.tlsn-https.v1",
+            data: { hello: "world" },
+            proof: "base64proofbytes==",
+          });
+          onEvent(result);
+        });
+      }
+      return { close: () => {} };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 30,
+    resultTimeoutMs: 1000,
+  });
+
+  const result = await customer.request({
+    spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
+    payment: { maxAmount: 1000 },
+    sourceProofs: [],
+  });
+
+  expect(result.providerPubkey).toBe(provider.publicKey);
+  expect(result.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(result.data).toEqual({ hello: "world" });
+  expect(result.proof).toBe("base64proofbytes==");
+});
+
+test("Customer.request runs schemaVerifiers when provided", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const customerEphemeralPubkey: { value: string | null } = { value: null };
+  const verifierCalls: { proof: unknown; predicate: unknown; data: unknown }[] = [];
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) {
+        requestEventId.id = event.id;
+        customerEphemeralPubkey.value = event.pubkey;
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const filterKinds = filter.kinds ?? [];
+      if (filterKinds.includes(7000)) {
+        queueMicrotask(() => {
+          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 100,
+          }));
+        });
+      } else if (filterKinds.includes(6300)) {
+        queueMicrotask(() => {
+          onEvent(buildQueryResponseEvent(
+            provider,
+            requestEventId.id ?? "x",
+            customerEphemeralPubkey.value ?? "00".repeat(32),
+            { schema: "io.anchr.tlsn-https.v1", data: { ok: true }, proof: "p1" },
+          ));
+        });
+      }
+      return { close: () => {} };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 30,
+    resultTimeoutMs: 1000,
+    schemaVerifiers: {
+      "io.anchr.tlsn-https.v1": (proof, predicate, data) => {
+        verifierCalls.push({ proof, predicate, data });
+        return true;
+      },
+    },
+  });
+
+  await customer.request({
+    spec: { schema: "io.anchr.tlsn-https.v1", predicate: { x: 1 } },
+    payment: { maxAmount: 1000 },
+    sourceProofs: [],
+  });
+
+  expect(verifierCalls).toHaveLength(1);
+  expect(verifierCalls[0].proof).toBe("p1");
+  expect(verifierCalls[0].predicate).toEqual({ x: 1 });
+  expect(verifierCalls[0].data).toEqual({ ok: true });
+});
+
+test("Customer.request throws SchemaVerificationError when verifier returns false", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const customerPub: { value: string | null } = { value: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) {
+        requestEventId.id = event.id;
+        customerPub.value = event.pubkey;
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const filterKinds = filter.kinds ?? [];
+      if (filterKinds.includes(7000)) {
+        queueMicrotask(() => {
+          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 100,
+          }));
+        });
+      } else if (filterKinds.includes(6300)) {
+        queueMicrotask(() => {
+          onEvent(buildQueryResponseEvent(
+            provider,
+            requestEventId.id ?? "x",
+            customerPub.value ?? "00".repeat(32),
+            { schema: "io.anchr.tlsn-https.v1", data: { x: 1 }, proof: "fake" },
+          ));
+        });
+      }
+      return { close: () => {} };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 30,
+    resultTimeoutMs: 1000,
+    schemaVerifiers: { "io.anchr.tlsn-https.v1": () => false },
+  });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(SchemaVerificationError);
+});
+
+test("Customer.request throws ResultTimeoutError when no result arrives", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) requestEventId.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      if ((filter.kinds ?? []).includes(7000)) {
+        queueMicrotask(() => {
+          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 100,
+          }));
+        });
+      }
+      // Never deliver a kind 6300 result.
+      return { close: () => {} };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 20,
+    resultTimeoutMs: 50,
+  });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(ResultTimeoutError);
+});
+
 test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishes selection", async () => {
   const providerA = generateKeypair();
   const providerB = generateKeypair();
@@ -362,15 +586,17 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     relayClient,
     cashuClient,
     quoteWindowMs: 30,
+    resultTimeoutMs: 50,
   });
 
+  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(/steps 8-11 not implemented/);
+  ).rejects.toThrow(ResultTimeoutError);
 
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
@@ -462,8 +688,10 @@ test("Customer.request honors `provider` pinning when set", async () => {
     relayClient,
     cashuClient,
     quoteWindowMs: 30,
+    resultTimeoutMs: 50,
   });
 
+  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
@@ -471,7 +699,7 @@ test("Customer.request honors `provider` pinning when set", async () => {
       sourceProofs: [],
       provider: wantedProvider.publicKey,
     }),
-  ).rejects.toThrow(/steps 8-11 not implemented/);
+  ).rejects.toThrow(ResultTimeoutError);
 
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
