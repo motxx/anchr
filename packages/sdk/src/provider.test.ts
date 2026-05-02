@@ -8,6 +8,7 @@ import {
   validateProviderOptions,
 } from "./provider.ts";
 import {
+  buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
 } from "./events.ts";
@@ -20,7 +21,7 @@ import {
   type RelayClient,
   type Subscription,
 } from "./nostr.ts";
-import type { CashuClient, CashuToken } from "./cashu.ts";
+import type { CashuClient, CashuToken, RedeemHtlcParams, RedeemResult } from "./cashu.ts";
 import { bytesToHex } from "./test-helpers.ts";
 import type { ProviderOptions } from "./types.ts";
 
@@ -30,13 +31,14 @@ const ORACLE_A = "a".repeat(64);
 
 const customerKey = generateKeypair();
 const providerKey = generateKeypair();
+const oracleKey = generateKeypair();
 
-function makeCashuClient(): CashuClient {
+function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
-    mintUrl: "https://mint.example.org",
-    buildHtlcLock: async (p) => ({ token: "x", amountSats: p.amountSats, proofs: [] }),
-    bindProvider: async () => ({ token: "y", amountSats: 0, proofs: [] }),
-    redeemHtlc: async () => ({ proofs: [], amountSats: 0 }),
+    mintUrl: overrides?.mintUrl ?? "https://mint.example.org",
+    buildHtlcLock: overrides?.buildHtlcLock ?? (async (p) => ({ token: "x", amountSats: p.amountSats, proofs: [] } satisfies CashuToken)),
+    bindProvider: overrides?.bindProvider ?? (async () => ({ token: "y", amountSats: 0, proofs: [] } satisfies CashuToken)),
+    redeemHtlc: overrides?.redeemHtlc ?? (async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({ proofs: [], amountSats: 0 })),
   };
 }
 
@@ -329,6 +331,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     ...validOptions(),
     relayClient,
     selectionTimeoutMs: 200,
+    preimageTimeoutMs: 30,
   });
   const servePromise = provider.serve(async () => ({
     amountSats: 200,
@@ -371,7 +374,9 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   });
   fireSelection(selectionEvent);
 
-  await new Promise((r) => setTimeout(r, 30));
+  // Wait for produce + result publish + preimage timeout (30ms) to drain
+  // before stopping, so no setTimeout leaks.
+  await new Promise((r) => setTimeout(r, 70));
   await provider.stop();
   await servePromise;
 
@@ -449,6 +454,101 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   // Only the kind 7000 quote was published; no kind 6300 result.
   expect(published).toHaveLength(1);
   expect(published[0].kind).toBe(7000);
+});
+
+test("Provider.serve receives oracle preimage DM and redeems the HTLC", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let onPreimageEvent: ((e: Event) => void) | null = null;
+  const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) onRequestEvent = onEvent;
+      else if (kinds.includes(7000)) onSelectionEvent = onEvent;
+      else if (kinds.includes(4)) onPreimageEvent = onEvent;
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const cashuClient = makeCashuClient({
+    redeemHtlc: async (p: RedeemHtlcParams): Promise<RedeemResult> => {
+      redeemRecorder.params = p;
+      return { proofs: [], amountSats: 200 };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    oracles: [oracleKey.publicKey],
+    relayClient,
+    cashuClient,
+    selectionTimeoutMs: 200,
+    preimageTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => ({ data: { ok: true }, proof: "p1" }),
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  const fireRequest = onRequestEvent as (e: Event) => void;
+
+  // Customer sends a request bound to our (real) oracle.
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q-redeem",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: { foo: "bar" },
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: oracleKey.publicKey,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuBinit",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  if (onSelectionEvent === null) throw new Error("selection subscribe was not called");
+  (onSelectionEvent as (e: Event) => void)(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      bound_token: "cashuBbound",
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  if (onPreimageEvent === null) throw new Error("preimage subscribe was not called");
+  (onPreimageEvent as (e: Event) => void)(buildPreimageDeliveryEvent(
+    oracleKey,
+    providerKey.publicKey,
+    {
+      query_id: "q-redeem",
+      request_event_id: requestEvent.id,
+      preimage: "ff".repeat(32),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(redeemRecorder.params).not.toBe(null);
+  if (redeemRecorder.params === null) throw new Error("unreachable");
+  expect(redeemRecorder.params.token).toBe("cashuBbound");
+  expect(redeemRecorder.params.preimageHex).toBe("ff".repeat(32));
+  expect(redeemRecorder.params.providerSecretKey).toEqual(providerKey.secretKey);
 });
 
 test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {

@@ -101,6 +101,8 @@ export interface ProviderOptions {
   notary?: string;
   /** Optional: how long to wait for a selection event after quoting (default: 60000 ms). */
   selectionTimeoutMs?: number;
+  /** Optional: how long to wait for the oracle's preimage NIP-44 DM (default: 300000 ms / 5 min). */
+  preimageTimeoutMs?: number;
   /** Optional: schema producer handlers, keyed by schema URI. The SDK calls these to produce a proof for an incoming request. */
   schemaProducers?: Record<string, SchemaProducer>;
 }

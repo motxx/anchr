@@ -476,14 +476,17 @@ export {
 } from "./customer.ts";
 
 export {
+  buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseQueryResponseEvent,
   parseQuoteFeedbackEvent,
   parseSelectionFeedbackEvent,
+  type PreimageDeliveryPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
   type QuoteFeedbackPayload,
@@ -495,6 +498,7 @@ export {
   validateProviderOptions,
   shouldQuote,
   ProviderConfigError,
+  DEFAULT_PREIMAGE_TIMEOUT_MS,
   DEFAULT_SELECTION_TIMEOUT_MS,
   type Provider,
 } from "./provider.ts";

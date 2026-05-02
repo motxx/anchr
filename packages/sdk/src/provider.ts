@@ -17,6 +17,7 @@
 import {
   buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
+  parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseSelectionFeedbackEvent,
 } from "./events.ts";
@@ -39,6 +40,9 @@ import { isSchemaUri } from "./schema.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
+
+/** Default timeout for waiting for the oracle's preimage NIP-44 DM after publishing the result (5 min). */
+export const DEFAULT_PREIMAGE_TIMEOUT_MS = 5 * 60_000;
 
 /** Provider client returned by `createProvider`. */
 export interface Provider {
@@ -132,6 +136,7 @@ export function createProvider(options: ProviderOptions): Provider {
   const notary = options.notary;
   const cashuClient = options.cashuClient;
   const selectionTimeoutMs = options.selectionTimeoutMs ?? DEFAULT_SELECTION_TIMEOUT_MS;
+  const preimageTimeoutMs = options.preimageTimeoutMs ?? DEFAULT_PREIMAGE_TIMEOUT_MS;
 
   // Resolve the provider's keypair eagerly so failures surface at
   // construction rather than on the first event.
@@ -165,6 +170,7 @@ export function createProvider(options: ProviderOptions): Provider {
               cashuClient,
               relayClient,
               selectionTimeoutMs,
+              preimageTimeoutMs,
             }, handler).catch(() => {
               // Swallow per-job failures; one bad event should not
               // tear down the provider's subscription. Consumers can
@@ -195,6 +201,7 @@ interface JobContext {
   cashuClient: import("./cashu.ts").CashuClient;
   relayClient: RelayClient;
   selectionTimeoutMs: number;
+  preimageTimeoutMs: number;
 }
 
 /**
@@ -285,10 +292,73 @@ async function handleJob(
   );
   await ctx.relayClient.publish(responseEvent);
 
-  // TODO(P2 chunk 7c): subscribe to NIP-44 DM (kind 4) from the
-  // oracle for the preimage, then redeem the HTLC at the mint.
-  void selection.bound_token; // captured for next chunk
-  void ctx.cashuClient;
+  // [step 8] Wait for the oracle's preimage NIP-44 DM (kind 4) that
+  // matches our query id. Time out after preimageTimeoutMs (the
+  // customer's HTLC locktime refund kicks in if the oracle never
+  // verifies and never releases).
+  const preimage = await waitForPreimage(
+    ctx,
+    payload.oracle_pubkey,
+    payload.query_id,
+    event.id,
+  );
+  if (preimage === null) return;
+
+  // [step 9] Redeem the bound HTLC at the mint.
+  try {
+    await ctx.cashuClient.redeemHtlc({
+      token: selection.bound_token,
+      preimageHex: preimage,
+      providerSecretKey: ctx.identity.secretKey,
+    });
+  } catch {
+    // Mint rejected the redemption — locktime refund will kick in.
+    return;
+  }
+}
+
+/**
+ * Wait for the oracle's preimage NIP-44 DM addressed to us. Returns
+ * the hex preimage on success, or null on timeout / parse failure.
+ */
+function waitForPreimage(
+  ctx: JobContext,
+  oraclePubkey: string,
+  queryId: string,
+  requestEventId: string,
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    const handles: {
+      sub?: { close(): void };
+      timeoutId?: ReturnType<typeof setTimeout>;
+    } = {};
+    handles.sub = ctx.relayClient.subscribe(
+      {
+        kinds: [4],
+        authors: [oraclePubkey],
+        "#p": [ctx.identity.publicKey],
+      },
+      (event) => {
+        const parsed = parsePreimageDeliveryEvent(
+          event,
+          ctx.identity.secretKey,
+          oraclePubkey,
+        );
+        if (parsed === null) return;
+        // Cross-check both query_id and request_event_id so a stale
+        // DM for a different request can't be replayed.
+        if (parsed.query_id !== queryId) return;
+        if (parsed.request_event_id !== requestEventId) return;
+        handles.sub?.close();
+        if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
+        resolve(parsed.preimage);
+      },
+    );
+    handles.timeoutId = setTimeout(() => {
+      handles.sub?.close();
+      resolve(null);
+    }, ctx.preimageTimeoutMs);
+  });
 }
 
 /**

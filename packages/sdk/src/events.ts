@@ -340,5 +340,79 @@ function base64Encode(bytes: Uint8Array): string {
   return btoa(s);
 }
 
+// --- kind 4: preimage delivery (oracle → provider, NIP-44-encrypted DM) ---
+
+import { KIND_DIRECT_MESSAGE } from "./nostr.ts";
+
+/** Plaintext payload that travels NIP-44-encrypted in the kind 4 content. */
+export interface PreimageDeliveryPayload {
+  /** Matches the request's query_id (anti-replay). */
+  query_id: string;
+  /** Original kind 5300 event id this preimage is for. */
+  request_event_id: string;
+  /** Hex preimage `S` such that `sha256(S) = H` (the customer's hashlock). */
+  preimage: string;
+}
+
+/**
+ * Build a signed kind 4 NIP-44 DM carrying a preimage from the oracle
+ * to the selected provider. The recipient is in the `p` tag.
+ */
+export function buildPreimageDeliveryEvent(
+  identity: Keypair,
+  recipientPubkey: string,
+  payload: PreimageDeliveryPayload,
+): Event {
+  const ciphertext = encryptNip44(JSON.stringify(payload), identity.secretKey, recipientPubkey);
+  const tags: string[][] = [["p", recipientPubkey]];
+  return signEvent(
+    {
+      kind: KIND_DIRECT_MESSAGE,
+      created_at: Math.floor(Date.now() / 1000),
+      content: ciphertext,
+      tags,
+    },
+    identity.secretKey,
+  );
+}
+
+/**
+ * Decrypt + parse a kind 4 NIP-44 DM expected to carry a preimage.
+ * Returns null if decryption fails (DM not for us) or shape is wrong.
+ */
+export function parsePreimageDeliveryEvent(
+  event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
+): PreimageDeliveryPayload | null {
+  if (event.kind !== KIND_DIRECT_MESSAGE) return null;
+  let plaintext: string;
+  try {
+    plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const p = parsed as Record<string, unknown>;
+  if (
+    typeof p.query_id !== "string" ||
+    typeof p.request_event_id !== "string" ||
+    typeof p.preimage !== "string"
+  ) {
+    return null;
+  }
+  return {
+    query_id: p.query_id,
+    request_event_id: p.request_event_id,
+    preimage: p.preimage,
+  };
+}
+
 // Re-export the kinds so consumers don't need to import nostr.ts just for these.
 export { KIND_QUERY_FEEDBACK, KIND_QUERY_REQUEST, KIND_QUERY_RESPONSE };
