@@ -5,12 +5,17 @@ import {
   createCustomer,
   CustomerConfigError,
   generateQueryId,
+  NoQuotesReceivedError,
   OracleWhitelistMismatchError,
   pickOracleForRequest,
   RelayPublishError,
   selectCheapestQuote,
   validateCustomerOptions,
 } from "./customer.ts";
+import {
+  buildQuoteFeedbackEvent,
+} from "./events.ts";
+import { generateKeypair } from "./nostr.ts";
 import { CashuMintError } from "./cashu.ts";
 import { InvalidSchemaUriError } from "./schema.ts";
 import type { OracleClient } from "./oracle.ts";
@@ -98,6 +103,9 @@ const validOptions = (): CustomerOptions => ({
   oracleClient: makeOracleClient(),
   cashuClient: makeCashuClient(),
   relayClient: makeRelayClient(),
+  // Short quote window so tests that flow past the publish step
+  // don't sit waiting the 30s default.
+  quoteWindowMs: 10,
 });
 
 // --- Validation ---
@@ -193,7 +201,7 @@ test("Customer.request calls oracleClient.requestHash", async () => {
       return { hash: HASH_HEX, oraclePubkey: ORACLE_A };
     },
   });
-  const customer = createCustomer({ ...validOptions(), oracleClient });
+  const customer = createCustomer({ ...validOptions(), oracleClient, quoteWindowMs: 10 });
 
   await expect(
     customer.request({
@@ -235,7 +243,7 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
       return { token: "cashuBlocked", amountSats: params.amountSats, proofs: [] };
     },
   });
-  const customer = createCustomer({ ...validOptions(), cashuClient });
+  const customer = createCustomer({ ...validOptions(), cashuClient, quoteWindowMs: 10 });
 
   await expect(
     customer.request({
@@ -269,15 +277,16 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
   ).rejects.toThrow(CashuMintError);
 });
 
-test("Customer.request reaches the not-implemented marker for steps 6-11 after publish", async () => {
-  const customer = createCustomer(validOptions());
+test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the window", async () => {
+  // Default mock subscribe delivers no events; quoteWindowMs=10ms is plenty short.
+  const customer = createCustomer({ ...validOptions(), quoteWindowMs: 10 });
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(/wire flow steps 6-11 not implemented/);
+  ).rejects.toThrow(NoQuotesReceivedError);
 });
 
 test("Customer.request publishes a kind 5300 Job Request event via relayClient", async () => {
@@ -288,7 +297,7 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
   });
-  const customer = createCustomer({ ...validOptions(), relayClient });
+  const customer = createCustomer({ ...validOptions(), relayClient, quoteWindowMs: 10 });
 
   await expect(
     customer.request({
@@ -302,6 +311,171 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
   if (recorder.event === null) throw new Error("unreachable");
   expect(recorder.event.kind).toBe(5300);
   expect(recorder.event.id).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishes selection", async () => {
+  const providerA = generateKeypair();
+  const providerB = generateKeypair();
+  const requestEventRecorder: { id: string | null } = { id: null };
+  const publishedEvents: Event[] = [];
+  const bindRecorder: { params: BindProviderParams | null } = { params: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      publishedEvents.push(event);
+      if (event.kind === 5300) requestEventRecorder.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      // The customer subscribes with an `#e` filter referencing the
+      // request event. Synchronously deliver two quotes (cheaper one
+      // should win) once the subscription is opened.
+      queueMicrotask(() => {
+        const requestId = requestEventRecorder.id ?? "unknown";
+        const quoteA = buildQuoteFeedbackEvent(providerA, requestId, "00".repeat(32), {
+          status: "payment-required",
+          provider_pubkey: providerA.publicKey,
+          amount_sats: 800,
+        });
+        const quoteB = buildQuoteFeedbackEvent(providerB, requestId, "00".repeat(32), {
+          status: "payment-required",
+          provider_pubkey: providerB.publicKey,
+          amount_sats: 500,
+        });
+        onEvent(quoteA);
+        onEvent(quoteB);
+      });
+      void filter;
+      return { close: () => {} };
+    },
+  });
+
+  const cashuClient = makeCashuClient({
+    bindProvider: async (p: BindProviderParams): Promise<CashuToken> => {
+      bindRecorder.params = p;
+      return { token: "cashuBbound", amountSats: 500, proofs: [] };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    cashuClient,
+    quoteWindowMs: 30,
+  });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(/steps 8-11 not implemented/);
+
+  expect(bindRecorder.params).not.toBe(null);
+  if (bindRecorder.params === null) throw new Error("unreachable");
+  expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey); // cheapest
+  expect(bindRecorder.params.initialToken).toBe("cashuBfake");
+
+  // Two events published: kind 5300 request + kind 7000 selection.
+  expect(publishedEvents).toHaveLength(2);
+  expect(publishedEvents[0].kind).toBe(5300);
+  expect(publishedEvents[1].kind).toBe(7000);
+});
+
+test("Customer.request rejects quotes above the maxAmount budget", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) requestEventId.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      queueMicrotask(() => {
+        const id = requestEventId.id ?? "unknown";
+        const expensive = buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
+          status: "payment-required",
+          provider_pubkey: provider.publicKey,
+          amount_sats: 9999, // over budget
+        });
+        onEvent(expensive);
+      });
+      return { close: () => {} };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 20,
+  });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(NoQuotesReceivedError);
+});
+
+test("Customer.request honors `provider` pinning when set", async () => {
+  const wantedProvider = generateKeypair();
+  const otherProvider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const bindRecorder: { params: BindProviderParams | null } = { params: null };
+
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) requestEventId.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      queueMicrotask(() => {
+        const id = requestEventId.id ?? "unknown";
+        // The "wrong" provider quotes too; the customer must reject it.
+        onEvent(buildQuoteFeedbackEvent(otherProvider, id, "00".repeat(32), {
+          status: "payment-required",
+          provider_pubkey: otherProvider.publicKey,
+          amount_sats: 100,
+        }));
+        onEvent(buildQuoteFeedbackEvent(wantedProvider, id, "00".repeat(32), {
+          status: "payment-required",
+          provider_pubkey: wantedProvider.publicKey,
+          amount_sats: 500,
+        }));
+      });
+      return { close: () => {} };
+    },
+  });
+  const cashuClient = makeCashuClient({
+    bindProvider: async (p) => {
+      bindRecorder.params = p;
+      return { token: "cashuBbound", amountSats: 500, proofs: [] };
+    },
+  });
+
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    cashuClient,
+    quoteWindowMs: 30,
+  });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+      provider: wantedProvider.publicKey,
+    }),
+  ).rejects.toThrow(/steps 8-11 not implemented/);
+
+  expect(bindRecorder.params).not.toBe(null);
+  if (bindRecorder.params === null) throw new Error("unreachable");
+  expect(bindRecorder.params.providerPubkey).toBe(wantedProvider.publicKey);
 });
 
 test("Customer.request throws RelayPublishError when no relay accepts the event", async () => {

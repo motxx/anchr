@@ -464,6 +464,7 @@ export {
   validateCustomerOptions,
   generateQueryId,
   CustomerConfigError,
+  NoQuotesReceivedError,
   OracleWhitelistMismatchError,
   RelayPublishError,
   DEFAULT_LOCKTIME_SECONDS,
@@ -473,8 +474,14 @@ export {
 
 export {
   buildQueryRequestEvent,
+  buildQuoteFeedbackEvent,
+  buildSelectionFeedbackEvent,
   parseQueryRequestEvent,
+  parseQuoteFeedbackEvent,
+  parseSelectionFeedbackEvent,
   type QueryRequestPayload,
+  type QuoteFeedbackPayload,
+  type SelectionFeedbackPayload,
 } from "./events.ts";
 
 export {

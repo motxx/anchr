@@ -124,5 +124,124 @@ export function parseQueryRequestEvent(event: Event): QueryRequestPayload | null
   };
 }
 
+// --- kind 7000: quote (provider → customer, status=payment-required) ---
+
+/** Plaintext payload published by a provider quoting on a request. */
+export interface QuoteFeedbackPayload {
+  status: "payment-required";
+  /** Provider's hex pubkey (must match the event's pubkey). */
+  provider_pubkey: string;
+  /** Amount in sats the provider asks for. */
+  amount_sats: number;
+}
+
+/** Build a signed kind 7000 quote event referencing the request event. */
+export function buildQuoteFeedbackEvent(
+  identity: Keypair,
+  requestEventId: string,
+  customerPubkey: string,
+  payload: QuoteFeedbackPayload,
+): Event {
+  const tags: string[][] = [
+    ["e", requestEventId, "", "request"],
+    ["p", customerPubkey],
+    ["status", payload.status],
+  ];
+  return signEvent(
+    {
+      kind: KIND_QUERY_FEEDBACK,
+      created_at: Math.floor(Date.now() / 1000),
+      content: JSON.stringify(payload),
+      tags,
+    },
+    identity.secretKey,
+  );
+}
+
+/** Parse a kind 7000 quote payload. Returns null if the event is not a quote. */
+export function parseQuoteFeedbackEvent(event: Event): QuoteFeedbackPayload | null {
+  if (event.kind !== KIND_QUERY_FEEDBACK) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(event.content);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const p = parsed as Record<string, unknown>;
+  if (
+    p.status !== "payment-required" ||
+    typeof p.provider_pubkey !== "string" ||
+    typeof p.amount_sats !== "number"
+  ) {
+    return null;
+  }
+  // Provider pubkey in payload must match event signer.
+  if (p.provider_pubkey !== event.pubkey) return null;
+  return {
+    status: "payment-required",
+    provider_pubkey: p.provider_pubkey,
+    amount_sats: p.amount_sats,
+  };
+}
+
+// --- kind 7000: selection (customer → selected provider, status=processing) ---
+
+/** Plaintext payload published by a customer announcing the selected provider. */
+export interface SelectionFeedbackPayload {
+  status: "processing";
+  /** Hex pubkey of the selected provider. */
+  selected_provider_pubkey: string;
+  /** Phase-2 HTLC token now bound to the selected provider. */
+  bound_token: string;
+}
+
+/** Build a signed kind 7000 selection event addressed to the chosen provider. */
+export function buildSelectionFeedbackEvent(
+  identity: Keypair,
+  requestEventId: string,
+  payload: SelectionFeedbackPayload,
+): Event {
+  const tags: string[][] = [
+    ["e", requestEventId, "", "request"],
+    ["p", payload.selected_provider_pubkey],
+    ["status", payload.status],
+  ];
+  return signEvent(
+    {
+      kind: KIND_QUERY_FEEDBACK,
+      created_at: Math.floor(Date.now() / 1000),
+      content: JSON.stringify(payload),
+      tags,
+    },
+    identity.secretKey,
+  );
+}
+
+/** Parse a kind 7000 selection payload. Returns null on malformed input. */
+export function parseSelectionFeedbackEvent(event: Event): SelectionFeedbackPayload | null {
+  if (event.kind !== KIND_QUERY_FEEDBACK) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(event.content);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const p = parsed as Record<string, unknown>;
+  if (
+    p.status !== "processing" ||
+    typeof p.selected_provider_pubkey !== "string" ||
+    typeof p.bound_token !== "string"
+  ) {
+    return null;
+  }
+  return {
+    status: "processing",
+    selected_provider_pubkey: p.selected_provider_pubkey,
+    bound_token: p.bound_token,
+  };
+}
+
 // Re-export the kinds so consumers don't need to import nostr.ts just for these.
 export { KIND_QUERY_FEEDBACK, KIND_QUERY_REQUEST, KIND_QUERY_RESPONSE };

@@ -32,7 +32,13 @@ import {
   type PublishResult,
   type RelayClient,
 } from "./nostr.ts";
-import { buildQueryRequestEvent, type QueryRequestPayload } from "./events.ts";
+import {
+  buildQueryRequestEvent,
+  buildSelectionFeedbackEvent,
+  parseQuoteFeedbackEvent,
+  type QueryRequestPayload,
+  type SelectionFeedbackPayload,
+} from "./events.ts";
 
 /**
  * Default quote-window in milliseconds. The SDK waits this long for
@@ -85,6 +91,17 @@ export class RelayPublishError extends Error {
         `(${result.failures.length} failures, 0 successes).`,
     );
     this.name = "RelayPublishError";
+  }
+}
+
+/** Thrown when no provider sent a (selectable) quote within the configured window. */
+export class NoQuotesReceivedError extends Error {
+  constructor(public readonly quoteWindowMs: number, public readonly receivedCount: number) {
+    super(
+      `No selectable quote received within ${quoteWindowMs}ms ` +
+        `(received ${receivedCount} candidate quote(s) total).`,
+    );
+    this.name = "NoQuotesReceivedError";
   }
 }
 
@@ -231,24 +248,80 @@ export function createCustomer(options: CustomerOptions): Customer {
           throw new RelayPublishError(publishResult);
         }
 
+        // [step 6] Subscribe to kind 7000 quotes referencing our request
+        // event for `quoteWindowMs`. Collect candidate quotes (filtered
+        // by amount ≤ maxAmount and structurally valid) into a buffer.
+        const quotes: Quote[] = [];
+        let totalReceived = 0;
+        const sub = relayClient.subscribe(
+          {
+            kinds: [7000],
+            "#e": [requestEvent.id],
+          },
+          (event) => {
+            const parsed = parseQuoteFeedbackEvent(event);
+            if (parsed === null) return;
+            totalReceived++;
+            if (parsed.amount_sats > req.payment.maxAmount) return;
+            if (req.provider !== undefined && parsed.provider_pubkey !== req.provider) return;
+            quotes.push({
+              providerPubkey: parsed.provider_pubkey,
+              amountSats: parsed.amount_sats,
+              quoteEventId: event.id,
+              receivedAt: Date.now(),
+            });
+          },
+        );
+
+        try {
+          await new Promise<void>((resolve) => setTimeout(resolve, quoteWindowMs));
+        } finally {
+          sub.close();
+        }
+
+        // [step 7] Apply the selector strategy.
+        const selected = selector(quotes);
+        if (selected === null) {
+          throw new NoQuotesReceivedError(quoteWindowMs, totalReceived);
+        }
+
+        // [step 7 cont] Phase-2 swap: bind the chosen provider's pubkey
+        // to the existing HTLC.
+        const boundLock: CashuToken = await cashuClient.bindProvider({
+          initialToken: initialLock.token,
+          providerPubkey: selected.providerPubkey,
+          hashHex: hash,
+          locktimeSeconds,
+          customerPubkey: identity.publicKey,
+        });
+
+        // [step 7 cont] Announce the selection so the chosen provider
+        // can begin work.
+        const selectionPayload: SelectionFeedbackPayload = {
+          status: "processing",
+          selected_provider_pubkey: selected.providerPubkey,
+          bound_token: boundLock.token,
+        };
+        const selectionEvent = buildSelectionFeedbackEvent(
+          identity,
+          requestEvent.id,
+          selectionPayload,
+        );
+        await relayClient.publish(selectionEvent);
+
         // Captured for the next-milestone wire-flow steps; explicitly
         // referenced so static analysis treats them as used.
-        void selector;
         void verifiers;
-        void req.provider;
 
-        // TODO(P2 chunk 5-7): implement remaining wire flow:
-        //   6. Subscribe to kind 7000 quotes for quoteWindowMs
-        //   7. Select via selector(quotes), bind HTLC to provider pubkey
-        //   8. Subscribe to kind 6300 result event
+        // TODO(P2 chunk 6-7): implement remaining wire flow:
+        //   8. Subscribe to kind 6300 result event from `selected.providerPubkey`
         //   9. Decrypt response payload via NIP-44
         //  10. Optionally call verifiers[req.spec.schema] for local verification
         //  11. Return RequestResult
         throw new Error(
-          "Customer.request: wire flow steps 6-11 not implemented in v0.0.1. " +
-            `Job Request event ${requestEvent.id.slice(0, 16)}… ` +
-            `accepted by ${publishResult.successes.length} of ` +
-            `${publishResult.successes.length + publishResult.failures.length} relays.`,
+          "Customer.request: wire flow steps 8-11 not implemented in v0.0.1. " +
+            `Selected provider ${selected.providerPubkey.slice(0, 16)}…, ` +
+            `bound token issued, selection event ${selectionEvent.id.slice(0, 16)}… published.`,
         );
       } finally {
         if (ownsRelayClient) {
