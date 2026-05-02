@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isCashuEnabled, getCashuConfig } from "./wallet.ts";
+import { isCashuEnabled, getCashuConfig, createBountyToken } from "./wallet.ts";
 
 describe("Cashu wallet", () => {
   test("isCashuEnabled returns false when CASHU_MINT_URL is not set", () => {
@@ -40,6 +40,22 @@ describe("Cashu wallet", () => {
       Deno.env.set("CASHU_MINT_URL", original);
     } else {
       Deno.env.delete("CASHU_MINT_URL");
+    }
+  });
+
+  test("createBountyToken returns null when CASHU_MINT_URL is unset (no implicit demo path)", async () => {
+    // The previous implementation called wallet.mintProofs() immediately
+    // after createMintQuote() — which raced against any externally-paid
+    // Lightning invoice and silently failed in production. The current
+    // implementation must at minimum bail cleanly when no mint is
+    // configured rather than throwing or hanging.
+    const original = Deno.env.get("CASHU_MINT_URL");
+    Deno.env.delete("CASHU_MINT_URL");
+    try {
+      const result = await createBountyToken(21);
+      expect(result).toBeNull();
+    } finally {
+      if (original) Deno.env.set("CASHU_MINT_URL", original);
     }
   });
 });

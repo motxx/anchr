@@ -40,22 +40,69 @@ export function getCashuWallet(): Wallet | null {
   return _wallet;
 }
 
+/** Options for {@link createBountyToken}. */
+export interface CreateBountyTokenOptions {
+  /** Interval (ms) between mint-quote state polls. Default 2000. */
+  pollIntervalMs?: number;
+  /** Total wait for the Lightning invoice to be paid before giving up. Default 5 min. */
+  invoiceTimeoutMs?: number;
+  /**
+   * Optional hook fired once the mint has issued the invoice. The caller can
+   * pay it however they like (regtest auto-pay, separate Lightning wallet,
+   * external coordinator). Returning a rejected promise aborts the poll loop.
+   */
+  onInvoice?: (bolt11: string) => Promise<void> | void;
+}
+
 /**
  * Create a locked ecash token for a query bounty.
- * The token can be redeemed by the worker after verification.
+ *
+ * Steps:
+ *   1. Ask the mint for a Lightning invoice for `amountSats`.
+ *   2. Notify the caller of the invoice (via `onInvoice` and a log line).
+ *   3. Poll the mint's quote state until it reports `PAID`.
+ *   4. Mint blinded proofs against the paid quote and return a token.
+ *
+ * Returns `null` if no Cashu mint is configured (unset `CASHU_MINT_URL`),
+ * if the invoice is not paid before `invoiceTimeoutMs`, or if any step
+ * fails. The token can be redeemed by the worker after verification.
  */
-export async function createBountyToken(amountSats: number): Promise<{
+export async function createBountyToken(
+  amountSats: number,
+  opts?: CreateBountyTokenOptions,
+): Promise<{
   token: string;
   proofs: Proof[];
 } | null> {
   const wallet = getCashuWallet();
   if (!wallet) return null;
 
+  const pollInterval = opts?.pollIntervalMs ?? 2_000;
+  const timeoutMs = opts?.invoiceTimeoutMs ?? 5 * 60_000;
+
   try {
     await wallet.loadMint();
     const mintQuote = await wallet.createMintQuote(amountSats);
-    // In production, user would pay the Lightning invoice in mintQuote.request
-    log.error(`Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
+    log.info(`Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
+    if (opts?.onInvoice) await opts.onInvoice(mintQuote.request);
+
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const state = await wallet.checkMintQuoteBolt11(mintQuote.quote);
+      if (state.state === "PAID") break;
+      if (state.state === "ISSUED") {
+        log.error("Mint quote already issued — proofs were minted elsewhere");
+        return null;
+      }
+      await new Promise((r) => setTimeout(r, pollInterval));
+    }
+    const finalState = await wallet.checkMintQuoteBolt11(mintQuote.quote);
+    if (finalState.state !== "PAID") {
+      log.error(
+        `Lightning invoice not paid within ${timeoutMs}ms (state=${finalState.state})`,
+      );
+      return null;
+    }
 
     const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
     const token = getEncodedToken({
