@@ -161,8 +161,17 @@ export function createFrostEscrowProvider(
       }
     },
 
-    async settle(_escrow_ref, _preimage) {
-      return { settled: true };
+    settle(_escrow_ref, _preimage) {
+      // FROST settlement requires threshold signing across the oracle
+      // cluster (NOT a single private key the EscrowProvider could
+      // hold). The worker drives redemption via the FROST coordinator
+      // path (see `frostDualKeySignAsync`). Return a clear error rather
+      // than a silent {settled:true} so any caller depending on this
+      // port-level method sees the problem immediately.
+      return Promise.resolve({
+        settled: false,
+        error: "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+      });
     },
 
     async cancel(escrow_ref) {

@@ -100,37 +100,54 @@ export function createCashuEscrowProvider(
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
+      let decoded;
       try {
-        const decoded = getDecodedToken(entry.token);
-        for (const proof of decoded.proofs) {
-          let secret: unknown;
-          try { secret = JSON.parse(proof.secret); } catch { continue; }
-          if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+        decoded = getDecodedToken(entry.token);
+      } catch (err) {
+        // Fail closed: an undecodable token gives us no basis to claim
+        // it's locked correctly. Returning ok:true here would let any
+        // malformed string bypass HTLC + P2PK verification.
+        return {
+          ok: false,
+          message: `Token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
+        };
+      }
 
-          if (secret[1]?.data !== payment_hash) {
-            return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
-          }
+      for (const proof of decoded.proofs) {
+        let secret: unknown;
+        try { secret = JSON.parse(proof.secret); } catch { continue; }
+        if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
 
-          const tags: string[][] | undefined = secret[1]?.tags;
-          const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
-          if (pubkeyTag) {
-            const lockedKeys = pubkeyTag.slice(1);
-            const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-              ? worker_pubkey
-              : `02${worker_pubkey}`;
-            if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
-              return { ok: false, message: "HTLC token not locked to selected worker" };
-            }
+        if (secret[1]?.data !== payment_hash) {
+          return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+        }
+
+        const tags: string[][] | undefined = secret[1]?.tags;
+        const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
+        if (pubkeyTag) {
+          const lockedKeys = pubkeyTag.slice(1);
+          const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
+            ? worker_pubkey
+            : `02${worker_pubkey}`;
+          if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
+            return { ok: false, message: "HTLC token not locked to selected worker" };
           }
         }
-      } catch {
-        // Token decode failed — non-fatal
       }
       return { ok: true };
     },
 
-    async settle(_escrow_ref, _preimage) {
-      return { settled: true };
+    settle(_escrow_ref, _preimage) {
+      // Settlement at the mint requires the worker's private key, which
+      // EscrowProvider does not carry. The worker calls
+      // `redeemHtlcToken(...)` from `@anchr/core-cashu/escrow` directly.
+      // Return a clear error rather than a silent {settled:true} so that
+      // any caller depending on this port-level method sees the problem
+      // immediately.
+      return Promise.resolve({
+        settled: false,
+        error: "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
+      });
     },
 
     async cancel(escrow_ref) {

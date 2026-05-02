@@ -134,7 +134,14 @@ function createTestableProvider(groupPubkey: string) {
       }
     },
 
-    async settle() { return { settled: true }; },
+    async settle() {
+      // Mirrors frost-escrow-provider.ts: settle is not wired through
+      // EscrowProvider in production paths.
+      return {
+        settled: false,
+        error: "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+      };
+    },
 
     async cancel(escrow_ref) {
       const deleted = tokenMap.delete(escrow_ref);

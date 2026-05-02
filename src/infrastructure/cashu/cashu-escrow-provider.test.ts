@@ -66,7 +66,10 @@ function makePlainToken(amount = 100): string {
 function createTestableProvider() {
   const tokenMap = new Map<string, { token: string; escrowToken: { proofs: import("@cashu/cashu-ts").Proof[] } }>();
 
-  const provider: EscrowProvider & { _seed(ref: string, token: string): void } = {
+  const provider: EscrowProvider & {
+    _seed(ref: string, token: string): void;
+    _seedRaw(ref: string, token: string): void;
+  } = {
     async createHold() { return null; },
     async bindWorker() { return null; },
 
@@ -90,36 +93,48 @@ function createTestableProvider() {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
+      let decoded;
       try {
-        const decoded = getDecodedToken(entry.token);
-        for (const proof of decoded.proofs) {
-          let secret: unknown;
-          try { secret = JSON.parse(proof.secret); } catch { continue; }
-          if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+        decoded = getDecodedToken(entry.token);
+      } catch (err) {
+        // Fail closed (mirrors cashu-escrow-provider.ts).
+        return {
+          ok: false,
+          message: `Token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
+        };
+      }
+      for (const proof of decoded.proofs) {
+        let secret: unknown;
+        try { secret = JSON.parse(proof.secret); } catch { continue; }
+        if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
 
-          if (secret[1]?.data !== payment_hash) {
-            return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
-          }
+        if (secret[1]?.data !== payment_hash) {
+          return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+        }
 
-          const tags: string[][] | undefined = secret[1]?.tags;
-          const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
-          if (pubkeyTag) {
-            const lockedKeys = pubkeyTag.slice(1);
-            const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-              ? worker_pubkey
-              : `02${worker_pubkey}`;
-            if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
-              return { ok: false, message: "HTLC token not locked to selected worker" };
-            }
+        const tags: string[][] | undefined = secret[1]?.tags;
+        const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
+        if (pubkeyTag) {
+          const lockedKeys = pubkeyTag.slice(1);
+          const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
+            ? worker_pubkey
+            : `02${worker_pubkey}`;
+          if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
+            return { ok: false, message: "HTLC token not locked to selected worker" };
           }
         }
-      } catch {
-        // Token decode failed -- non-fatal
       }
       return { ok: true };
     },
 
-    async settle() { return { settled: true }; },
+    async settle() {
+      // Mirrors cashu-escrow-provider.ts: settle is not wired through
+      // EscrowProvider in production paths.
+      return {
+        settled: false,
+        error: "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
+      };
+    },
 
     async cancel(escrow_ref) {
       const deleted = tokenMap.delete(escrow_ref);
@@ -129,6 +144,11 @@ function createTestableProvider() {
     _seed(ref: string, token: string) {
       const decoded = getDecodedToken(token);
       tokenMap.set(ref, { token, escrowToken: { proofs: decoded.proofs } });
+    },
+
+    /** Seed without decoding — used to test malformed-token handling. */
+    _seedRaw(ref: string, token: string) {
+      tokenMap.set(ref, { token, escrowToken: { proofs: [] } });
     },
   };
 
@@ -311,6 +331,30 @@ describe("Cashu HTLC EscrowProvider", () => {
       // Second proof has wrong hash -> fails
       expect(result.ok).toBe(false);
       expect(result.message).toContain("hash mismatch");
+    });
+
+    test("fails closed when token is undecodable (no silent ok=true bypass)", async () => {
+      // The previous behaviour swallowed decode errors and returned ok=true,
+      // letting any malformed string bypass HTLC + P2PK checks. Force a
+      // decode failure by seeding a non-cashuB string and assert verifyLock
+      // returns ok=false with a clear message.
+      provider._seedRaw("ref_undecodable", "(not-a-real-token)");
+      const result = await provider.verifyLock(
+        "ref_undecodable",
+        PAYMENT_HASH,
+        WORKER_PUB,
+      );
+      expect(result.ok).toBe(false);
+      expect(result.message).toContain("Token failed to decode");
+    });
+  });
+
+  describe("settle()", () => {
+    test("returns settled=false with explanatory error (settle is not wired through this port)", async () => {
+      const result = await provider.settle("any-ref", "00".repeat(32));
+      expect(result.settled).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(result.error).toContain("not wired");
     });
   });
 
