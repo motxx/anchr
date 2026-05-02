@@ -7,8 +7,12 @@ import {
   shouldQuote,
   validateProviderOptions,
 } from "./provider.ts";
-import { buildQueryRequestEvent } from "./events.ts";
 import {
+  buildQueryRequestEvent,
+  buildSelectionFeedbackEvent,
+} from "./events.ts";
+import {
+  decryptNip44,
   generateKeypair,
   type Event,
   type Filter,
@@ -206,8 +210,10 @@ test("Provider.serve publishes a kind 7000 quote when handler returns a Provider
   let onEventRef: ((e: Event) => void) | null = null;
 
   const relayClient = makeRelayClient({
-    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
-      onEventRef = onEvent;
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      // Capture only the request subscription (kinds: [5300]); ignore
+      // the per-job selection subscription so its timeout fires fast.
+      if ((filter.kinds ?? []).includes(5300)) onEventRef = onEvent;
       return { close: () => {} };
     },
     publish: async (event: Event): Promise<PublishResult> => {
@@ -216,7 +222,11 @@ test("Provider.serve publishes a kind 7000 quote when handler returns a Provider
     },
   });
 
-  const provider = createProvider({ ...validOptions(), relayClient });
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    selectionTimeoutMs: 30,
+  });
   const servePromise = provider.serve(async () => ({
     amountSats: 250,
     produce: async () => ({ data: null, proof: "p" }),
@@ -238,7 +248,9 @@ test("Provider.serve publishes a kind 7000 quote when handler returns a Provider
     locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
-  await new Promise((r) => setTimeout(r, 10));
+  // Wait long enough for the per-job selection timeout (30ms) to fire,
+  // so no setTimeout leaks across to the test runner.
+  await new Promise((r) => setTimeout(r, 60));
   await provider.stop();
   await servePromise;
 
@@ -286,6 +298,157 @@ test("Provider.serve declines requests where handler returns null (no publish)",
   await servePromise;
 
   expect(published).toHaveLength(0);
+});
+
+test("Provider.serve waits for selection, runs producer, and publishes encrypted kind 6300 result", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      // First subscription is the request listener (kind 5300 only).
+      // Second subscription (per job) is the selection listener
+      // (kinds: [7000], #e: [requestId], authors: [customer]).
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      } else if (kinds.includes(7000)) {
+        onSelectionEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    selectionTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => {
+      producerCalled = true;
+      return { data: { hello: "world" }, proof: "pf-bytes" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  const fireRequest = onRequestEvent as (e: Event) => void;
+
+  // Customer sends a request.
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: { foo: "bar" },
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  // Wait for the provider to publish its quote and open the selection
+  // subscription before we deliver the selection event.
+  await new Promise((r) => setTimeout(r, 30));
+  if (onSelectionEvent === null) throw new Error("selection subscribe was not called");
+  const fireSelection = onSelectionEvent as (e: Event) => void;
+
+  // Customer announces selecting this provider, with a bound token.
+  const selectionEvent = buildSelectionFeedbackEvent(customerKey, requestEvent.id, {
+    status: "processing",
+    selected_provider_pubkey: providerKey.publicKey,
+    bound_token: "cashuBbound",
+  });
+  fireSelection(selectionEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(true);
+  // Two publishes from the provider: kind 7000 quote + kind 6300 result.
+  expect(published).toHaveLength(2);
+  expect(published[0].kind).toBe(7000);
+  expect(published[1].kind).toBe(6300);
+
+  // The kind 6300 content is NIP-44-encrypted to the customer.
+  const decrypted = decryptNip44(
+    published[1].content,
+    customerKey.secretKey,
+    providerKey.publicKey,
+  );
+  const payload = JSON.parse(decrypted);
+  expect(payload.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(payload.data).toEqual({ hello: "world" });
+  expect(payload.proof).toBe("pf-bytes");
+});
+
+test("Provider.serve never runs the producer when no selection event arrives within timeout", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    selectionTimeoutMs: 30,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 100,
+    produce: async () => {
+      producerCalled = true;
+      return { data: null, proof: "x" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  (onRequestEvent as (e: Event) => void)(buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+
+  // Wait beyond the selection timeout without delivering a selection.
+  await new Promise((r) => setTimeout(r, 80));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(false);
+  // Only the kind 7000 quote was published; no kind 6300 result.
+  expect(published).toHaveLength(1);
+  expect(published[0].kind).toBe(7000);
 });
 
 test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {

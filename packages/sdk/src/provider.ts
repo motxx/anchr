@@ -15,16 +15,18 @@
  */
 
 import {
+  buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
   parseQueryRequestEvent,
+  parseSelectionFeedbackEvent,
 } from "./events.ts";
 import {
   createRelayClient,
   type Event as NostrEvent,
+  findTagValue,
   type Keypair,
   normalizeSecretKey,
   type RelayClient,
-  signEvent as _signEvent,
 } from "./nostr.ts";
 import { getPublicKey } from "nostr-tools/pure";
 import type {
@@ -248,9 +250,84 @@ async function handleJob(
   );
   await ctx.relayClient.publish(quoteEvent);
 
-  // TODO(P2 chunk 8): wait for selection event, run quote.produce(),
-  // encrypt+publish kind 6300, wait for oracle preimage DM, redeem HTLC.
-  void quote.produce; // captured for next chunk
-  void ctx.selectionTimeoutMs;
+  // [step 5] Wait for the customer's selection event (kind 7000
+  // status=processing) addressed to us. Time out after
+  // selectionTimeoutMs — the customer may select a different
+  // provider, in which case we never see a matching event.
+  const selection = await waitForSelection(
+    ctx,
+    event.id,
+    payload.customer_pubkey,
+  );
+  if (selection === null) return;
+
+  // [step 6] Run the lazy producer to generate the proof. Errors here
+  // mean we cannot fulfill the request — silently bail (locktime
+  // refunds the customer).
+  let result: { data: unknown; proof: Uint8Array | string };
+  try {
+    result = await quote.produce();
+  } catch {
+    return;
+  }
+
+  // [step 7] Build + publish the kind 6300 result event with the
+  // response NIP-44-encrypted to the customer's pubkey.
+  const responseEvent = buildQueryResponseEvent(
+    ctx.identity,
+    event.id,
+    payload.customer_pubkey,
+    {
+      schema: payload.schema,
+      data: result.data,
+      proof: result.proof,
+    },
+  );
+  await ctx.relayClient.publish(responseEvent);
+
+  // TODO(P2 chunk 7c): subscribe to NIP-44 DM (kind 4) from the
+  // oracle for the preimage, then redeem the HTLC at the mint.
+  void selection.bound_token; // captured for next chunk
   void ctx.cashuClient;
+}
+
+/**
+ * Wait for the customer's kind 7000 status=processing selection event
+ * referencing our quote. Returns the parsed selection payload, or
+ * null on timeout / no addressed-to-us event.
+ */
+function waitForSelection(
+  ctx: JobContext,
+  requestEventId: string,
+  customerPubkey: string,
+): Promise<{ bound_token: string } | null> {
+  return new Promise((resolve) => {
+    // Mutable holder so the subscribe callback can clear the timer
+    // and vice versa without `let` reassignment.
+    const handles: {
+      sub?: { close(): void };
+      timeoutId?: ReturnType<typeof setTimeout>;
+    } = {};
+    handles.sub = ctx.relayClient.subscribe(
+      {
+        kinds: [7000],
+        "#e": [requestEventId],
+        authors: [customerPubkey],
+      },
+      (event) => {
+        // The customer announces the selected provider via the `p` tag.
+        const selectedPubkey = findTagValue(event, "p");
+        if (selectedPubkey !== ctx.identity.publicKey) return;
+        const parsed = parseSelectionFeedbackEvent(event);
+        if (parsed === null) return;
+        handles.sub?.close();
+        if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
+        resolve({ bound_token: parsed.bound_token });
+      },
+    );
+    handles.timeoutId = setTimeout(() => {
+      handles.sub?.close();
+      resolve(null);
+    }, ctx.selectionTimeoutMs);
+  });
 }
