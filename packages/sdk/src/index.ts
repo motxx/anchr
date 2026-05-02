@@ -531,3 +531,19 @@ export {
   type HttpOracleOptions,
   type OracleClient,
 } from "./oracle.ts";
+
+export {
+  createCashuClient,
+  validateHashHex,
+  validateLocktime,
+  CashuClientError,
+  CashuMintError,
+  type BindProviderParams,
+  type BuildHtlcLockParams,
+  type CashuClient,
+  type CashuClientOptions,
+  type CashuProof,
+  type CashuToken,
+  type RedeemHtlcParams,
+  type RedeemResult,
+} from "./cashu.ts";
