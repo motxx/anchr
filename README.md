@@ -4,220 +4,190 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-**Buy cryptographically verified data with sats. No middleman holds your money.**
+P2P-style verified-data purchase between pseudonymous parties, settled
+atomically over Nostr.
 
-When you buy data online today, you have to trust the seller — that the
-number came from the claimed source, that they didn't tamper with it on
-the way, that they won't take your money and disappear. Every API key,
-every paid feed, every "we promise this is real" notice is a stand-in
-for that trust.
+> **Status: experimental.** Testnet only. SDK API design in progress;
+> packages may change.
 
-Anchr replaces it. The seller produces a proof you can check yourself,
-and the Bitcoin escrow only releases against that proof. The buyer
-can't take the data without paying. The seller can't get paid without
-producing a verifiable answer. Nobody in the middle can pocket the
-money.
+## Why this exists
 
-The reference server runs at
-[`anchr-app.fly.dev`](https://anchr-app.fly.dev/health); the wire
-specs are CC0 so anyone can implement an alternative.
+TLSNotary attests that a server returned an HTTPS response at time T.
+Cashu HTLC releases payment against a revealed secret. Combined over
+Nostr DMs, two parties can exchange verified data and payment with no
+Anchr-side intermediary — a thin oracle holds the HTLC preimage to
+enforce atomic settlement, and the Cashu mint remains the trust anchor
+for the ecash (as in any Cashu deployment).
+
+This SDK orchestrates the exchange. It is **not a middleman**: you pick
+every external service (Nostr relay, Cashu mint, TLSNotary notary,
+oracle). Anchr runs no central server. Customers and providers are pseudonymous
+Nostr pubkeys; no real-name accounts or KYC.
+
+Each primitive (NIP-90, Cashu HTLC, TLSNotary) exists in isolation. The
+hard part is composing them so payment release and proof verification
+happen atomically — that's what this SDK does.
 
 ## How it works
 
-Three actors. One Bitcoin escrow. One message bus. Four steps.
-Equivalently: **NIP-90 (Nostr DVM) + Cashu HTLC settlement + Oracle-verified proofs.**
+1. **Customer** locks Cashu HTLC at the mint with hashlock `H` (from oracle).
+2. **Customer** broadcasts a kind 5300 Job Request to Nostr relays — no
+   specific provider addressed.
+3. **Providers** subscribed to the request's `schema` reply with kind 7000
+   quotes. **Customer** selects one and binds the HTLC to the chosen
+   provider's pubkey.
+4. **Provider** produces a proof matching the schema, encrypts the response
+   to the customer's pubkey via NIP-44, and publishes a kind 6300 event.
+5. **Oracle** verifies the proof against the schema; if valid, sends
+   preimage `S` to the provider via NIP-44 DM.
+6. **Provider** redeems the HTLC at the mint with `S` — paid.
 
+The oracle alone gates payment release based on proof validity. The customer
+cannot withhold payment after a valid proof; the provider cannot get paid
+without producing one. If no provider delivers a valid proof before the HTLC's locktime expires,
+the customer's payment refunds automatically.
+
+Wire-compatible with [NIP-90 DVM](https://github.com/nostr-protocol/nips/blob/master/90.md)
+event kinds (5300 / 6300 / 7000) so DVM-aware clients can interoperate.
+
+## Install
+
+```sh
+deno add @anchr/sdk
+# or
+npm i @anchr/sdk
 ```
-Requester ─ locks escrow ──► posts query
-                                      │
-                                      ▼
-Worker   ─ discovers ──────► produces proof
-                                      │
-                                      ▼
-Oracle   ─ verifies ───────► releases escrow
-                                      │
-                                      ▼
-Worker   ─ redeems ────────► Requester gets the data
 
-                                      timeout? ─► escrow refunds
-```
+## Quick start
 
-1. **Requester** posts a query and locks payment in a Cashu HTLC.
-2. **Worker** discovers the query over Nostr (NIP-90 DVM), gathers the
-   data, and either generates a cryptographic proof (TLSNotary on
-   HTTPS responses) or relays an attestation produced upstream by a
-   signing device (C2PA from a hardware-signed camera, ProofMode from
-   an attested mobile capture). GPS coordinates inside a C2PA EXIF
-   assertion are verified within the same proof.
-3. **Oracle** verifies the proof. If valid, it releases the HTLC
-   preimage; for high-value queries, t-of-n independent oracles each
-   sign in parallel via FROST and a single party can't release alone.
-4. **Worker** redeems the Cashu token at the mint and the requester
-   receives the verified result. If anything fails, the locktime
-   refunds the requester.
+**Customer:**
 
-Three properties hold without trusting any single party: requesters
-can't revoke payment once work has begun; workers can't forge proofs
-because verification is cryptographic; oracles can't steal funds
-because the escrow only releases against the worker's own signature.
-An attack test pins each property — see
-[`docs/threat-model.md`](docs/threat-model.md) for the full
-enumeration.
+```ts
+import { createCustomer } from "@anchr/sdk";
 
-## Use it
-
-Three independent paths.
-
-### As a library
-
-```typescript
-import { Anchr } from "anchr-sdk";
-
-const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
-
-const result = await anchr.query({
-  description: "BTC price from CoinGecko",
-  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
-  maxSats: 21,
+const customer = createCustomer({
+  oracles: ["npub1oracle1...", "npub1oracle2..."],  // accepted oracle whitelist
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
 });
 
-console.log(result.verified);   // true
-console.log(result.data);       // { bitcoin: { usd: 71000 } }
-console.log(result.serverName); // "api.coingecko.com" — TLS session cryptographically bound to this server name (does not assert the data is "true")
-console.log(result.proof);      // base64 TLSNotary presentation, independently verifiable
+const result = await customer.request({
+  spec: {
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {
+      target: "https://api.github.com/users/alice",
+      conditions: [{ path: "$.public_repos", op: ">", value: 10 }],
+    },
+    description: "GitHub user has more than 10 public repos",  // optional
+  },
+  payment: { maxAmount: 1000 },  // accept any quote up to this
+});
+
+console.log(result.data);          // verified response payload
+console.log(result.proof);         // proof bytes (format depends on schema)
+console.log(result.providerPubkey);  // who fulfilled the request
 ```
 
-Install: `bun add anchr-sdk` (or `npm i anchr-sdk`).
+The customer broadcasts the request — any provider that supports the schema
+can quote. The SDK picks the cheapest quote within `maxAmount`. To
+target a specific provider, pass `provider: "npub1..."` instead.
 
-### As a server
+**Provider:**
 
-```bash
-deno install
-deno task build:ui && deno task build:css
-deno task dev                  # http://localhost:3000
+```ts
+import { createProvider } from "@anchr/sdk";
+
+const provider = createProvider({
+  oracles: ["npub1oracle1...", "npub1oracle2..."],  // accepted oracle whitelist
+  notary:  "wss://notary.example.org",
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
+  privKey: "nsec1...",
+});
+
+await provider.serve(async (request) => {
+  // request.spec.schema tells you what proof format to produce.
+  // Schema-specific producers live in @anchr/tlsn-toolkit, @anchr/photo-bounty, etc.
+  return await produceProof(request.spec);
+});
 ```
 
-Full local stack (regtest Bitcoin + Cashu mint + Nostr relay + Blossom)
-in Docker — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+> **Note.** The API above is the design target. Current
+> [`@anchr/sdk`](packages/sdk/) does not yet match this shape — see
+> the package README for current state.
 
-### As a contributor
+## Components (you choose)
 
-`./scripts/test-all.sh --local` runs the same gate as CI. Test
-commands and the quality bar live in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+The SDK does not bundle these — you pass URLs/pubkeys at construction
+time. Run your own, or use third-party infrastructure.
 
-## Built with it
+| Component | Role | Required for | Examples |
+|---|---|---|---|
+| **Oracle** | Atomic exchange enforcer. Verifies proof, releases HTLC preimage. Customer and provider each pass a whitelist; the protocol uses one oracle from the intersection. | All schemas | Self-host single-party, or FROST t-of-n cluster |
+| **Relay** | Nostr message transport. Any vanilla relay. | All schemas | strfry, nostr-rs-relay, third-party relays |
+| **Mint** | Cashu HTLC ecash issuer. Any vanilla mint. | All schemas | nutshell, cashu-rs-mint, public test mints |
+| **Notary** | TLSNotary verifier. Mediates the provider's TLS proof session. | TLSN-based schemas only | Self-host (`crates/tlsn-*`), or any compatible notary |
 
-Seven examples under [`example/`](example/) — five runnable, two
-conceptual sketches. All are exercised in CI.
+## Verification types
 
-| Example | What it shows |
-|---|---|
-| [Two-party binary bet (Kannagi)](example/prediction-market/) ([live](https://anchr-market.fly.dev)) | Two-party binary bet settled by oracle attestation; experimental — 1:1 matching, no CLOB or position transfer. |
-| [Auto-claim](example/auto-claim/) | "Install the extension. Browse normally. Money you're owed comes back automatically." |
-| [Airdrop bot shield (Katashiro)](example/airdrop-bot-shield/) | TLSNotary-based Sybil resistance for token airdrops — proves Web2 attributes without persisting the underlying credential. |
-| [Fiat ↔ BTC swap (Watari)](example/tlsn-fiat-swap-square/) | Counterparty proves a Square card payment via TLSNotary; the Cashu HTLC releases BTC against that proof. |
-| [C2PA photo verification](example/c2pa-media-verification/) | News desks pay sats for photos that carry hardware-signed Content Credentials (camera, timestamp, GPS) plus an AI-generation heuristic. |
-| [Royalty distribution](example/royalty-distribution/) | Conceptual sketch: recursive R/W/O across the edges of a content rights graph — every payment gated on verifiable proof, every distribution publicly auditable. The verification-only chain pattern at its cleanest (no physical-binding gap). |
-| [Supply-chain proof](example/supply-chain-proof/) | Conceptual sketch: same verification-only chain pattern in the *physical* domain. Demonstrates Anchr's value as well as its limit (the photo-to-shipment binding gap). |
+The SDK does not bake in any verification format. Each request carries
+a `schema` URI; provider and oracle interpret it. New formats plug in by
+publishing a schema, not by upgrading the SDK.
 
-## The pieces
-
-Anchr is **independently usable packages**. Most users only need the
-canonical composition above — but each piece can be picked up
-standalone for other patterns:
-
-| Package | Purpose | Used by |
+| Schema | Use case | Status |
 |---|---|---|
-| [`packages/photo-bounty`](packages/photo-bounty/) | C2PA + GPS + ProofMode + EXIF + AI heuristic | c2pa-media, supply-chain |
-| [`packages/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary verification (replay-protected, ReDoS-safe) | auto-claim, airdrop, fiat-swap, supply-chain |
-| [`packages/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Bilateral cross-lock for binary outcomes (HTLC + FROST P2PK) | prediction-market, fiat-swap, auto-claim, airdrop |
-| [`packages/cashu-frost-oracle`](packages/cashu-frost-oracle/) | FROST t-of-n threshold signing wrapper | prediction-market |
-| [`packages/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow + preimage store | (used by conditional-swap) |
-| [`packages/core-runtime`](packages/core-runtime/) | Bun ↔ Deno compatibility helpers | (used by host server) |
-| [`packages/sdk`](packages/sdk/) | High-level HTTP / MCP client for the canonical bounty flow | c2pa-media, auto-claim, fiat-swap |
+| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response | Defined |
+| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video with optional GPS predicate | Defined |
+| `io.anchr.dlc-price.v1` | DLC oracle price attestation at a future timestamp | Planned |
+| `io.anchr.mdl-residency.v1` | mDL / EU Digital Identity residency claim | Planned |
+| `io.anchr.dkim-email.v1` | DKIM-signed email proof | Planned |
 
-Plus Rust crates (`crates/frost-signer`, `crates/tlsn-*`) for the
-underlying primitives. See [`docs/architecture.md`](docs/architecture.md)
-for layer dependencies and composition patterns.
+Schemas live as Nostr parameterized replaceable events (kind `30888`);
+each defines the `predicate` shape, the proof format, and verification
+rules.
 
-The reference host also bundles an **attachment registry** at
-[`src/infrastructure/blossom/`](src/infrastructure/blossom/) — a Blossom
-([BUD-01–06](https://github.com/hzrd149/blossom)) integration that
-stores AES-256-GCM-encrypted proof attachments (photos, large TLSN
-presentations, ProofMode bundles) addressed by SHA-256 hash, with the
-decryption key delivered separately via NIP-44. Used wherever a proof
-exceeds the Nostr event size budget (c2pa-media, fiat-swap, future
-verification-only chains). The wire spec leaves `storage_kind` as
-`"blossom" | "external"` so alternative backends can be wired in;
-[`docs/host-storage.md`](docs/host-storage.md) documents the bundled
-choice.
+## Examples
 
-## Other compositions
+Use this SDK to build the products below. Status shows current
+implementation — see each example's README for what runs today.
 
-The bounty flow is the canonical use, but Anchr's packages can be
-combined differently:
+| Product | Status |
+|---|---|
+| Airdrop sybil resistance ([Katashiro](example/airdrop-bot-shield/)) | Simulation |
+| Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/)) | Testnet |
+| 2-party binary bet ([Kannagi](example/prediction-market/)) | Testnet |
+| Browser auto-claim ([Auto-claim](example/auto-claim/)) | Concept |
+| Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Concept (TLSN-on-Square compatibility risk) |
 
-- **Two-party bet** ([`prediction-market`](example/prediction-market/)) — two counterparties cross-lock at the Mint, an Oracle reveals the winning outcome via preimage or FROST signature. *Oracle fetches the resolution URL directly via TLSNotary — no separate Worker layer.* Uses `cashu-conditional-swap` + `cashu-frost-oracle` directly, no SDK.
-- **Verification-only chain** ([`supply-chain-proof`](example/supply-chain-proof/)) — multi-hop evidence chain using `photo-bounty` + `tlsn-toolkit` only. *No Cashu HTLC — settlement is off-protocol (typically fiat invoices).* Anchr's value here is the verifiable evidence chain, not the BTC flow.
+Composition sketches (not products):
+[Royalty distribution](example/royalty-distribution/),
+[Supply-chain proof](example/supply-chain-proof/).
 
-Detail in [`docs/architecture.md`](docs/architecture.md).
+## Underlying packages
+
+Each is independently usable.
+
+| Package | Purpose |
+|---|---|
+| [`@anchr/sdk`](packages/sdk/) | Customer/provider orchestration over the components above |
+| [`@anchr/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary proof verification (replay-protected, ReDoS-safe) |
+| [`@anchr/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Cross-lock primitive (HTLC + FROST P2PK) |
+| [`@anchr/cashu-frost-oracle`](packages/cashu-frost-oracle/) | FROST t-of-n threshold signing wrapper |
+| [`@anchr/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow primitives |
+| [`@anchr/photo-bounty`](packages/photo-bounty/) | C2PA + GPS + ProofMode + EXIF + AI heuristic verification |
+
+Plus Rust crates: `crates/frost-signer` (FROST signing daemon),
+`crates/tlsn-*` (TLSNotary integrations).
 
 ## Reference
 
-<details>
-<summary>HTTP API — query / oracle endpoints</summary>
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/queries` | Create query |
-| `GET` | `/queries` | List open queries |
-| `GET` | `/queries/:id` | Query detail |
-| `POST` | `/queries/:id/quotes` | Worker submits quote |
-| `POST` | `/queries/:id/select` | Select Worker |
-| `POST` | `/queries/:id/begin` | Worker begins work |
-| `POST` | `/queries/:id/result` | Submit proof + verify + settle |
-| `POST` | `/queries/:id/cancel` | Cancel query |
-| `POST` | `/queries/:id/upload` | Upload media (auth required) |
-| `GET` | `/queries/:id/attachments` | List attachments |
-| `POST` | `/hash` | Oracle generates preimage / hash |
-| `GET` | `/oracles` | List oracles |
-| `GET` | `/health` | Health check |
-
-</details>
-
-<details>
-<summary>HTTP API — marketplace endpoints</summary>
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/marketplace/listings` | List active data listings |
-| `POST` | `/marketplace/listings` | Create listing (auth required) |
-| `GET` | `/marketplace/data/:id` | Purchase info (HTTP 402) |
-| `POST` | `/marketplace/data/:id` | Buy data (X-Cashu / X-Cashu-Htlc) |
-
-</details>
-
-<details>
-<summary>Configuration (env)</summary>
-
-| Variable | Default |
-|---|---|
-| `PORT` / `REFERENCE_APP_PORT` | `3000` |
-| `HTTP_API_KEYS` (comma-separated) | — |
-| `CASHU_MINT_URL` | — |
-| `NOSTR_RELAYS` | — |
-| `BLOSSOM_SERVERS` | — |
-| `TLSN_VERIFIER_URL` / `TLSN_PROXY_URL` | — |
-| `FROST_CONFIG_PATH` | — |
-| `TRUSTED_ORACLE_PUBKEYS` | — |
-| `ANTHROPIC_API_KEY` (for AI content check) | — |
-| `ANCHR_LOG_LEVEL` (`debug`/`info`/`warning`/`error`) | `info` |
-| `RUNTIME_DATA_DIR` | `.local` |
-
-</details>
+- [Architecture](docs/architecture.md) — layer dependencies and
+  composition patterns
+- [Threat model](docs/threat-model.md) — attacker assumptions and
+  mitigations
+- [Wire spec](specs/) — protocol on the wire (CC0, anyone may implement)
+- [Contributing](CONTRIBUTING.md) — local stack, test commands
 
 ## License
 
-Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) — anyone may
-implement them.
+Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) — anyone may implement.

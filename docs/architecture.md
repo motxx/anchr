@@ -1,8 +1,9 @@
 # Architecture
 
-Anchr is seven independently typecheckable packages on top of a Hono /
-Deno reference server. No package depends on host-side code; each is
-isolated under `deno task test:packages`.
+Anchr is seven independently typecheckable packages, plus a reference
+Hono / Deno server that composes them as one example deployment. No
+package depends on host-side code; each is isolated under `deno task
+test:packages`.
 
 ```
 packages/
@@ -39,7 +40,7 @@ are tracked. API stability is not yet guaranteed.
 
 The reference host bundles a Blossom client (`src/infrastructure/blossom/`,
 ~540 LOC) as the **encrypted attachment registry** for proofs that
-don't fit in Nostr events. Without it, the canonical bounty flow can
+don't fit in Nostr events. Without it, the bounty composition can
 still carry small inline data, but anything photo-sized, large TLSN
 presentations, or ProofMode bundles needs an out-of-event store.
 

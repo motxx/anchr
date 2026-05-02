@@ -3,6 +3,8 @@
 > *Watari* — a crossing or ferry. Here: trustless fiat ↔ BTC crossing
 > via Square card payment proof.
 
+> **Status: Concept.** TLSN-on-Square has TLS compatibility risk that may affect production viability.
+
 > **Uses:** `anchr-sdk` → reference server (`@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap`).
 > **Pattern:** bounty (Seller asks for proof of fiat payment, Buyer provides it; see role mapping below for the inversion note).
 

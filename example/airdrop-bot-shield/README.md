@@ -4,6 +4,8 @@
 
 **Airdrop bot shield.**
 
+> **Status: Simulation.** The pattern is deliverable with the SDK; current code is mock-stage.
+
 > **Uses:** `@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap` (designed; current code is a simulation).
 > **Pattern:** bounty (Project pays each verified Claimant on TLSN-attested Web2 attribute).
 

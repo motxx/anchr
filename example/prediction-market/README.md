@@ -4,6 +4,8 @@
 
 **Two-party binary bet, settled by oracle attestation.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
 
+> **Status: Testnet.** Live deployment at <https://anchr-market.fly.dev>; testnut ecash, not real BTC.
+
 > **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
 > **Pattern:** two-party bet (two counterparties cross-lock; Oracle reveals outcome).
 

@@ -1,5 +1,7 @@
 # C2PA Media Verification
 
+> **Status: Testnet.** Backed by `@anchr/photo-bounty` and a testnut mint; not on mainnet.
+
 > **Uses:** `anchr-sdk` → reference server (`@anchr/photo-bounty` + `@anchr/cashu-conditional-swap`).
 > **Pattern:** bounty (News desk pays Journalist on verified C2PA + GPS proof).
 

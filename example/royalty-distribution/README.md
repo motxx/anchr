@@ -9,10 +9,10 @@
 > gated on a verifiable proof, every distribution is auditable by
 > anyone, and under-/over-payment becomes mathematically detectable.
 
-> **Status — implementation deferred.** `src/` contains type stubs
-> and a tiny simulated demo. The conceptual structure described below
-> is what the wired-up version aims to demonstrate; runnable
-> end-to-end code will follow once the conceptual framing stabilises.
+> **Status: Sketch.** `src/` contains type stubs and a tiny simulated
+> demo. The conceptual structure described below is what the wired-up
+> version aims to demonstrate; runnable end-to-end code will follow
+> once the conceptual framing stabilises.
 
 ## The shape this addresses
 

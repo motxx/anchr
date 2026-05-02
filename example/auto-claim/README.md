@@ -1,5 +1,7 @@
 # Auto-Claim
 
+> **Status: Concept.** Browser extension is the target UX; the current demo runs the same agent logic as a Deno script. No extension is shipping yet.
+
 > **Uses:** `anchr-sdk` + `@anchr/core-runtime` → reference server (`@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap`).
 > **Pattern:** bounty (Insurer pays Claimant on verified TLSN proof of triggering event).
 

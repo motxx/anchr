@@ -9,10 +9,10 @@
 > attestation tech (C2PA, ProofMode, hardware-signed sensors, per-item
 > IDs) achieves, and what Anchr alone fundamentally cannot solve.
 
-> **Status — implementation deferred.** `src/` contains a typed
-> verification engine and a runnable demo with **simulated proofs**
-> (no real C2PA capture, TLSNotary fetch, or Nostr publish). The
-> conceptual structure described below is what the wired-up version
+> **Status: Sketch.** `src/` contains a typed verification engine and
+> a runnable demo with **simulated proofs** (no real C2PA capture,
+> TLSNotary fetch, or Nostr publish). The conceptual structure
+> described below is what the wired-up version
 > aims to demonstrate; runnable end-to-end code will follow once the
 > conceptual framing stabilises.
 
