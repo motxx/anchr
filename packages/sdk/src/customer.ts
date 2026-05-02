@@ -7,11 +7,20 @@
  * response, optionally verifies the proof locally, and returns the
  * verified data.
  *
- * Status (v0.0.1): the API surface, configuration validation, and the
- * first three wire-flow steps (oracle hash retrieval → ephemeral
- * identity → Cashu HTLC lock) are implemented. The remaining steps
- * (Nostr publish, quote subscription, selection, result decryption,
- * local verification) land in subsequent milestones.
+ * Wire flow (each step is implemented in `request()` below):
+ *   0. Validate the request shape.
+ *   1. Pick an oracle from the configured whitelist.
+ *   2. Generate an ephemeral keypair + query id.
+ *   3. Ask the oracle for a hash `H` (preimage held by oracle).
+ *   4. Build the Phase-1 HTLC lock from the customer's source proofs.
+ *   5. Publish a kind 5300 Job Request event.
+ *   6. Subscribe to kind 7000 quotes for `quoteWindowMs`.
+ *   7. Select a quote, Phase-2-bind the HTLC to the chosen provider,
+ *      and announce the selection via kind 7000 status=processing.
+ *   8. Subscribe to the kind 6300 result from the selected provider.
+ *   9. NIP-44-decrypt the response.
+ *  10. Optionally invoke a schema-specific verifier.
+ *  11. Return the verified data + proof.
  */
 
 import type { CashuToken } from "./cashu.ts";

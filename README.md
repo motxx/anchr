@@ -112,10 +112,6 @@ await provider.serve(async (request) => {
 });
 ```
 
-> **Note.** The API above is the design target. Current
-> [`@anchr/sdk`](packages/sdk/) does not yet match this shape — see
-> the package README for current state.
-
 ## Components (you choose)
 
 The SDK does not bundle these — you pass URLs/pubkeys at construction

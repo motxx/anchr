@@ -1,17 +1,18 @@
 /**
- * End-to-end integration tests — wire Customer + Provider + a fake
- * oracle through a shared in-memory relay and assert the buyer gets
- * back the seller's data + proof.
+ * In-process wiring tests — co-execute Customer + Provider + a fake
+ * oracle against a fully mocked transport (in-memory relay) and a fully
+ * mocked Cashu mint (stubbed CashuClient). They verify that the SDK's
+ * event builders/parsers and Customer/Provider state machines compose
+ * correctly without touching any external infrastructure.
  *
- * The mock relay is a minimal in-process Nostr relay: kinds, authors,
- * `#e`, `#p` filters work; nothing is persisted, no network I/O. The
- * mock oracle watches kind 6300 events, locates the matching kind 5300
- * (to learn the customer's hashlock + the request id), and sends a
- * NIP-44 preimage DM to the provider.
+ * What this file is NOT:
+ *   - Not an end-to-end test against a real Nostr relay
+ *   - Not an end-to-end test against a real Cashu mint
+ *   - Not a verification that NUT-14 HTLC + NIP-44 actually work on the wire
  *
- * The mock CashuClient stubs HTLC operations; we don't exercise a real
- * mint here — that's covered when a default CashuClient ships in a
- * later milestone.
+ * The real e2e coverage lives at `e2e/sdk-integration.test.ts` (run via
+ * `deno task test:regtest`), which exercises this same flow against the
+ * Docker-backed regtest Cashu mint and Nostr relay.
  */
 
 import { test } from "@std/testing/bdd";
@@ -134,7 +135,7 @@ function makeCashuClient(): CashuClient {
 
 // --- End-to-end test ---
 
-test("end-to-end: customer.request returns the provider's data via a shared mock relay", async () => {
+test("in-process wiring: customer.request returns the provider's data via a shared mock relay (no real mint, no real network)", async () => {
   const relay = new MockRelay();
   const oracleKey = generateKeypair();
   const customerCashuClient = makeCashuClient();

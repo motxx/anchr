@@ -572,6 +572,8 @@ export {
   type CashuClient,
   type CashuClientOptions,
   type CashuProof,
+  type CashuSendChain,
+  type CashuWalletAdapter,
   type CashuToken,
   type RedeemHtlcParams,
   type RedeemResult,

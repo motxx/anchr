@@ -8,10 +8,20 @@
  * generate a proof, NIP-44-encrypts the response to the customer, and
  * publishes a kind 6300 result event.
  *
- * Status (v0.0.1): subscribe + parse + whitelist filter + handler
- * invocation + quote publish are implemented. Selection wait, result
- * publish, preimage wait, and HTLC redemption land in the next
- * milestones.
+ * Wire flow (each step is implemented in `handleJob()` below):
+ *   1. Parse the kind 5300 payload.
+ *   2. Filter by oracle whitelist.
+ *   3. Validate the schema URI shape.
+ *   4. Call the user-supplied handler for a quote; publish kind 7000
+ *      status=payment-required if the handler accepts.
+ *   5. Wait for the customer's kind 7000 status=processing selection
+ *      addressed to us (otherwise time out and bail).
+ *   6. Run the handler's lazy `produce()` to generate proof + data.
+ *   7. NIP-44-encrypt the response to the customer's pubkey and
+ *      publish a kind 6300 result event.
+ *   8. Wait for the oracle's preimage NIP-44 DM (kind 4) carrying our
+ *      query id; on timeout, locktime refunds the customer.
+ *   9. Redeem the HTLC at the mint with `preimage + provider sig`.
  */
 
 import {

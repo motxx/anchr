@@ -2694,6 +2694,7 @@
         "dependencies": [
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
+          "npm:@cashu/cashu-ts@3",
           "npm:nostr-tools@2"
         ]
       },
