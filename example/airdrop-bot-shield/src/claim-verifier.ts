@@ -18,6 +18,8 @@
  */
 
 import type { ProofCondition, AirdropCriteria } from "./airdrop-criteria.ts";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -288,42 +290,14 @@ export function verifyClaim(
 /**
  * Generate a unique claim hash for HTLC escrow.
  *
- * In production, this uses SHA-256 from @noble/hashes (the same library Anchr uses):
- *   import { sha256 } from "@noble/hashes/sha2.js";
- *   import { bytesToHex } from "@noble/hashes/utils.js";
- *
  * The preimage is a random 32-byte secret. The hash is SHA-256(preimage).
- * The oracle holds the preimage and releases it only when all conditions pass.
+ * The oracle holds the preimage and releases it only when all conditions
+ * pass. Both values are hex-encoded.
  */
 export function generateClaimHash(): { preimage: string; hash: string } {
-  // In production: use crypto.getRandomValues + @noble/hashes
-  // For the example, generate a deterministic mock
   const preimageBytes = new Uint8Array(32);
   crypto.getRandomValues(preimageBytes);
-  const preimage = Array.from(preimageBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  // SHA-256 hash of the preimage
-  // In production: const hash = bytesToHex(sha256(hexToBytes(preimage)));
-  // For the example, use Web Crypto API
-  return { preimage, hash: `sha256:${preimage.slice(0, 16)}...` };
-}
-
-/**
- * Async version of generateClaimHash using Web Crypto for real SHA-256.
- */
-export async function generateClaimHashAsync(): Promise<{ preimage: string; hash: string }> {
-  const preimageBytes = new Uint8Array(32);
-  crypto.getRandomValues(preimageBytes);
-  const preimage = Array.from(preimageBytes)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
-  const hashBuffer = await crypto.subtle.digest("SHA-256", preimageBytes);
-  const hash = Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
+  const preimage = bytesToHex(preimageBytes);
+  const hash = bytesToHex(sha256(preimageBytes));
   return { preimage, hash };
 }

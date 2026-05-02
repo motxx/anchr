@@ -30,7 +30,7 @@ import {
 
 import {
   verifyClaim,
-  generateClaimHashAsync,
+  generateClaimHash,
   type VerifiedProofData,
 } from "./claim-verifier.ts";
 
@@ -163,7 +163,7 @@ verifiedProofs.set(1, githubVerifiedData); // GitHub repos
 verifiedProofs.set(2, githubVerifiedData); // GitHub contributions
 
 // Generate HTLC hash/preimage for this claim
-const { preimage, hash } = await generateClaimHashAsync();
+const { preimage, hash } = generateClaimHash();
 console.log(`\nHTLC escrow:`);
 console.log(`  Preimage: ${preimage.slice(0, 16)}...${preimage.slice(-16)}`);
 console.log(`  Hash:     ${hash.slice(0, 16)}...${hash.slice(-16)}`);
