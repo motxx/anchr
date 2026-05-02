@@ -450,3 +450,54 @@ function sleep(ms: number): Promise<void> {
 // Default export
 export default Anchr;
 // Note: AnchrWorker (Node-only, uses node:fs) is exported from "@anchr/sdk/worker" via package.json subpath.
+
+// --- v0.0.1 Customer / Provider API ---
+//
+// New API matching the README's design target. The wire flow inside
+// Customer.request and Provider.serve is implemented incrementally.
+// See packages/sdk/src/customer.ts and provider.ts for current state.
+
+export {
+  createCustomer,
+  selectCheapestQuote,
+  pickOracleForRequest,
+  validateCustomerOptions,
+  CustomerConfigError,
+  DEFAULT_QUOTE_WINDOW_MS,
+  type Customer,
+} from "./customer.ts";
+
+export {
+  createProvider,
+  validateProviderOptions,
+  shouldQuote,
+  ProviderConfigError,
+  type Provider,
+} from "./provider.ts";
+
+export {
+  DEFINED_SCHEMAS,
+  isSchemaUri,
+  resolveProducer,
+  resolveVerifier,
+  UnknownSchemaError,
+  InvalidSchemaUriError,
+  type SchemaUri,
+  type DefinedSchemaUri,
+} from "./schema.ts";
+
+export type {
+  Spec,
+  Payment,
+  RequestResult,
+  Quote,
+  QuoteSelector,
+  CustomerOptions,
+  ProviderOptions,
+  RequestOptions,
+  ProviderRequestEvent,
+  ProviderHandler,
+  SchemaProducer,
+  SchemaVerifier,
+  SchemaProducerContext,
+} from "./types.ts";

@@ -2690,6 +2690,12 @@
           "npm:@anthropic-ai/sdk@0.78"
         ]
       },
+      "packages/sdk": {
+        "dependencies": [
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1"
+        ]
+      },
       "packages/tlsn-toolkit": {
         "dependencies": [
           "jsr:@logtape/logtape@2",

@@ -4,9 +4,17 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "imports": {
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
   "publish": {
     "include": [
       "src/index.ts",
+      "src/types.ts",
+      "src/schema.ts",
+      "src/customer.ts",
+      "src/provider.ts",
       "README.md",
       "deno.json"
     ],
@@ -27,5 +35,11 @@
       "deno.ns"
     ],
     "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-env --allow-read --allow-net src/customer.test.ts src/provider.test.ts src/schema.test.ts"
+  },
+  "test": {
+    "exclude": ["src/index.test.ts", "src/worker.test.ts"]
   }
 }
