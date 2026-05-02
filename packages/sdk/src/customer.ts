@@ -25,7 +25,14 @@ import {
   isSchemaUri,
   InvalidSchemaUriError,
 } from "./schema.ts";
-import { generateKeypair, type Keypair } from "./nostr.ts";
+import {
+  createRelayClient,
+  generateKeypair,
+  type Keypair,
+  type PublishResult,
+  type RelayClient,
+} from "./nostr.ts";
+import { buildQueryRequestEvent, type QueryRequestPayload } from "./events.ts";
 
 /**
  * Default quote-window in milliseconds. The SDK waits this long for
@@ -67,6 +74,17 @@ export class OracleWhitelistMismatchError extends Error {
   constructor(public readonly expected: string, public readonly received: string) {
     super(`Oracle pubkey mismatch: expected ${expected}, got ${received}`);
     this.name = "OracleWhitelistMismatchError";
+  }
+}
+
+/** Thrown when no relay accepted the published Job Request event. */
+export class RelayPublishError extends Error {
+  constructor(public readonly result: PublishResult) {
+    super(
+      `No relay accepted the Job Request event ` +
+        `(${result.failures.length} failures, 0 successes).`,
+    );
+    this.name = "RelayPublishError";
   }
 }
 
@@ -186,28 +204,57 @@ export function createCustomer(options: CustomerOptions): Customer {
         sourceProofs: req.sourceProofs,
       });
 
-      // Captured for the next-milestone wire-flow steps; explicitly
-      // referenced so static analysis treats them as used.
-      void quoteWindowMs;
-      void selector;
-      void verifiers;
-      void req.provider;
-      void initialLock;
-      void mint;
+      // [step 5] Build + publish the kind 5300 Job Request event. Use
+      // an injected RelayClient when available (tests inject a mock);
+      // otherwise build one from the configured relays for this call.
+      const ownsRelayClient = options.relayClient === undefined;
+      const relayClient: RelayClient = options.relayClient ?? createRelayClient(relays);
 
-      // TODO(P2 chunk 4-7): implement remaining wire flow:
-      //   5. Publish kind 5300 Job Request (relays + bounty token)
-      //   6. Subscribe to kind 7000 quotes for quoteWindowMs
-      //   7. Select via selector(quotes), bind HTLC to provider pubkey
-      //   8. Subscribe to kind 6300 result event
-      //   9. Decrypt response payload via NIP-44
-      //  10. Optionally call verifiers[req.spec.schema] for local verification
-      //  11. Return RequestResult
-      throw new Error(
-        "Customer.request: wire flow steps 5-11 not implemented in v0.0.1. " +
-          "Hash retrieved (oracle " + oraclePubkey + "), HTLC built. " +
-          "Remaining steps tracked as P2 chunks 4-7.",
-      );
+      try {
+        const requestPayload: QueryRequestPayload = {
+          query_id: queryId,
+          schema: req.spec.schema,
+          predicate: req.spec.predicate,
+          description: req.spec.description,
+          customer_pubkey: identity.publicKey,
+          oracle_pubkey: oraclePubkey,
+          mint_url: mint,
+          bounty_token: initialLock.token,
+          max_amount_sats: req.payment.maxAmount,
+          locktime_seconds: locktimeSeconds,
+          expires_at: Date.now() + quoteWindowMs,
+        };
+        const requestEvent = buildQueryRequestEvent(identity, requestPayload);
+        const publishResult = await relayClient.publish(requestEvent);
+
+        if (publishResult.successes.length === 0) {
+          throw new RelayPublishError(publishResult);
+        }
+
+        // Captured for the next-milestone wire-flow steps; explicitly
+        // referenced so static analysis treats them as used.
+        void selector;
+        void verifiers;
+        void req.provider;
+
+        // TODO(P2 chunk 5-7): implement remaining wire flow:
+        //   6. Subscribe to kind 7000 quotes for quoteWindowMs
+        //   7. Select via selector(quotes), bind HTLC to provider pubkey
+        //   8. Subscribe to kind 6300 result event
+        //   9. Decrypt response payload via NIP-44
+        //  10. Optionally call verifiers[req.spec.schema] for local verification
+        //  11. Return RequestResult
+        throw new Error(
+          "Customer.request: wire flow steps 6-11 not implemented in v0.0.1. " +
+            `Job Request event ${requestEvent.id.slice(0, 16)}… ` +
+            `accepted by ${publishResult.successes.length} of ` +
+            `${publishResult.successes.length + publishResult.failures.length} relays.`,
+        );
+      } finally {
+        if (ownsRelayClient) {
+          relayClient.close();
+        }
+      }
     },
   };
 }

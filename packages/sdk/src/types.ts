@@ -65,6 +65,11 @@ export interface CustomerOptions {
   oracleClient: import("./oracle.ts").OracleClient;
   /** Adapter for talking to the Cashu mint. */
   cashuClient: import("./cashu.ts").CashuClient;
+  /**
+   * Optional: pre-built relay client. When omitted the SDK builds one
+   * from `relays` on each request. Tests inject a mock here.
+   */
+  relayClient?: import("./nostr.ts").RelayClient;
   /** Optional: how to choose among provider quotes. Default: cheapest within `payment.maxAmount`. */
   quoteSelector?: QuoteSelector;
   /** Optional: how long to wait for quotes before selecting (default: 30000 ms). */

@@ -465,10 +465,17 @@ export {
   generateQueryId,
   CustomerConfigError,
   OracleWhitelistMismatchError,
+  RelayPublishError,
   DEFAULT_LOCKTIME_SECONDS,
   DEFAULT_QUOTE_WINDOW_MS,
   type Customer,
 } from "./customer.ts";
+
+export {
+  buildQueryRequestEvent,
+  parseQueryRequestEvent,
+  type QueryRequestPayload,
+} from "./events.ts";
 
 export {
   createProvider,

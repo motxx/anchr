@@ -7,6 +7,7 @@ import {
   generateQueryId,
   OracleWhitelistMismatchError,
   pickOracleForRequest,
+  RelayPublishError,
   selectCheapestQuote,
   validateCustomerOptions,
 } from "./customer.ts";
@@ -21,6 +22,13 @@ import type {
   RedeemHtlcParams,
   RedeemResult,
 } from "./cashu.ts";
+import type {
+  Event,
+  Filter,
+  PublishResult,
+  RelayClient,
+  Subscription,
+} from "./nostr.ts";
 import type { CustomerOptions, Quote } from "./types.ts";
 
 // --- Test doubles ---
@@ -66,12 +74,30 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   };
 }
 
+function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
+  return {
+    publish: overrides?.publish ?? (
+      async (_event: Event): Promise<PublishResult> => ({
+        successes: ["wss://relay.example.org"],
+        failures: [],
+      })
+    ),
+    subscribe: overrides?.subscribe ?? (
+      (_filter: Filter, _onEvent: (event: Event) => void): Subscription => ({
+        close: () => {},
+      })
+    ),
+    close: overrides?.close ?? (() => {}),
+  };
+}
+
 const validOptions = (): CustomerOptions => ({
   oracles: [ORACLE_A, ORACLE_B],
   relays: ["wss://relay.example.org"],
   mint: "https://mint.example.org",
   oracleClient: makeOracleClient(),
   cashuClient: makeCashuClient(),
+  relayClient: makeRelayClient(),
 });
 
 // --- Validation ---
@@ -243,7 +269,7 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
   ).rejects.toThrow(CashuMintError);
 });
 
-test("Customer.request reaches the not-implemented marker for steps 5-11 when prior steps succeed", async () => {
+test("Customer.request reaches the not-implemented marker for steps 6-11 after publish", async () => {
   const customer = createCustomer(validOptions());
   await expect(
     customer.request({
@@ -251,7 +277,49 @@ test("Customer.request reaches the not-implemented marker for steps 5-11 when pr
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(/wire flow steps 5-11 not implemented/);
+  ).rejects.toThrow(/wire flow steps 6-11 not implemented/);
+});
+
+test("Customer.request publishes a kind 5300 Job Request event via relayClient", async () => {
+  const recorder: { event: Event | null } = { event: null };
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      recorder.event = event;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+  const customer = createCustomer({ ...validOptions(), relayClient });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
+      payment: { maxAmount: 500 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow();
+
+  expect(recorder.event).not.toBe(null);
+  if (recorder.event === null) throw new Error("unreachable");
+  expect(recorder.event.kind).toBe(5300);
+  expect(recorder.event.id).toMatch(/^[0-9a-f]{64}$/);
+});
+
+test("Customer.request throws RelayPublishError when no relay accepts the event", async () => {
+  const relayClient = makeRelayClient({
+    publish: async (): Promise<PublishResult> => ({
+      successes: [],
+      failures: [{ relay: "wss://relay.example.org", reason: "rejected" }],
+    }),
+  });
+  const customer = createCustomer({ ...validOptions(), relayClient });
+
+  await expect(
+    customer.request({
+      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(RelayPublishError);
 });
 
 // --- Pure helpers ---
