@@ -72,7 +72,7 @@
     "test:ci": "deno test src/ packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-cashu/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=src/**/*.integration.test.ts,packages/sdk/'",
     "test:example": "deno test --allow-all example/",
     "test": "deno test src/ packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-cashu/ e2e/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:packages": "deno test packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-cashu/ packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts packages/sdk/src/schema.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:packages": "deno test packages/photo-bounty/ packages/tlsn-toolkit/ packages/cashu-frost-oracle/ packages/cashu-conditional-swap/ packages/core-runtime/ packages/core-cashu/ packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts packages/sdk/src/schema.test.ts packages/sdk/src/nostr.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:pentest": "deno test e2e/pentest/ --allow-env --allow-read --allow-net --allow-run --allow-sys",
     "test:all": "./scripts/test-all.sh --local",
     "test:all:docker": "./scripts/test-all.sh --docker",

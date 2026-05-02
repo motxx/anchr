@@ -2693,7 +2693,8 @@
       "packages/sdk": {
         "dependencies": [
           "jsr:@std/expect@1",
-          "jsr:@std/testing@1"
+          "jsr:@std/testing@1",
+          "npm:nostr-tools@2"
         ]
       },
       "packages/tlsn-toolkit": {

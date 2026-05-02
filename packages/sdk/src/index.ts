@@ -501,3 +501,25 @@ export type {
   SchemaVerifier,
   SchemaProducerContext,
 } from "./types.ts";
+
+export {
+  KIND_DIRECT_MESSAGE,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+  createRelayClient,
+  decryptNip44,
+  encryptNip44,
+  findAllTagValues,
+  findTagValue,
+  generateKeypair,
+  normalizePubkey,
+  normalizeSecretKey,
+  publishOnce,
+  signEvent,
+  type Filter,
+  type Keypair,
+  type PublishResult,
+  type RelayClient,
+  type Subscription,
+} from "./nostr.ts";

@@ -6,7 +6,11 @@
   },
   "imports": {
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
-    "@std/expect": "jsr:@std/expect@^1"
+    "@std/expect": "jsr:@std/expect@^1",
+    "nostr-tools/pool": "npm:nostr-tools@^2/pool",
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
+    "nostr-tools/nip44": "npm:nostr-tools@^2/nip44"
   },
   "publish": {
     "include": [
@@ -15,6 +19,7 @@
       "src/schema.ts",
       "src/customer.ts",
       "src/provider.ts",
+      "src/nostr.ts",
       "README.md",
       "deno.json"
     ],
@@ -37,7 +42,7 @@
     "strict": true
   },
   "tasks": {
-    "test": "deno test --allow-env --allow-read --allow-net src/customer.test.ts src/provider.test.ts src/schema.test.ts"
+    "test": "deno test --allow-env --allow-read --allow-net src/customer.test.ts src/provider.test.ts src/schema.test.ts src/nostr.test.ts"
   },
   "test": {
     "exclude": ["src/index.test.ts", "src/worker.test.ts"]
