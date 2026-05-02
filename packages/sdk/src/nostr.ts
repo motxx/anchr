@@ -217,7 +217,7 @@ export function createRelayClient(relays: readonly string[]): RelayClient {
       onEvent: (event: Event) => void,
       onEose?: () => void,
     ): Subscription {
-      const sub = pool.subscribeMany(relayList, filter, {
+      const sub = pool.subscribe(relayList, filter, {
         onevent: onEvent,
         oneose: onEose,
       });
