@@ -5,8 +5,13 @@
  *   - In-process simulated oracle
  *
  * The customer's source proofs are minted via regtest Lightning so the
- * Phase-2 swap and provider's HTLC redemption hit the real mint. This
- * is the "no Mock" verification of the SDK wire flow.
+ * Phase-1 lock, Phase-2 swap, and provider's HTLC redemption all hit
+ * the real mint. This is the "no Mock" verification of the SDK wire
+ * flow. **Scope:** HTLC + Nostr transport. The simulated oracle here
+ * does not verify proofs (it always releases the preimage on a kind
+ * 6300 result event); proof verification (TLSN attestation, C2PA, GPS,
+ * etc.) is a schema-specific concern outside the SDK and is covered by
+ * the per-schema test suites.
  *
  * Prerequisites:
  *   docker compose up -d
@@ -38,6 +43,7 @@ import {
   parseQueryRequestEvent,
 } from "../packages/sdk/src/events.ts";
 import type { OracleClient } from "../packages/sdk/src/oracle.ts";
+import { Wallet, getDecodedToken } from "@cashu/cashu-ts";
 
 import {
   checkInfraReady,
@@ -193,6 +199,87 @@ suite(
         oracleRelay.close();
         customerRelay.close();
         providerRelay.close();
+      }
+    });
+
+    test("Phase-1 bounty_token broadcast in kind 5300 is NOT spendable as a bearer instrument", async () => {
+      // Regression test for the bearer-leak issue: an attacker who
+      // subscribes to the relay sees the bounty_token in the kind 5300
+      // event content. The token MUST NOT be spendable by anyone except
+      // the customer (or, after Phase 2, by the chosen provider with
+      // the preimage). Phase 1 locks proofs to P2PK(customerPubkey).
+      const preimageBytes = new Uint8Array(32);
+      crypto.getRandomValues(preimageBytes);
+      const hashHex = bytesToHex(sha256(preimageBytes));
+
+      const customerProofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
+      const customerCashu = createCashuClient({ mintUrl: MINT_URL });
+      const customerKey = generateKeypair();
+
+      const phase1 = await customerCashu.buildHtlcLock({
+        amountSats: BOUNTY_SATS,
+        hashHex,
+        customerPubkey: customerKey.publicKey,
+        locktimeSeconds: Math.floor(Date.now() / 1000) + 3600,
+        sourceProofs: customerProofs,
+      });
+
+      // The token decodes to real cashuB proofs (proves it isn't an
+      // opaque blob).
+      const decoded = getDecodedToken(phase1.token);
+      expect(decoded.proofs.length).toBeGreaterThan(0);
+      // Each proof secret carries a P2PK lock to the customer pubkey.
+      for (const proof of decoded.proofs) {
+        const secret = JSON.parse(proof.secret) as [string, { data: string }];
+        expect(secret[0]).toBe("P2PK");
+        expect(secret[1].data).toContain(customerKey.publicKey);
+      }
+
+      // Attacker scenario A (cashu-ts client path): a passive relay
+      // subscriber decodes the bounty_token and tries to spend it via
+      // a fresh wallet that never knew the customer's privkey. The
+      // wallet's send() refuses to even build a swap request because
+      // the input proofs are P2PK-locked and no privkey was supplied.
+      const attackerWallet = new Wallet(MINT_URL, { unit: "sat" });
+      await attackerWallet.loadMint();
+      let clientPathError: unknown = null;
+      try {
+        await attackerWallet.ops.send(BOUNTY_SATS, decoded.proofs).run();
+      } catch (err) {
+        clientPathError = err;
+      }
+      expect(clientPathError).not.toBeNull();
+
+      // Attacker scenario B (direct mint POST): a more determined
+      // attacker bypasses cashu-ts and POSTs directly to the mint's
+      // /v1/swap endpoint. The mint MUST reject. (The balance and
+      // NUT-11 witness checks both reject; we just need _any_ rejection
+      // to confirm the proofs cannot be spent without the customer's
+      // signature.)
+      const inputAmount = decoded.proofs.reduce((s, p) => s + p.amount, 0);
+      const directPostRes = await fetch(`${MINT_URL}/v1/swap`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          inputs: decoded.proofs,
+          outputs: [
+            { amount: inputAmount, id: decoded.proofs[0]?.id ?? "00", B_: "02" + "ff".repeat(32) },
+          ],
+        }),
+      });
+      expect(directPostRes.ok).toBe(false);
+      const directPostBody = await directPostRes.text();
+      // Mint can reject for several reasons — fee imbalance, malformed
+      // outputs, or NUT-11 witness missing. All confirm the proofs
+      // cannot be spent without further signing.
+      expect(directPostBody.length).toBeGreaterThan(0);
+
+      // After both attack attempts, the proofs MUST still be UNSPENT
+      // at the mint (i.e., the legitimate customer can still claim
+      // them via Phase 2). This is the load-bearing property.
+      const stateRes = await attackerWallet.checkProofsStates(decoded.proofs);
+      for (const s of stateRes) {
+        expect(s.state).toBe("UNSPENT");
       }
     });
   },

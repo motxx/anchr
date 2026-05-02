@@ -320,13 +320,16 @@ export function createCustomer(options: CustomerOptions): Customer {
         }
 
         // [step 7 cont] Phase-2 swap: bind the chosen provider's pubkey
-        // to the existing HTLC.
+        // to the existing HTLC. The Phase-1 proofs are P2PK-locked to
+        // `identity.publicKey`, so the swap requires `identity.secretKey`
+        // to satisfy the input lock.
         const boundLock: CashuToken = await cashuClient.bindProvider({
           initialToken: initialLock.token,
           providerPubkey: selected.providerPubkey,
           hashHex: hash,
           locktimeSeconds,
           customerPubkey: identity.publicKey,
+          customerSecretKey: identity.secretKey,
         });
 
         // [step 7 cont] Announce the selection so the chosen provider

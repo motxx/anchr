@@ -32,6 +32,7 @@ import {
   getDecodedToken,
   getEncodedToken,
   signP2PKProofs,
+  verifyHTLCHash,
 } from "@cashu/cashu-ts";
 
 /**
@@ -61,12 +62,18 @@ export interface BindProviderParams {
   initialToken: string;
   /** Hex pubkey of the selected provider. */
   providerPubkey: string;
-  /** Same hash from Phase 1 (must match). */
+  /** Hash `H` whose preimage `S` the oracle releases on a valid proof. */
   hashHex: string;
-  /** Same locktime from Phase 1 (must match). */
+  /** Locktime as Unix timestamp (seconds). After this, customer can refund. */
   locktimeSeconds: number;
-  /** Customer's refund pubkey (must match Phase 1). */
+  /** Customer's hex pubkey (refund recipient). */
   customerPubkey: string;
+  /**
+   * Customer's secret key (32 bytes). Required because Phase-1 proofs are
+   * P2PK-locked to `customerPubkey`; the swap to the Phase-2 lock can only
+   * be authorised by a signature from this key.
+   */
+  customerSecretKey: Uint8Array;
 }
 
 /** Parameters for redeeming an HTLC token at the mint (provider side). */
@@ -202,7 +209,26 @@ function bytesToHexLocal(bytes: Uint8Array): string {
   return s;
 }
 
-/** Build the Phase-2 P2PK options for the HTLC bind step. */
+/**
+ * Phase-1 P2PK options: lock to the customer's pubkey only. The bounty
+ * token is broadcast in the kind 5300 event, so the lock prevents any
+ * Nostr-relay subscriber from spending the proofs as bearer tokens —
+ * spending requires the customer's signature, which only Phase 2
+ * (`bindProvider`) supplies.
+ *
+ * Hashlock is intentionally NOT applied in Phase 1: the customer needs
+ * to swap these proofs in Phase 2, and a hashlock would require the
+ * preimage (which only the oracle holds) to spend before locktime.
+ */
+function buildPhase1P2PKOptions(customerPubkey: string): P2PKOptions {
+  return new P2PKBuilder()
+    .addLockPubkey(customerPubkey)
+    .requireLockSignatures(1)
+    .sigAll()
+    .toOptions();
+}
+
+/** Phase-2 P2PK options: hashlock + provider P2PK + locktime + refund(customer). */
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
   return new P2PKBuilder()
     .addHashlock(p.hashHex)
@@ -213,6 +239,24 @@ function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();
+}
+
+/**
+ * Minimal shape check for a Cashu proof. Catches caller misuse (passing
+ * arbitrary objects as `sourceProofs`) before the values reach cashu-ts
+ * and produce confusing mint errors.
+ */
+function isValidProofShape(p: unknown): p is Proof {
+  if (typeof p !== "object" || p === null) return false;
+  const o = p as Record<string, unknown>;
+  return (
+    typeof o.id === "string" &&
+    typeof o.amount === "number" &&
+    Number.isFinite(o.amount) &&
+    o.amount > 0 &&
+    typeof o.secret === "string" &&
+    typeof o.C === "string"
+  );
 }
 
 /** Attach the HTLC preimage witness, then sign each proof with the provider's privkey. */
@@ -261,23 +305,54 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       if (typeof p.amountSats !== "number" || p.amountSats <= 0) {
         throw new CashuClientError("amountSats must be a positive number");
       }
-      // Phase 1: tokenize the customer's source proofs without any
-      // mint-side lock. Provider only sees the encoded bearer token in
-      // the kind 5300 event but cannot spend it (no preimage, no P2PK
-      // signature on these proofs). The actual HTLC lock happens in
-      // Phase 2 (`bindProvider`) once a provider is selected.
-      const proofs = p.sourceProofs as Proof[];
-      const token = getEncodedToken({ mint: mintUrl, proofs });
+      if (!Array.isArray(p.sourceProofs) || p.sourceProofs.length === 0) {
+        throw new CashuClientError("sourceProofs must be a non-empty array");
+      }
+      for (const proof of p.sourceProofs) {
+        if (!isValidProofShape(proof)) {
+          throw new CashuClientError("sourceProofs contains a malformed proof");
+        }
+      }
+
+      // Phase 1: swap the caller's source proofs at the mint for new
+      // proofs locked to the customer's pubkey (P2PK only — no hashlock
+      // yet, see `buildPhase1P2PKOptions` for why). The kind 5300 event
+      // can then carry this token in the open without exposing a
+      // bearer instrument: a Nostr-relay subscriber sees the token but
+      // cannot spend it without the customer's signature, which is
+      // only supplied during Phase 2 (`bindProvider`).
+      const wallet = await getWallet();
+      const sourceProofs = p.sourceProofs as Proof[];
+      const fee = wallet.getFeesForProofs(sourceProofs);
+      const swapAmount = p.amountSats - fee;
+      if (swapAmount <= 0) {
+        throw new CashuMintError(
+          `buildHtlcLock: mint fee ${fee} exceeds requested ${p.amountSats} sats`,
+        );
+      }
+
+      const phase1 = buildPhase1P2PKOptions(p.customerPubkey);
+      let send: Proof[];
+      try {
+        const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(phase1).run();
+        send = result.send;
+      } catch (err) {
+        throw new CashuMintError("buildHtlcLock: mint swap failed", err);
+      }
+      const token = getEncodedToken({ mint: mintUrl, proofs: send });
       return {
         token,
-        amountSats: p.amountSats,
-        proofs: proofs as CashuProof[],
+        amountSats: sumAmounts(send),
+        proofs: send as CashuProof[],
       };
     },
 
     async bindProvider(p: BindProviderParams): Promise<CashuToken> {
       validateHashHex(p.hashHex);
       validateLocktime(p.locktimeSeconds);
+      if (!(p.customerSecretKey instanceof Uint8Array) || p.customerSecretKey.length !== 32) {
+        throw new CashuClientError("customerSecretKey must be a 32-byte Uint8Array");
+      }
       const wallet = await getWallet();
       const decoded = getDecodedToken(p.initialToken);
       const sourceProofs = decoded.proofs;
@@ -297,11 +372,20 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         );
       }
 
-      const p2pk = buildHtlcP2PKOptions(p);
+      const phase2 = buildHtlcP2PKOptions(p);
+      const customerPrivkeyHex = bytesToHexLocal(p.customerSecretKey);
 
       let send: Proof[];
       try {
-        const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(p2pk).run();
+        // Phase-1 proofs are P2PK-locked to the customer; provide the
+        // customer's privkey to satisfy the input lock, while applying
+        // the Phase-2 (hashlock + provider P2PK + locktime + refund)
+        // conditions to the output proofs.
+        const result = await wallet.ops
+          .send(swapAmount, sourceProofs)
+          .privkey(customerPrivkeyHex)
+          .asP2PK(phase2)
+          .run();
         send = result.send;
       } catch (err) {
         throw new CashuMintError("bindProvider: mint swap failed", err);
@@ -321,6 +405,34 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       if (proofs.length === 0) {
         throw new CashuClientError("redeemHtlc: token has no proofs");
       }
+
+      // Defense in depth: verify the preimage matches each proof's
+      // hashlock locally before submitting to the mint. The mint also
+      // enforces NUT-14, but failing fast here means a malicious oracle
+      // delivering a bogus preimage surfaces as a clear SDK error
+      // instead of a noisy mint round-trip.
+      for (let i = 0; i < proofs.length; i++) {
+        const proof = proofs[i]!;
+        let secret: unknown;
+        try {
+          secret = JSON.parse(proof.secret);
+        } catch {
+          throw new CashuClientError(`redeemHtlc: proof ${i} has malformed secret`);
+        }
+        if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+          throw new CashuClientError(`redeemHtlc: proof ${i} is not an HTLC proof`);
+        }
+        const expectedHash = (secret[1] as { data?: unknown } | undefined)?.data;
+        if (typeof expectedHash !== "string") {
+          throw new CashuClientError(`redeemHtlc: proof ${i} has no hashlock data`);
+        }
+        if (!verifyHTLCHash(p.preimageHex, expectedHash)) {
+          throw new CashuClientError(
+            `redeemHtlc: preimage does not match proof ${i}'s hashlock`,
+          );
+        }
+      }
+
       const privkeyHex = bytesToHexLocal(p.providerSecretKey);
       const signedProofs = prepareHtlcRedemption(proofs, p.preimageHex, privkeyHex);
       const totalAmount = sumAmounts(signedProofs);
