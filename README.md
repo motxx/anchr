@@ -128,24 +128,6 @@ time. Run your own, or use third-party infrastructure.
 | **Mint** | Cashu HTLC ecash issuer. Any vanilla mint. | All schemas | nutshell, cashu-rs-mint, public test mints |
 | **Notary** | TLSNotary verifier. Mediates the provider's TLS proof session. | TLSN-based schemas only | Self-host (`crates/tlsn-*`), or any compatible notary |
 
-## Verification types
-
-The SDK does not bake in any verification format. Each request carries
-a `schema` URI; provider and oracle interpret it. New formats plug in by
-publishing a schema, not by upgrading the SDK.
-
-| Schema | Use case | Status |
-|---|---|---|
-| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response | Defined |
-| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video with optional GPS predicate | Defined |
-| `io.anchr.dlc-price.v1` | DLC oracle price attestation at a future timestamp | Planned |
-| `io.anchr.mdl-residency.v1` | mDL / EU Digital Identity residency claim | Planned |
-| `io.anchr.dkim-email.v1` | DKIM-signed email proof | Planned |
-
-Schemas live as Nostr parameterized replaceable events (kind `30888`);
-each defines the `predicate` shape, the proof format, and verification
-rules.
-
 ## Examples
 
 Use this SDK to build the products below. Status shows current
