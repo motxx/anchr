@@ -1,0 +1,31 @@
+{
+  "name": "@anchr/sdk",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publish": {
+    "include": [
+      "src/index.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/worker.ts",
+      "src/cli.ts",
+      "src/*.test.ts",
+      "dist/",
+      "tsconfig.json",
+      "package.json"
+    ]
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  }
+}

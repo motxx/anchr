@@ -5,7 +5,8 @@
     "./packages/tlsn-toolkit",
     "./packages/photo-bounty",
     "./packages/cashu-frost-oracle",
-    "./packages/cashu-conditional-swap"
+    "./packages/cashu-conditional-swap",
+    "./packages/sdk"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],

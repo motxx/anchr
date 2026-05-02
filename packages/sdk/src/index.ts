@@ -447,8 +447,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// Re-export worker
-export { AnchrWorker, type AnchrWorkerConfig, type FulfilledEvent } from "./worker.ts";
-
 // Default export
 export default Anchr;
+// Note: AnchrWorker (Node-only, uses node:fs) is exported from "@anchr/sdk/worker" via package.json subpath.
