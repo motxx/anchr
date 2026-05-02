@@ -523,3 +523,11 @@ export {
   type RelayClient,
   type Subscription,
 } from "./nostr.ts";
+
+export {
+  createHttpOracleClient,
+  OracleHttpError,
+  OracleResponseError,
+  type HttpOracleOptions,
+  type OracleClient,
+} from "./oracle.ts";
