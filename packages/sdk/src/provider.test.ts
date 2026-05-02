@@ -7,62 +7,112 @@ import {
   shouldQuote,
   validateProviderOptions,
 } from "./provider.ts";
+import { buildQueryRequestEvent } from "./events.ts";
+import {
+  generateKeypair,
+  type Event,
+  type Filter,
+  type PublishResult,
+  type RelayClient,
+  type Subscription,
+} from "./nostr.ts";
+import type { CashuClient, CashuToken } from "./cashu.ts";
+import { bytesToHex } from "./test-helpers.ts";
+import type { ProviderOptions } from "./types.ts";
 
-const validOptions = {
-  oracles: ["npub1oracle1"],
+// --- Test doubles ---
+
+const ORACLE_A = "a".repeat(64);
+
+const customerKey = generateKeypair();
+const providerKey = generateKeypair();
+
+function makeCashuClient(): CashuClient {
+  return {
+    mintUrl: "https://mint.example.org",
+    buildHtlcLock: async (p) => ({ token: "x", amountSats: p.amountSats, proofs: [] }),
+    bindProvider: async () => ({ token: "y", amountSats: 0, proofs: [] }),
+    redeemHtlc: async () => ({ proofs: [], amountSats: 0 }),
+  };
+}
+
+function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
+  return {
+    publish: overrides?.publish ?? (async () => ({ successes: ["wss://relay.example.org"], failures: [] })),
+    subscribe: overrides?.subscribe ?? ((_filter: Filter, _onEvent: (e: Event) => void): Subscription => ({ close: () => {} })),
+    close: overrides?.close ?? (() => {}),
+  };
+}
+
+const validOptions = (): ProviderOptions => ({
+  oracles: [ORACLE_A],
   relays: ["wss://relay.example.org"],
   mint: "https://mint.example.org",
-  privKey: "nsec1providerkey",
-};
+  privKey: bytesToHex(providerKey.secretKey),
+  cashuClient: makeCashuClient(),
+  relayClient: makeRelayClient(),
+});
+
+// --- Validation ---
 
 test("validateProviderOptions accepts a well-formed options object", () => {
-  expect(() => validateProviderOptions(validOptions)).not.toThrow();
+  expect(() => validateProviderOptions(validOptions())).not.toThrow();
 });
 
 test("validateProviderOptions accepts an optional notary URL", () => {
   expect(() =>
-    validateProviderOptions({ ...validOptions, notary: "wss://notary.example.org" })
+    validateProviderOptions({ ...validOptions(), notary: "wss://notary.example.org" })
   ).not.toThrow();
 });
 
 test("validateProviderOptions rejects empty oracles array", () => {
-  expect(() => validateProviderOptions({ ...validOptions, oracles: [] }))
+  expect(() => validateProviderOptions({ ...validOptions(), oracles: [] }))
     .toThrow(ProviderConfigError);
 });
 
 test("validateProviderOptions rejects empty relays array", () => {
-  expect(() => validateProviderOptions({ ...validOptions, relays: [] }))
+  expect(() => validateProviderOptions({ ...validOptions(), relays: [] }))
     .toThrow(ProviderConfigError);
 });
 
 test("validateProviderOptions rejects missing privKey", () => {
-  expect(() => validateProviderOptions({ ...validOptions, privKey: "" }))
+  expect(() => validateProviderOptions({ ...validOptions(), privKey: "" }))
     .toThrow(ProviderConfigError);
 });
 
 test("validateProviderOptions rejects empty-string notary when provided", () => {
-  expect(() => validateProviderOptions({ ...validOptions, notary: "" }))
+  expect(() => validateProviderOptions({ ...validOptions(), notary: "" }))
     .toThrow(ProviderConfigError);
 });
 
-test("createProvider exposes oracles / relays / mint / notary as readonly", () => {
-  const provider = createProvider({ ...validOptions, notary: "wss://notary.example.org" });
-  expect([...provider.oracles]).toEqual(validOptions.oracles);
-  expect([...provider.relays]).toEqual(validOptions.relays);
-  expect(provider.mint).toEqual(validOptions.mint);
+test("validateProviderOptions rejects missing cashuClient", () => {
+  const opts: Record<string, unknown> = { ...validOptions() };
+  delete opts.cashuClient;
+  expect(() => validateProviderOptions(opts)).toThrow(ProviderConfigError);
+});
+
+test("validateProviderOptions rejects a non-object input", () => {
+  expect(() => validateProviderOptions(null)).toThrow(ProviderConfigError);
+  expect(() => validateProviderOptions(42)).toThrow(ProviderConfigError);
+});
+
+// --- Constructor ---
+
+test("createProvider exposes oracles / relays / mint / notary / pubkey as readonly", () => {
+  const provider = createProvider({ ...validOptions(), notary: "wss://notary.example.org" });
+  expect([...provider.oracles]).toEqual([ORACLE_A]);
+  expect([...provider.relays]).toEqual(["wss://relay.example.org"]);
+  expect(provider.mint).toEqual("https://mint.example.org");
   expect(provider.notary).toEqual("wss://notary.example.org");
+  expect(provider.pubkey).toBe(providerKey.publicKey);
 });
 
 test("createProvider does not require notary (defaults to undefined)", () => {
-  const provider = createProvider(validOptions);
+  const provider = createProvider(validOptions());
   expect(provider.notary).toBe(undefined);
 });
 
-test("Provider.serve throws not-implemented when reaching the wire flow", async () => {
-  const provider = createProvider(validOptions);
-  await expect(provider.serve(async () => null))
-    .rejects.toThrow(/not implemented in v0\.0\.1/);
-});
+// --- shouldQuote helper ---
 
 test("shouldQuote returns true when oracle is in whitelist", () => {
   expect(shouldQuote(["a", "b", "c"], "b")).toBe(true);
@@ -74,4 +124,210 @@ test("shouldQuote returns false when oracle is not in whitelist", () => {
 
 test("shouldQuote returns false on empty whitelist", () => {
   expect(shouldQuote([], "a")).toBe(false);
+});
+
+// --- Subscription + handler invocation ---
+
+test("Provider.serve subscribes to kind 5300 events on the relays", async () => {
+  const subscribed: Filter[] = [];
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter): Subscription => {
+      subscribed.push(filter);
+      return { close: () => {} };
+    },
+  });
+  const provider = createProvider({ ...validOptions(), relayClient });
+  const servePromise = provider.serve(async () => null);
+  await new Promise((r) => setTimeout(r, 5));
+  await provider.stop();
+  await servePromise;
+  expect(subscribed).toHaveLength(1);
+  expect(subscribed[0].kinds).toEqual([5300]);
+});
+
+test("Provider.serve calls handler only for events whose oracle is in the whitelist", async () => {
+  const handlerCalls: number[] = [];
+  let onEventRef: ((e: Event) => void) | null = null;
+
+  const relayClient = makeRelayClient({
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      onEventRef = onEvent;
+      return { close: () => {} };
+    },
+  });
+
+  const provider = createProvider({ ...validOptions(), relayClient });
+  const servePromise = provider.serve(async (req) => {
+    handlerCalls.push(req.maxAmountSats);
+    return null;
+  });
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onEventRef === null) throw new Error("subscribe was not called");
+  const onEvent = onEventRef as (e: Event) => void;
+
+  // Event whose oracle IS in our whitelist → handler called.
+  const goodEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  });
+  // Event whose oracle is NOT in our whitelist → handler skipped.
+  const badEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q2",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: "z".repeat(64),
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 2000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  });
+  onEvent(goodEvent);
+  onEvent(badEvent);
+  await new Promise((r) => setTimeout(r, 10));
+  await provider.stop();
+  await servePromise;
+
+  expect(handlerCalls).toEqual([1000]);
+});
+
+test("Provider.serve publishes a kind 7000 quote when handler returns a ProviderQuote", async () => {
+  const published: Event[] = [];
+  let onEventRef: ((e: Event) => void) | null = null;
+
+  const relayClient = makeRelayClient({
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      onEventRef = onEvent;
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({ ...validOptions(), relayClient });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 250,
+    produce: async () => ({ data: null, proof: "p" }),
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onEventRef === null) throw new Error("subscribe was not called");
+  const onEvent = onEventRef as (e: Event) => void;
+
+  onEvent(buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+  await new Promise((r) => setTimeout(r, 10));
+  await provider.stop();
+  await servePromise;
+
+  expect(published).toHaveLength(1);
+  expect(published[0].kind).toBe(7000);
+  expect(published[0].pubkey).toBe(providerKey.publicKey);
+});
+
+test("Provider.serve declines requests where handler returns null (no publish)", async () => {
+  const published: Event[] = [];
+  let onEventRef: ((e: Event) => void) | null = null;
+
+  const relayClient = makeRelayClient({
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      onEventRef = onEvent;
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({ ...validOptions(), relayClient });
+  const servePromise = provider.serve(async () => null);
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onEventRef === null) throw new Error("subscribe was not called");
+  const onEvent = onEventRef as (e: Event) => void;
+
+  onEvent(buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+  await new Promise((r) => setTimeout(r, 10));
+  await provider.stop();
+  await servePromise;
+
+  expect(published).toHaveLength(0);
+});
+
+test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {
+  const published: Event[] = [];
+  let onEventRef: ((e: Event) => void) | null = null;
+
+  const relayClient = makeRelayClient({
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      onEventRef = onEvent;
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({ ...validOptions(), relayClient });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 99999, // wildly over-budget
+    produce: async () => ({ data: null, proof: "p" }),
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onEventRef === null) throw new Error("subscribe was not called");
+  const onEvent = onEventRef as (e: Event) => void;
+
+  onEvent(buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+  await new Promise((r) => setTimeout(r, 10));
+  await provider.stop();
+  await servePromise;
+
+  expect(published).toHaveLength(0);
 });

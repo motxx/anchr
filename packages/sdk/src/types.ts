@@ -90,10 +90,31 @@ export interface ProviderOptions {
   mint: string;
   /** Provider's secret key (nsec or hex). Used to sign Nostr events and redeem HTLC. */
   privKey: string;
+  /** Adapter for talking to the Cashu mint (used to redeem the HTLC after the oracle releases the preimage). */
+  cashuClient: import("./cashu.ts").CashuClient;
+  /**
+   * Optional: pre-built relay client. When omitted the SDK builds one
+   * from `relays` on each `serve()` call. Tests inject a mock here.
+   */
+  relayClient?: import("./nostr.ts").RelayClient;
   /** Optional: TLSN notary URL (only required for TLSN-based schemas). */
   notary?: string;
+  /** Optional: how long to wait for a selection event after quoting (default: 60000 ms). */
+  selectionTimeoutMs?: number;
   /** Optional: schema producer handlers, keyed by schema URI. The SDK calls these to produce a proof for an incoming request. */
   schemaProducers?: Record<string, SchemaProducer>;
+}
+
+/** Quote returned by a {@link ProviderHandler} when accepting a request. */
+export interface ProviderQuote {
+  /** Amount in sats the provider asks for. Must be ≤ request's maxAmountSats. */
+  amountSats: number;
+  /**
+   * Lazy producer — invoked by the SDK only after the customer selects
+   * this provider. Returns the data + proof that satisfy the request's
+   * schema.
+   */
+  produce: () => Promise<{ data: unknown; proof: Uint8Array | string }>;
 }
 
 /**
@@ -152,4 +173,4 @@ export interface ProviderRequestEvent {
 
 export type ProviderHandler = (
   request: ProviderRequestEvent,
-) => Promise<{ data: unknown; proof: Uint8Array | string } | null>;
+) => Promise<ProviderQuote | null>;

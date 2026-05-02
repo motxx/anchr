@@ -30,6 +30,7 @@
       "src/worker.ts",
       "src/cli.ts",
       "src/*.test.ts",
+      "src/test-helpers.ts",
       "dist/",
       "tsconfig.json",
       "package.json"

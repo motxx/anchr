@@ -495,6 +495,7 @@ export {
   validateProviderOptions,
   shouldQuote,
   ProviderConfigError,
+  DEFAULT_SELECTION_TIMEOUT_MS,
   type Provider,
 } from "./provider.ts";
 
@@ -520,6 +521,7 @@ export type {
   RequestOptions,
   ProviderRequestEvent,
   ProviderHandler,
+  ProviderQuote,
   SchemaProducer,
   SchemaVerifier,
   SchemaProducerContext,
