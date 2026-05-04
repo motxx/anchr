@@ -4,9 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Anchr is an SDK for hiring an authenticated proxy: pay a stranger to
-retrieve private data or perform an action you can't, with payment held
-until they prove they did it — atomic over Nostr, no Anchr server.
+Anchr is an SDK for P2P verified work — pay a stranger to fetch data or
+take an action you can't, with payment released only when they prove
+they did, atomic over Nostr.
 
 > **Status: experimental.** Testnet only. SDK API design in progress;
 > packages may change.
