@@ -91,7 +91,7 @@ name = "anchr-tlsn-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-tungstenite",
+ "async-tungstenite 0.34.1",
  "axum",
  "bincode",
  "clap",
@@ -325,8 +325,24 @@ dependencies = [
  "futures-util",
  "log",
  "pin-project-lite",
- "tokio",
  "tungstenite 0.26.2",
+]
+
+[[package]]
+name = "async-tungstenite"
+version = "0.34.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8447f02eaa65412035e2d3eeaa3fc82bbb8d7137c84c5976b4af685136012ee9"
+dependencies = [
+ "atomic-waker",
+ "futures-core",
+ "futures-io",
+ "futures-task",
+ "futures-util",
+ "log",
+ "pin-project-lite",
+ "tokio",
+ "tungstenite 0.29.0",
 ]
 
 [[package]]
@@ -4406,7 +4422,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3c9c55940d22313a53398bfeb9438c5f519de475fa37ed7ff068f8c1ca8eb45"
 dependencies = [
- "async-tungstenite",
+ "async-tungstenite 0.29.1",
  "async_io_stream",
  "bitflags",
  "futures-core",
