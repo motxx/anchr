@@ -128,7 +128,6 @@ describe("Marketplace Routes", () => {
 
   test("DELETE /marketplace/listings/:id deactivates listing", withOpenAuth(async () => {
     const { app, listingStore } = makeTestApp();
-    // Create listing directly in store
     listingStore.set("listing_del", {
       id: "listing_del",
       name: "To Delete",
@@ -149,7 +148,6 @@ describe("Marketplace Routes", () => {
     expect(json.ok).toBe(true);
     expect(json.active).toBe(false);
 
-    // Verify it's no longer in active list
     const listRes = await app.request("http://localhost/marketplace/listings");
     const listings = await listRes.json() as unknown[];
     expect(listings).toHaveLength(0);

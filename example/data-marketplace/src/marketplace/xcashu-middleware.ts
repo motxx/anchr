@@ -1,14 +1,5 @@
-/**
- * X-Cashu payment middleware for the Verified Data Marketplace.
- *
- * Implements HTTP 402 Payment Required flow:
- * - No payment header → 402 with pricing info
- * - X-Cashu header → direct payment mode (verifyToken)
- * - X-Cashu-Htlc + X-Htlc-Hash → HTLC escrow mode
- *
- * SHA-256(token) replay detection as defense-in-depth
- * (in addition to Mint's spent-proof verification).
- */
+// HTTP 402 flow for marketplace payments. SHA-256(token) replay detection
+// runs in front of the Mint's own spent-proof check (defense in depth).
 
 import { createHash } from "node:crypto";
 import type { MiddlewareHandler } from "hono";

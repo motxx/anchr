@@ -292,17 +292,11 @@ describe("Attack: Oracle Manipulation", () => {
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
-    // Pass a nonexistent oracle ID
     const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "nonexistent-oracle");
-    // The verification should fail because no oracle is available
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
   });
 });
-
-// =============================================================================
-// 4. State Machine Attacks
-// =============================================================================
 
 describe("Attack: State Machine — illegal transitions", () => {
   test("skip awaiting_quotes -> verifying: submit result directly", async () => {
@@ -314,7 +308,6 @@ describe("Attack: State Machine — illegal transitions", () => {
       { escrow: escrowInfo },
     );
 
-    // Query is in awaiting_quotes — try to submit result (should need processing)
     const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "test-oracle");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
@@ -325,12 +318,10 @@ describe("Attack: State Machine — illegal transitions", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query, workerPub } = await driveToProcessing(service, preimageStore);
 
-    // Get approval
     const approval = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(approval.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("approved");
 
-    // Try to submit again (revert to processing)
     const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not processing");
@@ -341,7 +332,6 @@ describe("Attack: State Machine — illegal transitions", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);
 
-    // Query is in processing — try to add another quote
     const quoteResult = service.recordQuote(query.id, {
       worker_pubkey: "w2",
       quote_event_id: "e2",
@@ -356,22 +346,16 @@ describe("Attack: State Machine — illegal transitions", () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);
 
-    // Query is in "processing" — try to complete verification (needs "verifying")
     const result = service.completeVerification(query.id, true, "test-oracle");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not verifying");
   });
 });
 
-// =============================================================================
-// 5. Cross-Query Attacks
-// =============================================================================
-
 describe("Attack: Cross-Query", () => {
   test("worker accepted on query A tries to submit on query B — fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
-    // Create query A with worker_a
     const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(preimageStore);
     const qA = service.createQuery(
       { description: "Query A" },
@@ -381,7 +365,6 @@ describe("Attack: Cross-Query", () => {
     await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
-    // Create query B with worker_b
     const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(preimageStore);
     const qB = service.createQuery(
       { description: "Query B" },
@@ -391,12 +374,11 @@ describe("Attack: Cross-Query", () => {
     await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));
     service.beginWork(qB.id);
 
-    // Worker A tries to submit result on query B
     const outcome = await service.submitEscrowResult(qB.id, { attachments: [] }, "worker_a", "test-oracle");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
 
-    // Query B still in processing — not corrupted
+    // Query B's state must remain unaffected by the cross-query attempt
     expect(service.getQuery(qB.id)?.status).toBe("processing");
   });
 

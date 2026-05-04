@@ -186,6 +186,5 @@ async function publishToRelays(wallet: Nip60Wallet, event: Event): Promise<void>
  */
 export async function closeNip60Wallet(wallet: Nip60Wallet): Promise<void> {
   wallet.pool.close(wallet.relays);
-  // One macrotask is usually enough for nostr-tools' close() to drain.
   await new Promise<void>((resolve) => setTimeout(resolve, 100));
 }

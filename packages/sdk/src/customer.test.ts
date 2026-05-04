@@ -41,8 +41,6 @@ import type {
 } from "./nostr.ts";
 import type { CustomerOptions, Quote } from "./types.ts";
 
-// --- Test doubles ---
-
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
 const HASH_HEX = "deadbeef".repeat(8);
@@ -108,12 +106,9 @@ const validOptions = (): CustomerOptions => ({
   oracleClient: makeOracleClient(),
   cashuClient: makeCashuClient(),
   relayClient: makeRelayClient(),
-  // Short quote window so tests that flow past the publish step
-  // don't sit waiting the 30s default.
+  // Short window so tests don't wait the 30s default.
   quoteWindowMs: 10,
 });
-
-// --- Validation ---
 
 test("validateCustomerOptions accepts a well-formed options object", () => {
   expect(() => validateCustomerOptions(validOptions())).not.toThrow();
@@ -157,8 +152,6 @@ test("validateCustomerOptions rejects a non-object input", () => {
   expect(() => validateCustomerOptions("string")).toThrow(CustomerConfigError);
 });
 
-// --- Constructor ---
-
 test("createCustomer exposes oracles / relays / mint as readonly copies", () => {
   const opts = validOptions();
   const customer = createCustomer(opts);
@@ -173,8 +166,6 @@ test("createCustomer copies arrays so mutating the original does not affect the 
   oracles.push("c".repeat(64));
   expect(customer.oracles).toHaveLength(2);
 });
-
-// --- Request flow ---
 
 test("Customer.request rejects an invalid schema URI synchronously", async () => {
   const customer = createCustomer(validOptions());
