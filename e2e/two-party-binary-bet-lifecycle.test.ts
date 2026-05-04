@@ -1,5 +1,5 @@
 /**
- * E2E: prediction market full lifecycle on regtest Cashu.
+ * E2E: two-party binary bet full lifecycle on regtest Cashu.
  *
  * Walks the entire user-visible flow with real Cashu proofs:
  *   1. Mint sats for alice (YES) and bob (NO) via regtest Lightning.
@@ -23,7 +23,7 @@
  *   docker compose up -d
  *   ./scripts/init-regtest.sh && docker compose restart cashu-mint
  *   CASHU_MINT_URL=http://localhost:3338 \
- *     deno test e2e/prediction-market-lifecycle.test.ts --allow-all
+ *     deno test e2e/two-party-binary-bet-lifecycle.test.ts --allow-all
  */
 
 import { afterAll, describe, test } from "@std/testing/bdd";
@@ -109,7 +109,7 @@ async function buildOrderBook(): Promise<OrderBook | undefined> {
   return pgOrderBook;
 }
 
-suite("e2e: prediction market lifecycle (regtest Cashu)", () => {
+suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
   afterAll(async () => {
     if (pgOrderBook) await pgOrderBook.close();
   });

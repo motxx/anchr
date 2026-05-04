@@ -1,5 +1,5 @@
 /**
- * Client-side Nostr keypair management for prediction markets.
+ * Client-side Nostr keypair management for two-party binary bets.
  *
  * Generates a secp256k1 keypair on first visit, stores the secret key
  * in localStorage, and never sends it to the server. Only the public key

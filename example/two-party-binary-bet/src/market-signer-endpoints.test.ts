@@ -24,7 +24,7 @@ import {
   type MarketRouteContext,
 } from "./server-routes.ts";
 import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
-import type { PredictionMarket } from "./market-types.ts";
+import type { TwoPartyBinaryBet } from "./market-types.ts";
 import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -121,7 +121,7 @@ function buildTestApp(stateOverrides?: Partial<MarketState>): Hono {
 }
 
 /** Build a test app and pre-populate a market in the state. */
-function buildTestAppWithMarket(market: PredictionMarket): { app: Hono; state: MarketState } {
+function buildTestAppWithMarket(market: TwoPartyBinaryBet): { app: Hono; state: MarketState } {
   const frostConfig = makeFrostConfig();
   const state = createMarketState({ frostConfig });
   state.markets.set(market.id, market);
@@ -135,8 +135,8 @@ function buildTestAppWithMarket(market: PredictionMarket): { app: Hono; state: M
   return { app, state };
 }
 
-/** Build a minimal PredictionMarket. */
-function makeMarket(overrides?: Partial<PredictionMarket>): PredictionMarket {
+/** Build a minimal TwoPartyBinaryBet. */
+function makeMarket(overrides?: Partial<TwoPartyBinaryBet>): TwoPartyBinaryBet {
   return {
     id: "mkt_test01",
     title: "Test Market",

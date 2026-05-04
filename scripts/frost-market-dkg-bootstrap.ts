@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * FROST Market DKG Bootstrap -- generates key material for a prediction market
+ * FROST Market DKG Bootstrap -- generates key material for a two-party binary bet
  * Oracle cluster with TWO threshold groups (YES and NO outcomes).
  *
  * Usage:

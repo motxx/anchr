@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * Production entrypoint for the prediction-market Fly app.
+ * Production entrypoint for the two-party-binary-bet Fly app.
  *
  * Decrypts the three FROST signer configs from base64-encoded Fly secrets,
  * writes them to /data, spawns the three FROST oracle node processes on

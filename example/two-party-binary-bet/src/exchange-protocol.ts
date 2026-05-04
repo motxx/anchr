@@ -1,7 +1,7 @@
 /**
  * P2P Token Exchange Protocol — trustless token creation and verification.
  *
- * In the non-custodial prediction market, users create their own P2PK-locked
+ * In the non-custodial two-party binary bet, users create their own P2PK-locked
  * tokens in the browser. The matchmaker only announces matches; it never
  * touches tokens. This module provides:
  *

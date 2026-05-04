@@ -1,5 +1,5 @@
 /**
- * E2E tests: FROST P2PK + real Cashu mint — full trustless prediction market flow.
+ * E2E tests: FROST P2PK + real Cashu mint — full trustless two-party binary bet flow.
  *
  * Tests the complete lifecycle using P2PK multi-sig instead of HTLC:
  *   1. Generate two Oracle keypairs (YES/NO groups) — simulates FROST DKG output
@@ -105,7 +105,7 @@ async function createP2PKLockedProofs(
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-suite("e2e: FROST P2PK + real Cashu mint — trustless prediction market flow", () => {
+suite("e2e: FROST P2PK + real Cashu mint — trustless two-party binary bet flow", () => {
   const wallet = sharedWallet!;
 
   // Oracle keypairs (simulating FROST DKG output)

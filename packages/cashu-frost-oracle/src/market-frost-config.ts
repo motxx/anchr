@@ -1,5 +1,5 @@
 /**
- * FROST configuration for prediction market Oracle nodes.
+ * FROST configuration for two-party binary bet Oracle nodes.
  *
  * Extends FrostNodeConfig with a second set of FROST keys for the NO outcome.
  * The YES group uses the standard fields; the NO group uses the `*_no` fields.
@@ -10,7 +10,7 @@
 import type { FrostNodeConfig, PeerConfig } from "./config.ts";
 
 /**
- * Per-node FROST config for a prediction market Oracle.
+ * Per-node FROST config for a two-party binary bet Oracle.
  *
  * Contains key material for BOTH outcome groups (YES and NO).
  * Each signer node loads one of these at startup.

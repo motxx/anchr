@@ -32,10 +32,10 @@
 > the public testnut Cashu mint (<https://testnut.cashu.space>), the
 > Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
 
-> **Operator runbook:** [`docs/prediction-market/deployment.md`](../../docs/prediction-market/deployment.md)
+> **Operator runbook:** [`docs/two-party-binary-bet/deployment.md`](../../docs/two-party-binary-bet/deployment.md)
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
-> the running UI live in [`docs/prediction-market/screenshots/`](../../docs/prediction-market/screenshots/).
+> the running UI live in [`docs/two-party-binary-bet/screenshots/`](../../docs/two-party-binary-bet/screenshots/).
 
 ## What you can build with this primitive
 
@@ -199,9 +199,9 @@ For local dev the `postgres` service in `docker-compose.yml` provisions a
 ready-to-use database (`postgres://anchr:anchr@localhost:5432/anchr_market`)
 and auto-applies the migration on first start. CI runs the regtest test
 suite with `DATABASE_URL` pointed at it, so both
-`prediction-market-orderbook-pg.test.ts` (direct PG order-book coverage:
+`two-party-binary-bet-orderbook-pg.test.ts` (direct PG order-book coverage:
 CRUD, FIFO, partial matches, concurrent `FOR UPDATE` matchers) and
-`prediction-market-lifecycle.test.ts` (full Cashu lifecycle on Postgres)
+`two-party-binary-bet-lifecycle.test.ts` (full Cashu lifecycle on Postgres)
 exercise the production code path.
 
 ## Running

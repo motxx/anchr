@@ -1,5 +1,5 @@
 /**
- * E2E: TLSNotary -> Market Resolution flow for prediction markets.
+ * E2E: TLSNotary -> Market Resolution flow for two-party binary bets.
  *
  * Tests the full oracle resolution pipeline with a mock TLSNotary proof
  * and real bitFlyer API data. Does NOT require Docker or Rust binaries --
@@ -10,7 +10,7 @@
  *   2. resolution.ts     resolveMarket  (dual-preimage reveal via DualPreimageStore)
  *
  * Run:
- *   deno test e2e/prediction-market-resolution.test.ts --allow-all
+ *   deno test e2e/two-party-binary-bet-resolution.test.ts --allow-all
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
@@ -29,7 +29,7 @@ import {
   OracleError,
 } from "../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   ResolutionCondition,
 } from "../example/two-party-binary-bet/src/market-types.ts";
 
@@ -54,10 +54,10 @@ function makePreimage(): { preimage: string; hash: string } {
   return { preimage: bytesToHex(raw), hash: bytesToHex(sha256(raw)) };
 }
 
-/** Build a PredictionMarket with sensible defaults. */
+/** Build a TwoPartyBinaryBet with sensible defaults. */
 function makeMarket(
-  overrides: Partial<PredictionMarket> = {},
-): PredictionMarket {
+  overrides: Partial<TwoPartyBinaryBet> = {},
+): TwoPartyBinaryBet {
   const { hash: hashYes } = makePreimage();
   const { hash: hashNo } = makePreimage();
   return {
@@ -87,14 +87,14 @@ function makeMarket(
     nostr_event_id: bytesToHex(randomBytes(32)),
     status: "open",
     ...overrides,
-  } as PredictionMarket;
+  } as TwoPartyBinaryBet;
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("Prediction Market Resolution E2E", () => {
+describe("Two-party binary bet Resolution E2E", () => {
   let bitflyerReachable = false;
   let bitflyerBody = "";
   let bitflyerJson: Record<string, unknown> = {};

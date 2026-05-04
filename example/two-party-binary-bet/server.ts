@@ -1,7 +1,7 @@
 /**
- * Standalone 巫(Kannagi) prediction market server.
+ * Standalone 巫(Kannagi) two-party binary bet server.
  *
- * Runs the prediction market as an independent application,
+ * Runs the two-party binary bet as an independent application,
  * separate from the Anchr protocol server.
  *
  * Usage:
@@ -134,5 +134,5 @@ app.get("/main.js.map", serveStatic({ path: "./example/two-party-binary-bet/ui/m
 app.get("*", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
 
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
-console.log(`巫(Kannagi) prediction market server on http://localhost:${port}`);
+console.log(`巫(Kannagi) two-party binary bet server on http://localhost:${port}`);
 Deno.serve({ port }, app.fetch);

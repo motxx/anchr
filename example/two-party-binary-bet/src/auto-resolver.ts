@@ -1,5 +1,5 @@
 /**
- * Auto-resolver — background scheduler that resolves prediction markets
+ * Auto-resolver — background scheduler that resolves two-party binary bets
  * once their `resolution_deadline` has passed.
  *
  * For each due market it:

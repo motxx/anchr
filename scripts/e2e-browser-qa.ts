@@ -125,8 +125,8 @@ async function main() {
     const res = await page.goto(`${BASE}/market/`);
     if (res?.status() !== 200) throw new Error(`status ${res?.status()}`);
   });
-  await check("shows Prediction Markets", async () => {
-    await page.waitForSelector("text=Prediction Markets", { timeout: 5000 });
+  await check("shows Two-party binary bets", async () => {
+    await page.waitForSelector("text=Two-party binary bets", { timeout: 5000 });
   });
   await check("displays market listings", async () => {
     const cards = await page.$$("[class*='card'], [class*='Card'], [class*='rounded']");

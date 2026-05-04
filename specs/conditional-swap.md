@@ -8,7 +8,7 @@ The conditional swap is an N:M primitive that extends Anchr's 1:1 atomic swap to
 
 Anchr's core protocol is a 1:1 atomic swap: one Requester pays one Worker for one proof. The conditional swap generalizes this to N:M — multiple parties bet against each other on a binary outcome, with the Oracle resolving which side wins.
 
-Use cases: prediction markets, insurance, group bounties, auctions.
+Use cases: two-party binary bets, insurance, group bounties, auctions.
 
 ## Cross-HTLC Dual-Preimage Pattern
 

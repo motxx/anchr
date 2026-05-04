@@ -1,11 +1,11 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * Capture screenshots of the prediction market UI for documentation.
+ * Capture screenshots of the two-party binary bet UI for documentation.
  *
  * Boots the standalone market server in-process, drives a headless
  * Chromium via Playwright through the empty state and the
  * create-market form, and writes screenshots into
- * docs/prediction-market/screenshots/.
+ * docs/two-party-binary-bet/screenshots/.
  *
  * Run:
  *   deno task build:ui && deno task build:css
@@ -22,7 +22,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
-const SCREENSHOT_DIR = join(PROJECT_ROOT, "docs/prediction-market/screenshots");
+const SCREENSHOT_DIR = join(PROJECT_ROOT, "docs/two-party-binary-bet/screenshots");
 const PORT = 3098;
 
 if (!existsSync(SCREENSHOT_DIR)) mkdirSync(SCREENSHOT_DIR, { recursive: true });
@@ -81,7 +81,7 @@ try {
 
   // Empty market list — the most common first impression.
   await page.goto(`http://localhost:${PORT}/`);
-  await page.waitForSelector("text=Prediction Markets", { timeout: 10_000 });
+  await page.waitForSelector("text=Two-party binary bets", { timeout: 10_000 });
   await page.screenshot({
     path: join(SCREENSHOT_DIR, "01-empty-markets.png"),
     fullPage: true,

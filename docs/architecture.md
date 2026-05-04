@@ -174,7 +174,7 @@ flowchart LR
   Mint -->|payout| Winner
 ```
 
-Used by: prediction-market (`example/two-party-binary-bet/`). Imports
+Used by: two-party-binary-bet (`example/two-party-binary-bet/`). Imports
 `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` directly
 (no SDK).
 

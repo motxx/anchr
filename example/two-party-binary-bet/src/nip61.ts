@@ -7,9 +7,9 @@
  * events, swaps the locked proofs at the mint with their nsec, and the
  * resulting plain proofs flow into their NIP-60 wallet.
  *
- * No new crypto — reuses the same NUT-11 P2PK lock that the prediction
- * market exchange path already builds, with `n_sigs=1` and the recipient
- * as the sole authorized signer.
+ * No new crypto — reuses the same NUT-11 P2PK lock that the two-party
+ * binary bet exchange path already builds, with `n_sigs=1` and the
+ * recipient as the sole authorized signer.
  *
  * Spec: https://github.com/nostr-protocol/nips/blob/master/61.md
  */

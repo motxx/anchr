@@ -69,7 +69,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d relay blossom postgres
-          # Wait for Postgres so the prediction-market order-book tests
+          # Wait for Postgres so the two-party-binary-bet order-book tests
           # don't start before /docker-entrypoint-initdb.d finishes.
           for i in $(seq 1 30); do
             if docker compose exec -T postgres pg_isready -U anchr -d anchr_market > /dev/null 2>&1; then
