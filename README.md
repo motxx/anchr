@@ -76,7 +76,8 @@ sequenceDiagram
 
     C->>M: lock payment (HTLC)
     C->>R: post request
-    R->>P: discover; reply with quote
+    R->>P: deliver request
+    P->>R: send quote
     C->>M: bind HTLC to Provider
     P->>P: produce proof
     P->>R: post proof
