@@ -36,6 +36,7 @@ COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
 COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
 COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
+COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
 COPY . .
