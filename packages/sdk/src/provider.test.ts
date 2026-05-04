@@ -91,10 +91,10 @@ test("validateProviderOptions rejects empty-string notary when provided", () => 
     .toThrow(ProviderConfigError);
 });
 
-test("validateProviderOptions rejects missing cashuClient", () => {
+test("validateProviderOptions accepts missing cashuClient (SDK builds one from mint)", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.cashuClient;
-  expect(() => validateProviderOptions(opts)).toThrow(ProviderConfigError);
+  expect(() => validateProviderOptions(opts)).not.toThrow();
 });
 
 test("validateProviderOptions rejects a non-object input", () => {

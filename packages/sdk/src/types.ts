@@ -63,8 +63,12 @@ export interface CustomerOptions {
   mint: string;
   /** Adapter for talking to the oracle (HTTP, Nostr DM, FROST cluster, etc.). */
   oracleClient: import("./oracle.ts").OracleClient;
-  /** Adapter for talking to the Cashu mint. */
-  cashuClient: import("./cashu.ts").CashuClient;
+  /**
+   * Optional: adapter for talking to the Cashu mint. When omitted the
+   * SDK builds one from `mint`. Pass an explicit client to inject a
+   * specific Wallet (e.g. to share state across requests).
+   */
+  cashuClient?: import("./cashu.ts").CashuClient;
   /**
    * Optional: pre-built relay client. When omitted the SDK builds one
    * from `relays` on each request. Tests inject a mock here.
@@ -90,8 +94,12 @@ export interface ProviderOptions {
   mint: string;
   /** Provider's secret key (nsec or hex). Used to sign Nostr events and redeem HTLC. */
   privKey: string;
-  /** Adapter for talking to the Cashu mint (used to redeem the HTLC after the oracle releases the preimage). */
-  cashuClient: import("./cashu.ts").CashuClient;
+  /**
+   * Optional: adapter for talking to the Cashu mint (used to redeem
+   * the HTLC after the oracle releases the preimage). When omitted the
+   * SDK builds one from `mint`.
+   */
+  cashuClient?: import("./cashu.ts").CashuClient;
   /**
    * Optional: pre-built relay client. When omitted the SDK builds one
    * from `relays` on each `serve()` call. Tests inject a mock here.

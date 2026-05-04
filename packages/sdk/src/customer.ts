@@ -23,7 +23,7 @@
  *  11. Return the verified data + proof.
  */
 
-import type { CashuToken } from "./cashu.ts";
+import { createCashuClient, type CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
   Quote,
@@ -180,9 +180,6 @@ export function validateCustomerOptions(options: unknown): asserts options is Cu
   if (o.oracleClient === undefined || o.oracleClient === null) {
     throw new CustomerConfigError("oracleClient is required");
   }
-  if (o.cashuClient === undefined || o.cashuClient === null) {
-    throw new CustomerConfigError("cashuClient is required");
-  }
 }
 
 /** Generate a unique query identifier for a single request. */
@@ -204,7 +201,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const relays = [...options.relays];
   const mint = options.mint;
   const oracleClient = options.oracleClient;
-  const cashuClient = options.cashuClient;
+  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;

@@ -47,6 +47,7 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri } from "./schema.ts";
+import { createCashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -111,9 +112,6 @@ export function validateProviderOptions(options: unknown): asserts options is Pr
   if (typeof o.privKey !== "string" || o.privKey.length === 0) {
     throw new ProviderConfigError("privKey must be a non-empty string");
   }
-  if (o.cashuClient === undefined || o.cashuClient === null) {
-    throw new ProviderConfigError("cashuClient is required");
-  }
   if (o.notary !== undefined) {
     if (typeof o.notary !== "string" || o.notary.length === 0) {
       throw new ProviderConfigError("notary, when provided, must be a non-empty string");
@@ -144,7 +142,7 @@ export function createProvider(options: ProviderOptions): Provider {
   const relays = [...options.relays];
   const mint = options.mint;
   const notary = options.notary;
-  const cashuClient = options.cashuClient;
+  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
   const selectionTimeoutMs = options.selectionTimeoutMs ?? DEFAULT_SELECTION_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ?? DEFAULT_PREIMAGE_TIMEOUT_MS;
 
