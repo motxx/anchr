@@ -218,7 +218,7 @@ Do NOT modify any files automatically — this skill is read-only review. Wait f
 When the review completes — findings absent, or the user has explicitly accepted them in this session — write `.arch-lint-llm-verified.json` at the repo root so the pre-ship hook recognises the diff as reviewed:
 
 ```bash
-deno run --allow-read --allow-run --allow-write - <<'JS'
+deno run --allow-read --allow-run --allow-write --allow-env - <<'JS'
 const root = (await new Deno.Command("git", { args: ["rev-parse", "--show-toplevel"], stdout: "piped" }).output()).stdout;
 const repo = new TextDecoder().decode(root).trim();
 const base = Deno.env.get("ARCH_BASE") ?? "origin/main";

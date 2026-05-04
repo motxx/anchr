@@ -172,7 +172,7 @@ This skill is read-only review. Do not modify files automatically.
 When the review completes — findings absent, or the user has explicitly accepted them in this session — write `.silent-bypass-verified.json` at the repo root so the pre-ship hook recognises the diff as reviewed:
 
 ```bash
-deno run --allow-read --allow-run --allow-write - <<'JS'
+deno run --allow-read --allow-run --allow-write --allow-env - <<'JS'
 const root = (await new Deno.Command("git", { args: ["rev-parse", "--show-toplevel"], stdout: "piped" }).output()).stdout;
 const repo = new TextDecoder().decode(root).trim();
 const base = Deno.env.get("BYPASS_BASE") ?? "origin/main";
