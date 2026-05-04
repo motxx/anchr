@@ -1,4 +1,5 @@
-import { test, expect, describe, beforeAll } from "bun:test";
+import { beforeAll, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { Anchr, QueryTimeoutError } from "../../packages/sdk/src/index.ts";
 import { AnchrWorker } from "./worker.ts";
 import { existsSync } from "node:fs";
@@ -73,7 +74,7 @@ describe("AnchrWorker", () => {
     const status = await anchr.getQueryStatus(queryId);
     expect(status.status).toBe("approved");
     expect(status.verification?.passed).toBe(true);
-  }, 120_000);
+  });
 
   test("SDK query() + Worker auto-fulfill (full loop)", async () => {
     if (!ready) return;
@@ -108,5 +109,5 @@ describe("AnchrWorker", () => {
     } finally {
       worker.stop();
     }
-  }, 120_000);
+  });
 });
