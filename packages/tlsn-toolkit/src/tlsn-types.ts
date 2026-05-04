@@ -1,9 +1,7 @@
 /**
  * TLSNotary application-layer types — canonical location for tlsn-toolkit
- * and any host that wires it in.
- *
- * Previously lived in the host shared domain module, but TLSNotary is the
- * package's concern and host servers should import from here.
+ * and any host that wires it in. TLSNotary is this package's concern; host
+ * servers should import from here.
  */
 
 /** A single condition the verifier evaluates against the revealed body. */

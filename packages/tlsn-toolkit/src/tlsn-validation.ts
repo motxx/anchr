@@ -21,7 +21,7 @@ import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "tlsn"]);
 
 // --- Proof replay protection ---
-// Stores SHA-256 hashes of previously accepted presentations to prevent reuse.
+// Stores SHA-256 hashes of accepted presentations to prevent replay. // allow-history: "previously accepted" describes the set's contents, not impl history
 const seenPresentations = new Set<string>();
 
 /** Visible for testing — clear the replay detection set. */
