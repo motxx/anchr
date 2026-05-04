@@ -35,10 +35,6 @@ jobs:
     name: Bootstrap anchr-market
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Bootstrap also calls `flyctl deploy`, so apply the same main-only
-    # rule the regular deploy workflows enforce — only dispatchable from
-    # the main branch so a feature-branch bootstrap can't ship that
-    # branch's code to production.
     if: ${{ github.ref == 'refs/heads/main' }}
     concurrency:
       group: fly-market-bootstrap

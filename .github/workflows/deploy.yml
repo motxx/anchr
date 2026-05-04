@@ -15,19 +15,10 @@ jobs:
     name: Deploy ${{ matrix.app }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Fly deploys only on merge-to-main:
-    #   - workflow_dispatch is gated on the dispatcher being on main
-    #     (github.ref of the dispatch must be refs/heads/main)
-    #   - workflow_run only fires when the upstream CI ran on main
-    #     AND succeeded (head_branch + conclusion both checked
-    #     explicitly here, in addition to the trigger-level
-    #     `branches: [main]` filter — belt and suspenders so a
-    #     misconfigured trigger can never silently auto-deploy a
-    #     feature branch).
     if: >-
       ${{
         (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success')
+        (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
       }}
     concurrency:
       group: fly-${{ matrix.app }}

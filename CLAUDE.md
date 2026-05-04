@@ -4,26 +4,13 @@ globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, deno.json"
 alwaysApply: false
 ---
 
-Default to using Deno instead of Node.js.
+## Deno over Node
 
-- Use `deno run --allow-all <file>` instead of `node <file>` or `ts-node <file>`
-- Use `deno test` instead of `jest` or `vitest`
-- Use `deno task build:ui` to build frontend bundles (esbuild under the hood)
-- Use `deno install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `deno task <name>` instead of `npm run <name>` (tasks defined in `deno.json`)
-- Use `npx <package> <command>` for CLI tools not yet on JSR
-- Deno auto-loads `.env` via `--env` flag in task definitions. Don't use dotenv.
-
-## Task completion (execute, then prove)
-
-Follow the user's instructions to the end. A task is done when the requested work is actually performed and verified—not when it sounds done in prose.
-
-- **Tests:** Run the tests (or checks) the task calls for. If you report that tests pass, include the relevant terminal output so the result is verifiable.
-- **Browser / mobile / UI:** If verification requires a desktop browser, mobile web (responsive or device viewport), or a native/simulator flow (for example iOS Simulator, Android emulator, or physical device), do that verification and report with concrete evidence—screenshots, short screen recordings, simulator/device logs, or described observable state—not a generic "verified" or "works on mobile" claim.
-- **Parallel work:** Wait for agents, subtasks, or CI-style checks to finish before writing a closing summary. Summarize outcomes after everything relevant has completed.
-- **Tools and failures:** If a command or tool fails, returns an error, or yields an unexpected result, say so in the same turn and continue from the real state—do not imply success or skip over it.
-
-Prefer running commands and using tools over telling the user what they could run. If something is blocked or out of scope, say that explicitly instead of marking the task complete.
+- `deno run --allow-all <file>`, not `node` / `ts-node`
+- `deno test`, not `jest` / `vitest`
+- `deno install`, not `npm` / `yarn` / `pnpm install`
+- `deno task <name>` for tasks defined in `deno.json`; `npx <pkg>` only for CLI not on JSR
+- `.env` is loaded via `--env` in task definitions — don't use `dotenv`
 
 ## Import Map (deno.json)
 
@@ -59,16 +46,7 @@ The level is read from `ANCHR_LOG_LEVEL` (or `LOG_LEVEL`) — `info` by default.
 
 ## Testing
 
-Use `deno test` to run tests. Tests use JSR standard library:
-
-```ts#index.test.ts
-import { test } from "@std/testing/bdd";
-import { expect } from "@std/expect";
-
-test("hello world", () => {
-  expect(1).toBe(1);
-});
-```
+Tests use `@std/testing/bdd` (`describe`/`it`/`test`) + `@std/expect`. Run with `deno test`.
 
 ## Frontend
 
@@ -98,39 +76,25 @@ deno task build:ui && deno task build:css && deno task dev
 | `deno task test:all:full` | all of the above combined | Yes |
 | `./scripts/test-all.sh --ci` | same as full, CI-optimized | Yes |
 
-Quality invariants the CI enforces:
-- No `--no-check` in test tasks (full TypeScript checking)
-- No `as unknown as` casts in source
-- No dynamic `await import(...)` in libraries (only platform conditionals + scripts)
-- No `process.env` in `src/`/`packages/` (use `Deno.env`)
-- No `console.*` in `src/infrastructure/` or `packages/` (use `getLogger` from `@anchr/core-runtime/logger`)
+Additional CI invariants beyond what the APIs / Logging sections already require: no `--no-check` in test tasks; no dynamic `await import(...)` in libraries (platform conditionals + scripts only).
 
 ## Type-safety bar
 
 - `as` casts and `any` are forbidden in `src/` and `packages/`. Narrow with type predicates (`x is T`) or runtime helpers in `src/infrastructure/lib/runtime-types.ts`.
-- `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use. Anywhere else, write the precise type.
-- Enforced by `deno task lint:refactor` (runs in CI via `scripts/test-all.sh`).
+- `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use.
+- Enforced by `deno task lint:refactor`.
 
 ## Versioning + deprecation policy
 
-Pre-1.0 (no published version, no users): when a function, field, or
-endpoint is replaced, **delete the old path outright**. Don't carry
-`@deprecated` aliases, "legacy" fallbacks, or "backward compat"
-shims through refactors. If a regression is the worry, write a test
-that locks the new behaviour — do not preserve the old one.
+Pre-1.0 (current): when a function, field, or endpoint is replaced, **delete the old path outright**. No `@deprecated` aliases, "legacy" fallbacks, or "backward compat" shims. If regression is the worry, lock the new behavior with a test.
 
-Post-1.0 (SemVer in effect): `@deprecated` notices are allowed only on
-**minor / patch boundaries** and must name the version that introduces
-the deprecation and the version that removes the symbol, e.g.
-`@deprecated since v1.4, removed in v2.0. Use X.`. Major versions
-delete; they do not deprecate.
+Post-1.0 (future): `@deprecated` only on minor/patch boundaries, naming the introduce + remove versions (`@deprecated since v1.4, removed in v2.0. Use X.`). Major versions delete.
 
-Enforcement: `deno task lint:deprecation` (`scripts/lint-deprecation.ts`)
-bans `@deprecated`, "deprecated", "legacy", and "backward(s) compat"
-in `*.ts` / `*.tsx` / `*.rs` source. Per-line opt-out is
-`allow-deprecation-vocab: <reason>` and is reserved for legitimate
-post-1.0 deprecation notices. Markdown is not scanned (specs and
-design docs may legitimately discuss the policy itself).
+Enforced by `deno task lint:deprecation`, which bans `@deprecated`, "deprecated", "legacy", "backward(s) compat" in `*.ts`/`*.tsx`/`*.rs`. Per-line opt-out: `allow-deprecation-vocab: <reason>` (reserved for legitimate post-1.0 notices). Markdown is not scanned.
+
+## Comments
+
+Default to no comments. Delete any comment that restates the code, narrates the change ("added for X", "previously did Y", "belt and suspenders so…"), or paraphrases an explicit expression. Keep one only for a non-obvious WHY (hidden invariant, workaround for a referenced bug, surprising ordering). When editing, strip violating comments in the touched region — don't preserve them out of politeness.
 
 ## Verification bar
 
@@ -155,25 +119,9 @@ design docs may legitimately discuss the policy itself).
 - Errors (E*) cause non-zero exit; warnings (W*) are informational
 
 ## Design System
-Always read DESIGN.md before making any visual or UI decisions.
-All font choices, colors, spacing, and aesthetic direction are defined there.
-Do not deviate without explicit user approval.
-In QA mode, flag any code that doesn't match DESIGN.md.
+
+`DESIGN.md` is the source of truth for fonts, colors, spacing, and visual direction. Don't deviate without explicit approval; in QA mode, flag drift.
 
 ## Skill routing
 
-When the user's request matches an available skill, ALWAYS invoke it using the Skill
-tool as your FIRST action. Do NOT answer directly, do NOT use other tools first.
-The skill has specialized workflows that produce better results than ad-hoc answers.
-
-Key routing rules:
-- Product ideas, "is this worth building", brainstorming → invoke office-hours
-- Bugs, errors, "why is this broken", 500 errors → invoke investigate
-- Ship, deploy, push, create PR → invoke ship
-- QA, test the site, find bugs → invoke qa
-- Code review, check my diff → invoke review
-- Update docs after shipping → invoke document-release
-- Weekly retro → invoke retro
-- Design system, brand → invoke design-consultation
-- Visual audit, design polish → invoke design-review
-- Architecture review → invoke plan-eng-review
+When a request matches an available skill, invoke it via the `Skill` tool as the first action — don't answer directly or run other tools first. Available skills are listed in the system reminder; trust their own descriptions for routing.

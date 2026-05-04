@@ -47,10 +47,6 @@ jobs:
     name: Smoke check
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Fly deploys only on merge-to-main. The `push` trigger above already
-    # filters to main, but workflow_dispatch is otherwise dispatchable from
-    # any branch — gate it explicitly so an accidental "Run workflow" on a
-    # feature branch can never deploy that branch's code to production.
     if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
     permissions:
       contents: read
