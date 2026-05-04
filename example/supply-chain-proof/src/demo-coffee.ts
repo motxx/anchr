@@ -21,10 +21,6 @@ import type {
 } from "./supply-chain-types.ts";
 import { printReport, verifySupplyChain } from "./chain-verifier.ts";
 
-// ---------------------------------------------------------------------------
-// Real GPS coordinates
-// ---------------------------------------------------------------------------
-
 const GPS = {
   sao_paulo_farm: { lat: -23.5505, lon: -46.6333, name: "Coffee Farm, Sao Paulo, Brazil" },
   santos_port: { lat: -23.9608, lon: -46.3336, name: "Port of Santos, Brazil" },
@@ -32,10 +28,7 @@ const GPS = {
   shibuya_cafe: { lat: 35.6595, lon: 139.7004, name: "Cafe, Shibuya, Tokyo, Japan" },
 } as const;
 
-// ---------------------------------------------------------------------------
-// Simulated actors (Nostr pubkeys are placeholders for the demo)
-// ---------------------------------------------------------------------------
-
+// Nostr pubkeys are placeholders for the demo.
 const ACTORS = {
   farmer: {
     name: "Fazenda Boa Vista",
@@ -54,10 +47,6 @@ const ACTORS = {
     pubkey: "d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5",
   },
 } as const;
-
-// ---------------------------------------------------------------------------
-// Verification requirements for each step type
-// ---------------------------------------------------------------------------
 
 const COFFEE_REQUIREMENTS: StepRequirement[] = [
   {
@@ -126,15 +115,10 @@ const COFFEE_REQUIREMENTS: StepRequirement[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Simulated supply chain steps
-// ---------------------------------------------------------------------------
-
 function buildCoffeeSteps(): SupplyChainStep[] {
   const productId = "coffee-fazenda-lot-2026-03";
-  const baseTime = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60; // 30 days ago
+  const baseTime = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
 
-  // Step 1: Origin — Farmer photographs the harvest
   const step1: SupplyChainStep = {
     id: "step-001-origin",
     product_id: productId,
@@ -171,14 +155,13 @@ function buildCoffeeSteps(): SupplyChainStep[] {
     nostr_event_id: "evt_origin_001",
   };
 
-  // Step 2: Transport — Exporter ships from Santos port
   const step2: SupplyChainStep = {
     id: "step-002-transport",
     product_id: productId,
     step_type: "transport",
     actor: ACTORS.exporter,
     location: GPS.santos_port,
-    timestamp: baseTime + 3 * 24 * 60 * 60, // 3 days later
+    timestamp: baseTime + 3 * 24 * 60 * 60,
     proofs: [
       {
         type: "tlsn_api",
@@ -205,14 +188,13 @@ function buildCoffeeSteps(): SupplyChainStep[] {
     nostr_event_id: "evt_transport_002",
   };
 
-  // Step 3: Processing — Roaster in Kawasaki receives and cups the coffee
   const step3: SupplyChainStep = {
     id: "step-003-processing",
     product_id: productId,
     step_type: "processing",
     actor: ACTORS.roaster,
     location: GPS.kawasaki_roaster,
-    timestamp: baseTime + 25 * 24 * 60 * 60, // 25 days later
+    timestamp: baseTime + 25 * 24 * 60 * 60,
     proofs: [
       {
         type: "gps_photo",
@@ -248,14 +230,13 @@ function buildCoffeeSteps(): SupplyChainStep[] {
     nostr_event_id: "evt_processing_003",
   };
 
-  // Step 4: Retail — Cafe in Shibuya receives final delivery
   const step4: SupplyChainStep = {
     id: "step-004-retail",
     product_id: productId,
     step_type: "retail",
     actor: ACTORS.cafe,
     location: GPS.shibuya_cafe,
-    timestamp: baseTime + 28 * 24 * 60 * 60, // 28 days later
+    timestamp: baseTime + 28 * 24 * 60 * 60,
     proofs: [
       {
         type: "gps_photo",
@@ -276,10 +257,6 @@ function buildCoffeeSteps(): SupplyChainStep[] {
   return [step1, step2, step3, step4];
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 function main() {
   console.log();
   console.log("  Supply Chain Proof — Coffee Demo");
@@ -299,7 +276,6 @@ function main() {
   console.log(`  Steps:   ${product.steps.length}`);
   console.log();
 
-  // Print each step summary
   for (const step of product.steps) {
     const proofTypes = step.proofs.map((p) => p.type).join(", ");
     console.log(`  [${step.step_type.toUpperCase().padEnd(10)}] ${step.location.name}`);
@@ -312,14 +288,12 @@ function main() {
     console.log();
   }
 
-  // Verify the full chain
   console.log("  Running verification...");
   console.log();
 
   const report = verifySupplyChain(product);
   printReport(report);
 
-  // Cashu HTLC payment summary
   console.log();
   console.log("  Cashu HTLC Payment Summary");
   console.log("  " + "-".repeat(50));
@@ -347,7 +321,6 @@ function main() {
   );
   console.log();
 
-  // Nostr event log
   console.log("  Nostr Event Log (decentralized audit trail)");
   console.log("  " + "-".repeat(50));
   for (const step of product.steps) {

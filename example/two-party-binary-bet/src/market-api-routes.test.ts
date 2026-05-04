@@ -3,7 +3,6 @@ import { expect } from "@std/expect";
 import { buildMarketApiRoutes } from "./market-api-routes.ts";
 import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 
-// Ensure we're in single-key mode for these tests
 _setFrostSignerPathForTest(null);
 
 function createTestApp() {
@@ -61,14 +60,12 @@ test("POST /markets creates a market with keys", async () => {
 test("GET /markets/:id returns created market", async () => {
   const { app } = createTestApp();
 
-  // Create market
   await app.request("/markets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: "m-1", title: "Test" }),
   });
 
-  // Fetch it
   const res = await app.request("/markets/m-1");
   expect(res.status).toBe(200);
   const body = await res.json();
@@ -87,7 +84,6 @@ test("GET /markets/:id returns 404 for unknown market", async () => {
 test("POST /markets/:id/resolve resolves YES when condition met", async () => {
   const { app } = createTestApp();
 
-  // Create market with price_above condition
   await app.request("/markets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -105,7 +101,6 @@ test("POST /markets/:id/resolve resolves YES when condition met", async () => {
     }),
   });
 
-  // Resolve with price = 200 (above threshold)
   const res = await app.request("/markets/resolve-yes/resolve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -142,7 +137,6 @@ test("POST /markets/:id/resolve resolves NO when condition not met", async () =>
     }),
   });
 
-  // Resolve with price = 50 (below threshold)
   const res = await app.request("/markets/resolve-no/resolve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -186,14 +180,12 @@ test("POST /markets/:id/resolve returns 409 for already resolved market", async 
     }),
   });
 
-  // First resolve
   await app.request("/markets/double-resolve/resolve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ verified_body: JSON.stringify({ price: 200 }) }),
   });
 
-  // Second resolve should fail
   const res = await app.request("/markets/double-resolve/resolve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

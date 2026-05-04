@@ -14,7 +14,7 @@ export function useUserLocation() {
         const coord = await locationProvider.getCurrentPosition();
         if (!cancelled) setLocation(coord);
       } catch {
-        // Location unavailable
+        // location unavailable
       }
     })();
     return () => { cancelled = true; };

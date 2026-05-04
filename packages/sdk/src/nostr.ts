@@ -1,13 +1,9 @@
 /**
  * Nostr helper layer for the SDK.
  *
- * Thin, type-safe wrappers around nostr-tools so Customer / Provider
- * code can speak Nostr without re-importing the npm package directly.
- * Encapsulates SimplePool lifecycle, NIP-44 v2 encryption, ephemeral
- * identity generation, and tag/key helpers.
- *
- * Anchr-specific NIP-90 event kinds (5300 / 6300 / 7000) are constants
- * here so both Customer and Provider reference the same values.
+ * Type-safe wrappers around nostr-tools: SimplePool lifecycle, NIP-44 v2
+ * encryption, ephemeral identity, tag/key helpers, and Anchr's NIP-90 kind
+ * constants (5300 / 6300 / 7000).
  */
 
 import { SimplePool } from "nostr-tools/pool";
@@ -22,8 +18,6 @@ import {
 import { decrypt as nip44Decrypt, encrypt as nip44Encrypt, getConversationKey } from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
 
-// --- Event kinds (NIP-90 + Anchr) ---
-
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;
 /** Anchr Job Result (NIP-90 standard kind 6300). */
@@ -32,8 +26,6 @@ export const KIND_QUERY_RESPONSE = 6300;
 export const KIND_QUERY_FEEDBACK = 7000;
 /** NIP-44 encrypted DM (kind 4). */
 export const KIND_DIRECT_MESSAGE = 4;
-
-// --- Identity ---
 
 /** Pair of secret + derived public key (both hex). */
 export interface Keypair {
@@ -94,8 +86,6 @@ function hexToBytes(hex: string): Uint8Array {
   return out;
 }
 
-// --- NIP-44 encryption ---
-
 /** Encrypt content from `senderSecretKey` to `recipientPubkey` via NIP-44 v2. */
 export function encryptNip44(
   content: string,
@@ -116,8 +106,6 @@ export function decryptNip44(
   return nip44Decrypt(ciphertext, key);
 }
 
-// --- Event signing ---
-
 /** Sign a template into a finalized Nostr event. */
 export function signEvent(
   template: EventTemplate | UnsignedEvent,
@@ -125,8 +113,6 @@ export function signEvent(
 ): Event {
   return finalizeEvent(template, secretKey);
 }
-
-// --- Relay pool ---
 
 /** Result of publishing one event to N relays. */
 export interface PublishResult {
@@ -230,13 +216,9 @@ export function createRelayClient(relays: readonly string[]): RelayClient {
   };
 }
 
-// --- Tag helpers ---
-
 /**
- * Anything with a Nostr-style `tags` field (array of `[key, value, ...]` arrays).
- *
- * The tag helpers below only inspect `tags`, so they accept any object with
- * that shape — no need to construct a full Event for testing.
+ * Anything with a Nostr-style `tags` field. The tag helpers below only
+ * inspect `tags`, so they accept any object with that shape.
  */
 export interface HasTags {
   tags: string[][];
@@ -259,5 +241,4 @@ export function findAllTagValues(event: HasTags, key: string): string[] {
   return out;
 }
 
-// Re-export underlying types so consumers do not have to import nostr-tools directly.
 export type { Event, EventTemplate, UnsignedEvent };

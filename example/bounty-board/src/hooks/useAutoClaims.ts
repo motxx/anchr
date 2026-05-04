@@ -15,7 +15,6 @@ export interface FlightClaim {
   raw: QuerySummary;
 }
 
-// Flight route lookup for demo
 const ROUTE_MAP: Record<string, { origin: string; destination: string; departure: string }> = {
   NH123: { origin: "NRT", destination: "SFO", departure: "10:00" },
   JL456: { origin: "HND", destination: "LAX", departure: "14:00" },

@@ -1,7 +1,5 @@
 import type { Query } from "./types.ts";
 
-// --- QueryStore interface ---
-
 export interface QueryStore {
   get(id: string): Query | null;
   set(id: string, query: Query): void;

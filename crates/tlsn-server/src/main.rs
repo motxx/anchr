@@ -205,8 +205,7 @@ async fn handle_session_ws_raw(
 
     eprintln!("[tlsn-server] WS MPC done for {}, waiting for reveal_config...", &session_id[..8]);
 
-    // Wait for reveal_config from extension (with timeout)
-    // The extension sends reveal_config after prove() extracts transcript ranges
+    // Extension sends reveal_config after prove() extracts transcript ranges.
     let reveal_config = tokio::time::timeout(std::time::Duration::from_secs(30), async {
         while let Some(Ok(msg)) = ws.next().await {
             if let async_tungstenite::tungstenite::Message::Text(text) = msg {
@@ -220,13 +219,11 @@ async fn handle_session_ws_raw(
         None
     }).await;
 
-    // Build results based on reveal_config ranges
     let mut results = Vec::new();
 
     if let Ok(Some(config)) = reveal_config {
         eprintln!("[tlsn-server] Received reveal_config for {}", &session_id[..8]);
 
-        // Process sent ranges
         if let Some(sent_ranges) = config["sent"].as_array() {
             for range in sent_ranges {
                 let start = range["start"].as_u64().unwrap_or(0) as usize;
@@ -234,7 +231,6 @@ async fn handle_session_ws_raw(
                 let handler_type = range.get("handler").and_then(|h| h["type"].as_str()).unwrap_or("SENT");
                 let handler_part = range.get("handler").and_then(|h| h["part"].as_str()).unwrap_or("ALL");
 
-                // Extract the range from the sent transcript
                 let value = if end <= result.sent_transcript.len() && start < end {
                     result.sent_transcript[start..end].to_string()
                 } else {
@@ -249,7 +245,6 @@ async fn handle_session_ws_raw(
             }
         }
 
-        // Process recv ranges
         if let Some(recv_ranges) = config["recv"].as_array() {
             for range in recv_ranges {
                 let start = range["start"].as_u64().unwrap_or(0) as usize;
@@ -290,8 +285,6 @@ async fn handle_session_ws_raw(
     eprintln!("[tlsn-server] WS session {} completed with {} results", &session_id[..8], results.len());
 }
 
-// --- /verifier handler (MPC-TLS via WsStream, same as official) ---
-
 async fn handle_verifier_ws_raw(
     ws: async_tungstenite::WebSocketStream<async_tungstenite::tokio::TokioAdapter<tokio::net::TcpStream>>,
     session_id: String,
@@ -305,10 +298,8 @@ async fn handle_verifier_ws_raw(
 
     eprintln!("[tlsn-server] WS MPC starting for {}", &session_id[..8]);
 
-    // Use WsStream (same as official tlsn-extension verifier)
+    // WsStream + Session matches the official tlsn-extension verifier wire format.
     let ws_stream = ws_stream_tungstenite::WsStream::new(ws);
-
-    // Run Session directly (same as official)
     let session = Session::new(ws_stream);
     let (driver, mut handle) = session.split();
     let driver_task = tokio::spawn(driver);
@@ -396,8 +387,6 @@ async fn connect_proxy_target(host: &str, port: u16) -> std::io::Result<tokio::n
     }
 }
 
-// --- /proxy handler (WS-to-TCP bridge, same approach as official) ---
-
 async fn handle_proxy_ws_raw(
     ws: async_tungstenite::WebSocketStream<async_tungstenite::tokio::TokioAdapter<tokio::net::TcpStream>>,
     host: String,
@@ -419,9 +408,8 @@ async fn handle_proxy_ws_raw(
         }
     };
 
-    // Message-based relay: WS Binary messages <-> raw TCP bytes.
-    // Connection: close header ensures the server sends close_notify immediately
-    // after the response, so all data is forwarded before the browser closes WS.
+    // Connection: close header makes the server emit close_notify before the
+    // browser tears down the WS, so all bytes reach us before EOF.
     let (mut ws_sink, mut ws_stream) = ws.split();
     let (mut tcp_read, mut tcp_write) = tokio::io::split(tcp);
 
@@ -500,8 +488,6 @@ async fn handle_proxy_ws_raw(
     let _ = tokio::join!(ws_to_tcp, tcp_to_ws);
     eprintln!("[tlsn-server] Proxy closed for {}", host);
 }
-
-// --- TCP protocol (CLI prover, unchanged) ---
 
 async fn run_tcp_server(port: u16, state: AppState) -> Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", port)).await?;

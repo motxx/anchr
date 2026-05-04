@@ -1,17 +1,5 @@
-/**
- * Unit tests for redeemHtlcToken witness preparation logic.
- *
- * The redeemHtlcToken() function in escrow.ts is tightly coupled to the Cashu
- * mint (via getWalletAndConfig / loadAndSend). We extract and test the two pure
- * helper functions it delegates to:
- *
- *   - prepareHtlcWitness: attaches preimage + P2PK signature to each proof
- *   - verifyHtlcSpendAuth: validates HTLC spending conditions locally
- *
- * Since these helpers are module-private, we replicate their logic here and test
- * the same behavior. We also exercise verifyHtlcProofs (the public verification
- * function) and the P2PK builder options used for HTLC tokens.
- */
+// prepareHtlcWitness/verifyHtlcSpendAuth are module-private in escrow.ts;
+// we replicate the logic here so we can exercise it without a live Cashu mint.
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
@@ -33,34 +21,22 @@ import {
   verifyHtlcProofs,
 } from "@anchr/core-cashu/escrow";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Generate a nostr-style hex keypair. */
 function genKeypair() {
   const sk = generateSecretKey();
   const pk = getPublicKey(sk);
   return { secretKey: bytesToHex(sk), publicKey: pk };
 }
 
-/** Compute SHA-256 hash of a hex preimage, returning hex. */
 function sha256Hex(hexPreimage: string): string {
   const bytes = new Uint8Array(hexPreimage.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
   return bytesToHex(sha256(bytes));
 }
 
-/** Generate a random hex preimage (32 bytes). */
 function randomPreimage(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-/**
- * Create a crafted HTLC proof with a structured secret.
- *
- * The secret follows NUT-14 format:
- *   ["HTLC", { data: <hash>, nonce: <nonce>, tags: [...] }]
- */
+// NUT-14 secret format: ["HTLC", { data: <hash>, nonce, tags: [...] }]
 function makeHtlcProof(params: {
   hash: string;
   workerPubkey: string;
@@ -70,7 +46,6 @@ function makeHtlcProof(params: {
 }): Proof {
   const { hash, workerPubkey, refundPubkey, locktime, amount = 64 } = params;
 
-  // Build secret using NUT-14 HTLC format
   const secret = JSON.stringify([
     "HTLC",
     {
@@ -94,11 +69,6 @@ function makeHtlcProof(params: {
   };
 }
 
-/**
- * Replicate prepareHtlcWitness from escrow.ts:
- *   1. Attach preimage as HTLC witness on each proof
- *   2. Sign proofs with worker's private key (P2PK)
- */
 function prepareHtlcWitness(proofs: Proof[], preimage: string, workerPrivateKey: string): Proof[] {
   const proofsWithPreimage = proofs.map((p) => ({
     ...p,
@@ -106,10 +76,6 @@ function prepareHtlcWitness(proofs: Proof[], preimage: string, workerPrivateKey:
   }));
   return signP2PKProofs(proofsWithPreimage, workerPrivateKey);
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("redeemHtlcToken — witness preparation", () => {
   const worker = genKeypair();
@@ -151,8 +117,7 @@ describe("redeemHtlcToken — witness preparation", () => {
     expect(witness.signatures).toBeDefined();
     expect(Array.isArray(witness.signatures)).toBe(true);
     expect(witness.signatures.length).toBeGreaterThan(0);
-    // Each signature should be a hex string (64-byte Schnorr = 128 hex chars)
-    expect(witness.signatures[0].length).toBe(128);
+    expect(witness.signatures[0].length).toBe(128); // 64-byte Schnorr
   });
 
   test("prepareHtlcWitness preserves proof amount and secret", () => {
@@ -198,7 +163,6 @@ describe("redeemHtlcToken — witness preparation", () => {
 
     const signed = prepareHtlcWitness([proof], preimage, worker.secretKey);
 
-    // cashu-ts isHTLCSpendAuthorised verifies witness against HTLC conditions
     expect(isHTLCSpendAuthorised(signed[0]!)).toBe(true);
   });
 });
@@ -221,7 +185,6 @@ describe("redeemHtlcToken — invalid token handling", () => {
     const wrongPreimage = randomPreimage();
     const signed = prepareHtlcWitness([proof], wrongPreimage, worker.secretKey);
 
-    // The preimage doesn't match the hash, so HTLC spend should not be authorized
     expect(isHTLCSpendAuthorised(signed[0]!)).toBe(false);
   });
 
@@ -235,23 +198,18 @@ describe("redeemHtlcToken — invalid token handling", () => {
 
     const impostor = genKeypair();
 
-    // signP2PKProofs with wrong key: the function should either throw or
-    // produce proofs that fail spend authorization.
-    // cashu-ts signP2PKProofs logs a warning and returns the proof unsigned
-    // when the key isn't in the pubkeys list.
+    // cashu-ts signP2PKProofs with a key not in the pubkeys list either logs
+    // and returns unsigned, or signs with a useless key — either way the
+    // resulting proof must not pass spend authorization.
     const signed = prepareHtlcWitness([proof], preimage, impostor.secretKey);
 
-    // The witness should either have no signatures or fail authorization
     const witness = typeof signed[0]!.witness === "string"
       ? JSON.parse(signed[0]!.witness)
       : signed[0]!.witness;
 
-    // If signP2PKProofs skipped signing (key not in lock), signatures is empty
     if (witness.signatures.length === 0) {
       expect(isHTLCSpendAuthorised(signed[0]!)).toBe(false);
     } else {
-      // If it signed anyway (some versions don't check), the HTLC auth
-      // should still fail because the signature doesn't match a required pubkey
       expect(isHTLCSpendAuthorised(signed[0]!)).toBe(false);
     }
   });
@@ -343,7 +301,7 @@ describe("verifyHtlcProofs — public verification function", () => {
     const otherPreimage = randomPreimage();
     const otherHash = sha256Hex(otherPreimage);
     const proof = makeHtlcProof({
-      hash: otherHash, // proof locked with different hash
+      hash: otherHash,
       workerPubkey: worker.publicKey,
       refundPubkey: requester.publicKey,
       locktime,
@@ -371,13 +329,11 @@ describe("verifyHtlcProofs — public verification function", () => {
   test("returns error for empty proofs array with wrong preimage", () => {
     const wrongPreimage = randomPreimage();
     const result = verifyHtlcProofs([], hash, wrongPreimage);
-    // verifyHTLCHash check happens first, fails for wrong preimage
     expect(result).not.toBeNull();
     expect(result).toContain("Preimage does not match expected hash");
   });
 
   test("returns null for empty proofs array with correct preimage", () => {
-    // No proofs to check = vacuously valid
     const result = verifyHtlcProofs([], hash, preimage);
     expect(result).toBeNull();
   });

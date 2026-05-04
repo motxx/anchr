@@ -50,10 +50,6 @@ export interface DecryptedTokenContent {
   del?: string[];
 }
 
-// ---------------------------------------------------------------------------
-// Wallet construction
-// ---------------------------------------------------------------------------
-
 export interface CreateWalletInput {
   secretKey: Uint8Array;
   relays: string[];
@@ -92,10 +88,6 @@ export async function publishWalletConfig(wallet: Nip60Wallet): Promise<string> 
   await publishToRelays(wallet, event);
   return event.id;
 }
-
-// ---------------------------------------------------------------------------
-// Token event read / write
-// ---------------------------------------------------------------------------
 
 /** Publish a new kind:7375 token event covering `proofs`. */
 export async function publishProofs(
@@ -153,7 +145,7 @@ export async function loadProofs(wallet: Nip60Wallet): Promise<TokenEntry[]> {
     }
     live.push({ eventId: ev.id, mint: payload.mint, proofs: payload.proofs });
   }
-  // Filter again — a later event might have del'd one we already added.
+  // A later event may have del'd one of the entries we already pushed.
   return live.filter((entry) => !tombstoned.has(entry.eventId));
 }
 
@@ -168,10 +160,7 @@ export async function getBalance(wallet: Nip60Wallet): Promise<number> {
   return total;
 }
 
-// ---------------------------------------------------------------------------
-// Encryption (NIP-44, self → self)
-// ---------------------------------------------------------------------------
-
+// NIP-44 v2, self → self conversation key.
 function encryptToSelf(wallet: Nip60Wallet, plaintext: string): string {
   const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
   return nip44.v2.encrypt(plaintext, key);
@@ -181,10 +170,6 @@ function decryptToSelf(wallet: Nip60Wallet, ciphertext: string): string {
   const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
   return nip44.v2.decrypt(ciphertext, key);
 }
-
-// ---------------------------------------------------------------------------
-// Relay plumbing
-// ---------------------------------------------------------------------------
 
 async function publishToRelays(wallet: Nip60Wallet, event: Event): Promise<void> {
   // Promise.allSettled so a single failed relay doesn't drop the publish.

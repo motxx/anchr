@@ -3,14 +3,6 @@ import { expect } from "@std/expect";
 import { fetchBlossomAttachment } from "./fetch-attachment.ts";
 import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types.ts";
 
-/**
- * Tests for fetchBlossomAttachment guard logic.
- *
- * The function delegates to downloadFromBlossom for actual network calls.
- * We test the early-return guards that skip downloads when preconditions
- * are not met.
- */
-
 describe("fetchBlossomAttachment", () => {
   const validKey: BlossomKeyMaterial = {
     encrypt_key: "abcdef1234567890abcdef1234567890",
@@ -36,7 +28,6 @@ describe("fetchBlossomAttachment", () => {
       uri: "https://blossom.example.com/abc",
       mime_type: "image/jpeg",
       storage_kind: "blossom",
-      // no blossom_hash
     };
 
     const result = await fetchBlossomAttachment(ref, validKey);

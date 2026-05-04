@@ -1,13 +1,5 @@
-/**
- * Worker-side upload: EXIF strip → encrypt → Blossom upload.
- *
- * Workers use this to prepare attachments locally before submitting.
- * The server/oracle never receives the raw file — only the Blossom
- * reference with decryption key for verification.
- *
- * Privacy benefit: the worker's EXIF metadata (GPS, device info)
- * never leaves their device.
- */
+// Worker-side: EXIF strip happens locally so GPS/device metadata never
+// leaves the worker's device.
 
 import { Buffer } from "node:buffer";
 import { stripExif } from "../exif-strip.ts";
@@ -29,12 +21,6 @@ export interface WorkerUploadResult {
   blossom: BlossomUploadResult;
 }
 
-/**
- * Strip EXIF, encrypt, and upload to Blossom.
- *
- * Returns an AttachmentRef with `storage_kind: "blossom"` that can be
- * included in a query result submission.
- */
 export async function workerUpload(
   data: Uint8Array,
   filename: string,
@@ -45,7 +31,6 @@ export async function workerUpload(
   const serverUrls = options?.serverUrls ?? config?.serverUrls;
   if (!serverUrls || serverUrls.length === 0) return null;
 
-  // 1. Strip EXIF (unless skipped)
   let processed: Uint8Array;
   if (options?.skipExifStrip) {
     processed = data;
@@ -54,12 +39,11 @@ export async function workerUpload(
     processed = new Uint8Array(stripped);
   }
 
-  // 2. Encrypt + upload to Blossom
   const identity = generateEphemeralIdentity();
   const result = await uploadToBlossom(processed, identity, serverUrls);
   if (!result) return null;
 
-  // 3. Build attachment ref (E2E: no encryption keys stored here)
+  // E2E: no encryption keys stored in the AttachmentRef.
   const attachment: AttachmentRef = {
     id: result.hash,
     uri: result.urls[0]!,

@@ -17,7 +17,6 @@ describe("HTLC escrow (NUT-14)", () => {
       locktimeSeconds: 1700000000,
     });
 
-    // Phase 1: no conditions — plain proofs held locally
     expect(opts).toBeNull();
   });
 
@@ -29,7 +28,6 @@ describe("HTLC escrow (NUT-14)", () => {
       locktimeSeconds: 1700000000,
     });
 
-    // Phase 2: HTLC with hashlock + Worker lock
     expect(opts.hashlock).toBe(HASH);
     expect(opts.locktime).toBe(1700000000);
     expect(opts.sigFlag).toBe("SIG_ALL");
@@ -52,10 +50,8 @@ describe("HTLC escrow (NUT-14)", () => {
       locktimeSeconds: 1700000000,
     });
 
-    // Phase 1: no conditions
     expect(initial).toBeNull();
 
-    // Phase 2: hashlock + Worker lock
     expect(final.hashlock).toBe(HASH);
     const finalPubkeys = Array.isArray(final.pubkey) ? final.pubkey : [final.pubkey];
     expect(finalPubkeys).toContain(`02${WORKER_PUB}`);

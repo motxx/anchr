@@ -89,7 +89,7 @@ test("resolveMarket returns NO when condition not met", () => {
   const { preimage, hash } = makePreimage();
   const market = makeMarket({ htlc_hash_yes: hash });
   const now = Math.floor(Date.now() / 1000);
-  const body = JSON.stringify({ price: 50 }); // Below threshold of 100
+  const body = JSON.stringify({ price: 50 });
 
   const result = resolveMarket(
     market,
@@ -103,8 +103,6 @@ test("resolveMarket returns NO when condition not met", () => {
   expect(result.outcome).toBe("no");
   expect(result.preimage).toBeUndefined();
 });
-
-// --- verifyMarketResolution: trustless TLSN-verified resolution path ---
 
 let mockVerifierDir: string;
 let mockVerifierPath: string;

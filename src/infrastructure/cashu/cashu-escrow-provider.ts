@@ -1,9 +1,3 @@
-/**
- * CashuEscrowProvider — wraps existing Cashu HTLC escrow as an EscrowProvider.
- *
- * Thin adapter: delegates to escrow.ts functions without changing any existing logic.
- */
-
 import type { EscrowProvider } from "../../application/escrow-port.ts";
 import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "@anchr/core-cashu/escrow";
 import { verifyToken } from "@anchr/core-cashu/wallet";

@@ -15,10 +15,6 @@ import {
   createMarketWallet,
 } from "./market-wallet.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Create a minimal Cashu Proof stub with given amount. */
 function makeProof(amount: number, id = "test-keyset"): Proof {
   const rand = crypto.randomUUID().replace(/-/g, "");
@@ -38,9 +34,7 @@ function makeMockWallet(opts?: {
   const sendResult = opts?.sendResult ?? { send: [], keep: [] };
   const sendError = opts?.sendError;
 
-  // The wallet.ops.send(amount, proofs).run() call chain
   const mockSend = (_amount: number, _proofs: Proof[]) => ({
-    // Intermediate builder — support .asP2PK() chaining too
     asP2PK: () => ({
       run: async () => {
         if (sendError) throw sendError;
@@ -70,10 +64,6 @@ function makeMockWallet(opts?: {
   return stub as Wallet;
 }
 
-// ---------------------------------------------------------------------------
-// getUserBalance
-// ---------------------------------------------------------------------------
-
 describe("getUserBalance", () => {
   let store: Map<string, Proof[]>;
 
@@ -95,10 +85,6 @@ describe("getUserBalance", () => {
     expect(getUserBalance(store, "bob")).toBe(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// creditUser
-// ---------------------------------------------------------------------------
 
 describe("creditUser", () => {
   let store: Map<string, Proof[]>;
@@ -128,10 +114,6 @@ describe("creditUser", () => {
     expect(getUserBalance(store, "bob")).toBe(200);
   });
 });
-
-// ---------------------------------------------------------------------------
-// debitUser
-// ---------------------------------------------------------------------------
 
 describe("debitUser", () => {
   let store: Map<string, Proof[]>;
@@ -164,7 +146,6 @@ describe("debitUser", () => {
     expect(result).not.toBeNull();
     expect(result!.length).toBe(1);
     expect(result![0].amount).toBe(100);
-    // alice should have the 50-sat proof remaining
     expect(getUserBalance(store, "alice")).toBe(50);
   });
 
@@ -177,7 +158,6 @@ describe("debitUser", () => {
     const result = await debitUser(store, "alice", 100, wallet);
 
     expect(result).not.toBeNull();
-    // Both proofs selected (60+40 = 100 exact)
     expect(result!.reduce((s, p) => s + p.amount, 0)).toBe(100);
     expect(getUserBalance(store, "alice")).toBe(0);
   });
@@ -187,7 +167,6 @@ describe("debitUser", () => {
     const p2 = makeProof(50);
     store.set("alice", [p1, p2]);
 
-    // Mock wallet returns split: 70 sats sent, 10 sats change
     const sendProof = makeProof(70);
     const keepProof = makeProof(10);
     const wallet = makeMockWallet({
@@ -198,7 +177,6 @@ describe("debitUser", () => {
 
     expect(result).not.toBeNull();
     expect(result!).toEqual([sendProof]);
-    // 50 (untouched) + 10 (change) = 60 remaining
     expect(getUserBalance(store, "alice")).toBe(60);
   });
 
@@ -215,10 +193,6 @@ describe("debitUser", () => {
     expect(result).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// createMarketWallet factory
-// ---------------------------------------------------------------------------
 
 describe("createMarketWallet", () => {
   test("creates wallet with fresh store", () => {

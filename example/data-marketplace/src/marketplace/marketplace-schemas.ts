@@ -1,8 +1,3 @@
-/**
- * Zod validation schemas for Marketplace API endpoints.
- * Reuses tlsn-related schemas from worker-api-schemas.
- */
-
 import { z } from "zod";
 import { tlsnRequirementSchema } from "../../../../src/infrastructure/worker-api-schemas.ts";
 

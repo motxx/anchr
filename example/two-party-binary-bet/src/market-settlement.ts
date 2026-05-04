@@ -200,11 +200,10 @@ export async function settleMarket(
     state.resolvedPreimages.set(marketId, result.preimage);
   }
 
-  // Update market status.
   const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
   market.status = newStatus;
 
-  // Mark matched pairs as settled (clients call /redeem to retrieve tokens).
+  // Clients call /redeem to retrieve their share of the matched-pair tokens.
   const settledPairs: SettledPair[] = [];
   for (const pair of state.matchedPairs.values() as IterableIterator<MatchedBetPair>) {
     if (pair.market_id !== marketId) continue;

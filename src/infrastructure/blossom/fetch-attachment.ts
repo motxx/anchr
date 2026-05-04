@@ -1,18 +1,7 @@
-/**
- * Fetch a Blossom-hosted attachment for verification.
- *
- * Downloads the encrypted blob from Blossom servers and decrypts it
- * using ephemeral key material passed as a parameter (E2E encryption).
- */
-
 import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types.ts";
 import { downloadFromBlossom } from "./client.ts";
 
-/**
- * Download and decrypt a Blossom-hosted attachment.
- * Requires ephemeral key material — keys are never stored in AttachmentRef.
- * Returns the decrypted file data, or null if unavailable.
- */
+// Ephemeral key material is required: keys are never stored in AttachmentRef.
 export async function fetchBlossomAttachment(
   ref: AttachmentRef,
   keyMaterial?: BlossomKeyMaterial,

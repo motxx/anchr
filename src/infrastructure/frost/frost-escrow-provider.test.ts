@@ -1,10 +1,3 @@
-/**
- * Unit tests for FROST P2PK EscrowProvider (NUT-11 P2PK 2-of-2).
- *
- * Tests buildFrostP2PKOptions and the verify/verifyLock/cancel logic
- * of createFrostEscrowProvider without requiring a live Cashu mint.
- */
-
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
@@ -15,13 +8,11 @@ import {
 } from "./frost-escrow-provider.ts";
 import type { EscrowProvider } from "../../application/escrow-port.ts";
 
-// Valid 32-byte x-only pubkeys (64 hex chars)
 const WORKER_PUB = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const GROUP_PUB  = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const REFUND_PUB = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const OTHER_PUB  = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
-/** Build a Cashu token with a P2PK secret containing specified pubkeys. */
 function makeP2PKToken(pubkeys: string[], amount = 100): string {
   const secret = JSON.stringify([
     "P2PK",
@@ -47,7 +38,6 @@ function makeP2PKToken(pubkeys: string[], amount = 100): string {
   });
 }
 
-/** Build a plain (non-P2PK) token for negative tests. */
 function makePlainToken(amount = 100): string {
   return getEncodedToken({
     mint: "https://mint.example.com",
@@ -60,28 +50,12 @@ function makePlainToken(amount = 100): string {
   });
 }
 
-/**
- * Helper: create a FROST escrow provider and manually insert a token entry
- * into the internal tokenMap via the provider's own createHold + override.
- *
- * Since we cannot call createHold without a real mint, we use a trick:
- * wrap createFrostEscrowProvider and expose a way to seed the map.
- */
 function createTestableProvider(groupPubkey: string) {
-  // We create the provider with a sourceProofsResolver that won't be called,
-  // then manually call the internal methods through a seeded approach.
-  // Instead, we exploit the fact that we can test verifyLock by:
-  // 1. Creating the provider
-  // 2. Using cancel/verify on non-existent refs (negative tests)
-  // 3. For positive tests, we build a thin wrapper that exposes the tokenMap.
-
-  // Approach: Create a provider and seed it via a custom factory.
   const tokenMap = new Map<string, { token: string; proofs: import("@cashu/cashu-ts").Proof[] }>();
   const refCounter = 0;
 
   const config: FrostEscrowConfig = { groupPubkey };
 
-  // Recreate the provider logic but with an exposed tokenMap for testing
   const provider: EscrowProvider & { _seed(ref: string, token: string): void } = {
     async createHold() { return null; },
     async bindWorker() { return null; },
@@ -90,7 +64,6 @@ function createTestableProvider(groupPubkey: string) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { valid: false, error: "Unknown escrow reference" };
 
-      // Inline token verification (no mint needed)
       try {
         const decoded = getDecodedToken(entry.token);
         const totalAmount = decoded.proofs.reduce((sum: number, p) => sum + p.amount, 0);
@@ -135,8 +108,6 @@ function createTestableProvider(groupPubkey: string) {
     },
 
     async settle() {
-      // Mirrors frost-escrow-provider.ts: settle is not wired through
-      // EscrowProvider in production paths.
       return {
         settled: false,
         error: "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
@@ -157,13 +128,10 @@ function createTestableProvider(groupPubkey: string) {
   return provider;
 }
 
-// ---------- buildFrostP2PKOptions ----------
-
 describe("buildFrostP2PKOptions", () => {
   test("creates 2-of-2 P2PK lock with worker + group pubkey", () => {
     const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, 1700000000);
 
-    // P2PKBuilder prepends 02 prefix
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys).toContain(`02${WORKER_PUB}`);
     expect(pubkeys).toContain(`02${GROUP_PUB}`);
@@ -193,16 +161,12 @@ describe("buildFrostP2PKOptions", () => {
   });
 });
 
-// ---------- FROST EscrowProvider ----------
-
 describe("FROST EscrowProvider", () => {
   let provider: ReturnType<typeof createTestableProvider>;
 
   beforeEach(() => {
     provider = createTestableProvider(GROUP_PUB);
   });
-
-  // --- verify ---
 
   describe("verify()", () => {
     test("returns invalid for unknown escrow reference", async () => {
@@ -238,8 +202,6 @@ describe("FROST EscrowProvider", () => {
       expect(result.error).toContain("Insufficient amount");
     });
   });
-
-  // --- verifyLock ---
 
   describe("verifyLock()", () => {
     test("returns failed for unknown escrow reference", async () => {
@@ -288,11 +250,9 @@ describe("FROST EscrowProvider", () => {
 
       const result = await provider.verifyLock("ref_plain", "", WORKER_PUB);
       expect(result.ok).toBe(false);
-      // Plain secret will fail JSON parse -> caught as P2PK verification failure
     });
 
     test("fails when P2PK proof has no pubkeys tag", async () => {
-      // Build a P2PK secret without pubkeys tag
       const secret = JSON.stringify([
         "P2PK",
         {
@@ -321,7 +281,6 @@ describe("FROST EscrowProvider", () => {
     });
 
     test("checks all proofs in a multi-proof token", async () => {
-      // Two proofs: first valid, second missing worker
       const validSecret = JSON.stringify([
         "P2PK",
         {
@@ -348,13 +307,10 @@ describe("FROST EscrowProvider", () => {
       provider._seed("ref_multi", token);
 
       const result = await provider.verifyLock("ref_multi", "", WORKER_PUB);
-      // Second proof lacks worker -> fails
       expect(result.ok).toBe(false);
       expect(result.message).toBe("Worker pubkey not in P2PK lock");
     });
   });
-
-  // --- cancel ---
 
   describe("cancel()", () => {
     test("deletes existing entry from token map", async () => {
@@ -364,7 +320,6 @@ describe("FROST EscrowProvider", () => {
       const result = await provider.cancel("ref_cancel");
       expect(result.cancelled).toBe(true);
 
-      // Verify it's gone
       const verify = await provider.verify("ref_cancel", 100);
       expect(verify.valid).toBe(false);
       expect(verify.error).toBe("Unknown escrow reference");
@@ -386,8 +341,6 @@ describe("FROST EscrowProvider", () => {
       expect(second.cancelled).toBe(false);
     });
   });
-
-  // --- createHold without sourceProofsResolver ---
 
   describe("createHold()", () => {
     test("returns null when no sourceProofsResolver configured", async () => {

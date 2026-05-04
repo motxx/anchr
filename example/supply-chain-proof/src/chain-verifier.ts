@@ -28,11 +28,7 @@ import type {
   SupplyChainStep,
 } from "./supply-chain-types.ts";
 
-// ---------------------------------------------------------------------------
-// Haversine (same formula as src/domain/geo.ts — duplicated here so the
-// example is self-contained without importing from the Anchr core)
-// ---------------------------------------------------------------------------
-
+// Duplicated from src/domain/geo.ts so the example is self-contained.
 function haversineKm(
   lat1: number,
   lon1: number,
@@ -49,10 +45,6 @@ function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ---------------------------------------------------------------------------
-// Condition evaluation
-// ---------------------------------------------------------------------------
-
 function evaluateCondition(
   actual: unknown,
   operator: ConditionOperator,
@@ -66,11 +58,7 @@ function evaluateCondition(
     case "lt":
       return typeof actual === "number" && actual < Number(expected);
     case "within_km": {
-      // `actual` should be { lat, lon } and `expected` is the max distance in km.
-      // The reference location comes from the step's location field, passed via data.
-      // For within_km, data must contain { lat, lon, ref_lat, ref_lon } or the step
-      // location is used as reference. We check data.distance_km if pre-computed,
-      // otherwise fall back.
+      // `actual` is the pre-computed distance in km (caller resolves geometry).
       if (typeof actual === "number") {
         return actual <= Number(expected);
       }
@@ -80,10 +68,6 @@ function evaluateCondition(
       return false;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Individual proof checks
-// ---------------------------------------------------------------------------
 
 function checkGpsPhotoProof(
   proof: StepProof,
@@ -104,7 +88,6 @@ function checkGpsPhotoProof(
 
   const distanceKm = haversineKm(lat, lon, step.location.lat, step.location.lon);
 
-  // Check requirement conditions
   if (requirement) {
     for (const cond of requirement.conditions) {
       if (cond.operator === "within_km") {
@@ -156,7 +139,6 @@ function checkTlsnApiProof(
     };
   }
 
-  // Check requirement conditions against the revealed body
   if (requirement) {
     for (const cond of requirement.conditions) {
       const fieldValue = data[cond.field] ?? extractJsonPath(revealedBody, cond.field);
@@ -227,7 +209,6 @@ function checkTemperatureLogProof(
     };
   }
 
-  // Check conditions (e.g. all readings below a max temperature)
   if (requirement) {
     for (const cond of requirement.conditions) {
       if (cond.field === "celsius") {
@@ -257,10 +238,6 @@ function checkTemperatureLogProof(
   };
 }
 
-// ---------------------------------------------------------------------------
-// JSON path extraction (minimal, for TLSNotary body inspection)
-// ---------------------------------------------------------------------------
-
 function extractJsonPath(body: string, path: string): unknown {
   try {
     const obj = JSON.parse(body);
@@ -274,10 +251,6 @@ function extractJsonPath(body: string, path: string): unknown {
     return undefined;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Step verification
-// ---------------------------------------------------------------------------
 
 function findRequirement(
   requirements: StepRequirement[],
@@ -301,7 +274,6 @@ function verifyStepProofs(
   const proofResults: ProofCheckResult[] = [];
   const issues: string[] = [];
 
-  // Check each proof attached to this step
   for (const proof of step.proofs) {
     const reqProof = findRequiredProof(requirement, proof.type);
     let result: ProofCheckResult;
@@ -333,7 +305,6 @@ function verifyStepProofs(
     }
   }
 
-  // Check for missing required proofs
   if (requirement) {
     for (const reqProof of requirement.required_proofs) {
       const hasProof = step.proofs.some((p) => p.type === reqProof.proof_type);
@@ -364,10 +335,6 @@ function verifyStepProofs(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Chain integrity checks
-// ---------------------------------------------------------------------------
-
 function verifyChainIntegrity(steps: SupplyChainStep[]): {
   intact: boolean;
   issues: string[];
@@ -379,7 +346,6 @@ function verifyChainIntegrity(steps: SupplyChainStep[]): {
   const issues: string[] = [];
   const stepMap = new Map(steps.map((s) => [s.id, s]));
 
-  // The first step (origin) should have no previous_step_id
   const originSteps = steps.filter((s) => !s.previous_step_id);
   if (originSteps.length === 0) {
     issues.push("No origin step found (step without previous_step_id)");
@@ -389,7 +355,6 @@ function verifyChainIntegrity(steps: SupplyChainStep[]): {
     );
   }
 
-  // Every non-origin step must reference a valid previous step
   for (const step of steps) {
     if (step.previous_step_id) {
       if (!stepMap.has(step.previous_step_id)) {
@@ -409,14 +374,12 @@ function verifyTimeOrdering(steps: SupplyChainStep[]): {
 } {
   const issues: string[] = [];
 
-  // Build the chain order by following previous_step_id links
   const stepMap = new Map(steps.map((s) => [s.id, s]));
   const origin = steps.find((s) => !s.previous_step_id);
   if (!origin) {
     return { ordered: false, issues: ["Cannot check time ordering without origin step"] };
   }
 
-  // Walk the chain
   const ordered: SupplyChainStep[] = [origin];
   const visited = new Set<string>([origin.id]);
   let current = origin;
@@ -431,7 +394,6 @@ function verifyTimeOrdering(steps: SupplyChainStep[]): {
     current = next;
   }
 
-  // Check chronological order
   for (let i = 1; i < ordered.length; i++) {
     const prev = ordered[i - 1];
     const curr = ordered[i];
@@ -448,16 +410,8 @@ function verifyTimeOrdering(steps: SupplyChainStep[]): {
   return { ordered: issues.length === 0, issues };
 }
 
-// ---------------------------------------------------------------------------
-// Trust score calculation
-// ---------------------------------------------------------------------------
-
 /**
- * Calculate a trust score 0-100 based on:
- *   - 40 points: chain integrity
- *   - 30 points: proof completeness and validity
- *   - 20 points: time ordering
- *   - 10 points: proof diversity (more proof types = higher confidence)
+ * Trust score 0-100, weighted: chain 40, validity 30, time 20, diversity 10.
  */
 function calculateTrustScore(
   stepResults: StepVerificationResult[],
@@ -466,13 +420,9 @@ function calculateTrustScore(
 ): number {
   let score = 0;
 
-  // Chain integrity: 40 points
   if (chainIntact) score += 40;
-
-  // Time ordering: 20 points
   if (timeOrdered) score += 20;
 
-  // Proof validity: 30 points (proportional to passing proofs)
   if (stepResults.length > 0) {
     const totalProofs = stepResults.reduce(
       (sum, r) => sum + r.proof_results.length,
@@ -487,53 +437,34 @@ function calculateTrustScore(
     }
   }
 
-  // Proof diversity: 10 points
   const proofTypes = new Set<string>();
   for (const r of stepResults) {
     for (const p of r.proof_results) {
       if (p.passed) proofTypes.add(p.proof_type);
     }
   }
-  // 4 proof types max => 2.5 points each
+  // 4 proof types max → 2.5 points each.
   score += Math.min(10, Math.round(proofTypes.size * 2.5));
 
   return Math.min(100, Math.max(0, score));
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Verify an entire supply chain product.
- *
- * Returns a detailed report including per-step results, chain integrity,
- * time ordering, and an overall trust score.
- */
 export function verifySupplyChain(
   product: SupplyChainProduct,
 ): ChainVerificationReport {
   const { steps, verification_requirements } = product;
 
-  // 1. Verify each step's proofs
   const stepResults = steps.map((step) =>
     verifyStepProofs(step, verification_requirements)
   );
-
-  // 2. Verify chain integrity
   const chainCheck = verifyChainIntegrity(steps);
-
-  // 3. Verify time ordering
   const timeCheck = verifyTimeOrdering(steps);
-
-  // 4. Calculate trust score
   const trustScore = calculateTrustScore(
     stepResults,
     chainCheck.intact,
     timeCheck.ordered,
   );
 
-  // 5. Calculate released sats
   let totalSatsReleased = 0;
   for (const result of stepResults) {
     if (result.verdict === "pass") {
@@ -544,7 +475,6 @@ export function verifySupplyChain(
     }
   }
 
-  // Append chain/time issues to the relevant step results for reporting
   if (chainCheck.issues.length > 0) {
     for (const issue of chainCheck.issues) {
       stepResults[0]?.issues.push(`[chain] ${issue}`);
@@ -567,10 +497,6 @@ export function verifySupplyChain(
     verified_at: Math.floor(Date.now() / 1000),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Pretty printer (for CLI usage)
-// ---------------------------------------------------------------------------
 
 export function printReport(report: ChainVerificationReport): void {
   console.log("=".repeat(70));

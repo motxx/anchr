@@ -3,8 +3,6 @@ import { expect } from "@std/expect";
 import { queryTemplates } from "./query-templates.ts";
 import type { QueryInput } from "./types.ts";
 
-// --- photoProof ---
-
 test("photoProof sets description and location_hint", () => {
   const input = queryTemplates.photoProof("Shibuya crossing");
   expect(input.description).toBe("Photo proof: Shibuya crossing");
@@ -17,8 +15,6 @@ test("photoProof returns valid QueryInput (no extra fields)", () => {
   expect(keys).toEqual(["description", "location_hint"]);
 });
 
-// --- storeStatus ---
-
 test("storeStatus uses storeName as location_hint when location omitted", () => {
   const input = queryTemplates.storeStatus("Seven Eleven");
   expect(input.description).toBe("Store status check: Seven Eleven");
@@ -30,8 +26,6 @@ test("storeStatus uses explicit location when provided", () => {
   expect(input.description).toBe("Store status check: Seven Eleven");
   expect(input.location_hint).toBe("Tokyo Station");
 });
-
-// --- eventVerification ---
 
 test("eventVerification has undefined location_hint when location omitted", () => {
   const input = queryTemplates.eventVerification("Concert at Budokan");
@@ -46,11 +40,9 @@ test("eventVerification uses explicit location when provided", () => {
 });
 
 test("all templates conform to QueryInput", () => {
-  // Type-check: assign each result to QueryInput
   const a: QueryInput = queryTemplates.photoProof("X");
   const b: QueryInput = queryTemplates.storeStatus("X");
   const c: QueryInput = queryTemplates.eventVerification("X");
-  // Ensure all have description
   expect(a.description).toBeTruthy();
   expect(b.description).toBeTruthy();
   expect(c.description).toBeTruthy();

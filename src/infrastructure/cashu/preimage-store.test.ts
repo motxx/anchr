@@ -62,12 +62,10 @@ describe("PersistentPreimageStore", () => {
 
   function tmpPath(): string {
     const p = Deno.makeTempFileSync({ suffix: ".json" });
-    // Remove the file so the store starts fresh (tests that need pre-existing data will write it)
     try {
       Deno.removeSync(p);
     } catch { /* ignore */ }
     tmpFiles.push(p);
-    // Also track the .tmp sibling for cleanup
     tmpFiles.push(p + ".tmp");
     return p;
   }
@@ -90,7 +88,6 @@ describe("PersistentPreimageStore", () => {
     expect(entry.preimage).toHaveLength(64);
     expect(entry.created_at).toBeGreaterThan(0);
 
-    // File should exist with the entry
     const data = JSON.parse(Deno.readTextFileSync(filePath));
     expect(data.entries[entry.hash]).toBeDefined();
     expect(data.entries[entry.hash].preimage).toBe(entry.preimage);
@@ -134,7 +131,6 @@ describe("PersistentPreimageStore", () => {
     expect(store.has(entry.hash)).toBe(false);
     expect(store.getPreimage(entry.hash)).toBe(null);
 
-    // File should reflect deletion
     const data = JSON.parse(Deno.readTextFileSync(filePath));
     expect(data.entries[entry.hash]).toBeUndefined();
   });
@@ -142,12 +138,10 @@ describe("PersistentPreimageStore", () => {
   test("survives process restart by reading from file", () => {
     const filePath = tmpPath();
 
-    // Simulate first run: create entries
     const store1 = createPersistentPreimageStore(filePath);
     const e1 = store1.create();
     const e2 = store1.create();
 
-    // Simulate restart: create a new store instance from same file
     const store2 = createPersistentPreimageStore(filePath);
 
     expect(store2.has(e1.hash)).toBe(true);
@@ -171,11 +165,9 @@ describe("PersistentPreimageStore", () => {
     const e1 = store1.create();
     const e2 = store1.create();
 
-    // Reload and delete one entry
     const store2 = createPersistentPreimageStore(filePath);
     store2.delete(e1.hash);
 
-    // Reload again and verify
     const store3 = createPersistentPreimageStore(filePath);
     expect(store3.has(e1.hash)).toBe(false);
     expect(store3.has(e2.hash)).toBe(true);

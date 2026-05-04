@@ -21,8 +21,6 @@ import type {
 import { validateTlsn } from "@anchr/tlsn-toolkit/tlsn-validation";
 import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
 
-// --- HTLC key generation ---
-
 /**
  * Generate a fresh HTLC hash/preimage pair for a new market.
  *
@@ -39,15 +37,10 @@ export function createMarketHtlc(): OracleHtlcKeypair {
   };
 }
 
-/**
- * Verify that a preimage matches a hash.
- */
 export function verifyPreimage(preimage: string, expectedHash: string): boolean {
   const hashBytes = sha256(hexToBytes(preimage));
   return bytesToHex(hashBytes) === expectedHash;
 }
-
-// --- Market resolution ---
 
 /**
  * Resolve a two-party binary bet from already-verified TLSNotary data.
@@ -66,7 +59,6 @@ export function resolveMarket(
   verifiedTimestamp: number,
   oraclePreimage: string,
 ): MarketResolution {
-  // 1. Verify server name matches resolution URL
   const expectedDomain = new URL(market.resolution_url).hostname;
   if (verifiedServerName !== expectedDomain) {
     throw new OracleError(
@@ -74,25 +66,20 @@ export function resolveMarket(
     );
   }
 
-  // 2. Verify the proof timestamp is reasonable (within 10 minutes of resolution)
   const now = Math.floor(Date.now() / 1000);
-  const maxAge = 600; // 10 minutes
+  const maxAge = 600;
   if (now - verifiedTimestamp > maxAge) {
     throw new OracleError(
       `TLSNotary proof too old: ${now - verifiedTimestamp}s (max ${maxAge}s)`,
     );
   }
 
-  // 3. Verify the preimage matches the market's YES HTLC hash.
   const expectedHash = market.htlc_hash_yes;
   if (!expectedHash || !verifyPreimage(oraclePreimage, expectedHash)) {
     throw new OracleError("Preimage does not match market HTLC hash");
   }
 
-  // 4. Evaluate the resolution condition
   const conditionMet = evaluateCondition(market.resolution_condition, verifiedBody);
-
-  // 5. Build resolution
   const outcome = conditionMet ? "yes" : "no";
 
   return {
@@ -104,12 +91,9 @@ export function resolveMarket(
       revealed_body: verifiedBody,
       timestamp: verifiedTimestamp,
     },
-    // Only reveal preimage if YES wins
     preimage: outcome === "yes" ? oraclePreimage : undefined,
   };
 }
-
-// --- Trustless verification: validate the TLSNotary proof, then evaluate ---
 
 /**
  * Trustless market resolution: cryptographically verify the TLSNotary
@@ -177,8 +161,6 @@ export async function verifyMarketResolution(
   };
 }
 
-// --- Condition evaluation ---
-
 /**
  * Evaluate a resolution condition against a verified response body.
  *
@@ -207,8 +189,6 @@ export function evaluateCondition(
       throw new OracleError(`Unknown condition type: ${condition.type}`);
   }
 }
-
-// --- Condition helpers ---
 
 function evaluateContainsText(
   condition: ResolutionCondition,
@@ -276,7 +256,6 @@ export function extractJsonValue(
       throw new OracleError(`Path "${path}" not found: null at "${segment}"`);
     }
 
-    // Handle array indexing: "results[0]"
     const arrayMatch = segment.match(/^(\w+)\[(\d+)\]$/);
     if (arrayMatch) {
       const [, key, indexStr] = arrayMatch;
@@ -292,8 +271,6 @@ export function extractJsonValue(
 
   return current;
 }
-
-// --- Oracle fee calculation ---
 
 /**
  * Calculate the oracle's resolution fee from the total pool.
@@ -338,8 +315,6 @@ export function calculatePayouts(
     payout_sats: Math.floor((bet.amount_sats / winningPool) * payablePool),
   }));
 }
-
-// --- Error ---
 
 export class OracleError extends Error {
   constructor(message: string) {
