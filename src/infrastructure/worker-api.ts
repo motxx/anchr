@@ -1,6 +1,4 @@
 import { timingSafeEqual } from "node:crypto";
-import { join } from "node:path";
-import { spawn, fileExists, fileLastModified, moduleDir } from "@anchr/core-runtime/mod";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
@@ -72,36 +70,6 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
     { "www-authenticate": "Bearer" },
   );
 };
-
-// --- CSS Build ---
-
-async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
-  if (await fileExists(cssOut)) {
-    const outStat = await fileLastModified(cssOut);
-    const inStat = await fileLastModified(cssIn);
-    if (outStat >= inStat) {
-      return;
-    }
-  }
-
-  const proc = spawn(["npx", "tailwindcss", "-i", cssIn, "-o", cssOut], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  await proc.exited;
-  if (proc.exitCode !== 0) {
-    log.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
-  }
-}
-
-export async function prepareWorkerApiAssets() {
-  const dir = moduleDir(import.meta);
-  await Promise.all([
-    buildCssIfNeeded(join(dir, "../ui/globals.css"), join(dir, "../ui/generated.css"), "worker"),
-    buildCssIfNeeded(join(dir, "../ui/requester/globals.css"), join(dir, "../ui/requester/generated.css"), "requester"),
-    buildCssIfNeeded(join(dir, "../ui/dashboard/globals.css"), join(dir, "../ui/dashboard/generated.css"), "dashboard"),
-  ]);
-}
 
 // --- App ---
 

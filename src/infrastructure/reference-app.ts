@@ -1,8 +1,10 @@
+import { join } from "node:path";
+import { spawn, fileExists, fileLastModified, moduleDir } from "@anchr/core-runtime/mod";
 import { getRuntimeConfig } from "./config.ts";
 import { setupServerLogCapture } from "./log-stream.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { QueryService } from "../application/query-service.ts";
-import { buildWorkerApiApp, prepareWorkerApiAssets } from "./worker-api.ts";
+import { buildWorkerApiApp } from "./worker-api.ts";
 import { serveStatic } from "hono/deno";
 import type { OracleRegistry } from "./oracle/registry.ts";
 
@@ -15,9 +17,38 @@ export interface ReferenceAppDeps {
   oracleRegistry: OracleRegistry;
 }
 
+async function buildCssIfNeeded(cssIn: string, cssOut: string, label: string) {
+  if (await fileExists(cssOut)) {
+    const outStat = await fileLastModified(cssOut);
+    const inStat = await fileLastModified(cssIn);
+    if (outStat >= inStat) return;
+  }
+  const proc = spawn(["npx", "tailwindcss", "-i", cssIn, "-o", cssOut], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.exited;
+  if (proc.exitCode !== 0) {
+    log.error(`[css-build:${label}] Failed:`, await new Response(proc.stderr).text());
+  }
+}
+
+async function prepareReferenceAppAssets() {
+  // reference-app.ts lives at src/infrastructure/; the UI lives at
+  // example/reference-app/ui/. Compute the project root and resolve
+  // CSS source/output paths there.
+  const projectRoot = join(moduleDir(import.meta), "../..");
+  const uiRoot = join(projectRoot, "example/reference-app/ui");
+  await Promise.all([
+    buildCssIfNeeded(join(uiRoot, "globals.css"), join(uiRoot, "generated.css"), "worker"),
+    buildCssIfNeeded(join(uiRoot, "requester/globals.css"), join(uiRoot, "requester/generated.css"), "requester"),
+    buildCssIfNeeded(join(uiRoot, "dashboard/globals.css"), join(uiRoot, "dashboard/generated.css"), "dashboard"),
+  ]);
+}
+
 export async function startReferenceApp(deps: ReferenceAppDeps) {
   setupServerLogCapture();
-  await prepareWorkerApiAssets();
+  await prepareReferenceAppAssets();
 
   const { queryService, preimageStore, oracleRegistry } = deps;
   const app = buildWorkerApiApp({ queryService, preimageStore, oracleRegistry });

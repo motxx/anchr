@@ -1,3 +1,6 @@
+// Anchr core barrel — re-exports the domain, application, and infrastructure
+// surfaces consumed by the host server, examples, and tests.
+
 // --- Domain ---
 export { queryTemplates } from "./domain/query-templates.ts";
 export {
@@ -57,7 +60,6 @@ export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./
 export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server.ts";
 export { startReferenceApp } from "./infrastructure/reference-app.ts";
 export { startReferenceRuntime } from "./infrastructure/runtime.ts";
-export { buildWorkerApiApp as buildReferenceWorkerApi, prepareWorkerApiAssets } from "./infrastructure/worker-api.ts";
 export { verify as verifyQueryResult } from "./infrastructure/verification/verifier.ts";
 export { stripExif } from "./infrastructure/exif-strip.ts";
 
