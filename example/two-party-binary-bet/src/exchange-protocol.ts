@@ -216,11 +216,18 @@ export function verifyReceivedToken(
     amount: number;
     minLocktime: number;
   },
+  /**
+   * Wallet's known keyset IDs. Required for V4 cashuB tokens that
+   * truncate keyset IDs to a short form on encode — without these the
+   * decoder cannot map the short ID back to the full keyset and rejects
+   * the token. Pass `wallet.keyChain.getAllKeysetIds()`.
+   */
+  knownKeysets?: readonly string[],
 ): VerificationResult {
-  // 1. Decode token
+  // 1. Decode token (passing known keysets so V4 short IDs can be mapped).
   let decoded;
   try {
-    decoded = getDecodedToken(token);
+    decoded = getDecodedToken(token, knownKeysets ? [...knownKeysets] : undefined);
   } catch {
     return { valid: false, error: "Failed to decode cashu token" };
   }

@@ -601,7 +601,9 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
   expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey); // cheapest
-  expect(bindRecorder.params.initialToken).toBe("cashuBfake");
+  // Phase-2 receives the Phase-1 proofs directly (passed by value through
+  // the Customer flow rather than re-decoded from the broadcast token).
+  expect(bindRecorder.params.initialProofs).toEqual([]);
 
   // Two events published: kind 5300 request + kind 7000 selection.
   expect(publishedEvents).toHaveLength(2);

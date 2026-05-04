@@ -58,8 +58,13 @@ export interface BuildHtlcLockParams {
 
 /** Parameters for the Phase-2 swap that binds a selected provider to the lock. */
 export interface BindProviderParams {
-  /** The Phase-1 token returned by `buildHtlcLock`. */
-  initialToken: string;
+  /**
+   * Phase-1 proofs (returned by `buildHtlcLock` as `proofs`). Passed
+   * directly rather than via the encoded token to sidestep the V4
+   * cashu-ts encoding which truncates keyset IDs to a short form that
+   * requires wallet keychain access to map back on decode.
+   */
+  initialProofs: CashuProof[];
   /** Hex pubkey of the selected provider. */
   providerPubkey: string;
   /** Hash `H` whose preimage `S` the oracle releases on a valid proof. */
@@ -144,6 +149,15 @@ export interface CashuWalletAdapter {
    * provider HTLC redemption).
    */
   getFeesForProofs(proofs: Proof[]): number;
+  /**
+   * Keychain accessor — exposes the wallet's known keyset IDs. Required
+   * to decode V4 cashuB tokens that carry truncated (V2 short) keyset
+   * IDs back to their full form. Mirrors the real cashu-ts `Wallet`
+   * shape (`wallet.keyChain.getAllKeysetIds()`).
+   */
+  keyChain: {
+    getAllKeysetIds(): readonly string[];
+  };
 }
 
 /** Construction options for {@link createCashuClient}. */
@@ -353,12 +367,19 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       if (!(p.customerSecretKey instanceof Uint8Array) || p.customerSecretKey.length !== 32) {
         throw new CashuClientError("customerSecretKey must be a 32-byte Uint8Array");
       }
+      if (!Array.isArray(p.initialProofs) || p.initialProofs.length === 0) {
+        throw new CashuClientError("initialProofs must be a non-empty array");
+      }
+      for (const proof of p.initialProofs) {
+        if (!isValidProofShape(proof)) {
+          throw new CashuClientError("initialProofs contains a malformed proof");
+        }
+      }
       const wallet = await getWallet();
-      const decoded = getDecodedToken(p.initialToken);
-      const sourceProofs = decoded.proofs;
+      const sourceProofs = p.initialProofs as Proof[];
       const totalAmount = sumAmounts(sourceProofs);
       if (totalAmount <= 0) {
-        throw new CashuClientError("initialToken contains no spendable proofs");
+        throw new CashuClientError("initialProofs contains no spendable proofs");
       }
 
       // Mint swap fees are taken from the input proofs. We swap ALL the
@@ -400,7 +421,11 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
 
     async redeemHtlc(p: RedeemHtlcParams): Promise<RedeemResult> {
       const wallet = await getWallet();
-      const decoded = getDecodedToken(p.token);
+      // Pass the wallet's known keyset IDs so V4 cashuB tokens (which
+      // truncate keyset IDs to a short form on encode) can be mapped
+      // back to their full IDs on decode.
+      const knownKeysets = wallet.keyChain.getAllKeysetIds();
+      const decoded = getDecodedToken(p.token, [...knownKeysets]);
       const proofs = decoded.proofs;
       if (proofs.length === 0) {
         throw new CashuClientError("redeemHtlc: token has no proofs");

@@ -132,36 +132,6 @@ export interface MarketState {
   ) => { valid: boolean; error?: string };
 }
 
-/**
- * Production-default exchange-token verifier — decodes the cashuB token
- * and runs `verifyReceivedToken` against the supplied expectations.
- *
- * Returns `{ valid: false, error }` on any decode failure or P2PK
- * mismatch so the route can respond with a 400.
- */
-function defaultVerifyExchangeToken(
-  cashuToken: string,
-  expected: {
-    groupPubkey: string;
-    myPubkey: string;
-    amount: number;
-    minLocktime: number;
-  },
-): { valid: boolean; error?: string } {
-  let decoded;
-  try {
-    decoded = getDecodedToken(cashuToken);
-  } catch (err) {
-    return {
-      valid: false,
-      error: `cashu_token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
-    };
-  }
-  if (!decoded.proofs || decoded.proofs.length === 0) {
-    return { valid: false, error: "cashu_token has no proofs" };
-  }
-  return verifyReceivedToken(cashuToken, expected);
-}
 
 /** Create a fresh MarketState. Used for tests and as default state. */
 export function createMarketState(opts?: {
@@ -800,13 +770,33 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
           400,
         );
       }
-      const verifyFn = s.verifyExchangeToken ?? defaultVerifyExchangeToken;
-      const verification = verifyFn(cashu_token, {
-        groupPubkey: expectedGroupPubkey,
-        myPubkey: expectedCounterpartyPubkey,
-        amount: pair.amount_sats,
-        minLocktime: market.resolution_deadline,
-      });
+      let verification: { valid: boolean; error?: string };
+      if (s.verifyExchangeToken) {
+        // Test path: caller-supplied stub.
+        verification = s.verifyExchangeToken(cashu_token, {
+          groupPubkey: expectedGroupPubkey,
+          myPubkey: expectedCounterpartyPubkey,
+          amount: pair.amount_sats,
+          minLocktime: market.resolution_deadline,
+        });
+      } else {
+        // Production path: feed the wallet's known keyset IDs into the
+        // decoder so V4 cashuB tokens (which truncate keyset IDs on
+        // encode) can be mapped back to their full keysets.
+        const getWallet = s.getCashuWallet ?? getCashuWalletDefault;
+        const wallet = await getWallet();
+        const knownKeysets = wallet ? wallet.keyChain.getAllKeysetIds() : undefined;
+        verification = verifyReceivedToken(
+          cashu_token,
+          {
+            groupPubkey: expectedGroupPubkey,
+            myPubkey: expectedCounterpartyPubkey,
+            amount: pair.amount_sats,
+            minLocktime: market.resolution_deadline,
+          },
+          knownKeysets,
+        );
+      }
       if (!verification.valid) {
         return c.json(
           { error: `Token verification failed: ${verification.error}` },

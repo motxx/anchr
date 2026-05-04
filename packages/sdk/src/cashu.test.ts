@@ -51,6 +51,8 @@ function makeFakeWallet(opts: {
   errorOnSend?: Error;
   /** Fee (sats) per swap call. Defaults to 0 (free regtest mints). */
   fee?: number;
+  /** Keyset IDs the fake wallet knows. Defaults to ["k1"]. */
+  keysetIds?: readonly string[];
 }): { wallet: CashuWalletAdapter; calls: SendCall[] } {
   const calls: SendCall[] = [];
   const outputs = opts.outputs ?? [];
@@ -79,6 +81,9 @@ function makeFakeWallet(opts: {
       },
     },
     getFeesForProofs: () => opts.fee ?? 0,
+    keyChain: {
+      getAllKeysetIds: () => opts.keysetIds ?? ["k1"],
+    },
   };
   return { wallet, calls };
 }
@@ -232,28 +237,21 @@ test("buildHtlcLock wraps mint errors in CashuMintError", async () => {
 });
 
 test("bindProvider signs Phase-1 input with customer privkey and locks output with hashlock + provider P2PK + locktime + refund", async () => {
-  const phase1Output: Proof[] = [
-    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
-  ];
   const phase2Output: Proof[] = [
     { id: "k1", amount: 1000, secret: '["HTLC",{"data":"' + VALID_HASH + '"}]', C: "C-2" },
   ];
-  const { wallet, calls } = makeFakeWallet({
-    outputs: [phase1Output, phase2Output],
-  });
+  const { wallet, calls } = makeFakeWallet({ outputProofs: phase2Output });
   const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
 
-  const phase1 = await client.buildHtlcLock({
-    amountSats: 1000,
-    hashHex: VALID_HASH,
-    customerPubkey: CUSTOMER_PUBKEY,
-    locktimeSeconds: FUTURE_LOCKTIME(),
-    sourceProofs: VALID_SOURCE_PROOFS,
-  });
+  // Caller-supplied Phase-1 proofs (in the real flow these come from
+  // `buildHtlcLock`'s return value; here we hand them in directly).
+  const phase1Proofs = [
+    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
+  ];
 
   const lockTime = FUTURE_LOCKTIME();
   const result = await client.bindProvider({
-    initialToken: phase1.token,
+    initialProofs: phase1Proofs,
     providerPubkey: PROVIDER_PUBKEY,
     hashHex: VALID_HASH,
     locktimeSeconds: lockTime,
@@ -262,11 +260,11 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
   });
 
   expect(result.amountSats).toBe(1000);
-  expect(calls.length).toBe(2); // Phase-1 swap + Phase-2 swap
-  // Phase-2 call must:
+  expect(calls.length).toBe(1);
+  const phase2Call = calls[0]!;
+  // The Phase-2 call must:
   //   1. Pass the customer's privkey to satisfy the Phase-1 P2PK input lock.
   //   2. Apply hashlock + provider P2PK + locktime + refund to the output.
-  const phase2Call = calls[1]!;
   expect(typeof phase2Call.privkey).toBe("string");
   expect(phase2Call.p2pk).toBeDefined();
   const tagsJson = JSON.stringify(phase2Call.p2pk);
@@ -277,21 +275,14 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
 });
 
 test("bindProvider rejects a missing or wrong-shape customerSecretKey", async () => {
-  const phase1Output: Proof[] = [
+  const { wallet } = makeFakeWallet({ outputProofs: [] });
+  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const phase1Proofs = [
     { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
   ];
-  const { wallet } = makeFakeWallet({ outputs: [phase1Output, []] });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
-  const phase1 = await client.buildHtlcLock({
-    amountSats: 1000,
-    hashHex: VALID_HASH,
-    customerPubkey: CUSTOMER_PUBKEY,
-    locktimeSeconds: FUTURE_LOCKTIME(),
-    sourceProofs: VALID_SOURCE_PROOFS,
-  });
   await expect(
     client.bindProvider({
-      initialToken: phase1.token,
+      initialProofs: phase1Proofs,
       providerPubkey: PROVIDER_PUBKEY,
       hashHex: VALID_HASH,
       locktimeSeconds: FUTURE_LOCKTIME(),
@@ -301,25 +292,35 @@ test("bindProvider rejects a missing or wrong-shape customerSecretKey", async ()
   ).rejects.toThrow(CashuClientError);
 });
 
+test("bindProvider rejects malformed initialProofs (caller misuse)", async () => {
+  const { wallet } = makeFakeWallet({ outputProofs: [] });
+  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  await expect(
+    client.bindProvider({
+      initialProofs: [],
+      providerPubkey: PROVIDER_PUBKEY,
+      hashHex: VALID_HASH,
+      locktimeSeconds: FUTURE_LOCKTIME(),
+      customerPubkey: CUSTOMER_PUBKEY,
+      customerSecretKey: CUSTOMER_SECRET,
+    }),
+  ).rejects.toThrow(CashuClientError);
+  await expect(
+    client.bindProvider({
+      initialProofs: [{ amount: 1000 }],
+      providerPubkey: PROVIDER_PUBKEY,
+      hashHex: VALID_HASH,
+      locktimeSeconds: FUTURE_LOCKTIME(),
+      customerPubkey: CUSTOMER_PUBKEY,
+      customerSecretKey: CUSTOMER_SECRET,
+    }),
+  ).rejects.toThrow(CashuClientError);
+});
+
 test("bindProvider wraps mint errors in CashuMintError", async () => {
-  const phase1Output: Proof[] = [
+  const phase1Proofs = [
     { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
   ];
-  // Build the Phase-1 token first with a clean fake, then construct a
-  // second fake whose Phase-2 send rejects.
-  const buildFake = makeFakeWallet({ outputProofs: phase1Output });
-  const buildClient = createCashuClient({
-    mintUrl: "https://mint.example.org",
-    wallet: buildFake.wallet,
-  });
-  const phase1 = await buildClient.buildHtlcLock({
-    amountSats: 1000,
-    hashHex: VALID_HASH,
-    customerPubkey: CUSTOMER_PUBKEY,
-    locktimeSeconds: FUTURE_LOCKTIME(),
-    sourceProofs: VALID_SOURCE_PROOFS,
-  });
-
   const failFake = makeFakeWallet({
     outputProofs: [],
     errorOnSend: new Error("mint unavailable"),
@@ -330,7 +331,7 @@ test("bindProvider wraps mint errors in CashuMintError", async () => {
   });
   await expect(
     failClient.bindProvider({
-      initialToken: phase1.token,
+      initialProofs: phase1Proofs,
       providerPubkey: PROVIDER_PUBKEY,
       hashHex: VALID_HASH,
       locktimeSeconds: FUTURE_LOCKTIME(),

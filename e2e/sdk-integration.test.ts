@@ -224,9 +224,19 @@ suite(
         sourceProofs: customerProofs,
       });
 
+      // Attacker wallet — loaded from the same mint so its keychain
+      // can map the V4-truncated short keyset IDs in the broadcast
+      // token back to full IDs.
+      const attackerWallet = new Wallet(MINT_URL, { unit: "sat" });
+      await attackerWallet.loadMint();
+
       // The token decodes to real cashuB proofs (proves it isn't an
-      // opaque blob).
-      const decoded = getDecodedToken(phase1.token);
+      // opaque blob). Pass the wallet's keysets so V4 short IDs can be
+      // resolved.
+      const decoded = getDecodedToken(
+        phase1.token,
+        attackerWallet.keyChain.getAllKeysetIds(),
+      );
       expect(decoded.proofs.length).toBeGreaterThan(0);
       // Each proof secret carries a P2PK lock to the customer pubkey.
       for (const proof of decoded.proofs) {
@@ -240,8 +250,6 @@ suite(
       // a fresh wallet that never knew the customer's privkey. The
       // wallet's send() refuses to even build a swap request because
       // the input proofs are P2PK-locked and no privkey was supplied.
-      const attackerWallet = new Wallet(MINT_URL, { unit: "sat" });
-      await attackerWallet.loadMint();
       let clientPathError: unknown = null;
       try {
         await attackerWallet.ops.send(BOUNTY_SATS, decoded.proofs).run();
