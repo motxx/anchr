@@ -125,7 +125,7 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
 // ---------------------------------------------------------------------------
 
 /**
- * Perform FROST threshold signing for a prediction market resolution.
+ * Perform FROST threshold signing for a two-party binary bet resolution.
  *
  * This is the async counterpart of `DualKeyStore.sign()`. It coordinates
  * signing across peer Oracle nodes and returns the group signature only

@@ -114,7 +114,7 @@ services:
       - lnd-mint-data:/lnd:ro
     command: ["poetry", "run", "mint"]
 
-  # Prediction-market order book persistence. The official postgres image
+  # Two-party-binary-bet order book persistence. The official postgres image
   # auto-runs every *.sql under /docker-entrypoint-initdb.d on first start,
   # so the order-book schema is applied without a separate migrate step.
   postgres:

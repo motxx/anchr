@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Prediction Market Oracle (Resolution Logic)
+ * 巫(Kannagi) — Two-party binary bet Oracle (Resolution Logic)
  *
  * The oracle resolves markets by generating a TLSNotary proof from an
  * authoritative URL and evaluating the resolution condition against the
@@ -13,7 +13,7 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   MarketResolution,
   ResolutionCondition,
   OracleHtlcKeypair,
@@ -50,7 +50,7 @@ export function verifyPreimage(preimage: string, expectedHash: string): boolean 
 // --- Market resolution ---
 
 /**
- * Resolve a prediction market from already-verified TLSNotary data.
+ * Resolve a two-party binary bet from already-verified TLSNotary data.
  *
  * The caller is responsible for cryptographic verification (see
  * `verifyMarketResolution` for the trustless path that does the crypto
@@ -59,7 +59,7 @@ export function verifyPreimage(preimage: string, expectedHash: string): boolean 
  * for callers that have already validated the presentation upstream.
  */
 export function resolveMarket(
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   tlsnProof: string,
   verifiedServerName: string,
   verifiedBody: string,
@@ -126,7 +126,7 @@ export function resolveMarket(
  * see `isTlsnVerifierAvailable` to gate the UI.
  */
 export async function verifyMarketResolution(
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   tlsnPresentation: string,
   opts?: { maxAgeSeconds?: number },
 ): Promise<{
@@ -318,7 +318,7 @@ export function calculateOracleFee(totalPoolSats: number, feePpm: number): numbe
  * Alice gets: (100/100) * (200 - 1 - 1) = 198 sats. Net profit: +98 sats.
  */
 export function calculatePayouts(
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   outcome: "yes" | "no",
   bets: Array<{ side: "yes" | "no"; amount_sats: number; bettor_pubkey: string }>,
   oracleFeePpm: number,

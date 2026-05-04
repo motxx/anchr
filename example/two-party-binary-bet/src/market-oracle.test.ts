@@ -16,14 +16,14 @@ import {
   _setVerifierPathForTest,
   _clearSeenPresentationsForTest,
 } from "@anchr/tlsn-toolkit/tlsn-validation";
-import type { PredictionMarket } from "./market-types.ts";
+import type { TwoPartyBinaryBet } from "./market-types.ts";
 
 function makePreimage(): { preimage: string; hash: string } {
   const raw = randomBytes(32);
   return { preimage: bytesToHex(raw), hash: bytesToHex(sha256(raw)) };
 }
 
-function makeMarket(overrides: Partial<PredictionMarket> = {}): PredictionMarket {
+function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
   const { preimage, hash } = makePreimage();
   return {
     id: bytesToHex(randomBytes(16)),
@@ -51,7 +51,7 @@ function makeMarket(overrides: Partial<PredictionMarket> = {}): PredictionMarket
     nostr_event_id: bytesToHex(randomBytes(32)),
     status: "open",
     ...overrides,
-  } as PredictionMarket;
+  } as TwoPartyBinaryBet;
 }
 
 test("resolveMarket works with htlc_hash_yes", () => {

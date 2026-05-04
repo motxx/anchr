@@ -34,19 +34,20 @@ COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
 COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
 COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
+COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
 COPY . .
 
 # Build the bundled UI + Tailwind output. The market UI is bundled
-# in-place under example/prediction-market/ui/.
+# in-place under example/two-party-binary-bet/ui/.
 RUN deno task build:ui
 RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null \
-  && ln -sf /tmp/node_modules /app/example/prediction-market/ui/node_modules \
+  && ln -sf /tmp/node_modules /app/example/two-party-binary-bet/ui/node_modules \
   && /tmp/node_modules/.bin/tailwindcss \
-       -i /app/example/prediction-market/ui/globals.css \
-       -o /app/example/prediction-market/ui/generated.css \
-  && rm -f /app/example/prediction-market/ui/node_modules \
+       -i /app/example/two-party-binary-bet/ui/globals.css \
+       -o /app/example/two-party-binary-bet/ui/generated.css \
+  && rm -f /app/example/two-party-binary-bet/ui/node_modules \
   && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
 
 ENV NODE_ENV=production

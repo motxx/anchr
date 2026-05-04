@@ -1,6 +1,6 @@
 # @anchr/cashu-conditional-swap
 
-N:M binary outcome conditional swap primitive on Cashu. Brand-neutral — usable beyond Anchr for prediction markets, parametric insurance, group bounties, auctions, dispute escrow, anywhere binary outcome settlement is required.
+N:M binary outcome conditional swap primitive on Cashu. Brand-neutral — usable beyond Anchr for two-party binary bets, parametric insurance, group bounties, auctions, dispute escrow, anywhere binary outcome settlement is required.
 
 ## Install
 

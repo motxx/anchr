@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Prediction Market API Routes (Hono HTTP server for market operations).
+ * 巫(Kannagi) — Two-party binary bet API Routes (Hono HTTP server for market operations).
  *
  * Supports two resolution modes:
  * - Single-key (demo): Local Schnorr signing via DualKeyStore
@@ -28,7 +28,7 @@ import {
 } from "./market-oracle.ts";
 import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   Bet,
   MarketResolution,
 } from "./market-types.ts";
@@ -48,7 +48,7 @@ export interface MarketApiConfig {
 
 export interface MarketApiState {
   /** Active markets. */
-  markets: Map<string, PredictionMarket>;
+  markets: Map<string, TwoPartyBinaryBet>;
   /** All bets placed. */
   bets: Map<string, Bet[]>;
   /** Order book for matching. */
@@ -124,7 +124,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
   // --- Market CRUD ---
 
   app.post("/markets", authMiddleware, async (c) => {
-    const body = await c.req.json<Partial<PredictionMarket>>().catch(() => null);
+    const body = await c.req.json<Partial<TwoPartyBinaryBet>>().catch(() => null);
     if (!body?.id || !body?.title) {
       return c.json({ error: "Missing required fields (id, title)" }, 400);
     }
@@ -133,7 +133,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     const preimages = state.dualPreimageStore.create(body.id);
     const keys = state.dualKeyStore.create(body.id);
 
-    const market: PredictionMarket = {
+    const market: TwoPartyBinaryBet = {
       id: body.id,
       title: body.title,
       description: body.description ?? "",
@@ -308,7 +308,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       market_id: string;
       outcome: string;
       condition_data: {
-        resolution_condition: PredictionMarket["resolution_condition"];
+        resolution_condition: TwoPartyBinaryBet["resolution_condition"];
         verified_body: string;
       };
     }>().catch(() => null);

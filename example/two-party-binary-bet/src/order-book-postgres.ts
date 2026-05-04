@@ -1,5 +1,5 @@
 /**
- * PostgreSQL-backed order book for prediction-market FIFO matching.
+ * PostgreSQL-backed order book for two-party-binary-bet FIFO matching.
  *
  * Schema lives in `migrations/001_create_orders.sql` (alongside this file's
  * directory in `example/two-party-binary-bet/migrations/`). Run that file
@@ -23,7 +23,7 @@ import { getLogger } from "@anchr/core-runtime/logger";
 import type { OpenOrder, MatchProposal } from "./market-types.ts";
 import type { OrderBook } from "./order-book.ts";
 
-const log = getLogger(["anchr", "prediction-market", "order-book-pg"]);
+const log = getLogger(["anchr", "two-party-binary-bet", "order-book-pg"]);
 
 interface OrderRow {
   id: string;
@@ -78,7 +78,7 @@ export async function createPostgresOrderBook(
     async addOrder(order: OpenOrder): Promise<OpenOrder> {
       const remaining = order.remaining_sats ?? order.amount_sats;
       const rows = await sql<OrderRow[]>`
-        INSERT INTO prediction_market_orders
+        INSERT INTO two_party_binary_bet_orders
           (id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts)
         VALUES
           (${order.id}, ${order.market_id}, ${order.bettor_pubkey}, ${order.side},
@@ -91,7 +91,7 @@ export async function createPostgresOrderBook(
     },
 
     async cancelOrder(id: string): Promise<boolean> {
-      const result = await sql`DELETE FROM prediction_market_orders WHERE id = ${id}`;
+      const result = await sql`DELETE FROM two_party_binary_bet_orders WHERE id = ${id}`;
       return result.count > 0;
     },
 
@@ -99,7 +99,7 @@ export async function createPostgresOrderBook(
       const rows = side
         ? await sql<OrderRow[]>`
             SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts
-            FROM prediction_market_orders
+            FROM two_party_binary_bet_orders
             WHERE market_id = ${market_id}
               AND side = ${side}
               AND remaining_sats > 0
@@ -107,7 +107,7 @@ export async function createPostgresOrderBook(
           `
         : await sql<OrderRow[]>`
             SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts
-            FROM prediction_market_orders
+            FROM two_party_binary_bet_orders
             WHERE market_id = ${market_id}
               AND remaining_sats > 0
             ORDER BY ts ASC
@@ -121,7 +121,7 @@ export async function createPostgresOrderBook(
       return sql.begin(async (tx: TransactionSql<Record<string, never>>): Promise<MatchProposal[]> => {
         const yesRows = await tx<OrderRow[]>`
           SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts
-          FROM prediction_market_orders
+          FROM two_party_binary_bet_orders
           WHERE market_id = ${market_id}
             AND side = 'yes'
             AND remaining_sats > 0
@@ -130,7 +130,7 @@ export async function createPostgresOrderBook(
         `;
         const noRows = await tx<OrderRow[]>`
           SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts
-          FROM prediction_market_orders
+          FROM two_party_binary_bet_orders
           WHERE market_id = ${market_id}
             AND side = 'no'
             AND remaining_sats > 0
@@ -173,7 +173,7 @@ export async function createPostgresOrderBook(
         for (const order of [...yesOrders, ...noOrders]) {
           if (!changed.has(order.id)) continue;
           await tx`
-            UPDATE prediction_market_orders
+            UPDATE two_party_binary_bet_orders
             SET remaining_sats = ${order.remaining_sats}
             WHERE id = ${order.id}
           `;

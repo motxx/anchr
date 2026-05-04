@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Nostr Integration for Prediction Market Discovery
+ * 巫(Kannagi) — Nostr Integration for Two-party binary bet Discovery
  *
  * Markets are published as Nostr events so anyone can discover and
  * participate without a centralized server. Uses kind 30078
@@ -11,13 +11,13 @@
  *   30078  — Resolution publication (oracle updates the market event)
  *
  * Discovery:
- *   Filter by kind=30078 + #t=anchr-prediction-market
+ *   Filter by kind=30078 + #t=anchr-two-party-binary-bet
  *   Category filtering via #t=anchr-pm-{category}
  */
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   MarketResolution,
   MarketEventContent,
   BetEventContent,
@@ -26,7 +26,7 @@ import type {
 
 // --- Constants ---
 
-/** Nostr event kind for prediction markets (NIP-78: arbitrary custom app data). */
+/** Nostr event kind for two-party binary bets (NIP-78: arbitrary custom app data). */
 const MARKET_EVENT_KIND = 30078;
 
 /** Standard Nostr relays for market discovery. */
@@ -48,14 +48,14 @@ export interface MarketIdentity {
 // --- Publish market ---
 
 /**
- * Build a Nostr event for publishing a new prediction market.
+ * Build a Nostr event for publishing a new two-party binary bet.
  *
  * The event uses kind 30078 (parametrized replaceable) so the creator
  * can update the market status later. The "d" tag contains the market ID.
  *
  * Tags:
  *   d           — Market ID (for replacement)
- *   t           — "anchr-prediction-market" (for discovery)
+ *   t           — "anchr-two-party-binary-bet" (for discovery)
  *   t           — "anchr-pm-{category}" (for category filtering)
  *   p           — Oracle pubkey
  *   expiration  — Resolution deadline (NIP-40)
@@ -64,7 +64,7 @@ export interface MarketIdentity {
  */
 export function buildMarketEvent(
   identity: MarketIdentity,
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
 ): VerifiedEvent {
   const content: MarketEventContent = {
     title: market.title,
@@ -85,7 +85,7 @@ export function buildMarketEvent(
 
   const tags: string[][] = [
     ["d", market.id],
-    ["t", "anchr-prediction-market"],
+    ["t", "anchr-two-party-binary-bet"],
     ["t", `anchr-pm-${market.category}`],
     ["p", market.oracle_pubkey, "", "oracle"],
     ["expiration", String(market.resolution_deadline)],
@@ -113,12 +113,12 @@ export function buildMarketEvent(
 }
 
 /**
- * Publish a prediction market to Nostr relays.
+ * Publish a two-party binary bet to Nostr relays.
  *
  * @returns The Nostr event ID
  */
 export async function publishMarket(
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   identity: MarketIdentity,
   relayUrls: string[] = DEFAULT_RELAYS,
 ): Promise<string> {
@@ -186,7 +186,7 @@ export function subscribeToBets(
         const filter = {
           kinds: [1],
           "#e": [marketEventId],
-          "#t": ["anchr-prediction-bet"],
+          "#t": ["anchr-binary-bet"],
         };
         ws.send(JSON.stringify(["REQ", `bets-${marketEventId}`, filter]));
       };
@@ -234,7 +234,7 @@ export function buildBetEvent(
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["e", marketEventId],
-      ["t", "anchr-prediction-bet"],
+      ["t", "anchr-binary-bet"],
       ["t", `anchr-pm-bet-${bet.side}`],
     ],
     content: JSON.stringify(bet),
@@ -254,7 +254,7 @@ export function buildBetEvent(
  */
 export function buildResolutionEvent(
   identity: MarketIdentity,
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   resolution: MarketResolution,
 ): VerifiedEvent {
   const content: ResolutionEventContent = {
@@ -267,8 +267,8 @@ export function buildResolutionEvent(
 
   const tags: string[][] = [
     ["d", market.id],
-    ["t", "anchr-prediction-market"],
-    ["t", "anchr-prediction-resolution"],
+    ["t", "anchr-two-party-binary-bet"],
+    ["t", "anchr-binary-resolution"],
     ["t", `anchr-pm-resolved-${resolution.outcome}`],
     ["e", market.nostr_event_id],
     ["p", market.creator_pubkey],
@@ -295,7 +295,7 @@ export function buildResolutionEvent(
  * @returns The Nostr event ID of the resolution
  */
 export async function publishResolution(
-  market: PredictionMarket,
+  market: TwoPartyBinaryBet,
   resolution: MarketResolution,
   identity: MarketIdentity,
   relayUrls: string[] = DEFAULT_RELAYS,
@@ -336,7 +336,7 @@ export async function publishResolution(
 // --- Discovery ---
 
 /**
- * Fetch open prediction markets from Nostr relays.
+ * Fetch open two-party binary bets from Nostr relays.
  *
  * @param category Optional category filter
  * @returns Array of market event contents
@@ -351,7 +351,7 @@ export async function discoverMarkets(
     content: MarketEventContent;
   }> = [];
 
-  const tags = ["anchr-prediction-market"];
+  const tags = ["anchr-two-party-binary-bet"];
   if (category) {
     tags.push(`anchr-pm-${category}`);
   }

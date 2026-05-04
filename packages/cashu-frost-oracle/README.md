@@ -2,7 +2,7 @@
 
 FROST t-of-n threshold signing toolkit for Cashu P2PK. Brand-neutral — usable beyond Anchr for any Bitcoin / Cashu app that needs a threshold-signing Oracle.
 
-Use cases: multi-sig Cashu vaults with social recovery, DAO treasuries, dispute-resolution juries, distributed escrow services, prediction-market oracles.
+Use cases: multi-sig Cashu vaults with social recovery, DAO treasuries, dispute-resolution juries, distributed escrow services, two-party-binary-bet oracles.
 
 ## Install
 

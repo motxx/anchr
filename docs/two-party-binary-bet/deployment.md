@@ -1,6 +1,6 @@
-# Prediction Market Deployment Guide
+# Two-party binary bet Deployment Guide
 
-End-to-end operator runbook for deploying the Anchr prediction market on
+End-to-end operator runbook for deploying the Anchr two-party binary bet on
 **regtest** (local development) or **testnet** (public preview). The
 production-style deploy uses encrypted FROST DKG keys (PR-D), the
 auto-resolver (PR-B), trustless TLSNotary verification (PR-C), and the
@@ -57,7 +57,7 @@ docker compose up -d
 ./scripts/init-regtest.sh
 docker compose restart cashu-mint
 
-# 3. Start the prediction market server
+# 3. Start the two-party binary bet server
 CASHU_MINT_URL=http://localhost:3338 \
 NOSTR_RELAYS=ws://localhost:7777 \
 MARKET_PORT=3001 \
@@ -230,7 +230,7 @@ the HTLC fallback path for those legacy markets.
 
 ```bash
 # In-process test of the full lifecycle (skips when mint isn't reachable):
-deno test --allow-all e2e/prediction-market-lifecycle.test.ts
+deno test --allow-all e2e/two-party-binary-bet-lifecycle.test.ts
 
 # Just the unit + route tests (no Docker needed):
 deno task test:example
@@ -258,7 +258,7 @@ deno run --allow-all scripts/market-screenshots.ts
 The script boots the market server in-process on port 3098, drives
 headless Chromium via Playwright through the empty state and the
 create-market form, optionally seeds one demo market, and writes
-the screenshots to `docs/prediction-market/screenshots/`.
+the screenshots to `docs/two-party-binary-bet/screenshots/`.
 
 ## 7. Known gaps (pre-1.0)
 

@@ -1,12 +1,12 @@
 # Design System — Kannagi (かんなぎ)
 
-> Scope: this file governs the visual identity of the Prediction Market app
+> Scope: this file governs the visual identity of the Two-party binary bet app
 > at `example/two-party-binary-bet/`. It supersedes the root `DESIGN.md` for
 > this directory only.
 
 ## 1. Atmosphere
 
-**Kannagi** is a Bitcoin-native prediction market. The product is a
+**Kannagi** is a Bitcoin-native two-party binary bet. The product is a
 financial-decision tool — users compare percentages, sat amounts, and
 volumes vertically all day — so the chrome stays out of the way. The brand
 expresses itself in three places only:
@@ -158,7 +158,7 @@ Allowed:
 ### Do
 - Render every numeric value in `font-mono`
 - Use `bg-foreground text-background` for active sort/category pills
-- Use `bg-yes` / `bg-no` only for prediction outcomes (buttons, badges,
+- Use `bg-yes` / `bg-no` only for bet outcomes (buttons, badges,
   resolved states, sparkline trend color)
 - Truncate hashes / pubkeys with `…` and surface full value in `title`
 - Land the user on the Featured market — let it carry the hero
@@ -171,11 +171,11 @@ Allowed:
 - Don't add "Verified by TLSNotary" or other technical chrome to user-facing
   copy unless the user is acting on it
 - Don't put a Page Title above the Featured market — Kannagi *is* the
-  prediction-market platform; the header already says that
+  two-party-binary-bet platform; the header already says that
 
 ## 8. Mobile
 
-Phones are the primary surface (60%+ of prediction-market traffic).
+Phones are the primary surface (60%+ of two-party-binary-bet traffic).
 - Header height 56px, pubkey pill hidden under `md`
 - Cards 1-up at all mobile widths
 - Bet panel reorder on detail (described in §5) is the most important
@@ -189,11 +189,11 @@ Phones are the primary surface (60%+ of prediction-market traffic).
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-04-27 | Rebrand from Anchr → Kannagi | Distinct identity for the prediction-market surface, separate from the underlying protocol. |
-| 2026-04-27 | Light theme as the only mode | The anime's atmosphere is daylight; dark mode would betray the source. Kalshi precedent shows light works for prediction markets. |
+| 2026-04-27 | Rebrand from Anchr → Kannagi | Distinct identity for the two-party-binary-bet surface, separate from the underlying protocol. |
+| 2026-04-27 | Light theme as the only mode | The anime's atmosphere is daylight; dark mode would betray the source. Kalshi precedent shows light works for two-party binary bets. |
 | 2026-04-27 | Klee One restricted to the brand wordmark | Mincho is too heavy for body UI; Inter does the dense work. Klee earns its presence by appearing twice (header + footer). |
 | 2026-04-27 | Sakura coral `#FF6B85` as the only brand color | Replaces the earlier vermillion. Softer, less ceremonial; pairs with the kawaii-but-not-noisy direction. |
 | 2026-04-27 | Sakura on background → resolve / bet-fill moment | Designer review: the field was visual noise. Resolving the brand to an event-triggered burst maps the petal motif to its meaning (神和ぎ = ritual completion). |
 | 2026-04-27 | Card radius 15px | Designer review: Polymarket 8 felt cheap, Kalshi 6 felt banky. 15 keeps Kannagi's softness without infantilizing. |
 | 2026-04-27 | Mobile bet-panel reorder | Designer flagged "audit at 390px before touching anything else." Bet panel was at the bottom of the mobile detail page, killing conversion. Reordered grid placement so it sits right after the chart on mobile, sticky right-column on desktop. |
-| 2026-04-27 | Drop hero "Prediction Markets / 予想市場" subtitle | Kannagi *is* the platform; the header already names it. Page lands on the create-market CTA, then Featured. |
+| 2026-04-27 | Drop hero "Two-party binary bets / 予想市場" subtitle | Kannagi *is* the platform; the header already names it. Page lands on the create-market CTA, then Featured. |

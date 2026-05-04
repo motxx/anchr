@@ -1,6 +1,6 @@
 /**
  * MarketMakerBot — a single end-to-end bot that participates in a Kannagi
- * prediction market with a real Cashu wallet, real proofs minted via the
+ * two-party binary bet with a real Cashu wallet, real proofs minted via the
  * regtest Lightning faucet, and real P2PK-locked exchange tokens.
  *
  * The bot owns:

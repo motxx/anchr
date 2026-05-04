@@ -1,5 +1,5 @@
 /**
- * E2E: NIP-60-backed user participating in 巫(Kannagi) prediction market.
+ * E2E: NIP-60-backed user participating in 巫(Kannagi) two-party binary bet.
  *
  * Demonstrates the user-facing path:
  *   1. Open a fresh NIP-60 wallet (real Nostr nsec, real relay).

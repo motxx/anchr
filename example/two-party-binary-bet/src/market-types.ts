@@ -1,13 +1,13 @@
 /**
- * 巫(Kannagi) — Prediction Market Types
+ * 巫(Kannagi) — Two-party binary bet Types
  *
- * Core types for a Bitcoin-native prediction market built on
+ * Core types for a Bitcoin-native two-party binary bet built on
  * Cashu HTLC + Nostr + TLSNotary. No Ethereum, no bridges, no KYC.
  */
 
 // --- Market ---
 
-export interface PredictionMarket {
+export interface TwoPartyBinaryBet {
   /** Unique market identifier (hex, derived from Nostr event id). */
   id: string;
   /** Human-readable question, e.g. "Will BTC be above $100K on 2025-12-31?" */
@@ -114,7 +114,7 @@ export interface Bet {
 
 // --- Matched pairs (N:M conditional swap specialization) ---
 
-/** A matched bet pair — ConditionalSwap's SwapPair specialized for prediction markets. */
+/** A matched bet pair — ConditionalSwap's SwapPair specialized for two-party binary bets. */
 export interface MatchedBetPair {
   /** Unique pair identifier. */
   pair_id: string;
@@ -188,23 +188,23 @@ export interface MarketResolution {
   oracle_signature?: string;
 }
 
-// --- Nostr event kind for prediction markets ---
+// --- Nostr event kind for two-party binary bets ---
 
 /**
- * NIP-90 DVM Job Request kind for prediction market events.
+ * NIP-90 DVM Job Request kind for two-party binary bet events.
  * Uses the same kind range as Anchr queries (5300) with a
  * "t" tag of "anchr-market" for filtering.
  */
-export const PREDICTION_MARKET_KIND = 30078;
+export const TWO_PARTY_BINARY_BET_KIND = 30078;
 
 /**
- * Nostr event content for a published prediction market.
+ * Nostr event content for a published two-party binary bet.
  * Stored as JSON in the event content field.
  */
 export interface MarketEventContent {
   title: string;
   description: string;
-  category: PredictionMarket["category"];
+  category: TwoPartyBinaryBet["category"];
   resolution_url: string;
   resolution_condition: ResolutionCondition;
   resolution_deadline: number;

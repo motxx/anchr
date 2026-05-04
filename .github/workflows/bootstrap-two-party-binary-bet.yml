@@ -1,6 +1,6 @@
-name: Bootstrap Anchr Market
+name: Bootstrap Two-party binary bet
 
-# Manual one-shot to stand up the prediction-market Fly app from scratch:
+# Manual one-shot to stand up the two-party-binary-bet Fly app from scratch:
 # creates the Fly app + volume (idempotent), runs FROST 2-of-3 DKG,
 # uploads the encrypted shares + passphrase as Fly secrets, then deploys.
 #
@@ -8,8 +8,8 @@ name: Bootstrap Anchr Market
 #   FLY_API_TOKEN_MARKET    — Fly deploy token scoped to anchr-market
 #   FROST_KEY_PASSPHRASE    — 32+ hex chars (e.g. `openssl rand -hex 32`)
 #
-# After this workflow succeeds, the regular .github/workflows/deploy.yml
-# `deploy-market` job picks up future commits to main automatically.
+# After this workflow succeeds, the regular deploy-two-party-binary-bet.yml
+# workflow picks up future commits to main automatically.
 
 on:
   workflow_dispatch:

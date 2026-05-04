@@ -1,9 +1,9 @@
 /**
- * URL validation for prediction-market truth sources.
+ * URL validation for two-party-binary-bet truth sources.
  *
  * Wraps `validateAttachmentUri` from src/infrastructure with stricter rules:
  *   - **Always** rejects loopback / private / link-local addresses, even in
- *     development mode. A truth source for a prediction market is by definition
+ *     development mode. A truth source for a two-party binary bet is by definition
  *     a public-internet HTTPS endpoint — pointing at `127.0.0.1` is either an
  *     SSRF attempt or a misconfiguration.
  *   - Allows http://localhost only when `ALLOW_LOCAL_TRUTH_SOURCES=1` (e.g.

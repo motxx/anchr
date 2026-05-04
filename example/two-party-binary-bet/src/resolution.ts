@@ -26,9 +26,9 @@ export interface FrostPerProofResolutionResult {
 }
 
 /**
- * Resolve a prediction market using HTLC preimage mode.
+ * Resolve a two-party binary bet using HTLC preimage mode.
  *
- * Maps prediction market outcomes to conditional swap outcomes:
+ * Maps two-party binary bet outcomes to conditional swap outcomes:
  *   YES wins -> outcome "a" (hash_a = hash_yes)
  *   NO wins  -> outcome "b" (hash_b = hash_no)
  *
@@ -44,7 +44,7 @@ export function resolveMarket(
   outcome: "yes" | "no",
   dualPreimageStore: DualPreimageStore,
 ): ResolutionResult | null {
-  // Map prediction market outcome to conditional swap outcome
+  // Map two-party binary bet outcome to conditional swap outcome
   const swapOutcome = outcome === "yes" ? "a" : "b";
 
   const preimage = dualPreimageStore.reveal(market_id, swapOutcome);
@@ -54,7 +54,7 @@ export function resolveMarket(
 }
 
 /**
- * Resolve a prediction market using FROST P2PK mode with per-proof signing.
+ * Resolve a two-party binary bet using FROST P2PK mode with per-proof signing.
  *
  * For NUT-11 P2PK redemption, the Oracle must sign each individual proof.secret
  * (specifically, SHA256(proof.secret)), NOT a market-level message.

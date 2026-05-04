@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Prediction Market HTTP route registration.
+ * 巫(Kannagi) — Two-party binary bet HTTP route registration.
  *
  * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
  * pattern from worker-api-routes.ts. In-memory market store + order book +
@@ -14,7 +14,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   OpenOrder,
   MatchedBetPair,
   MarketStatus,
@@ -75,9 +75,9 @@ export interface MarketRouteContext {
 // MarketState — injectable for testing
 // ---------------------------------------------------------------------------
 
-/** All mutable state for the prediction market API. */
+/** All mutable state for the two-party binary bet API. */
 export interface MarketState {
-  markets: Map<string, PredictionMarket>;
+  markets: Map<string, TwoPartyBinaryBet>;
   matchedPairs: Map<string, MatchedBetPair>;
   resolvedPreimages: Map<string, string>;
   resolvedSignatures: Map<string, string>;
@@ -108,7 +108,7 @@ export interface MarketState {
    * assert publish was called without spinning up a relay.
    */
   publishMarket?: (
-    market: PredictionMarket,
+    market: TwoPartyBinaryBet,
     identity: MarketIdentity,
     relayUrls: string[],
   ) => Promise<string>;
@@ -268,7 +268,7 @@ function generateId(prefix: string): string {
   return `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
-function marketSummary(m: PredictionMarket, state: MarketState) {
+function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
   const orders = Array.from(state.matchedPairs.values()).filter((p) => p.market_id === m.id);
   const preimage = state.resolvedPreimages.get(m.id);
   const oracleSignature = state.resolvedSignatures.get(m.id);
@@ -539,11 +539,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const hashes = s.dualPreimageStore.create(id);
     const frostKeys = s.dualKeyStore.create(id);
 
-    const market: PredictionMarket = {
+    const market: TwoPartyBinaryBet = {
       id,
       title,
       description,
-      category: category as PredictionMarket["category"],
+      category: category as TwoPartyBinaryBet["category"],
       creator_pubkey,
       resolution_url,
       resolution_condition,
@@ -1097,7 +1097,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // -----------------------------------------------------------------------
   // DELETE /markets/:id/orders/:orderId — cancel an open order
   //
-  // Closes a #3 gap from docs/prediction-market/market-maker-gaps.md so
+  // Closes a #3 gap from docs/two-party-binary-bet/market-maker-gaps.md so
   // bots / users can replace orders instead of waiting for fill or expiry.
   // The caller's pubkey must match the order's bettor_pubkey — the server
   // can't sign for them, so this is the trust boundary. Body:

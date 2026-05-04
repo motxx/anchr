@@ -1,7 +1,7 @@
 /**
  * Attack Scenario Tests — CTF-style security property verification.
  *
- * These tests verify that the prediction market protocol is resilient to
+ * These tests verify that the two-party binary bet protocol is resilient to
  * specific attack vectors identified during security review. All tests are
  * unit-level and do not require Docker or a running mint.
  */
@@ -18,7 +18,7 @@ import {
   createDualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import { calculatePayouts } from "./market-oracle.ts";
-import type { PredictionMarket } from "./market-types.ts";
+import type { TwoPartyBinaryBet } from "./market-types.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -31,8 +31,8 @@ function makeKeypair() {
   return { secretKey: sk, pubkey: pk };
 }
 
-/** Build a minimal PredictionMarket for testing payouts. */
-function makeMarket(overrides: Partial<PredictionMarket> = {}): PredictionMarket {
+/** Build a minimal TwoPartyBinaryBet for testing payouts. */
+function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
   return {
     id: bytesToHex(randomBytes(16)),
     title: "Test market",
@@ -59,7 +59,7 @@ function makeMarket(overrides: Partial<PredictionMarket> = {}): PredictionMarket
     nostr_event_id: bytesToHex(randomBytes(32)),
     status: "open",
     ...overrides,
-  } as PredictionMarket;
+  } as TwoPartyBinaryBet;
 }
 
 // ===========================================================================

@@ -83,7 +83,7 @@ suite("e2e: NIP-61 nutzap (regtest Cashu + Nostr relay)", () => {
         senderProofs,
         amountSats: ZAP,
         relays: [RELAY_URL],
-        comment: "for the prediction market faucet",
+        comment: "for the two-party binary bet faucet",
         pool,
       });
       expect(sendResult.eventId).toMatch(/^[0-9a-f]{64}$/);
@@ -101,7 +101,7 @@ suite("e2e: NIP-61 nutzap (regtest Cashu + Nostr relay)", () => {
       expect(nz).toBeTruthy();
       expect(nz!.amountSats).toBe(ZAP);
       expect(nz!.mintUrl).toBe(MINT_URL);
-      expect(nz!.comment).toBe("for the prediction market faucet");
+      expect(nz!.comment).toBe("for the two-party binary bet faucet");
 
       // Recipient swaps the locked nutzap at the mint. The proofs are
       // P2PK-locked to recipientPk; redeemNutzap passes the nsec to

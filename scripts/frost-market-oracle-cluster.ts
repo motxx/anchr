@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
  * FROST Market Oracle Cluster -- starts multiple Oracle nodes for
- * prediction market resolution with FROST threshold signing.
+ * two-party binary bet resolution with FROST threshold signing.
  *
  * Each node loads a MarketFrostNodeConfig (with YES + NO group keys)
  * and serves the market API routes with FROST signing endpoints.

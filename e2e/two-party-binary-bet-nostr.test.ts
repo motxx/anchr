@@ -1,5 +1,5 @@
 /**
- * E2E tests for Prediction Market Nostr integration.
+ * E2E tests for Two-party binary bet Nostr integration.
  *
  * Verifies the full lifecycle: publish market, discover, place bets,
  * resolve, and category filtering — all against a real Nostr relay.
@@ -8,7 +8,7 @@
  *   docker compose up -d          (provides relay at ws://localhost:7777)
  *
  * Run:
- *   NOSTR_RELAYS=ws://localhost:7777 deno test e2e/prediction-market-nostr.test.ts --allow-all
+ *   NOSTR_RELAYS=ws://localhost:7777 deno test e2e/two-party-binary-bet-nostr.test.ts --allow-all
  */
 
 import { describe, test, beforeAll } from "@std/testing/bdd";
@@ -26,7 +26,7 @@ import {
 } from "../example/two-party-binary-bet/src/nostr-market.ts";
 import { createMarketHtlc } from "../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   MarketResolution,
   BetEventContent,
 } from "../example/two-party-binary-bet/src/market-types.ts";
@@ -66,11 +66,11 @@ const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable() : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(
-    `[e2e] NOSTR_RELAYS not set – prediction market tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e`,
+    `[e2e] NOSTR_RELAYS not set – two-party binary bet tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e`,
   );
 } else if (!RELAY_REACHABLE) {
   console.warn(
-    `[e2e] Relay not reachable at ${RELAY_URL} – prediction market tests skipped. Run: docker compose up -d`,
+    `[e2e] Relay not reachable at ${RELAY_URL} – two-party binary bet tests skipped. Run: docker compose up -d`,
   );
 }
 
@@ -103,19 +103,19 @@ async function publishEventToRelay(
   }
 }
 
-/** Build a full PredictionMarket object for testing. */
+/** Build a full TwoPartyBinaryBet object for testing. */
 function buildTestMarket(
-  overrides: Partial<PredictionMarket> & {
+  overrides: Partial<TwoPartyBinaryBet> & {
     id: string;
     htlc_hash_yes: string;
     htlc_hash_no: string;
     oracle_pubkey: string;
     creator_pubkey: string;
   },
-): PredictionMarket {
+): TwoPartyBinaryBet {
   return {
     title: "E2E Test: Will BTC hit $200K?",
-    description: "Test market for E2E prediction market Nostr integration.",
+    description: "Test market for E2E two-party binary bet Nostr integration.",
     category: "crypto",
     resolution_url: "https://api.example.com/price",
     resolution_condition: {
@@ -143,7 +143,7 @@ function buildTestMarket(
 
 suite(
   {
-    name: "e2e: Prediction Market Nostr integration",
+    name: "e2e: Two-party binary bet Nostr integration",
     sanitizeOps: false,
     sanitizeResources: false,
   },
@@ -154,7 +154,7 @@ suite(
 
     // Shared state across tests
     let marketEventId: string;
-    let testMarket: PredictionMarket;
+    let testMarket: TwoPartyBinaryBet;
     let htlcYes: ReturnType<typeof createMarketHtlc>;
     let htlcNo: ReturnType<typeof createMarketHtlc>;
 
@@ -200,7 +200,7 @@ suite(
       expect(tags.some((t) => t[0] === "d" && t[1] === marketId)).toBe(true);
       expect(
         tags.some(
-          (t) => t[0] === "t" && t[1] === "anchr-prediction-market",
+          (t) => t[0] === "t" && t[1] === "anchr-two-party-binary-bet",
         ),
       ).toBe(true);
       expect(
@@ -267,7 +267,7 @@ suite(
       // Verify the bet is tagged for discovery
       expect(
         betEvent.tags.some(
-          (t) => t[0] === "t" && t[1] === "anchr-prediction-bet",
+          (t) => t[0] === "t" && t[1] === "anchr-binary-bet",
         ),
       ).toBe(true);
       expect(
@@ -318,7 +318,7 @@ suite(
       );
       expect(
         tags.some(
-          (t) => t[0] === "t" && t[1] === "anchr-prediction-resolution",
+          (t) => t[0] === "t" && t[1] === "anchr-binary-resolution",
         ),
       ).toBe(true);
       expect(
@@ -400,9 +400,9 @@ suite(
       await publishEventToRelay(politicsEvent);
 
       // NIP-01: #t with multiple values uses OR semantics, so passing
-      // ["anchr-prediction-market", "anchr-pm-crypto"] returns all events
-      // that have EITHER tag. Since all prediction market events carry the
-      // base "anchr-prediction-market" tag, the relay returns a superset.
+      // ["anchr-two-party-binary-bet", "anchr-pm-crypto"] returns all events
+      // that have EITHER tag. Since all two-party binary bet events carry the
+      // base "anchr-two-party-binary-bet" tag, the relay returns a superset.
       //
       // Verify that discoverMarkets with a category filter returns results
       // that include the matching category, and that the content.category
