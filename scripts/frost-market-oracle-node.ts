@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 /**
- * FROST Market Oracle Node -- single Oracle server instance for prediction markets.
+ * FROST Market Oracle Node -- single Oracle server instance for two-party binary bets.
  *
  * Loads a MarketFrostNodeConfig and serves market API routes with FROST signing.
  * Launched by scripts/frost-market-oracle-cluster.ts.

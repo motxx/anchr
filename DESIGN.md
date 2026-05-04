@@ -1,15 +1,15 @@
-# Design System — Anchr Prediction Market
+# Design System — Anchr Two-party binary bet
 
 ## 1. Visual Theme & Atmosphere
 
-Anchr is a Bitcoin-native prediction market built on Cashu HTLC + Nostr + TLSNotary. The visual identity is rooted in Nostr culture — dark, sovereign, cypherpunk — but elevated to the polish level of Polymarket and Stripe. The interface should feel like a serious financial instrument that happens to run on Nostr keys and Lightning sats, not a toy or proof of concept.
+Anchr is a Bitcoin-native two-party binary bet built on Cashu HTLC + Nostr + TLSNotary. The visual identity is rooted in Nostr culture — dark, sovereign, cypherpunk — but elevated to the polish level of Polymarket and Stripe. The interface should feel like a serious financial instrument that happens to run on Nostr keys and Lightning sats, not a toy or proof of concept.
 
 The atmosphere is **dark-immersive**: deep, near-black surfaces with a subtle purple tint inherited from Nostr's brand identity. Purple is the singular brand accent — every interactive element, glow, and highlight traces back to it. Color is rare and meaningful: only YES (green), NO (red), and brand purple appear against the dark canvas.
 
 **Key Characteristics:**
 - Near-black backgrounds with purple undertone (`#0A0910`)
 - Single brand accent: Nostr purple (`#8B5CF6`)
-- Prediction-market-native color pair: YES emerald / NO red
+- Two-party-binary-bet-native color pair: YES emerald / NO red
 - Inter Variable for all UI text; Geist Mono for numbers, hashes, pubkeys
 - Conservative border-radius (8–12px) — polished but not bubbly
 - Purple glow on hover/focus — subtle, never decorative
@@ -25,7 +25,7 @@ The atmosphere is **dark-immersive**: deep, near-black surfaces with a subtle pu
 - **Purple Glow** (`rgba(139, 92, 246, 0.15)`): Ambient glow for hover cards, focused inputs.
 - **Purple Surface** (`rgba(139, 92, 246, 0.10)`): Background tint for selected/active states and badges.
 
-### Prediction Market Pair
+### Two-party binary bet Pair
 - **YES Green** (`#22C55E` / `hsl(142, 71%, 45%)`): YES bets, positive outcomes, success. Used in probability bars, bet buttons, and resolved-YES badges.
 - **YES Green Background** (`rgba(34, 197, 94, 0.12)`): Tinted surface for YES-related regions.
 - **YES Green Dark** (`#166534`): YES button text (on green background) for contrast.
@@ -71,7 +71,7 @@ Default and only mode. All values above are the canonical palette.
 
 | Role | Font | Size | Weight | Line Height | Letter Spacing | Use |
 |------|------|------|--------|-------------|----------------|-----|
-| Page Title | Inter | 30px (1.875rem) | 700 | 1.2 | -0.03em | "Prediction Markets" |
+| Page Title | Inter | 30px (1.875rem) | 700 | 1.2 | -0.03em | "Two-party binary bets" |
 | Section Heading | Inter | 20px (1.25rem) | 600 | 1.3 | -0.02em | Panel titles, "Market Details" |
 | Market Title | Inter | 15px (0.9375rem) | 600 | 1.4 | -0.01em | Market question text in cards |
 | Body | Inter | 14px (0.875rem) | 400 | 1.6 | normal | Descriptions, paragraphs |
@@ -267,7 +267,7 @@ Default and only mode. All values above are the canonical palette.
 
 ### Do
 - Use `#8B5CF6` (Nostr purple) as the singular brand/interactive color — consistency IS the brand
-- Use YES green (`#22C55E`) and NO red (`#EF4444`) only for prediction market outcomes — never decoratively
+- Use YES green (`#22C55E`) and NO red (`#EF4444`) only for two-party binary bet outcomes — never decoratively
 - Use Geist Mono for all numeric and cryptographic data — sat amounts, probabilities, hashes, pubkeys
 - Use purple glow (`rgba(139, 92, 246, 0.15)`) for hover/focus elevation — it's atmospheric, not decorative
 - Keep border-radius between 8–12px for cards and buttons — polished but not bubbly
@@ -354,7 +354,7 @@ Default and only mode. All values above are the canonical palette.
 ### Implementation Notes
 - CSS variables defined in `globals.css` using HSL values in `:root` and `.dark` selectors
 - Tailwind `@theme` block maps CSS vars to utility classes (`bg-primary`, `text-foreground`, etc.)
-- Custom colors `--yes` and `--no` extend the theme for prediction-market-specific utilities
+- Custom colors `--yes` and `--no` extend the theme for two-party-binary-bet-specific utilities
 - `cn()` utility from `clsx` + `tailwind-merge` for conditional class merging
 - Components use React + Tailwind CSS — no CSS-in-JS, no styled-components
 
@@ -372,6 +372,6 @@ Default and only mode. All values above are the canonical palette.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-03-31 | Findexa-inspired blue theme | Initial design for Worker/Requester dashboards. Blue brand accent. |
-| 2026-04-06 | Nostr purple theme for Prediction Market | Market page needs distinct identity from dashboard. Nostr culture uses purple (Damus, Primal). Black + purple creates sovereign, cypherpunk feel appropriate for permissionless prediction markets. |
+| 2026-04-06 | Nostr purple theme for Two-party binary bet | Market page needs distinct identity from dashboard. Nostr culture uses purple (Damus, Primal). Black + purple creates sovereign, cypherpunk feel appropriate for permissionless two-party binary bets. |
 | 2026-04-06 | 9-section structure adopted | Following awesome-design-md convention for AI-agent-readable design systems. Sections: theme, color, typography, components, layout, depth, do's/don'ts, responsive, agent guide. |
-| 2026-04-06 | YES/NO as domain colors, not brand | Green/red reserved exclusively for prediction outcomes. Prevents color confusion and keeps the brand identity clean (purple only). |
+| 2026-04-06 | YES/NO as domain colors, not brand | Green/red reserved exclusively for bet outcomes. Prevents color confusion and keeps the brand identity clean (purple only). |

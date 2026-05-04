@@ -1,6 +1,11 @@
 # dependencies
 node_modules
 
+# pre-ship verification records (per-repo, per-branch state for the
+# arch-lint-llm and check-silent-bypass skills)
+.silent-bypass-verified.json
+.arch-lint-llm-verified.json
+
 # output
 out
 dist
@@ -49,8 +54,8 @@ uploads/*
 generated.css
 
 # bundled UI outputs (rebuilt by `deno task build:ui`)
-example/prediction-market/ui/main.js
-example/prediction-market/ui/main.js.map
+example/two-party-binary-bet/ui/main.js
+example/two-party-binary-bet/ui/main.js.map
 
 # mobile (expo)
 mobile/.expo/

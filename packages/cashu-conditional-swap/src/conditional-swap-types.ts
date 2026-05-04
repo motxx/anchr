@@ -7,7 +7,7 @@
  *
  * 1:1 atomic swap is the special case where N=1, M=1.
  *
- * Use cases: prediction markets, insurance, group bounties, auctions.
+ * Use cases: two-party binary bets, insurance, group bounties, auctions.
  */
 
 /** Binary outcome conditional swap definition. */

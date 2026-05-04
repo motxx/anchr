@@ -1,5 +1,5 @@
 /**
- * Order book interface for prediction-market FIFO matching.
+ * Order book interface for two-party-binary-bet FIFO matching.
  *
  * Two implementations:
  *   - createInMemoryOrderBook (this file) — Map-backed, ephemeral; for tests/dev

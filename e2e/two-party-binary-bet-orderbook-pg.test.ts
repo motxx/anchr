@@ -12,7 +12,7 @@
  * Run:
  *   docker compose up -d postgres
  *   DATABASE_URL=postgres://anchr:anchr@localhost:5432/anchr_market \
- *     deno test e2e/prediction-market-orderbook-pg.test.ts --allow-all
+ *     deno test e2e/two-party-binary-bet-orderbook-pg.test.ts --allow-all
  */
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";

@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "types": ["bun-types"]
   },
-  "include": ["src/index.ts", "src/worker.ts"]
+  "include": ["src/index.ts"]
 }

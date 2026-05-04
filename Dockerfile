@@ -1,5 +1,5 @@
 # Build tlsn-verifier binary
-FROM rust:1-bookworm@sha256:6ae102bdbf528294bc79ad6e1fae682f6f7c2a6e6621506ba959f9685b308a55 AS rust-builder
+FROM rust:1-bookworm@sha256:adab7941580c74513aa3347f2d2a1f975498280743d29ec62978ba12e3540d3a AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY crates/tlsn-verifier/Cargo.toml ./crates/tlsn-verifier/
@@ -12,7 +12,7 @@ COPY crates/tlsn-prover/src/ ./crates/tlsn-prover/src/
 RUN cd crates/tlsn-prover && cargo build --release
 
 # Main app
-FROM denoland/deno@sha256:9c47e8b8fa41e91fe2dd1448888244a56c4ec90124333d5341319b043a3a6ca0 AS app
+FROM denoland/deno@sha256:564e989f4a93371e70fd8720e5dbe3e027fd4a0daad71a2b008008596ffa6492 AS app
 
 WORKDIR /app
 
@@ -36,6 +36,7 @@ COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
 COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
 COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
+COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
 COPY . .
@@ -45,13 +46,15 @@ RUN deno task build:ui
 # Tailwind CSS v4: @import "tailwindcss" resolves from the input file's
 # directory. Symlink node_modules into /app so the CSS resolver finds it.
 RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null; \
-  ln -sf /tmp/node_modules /app/src/ui/node_modules \
-  && ln -sf /tmp/node_modules /app/src/ui/requester/node_modules \
-  && ln -sf /tmp/node_modules /app/src/ui/dashboard/node_modules \
-  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/globals.css -o /app/dist/ui/generated.css \
-  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/requester/globals.css -o /app/dist/ui/requester/generated.css \
-  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/dashboard/globals.css -o /app/dist/ui/dashboard/generated.css \
-  && rm -f /app/src/ui/node_modules /app/src/ui/requester/node_modules /app/src/ui/dashboard/node_modules \
+  ln -sf /tmp/node_modules /app/example/reference-app/ui/node_modules \
+  && ln -sf /tmp/node_modules /app/example/reference-app/ui/requester/node_modules \
+  && ln -sf /tmp/node_modules /app/example/reference-app/ui/dashboard/node_modules \
+  && ln -sf /tmp/node_modules /app/example/two-party-binary-bet/ui/node_modules \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/example/reference-app/ui/globals.css -o /app/dist/ui/generated.css \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/example/reference-app/ui/requester/globals.css -o /app/dist/ui/requester/generated.css \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/example/reference-app/ui/dashboard/globals.css -o /app/dist/ui/dashboard/generated.css \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/example/two-party-binary-bet/ui/globals.css -o /app/example/two-party-binary-bet/ui/generated.css \
+  && rm -f /app/example/reference-app/ui/node_modules /app/example/reference-app/ui/requester/node_modules /app/example/reference-app/ui/dashboard/node_modules /app/example/two-party-binary-bet/ui/node_modules \
   && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
 
 ENV NODE_ENV=production

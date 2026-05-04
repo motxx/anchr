@@ -6,7 +6,7 @@ import { DashboardLogsPanel } from "./LogsPanel.tsx";
 import { ProofPanel } from "./ProofPanel.tsx";
 import { useActivityTracker } from "./useActivityTracker.ts";
 
-const WORKER_PUBKEY = "worker_ui_placeholder_pubkey";
+const WORKER_PUBKEY = "worker_ui_placeholder_pubkey"; // allow-stub: demo UI runs requester+worker in one process; worker pubkey unused server-side
 const REQUESTER_PUBKEY = "requester_demo";
 
 interface BalanceData { role: string; pubkey: string; balance_sats: number; pending_sats: number; mint_url: string | null }

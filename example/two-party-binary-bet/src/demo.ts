@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Prediction Market Demo (N:M Conditional Swap)
+ * 巫(Kannagi) — Two-party binary bet Demo (N:M Conditional Swap)
  *
  * Demonstrates the full lifecycle using the protocol layer:
  *
@@ -32,7 +32,7 @@ import {
   calculateOracleFee,
 } from "./market-oracle.ts";
 import type {
-  PredictionMarket,
+  TwoPartyBinaryBet,
   Bet,
   ResolutionCondition,
   OpenOrder,
@@ -47,7 +47,7 @@ const RESOLUTION_DEADLINE = Math.floor(Date.now() / 1000) + 86400; // 24h from n
 const ORACLE_FEE_PPM = 5_000;  // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
 
-console.log("=== 巫(Kannagi) — Bitcoin-Native Prediction Market Demo (N:M Conditional Swap) ===\n");
+console.log("=== 巫(Kannagi) — Bitcoin-Native Two-party binary bet Demo (N:M Conditional Swap) ===\n");
 console.log("Powered by Anchr: FROST P2PK Conditional Swap + Nostr + TLSNotary\n");
 console.log("\u2501".repeat(60));
 
@@ -92,7 +92,7 @@ const resolutionCondition: ResolutionCondition = {
   description: "BTC/JPY best bid price must be above 11,000,000",
 };
 
-const market: PredictionMarket = {
+const market: TwoPartyBinaryBet = {
   id: marketId,
   title: "Will BTC/JPY be above \u00a511,000,000 on resolution date?",
   description: "Resolves YES if BTC/JPY best bid > \u00a511M on bitFlyer. TLSNotary verified.",

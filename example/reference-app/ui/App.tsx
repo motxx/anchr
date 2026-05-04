@@ -23,7 +23,7 @@ interface BalanceData {
   mint_url: string | null;
 }
 
-const WORKER_PUBKEY = "worker_ui_placeholder_pubkey";
+const WORKER_PUBKEY = "worker_ui_placeholder_pubkey"; // allow-stub: demo UI runs requester+worker in one process; worker pubkey unused server-side
 const OPEN_STATUSES = ["pending", "awaiting_quotes", "worker_selected", "processing"];
 
 // ---- ClosedQueryList ----

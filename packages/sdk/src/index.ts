@@ -449,7 +449,6 @@ function sleep(ms: number): Promise<void> {
 
 // Default export
 export default Anchr;
-// Note: AnchrWorker (Node-only, uses node:fs) is exported from "@anchr/sdk/worker" via package.json subpath.
 
 // --- v0.0.1 Customer / Provider API ---
 //

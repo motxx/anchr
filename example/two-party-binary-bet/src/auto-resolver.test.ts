@@ -7,9 +7,9 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { startAutoResolver } from "./auto-resolver.ts";
 import { createMarketState } from "./server-routes.ts";
-import type { PredictionMarket } from "./market-types.ts";
+import type { TwoPartyBinaryBet } from "./market-types.ts";
 
-function makeMarket(overrides: Partial<PredictionMarket> = {}): PredictionMarket {
+function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
   return {
     id: "mkt_test",
     title: "Will it work?",

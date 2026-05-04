@@ -1,5 +1,5 @@
 /**
- * Market wallet operations — user proof management for prediction markets.
+ * Market wallet operations — user proof management for two-party binary bets.
  *
  * Extracted from market-api-routes.ts to enable dependency injection and testing.
  * All functions take a `userProofs` map as parameter instead of accessing globals.

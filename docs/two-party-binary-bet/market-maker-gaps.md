@@ -1,7 +1,7 @@
 # Kannagi vs Polymarket — market-maker gap analysis
 
 What the bot fleet under `scripts/bot-fleet/` exercised against the current
-Kannagi (巫) prediction-market platform, and which Polymarket-style
+Kannagi (巫) two-party-binary-bet platform, and which Polymarket-style
 liquidity behaviors are not yet expressible. Captured 2026-04-28.
 
 The fleet runs real Cashu wallets on a regtest Lightning + Cashu mint and
@@ -98,7 +98,7 @@ Smallest unblocking change for the bot fleet. Expose:
 
 ### 2. Order cancellation HTTP endpoint
 The `OrderBook.cancelOrder` primitive already exists (`example
-/prediction-market/src/order-book.ts:31`). Adding `DELETE /markets/:id
+/two-party-binary-bet/src/order-book.ts:31`). Adding `DELETE /markets/:id
 /orders/:orderId` (with `bettor_pubkey` auth) is mechanical. Without it
 bots that change their mind have to wait for the order to fill or for
 the market to expire.

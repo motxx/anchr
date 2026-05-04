@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Harden runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
         with:
           egress-policy: audit
 
@@ -69,7 +69,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d relay blossom postgres
-          # Wait for Postgres so the prediction-market order-book tests
+          # Wait for Postgres so the two-party-binary-bet order-book tests
           # don't start before /docker-entrypoint-initdb.d finishes.
           for i in $(seq 1 30); do
             if docker compose exec -T postgres pg_isready -U anchr -d anchr_market > /dev/null 2>&1; then

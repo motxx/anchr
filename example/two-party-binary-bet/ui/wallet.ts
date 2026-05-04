@@ -1,5 +1,5 @@
 /**
- * Browser-side Cashu wallet for non-custodial prediction market.
+ * Browser-side Cashu wallet for non-custodial two-party binary bet.
  *
  * When the server advertises Nostr relays in `/markets/wallet/config`, the
  * wallet stores Cashu proofs as encrypted NIP-60 `kind:7375` events on

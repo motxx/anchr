@@ -177,7 +177,7 @@ run_docker_tests() {
   step "Phase 3: Regtest Tests (HTLC + Cashu + Postgres)"
 
   # DATABASE_URL plumbs the Postgres-backed OrderBook through the
-  # prediction-market lifecycle and order-book PG tests. Without it those
+  # two-party-binary-bet lifecycle and order-book PG tests. Without it those
   # tests skip themselves and the lifecycle test runs against in-memory.
   CASHU_MINT_URL=http://localhost:3338 \
   NOSTR_RELAYS=ws://localhost:7777 \

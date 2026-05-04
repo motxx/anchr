@@ -334,10 +334,10 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("fails closed when token is undecodable (no silent ok=true bypass)", async () => {
-      // The previous behaviour swallowed decode errors and returned ok=true,
-      // letting any malformed string bypass HTLC + P2PK checks. Force a
-      // decode failure by seeding a non-cashuB string and assert verifyLock
-      // returns ok=false with a clear message.
+      // verifyLock must fail closed on undecodable input — a malformed string
+      // must not bypass HTLC + P2PK checks via a swallowed decode error
+      // returned as ok=true. Force a decode failure by seeding a non-cashuB
+      // string and assert verifyLock returns ok=false with a clear message.
       provider._seedRaw("ref_undecodable", "(not-a-real-token)");
       const result = await provider.verifyLock(
         "ref_undecodable",
