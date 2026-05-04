@@ -1,10 +1,10 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S deno run --allow-all
 /**
- * Anchr Auto-Worker CLI
+ * Anchr TLSNotary Auto-Worker CLI (example).
  *
  * Usage:
- *   bun run packages/sdk/src/cli.ts --server http://localhost:3000 --verifier localhost:7047
- *   bunx anchr-worker --server http://localhost:3000 --verifier localhost:7047
+ *   deno run --allow-all example/tlsn-worker/cli.ts \
+ *     --server http://localhost:3000 --verifier localhost:7047
  */
 
 import { AnchrWorker } from "./worker.ts";

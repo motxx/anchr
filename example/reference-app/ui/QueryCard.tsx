@@ -64,7 +64,7 @@ interface ResultResponse {
 
 // ---- Helpers ----
 
-const WORKER_PUBKEY = "worker_ui_placeholder_pubkey";
+const WORKER_PUBKEY = "worker_ui_placeholder_pubkey"; // allow-stub: demo UI runs requester+worker in one process; worker pubkey unused server-side
 const STORAGE_KEY = "anchr_worker_queries";
 const MAX_STORED = 20;
 

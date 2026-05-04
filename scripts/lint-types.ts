@@ -28,7 +28,7 @@ const HARD_SCOPE = [
 
 // Soft rules apply only outside this list (UI + tests + scripts).
 const SOFT_EXEMPT = [
-  "src/ui/",
+  "example/reference-app/ui/",
   ".test.ts",
   ".test.tsx",
   "/test/",

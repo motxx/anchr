@@ -559,7 +559,7 @@ Deno.serve({ port: PORT }, (req) => {
 
   if (url.pathname === "/") {
     // Serve the demo HTML file
-    return Deno.readFile("./src/ui/demo/index.html").then(
+    return Deno.readFile("./example/reference-app/ui/demo/index.html").then(
       (data) => new Response(data, { headers: { "content-type": "text/html; charset=utf-8" } })
     );
   }
