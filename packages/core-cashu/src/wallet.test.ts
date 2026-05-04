@@ -44,11 +44,10 @@ describe("Cashu wallet", () => {
   });
 
   test("createBountyToken returns null when CASHU_MINT_URL is unset (no implicit demo path)", async () => {
-    // The previous implementation called wallet.mintProofs() immediately
-    // after createMintQuote() — which raced against any externally-paid
-    // Lightning invoice and silently failed in production. The current
-    // implementation must at minimum bail cleanly when no mint is
-    // configured rather than throwing or hanging.
+    // When CASHU_MINT_URL is unset, createBountyToken must bail cleanly —
+    // calling wallet.mintProofs() immediately after createMintQuote() races
+    // against any externally-paid Lightning invoice and silently fails in
+    // production. The function must return null in this case (no throw, no hang).
     const original = Deno.env.get("CASHU_MINT_URL");
     Deno.env.delete("CASHU_MINT_URL");
     try {
