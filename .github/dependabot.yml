@@ -15,6 +15,15 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    # Supply-chain safety: skip versions released too recently.
+    # Newly-published packages are the typical attack window for
+    # malicious-publish / token-compromise incidents (e.g. ua-parser-js,
+    # event-stream, debug). Wait for community signal before adopting.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 5
 
   # Docker
   - package-ecosystem: "docker"
