@@ -1,6 +1,11 @@
 # dependencies
 node_modules
 
+# pre-ship verification records (per-repo, per-branch state for the
+# arch-lint-llm and check-silent-bypass skills)
+.silent-bypass-verified.json
+.arch-lint-llm-verified.json
+
 # output
 out
 dist
