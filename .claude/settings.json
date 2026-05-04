@@ -1,5 +1,20 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "deno run --allow-read --allow-run --allow-env scripts/arch-lint-llm-verify.ts"
+          },
+          {
+            "type": "command",
+            "command": "deno run --allow-read --allow-run --allow-env scripts/silent-bypass-verify.ts"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
