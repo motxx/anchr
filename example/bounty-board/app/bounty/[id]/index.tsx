@@ -33,7 +33,6 @@ export default function BountyDetailScreen() {
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 40 }}
     >
-      {/* Header */}
       <View className="flex-row items-center px-4 mb-4">
         <Pressable onPress={() => router.back()} className="mr-3">
           <Ionicons name="arrow-back" size={24} color="#fafafa" />
@@ -45,12 +44,10 @@ export default function BountyDetailScreen() {
         </View>
       </View>
 
-      {/* Status Timeline */}
       <View className="px-4 mb-4">
         <StatusTimeline status={bounty.status} />
       </View>
 
-      {/* Info Cards */}
       <View className="px-4 gap-3">
         <DSCard>
           <View className="flex-row items-center justify-between mb-2">
@@ -101,7 +98,6 @@ export default function BountyDetailScreen() {
           </View>
         </DSCard>
 
-        {/* TLSNotary Requirements */}
         {bounty.tlsn_requirements && (
           <DSSection title="WEB PROOF REQUIREMENTS">
             <DSCard>
@@ -118,14 +114,12 @@ export default function BountyDetailScreen() {
           </DSSection>
         )}
 
-        {/* Verification Results */}
         {bounty.verification && (
           <DSSection title="VERIFICATION">
             <VerificationResults verification={bounty.verification} />
           </DSSection>
         )}
 
-        {/* Actions */}
         <View className="gap-2 mt-2">
           {bounty.status === "awaiting_quotes" && (
             <DSButton

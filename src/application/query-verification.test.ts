@@ -1,11 +1,3 @@
-/**
- * Unit tests for quorum verification logic (verifyWithQuorum).
- *
- * Tests single-oracle and multi-oracle quorum verification flows,
- * including the CTF-1 mitigation that ignores worker-supplied oracleId
- * when the query has no acceptable oracle list.
- */
-
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
@@ -17,9 +9,6 @@ import {
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 
-// --- Test helpers ---
-
-/** Create a mock oracle that always passes or always fails. */
 function makeMockOracle(
   id: string,
   passFn?: (query: Query, result: QueryResult) => boolean,
@@ -40,7 +29,6 @@ function makeMockOracle(
   };
 }
 
-/** Minimal query for testing. */
 function makeQuery(overrides?: Partial<Query>): Query {
   return {
     id: "test-query-1",
@@ -54,7 +42,6 @@ function makeQuery(overrides?: Partial<Query>): Query {
   };
 }
 
-/** Minimal query result for testing. */
 function makeResult(): QueryResult {
   return {
     attachments: [],
@@ -62,7 +49,6 @@ function makeResult(): QueryResult {
   };
 }
 
-/** Create an OracleResolver from a map of oracles. */
 function makeResolver(oracleMap: Record<string, Oracle>): OracleResolver {
   return (oracleId, acceptableIds) => {
     if (oracleId && oracleMap[oracleId]) {
@@ -71,7 +57,6 @@ function makeResolver(oracleMap: Record<string, Oracle>): OracleResolver {
       }
       return oracleMap[oracleId];
     }
-    // Fallback: return first acceptable oracle, or first available
     if (acceptableIds?.length) {
       for (const id of acceptableIds) {
         if (oracleMap[id]) return oracleMap[id];
@@ -83,7 +68,6 @@ function makeResolver(oracleMap: Record<string, Oracle>): OracleResolver {
   };
 }
 
-/** Create a MultiOracleResolver from a list of oracles. */
 function makeMultiResolver(oracles: Oracle[]): MultiOracleResolver {
   return (acceptableIds, count) => {
     let pool = oracles;
@@ -93,8 +77,6 @@ function makeMultiResolver(oracles: Oracle[]): MultiOracleResolver {
     return pool.slice(0, count);
   };
 }
-
-// ---------- toAttestationRecord ----------
 
 describe("toAttestationRecord", () => {
   test("maps OracleAttestation to OracleAttestationRecord", () => {
@@ -137,8 +119,6 @@ describe("toAttestationRecord", () => {
     expect(record.tlsn_verified).toBeUndefined();
   });
 });
-
-// ---------- verifyWithQuorum: single oracle ----------
 
 describe("verifyWithQuorum (single oracle)", () => {
   const passingOracle = makeMockOracle("oracle-pass");
@@ -204,42 +184,31 @@ describe("verifyWithQuorum (single oracle)", () => {
       "oracle-fail": failingOracle,
     });
 
-    // Request oracle-fail, but it's not in the acceptable list
     const result = await verifyWithQuorum(
       query, makeResult(), resolver, undefined, undefined, "oracle-fail",
     );
 
-    // The resolver should reject oracle-fail since it's not acceptable
     expect(result.passed).toBe(false);
     expect(result.verification.failures[0]).toContain("not available or not accepted");
   });
 });
 
-// ---------- CTF-1: oracle_id sanitization ----------
-
 describe("CTF-1: oracle_id from worker sanitization", () => {
   test("ignores worker-supplied oracleId when query has no oracle_ids", async () => {
-    // A worker tries to force use of a malicious oracle
     const maliciousOracle = makeMockOracle("malicious-oracle", () => true);
     const defaultOracle = makeMockOracle("default-oracle");
 
-    const query = makeQuery(); // No oracle_ids -> any oracle accepted
+    const query = makeQuery();
     const resolver = makeResolver({
       "malicious-oracle": maliciousOracle,
       "default-oracle": defaultOracle,
     });
 
-    // Worker supplies "malicious-oracle" but query has no oracle_ids list
-    // CTF-1 mitigation: effectiveOracleId becomes undefined
     const result = await verifyWithQuorum(
       query, makeResult(), resolver, undefined, undefined, "malicious-oracle",
     );
 
-    // The resolver should use the default (first available), not the malicious one
     expect(result.passed).toBe(true);
-    // effectiveOracleId is undefined, so resolver picks the first available
-    // (which is "malicious-oracle" in our map -- but the KEY point is the code
-    // ignores the worker-supplied ID and doesn't trust it)
     expect(result.attestations.length).toBe(1);
   });
 
@@ -253,7 +222,6 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
       "oracle-b": oracleB,
     });
 
-    // Worker picks oracle-b, which is in the acceptable list
     const result = await verifyWithQuorum(
       query, makeResult(), resolver, undefined, undefined, "oracle-b",
     );
@@ -265,20 +233,17 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
   test("ignores oracleId when oracle_ids is empty array", async () => {
     const oracleX = makeMockOracle("oracle-x");
 
-    const query = makeQuery({ oracle_ids: [] }); // empty array
+    const query = makeQuery({ oracle_ids: [] });
     const resolver = makeResolver({ "oracle-x": oracleX });
 
     const result = await verifyWithQuorum(
       query, makeResult(), resolver, undefined, undefined, "oracle-x",
     );
 
-    // Empty oracle_ids -> effectiveOracleId = undefined (CTF-1)
     expect(result.passed).toBe(true);
     expect(result.attestations.length).toBe(1);
   });
 });
-
-// ---------- verifyWithQuorum: multi-oracle quorum ----------
 
 describe("verifyWithQuorum (multi-oracle quorum)", () => {
   test("passes when min_approvals are met", async () => {
@@ -385,7 +350,6 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
 
     expect(result.passed).toBe(true);
-    // All checks and failures are aggregated
     expect(result.verification.checks).toContain("o1 check passed");
     expect(result.verification.checks).toContain("o3 check passed");
     expect(result.verification.failures).toContain("o2 check failed");
@@ -418,7 +382,7 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     ];
     const query = makeQuery({
       quorum: { min_approvals: 2 },
-      oracle_ids: ["trusted-1", "trusted-2"], // untrusted not in list
+      oracle_ids: ["trusted-1", "trusted-2"],
     });
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
@@ -431,7 +395,6 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
   });
 
   test("resolves oracles independently (each verifies on its own)", async () => {
-    // Verify that each oracle gets its own independent call
     const callLog: string[] = [];
     const oracles: Oracle[] = [
       {

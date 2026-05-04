@@ -76,13 +76,10 @@ test("DualOutcomeFrostNodeConfig preserves signer identity across groups", () =>
   const yesConfig = toOutcomeAFrostNodeConfig(config);
   const noConfig = toOutcomeBFrostNodeConfig(config);
 
-  // Same signer in both groups
   expect(yesConfig.signer_index).toBe(noConfig.signer_index);
   expect(yesConfig.threshold).toBe(noConfig.threshold);
   expect(yesConfig.total_signers).toBe(noConfig.total_signers);
 });
-
-// --- Encrypted-at-rest tests -----------------------------------------------
 
 async function withTempFile<T>(fn: (path: string) => Promise<T>): Promise<T> {
   const path = await Deno.makeTempFile({ prefix: "frost-cfg-", suffix: ".json" });
@@ -123,7 +120,6 @@ test("encrypted file written to disk is an envelope, not plaintext", async () =>
     expect(typeof onDisk.salt).toBe("string");
     expect(typeof onDisk.iv).toBe("string");
     expect(typeof onDisk.ciphertext).toBe("string");
-    // Secret material must not appear in plaintext on disk.
     const raw = await Deno.readTextFile(path);
     expect(raw).not.toContain("yes_secret_share");
     expect(raw).not.toContain("no_secret_share");
@@ -158,7 +154,6 @@ test("sync loader rejects encrypted file with actionable message", async () => {
 test("plaintext loader still works through the async path (back-compat)", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    // Write plaintext directly.
     await Deno.writeTextFile(path, JSON.stringify(original));
     const loaded = await loadDualOutcomeFrostNodeConfigAsync(path);
     expect(loaded).toEqual(original);
@@ -186,7 +181,6 @@ test("tampered ciphertext fails GCM authentication", async () => {
   await withTempFile(async (path) => {
     await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "pass" });
     const envelope = JSON.parse(await Deno.readTextFile(path));
-    // Flip one byte in the base64 ciphertext (re-encode after mutating).
     const ct = atob(envelope.ciphertext);
     const bytes = new Uint8Array(ct.length);
     for (let i = 0; i < ct.length; i++) bytes[i] = ct.charCodeAt(i);

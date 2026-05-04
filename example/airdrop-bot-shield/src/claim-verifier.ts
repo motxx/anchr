@@ -21,10 +21,6 @@ import type { ProofCondition, AirdropCriteria } from "./airdrop-criteria.ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 /** A TLSNotary presentation submitted by a claimant for one condition. */
 export interface ClaimProof {
   /** Index into the airdrop criteria's conditions array. */
@@ -68,10 +64,6 @@ export interface VerifiedProofData {
   /** Unix timestamp of the TLS session. */
   session_timestamp: number;
 }
-
-// ---------------------------------------------------------------------------
-// Core Verification
-// ---------------------------------------------------------------------------
 
 /** Maximum attestation age in seconds (10 minutes). */
 const MAX_ATTESTATION_AGE_SECONDS = 600;
@@ -127,7 +119,6 @@ export function evaluateCondition(
 ): ConditionResult {
   const checks: string[] = [];
 
-  // 1. Domain verification
   const expectedHost = extractHostname(condition.target_url);
   if (!expectedHost) {
     return {
@@ -146,7 +137,6 @@ export function evaluateCondition(
   }
   checks.push(`Domain verified: ${expectedHost}`);
 
-  // 2. Freshness check
   const ageSeconds = Math.floor(Date.now() / 1000) - verifiedData.session_timestamp;
   if (ageSeconds < 0 || ageSeconds > MAX_ATTESTATION_AGE_SECONDS) {
     return {
@@ -157,7 +147,6 @@ export function evaluateCondition(
   }
   checks.push(`Attestation fresh: ${ageSeconds}s old`);
 
-  // 3. Parse response body and extract value
   let parsed: unknown;
   try {
     parsed = JSON.parse(verifiedData.revealed_body);
@@ -178,7 +167,6 @@ export function evaluateCondition(
     };
   }
 
-  // 4. Type-specific value comparison
   let numericValue: number;
 
   if (condition.type === "github_account_age") {
@@ -194,7 +182,6 @@ export function evaluateCondition(
     }
     numericValue = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
   } else {
-    // Direct numeric comparison for repos, followers, contributions
     numericValue = Number(rawValue);
     if (isNaN(numericValue)) {
       return {
@@ -206,7 +193,6 @@ export function evaluateCondition(
     }
   }
 
-  // 5. Threshold check
   if (condition.min_value !== undefined && numericValue < condition.min_value) {
     return {
       condition,
@@ -250,7 +236,6 @@ export function verifyClaim(
   const checks: string[] = [];
   const failures: string[] = [];
 
-  // Ensure every condition has a corresponding proof
   for (let i = 0; i < criteria.conditions.length; i++) {
     const condition = criteria.conditions[i]!;
     const proofData = verifiedProofs.get(i);

@@ -42,8 +42,6 @@ struct Cli {
     webhook_url: Option<String>,
 }
 
-// --- Shared state ---
-
 struct SessionState {
     verifier_output: VerifierOutput,
     connection_info: ConnectionInfo,
@@ -83,7 +81,6 @@ async fn main() -> Result<()> {
         webhook_url: cli.webhook_url.clone(),
     };
 
-    // TCP listener (CLI protocol)
     let tcp_state = state.clone();
     let tcp_port = cli.tcp_port;
     tokio::spawn(async move {
@@ -92,9 +89,6 @@ async fn main() -> Result<()> {
         }
     });
 
-    // WS listener (Browser extension protocol)
-    // We handle /verifier and /proxy with raw async-tungstenite (same as official)
-    // and /session, /health, /info with axum
     let ws_port = cli.ws_port;
     let ws_state = state.clone();
     tokio::spawn(async move {
@@ -106,11 +100,8 @@ async fn main() -> Result<()> {
     eprintln!("[tlsn-server] TCP  on 0.0.0.0:{}", cli.tcp_port);
     eprintln!("[tlsn-server] HTTP/WS on 0.0.0.0:{}", cli.ws_port);
 
-    // Keep main alive
     loop { tokio::time::sleep(std::time::Duration::from_secs(3600)).await; }
 }
-
-// --- WS server using raw hyper + tungstenite ---
 
 async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
     let listener = TcpListener::bind(("0.0.0.0", port)).await?;
@@ -120,8 +111,6 @@ async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
         let state = state.clone();
 
         tokio::spawn(async move {
-            // Parse the HTTP request to determine the path, then upgrade to WS
-            // using async-tungstenite directly (same as official tlsn-extension verifier)
             use async_tungstenite::tokio::TokioAdapter;
             use async_tungstenite::tungstenite::handshake::server::{Request, Response, ErrorResponse};
 
@@ -134,16 +123,11 @@ async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
                     path = req.uri().path().to_string();
                     query = req.uri().query().unwrap_or("").to_string();
 
-                    // For non-WS paths, we'd need a different approach
-                    // But the extension only connects via WS to all endpoints
                     Ok(resp)
                 },
             ).await {
                 Ok(ws) => ws,
                 Err(e) => {
-                    // Not a WS request — handle as HTTP
-                    // For simplicity, we only support WS on this port
-                    // /health and /info can be checked via the TCP port or curl
                     eprintln!("[ws] non-WS connection from {}: {}", addr, e);
                     return;
                 }
@@ -178,15 +162,12 @@ fn parse_query_param(query: &str, key: &str) -> Option<String> {
     })
 }
 
-// --- /session handler (JSON over WS, using tungstenite directly) ---
-
 async fn handle_session_ws_raw(
     mut ws: async_tungstenite::WebSocketStream<async_tungstenite::tokio::TokioAdapter<tokio::net::TcpStream>>,
     state: AppState,
 ) {
     use async_tungstenite::tungstenite::Message;
 
-    // Wait for register message
     let msg = match ws.next().await {
         Some(Ok(Message::Text(t))) => t,
         _ => return,
@@ -206,16 +187,13 @@ async fn handle_session_ws_raw(
         max_recv_data: max_recv,
     });
 
-    // Create result channel
     let (result_tx, result_rx) = oneshot::channel::<WsVerificationResult>();
     state.ws_results.lock().await.insert(session_id.clone(), result_tx);
 
-    // Send session_registered
     let resp = serde_json::json!({ "type": "session_registered", "sessionId": session_id });
     if ws.send(Message::Text(resp.to_string().into())).await.is_err() { return; }
     eprintln!("[tlsn-server] WS session registered: {}", &session_id[..8]);
 
-    // Wait for MPC verification result
     let result = match tokio::time::timeout(std::time::Duration::from_secs(120), result_rx).await {
         Ok(Ok(r)) => r,
         _ => {

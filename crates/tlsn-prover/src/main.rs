@@ -124,24 +124,19 @@ async fn main() -> Result<()> {
 
     let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
         if verifier_addr.starts_with("wss://") || verifier_addr.starts_with("ws://") {
-            // WebSocket mode: connect to TLSNotary demo/extension verifier
             eprintln!("[tlsn-prove] Using WebSocket verifier: {}", verifier_addr);
             run_with_ws_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
         } else {
-            // TCP mode: connect to our custom Verifier Server
             eprintln!("[tlsn-prove] Using TCP verifier: {}", verifier_addr);
             run_with_remote_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
         }
     } else {
-        // Local mode: run both prover and verifier in-process
         eprintln!("[tlsn-prove] Using in-process verifier");
         run_with_local_verifier(&host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
     };
 
-    // Build presentation (with optional selective disclosure)
     let presentation = build_presentation(attestation, secrets, &cli.redact_sent_headers)?;
 
-    // Save
     let bytes = bincode::serialize(&presentation)?;
     std::fs::write(&cli.output, &bytes)?;
 
@@ -194,14 +189,12 @@ async fn run_with_ws_verifier(
     use async_tungstenite::tungstenite::Message;
     use futures::{SinkExt, StreamExt};
 
-    // Step 1: Register session via /session WebSocket
     let session_ws_url = format!("{}/session", verifier_url);
     eprintln!("[tlsn-prove] Connecting to session endpoint: {}", session_ws_url);
 
     let (mut session_ws, _) = connect_async(&session_ws_url).await
         .map_err(|e| anyhow!("Failed to connect to session WS: {e}"))?;
 
-    // Send register message
     let register_msg = serde_json::json!({
         "type": "register",
         "maxRecvData": max_recv_data,
@@ -210,7 +203,6 @@ async fn run_with_ws_verifier(
     });
     session_ws.send(Message::Text(register_msg.to_string().into())).await?;
 
-    // Receive session_registered response
     let resp = session_ws.next().await
         .ok_or_else(|| anyhow!("Session WS closed"))??;
     let resp_text = resp.into_text()?;
@@ -219,24 +211,18 @@ async fn run_with_ws_verifier(
         .ok_or_else(|| anyhow!("No sessionId in response: {}", resp_text))?;
     eprintln!("[tlsn-prove] Session registered: {}", session_id);
 
-    // Step 2: Connect to /verifier?sessionId=<id> for MPC-TLS
     let verifier_ws_url = format!("{}/verifier?sessionId={}", verifier_url, session_id);
     eprintln!("[tlsn-prove] Connecting to verifier: {}", verifier_ws_url);
 
     let (verifier_ws, _) = connect_async(&verifier_ws_url).await
         .map_err(|e| anyhow!("Failed to connect to verifier WS: {e}"))?;
 
-    // Wrap WebSocket as AsyncRead+AsyncWrite
-    // WsStream needs the inner WebSocket, not the wrapper
     let ws_stream = ws_stream_tungstenite::WsStream::new(verifier_ws);
 
-    // Step 3: Run MPC-TLS prover over the WebSocket stream
-    // Session expects futures AsyncRead/AsyncWrite (it calls .compat() internally)
     let prover_output = run_prover_mpc_futures_stream(ws_stream, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await?;
 
     eprintln!("[tlsn-prove] MPC complete, waiting for session result...");
 
-    // Wait for session_completed from server (includes verifier data for attestation)
     let resp = session_ws.next().await
         .ok_or_else(|| anyhow!("Session WS closed before completion"))??;
     let resp_text = resp.into_text()?;
@@ -253,7 +239,6 @@ async fn run_with_ws_verifier(
         return Err(anyhow!("Unexpected response type: {}", resp_type));
     }
 
-    // Check if server returned verifier data (our self-hosted server does)
     let has_verifier_data = resp_json["connectionInfo"].is_string()
         && resp_json["serverEphemeralKey"].is_string()
         && resp_json["transcriptCommitments"].is_string();
@@ -262,7 +247,6 @@ async fn run_with_ws_verifier(
         eprintln!("[tlsn-prove] Building attestation from server-provided verifier data");
         build_attestation_from_server_data(prover_output, &resp_json)?
     } else {
-        // External server (like demo.tlsnotary.org) that doesn't return verifier data
         return Err(anyhow!("Server did not return verifier data. Use a self-hosted Verifier Server."));
     };
 
@@ -276,7 +260,6 @@ fn build_attestation_from_server_data(
     output: ProverMpcOutput,
     resp: &serde_json::Value,
 ) -> Result<(Attestation, Secrets)> {
-    // Decode server-provided verifier data
     let conn_info_bytes = base64_decode(resp["connectionInfo"].as_str().unwrap_or(""))?;
     let eph_key_bytes = base64_decode(resp["serverEphemeralKey"].as_str().unwrap_or(""))?;
     let commitments_bytes = base64_decode(resp["transcriptCommitments"].as_str().unwrap_or(""))?;
@@ -285,7 +268,6 @@ fn build_attestation_from_server_data(
     let server_ephemeral_key = bincode::deserialize(&eph_key_bytes)?;
     let transcript_commitments = bincode::deserialize(&commitments_bytes)?;
 
-    // Sign attestation locally (the verifier data is from the real MPC session)
     let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
     let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
     let mut provider = CryptoProvider::default();
@@ -341,7 +323,6 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
     max_sent_data: usize,
     max_recv_data: usize,
 ) -> Result<ProverMpcOutput> {
-    // Session::new expects futures AsyncRead+AsyncWrite
     let session = Session::new(stream);
     let (driver, mut handle) = session.split();
     let driver_task = tokio::spawn(driver);
@@ -573,12 +554,11 @@ async fn run_with_remote_verifier(
 ) -> Result<(Attestation, Secrets)> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    // Generate random session ID
     let session_id: [u8; 16] = rand::random();
     let sid_hex = hex::encode(&session_id[..8]);
     eprintln!("[tlsn-prove] Session ID: {}", sid_hex);
 
-    // Connection 1: MPC Session
+    // Two-connection protocol: 'M' opens MPC, 'A' exchanges attestation after MPC closes.
     let mut mpc_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
     mpc_tcp.write_all(&[b'M']).await?;
     mpc_tcp.write_all(&session_id).await?;
@@ -586,23 +566,19 @@ async fn run_with_remote_verifier(
 
     eprintln!("[tlsn-prove] MPC connection established");
 
-    // Run prover (MPC session) — no oneshot channels, we handle attestation over TCP
     let prover_output = run_prover_mpc(mpc_tcp, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await?;
 
     eprintln!("[tlsn-prove] MPC complete, requesting attestation...");
 
-    // Connection 2: Attestation exchange
     let mut att_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
     att_tcp.write_all(&[b'A']).await?;
     att_tcp.write_all(&session_id).await?;
 
-    // Send AttestationRequest
     let req_bytes = bincode::serialize(&prover_output.request)?;
     att_tcp.write_all(&(req_bytes.len() as u32).to_be_bytes()).await?;
     att_tcp.write_all(&req_bytes).await?;
     att_tcp.flush().await?;
 
-    // Receive Attestation
     let mut len_buf = [0u8; 4];
     att_tcp.read_exact(&mut len_buf).await?;
     let att_len = u32::from_be_bytes(len_buf) as usize;
@@ -610,7 +586,6 @@ async fn run_with_remote_verifier(
     att_tcp.read_exact(&mut att_buf).await?;
     let attestation: Attestation = bincode::deserialize(&att_buf)?;
 
-    // Validate
     let provider = CryptoProvider::default();
     prover_output.request.validate(&attestation, &provider)?;
 
@@ -691,7 +666,6 @@ async fn run_prover_mpc(
 
     let mut prover = prover_task.await??;
 
-    // Configure commits
     let transcript = prover.transcript();
     let sent_len = transcript.sent().len();
     let recv_len = transcript.received().len();
@@ -705,7 +679,6 @@ async fn run_prover_mpc(
     req_builder.transcript_commit(transcript_commit);
     let request_config = req_builder.build()?;
 
-    // Prove phase
     let mut prove_builder = ProveConfig::builder(prover.transcript());
     if let Some(tc) = request_config.transcript_commit() {
         prove_builder.transcript_commit(tc.clone());
@@ -722,7 +695,6 @@ async fn run_prover_mpc(
     let tls_transcript = prover.tls_transcript().clone();
     prover.close().await?;
 
-    // Build attestation request
     let mut att_builder = AttestationRequest::builder(&request_config);
     att_builder
         .server_name(ServerName::Dns(host.try_into()?))
@@ -797,7 +769,6 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
         )
         .await?;
 
-    // Connect to the real target server
     let tcp = connect_target(host, port, socks_proxy).await?;
     eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
 
@@ -835,7 +806,6 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
 
     let prover = prover_task.await??;
 
-    // Configure transcript commits (reveal all sent/received data)
     let transcript = prover.transcript();
     let sent_len = transcript.sent().len();
     let recv_len = transcript.received().len();
@@ -849,7 +819,6 @@ async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
     builder.transcript_commit(transcript_commit);
     let request_config = builder.build()?;
 
-    // Run attestation protocol
     let (attestation, secrets) = attestation_protocol(prover, &request_config, host, req_tx, resp_rx).await?;
 
     handle.close();
@@ -965,7 +934,6 @@ async fn run_verifier<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
 
     let request = request_rx.await?;
 
-    // Generate a signing key for the attestation
     let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
     let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
     let mut provider = CryptoProvider::default();
@@ -1027,7 +995,6 @@ fn find_header_value_ranges(sent_bytes: &[u8], redact_names: &[String]) -> Vec<s
         if let Some(colon_pos) = line.find(':') {
             let name = line[..colon_pos].trim();
             let value_start_in_line = colon_pos + 1;
-            // Find where the actual value starts (skip leading space)
             let value_with_space = &line[value_start_in_line..];
             let trimmed_start = value_with_space.len() - value_with_space.trim_start().len();
             let value_byte_start = offset + value_start_in_line + trimmed_start;
@@ -1084,7 +1051,6 @@ fn build_presentation(
 
     let mut builder = secrets.transcript_proof_builder();
 
-    // Selective disclosure: redact specified header values from sent data
     let redact_ranges = find_header_value_ranges(sent_bytes, redact_sent_headers);
     if redact_ranges.is_empty() {
         builder.reveal_sent(&(0..sent_len))?;
@@ -1096,7 +1062,6 @@ fn build_presentation(
         eprintln!("[tlsn-prove] Selective disclosure: {} byte range(s) redacted from sent data", redact_ranges.len());
     }
 
-    // Reveal all received data (response headers + body are public)
     builder.reveal_recv(&(0..recv_len))?;
 
     let transcript_proof = builder.build()?;

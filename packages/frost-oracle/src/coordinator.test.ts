@@ -14,8 +14,6 @@ function makeConfig(overrides?: Partial<ThresholdOracleConfig>): ThresholdOracle
 }
 
 describe("FrostCoordinator", () => {
-  // --- DKG ---
-
   test("initDkg creates a session with correct config", () => {
     const coord = createFrostCoordinator();
     const session = coord.initDkg({ threshold: 2, total: 3 });
@@ -69,8 +67,6 @@ describe("FrostCoordinator", () => {
     expect(coord.getDkgSession("nonexistent")).toBeUndefined();
   });
 
-  // --- Signing ---
-
   test("startSigning creates session with correct config", () => {
     const coord = createFrostCoordinator();
     const config = makeConfig();
@@ -116,7 +112,6 @@ describe("FrostCoordinator", () => {
     const config = makeConfig();
     const session = coord.startSigning("q3", "msg", config);
 
-    // Manually finalize the session by modifying it
     const retrieved = coord.getSigningSession(session.session_id)!;
     retrieved.finalized = true;
 
@@ -141,7 +136,6 @@ describe("FrostCoordinator", () => {
     const config = makeConfig({ threshold: 2 });
     const session = coord.startSigning("q5", "msg", config);
 
-    // Submit only 1 share (below threshold of 2)
     coord.submitSignatureShare(session.session_id, "aaa", "share_aaa");
 
     const result = await coord.tryAggregate(session.session_id);

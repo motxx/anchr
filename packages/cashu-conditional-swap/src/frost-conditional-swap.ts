@@ -31,10 +31,6 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-swap"]);
 
-// ---------------------------------------------------------------------------
-// P2PK option builders
-// ---------------------------------------------------------------------------
-
 /**
  * Build P2PK options for party A's token (redeemable by B if outcome B wins).
  *
@@ -82,10 +78,6 @@ export function buildFrostSwapForPartyB(params: {
     .sigAll()
     .toOptions();
 }
-
-// ---------------------------------------------------------------------------
-// Dual Key Store — manages two keypairs per swap
-// ---------------------------------------------------------------------------
 
 /** A stored keypair entry for a conditional swap. */
 export interface DualKeyEntry {
@@ -179,7 +171,6 @@ export function createDualKeyStore(): DualKeyStore {
       const secret = outcome === "a" ? entry.secret_a : entry.secret_b;
       if (!secret) return null;
 
-      // Mark as signed — one-time operation, same as preimage reveal
       entry.signed = true;
 
       // Delete the losing side's secret key — irreversible
@@ -236,10 +227,6 @@ export function createDualKeyStore(): DualKeyStore {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Swap pair token creation
-// ---------------------------------------------------------------------------
 
 /**
  * Create both FROST P2PK escrow tokens for a matched pair.

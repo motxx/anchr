@@ -68,7 +68,6 @@ function generateSessionId(): string {
 export function createFrostCoordinator(): FrostCoordinator {
   const dkgSessions = new Map<string, DkgSession>();
   const signingSessions = new Map<string, FrostSigningSession>();
-  // queryId -> sessionId for lookup
   const querySessionMap = new Map<string, string>();
 
   return {
@@ -107,7 +106,6 @@ export function createFrostCoordinator(): FrostCoordinator {
       }
 
       if (round === 2) {
-        // packageJson contains the packages map for this signer
         const packages = JSON.parse(packageJson) as Record<string, string>;
         const pkgMap = new Map<number, string>();
         for (const [idx, pkg] of Object.entries(packages)) {
@@ -128,7 +126,6 @@ export function createFrostCoordinator(): FrostCoordinator {
       if (round === 3) {
         session.key_packages.set(signerIndex, packageJson);
 
-        // Parse group_pubkey and pubkey_package from the result
         try {
           const parsed = JSON.parse(packageJson);
           if (parsed.group_pubkey && !session.group_pubkey) {
@@ -191,7 +188,6 @@ export function createFrostCoordinator(): FrostCoordinator {
       if (!session || session.finalized) return null;
       if (session.signature_shares.size < session.config.threshold) return null;
 
-      // Collect commitments and shares as JSON maps
       const commitmentsObj: Record<string, string> = {};
       for (const [pk, c] of session.nonce_commitments) {
         commitmentsObj[pk] = c;

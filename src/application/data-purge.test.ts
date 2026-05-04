@@ -20,26 +20,21 @@ describe("data purge", () => {
   });
 
   test("purges expired queries from memory store", async () => {
-    // Create an expired query
     svc.createQuery(
       { description: "expired test query" },
       { ttlMs: -1 },
     );
-    // Create an active query
     const active = svc.createQuery(
       { description: "active test query" },
       { ttlMs: 60_000 },
     );
 
-    // Expire pending queries first
     const expired = svc.expireQueries();
     expect(expired).toBe(1);
 
-    // Purge expired
     const purged = svc.purgeExpiredFromStore();
     expect(purged).toHaveLength(1);
 
-    // Active query should still exist
     expect(svc.getQuery(active.id)).not.toBeNull();
   });
 

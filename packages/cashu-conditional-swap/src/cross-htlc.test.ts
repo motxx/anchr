@@ -66,11 +66,9 @@ test("party A and B use opposite hashes", () => {
     locktime: LOCKTIME,
   });
 
-  // Both should produce options but with different configurations
   expect(optsA).toBeTruthy();
   expect(optsB).toBeTruthy();
 
-  // Serialize to compare — they should differ because different hashes/pubkeys
   const strA = JSON.stringify(optsA);
   const strB = JSON.stringify(optsB);
   expect(strA).not.toBe(strB);
@@ -88,8 +86,6 @@ test("locktime and refund pubkey are set correctly", () => {
     locktime: LOCKTIME,
   });
 
-  // P2PKOptions structure includes locktime and refund keys
-  // The exact structure depends on cashu-ts P2PKBuilder output
   const serialized = JSON.stringify(opts);
   expect(serialized).toContain(refund);
   expect(serialized).toContain(counterparty);

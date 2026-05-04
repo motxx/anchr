@@ -36,13 +36,6 @@ export function toAttestationRecord(a: OracleAttestation): OracleAttestationReco
   };
 }
 
-/**
- * Verify a query result against one or more oracles.
- *
- * For single-oracle queries the `resolveOracle` callback picks the
- * appropriate oracle; for quorum queries the `resolveMultiple` callback
- * fetches several and a majority vote is applied.
- */
 export async function verifyWithQuorum(
   query: Query,
   result: QueryResult,
@@ -56,11 +49,9 @@ export async function verifyWithQuorum(
   const effectiveOracleId = query.oracle_ids?.length ? oracleId : undefined;
 
   if (!query.quorum) {
-    // Single oracle path — no quorum config supplied
     return verifySingleOracle(query, result, resolveOracle, effectiveOracleId, blossomKeys);
   }
 
-  // Multi-oracle quorum
   return verifyQuorum(query, result, resolveMultiple, blossomKeys);
 }
 
@@ -127,7 +118,6 @@ async function verifyQuorum(
 
   const passCount = records.filter((a) => a.passed).length;
   const passed = passCount >= query.quorum!.min_approvals;
-  // Use the first passing oracle's tlsn_verified data
   const firstPass = records.find((a) => a.passed);
   const allChecks = records.flatMap((a) => a.checks);
   const allFailures = records.flatMap((a) => a.failures);

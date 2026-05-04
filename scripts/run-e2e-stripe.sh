@@ -15,7 +15,6 @@ LOGS_DIR="/tmp/anchr-e2e-logs"
 rm -rf "$LOGS_DIR"
 mkdir -p "$LOGS_DIR"
 
-# Track background PIDs for cleanup
 PIDS=()
 cleanup() {
   echo ""
@@ -32,7 +31,6 @@ echo "=========================================="
 echo " Anchr · Stripe E2E (Clean Start)"
 echo "=========================================="
 
-# --- Preflight checks ---
 if [ ! -f crates/tlsn-prover/target/release/tlsn-prove ]; then
   echo "[error] TLSNotary prover not found. Build first:"
   echo "  cd crates/tlsn-prover && cargo build --release"
@@ -49,9 +47,7 @@ if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
   exit 1
 fi
 
-# ============================================================
-# 0. Kill any existing Anchr server (in-memory store = stale data)
-# ============================================================
+# In-memory store = stale data, so kill any existing Anchr server.
 if lsof -ti:3000 >/dev/null 2>&1; then
   echo ""
   echo "[0] Killing existing process on port 3000..."
@@ -60,14 +56,10 @@ if lsof -ti:3000 >/dev/null 2>&1; then
   echo "  ✓ Port 3000 freed"
 fi
 
-# ============================================================
-# 1. Clean slate — remove containers + volumes
-# ============================================================
 echo ""
 echo "[1/6] Tearing down containers + volumes (fresh DB)..."
 docker compose down -v 2>/dev/null || true
 
-# Verify no leftover containers
 REMAINING=$(docker compose ps -q 2>/dev/null | wc -l | tr -d ' ')
 if [ "$REMAINING" != "0" ]; then
   echo "  ⚠ $REMAINING containers still running, force removing..."
@@ -75,7 +67,6 @@ if [ "$REMAINING" != "0" ]; then
   docker compose down -v --remove-orphans 2>/dev/null || true
 fi
 
-# Verify volumes are gone
 for vol in anchr_relay-data anchr_blossom-data anchr_bitcoin-data anchr_lnd-mint-data anchr_lnd-user-data; do
   if docker volume inspect "$vol" >/dev/null 2>&1; then
     echo "  ⚠ Removing leftover volume $vol..."
@@ -84,14 +75,10 @@ for vol in anchr_relay-data anchr_blossom-data anchr_bitcoin-data anchr_lnd-mint
 done
 echo "  ✓ All containers stopped, volumes removed"
 
-# ============================================================
-# 2. Start all containers
-# ============================================================
 echo ""
 echo "[2/6] Starting containers..."
 docker compose up -d
 
-# Verify all containers are actually running
 echo "  Waiting for containers to be ready..."
 EXPECTED_SERVICES="bitcoind blossom cashu-mint lnd-mint lnd-user relay tlsn-verifier"
 for attempt in $(seq 1 30); do
@@ -115,9 +102,6 @@ for attempt in $(seq 1 30); do
 done
 echo "  ✓ All 7 containers running"
 
-# ============================================================
-# 3. Stream container logs (per-service + combined)
-# ============================================================
 echo ""
 echo "[3/6] Starting container log streams..."
 
@@ -127,7 +111,6 @@ for svc in "${SERVICES[@]}"; do
   PIDS+=($!)
 done
 
-# Combined log
 docker compose logs -f --tail=0 > "$LOGS_DIR/all.log" 2>&1 &
 PIDS+=($!)
 
@@ -142,9 +125,6 @@ echo "  │  tail -f $LOGS_DIR/lnd-user.log       │"
 echo "  │  tail -f $LOGS_DIR/tlsn-verifier.log  │"
 echo "  └────────────────────────────────────────┘"
 
-# ============================================================
-# 4. Init regtest Lightning network
-# ============================================================
 echo ""
 echo "[4/6] Waiting for LND nodes to start (25s)..."
 sleep 25
@@ -152,23 +132,16 @@ sleep 25
 echo "[4/6] Initializing regtest Lightning network..."
 ./scripts/init-regtest.sh
 
-# Restart cashu-mint so it picks up the funded LND
 echo "[4/6] Restarting cashu-mint (needs funded LND)..."
 docker compose restart cashu-mint
 sleep 5
 
-# ============================================================
-# 5. Show container health
-# ============================================================
 echo ""
 echo "[5/6] Container status:"
 echo "  ──────────────────────────────────────────"
 docker compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null || docker compose ps
 echo "  ──────────────────────────────────────────"
 
-# ============================================================
-# 6. Start Anchr server + run E2E
-# ============================================================
 echo ""
 echo "[6/6] Starting Anchr server..."
 
@@ -179,7 +152,6 @@ deno run --watch --allow-all --env src/infrastructure/server.ts > "$LOGS_DIR/anc
 ANCHR_PID=$!
 PIDS+=($ANCHR_PID)
 
-# Wait for server to be ready
 echo "  Waiting for Anchr server..."
 for i in $(seq 1 15); do
   if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
@@ -195,7 +167,6 @@ done
 
 echo "  Anchr server logs → $LOGS_DIR/anchr-server.log"
 
-# Run the E2E
 echo ""
 echo "=========================================="
 echo " Running Stripe E2E..."
