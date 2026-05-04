@@ -7,16 +7,12 @@ import { verifyToken } from "@anchr/core-cashu/wallet";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import type { DataListing, MarketplaceEnv, PaymentInfo } from "./types.ts";
 
-/** Set of token hashes already seen (defense-in-depth replay detection). */
 const seenTokens = new Set<string>();
 
 function sha256Hex(data: string): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
-/**
- * Build a 402 Payment Required response with pricing headers.
- */
 function build402Response(listing: DataListing) {
   const config = getCashuConfig();
   const mintUrl = config?.mintUrl ?? "not-configured";
@@ -44,11 +40,6 @@ function build402Response(listing: DataListing) {
   );
 }
 
-/**
- * Create payment middleware that resolves the listing from the route param.
- *
- * On success, sets `c.set("paymentInfo", PaymentInfo)` for downstream handlers.
- */
 export function createPaymentMiddleware(
   resolveListing: (id: string) => DataListing | null,
 ): MiddlewareHandler<MarketplaceEnv> {
@@ -66,7 +57,6 @@ export function createPaymentMiddleware(
       return c.json({ error: "Listing is no longer active" }, 410);
     }
 
-    // --- Check for HTLC mode ---
     const escrowToken = c.req.header("x-cashu-htlc");
     if (escrowToken) {
       const htlcHash = c.req.header("x-htlc-hash");
@@ -107,7 +97,6 @@ export function createPaymentMiddleware(
       return next();
     }
 
-    // --- Check for direct X-Cashu mode ---
     const directToken = c.req.header("x-cashu");
     if (directToken) {
       const tokenHash = sha256Hex(directToken);
@@ -142,12 +131,10 @@ export function createPaymentMiddleware(
       return next();
     }
 
-    // --- No payment → 402 ---
     return build402Response(listing);
   };
 }
 
-/** Visible for testing — clear the replay detection set. */
 export function _clearSeenTokensForTest(): void {
   seenTokens.clear();
 }

@@ -205,14 +205,13 @@ test("Customer.request calls oracleClient.requestHash", async () => {
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(); // wire flow continues but later steps not impl
+  ).rejects.toThrow();
 
   expect(receivedQueryId).toMatch(/^query_\d+_[a-z0-9]+$/);
 });
 
 test("Customer.request rejects when oracleClient returns a pubkey not matching the picked oracle", async () => {
   const oracleClient = makeOracleClient({ fixedOracle: ORACLE_B });
-  // Customer's whitelist[0] is ORACLE_A; oracleClient claims to be ORACLE_B.
   const customer = createCustomer({
     ...validOptions(),
     oracles: [ORACLE_A],
@@ -229,9 +228,6 @@ test("Customer.request rejects when oracleClient returns a pubkey not matching t
 });
 
 test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", async () => {
-  // Wrapper object — TypeScript narrows property access through closures
-  // more reliably than free `let` variables (which get stuck on the
-  // initial-assignment type).
   const recorder: { params: BuildHtlcLockParams | null } = { params: null };
   const cashuClient = makeCashuClient({
     buildHtlcLock: async (params: BuildHtlcLockParams): Promise<CashuToken> => {
@@ -247,7 +243,7 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
       payment: { maxAmount: 1234 },
       sourceProofs: [{ id: "proof1" }],
     }),
-  ).rejects.toThrow(); // wire flow continues but later steps not impl
+  ).rejects.toThrow();
 
   expect(recorder.params).not.toBe(null);
   if (recorder.params === null) throw new Error("unreachable");
@@ -274,7 +270,6 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
 });
 
 test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the window", async () => {
-  // Default mock subscribe delivers no events; quoteWindowMs=10ms is plenty short.
   const customer = createCustomer({ ...validOptions(), quoteWindowMs: 10 });
   await expect(
     customer.request({
@@ -318,7 +313,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     publish: async (event: Event): Promise<PublishResult> => {
       if (event.kind === 5300) {
         requestEventId.id = event.id;
-        // Sniff the customer's ephemeral pubkey from the request event.
         customerEphemeralPubkey.value = event.pubkey;
       }
       return { successes: ["wss://relay.example.org"], failures: [] };
@@ -326,7 +320,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       const filterKinds = filter.kinds ?? [];
       if (filterKinds.includes(7000)) {
-        // Quote subscription — deliver one quote.
         queueMicrotask(() => {
           const id = requestEventId.id ?? "unknown";
           onEvent(buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
@@ -336,7 +329,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
           }));
         });
       } else if (filterKinds.includes(6300)) {
-        // Result subscription — deliver an encrypted-to-customer result.
         queueMicrotask(() => {
           const id = requestEventId.id ?? "unknown";
           const customerPub = customerEphemeralPubkey.value ?? "00".repeat(32);
@@ -507,7 +499,6 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
           }));
         });
       }
-      // Never deliver a kind 6300 result.
       return { close: () => {} };
     },
   });
@@ -542,9 +533,6 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
-      // The customer subscribes with an `#e` filter referencing the
-      // request event. Synchronously deliver two quotes (cheaper one
-      // should win) once the subscription is opened.
       queueMicrotask(() => {
         const requestId = requestEventRecorder.id ?? "unknown";
         const quoteA = buildQuoteFeedbackEvent(providerA, requestId, "00".repeat(32), {

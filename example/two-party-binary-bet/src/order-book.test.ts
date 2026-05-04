@@ -56,7 +56,6 @@ test("cancelOrder removes the order", async () => {
   expect(await ob.cancelOrder(order.id)).toBe(true);
   expect((await ob.getOpenOrders(MARKET_ID)).length).toBe(0);
 
-  // Cancel non-existent
   expect(await ob.cancelOrder("nonexistent")).toBe(false);
 });
 
@@ -85,7 +84,6 @@ test("matchOrders: partial match (100 YES vs 50 NO)", async () => {
   expect(matches.length).toBe(1);
   expect(matches[0]!.amount_sats).toBe(50);
 
-  // YES order has 50 remaining
   const remaining = await ob.getOpenOrders(MARKET_ID, "yes");
   expect(remaining[0]!.remaining_sats).toBe(50);
 });
@@ -101,7 +99,6 @@ test("matchOrders: partial match (50 YES vs 100 NO)", async () => {
   expect(matches.length).toBe(1);
   expect(matches[0]!.amount_sats).toBe(50);
 
-  // NO order has 50 remaining
   const remaining = await ob.getOpenOrders(MARKET_ID, "no");
   expect(remaining[0]!.remaining_sats).toBe(50);
 });
@@ -129,7 +126,6 @@ test("matchOrders: FIFO order — earliest matched first", async () => {
 
   const matches = await ob.matchOrders(MARKET_ID);
   expect(matches.length).toBe(1);
-  // First YES order (earliest timestamp) should be matched
   expect(matches[0]!.yes_order_id).toBe(yes1.id);
 });
 
@@ -147,6 +143,6 @@ test("matchOrders: multiple matches across orders", async () => {
 
   const matches = await ob.matchOrders(MARKET_ID);
   expect(matches.length).toBe(2);
-  expect(matches[0]!.amount_sats).toBe(60); // Full no1
-  expect(matches[1]!.amount_sats).toBe(40); // Partial no2
+  expect(matches[0]!.amount_sats).toBe(60);
+  expect(matches[1]!.amount_sats).toBe(40);
 });

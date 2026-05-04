@@ -63,9 +63,9 @@ export async function createPostgresOrderBook(
   opts: PostgresOrderBookOpts,
 ): Promise<PostgresOrderBook> {
   const sql = postgres(opts.connectionUrl, {
+    // postgres-js's BigInt return for BIGINT is intentional — JS Number can't
+    // hold 64-bit sats safely.
     max: opts.maxConnections ?? 10,
-    // postgres-js returns BigInt for BIGINT columns by default, which is what
-    // we want — JS Number can't hold 64-bit sats reliably.
   });
 
   // Smoke-test the connection so misconfiguration fails fast at startup.
@@ -116,8 +116,6 @@ export async function createPostgresOrderBook(
     },
 
     matchOrders(market_id: string): Promise<MatchProposal[]> {
-      // sql.begin runs the callback inside a transaction; tx is a tagged
-      // template bound to that transaction. Locks held until commit/rollback.
       return sql.begin(async (tx: TransactionSql<Record<string, never>>): Promise<MatchProposal[]> => {
         const yesRows = await tx<OrderRow[]>`
           SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts
@@ -169,7 +167,6 @@ export async function createPostgresOrderBook(
           }
         }
 
-        // Persist only the orders whose remaining_sats actually changed.
         for (const order of [...yesOrders, ...noOrders]) {
           if (!changed.has(order.id)) continue;
           await tx`

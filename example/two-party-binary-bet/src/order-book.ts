@@ -48,7 +48,6 @@ export function createInMemoryOrderBook(): OrderBook {
         if (side && o.side !== side) continue;
         result.push(o);
       }
-      // FIFO: sort by timestamp ascending
       result.sort((a, b) => a.timestamp - b.timestamp);
       return Promise.resolve(result);
     },
