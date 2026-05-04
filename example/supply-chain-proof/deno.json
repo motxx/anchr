@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["esnext", "deno.ns", "dom"],
+    "strict": true
+  },
+  "imports": {
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
+  "tasks": {
+    "demo:coffee": "deno run --allow-all src/demo-coffee.ts",
+    "verify": "deno run --allow-all src/chain-verifier.ts"
+  }
+}

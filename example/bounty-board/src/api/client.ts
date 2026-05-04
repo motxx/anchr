@@ -7,9 +7,11 @@ import type {
   BlossomKeyMap,
   CreateQueryRequest,
   QuoteInfo,
-} from "./types";
-import { useSettingsStore } from "../store/settings";
-import { useAuthStore } from "../store/auth";
+} from "./types.ts";
+// Side-effect import: augments FormData.append with the RN { uri, name, type } overload.
+import "../types/rn-formdata.d.ts";
+import { useSettingsStore } from "../store/settings.ts";
+import { useAuthStore } from "../store/auth.ts";
 
 function getBaseUrl(): string {
   return useSettingsStore.getState().serverUrl;
@@ -62,7 +64,7 @@ export async function uploadPhoto(
     uri: fileUri,
     name: filename,
     type: mimeType,
-  } as unknown as Blob);
+  });
 
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/upload`, {
     method: "POST",
@@ -87,11 +89,11 @@ export async function submitQuote(queryId: string, amountSats?: number): Promise
   return res.json();
 }
 
-export async function selectWorker(queryId: string, workerPubkey: string, htlcToken?: string): Promise<{ ok: boolean }> {
+export async function selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<{ ok: boolean }> {
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/select`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ worker_pubkey: workerPubkey, htlc_token: htlcToken }),
+    body: JSON.stringify({ worker_pubkey: workerPubkey, htlc_token: escrowToken }),
   });
   if (!res.ok) throw new Error(`Select failed: ${res.status}`);
   return res.json();
@@ -103,12 +105,21 @@ export async function submitResult(
   notes: string,
   encryptionKeys?: BlossomKeyMap,
 ): Promise<SubmitResponse> {
-  const body: Record<string, unknown> = { attachments, notes };
+  const { publicKey } = useAuthStore.getState();
+  if (!publicKey) {
+    throw new Error("Worker pubkey is required to submit a result. Sign in first.");
+  }
+
+  const body: Record<string, unknown> = {
+    worker_pubkey: publicKey,
+    attachments,
+    notes,
+  };
   if (encryptionKeys && Object.keys(encryptionKeys).length > 0) {
     body.encryption_keys = encryptionKeys;
   }
 
-  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/submit`, {
+  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/result`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),

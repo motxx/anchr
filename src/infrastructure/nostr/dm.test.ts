@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "./identity";
-import { buildPreimageDM, buildRejectionDM, parseOracleDM, DM_KIND } from "./dm";
+import { generateEphemeralIdentity } from "./identity.ts";
+import { buildPreimageDM, buildRejectionDM, parseOracleDM, DM_KIND } from "./dm.ts";
 
 describe("NIP-44 DM (Oracle ↔ Worker)", () => {
   test("buildPreimageDM creates kind 4 encrypted DM", () => {

@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-commit backstops.
+# Enable with: deno task setup:hooks
+# (which runs `git config core.hooksPath scripts/git-hooks`)
+set -e
+deno task lint:arch --errors-only
+deno task lint:paths
+deno task lint:deprecation
+deno task lint:invariants
+deno task lint:types
+# Scan commit message for local paths once git has written it out.
+# (Message-body scanning handled by commit-msg hook if present.)

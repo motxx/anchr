@@ -3,8 +3,15 @@
  * as an Oracle interface so it can be used seamlessly in the registry.
  */
 
-import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types";
-import type { Oracle, OracleAttestation, OracleInfo } from "./types";
+import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types.ts";
+import type { Oracle, OracleAttestation, OracleInfo } from "./types.ts";
+import {
+  isRecord,
+  optionalNumber,
+  optionalStringArray,
+  requireBoolean,
+  requireStringArray,
+} from "../lib/runtime-types.ts";
 
 export interface HttpOracleConfig {
   id: string;
@@ -60,20 +67,18 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
           throw new Error(`Oracle ${config.id} returned ${response.status}: ${text}`);
         }
 
-        const attestation = (await response.json()) as OracleAttestation;
-
-        // Ensure the attestation has required fields
-        if (typeof attestation.passed !== "boolean" || !Array.isArray(attestation.checks)) {
-          throw new Error(`Oracle ${config.id} returned malformed attestation`);
+        const json: unknown = await response.json();
+        if (!isRecord(json)) {
+          throw new Error(`Oracle ${config.id} returned malformed attestation (not an object)`);
         }
 
         return {
           oracle_id: config.id,
           query_id: query.id,
-          passed: attestation.passed,
-          checks: attestation.checks,
-          failures: attestation.failures ?? [],
-          attested_at: attestation.attested_at ?? Date.now(),
+          passed: requireBoolean(json, "passed"),
+          checks: requireStringArray(json, "checks"),
+          failures: optionalStringArray(json, "failures"),
+          attested_at: optionalNumber(json, "attested_at") ?? Date.now(),
         };
       } finally {
         clearTimeout(timeout);

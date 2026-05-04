@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity, restoreIdentity } from "./identity";
+import { generateEphemeralIdentity, restoreIdentity } from "./identity.ts";
 
 describe("Nostr identity", () => {
   test("generates unique ephemeral identities", () => {

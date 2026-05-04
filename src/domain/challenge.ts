@@ -4,10 +4,18 @@ import { randomBytes } from "node:crypto";
 const NONCE_CHARS = "ABCDEFGHJKLMNPQRTUVWXY2346789";
 
 export function generateNonce(length = 6): string {
-  const bytes = randomBytes(length);
+  const charCount = NONCE_CHARS.length;
+  // Rejection sampling: discard values >= largest multiple of charCount
+  // that fits in a byte to eliminate modulo bias.
+  const limit = 256 - (256 % charCount);
   let result = "";
-  for (let i = 0; i < length; i++) {
-    result += NONCE_CHARS[bytes[i]! % NONCE_CHARS.length];
+  while (result.length < length) {
+    const bytes = randomBytes(length - result.length);
+    for (const b of bytes) {
+      if (b < limit && result.length < length) {
+        result += NONCE_CHARS[b % charCount];
+      }
+    }
   }
   return result;
 }

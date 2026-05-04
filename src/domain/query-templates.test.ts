@@ -1,7 +1,7 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { queryTemplates } from "./query-templates";
-import type { QueryInput } from "./types";
+import { queryTemplates } from "./query-templates.ts";
+import type { QueryInput } from "./types.ts";
 
 // --- photoProof ---
 

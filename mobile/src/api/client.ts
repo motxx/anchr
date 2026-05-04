@@ -6,6 +6,8 @@ import type {
   AttachmentRef,
   BlossomKeyMap,
 } from "./types";
+// Side-effect import: augments FormData.append with the RN { uri, name, type } overload.
+import "../types/rn-formdata.d.ts";
 import { useSettingsStore } from "../store/settings";
 
 function getBaseUrl(): string {
@@ -46,7 +48,7 @@ export async function uploadPhoto(
     uri: fileUri,
     name: filename,
     type: mimeType,
-  } as unknown as Blob);
+  });
 
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/upload`, {
     method: "POST",
@@ -66,16 +68,25 @@ export async function uploadPhoto(
 
 export async function submitResult(
   queryId: string,
+  workerPubkey: string,
   attachments: AttachmentRef[],
   notes: string,
   encryptionKeys?: BlossomKeyMap,
 ): Promise<SubmitResponse> {
-  const body: Record<string, unknown> = { attachments, notes };
+  if (!workerPubkey) {
+    throw new Error("workerPubkey is required to submit a result.");
+  }
+
+  const body: Record<string, unknown> = {
+    worker_pubkey: workerPubkey,
+    attachments,
+    notes,
+  };
   if (encryptionKeys && Object.keys(encryptionKeys).length > 0) {
     body.encryption_keys = encryptionKeys;
   }
 
-  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/submit`, {
+  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/result`, {
     method: "POST",
     headers: {
       ...getHeaders(),

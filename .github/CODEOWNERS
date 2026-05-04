@@ -1,0 +1,5 @@
+# Require review for CI/CD and security-sensitive files
+.github/ @motxx
+Dockerfile @motxx
+docker-compose.yml @motxx
+*.toml @motxx

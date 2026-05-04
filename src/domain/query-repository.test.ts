@@ -1,22 +1,10 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createInMemoryQueryRepository, toRepository } from "./query-repository";
-import { createQueryStore } from "./query-store";
-import type { Query } from "./types";
-import type { QueryRepository } from "./query-repository";
-
-function makeQuery(overrides?: Partial<Query>): Query {
-  return {
-    id: `q_${Math.random().toString(36).slice(2)}`,
-    status: "pending",
-    description: "Test",
-    verification_requirements: ["gps", "ai_check"],
-    created_at: Date.now(),
-    expires_at: Date.now() + 600_000,
-    payment_status: "locked",
-    ...overrides,
-  };
-}
+import { createInMemoryQueryRepository, toRepository } from "./query-repository.ts";
+import { createQueryStore } from "./query-store.ts";
+import type { Query } from "./types.ts";
+import type { QueryRepository } from "./query-repository.ts";
+import { makeQuery } from "../testing/factories.ts";
 
 function runRepositoryTests(name: string, factory: () => QueryRepository) {
   describe(name, () => {

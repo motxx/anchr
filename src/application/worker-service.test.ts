@@ -1,10 +1,10 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { DiscoveredQuery, WorkerConfig } from "./worker-service";
+import type { DiscoveredQuery, WorkerConfig } from "../infrastructure/nostr/worker-service.ts";
 import {
   parseQueryRequestPayload,
   type QueryRequestPayload,
-} from "../infrastructure/nostr/events";
+} from "../infrastructure/nostr/events.ts";
 
 /**
  * Worker service tests — focuses on the pure logic that can be tested

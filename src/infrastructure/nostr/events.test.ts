@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "./identity";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildQueryRequestEvent,
   buildQueryResponseEvent,
@@ -15,11 +15,10 @@ import {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
   ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_SETTLEMENT,
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events";
+} from "./events.ts";
 
 describe("Nostr events (NIP-90 DVM)", () => {
   test("builds and parses QueryRequest event with DVM tags", () => {
@@ -98,7 +97,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
         attachments: [{
           blossom_hash: "sha256:deadbeef",
           blossom_urls: ["https://blossom.example/deadbeef"],
-          decrypt_key: "0123456789abcdef",
+          decrypt_key_requester: "0123456789abcdef",
           decrypt_iv: "aabbccdd00112233",
           mime: "image/jpeg",
         }],
@@ -132,11 +131,11 @@ describe("Nostr events (NIP-90 DVM)", () => {
       worker.publicKey,
       {
         status: "accepted",
-        cashu_token: "cashuAbc123...",
+        escrow_token: "cashuAbc123...",
       },
     );
 
-    expect(settlement.kind).toBe(ANCHR_QUERY_SETTLEMENT);
+    expect(settlement.kind).toBe(ANCHR_QUERY_FEEDBACK);
 
     // Check tags
     const eTags = settlement.tags.filter((t) => t[0] === "e");
@@ -151,7 +150,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       requester.publicKey,
     );
     expect(parsed.status).toBe("accepted");
-    expect(parsed.cashu_token).toBe("cashuAbc123...");
+    expect(parsed.escrow_token).toBe("cashuAbc123...");
   });
 
   test("QueryResponse includes oracle_payload when oraclePubKey provided", () => {

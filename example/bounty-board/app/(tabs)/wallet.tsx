@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { View, ScrollView, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSButton, DSInput, DSSection, DSCard, DSFeedbackBanner } from "../../src/components/ds";
-import { BalanceCard } from "../../src/components/wallet/BalanceCard";
-import { TransactionList } from "../../src/components/wallet/TransactionList";
-import { useWallet } from "../../src/hooks/useWallet";
+import { DSText, DSButton, DSInput, DSSection, DSCard, DSFeedbackBanner } from "../../src/components/ds/index.ts";
+import { BalanceCard } from "../../src/components/wallet/BalanceCard.tsx";
+import { TransactionList } from "../../src/components/wallet/TransactionList.tsx";
+import { useWallet } from "../../src/hooks/useWallet.ts";
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();

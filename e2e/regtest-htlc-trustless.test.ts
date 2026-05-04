@@ -25,7 +25,6 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
 import {
   Wallet,
   type Proof,
@@ -34,85 +33,20 @@ import {
   P2PKBuilder,
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { redeemHtlcToken, verifyHtlcProofs } from "../src/infrastructure/cashu/escrow";
+import { redeemHtlcToken, verifyHtlcProofs } from "@anchr/core-cashu/escrow";
+import {
+  checkInfraReady,
+  createWallet as createRegtestWallet,
+  throttledMintProofs,
+  throttleMintOp,
+  retryOnRateLimit,
+  generateKeypair,
+} from "./helpers/regtest.ts";
+import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const AMOUNT_SATS = 64;
-
-// --- Infrastructure helpers ---
-
-async function isCashuMintReachable(): Promise<boolean> {
-  try {
-    const res = await fetch(`${MINT_URL}/v1/info`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function isLndUserReachable(): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "getinfo",
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "payinvoice", "--force", bolt11,
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-// --- Crypto helpers ---
-
-function generateKeypair() {
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
-  return { secretKey: bytesToHex(sk), publicKey: pk };
-}
-
-// --- Mint helpers ---
-
-async function createWallet(): Promise<Wallet> {
-  const wallet = new Wallet(MINT_URL, { unit: "sat" });
-  await wallet.loadMint();
-  return wallet;
-}
-
-async function mintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
-  const mintQuote = await wallet.createMintQuote(amountSats);
-  const paid = await payInvoiceViaLndUser(mintQuote.request);
-  if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-  await new Promise(r => setTimeout(r, 2000));
-  return wallet.mintProofs(amountSats, mintQuote.quote);
-}
-
-// Rate-limit mintProofs calls to avoid hitting the Nutshell mint's built-in
-// rate limiter (18+ tests each calling 3+ Cashu API calls).
-let lastMintTime = 0;
-async function throttledMintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
-  const elapsed = Date.now() - lastMintTime;
-  if (elapsed < 1000) await new Promise(r => setTimeout(r, 1000 - elapsed));
-  lastMintTime = Date.now();
-  return mintProofs(wallet, amountSats);
-}
 
 /**
  * Create HTLC-locked proofs on the real Cashu Mint.
@@ -144,10 +78,10 @@ async function createHtlcProofs(
   const sendAmount = amountSats - fee;
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
-  const { send } = await wallet.ops
-    .send(sendAmount, sourceProofs)
-    .asP2PK(p2pkOptions)
-    .run();
+  await throttleMintOp();
+  const { send } = await retryOnRateLimit(() =>
+    wallet.ops.send(sendAmount, sourceProofs).asP2PK(p2pkOptions).run()
+  );
 
   return send;
 }
@@ -187,11 +121,12 @@ async function attemptRedeem(
   privateKey: string | undefined,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     // 1. Build witness
     // - With preimage: receiver path (preimage + signatures)
     // - With key but no preimage: refund path (signatures only)
     // - Neither: no witness at all
-    let proofsWithWitness = htlcProofs.map((p) => ({
+    const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: preimage
         ? JSON.stringify({ preimage, signatures: [] })
@@ -231,8 +166,10 @@ async function attemptRedeem(
     }
 
     const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
-    // Return signature count as proxy for success (we don't unblind here)
-    return signatures as unknown as Proof[];
+    // Mint returned blinded signatures. We never unblind here — the redeem-attempt
+    // helper uses these only as a "swap accepted" proxy (length / non-null check).
+    // Map to the structurally-compatible Proof shape (placeholder secret + C field).
+    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-attempt] Error: ${msg}`);
@@ -242,16 +179,7 @@ async function attemptRedeem(
 
 // --- Infrastructure readiness (top-level await for test.skipIf) ---
 
-const [MINT_REACHABLE, LND_REACHABLE] = await Promise.all([
-  isCashuMintReachable(),
-  isLndUserReachable(),
-]);
-const INFRA_READY = MINT_REACHABLE && LND_REACHABLE;
-
-if (!INFRA_READY) {
-  console.warn("[e2e] Infrastructure not ready – tests will be skipped.");
-  console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
-}
+const INFRA_READY = await checkInfraReady(MINT_URL);
 
 // =============================================================================
 
@@ -260,7 +188,7 @@ const suite = INFRA_READY ? describe : describe.ignore;
 // Create wallet at module level before describes register.
 // This ensures loadMint() fetch responses are fully consumed
 // before any test scope begins (avoids Deno sanitizer false positives).
-const sharedWallet = INFRA_READY ? await createWallet() : undefined;
+const sharedWallet = INFRA_READY ? await createRegtestWallet(MINT_URL) : undefined;
 
 suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   const wallet = sharedWallet!;
@@ -357,10 +285,10 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
@@ -389,10 +317,10 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
-    const { send: first } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: first } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
     expect(first).not.toBeNull();
 
     // Second redemption with same proofs via direct Mint call: MUST reject
@@ -449,6 +377,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 8. Refund path BEFORE locktime (Requester tries early refund)
   // ---------------------------------------------------------------------------
 
+  // INV-03: Requester can't unlock escrow before timeout
   test("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
@@ -492,10 +421,10 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     }));
     const totalSats = proofsForRefund.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsForRefund);
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsForRefund)
-      .privkey(requester.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsForRefund).privkey(requester.secretKey).run()
+    );
 
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);

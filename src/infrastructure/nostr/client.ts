@@ -9,16 +9,16 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "./events";
-import { DM_KIND } from "./dm";
-import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation";
+import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "./events.ts";
+import { DM_KIND } from "./dm.ts";
+import { ANCHR_ORACLE_ATTESTATION } from "./oracle-attestation.ts";
 
 export interface NostrClientConfig {
   relayUrls: string[];
 }
 
 export function getNostrConfig(): NostrClientConfig | null {
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",")
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",")
     .map((url) => url.trim())
     .filter(Boolean);
 
@@ -38,10 +38,14 @@ function getPool(): SimplePool {
 
 /**
  * Publish an event to all configured relays.
+ *
+ * When `options.minSuccesses` is set, throws if fewer relays
+ * than the threshold accepted the event.
  */
 export async function publishEvent(
   event: VerifiedEvent,
   relayUrls?: string[],
+  options?: { minSuccesses?: number },
 ): Promise<{ successes: string[]; failures: string[] }> {
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls;
@@ -54,7 +58,7 @@ export async function publishEvent(
   const failures: string[] = [];
 
   const results = await Promise.allSettled(
-    pool.publish(urls, event as unknown as Event),
+    pool.publish(urls, event),
   );
 
   for (let i = 0; i < results.length; i++) {
@@ -64,6 +68,15 @@ export async function publishEvent(
     } else {
       failures.push(`${urls[i]}: ${result.reason}`);
     }
+  }
+
+  if (
+    options?.minSuccesses !== undefined &&
+    successes.length < options.minSuccesses
+  ) {
+    throw new Error(
+      `publishEvent failed: ${successes.length} relay(s) succeeded, but at least ${options.minSuccesses} required`,
+    );
   }
 
   return { successes, failures };

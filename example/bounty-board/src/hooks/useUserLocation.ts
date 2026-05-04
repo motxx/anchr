@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { locationProvider } from "../platform/location";
-import type { GpsCoord } from "../api/types";
+import { locationProvider } from "../platform/location.ts";
+import type { GpsCoord } from "../api/types.ts";
 
 export function useUserLocation() {
   const [location, setLocation] = useState<GpsCoord | null>(null);

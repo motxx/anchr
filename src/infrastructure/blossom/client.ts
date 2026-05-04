@@ -16,14 +16,17 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { finalizeEvent, type EventTemplate } from "nostr-tools";
-import type { NostrIdentity } from "../nostr/identity";
+import type { NostrIdentity } from "../nostr/identity.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "blossom"]);
 
 export interface BlossomConfig {
   serverUrls: string[];
 }
 
 export function getBlossomConfig(): BlossomConfig | null {
-  const urls = process.env.BLOSSOM_SERVERS?.split(",")
+  const urls = Deno.env.get("BLOSSOM_SERVERS")?.split(",")
     .map((u) => u.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
@@ -163,11 +166,11 @@ export async function uploadToBlossom(
         body: encrypted.buffer as ArrayBuffer,
       });
 
+      await response.body?.cancel();
       if (response.ok) {
         successUrls.push(`${serverUrl}/${hash}`);
       } else {
-        console.error(
-          `[blossom] Upload to ${serverUrl} failed: ${response.status}`,
+        log.error(`Upload to ${serverUrl} failed: ${response.status}`,
         );
       }
     }),
@@ -186,34 +189,51 @@ export async function uploadToBlossom(
 
 /**
  * Download and decrypt a blob from Blossom servers.
+ *
+ * Retries the entire server list up to `maxRetries` times (default 3)
+ * with a delay of `retryDelayMs` ms (default 5000) between attempts.
  */
 export async function downloadFromBlossom(
   hash: string,
   encryptKey: string,
   encryptIv: string,
   serverUrls?: string[],
+  options?: { maxRetries?: number; retryDelayMs?: number },
 ): Promise<Uint8Array | null> {
   const config = getBlossomConfig();
   const urls = serverUrls ?? config?.serverUrls;
   if (!urls || urls.length === 0) return null;
 
+  const maxRetries = options?.maxRetries ?? 3;
+  const retryDelayMs = options?.retryDelayMs ?? 5000;
+
   const { hexToBytes } = await import("@noble/hashes/utils.js");
 
-  // Try each server until we get the blob
-  for (const serverUrl of urls) {
-    try {
-      const response = await fetch(`${serverUrl}/${hash}`);
-      if (!response.ok) continue;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    // Try each server until we get the blob
+    for (const serverUrl of urls) {
+      try {
+        const response = await fetch(`${serverUrl}/${hash}`);
+        if (!response.ok) continue;
 
-      const encrypted = new Uint8Array(await response.arrayBuffer());
-      const key = hexToBytes(encryptKey);
-      const iv = hexToBytes(encryptIv);
+        const encrypted = new Uint8Array(await response.arrayBuffer());
+        const key = hexToBytes(encryptKey);
+        const iv = hexToBytes(encryptIv);
 
-      return await decryptBlob(encrypted, key, iv);
-    } catch {
-      continue;
+        return await decryptBlob(encrypted, key, iv);
+      } catch {
+        continue;
+      }
+    }
+
+    if (attempt < maxRetries) {
+      log.warn(`Download attempt ${attempt}/${maxRetries} failed for ${hash}, retrying in ${retryDelayMs}ms...`,
+      );
+      await new Promise((r) => setTimeout(r, retryDelayMs));
     }
   }
 
+  log.error(`All ${maxRetries} download attempts failed for ${hash}`,
+  );
   return null;
 }

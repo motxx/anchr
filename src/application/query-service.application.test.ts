@@ -1,10 +1,10 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createQueryService, createQueryStore } from "./query-service";
-import type { QueryService, QueryStore } from "./query-service";
-import { createOracleRegistry } from "../infrastructure/oracle";
-import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle";
-import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../domain/types";
+import { createQueryService, createQueryStore } from "./query-service.ts";
+import type { QueryService, QueryStore } from "./query-service.ts";
+import { createOracleRegistry } from "../infrastructure/oracle/index.ts";
+import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle/index.ts";
+import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../domain/types.ts";
 
 // --- Mock oracle ---
 
@@ -161,9 +161,10 @@ describe("Application Service — Simple lifecycle", () => {
 
 describe("Application Service — HTLC lifecycle", () => {
   const htlcOptions = () => ({
-    htlc: {
+    escrow: {
+      type: "htlc" as const,
       hash: "abc123",
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
@@ -174,7 +175,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
     expect(query.status).toBe("awaiting_quotes");
-    expect(query.htlc).toBeDefined();
+    expect(query.escrow).toBeDefined();
     expect(query.quotes).toEqual([]);
   });
 
@@ -192,11 +193,12 @@ describe("Application Service — HTLC lifecycle", () => {
 
     // Select worker (no token verification in mock)
     const selectOutcome = await svc.selectWorker(query.id, "worker1");
+    svc.beginWork(query.id);
     expect(selectOutcome.ok).toBe(true);
     expect(svc.getQuery(query.id)?.status).toBe("processing");
 
     // Submit + verify in one call
-    const submitOutcome = await svc.submitHtlcResult(
+    const submitOutcome = await svc.submitEscrowResult(
       query.id,
       defaultResult,
       "worker1",
@@ -214,8 +216,9 @@ describe("Application Service — HTLC lifecycle", () => {
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.status).toBe("rejected");
   });
@@ -225,6 +228,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     const recordOutcome = svc.recordResult(query.id, defaultResult, "w1");
     expect(recordOutcome.ok).toBe(true);
@@ -240,6 +244,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
     svc.recordResult(query.id, defaultResult, "w1");
 
     const outcome = svc.completeVerification(query.id, false);
@@ -260,6 +265,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, { ...htlcOptions(), ttlMs: 1 });
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
     await new Promise((r) => setTimeout(r, 5));
     const expired = svc.expireQueries();
@@ -270,9 +276,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: cannot submit to non-HTLC query", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput);
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "w1");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "w1");
     expect(outcome.ok).toBe(false);
-    expect(outcome.message).toContain("HTLC");
+    expect(outcome.message).toContain("escrow");
   });
 
   test("HTLC: worker pubkey mismatch", async () => {
@@ -280,8 +286,9 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
     await svc.selectWorker(query.id, "w1");
+    svc.beginWork(query.id);
 
-    const outcome = await svc.submitHtlcResult(query.id, defaultResult, "wrong_worker");
+    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "wrong_worker");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
   });
@@ -335,9 +342,10 @@ describe("Application Service — Aggregate error propagation", () => {
     const { svc } = setup();
     const nowSecs = Math.floor(Date.now() / 1000);
     expect(() => svc.createQuery(defaultInput, {
-      htlc: {
+      escrow: {
+        type: "htlc",
         hash: "h",
-        oracle_pubkey: "o",
+        oracle_pubkeys: ["o"],
         requester_pubkey: "r",
         locktime: nowSecs + 100,
       },

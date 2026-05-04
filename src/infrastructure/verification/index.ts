@@ -1,6 +1,16 @@
-export { verify } from "./verifier";
-export { checkAttachmentContent, type ContentCheckResult } from "./ai-content-check";
-export { validateExif, extractExifMetadata, type ExifMetadata, type ExifValidationResult } from "./exif-validation";
-export { validateC2pa, isC2paAvailable, type C2paValidationResult, type C2paManifest } from "./c2pa-validation";
-export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "./tlsn-validation";
-export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "./integrity-store";
+export { verify } from "./verifier.ts";
+export { checkAttachmentContent, type ContentCheckResult } from "./ai-content-check.ts";
+export {
+  validateExif,
+  extractExifMetadata,
+  type ExifMetadata,
+  type ExifValidationResult,
+} from "@anchr/photo-bounty/exif-validation";
+export {
+  validateC2pa,
+  isC2paAvailable,
+  type C2paValidationResult,
+  type C2paManifest,
+} from "@anchr/photo-bounty/c2pa-validation";
+export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "@anchr/photo-bounty/integrity-store";

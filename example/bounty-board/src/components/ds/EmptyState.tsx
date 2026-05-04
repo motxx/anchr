@@ -1,7 +1,7 @@
 import React from "react";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { DSText } from "./Text";
+import { DSText } from "./Text.tsx";
 
 export interface DSEmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;

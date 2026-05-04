@@ -20,7 +20,6 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
 import {
   Wallet,
   type Proof,
@@ -29,74 +28,19 @@ import {
   P2PKBuilder,
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
-import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import {
+  checkInfraReady,
+  createWallet as createRegtestWallet,
+  throttledMintProofs,
+  throttleMintOp,
+  retryOnRateLimit,
+  generateKeypair,
+} from "./helpers/regtest.ts";
+import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const AMOUNT_SATS = 64;
-
-// --- Infrastructure helpers ---
-
-async function isCashuMintReachable(): Promise<boolean> {
-  try {
-    const res = await fetch(`${MINT_URL}/v1/info`, { signal: AbortSignal.timeout(3000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function isLndUserReachable(): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "getinfo",
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
-  try {
-    const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "payinvoice", "--force", bolt11,
-    ], { stdout: "pipe", stderr: "pipe" });
-    await proc.exited;
-    return proc.exitCode === 0;
-  } catch {
-    return false;
-  }
-}
-
-// --- Crypto helpers ---
-
-function generateKeypair() {
-  const sk = generateSecretKey();
-  const pk = getPublicKey(sk);
-  return { secretKey: bytesToHex(sk), publicKey: pk };
-}
-
-// --- Mint helpers ---
-
-async function createWallet(): Promise<Wallet> {
-  const wallet = new Wallet(MINT_URL, { unit: "sat" });
-  await wallet.loadMint();
-  return wallet;
-}
-
-async function mintProofs(wallet: Wallet, amountSats: number): Promise<Proof[]> {
-  const mintQuote = await wallet.createMintQuote(amountSats);
-  const paid = await payInvoiceViaLndUser(mintQuote.request);
-  if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-  await new Promise(r => setTimeout(r, 2000));
-  return wallet.mintProofs(amountSats, mintQuote.quote);
-}
 
 /**
  * Create HTLC-locked proofs on the real Cashu Mint.
@@ -124,10 +68,10 @@ async function createHtlcProofs(
   const sendAmount = amountSats - fee;
   if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
 
-  const { send } = await wallet.ops
-    .send(sendAmount, sourceProofs)
-    .asP2PK(p2pkOptions)
-    .run();
+  await throttleMintOp();
+  const { send } = await retryOnRateLimit(() =>
+    wallet.ops.send(sendAmount, sourceProofs).asP2PK(p2pkOptions).run()
+  );
 
   return send;
 }
@@ -161,6 +105,7 @@ async function attemptRedeem(
   privateKey: string | undefined,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: preimage
@@ -199,7 +144,9 @@ async function attemptRedeem(
     }
 
     const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
-    return signatures as unknown as Proof[];
+    // See redeem-attempt note in regtest-htlc-trustless: blinded signatures are
+    // mapped to a Proof-shaped record purely as a structural carrier for tests.
+    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-attempt] Error: ${msg}`);
@@ -216,6 +163,7 @@ async function attemptRedeemWithCustomWitness(
   witnessObj: Record<string, unknown>,
 ): Promise<Proof[] | null> {
   try {
+    await throttleMintOp();
     const proofsWithWitness = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify(witnessObj),
@@ -250,7 +198,8 @@ async function attemptRedeemWithCustomWitness(
     }
 
     const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
-    return signatures as unknown as Proof[];
+    // See redeem-attempt note above.
+    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-custom] Error: ${msg}`);
@@ -260,23 +209,14 @@ async function attemptRedeemWithCustomWitness(
 
 // --- Infrastructure readiness ---
 
-const [MINT_REACHABLE, LND_REACHABLE] = await Promise.all([
-  isCashuMintReachable(),
-  isLndUserReachable(),
-]);
-const INFRA_READY = MINT_REACHABLE && LND_REACHABLE;
-
-if (!INFRA_READY) {
-  console.warn("[e2e] Infrastructure not ready – tests will be ignored.");
-  console.warn("  Run: docker compose up -d && ./scripts/init-regtest.sh && docker compose restart cashu-mint");
-}
+const INFRA_READY = await checkInfraReady(MINT_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
 // Create wallet at module level before describes register.
 // This ensures loadMint() fetch responses are fully consumed
 // before any test scope begins (avoids Deno sanitizer false positives).
-const sharedWallet = INFRA_READY ? await createWallet() : undefined;
+const sharedWallet = INFRA_READY ? await createRegtestWallet(MINT_URL) : undefined;
 
 // =============================================================================
 // E2E Attack Category 1: Proof Manipulation
@@ -291,7 +231,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -314,14 +254,14 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     // Create two separate HTLC proof sets
     const { hash: hash1, preimage: preimage1 } = createHTLCHash();
-    const source1 = await mintProofs(wallet, AMOUNT_SATS);
+    const source1 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs1 = await createHtlcProofs(
       wallet, source1, AMOUNT_SATS,
       hash1, worker.publicKey, requester.publicKey, locktime,
     );
 
     const { hash: hash2, preimage: preimage2 } = createHTLCHash();
-    const source2 = await mintProofs(wallet, AMOUNT_SATS);
+    const source2 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs2 = await createHtlcProofs(
       wallet, source2, AMOUNT_SATS,
       hash2, worker.publicKey, requester.publicKey, locktime,
@@ -344,7 +284,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -374,7 +314,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -402,7 +342,7 @@ suite("e2e: Redemption Timing Attacks", () => {
     // Locktime in the past: already expired
     const locktime = Math.floor(Date.now() / 1000) - 60;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,
@@ -417,11 +357,10 @@ suite("e2e: Redemption Timing Attacks", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
-
-    const { send: result } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: result } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+    );
 
     // Worker SHOULD succeed — preimage path is independent of locktime
     expect(result).not.toBeNull();
@@ -444,7 +383,7 @@ suite("e2e: Multi-Party Attacks", () => {
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
     // Lock proofs to worker1's key
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker1.publicKey, requester.publicKey, locktime,
@@ -457,10 +396,10 @@ suite("e2e: Multi-Party Attacks", () => {
     }));
     const totalSats = proofsWithPreimage.reduce((sum, p) => sum + p.amount, 0);
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
-    const { send: first } = await wallet.ops
-      .send(totalSats - fee, proofsWithPreimage)
-      .privkey(worker1.secretKey)
-      .run();
+    await throttleMintOp();
+    const { send: first } = await retryOnRateLimit(() =>
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker1.secretKey).run()
+    );
     expect(first).not.toBeNull();
     expect(first.length).toBeGreaterThan(0);
 
@@ -470,6 +409,7 @@ suite("e2e: Multi-Party Attacks", () => {
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
   });
 
+  // INV-03: Requester can't unlock escrow before timeout
   test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();
@@ -477,7 +417,7 @@ suite("e2e: Multi-Party Attacks", () => {
     // Locktime 1 hour in the future — refund path is NOT available
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    const sourceProofs = await mintProofs(wallet, AMOUNT_SATS);
+    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet, sourceProofs, AMOUNT_SATS,
       hash, worker.publicKey, requester.publicKey, locktime,

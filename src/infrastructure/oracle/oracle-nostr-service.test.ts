@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { withEnv } from "../../testing/helpers.ts";
 import {
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
   _setPublishEventForTest,
   _setVerifyForTest,
-} from "./oracle-nostr-service";
-import type { OracleNostrServiceConfig } from "./oracle-nostr-service";
-import { generateEphemeralIdentity } from "../nostr/identity";
-import { createPreimageStore } from "../cashu/preimage-store";
+} from "./oracle-nostr-service.ts";
+import type { OracleNostrServiceConfig } from "./oracle-nostr-service.ts";
+import { generateEphemeralIdentity } from "../nostr/identity.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---
@@ -24,31 +25,6 @@ function makeConfig(overrides?: Partial<OracleNostrServiceConfig>): OracleNostrS
     ...overrides,
   };
 }
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => void | Promise<void>) {
-  const saved: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(overrides)) {
-    saved[key] = process.env[key];
-    if (value === undefined) delete process.env[key];
-    else process.env[key] = value;
-  }
-  const restore = () => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  };
-  const result = fn();
-  if (result instanceof Promise) return result.finally(restore);
-  restore();
-}
-
-// --- Teardown ---
-
-afterEach(() => {
-  _setPublishEventForTest(null);
-  _setVerifyForTest(null);
-});
 
 // --- generateHash ---
 
@@ -81,6 +57,11 @@ describe("generateHash", () => {
 // --- verifyAndDeliver ---
 
 describe("verifyAndDeliver", () => {
+  afterEach(() => {
+    _setPublishEventForTest(null);
+    _setVerifyForTest(null);
+  });
+
   test("publishes preimage DM on verification pass", async () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });
@@ -105,7 +86,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
@@ -139,7 +120,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
@@ -166,7 +147,7 @@ describe("verifyAndDeliver", () => {
       verification_requirements: ["gps" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
-      payment_status: "htlc_swapped" as const,
+      payment_status: "escrow_swapped" as const,
     };
 
     // Verify passes but no preimage exists, so rejection DM is sent

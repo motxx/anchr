@@ -3,10 +3,10 @@ import { expect } from "@std/expect";
 import {
   validateGpsCoord,
   validateBountyInfo,
-  validateHtlcLocktime,
+  validateEscrowLocktime,
   validateQueryInput,
   validateQuoteInfo,
-} from "./value-objects";
+} from "./value-objects.ts";
 
 describe("validateGpsCoord", () => {
   // --- Valid ---
@@ -70,7 +70,7 @@ describe("validateBountyInfo", () => {
     expect(validateBountyInfo({ amount_sats: 100 })).toBeNull();
   });
   test("valid amount with token", () => {
-    expect(validateBountyInfo({ amount_sats: 1, cashu_token: "tok" })).toBeNull();
+    expect(validateBountyInfo({ amount_sats: 1, escrow_token: "tok" })).toBeNull();
   });
   test("zero", () => {
     expect(validateBountyInfo({ amount_sats: 0 })).toContain("positive");
@@ -89,26 +89,26 @@ describe("validateBountyInfo", () => {
   });
 });
 
-describe("validateHtlcLocktime", () => {
+describe("validateEscrowLocktime", () => {
   const minSecs = 600;
 
   test("exactly at minimum", () => {
-    expect(validateHtlcLocktime(1600, 1000, minSecs)).toBeNull();
+    expect(validateEscrowLocktime(1600, 1000, minSecs)).toBeNull();
   });
   test("well above minimum", () => {
-    expect(validateHtlcLocktime(2000, 1000, minSecs)).toBeNull();
+    expect(validateEscrowLocktime(2000, 1000, minSecs)).toBeNull();
   });
   test("1 second short of minimum", () => {
-    expect(validateHtlcLocktime(1599, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(1599, 1000, minSecs)).toContain("600s");
   });
   test("already expired", () => {
-    expect(validateHtlcLocktime(500, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(500, 1000, minSecs)).toContain("600s");
   });
   test("equal to now (0s remaining)", () => {
-    expect(validateHtlcLocktime(1000, 1000, minSecs)).toContain("600s");
+    expect(validateEscrowLocktime(1000, 1000, minSecs)).toContain("600s");
   });
   test("NaN locktime", () => {
-    expect(validateHtlcLocktime(NaN, 1000, minSecs)).toContain("finite");
+    expect(validateEscrowLocktime(NaN, 1000, minSecs)).toContain("finite");
   });
 });
 
@@ -125,6 +125,7 @@ describe("validateQueryInput", () => {
       expected_gps: { lat: 35.6, lon: 139.7 },
       max_gps_distance_km: 10,
       tlsn_requirements: { target_url: "https://example.com/api" },
+      visibility: "public",
     })).toBeNull();
   });
   test("empty description", () => {
@@ -179,7 +180,14 @@ describe("validateQueryInput", () => {
     expect(validateQueryInput({
       description: "Photo",
       tlsn_requirements: { target_url: "https://api.example.com/data" },
+      visibility: "requester_only",
     })).toBeNull();
+  });
+  test("tlsn_requirements without visibility", () => {
+    expect(validateQueryInput({
+      description: "Photo",
+      tlsn_requirements: { target_url: "https://api.example.com/data" },
+    })).toContain("visibility");
   });
 });
 

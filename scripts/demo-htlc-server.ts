@@ -6,7 +6,7 @@
  *
  *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity";
+import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity.ts";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -21,23 +21,25 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/infrastructure/nostr/events";
-import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm";
-import { publishEvent, closePool } from "../src/infrastructure/nostr/client";
-import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption";
-import { createPreimageStore } from "../src/infrastructure/cashu/preimage-store";
-import { createBountyToken } from "../src/infrastructure/cashu/wallet";
+} from "../src/infrastructure/nostr/events.ts";
+import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm.ts";
+import { publishEvent, closePool } from "../src/infrastructure/nostr/client.ts";
+import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption.ts";
+import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
+import { createBountyToken } from "../packages/core-cashu/src/wallet.ts";
 import {
   swapHtlcBindWorker,
   redeemHtlcToken,
   inspectEscrowToken,
-} from "../src/infrastructure/cashu/escrow";
-import { workerUpload } from "../src/infrastructure/blossom/worker-upload";
+} from "../packages/core-cashu/src/escrow.ts";
+import { workerUpload } from "../src/infrastructure/blossom/worker-upload.ts";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import process from "node:process";
+import { Buffer } from "node:buffer";
 
 // --- DemoEvent type (mirrors DemoApp.tsx) ---
 

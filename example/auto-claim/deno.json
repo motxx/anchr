@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@anchr/core-runtime": "../../packages/core-runtime/src/mod.ts",
+    "anchr-sdk": "../../packages/sdk/src/index.ts"
+  },
+  "tasks": {
+    "agent": "deno run --allow-all agent.ts",
+    "insurer": "deno run --allow-all insurer.ts",
+    "mock-airline": "deno run --allow-all mock-airline.ts"
+  }
+}

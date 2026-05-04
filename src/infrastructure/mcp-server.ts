@@ -1,38 +1,40 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { getMcpQueryBackend } from "./mcp-query-backend";
-import { isNostrEnabled } from "./nostr/client";
-import { isCashuEnabled } from "./cashu/wallet";
-import type { QueryInput, QueryResult } from "../application/query-service";
-import type { RequesterMeta, VerificationFactor, TlsnCondition } from "../domain/types";
-import { VERIFICATION_FACTORS } from "../domain/types";
+import type { QueryService } from "../application/query-service.ts";
+import { getMcpQueryBackend } from "./mcp-query-backend.ts";
+import { isNostrEnabled } from "./nostr/client.ts";
+import { isCashuEnabled } from "@anchr/core-cashu/wallet";
+import type { VerificationFactor, TlsnCondition } from "../domain/types.ts";
+import { VERIFICATION_FACTORS } from "../domain/types.ts";
+import {
+  handleCreateQuery,
+  handleGetQueryStatus,
+  handleCancelQuery,
+  handleListAvailableQueries,
+  handleSubmitQueryResult,
+  handleGetQueryAttachment,
+  handleGetQueryAttachmentPreview,
+} from "./mcp-tool-handlers.ts";
+import {
+  handleMarketplaceListData,
+  handleMarketplaceBuyData,
+  handleMarketplaceSearchListings,
+} from "./mcp-marketplace-handlers.ts";
 
-/** Args for the create_query MCP tool. */
-interface CreateQueryArgs {
-  description: string;
-  location_hint?: string;
-  ttl_seconds?: number;
-  oracle_ids?: string[];
-  verification_requirements?: VerificationFactor[];
-  target_url?: string;
-  target_method?: "GET" | "POST";
-  conditions?: TlsnCondition[];
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "mcp-server"]);
+
+export interface McpServerDeps {
+  queryService: QueryService;
 }
 
-function buildRequesterMeta(): RequesterMeta {
-  return {
-    requester_type: "agent",
-    client_name: process.env.REMOTE_QUERY_API_BASE_URL ? "mcp-remote" : "mcp",
-  };
-}
-
-export async function startMcpServer() {
+export async function startMcpServer(deps: McpServerDeps) {
   const server = new McpServer({
     name: "anchr",
     version: "0.3.0",
   });
-  const backend = getMcpQueryBackend();
+  const backend = getMcpQueryBackend(deps.queryService);
 
   server.tool(
     "create_query",
@@ -59,21 +61,8 @@ export async function startMcpServer() {
         description: z.string().optional().describe("Human-readable description of what this checks"),
       })).optional().describe("Conditions to verify against the proven response body."),
     },
-    async ({ description, location_hint, ttl_seconds, oracle_ids, verification_requirements, target_url, target_method, conditions }: CreateQueryArgs) => {
-      const input: QueryInput = {
-        description,
-        location_hint,
-        verification_requirements,
-        tlsn_requirements: target_url ? {
-          target_url,
-          method: target_method,
-          conditions,
-        } : undefined,
-      };
-      const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+    async (args: { description: string; location_hint?: string; ttl_seconds?: number; oracle_ids?: string[]; verification_requirements?: VerificationFactor[]; target_url?: string; target_method?: "GET" | "POST"; conditions?: TlsnCondition[] }) => {
+      return handleCreateQuery(backend, args);
     },
   );
 
@@ -84,10 +73,7 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID returned from create_query"),
     },
     async ({ query_id }: { query_id: string }) => {
-      const payload = await backend.getQueryStatus(query_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleGetQueryStatus(backend, query_id);
     },
   );
 
@@ -98,10 +84,7 @@ export async function startMcpServer() {
       query_id: z.string().describe("Query ID to cancel"),
     },
     async ({ query_id }: { query_id: string }) => {
-      const payload = await backend.cancelQuery(query_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleCancelQuery(backend, query_id);
     },
   );
 
@@ -110,10 +93,7 @@ export async function startMcpServer() {
     "List currently available Anchr queries waiting for a reporter.",
     {},
     async () => {
-      const payload = await backend.listAvailableQueries();
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleListAvailableQueries(backend);
     },
   );
 
@@ -126,10 +106,7 @@ export async function startMcpServer() {
       oracle_id: z.string().optional().describe("Oracle ID to use for verification. Omit to use default."),
     },
     async ({ query_id, result, oracle_id }: { query_id: string; result: Record<string, unknown>; oracle_id?: string }) => {
-      const payload = await backend.submitQueryResult(query_id, result as unknown as QueryResult, oracle_id);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleSubmitQueryResult(backend, query_id, result, oracle_id);
     },
   );
 
@@ -141,10 +118,7 @@ export async function startMcpServer() {
       attachment_index: z.number().int().min(0).optional().describe("Zero-based attachment index. Defaults to 0."),
     },
     async ({ query_id, attachment_index }: { query_id: string; attachment_index?: number }) => {
-      const payload = await backend.getQueryAttachment(query_id, attachment_index ?? 0);
-      return {
-        content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
-      };
+      return handleGetQueryAttachment(backend, query_id, attachment_index ?? 0);
     },
   );
 
@@ -157,27 +131,50 @@ export async function startMcpServer() {
       max_dimension: z.number().int().min(64).max(2048).optional().describe("Maximum width or height of the preview image. Defaults to PREVIEW_MAX_DIMENSION."),
     },
     async ({ query_id, attachment_index, max_dimension }: { query_id: string; attachment_index?: number; max_dimension?: number }) => {
-      const preview = await backend.getQueryAttachmentPreview(query_id, attachment_index ?? 0, max_dimension);
-      const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
-        {
-          type: "text",
-          text: JSON.stringify(preview.payload, null, 2),
-        },
-      ];
+      return handleGetQueryAttachmentPreview(backend, query_id, attachment_index ?? 0, max_dimension);
+    },
+  );
 
-      if (preview.image) {
-        content.push({
-          type: "image",
-          data: preview.image.data,
-          mimeType: preview.image.mimeType,
-        });
-      }
+  // --- Marketplace tools ---
 
-      return { content };
+  server.tool(
+    "marketplace_list_data",
+    "List available verified data listings on the Anchr marketplace. " +
+    "Each listing provides TLSNotary-proven API data that can be purchased with Cashu ecash.",
+    {
+      active_only: z.boolean().optional().describe("Only show active listings (default true)"),
+    },
+    async (args: { active_only?: boolean }) => {
+      return handleMarketplaceListData(backend, args.active_only ?? true);
+    },
+  );
+
+  server.tool(
+    "marketplace_buy_data",
+    "Purchase verified data from the Anchr marketplace. " +
+    "Pays with Cashu ecash token (X-Cashu direct mode). " +
+    "Returns the data along with TLSNotary proof of authenticity.",
+    {
+      listing_id: z.string().describe("Listing ID to purchase"),
+      cashu_token: z.string().describe("Cashu ecash token for payment"),
+    },
+    async (args: { listing_id: string; cashu_token: string }) => {
+      return handleMarketplaceBuyData(backend, args.listing_id, args.cashu_token);
+    },
+  );
+
+  server.tool(
+    "marketplace_search_listings",
+    "Search marketplace listings by keyword in name or description.",
+    {
+      query: z.string().describe("Search keyword"),
+    },
+    async (args: { query: string }) => {
+      return handleMarketplaceSearchListings(backend, args.query);
     },
   );
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[mcp-server] Connected via stdio");
+  log.error("Connected via stdio");
 }

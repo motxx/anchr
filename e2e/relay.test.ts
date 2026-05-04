@@ -14,11 +14,15 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
-import { clearQueryStore } from "../src/application/query-service.ts";
+import { createQueryService } from "../src/application/query-service.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import { publishQueryToRelay } from "../src/infrastructure/nostr/relay-publish.ts";
 import { closePool } from "../src/infrastructure/nostr/client.ts";
 import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events.ts";
+import process from "node:process";
 
-const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();
+const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
 
 async function isRelayReachable(): Promise<boolean> {
   try {
@@ -58,9 +62,13 @@ async function waitForRelayEvent(
 
 // --- Infrastructure readiness (top-level await for describe.ignore) ---
 
-const RELAY_REACHABLE = await isRelayReachable();
+// Both conditions required: NOSTR_RELAYS env var must be set (so the worker API
+// knows where to publish) AND the relay must be reachable.
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable() : false;
 
-if (!RELAY_REACHABLE) {
+if (!NOSTR_RELAYS_ENV) {
+  console.warn(`[e2e] NOSTR_RELAYS not set – relay tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay`);
+} else if (!RELAY_REACHABLE) {
   console.warn(`[e2e] Relay not reachable at ${RELAY_URL} – tests will be skipped. Run: docker compose up -d`);
 }
 
@@ -68,9 +76,14 @@ const suite = RELAY_REACHABLE ? describe : describe.ignore;
 
 // Relay tests need actual relay hooks (fire-and-forget WebSocket publishes),
 // so we disable Deno's resource/ops sanitizers and clean up via closePool().
+const relayService = createQueryService({
+  oracleRegistry: createOracleRegistry(),
+  hooks: { onCreated: publishQueryToRelay },
+});
+
 suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, sanitizeResources: false }, () => {
   afterAll(() => {
-    clearQueryStore();
+    relayService.clearQueryStore();
     closePool();
   });
 
@@ -79,7 +92,7 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
   });
 
   test("create query via HTTP and verify relay publication", async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: relayService });
 
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
@@ -130,7 +143,7 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
   });
 
   test("full lifecycle: create → list → submit → verify status", async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: relayService });
 
     // 1. Create query
     const createRes = await app.request("http://localhost/queries", {
@@ -191,7 +204,7 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
   });
 
   test("cancel query flow", async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: relayService });
 
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
@@ -214,7 +227,7 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
   });
 
   test("multiple queries appear on relay", async () => {
-    const app = buildWorkerApiApp();
+    const app = buildWorkerApiApp({ queryService: relayService });
     const since = Math.floor(Date.now() / 1000) - 5;
 
     // Create 3 queries in parallel

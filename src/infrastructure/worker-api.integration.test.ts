@@ -1,31 +1,15 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isBlossomEnabled, getBlossomConfig } from "./blossom/client";
-import { createQueryService, createQuery, getQuery } from "../application/query-service";
-import { storeIntegrity } from "./verification/integrity-store";
-import { buildWorkerApiApp } from "./worker-api";
+import { isBlossomEnabled, getBlossomConfig } from "./blossom/client.ts";
+import { createQueryService } from "../application/query-service.ts";
+import { storeIntegrity } from "@anchr/photo-bounty/integrity-store";
+import { buildWorkerApiApp } from "./worker-api.ts";
+import { withEnvThunk as withEnv } from "../testing/helpers.ts";
 
 // QueryService without relay hooks — avoids fire-and-forget WebSocket leaks
 // that trip Deno's resource sanitizer.
 const testService = createQueryService({ hooks: {} });
-
-function withEnv(overrides: Record<string, string | undefined>, fn: () => Promise<void> | void) {
-  return async () => {
-    const saved: Record<string, string | undefined> = {};
-    for (const key of Object.keys(overrides)) {
-      saved[key] = process.env[key];
-      if (overrides[key] === undefined) delete process.env[key];
-      else process.env[key] = overrides[key];
-    }
-    try { await fn(); } finally {
-      for (const key of Object.keys(saved)) {
-        if (saved[key] === undefined) delete process.env[key];
-        else process.env[key] = saved[key];
-      }
-    }
-  };
-}
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -42,6 +26,7 @@ async function isBlossomReachable(): Promise<boolean> {
   if (!isBlossomEnabled()) return false;
   try {
     const res = await fetch(getBlossomConfig()!.serverUrls[0]!, { signal: AbortSignal.timeout(1000) });
+    await res.body?.cancel();
     return res.ok || res.status < 500;
   } catch { return false; }
 }
@@ -138,6 +123,7 @@ describe("worker api photo proof (Blossom)", () => {
 
     // Blossom attachments redirect to encrypted blob URL
     const viewResponse = await app.request(`http://localhost/queries/${query.id}/attachments/0`);
+    await viewResponse.body?.cancel();
     expect(viewResponse.status).toBe(302);
     expect(viewResponse.headers.get("location")).toBeTruthy();
 
@@ -148,7 +134,7 @@ describe("worker api photo proof (Blossom)", () => {
 
 test("worker api creates queries over HTTP and enforces write API keys",
   withEnv({ HTTP_API_KEY: "secret-write-key", HTTP_API_KEYS: undefined }, async () => {
-  const app = buildWorkerApiApp();
+  const app = buildWorkerApiApp({ queryService: testService });
 
   const unauthorizedResponse = await app.request("http://localhost/queries", {
     method: "POST",
@@ -157,6 +143,7 @@ test("worker api creates queries over HTTP and enforces write API keys",
       description: "Unauthorized Test Store",
     }),
   });
+  await unauthorizedResponse.body?.cancel();
   expect(unauthorizedResponse.status).toBe(401);
 
   const createResponse = await app.request("http://localhost/queries", {
@@ -197,7 +184,7 @@ test("worker api creates queries over HTTP and enforces write API keys",
   expect(createJson.requester_meta?.requester_id).toBe("integration-test-client");
   expect(createJson.query_api_url).toContain(`/queries/${createJson.query_id}`);
 
-  const storedQuery = getQuery(createJson.query_id);
+  const storedQuery = testService.getQuery(createJson.query_id);
   expect(storedQuery?.requester_meta?.requester_type).toBe("app");
   expect(storedQuery?.requester_meta?.client_name).toBe("worker-api.integration.test");
 }));
@@ -208,28 +195,28 @@ describe("writeAuth middleware", () => {
   const authEnv = { HTTP_API_KEY: "test-key", HTTP_API_KEYS: undefined as string | undefined };
 
   test("rejects unauthenticated upload", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const app = buildWorkerApiApp({ queryService: testService });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const form = new FormData();
     form.append("photo", new Blob([PNG_BYTES], { type: "image/png" }), "proof.png");
     const res = await app.request(`http://localhost/queries/${query.id}/upload`, { method: "POST", body: form });
     expect(res.status).toBe(401);
   }));
 
-  test("rejects unauthenticated submit", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
-    const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
+  test("rejects unauthenticated result submission", withEnv(authEnv, async () => {
+    const app = buildWorkerApiApp({ queryService: testService });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ attachments: [], notes: "" }),
+      body: JSON.stringify({ worker_pubkey: "w1", attachments: [], notes: "" }),
     });
     expect(res.status).toBe(401);
   }));
 
   test("rejects unauthenticated cancel", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
-    const query = createQuery({ description: "auth test" }, { ttlSeconds: 300 });
+    const app = buildWorkerApiApp({ queryService: testService });
+    const query = testService.createQuery({ description: "auth test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
     expect(res.status).toBe(401);
   }));
@@ -245,8 +232,8 @@ describe("writeAuth middleware", () => {
   }));
 
   test("accepts X-API-Key header on cancel", withEnv(authEnv, async () => {
-    const app = buildWorkerApiApp();
-    const query = createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
+    const app = buildWorkerApiApp({ queryService: testService });
+    const query = testService.createQuery({ description: "cancel test" }, { ttlSeconds: 300 });
     const res = await app.request(`http://localhost/queries/${query.id}/cancel`, {
       method: "POST",
       headers: { "x-api-key": "test-key" },

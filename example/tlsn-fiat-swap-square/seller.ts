@@ -1,7 +1,7 @@
 /**
- * TLSNotary Fiat Swap (Square) — Seller (has BTC, wants fiat)
+ * 渡(Watari) — Seller (has BTC, wants fiat)
  *
- * The seller creates an on-ramp order:
+ * Watari is the trustless fiat ↔ BTC crossing. The seller creates a 渡(Watari) order:
  *   1. Creates a Square Payment Link for the fiat amount
  *   2. Creates an Anchr query with TLSNotary requirements
  *      - Public: domain_hint = "connect.squareupsandbox.com" (visible to all Workers)
@@ -20,7 +20,8 @@
  */
 
 // Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "../../packages/sdk/src/index";
+import { Anchr } from "anchr-sdk";
+import process from "node:process";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
@@ -34,7 +35,7 @@ if (!SQUARE_ACCESS_TOKEN) {
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
 
-console.log("=== TLSNotary Fiat Swap (Square) — Seller ===\n");
+console.log("=== 渡(Watari) — Seller ===\n");
 console.log(`Server: ${SERVER_URL}`);
 
 // Step 1: Create a Square Payment Link (or use an existing one)
@@ -121,5 +122,5 @@ while (Date.now() - startTime < TIMEOUT_MS) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   process.stdout.write(`\r  Status: ${status.status} (${elapsed}s elapsed)`);
 
-  await Bun.sleep(POLL_INTERVAL_MS);
+  await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
 }

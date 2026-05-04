@@ -1,391 +1,186 @@
 # Anchr
 
-[![CI](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci-cd.yml)
+[![CI](https://github.com/motxx/anchr/actions/workflows/ci.yml/badge.svg)](https://github.com/motxx/anchr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Decentralized marketplace for cryptographically verified data, paid with Bitcoin.
+P2P-style verified-data purchase between pseudonymous parties, settled
+atomically over Nostr.
 
-AI agents and humans buy verified API responses, price feeds, and real-world photos — with minimized trust. Workers earn sats by proving what servers returned (TLSNotary) or what they saw (C2PA).
+> **Status: experimental.** Testnet only. SDK API design in progress;
+> packages may change.
 
-## SDK
+## Why this exists
 
-```typescript
-import { Anchr } from "anchr-sdk";
+TLSNotary attests that a server returned an HTTPS response at time T.
+Cashu HTLC releases payment against a revealed secret. Combined over
+Nostr DMs, two parties can exchange verified data and payment with no
+Anchr-side intermediary — a thin oracle holds the HTLC preimage to
+enforce atomic settlement, and the Cashu mint remains the trust anchor
+for the ecash (as in any Cashu deployment).
 
-const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
+This SDK orchestrates the exchange. It is **not a middleman**: you pick
+every external service (Nostr relay, Cashu mint, TLSNotary notary,
+oracle). Anchr runs no central server. Customers and providers are pseudonymous
+Nostr pubkeys; no real-name accounts or KYC.
 
-const result = await anchr.query({
-  description: "BTC price from CoinGecko",
-  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
-  maxSats: 21,
+Each primitive (NIP-90, Cashu HTLC, TLSNotary) exists in isolation. The
+hard part is composing them so payment release and proof verification
+happen atomically — that's what this SDK does.
+
+## How it works
+
+1. **Customer** locks Cashu HTLC at the mint with hashlock `H` (from oracle).
+2. **Customer** broadcasts a kind 5300 Job Request to Nostr relays — no
+   specific provider addressed.
+3. **Providers** subscribed to the request's `schema` reply with kind 7000
+   quotes. **Customer** selects one and binds the HTLC to the chosen
+   provider's pubkey.
+4. **Provider** produces a proof matching the schema, encrypts the response
+   to the customer's pubkey via NIP-44, and publishes a kind 6300 event.
+5. **Oracle** verifies the proof against the schema; if valid, sends
+   preimage `S` to the provider via NIP-44 DM.
+6. **Provider** redeems the HTLC at the mint with `S` — paid.
+
+The oracle alone gates payment release based on proof validity. The customer
+cannot withhold payment after a valid proof; the provider cannot get paid
+without producing one. If no provider delivers a valid proof before the HTLC's locktime expires,
+the customer's payment refunds automatically.
+
+Wire-compatible with [NIP-90 DVM](https://github.com/nostr-protocol/nips/blob/master/90.md)
+event kinds (5300 / 6300 / 7000) so DVM-aware clients can interoperate.
+
+## Install
+
+```sh
+deno add @anchr/sdk
+# or
+npm i @anchr/sdk
+```
+
+## Quick start
+
+**Customer:**
+
+```ts
+import { createCustomer } from "@anchr/sdk";
+
+const customer = createCustomer({
+  oracles: ["npub1oracle1...", "npub1oracle2..."],  // accepted oracle whitelist
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
 });
 
-result.verified;    // true — cryptographically proven
-result.data;        // { bitcoin: { usd: 71000 } }
-result.serverName;  // "api.coingecko.com" — from TLS certificate
-result.proof;       // TLSNotary presentation (independently verifiable)
-```
-
-## How It Works
-
-This protocol is **trust-minimized**, not trustless. Cryptography eliminates several attack vectors, but residual trust assumptions remain.
-
-**Protocol-level guarantees (Cashu [NUT-11](https://github.com/cashubtc/nuts/blob/main/11.md) P2PK + [NUT-14](https://github.com/cashubtc/nuts/blob/main/14.md) HTLC + [NUT-07](https://github.com/cashubtc/nuts/blob/main/07.md) State Check):**
-- **Oracle cannot steal BTC** — HTLC redemption requires Worker's signature (NUT-11 P2PK), which Oracle cannot forge
-- **Worker cannot forge proofs** — TLSNotary Verifier holds an independent MPC-TLS key share; Worker cannot alter the server's response
-- **Worker cannot redeem without valid proof** — Oracle holds the preimage; HTLC hashlock (NUT-14) prevents redemption without it
-- **Requester cannot revoke payment** — sats are locked in HTLC before work begins; Worker verifies proofs are UNSPENT on Mint (NUT-07) before starting work
-- **Timeout refund is automatic** — NUT-11 locktime + refund pubkey returns sats to Requester if HTLC expires
-
-**Residual trust assumptions:**
-- **Cashu Mint** — trusted to honor token issuance, redemption, and NUT-14 HTLC spending condition enforcement (verified by E2E tests against Nutshell 0.19.2 — see `e2e/regtest-htlc-trustless.test.ts`). Anchr also verifies HTLC conditions server-side as defense in depth.
-- **Oracle + Requester collusion** — Requester decrypts the result (via K_R) before Oracle verifies. If Oracle withholds the preimage, Requester gets data for free and BTC refunds on timeout. Oracle cannot profit, but Worker loses.
-- **TLSNotary Verifier** — if Verifier colludes with Worker, they can combine key shares to forge proofs
-
-**Mitigation — Oracle whitelist:** Requester specifies acceptable Oracles in the Job Request; Worker independently verifies the Oracle pubkey against its own trusted whitelist before accepting work. Both parties must agree on the Oracle, so a colluding Oracle would need to compromise the trust of both sides.
-
-### Trustless Flow
-
-```mermaid
-sequenceDiagram
-    participant R as Requester
-    participant O as Oracle
-    participant M as Cashu Mint
-    participant W as Worker
-    participant V as TLSNotary Verifier
-    participant T as Target Server
-
-    R->>O: get hash(preimage)
-    R->>M: create HTLC token<br/>condition: hash(preimage) AND Worker sig
-    R->>W: send HTLC token
-
-    Note over O,M: Oracle has preimage but not Worker's key<br/>→ cannot redeem HTLC
-
-    W->>V: MPC-TLS handshake (joint key shares)
-    W->>T: HTTPS request (co-signed TLS session)
-    T-->>W: HTTPS response
-    V-->>W: .presentation.tlsn
-
-    Note over W,V: Worker sees plaintext but can't alter it<br/>(Verifier holds independent key share)
-
-    W->>O: submit .presentation.tlsn
-    O->>O: verify MPC-TLS signatures + conditions
-
-    alt verification passed
-        O->>W: reveal preimage
-        W->>M: redeem HTLC (preimage + Worker sig)
-        M-->>W: unlocked sats
-    else verification failed
-        Note over O,W: Oracle withholds preimage
-    end
-
-    Note over R,M: timeout → HTLC refunds to Requester<br/>(Oracle cannot profit, only deny payment)
-```
-
-<details>
-<summary>Protocol Sequence (detailed)</summary>
-
-```mermaid
-sequenceDiagram
-    participant R as Requester
-    participant O as Oracle
-    participant N as Nostr Relay
-    participant W as Worker
-    participant V as TLSNotary Verifier
-    participant B as Blossom
-    participant M as Cashu Mint
-
-    R->>O: request hash for new query
-    O->>O: generate preimage, store secretly
-    O->>R: return hash(preimage) only
-
-    Note over R: hold Cashu proofs locally<br/>(plain bearer tokens, no conditions yet)
-    R->>N: DVM Job Request (kind 5300)<br/>Requester pubkey + Oracle pubkey included
-
-    W->>N: subscribe and pick up query
-    W->>W: verify Oracle pubkey in Job Request<br/>against trusted Oracle whitelist → drop out if unknown
-    W->>N: quote (kind 7000 status=payment-required)<br/>Worker pubkey included
-    O->>N: listen for kind 7000 quotes → record Worker pubkey
-
-    R->>N: listen and receive quotes (possibly multiple Workers)
-    R->>R: select one Worker based on quote
-    R->>M: swap HTLC to add selected Worker pubkey<br/>condition: hash(preimage) AND Worker signature
-    R->>N: announce selection (kind 7000 status=processing)<br/>selected Worker pubkey included
-    O->>M: check HTLC condition → record selected Worker pubkey
-
-    loop all Workers watching Nostr
-        W->>N: watch for kind 7000 status=processing
-        alt own pubkey selected
-            W->>M: verify own pubkey in HTLC condition → proceed
-        else another pubkey or HTLC mismatch
-            W->>W: drop out
-        end
-    end
-
-    alt Web Data (TLSNotary)
-        W->>V: MPC-TLS handshake
-        W->>W: HTTPS request via co-signed TLS session
-        V-->>W: .presentation.tlsn
-    else Real-World Photo (C2PA)
-        W->>W: photograph on-site<br/>C2PA signed + EXIF strip
-    end
-
-    W->>W: generate symmetric key K<br/>encrypt blob with K (AES-256-GCM)<br/>encrypt K with Requester pubkey → K_R<br/>encrypt K with Oracle pubkey → K_O
-    W->>B: upload encrypted blob
-    W->>N: DVM Job Result (kind 6300)<br/>Blossom URL + blob hash + K_R + K_O
-
-    R->>N: listen and receive result (Blossom URL + K_R)
-    R->>B: download encrypted blob
-    R->>R: decrypt K_R with Requester privkey → K<br/>decrypt blob with K → verify + view result
-
-    O->>N: listen and receive result (Blossom URL + K_O)
-    O->>O: verify kind 6300 pubkey = selected Worker pubkey<br/>verify references correct Job Request ID
-    O->>B: download encrypted blob
-    O->>O: decrypt K_O with Oracle privkey → K<br/>decrypt blob with K
-    O->>O: verify proof<br/>(TLSNotary: MPC-TLS signatures + conditions<br/>C2PA: manifest signature + GPS proximity)
-    alt verification passed
-        O->>N: send preimage via NIP-44 DM (kind 4)
-        W->>N: receive DM
-        W->>W: verify sender pubkey = Oracle pubkey in Job Request
-        W->>M: redeem token with preimage + Worker signature
-    else verification failed
-        O->>N: send rejection via NIP-44 DM (kind 4)
-        W->>W: verify sender → stop waiting
-        Note over M,R: timelock expires → Cashu refunds Requester automatically
-    end
-```
-
-### State Machine
-
-```
-awaiting_quotes → processing → verifying → approved  (preimage revealed, sats released)
-                                         → rejected  (proofs refunded to Requester)
-```
-
-### Key Properties
-
-- **Atomic payment**: Cashu HTLC locks funds — Worker can only redeem with the preimage, which Oracle only reveals on successful verification
-- **Timeout refund**: If HTLC locktime expires, Requester reclaims the escrowed sats
-- **Privacy**: Cashu blind signatures prevent Mint from linking token issuance to redemption; Nostr provides pseudonymous identity
-- **Two proof types**: TLSNotary (web API data) and C2PA (real-world photos) — both cryptographically bound to source
-- **Trust boundary**: Oracle honesty and Verifier independence are assumed — see [trust model](#how-it-works) above
-
-</details>
-
-## Two Verification Modes
-
-### Web Data (TLSNotary)
-
-Prove what any HTTPS server returned. Workers fetch the URL through a Multi-Party Computation TLS session — the Verifier Server co-signs the session without seeing the plaintext.
-
-### Real-World Photos (C2PA)
-
-Prove what a location looks like right now. Workers photograph with a C2PA-signed camera — the Content Credentials are cryptographically bound to the image, GPS, and timestamp.
-
-## Use Cases
-
-| Use case | Verification | Example |
-|----------|-------------|---------|
-| Price oracle (DeFi) | TLSNotary | Prove BTC/ETH price from CoinGecko, Binance |
-| Flight status | TLSNotary | Prove flight delay for parametric insurance |
-| API response proof | TLSNotary | Prove any HTTPS API returned specific data |
-| Location check | C2PA + GPS | Photograph a store, intersection, event |
-| Combined proof | Both | Photo of a price tag + API price verification |
-
-## Quick Start
-
-```bash
-bun install
-bun run infra:up                    # relay + blossom + verifier (docker)
-bun run dev                         # server on :3000
-```
-
-Worker app (iOS / Android / Web):
-```bash
-cd mobile && bun install
-bun run ios                         # or: bun run web
-```
-
-## API
-
-```bash
-# Web data query (TLSNotary)
-curl -X POST localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "BTC price from CoinGecko",
-    "verification_requirements": ["tlsn"],
-    "tlsn_requirements": {
-      "target_url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-      "conditions": [{"type": "jsonpath", "expression": "bitcoin.usd"}]
+const result = await customer.request({
+  spec: {
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: {
+      target: "https://api.github.com/users/alice",
+      conditions: [{ path: "$.public_repos", op: ">", value: 10 }],
     },
-    "bounty": {"amount_sats": 21}
-  }'
+    description: "GitHub user has more than 10 public repos",  // optional
+  },
+  payment: { maxAmount: 1000 },  // accept any quote up to this
+});
 
-# Photo query (C2PA)
-curl -X POST localhost:3000/queries \
-  -H "Content-Type: application/json" \
-  -d '{
-    "description": "渋谷スクランブル交差点の混雑状況",
-    "expected_gps": {"lat": 35.6595, "lon": 139.7004},
-    "max_gps_distance_km": 0.5,
-    "bounty": {"amount_sats": 100}
-  }'
+console.log(result.data);          // verified response payload
+console.log(result.proof);         // proof bytes (format depends on schema)
+console.log(result.providerPubkey);  // who fulfilled the request
 ```
 
-<details>
-<summary>Full endpoint list</summary>
+The customer broadcasts the request — any provider that supports the schema
+can quote. The SDK picks the cheapest quote within `maxAmount`. To
+target a specific provider, pass `provider: "npub1..."` instead.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/hash` | Oracle generates preimage/hash pair |
-| `POST` | `/queries` | Create query (HTLC mode) |
-| `GET` | `/queries` | List open queries (`?lat=&lon=&max_distance_km=`) |
-| `GET` | `/queries/all` | List all queries (any status) |
-| `GET` | `/queries/:id` | Query detail |
-| `POST` | `/queries/:id/quotes` | Worker submits quote |
-| `POST` | `/queries/:id/select` | Select worker + verify HTLC token |
-| `POST` | `/queries/:id/result` | Submit proof (inline verification → preimage) |
-| `POST` | `/queries/:id/upload` | Upload photo (multipart) |
-| `POST` | `/queries/:id/cancel` | Cancel query (refund proofs) |
-| `GET` | `/queries/:id/attachments` | List attachments |
-| `GET` | `/wallet/balance` | Wallet balance (`?role=&pubkey=&verify=true`) |
-| `GET` | `/health` | Health check |
-| `GET` | `/oracles` | List oracles |
-| `GET` | `/logs/stream` | Server log stream (SSE) |
+**Provider:**
 
-</details>
+```ts
+import { createProvider } from "@anchr/sdk";
 
-## MCP (AI Agent Integration)
+const provider = createProvider({
+  oracles: ["npub1oracle1...", "npub1oracle2..."],  // accepted oracle whitelist
+  notary:  "wss://notary.example.org",
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
+  privKey: "nsec1...",
+});
 
-Anchr exposes an MCP server so AI agents (Claude Desktop, Claude Code, etc.) can request cryptographically verified data.
-
-### Claude Desktop
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "anchr": {
-      "command": "bun",
-      "args": ["run", "/path/to/anchr/src/mcp.ts"],
-      "env": {
-        "REMOTE_QUERY_API_BASE_URL": "https://anchr-app.fly.dev"
-      }
-    }
-  }
-}
+await provider.serve(async (request) => {
+  // request.spec.schema tells you what proof format to produce.
+  // Schema-specific producers live in @anchr/tlsn-toolkit, @anchr/photo-bounty, etc.
+  return await produceProof(request.spec);
+});
 ```
 
-### Claude Code
+## Components (you choose)
 
-```bash
-claude mcp add anchr -- bun run /path/to/anchr/src/mcp.ts
-```
+The SDK does not bundle these — you pass URLs/pubkeys at construction
+time. Run your own, or use third-party infrastructure.
 
-### Available tools
+| Component | Role | Required for | Examples |
+|---|---|---|---|
+| **Oracle** | Atomic exchange enforcer. Verifies proof, releases HTLC preimage. Customer and provider each pass a whitelist; the protocol uses one oracle from the intersection. | All schemas | Self-host single-party, or FROST t-of-n cluster |
+| **Relay** | Nostr message transport. Any vanilla relay. | All schemas | strfry, nostr-rs-relay, third-party relays |
+| **Mint** | Cashu HTLC ecash issuer. Any vanilla mint. | All schemas | nutshell, cashu-rs-mint, public test mints |
+| **Notary** | TLSNotary verifier. Mediates the provider's TLS proof session. | TLSN-based schemas only | Self-host (`crates/tlsn-*`), or any compatible notary |
 
-| Tool | Description |
-|------|-------------|
-| `create_query` | Request verified web data (TLSNotary) or real-world photos (C2PA) |
-| `get_query_status` | Poll query status and retrieve verified results |
-| `list_available_queries` | List open queries |
-| `cancel_query` | Cancel a pending query |
-| `get_query_attachment` | Get attachment URL/metadata |
-| `get_query_attachment_preview` | Get resized preview image |
+## Verification types
 
-### Example: AI agent verifies BTC price
+The SDK does not bake in any verification format. Each request carries
+a `schema` URI; provider and oracle interpret it. New formats plug in by
+publishing a schema, not by upgrading the SDK.
 
-```
-Human: "What is the current BTC price? I need a cryptographic proof."
+| Schema | Use case |
+|---|---|
+| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
+| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video with optional GPS predicate |
 
-Claude uses create_query:
-  verification_requirements: ["tlsn"]
-  target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }]
+Schemas live as Nostr parameterized replaceable events (kind `30888`);
+each defines the `predicate` shape, the proof format, and verification
+rules.
 
-→ Auto-worker fetches via MPC-TLS, generates cryptographic proof
-→ Claude polls get_query_status, receives verified data
-→ "BTC is $XX,XXX (cryptographically proven via TLSNotary — server: api.coingecko.com)"
-```
+## Examples
 
-## Architecture
+Use this SDK to build the products below. Status shows current
+implementation — see each example's README for what runs today.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Requester                                 │
-│  anchr.query({ targetUrl, conditions, sats })                    │
-└────────────┬─────────────────────────────────┬───────────────────┘
-             │ Nostr kind 5300                  │ Cashu Proof[]
-             ▼                                  ▼
-┌────────────────────┐                ┌─────────────────┐
-│    Nostr Relay      │                │   Cashu Mint     │
-│  (broadcast + DM)   │                │ (Lightning-backed)│
-└────────────┬────────┘                └──────┬──────────┘
-             │ kind 5300                       │ checkProofsStates
-             ▼                                 │
-┌──────────────────────────────────────────────┼───────────────────┐
-│                        Worker                │                    │
-│                                              │                    │
-│  TLSNotary path:          Photo path:        │                    │
-│    tlsn-prove               C2PA camera      │                    │
-│      ↕ MPC-TLS                ↓              │                    │
-│    Verifier Server          Upload + GPS     │                    │
-│      ↓                        ↓              │                    │
-│    .presentation.tlsn       C2PA manifest    │                    │
-│              ↓                 ↓             │                    │
-│              └── Blossom (E2E encrypted) ────┘                    │
-└────────────┬─────────────────────────────────────────────────────┘
-             │ POST /queries/:id/result
-             ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                     Oracle (Anchr Server)                         │
-│                                                                   │
-│  TLSNotary: tlsn-verifier → MPC-TLS signature verify             │
-│  C2PA: c2patool → Content Credentials signature verify            │
-│  Conditions: jsonpath / regex / GPS haversine / nonce challenge   │
-│                                                                   │
-│  ✓ Pass → reveal preimage → Cashu HTLC bounty → Worker           │
-│  ✗ Fail → refund Proof[] → Requester                             │
-└──────────────────────────────────────────────────────────────────┘
-```
+| Product | Status |
+|---|---|
+| Airdrop sybil resistance ([Katashiro](example/airdrop-bot-shield/)) | Simulation |
+| Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/)) | Testnet |
+| 2-party binary bet ([Kannagi](example/two-party-binary-bet/)) | Testnet |
+| Browser auto-claim ([Auto-claim](example/auto-claim/)) | Concept |
+| Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Concept (TLSN-on-Square compatibility risk) |
 
-## Configuration
+Composition sketches (not products):
+[Royalty distribution](example/royalty-distribution/),
+[Supply-chain proof](example/supply-chain-proof/).
 
-| Variable | Description |
-|----------|-------------|
-| `NOSTR_RELAYS` | Relay WebSocket URLs (comma-separated) |
-| `BLOSSOM_SERVERS` | Blossom blob server URLs |
-| `CASHU_MINT_URL` | Cashu mint for ecash payments |
-| `HTTP_API_KEY` | API key for write endpoints |
-| `TLSN_VERIFIER_URL` | TLSNotary Verifier Server URL |
-| `TLSN_PROXY_URL` | TLSNotary WebSocket proxy URL |
+## Underlying packages
 
-## Testing
+Each is independently usable.
 
-```bash
-bun test                         # all tests
-bun test src/                    # unit tests
-bun test e2e/tlsn.test.ts       # TLSNotary E2E (real MPC-TLS)
-bun test e2e/tlsn-browser.test.ts  # browser extension E2E
-bun run test:regtest             # Lightning + Cashu E2E
-```
+| Package | Purpose |
+|---|---|
+| [`@anchr/sdk`](packages/sdk/) | Customer/provider orchestration over the components above |
+| [`@anchr/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary proof verification (replay-protected, ReDoS-safe) |
+| [`@anchr/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Cross-lock primitive (HTLC + FROST P2PK) |
+| [`@anchr/cashu-frost-oracle`](packages/cashu-frost-oracle/) | FROST t-of-n threshold signing wrapper |
+| [`@anchr/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow primitives |
+| [`@anchr/photo-bounty`](packages/photo-bounty/) | C2PA + GPS + ProofMode + EXIF + AI heuristic verification |
 
-## Stack
+Plus Rust crates: `crates/frost-signer` (FROST signing daemon),
+`crates/tlsn-*` (TLSNotary integrations).
 
-| Layer | Tech |
-|-------|------|
-| SDK | TypeScript (`anchr-sdk`) |
-| Server | Bun + Hono |
-| Messaging | Nostr (NIP-90 DVM) |
-| Storage | Blossom (E2E encrypted) |
-| Payment | Cashu ecash (NUT-14 HTLC) / Lightning |
-| Web Verification | TLSNotary (MPC-TLS + Rust verifier) |
-| Photo Verification | C2PA + EXIF + ProofMode + GPS |
-| TLS Verifier Server | Rust (async-tungstenite + WsStream) |
-| Mobile | React Native (Expo) + NativeWind |
+## Reference
+
+- [Architecture](docs/architecture.md) — layer dependencies and
+  composition patterns
+- [Threat model](docs/threat-model.md) — attacker assumptions and
+  mitigations
+- [Wire spec](specs/) — protocol on the wire (CC0, anyone may implement)
+- [Contributing](CONTRIBUTING.md) — local stack, test commands
 
 ## License
 
-[MIT](LICENSE)
+Code: [MIT](LICENSE) · Specs: [CC0](specs/LICENSE) — anyone may implement.

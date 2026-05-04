@@ -70,8 +70,8 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
     let (revealed_sent, revealed_recv) = match transcript {
         Some(mut partial) => {
             partial.set_unauthed(0u8);
-            let sent = String::from_utf8_lossy(partial.sent_unsafe()).to_string();
-            let recv = String::from_utf8_lossy(partial.received_unsafe()).to_string();
+            let sent = render_with_redaction(partial.sent_unsafe());
+            let recv = render_with_redaction(partial.received_unsafe());
             (Some(sent), Some(recv))
         }
         None => (None, None),
@@ -102,6 +102,31 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
         "revealed_recv": revealed_recv,
         "error": null,
     }))
+}
+
+/// Render transcript bytes, replacing runs of \0 (unauthed/redacted bytes) with [REDACTED].
+/// This preserves the cryptographic proof — redacted regions are still committed to
+/// but their content is not revealed in the presentation.
+fn render_with_redaction(bytes: &[u8]) -> String {
+    let mut result = String::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == 0 {
+            // Find end of redacted run
+            while i < bytes.len() && bytes[i] == 0 {
+                i += 1;
+            }
+            result.push_str("[REDACTED]");
+        } else {
+            // Find end of non-redacted run
+            let start_idx = i;
+            while i < bytes.len() && bytes[i] != 0 {
+                i += 1;
+            }
+            result.push_str(&String::from_utf8_lossy(&bytes[start_idx..i]));
+        }
+    }
+    result
 }
 
 /// Decode HTTP chunked transfer encoding.

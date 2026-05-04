@@ -14,6 +14,17 @@ Default to using Deno instead of Node.js.
 - Use `npx <package> <command>` for CLI tools not yet on JSR
 - Deno auto-loads `.env` via `--env` flag in task definitions. Don't use dotenv.
 
+## Task completion (execute, then prove)
+
+Follow the user's instructions to the end. A task is done when the requested work is actually performed and verified—not when it sounds done in prose.
+
+- **Tests:** Run the tests (or checks) the task calls for. If you report that tests pass, include the relevant terminal output so the result is verifiable.
+- **Browser / mobile / UI:** If verification requires a desktop browser, mobile web (responsive or device viewport), or a native/simulator flow (for example iOS Simulator, Android emulator, or physical device), do that verification and report with concrete evidence—screenshots, short screen recordings, simulator/device logs, or described observable state—not a generic "verified" or "works on mobile" claim.
+- **Parallel work:** Wait for agents, subtasks, or CI-style checks to finish before writing a closing summary. Summarize outcomes after everything relevant has completed.
+- **Tools and failures:** If a command or tool fails, returns an error, or yields an unexpected result, say so in the same turn and continue from the real state—do not imply success or skip over it.
+
+Prefer running commands and using tools over telling the user what they could run. If something is blocked or out of scope, say that explicitly instead of marking the task complete.
+
 ## Import Map (deno.json)
 
 JSR packages (supply-chain safe, no npm):
@@ -30,8 +41,21 @@ npm packages (via `npm:` prefix):
 
 - `Deno.serve()` for HTTP servers. Use Hono for routing. Don't use `express`.
 - `Deno.upgradeWebSocket()` for WebSocket support.
-- Runtime compat layer at `src/runtime/mod.ts` provides: `spawn`, `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `which`, `moduleDir`
+- Runtime compat layer at `packages/core-runtime/` exposes: `spawn`, `readFile`, `writeFile`, `fileExists`, `fileLastModified`, `which`, `moduleDir`. Import as `@anchr/core-runtime` (or subpaths like `@anchr/core-runtime/logger`).
+- Env access: use `Deno.env.get/set/delete` — never `process.env` (caught by lint).
 - `WebSocket` is built-in. Don't use `ws`.
+
+## Logging
+
+Use logTape via `@anchr/core-runtime/logger` (re-exposed for the host as `src/infrastructure/logger.ts`). Don't call `console.*` in `src/infrastructure/` or `packages/` — `console` is reserved for UI/scripts and the `log-stream` tee.
+
+```ts
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "verifier"]);
+log.info("verification passed", { queryId, oracleId });
+```
+
+The level is read from `ANCHR_LOG_LEVEL` (or `LOG_LEVEL`) — `info` by default.
 
 ## Testing
 
@@ -61,6 +85,74 @@ Run the server:
 ```sh
 deno task build:ui && deno task build:css && deno task dev
 ```
+
+## Test Commands
+
+| Command | Scope | Docker |
+|---------|-------|--------|
+| `deno task lint` | recommended deno-lint rules + no-eval / no-self-compare / default-param-last | No |
+| `deno task lint:strict` | deno lint + arch + invariants + paths + refactor | No |
+| `deno task test:packages` | per-package tests across all 7 workspace members | No |
+| `deno task test:all` | deno lint + arch + invariants + paths + dep audit + unit + protocol + frost + integration + example + pentest | No |
+| `deno task test:all:docker` | e2e relay + regtest (starts/stops Docker) | Yes |
+| `deno task test:all:full` | all of the above combined | Yes |
+| `./scripts/test-all.sh --ci` | same as full, CI-optimized | Yes |
+
+Quality invariants the CI enforces:
+- No `--no-check` in test tasks (full TypeScript checking)
+- No `as unknown as` casts in source
+- No dynamic `await import(...)` in libraries (only platform conditionals + scripts)
+- No `process.env` in `src/`/`packages/` (use `Deno.env`)
+- No `console.*` in `src/infrastructure/` or `packages/` (use `getLogger` from `@anchr/core-runtime/logger`)
+
+## Type-safety bar
+
+- `as` casts and `any` are forbidden in `src/` and `packages/`. Narrow with type predicates (`x is T`) or runtime helpers in `src/infrastructure/lib/runtime-types.ts`.
+- `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use. Anywhere else, write the precise type.
+- Enforced by `deno task lint:refactor` (runs in CI via `scripts/test-all.sh`).
+
+## Versioning + deprecation policy
+
+Pre-1.0 (no published version, no users): when a function, field, or
+endpoint is replaced, **delete the old path outright**. Don't carry
+`@deprecated` aliases, "legacy" fallbacks, or "backward compat"
+shims through refactors. If a regression is the worry, write a test
+that locks the new behaviour — do not preserve the old one.
+
+Post-1.0 (SemVer in effect): `@deprecated` notices are allowed only on
+**minor / patch boundaries** and must name the version that introduces
+the deprecation and the version that removes the symbol, e.g.
+`@deprecated since v1.4, removed in v2.0. Use X.`. Major versions
+delete; they do not deprecate.
+
+Enforcement: `deno task lint:deprecation` (`scripts/lint-deprecation.ts`)
+bans `@deprecated`, "deprecated", "legacy", and "backward(s) compat"
+in `*.ts` / `*.tsx` / `*.rs` source. Per-line opt-out is
+`allow-deprecation-vocab: <reason>` and is reserved for legitimate
+post-1.0 deprecation notices. Markdown is not scanned (specs and
+design docs may legitimately discuss the policy itself).
+
+## Verification bar
+
+- A change is "done" only after a full local run passes: `deno task test:all` (lint + unit + protocol + frost + integration + example + pentest) **plus** `deno task test:all:docker` (Docker-backed e2e: relay + regtest). Don't claim done after only unit tests.
+- If a test or check fails, fix the implementation. Do not skip the test, weaken the assertion, delete the case, or `--no-check` around it. Iterate on root cause until tests pass with the correct behavior.
+
+## Architecture Lint
+
+`deno task lint:arch` enforces Clean Architecture layer dependencies:
+
+| Rule | Layer | Must NOT import from |
+|------|-------|---------------------|
+| E001 | `domain/` | application, infrastructure, ui, runtime |
+| E002 | `runtime/` | domain, application, infrastructure, ui |
+| E003 | `ui/` | infrastructure, application |
+| E004 | Any | `express`, `dotenv`, `ws` (banned packages) |
+| E005 | `application/` | infrastructure, ui, runtime |
+| W001 | Any | npm: when JSR equivalent exists |
+
+- Runs automatically on every Edit/Write via Claude Code hook (PostToolUse)
+- Runs in CI before typecheck
+- Errors (E*) cause non-zero exit; warnings (W*) are informational
 
 ## Design System
 Always read DESIGN.md before making any visual or UI decisions.

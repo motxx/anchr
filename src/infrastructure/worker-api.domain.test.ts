@@ -1,11 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildWorkerApiApp } from "./worker-api";
-import { createQueryService, createQueryStore } from "../application/query-service";
-import type { QueryService } from "../application/query-service";
-import { createOracleRegistry } from "./oracle";
-import type { Oracle, OracleAttestation } from "./oracle";
-import type { Query, QueryResult, BlossomKeyMap } from "../domain/types";
+import { buildWorkerApiApp } from "./worker-api.ts";
+import { createQueryService, createQueryStore } from "../application/query-service.ts";
+import type { QueryService } from "../application/query-service.ts";
+import { createOracleRegistry } from "./oracle/index.ts";
+import type { Oracle, OracleAttestation } from "./oracle/index.ts";
+import type { Query, QueryResult, BlossomKeyMap } from "../domain/types.ts";
 
 // --- Mock oracle ---
 
@@ -31,10 +31,10 @@ function makeApp(oraclePass = true) {
   registry.register(makeMockOracle(oraclePass));
   const svc = createQueryService({ store, oracleRegistry: registry });
   // Ensure no API key required for tests
-  const savedKey = process.env.HTTP_API_KEY;
-  const savedKeys = process.env.HTTP_API_KEYS;
-  delete process.env.HTTP_API_KEY;
-  delete process.env.HTTP_API_KEYS;
+  const savedKey = Deno.env.get("HTTP_API_KEY");
+  const savedKeys = Deno.env.get("HTTP_API_KEYS");
+  Deno.env.delete("HTTP_API_KEY");
+  Deno.env.delete("HTTP_API_KEYS");
 
   const app = buildWorkerApiApp({ queryService: svc });
 
@@ -42,10 +42,10 @@ function makeApp(oraclePass = true) {
     app,
     svc,
     cleanup: () => {
-      if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-      else delete process.env.HTTP_API_KEY;
-      if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-      else delete process.env.HTTP_API_KEYS;
+      if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+      else Deno.env.delete("HTTP_API_KEY");
+      if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+      else Deno.env.delete("HTTP_API_KEYS");
     },
   };
 }
@@ -337,9 +337,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "HTLC query",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "abc123",
-          oracle_pubkey: "oracle_pub",
+          oracle_pubkeys: ["oracle_pub"],
           requester_pubkey: "req_pub",
           locktime: nowSecs + 1200,
         },
@@ -351,9 +352,9 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       // Verify via HTTP
       const getRes = await app.request(`/queries/${id}`, { method: "GET" });
       expect(getRes.status).toBe(200);
-      const detail = await getRes.json() as { status: string; htlc: unknown };
+      const detail = await getRes.json() as { status: string; escrow: unknown };
       expect(detail.status).toBe("awaiting_quotes");
-      expect(detail.htlc).toBeDefined();
+      expect(detail.escrow).toBeDefined();
     } finally {
       cleanup();
     }
@@ -365,9 +366,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "HTLC flow",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h123",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },
@@ -377,6 +379,7 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       // Quote + select via service (these are service-level operations)
       svc.recordQuote(id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
       await svc.selectWorker(id, "w1");
+      svc.beginWork(id);
 
       // Submit result via HTTP
       const submitRes = await submitResultViaHttp(app, id, {
@@ -403,9 +406,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       const createRes = await createQueryViaHttp(app, {
         description: "Quote test",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },
@@ -440,9 +444,10 @@ describe("Domain integration: HTLC lifecycle via HTTP", () => {
       const nowSecs = Math.floor(Date.now() / 1000);
       await createQueryViaHttp(app, {
         description: "HTLC listed",
-        htlc: {
+        escrow: {
+          type: "htlc",
           hash: "h",
-          oracle_pubkey: "o",
+          oracle_pubkeys: ["o"],
           requester_pubkey: "r",
           locktime: nowSecs + 1200,
         },

@@ -5,15 +5,14 @@
  */
 
 declare global {
-  interface Window {
-    __ANCHR_API_URL__?: string;
-  }
+  // eslint-disable-next-line no-var
+  var __ANCHR_API_URL__: string | undefined;
 }
 
 function getApiBaseUrl(): string {
   // 1. Explicit global override (e.g. set by CDN deployment)
-  if (typeof window !== "undefined" && window.__ANCHR_API_URL__) {
-    return window.__ANCHR_API_URL__.replace(/\/+$/, "");
+  if (typeof globalThis !== "undefined" && globalThis.__ANCHR_API_URL__) {
+    return globalThis.__ANCHR_API_URL__.replace(/\/+$/, "");
   }
 
   // 2. Data attribute on root element

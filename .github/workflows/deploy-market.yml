@@ -1,0 +1,112 @@
+name: Deploy Prediction Market
+
+# Auto-deploys the 巫(Kannagi) prediction market to Fly when:
+#   - push to main, AND
+#   - the change touches example/two-party-binary-bet/, the src/ &
+#     packages/ paths the market server depends on at build time,
+#     or the deploy config / Dockerfile.
+#
+# Independent of deploy.yml — that workflow orchestrates the
+# protocol-server stack (relay + blossom + tlsn-verifier + worker +
+# anchr app). Examples deploy on their own cadence so a market UI tweak
+# doesn't trigger a relay rollout.
+#
+# Manual trigger via workflow_dispatch is always available.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "example/two-party-binary-bet/**"
+      - "packages/cashu-conditional-swap/**"
+      - "packages/cashu-frost-oracle/**"
+      - "packages/core-cashu/**"
+      - "packages/core-runtime/**"
+      - "packages/tlsn-toolkit/**"
+      - "src/infrastructure/**"
+      - "src/ui/**"
+      - "scripts/build-ui.ts"
+      - "scripts/build-css.ts"
+      - "fly.market.toml"
+      - "deno.json"
+      - "deno.lock"
+      - "crates/tlsn-verifier/**"
+      - "crates/frost-signer/**"
+      - ".github/workflows/deploy-market.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fly-market
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Deno
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
+        with:
+          deno-version: v2.x
+      - name: Install workspace deps
+        run: deno install
+      - name: Architecture lint (errors only)
+        run: deno task lint:arch
+      - name: Type-check market sources
+        run: |
+          deno check \
+            example/two-party-binary-bet/server.ts \
+            example/two-party-binary-bet/src/server-routes.ts \
+            example/two-party-binary-bet/src/exchange-protocol.ts \
+            example/two-party-binary-bet/src/nip60.ts \
+            example/two-party-binary-bet/src/nip61.ts
+      - name: Unit tests (market + bot fleet)
+        run: deno test example/two-party-binary-bet/src/ scripts/bot-fleet/ --allow-all --no-check
+      - name: Build UI
+        run: deno task build:ui
+
+  deploy:
+    name: Deploy to Fly
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # master
+      - name: Deploy
+        run: flyctl deploy --remote-only --config fly.market.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_MARKET }}
+      - name: Verify health
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS https://anchr-market.fly.dev/markets/wallet/config >/dev/null; then
+              echo "Health OK on attempt $i"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check failed"
+          exit 1

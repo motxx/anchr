@@ -1,0 +1,55 @@
+{
+  "name": "@anchr/sdk",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1",
+    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
+    "nostr-tools/pool": "npm:nostr-tools@^2/pool",
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
+    "nostr-tools/nip44": "npm:nostr-tools@^2/nip44"
+  },
+  "publish": {
+    "include": [
+      "src/index.ts",
+      "src/types.ts",
+      "src/schema.ts",
+      "src/customer.ts",
+      "src/provider.ts",
+      "src/nostr.ts",
+      "src/oracle.ts",
+      "src/cashu.ts",
+      "src/events.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/worker.ts",
+      "src/cli.ts",
+      "src/*.test.ts",
+      "src/test-helpers.ts",
+      "dist/",
+      "tsconfig.json",
+      "package.json"
+    ]
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-env --allow-read --allow-net src/customer.test.ts src/provider.test.ts src/schema.test.ts src/nostr.test.ts src/oracle.test.ts src/cashu.test.ts src/events.test.ts src/integration.test.ts"
+  },
+  "test": {
+    "exclude": ["src/index.test.ts", "src/worker.test.ts"]
+  }
+}

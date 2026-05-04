@@ -2,15 +2,26 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "../runtime/mod.ts";
-import { getRuntimeConfig } from "./config";
+import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime/mod";
+import { getRuntimeConfig } from "./config.ts";
 import type {
   AttachmentAccess,
   AttachmentHandle,
   AttachmentRef,
   AttachmentStorageKind,
   QueryResult,
-} from "../domain/types";
+} from "../domain/types.ts";
+import {
+  attachmentRefSource,
+  inferAttachmentId,
+  extractBlossomFields,
+  normalizeFromResolved,
+  normalizeFromRef,
+  normalizeFromString,
+  readBlossomAttachment,
+  readExternalAttachment,
+} from "./attachment-helpers.ts";
+import process from "node:process";
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -98,26 +109,12 @@ function resolvePreviewCommand():
   return null;
 }
 
-function attachmentRefSource(ref: AttachmentLike): string {
-  if (typeof ref === "string") return ref;
-  return ref.uri;
-}
-
-function inferAttachmentId(value: string): string {
-  try {
-    const pathname = new URL(value).pathname;
-    return pathname.split("/").filter(Boolean).pop() ?? value;
-  } catch {
-    return value.split("/").filter(Boolean).pop() ?? value;
-  }
-}
-
 function inferMimeTypeFromFilename(filename: string): string {
   return MIME_TYPES[extname(filename).toLowerCase()] ?? "application/octet-stream";
 }
 
 export function attachmentPublicBaseUrl(requestUrl?: string): string {
-  const configured = process.env.ATTACHMENT_PUBLIC_BASE_URL ?? process.env.PUBLIC_BASE_URL;
+  const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ?? Deno.env.get("PUBLIC_BASE_URL");
   if (configured) return configured.replace(/\/+$/, "");
   if (requestUrl) return new URL("/", requestUrl).toString().replace(/\/+$/, "");
   return `http://localhost:${getRuntimeConfig().referenceAppPort}`;
@@ -134,42 +131,17 @@ export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: str
 
 export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
   const resolved = resolveStoredAttachment(ref, requestUrl);
-  const blossomFields = typeof ref !== "string" ? {
-    blossom_hash: ref.blossom_hash,
-    blossom_servers: ref.blossom_servers,
-  } : {};
+  const blossomFields = extractBlossomFields(ref);
 
   if (resolved) {
-    const baseRef = typeof ref === "string" ? null : ref;
-    return {
-      id: baseRef?.id ?? resolved.filename ?? inferAttachmentId(attachmentRefSource(ref)),
-      uri: resolved.absoluteUrl,
-      mime_type: baseRef?.mime_type ?? resolved.mimeType,
-      storage_kind: baseRef?.storage_kind ?? resolved.storageKind,
-      filename: baseRef?.filename ?? resolved.filename,
-      size_bytes: baseRef?.size_bytes,
-      ...blossomFields,
-    };
+    return normalizeFromResolved(ref, resolved, blossomFields);
   }
 
   if (typeof ref !== "string") {
-    return {
-      id: ref.id || inferAttachmentId(ref.uri),
-      uri: ref.uri,
-      mime_type: ref.mime_type || "application/octet-stream",
-      storage_kind: ref.storage_kind || "external",
-      filename: ref.filename,
-      size_bytes: ref.size_bytes,
-      ...blossomFields,
-    };
+    return normalizeFromRef(ref, blossomFields);
   }
 
-  return {
-    id: inferAttachmentId(ref),
-    uri: ref,
-    mime_type: "application/octet-stream",
-    storage_kind: "external",
-  };
+  return normalizeFromString(ref);
 }
 
 export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
@@ -260,31 +232,16 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../domain/types").BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../domain/types.ts").BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
-  // Requires ephemeral key material — keys are never stored in AttachmentRef (E2E).
   if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
-    const { downloadFromBlossom } = await import("./blossom/client");
-    const data = await downloadFromBlossom(ref.blossom_hash, blossomKeyMaterial.encrypt_key, blossomKeyMaterial.encrypt_iv, ref.blossom_servers);
-    if (!data) return null;
-    return {
-      filename: ref.filename ?? ref.blossom_hash,
-      mimeType: ref.mime_type ?? "application/octet-stream",
-      absoluteUrl: ref.uri,
-      storageKind: "blossom" as AttachmentStorageKind,
-      data: Buffer.from(data),
-    };
+    return readBlossomAttachment(ref, blossomKeyMaterial);
   }
 
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 
-  const response = await fetch(attachment.absoluteUrl);
-  if (!response.ok) return null;
-  return {
-    ...attachment,
-    data: Buffer.from(await response.arrayBuffer()),
-  };
+  return readExternalAttachment(attachment);
 }
 
 export async function renderStoredAttachmentPreview(

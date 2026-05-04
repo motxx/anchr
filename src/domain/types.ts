@@ -10,9 +10,9 @@ export type QueryStatus =
   | "expired";
 export type PaymentStatus =
   | "none"
-  | "htlc_pending"
-  | "htlc_locked"
-  | "htlc_swapped"
+  | "escrow_pending"
+  | "escrow_locked"
+  | "escrow_swapped"
   | "locked"
   | "released"
   | "cancelled";
@@ -20,6 +20,10 @@ export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "worker_api" | "mcp";
 export type AttachmentStorageKind = "blossom" | "external";
+
+/** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
+export type ProofVisibility = "public" | "requester_only";
+
 
 export interface GpsCoord {
   lat: number;
@@ -35,48 +39,16 @@ export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
 
-export interface TlsnCondition {
-  type: "contains" | "regex" | "jsonpath";
-  expression: string;
-  expected?: string;
-  description?: string;
-}
-
-export interface TlsnRequirement {
-  target_url: string;
-  method?: "GET" | "POST";
-  conditions?: TlsnCondition[];
-  /** Max age of attestation in seconds (default: 300). */
-  max_attestation_age_seconds?: number;
-  /** Domain hint for public display when actual URL is delivered via encrypted_context. */
-  domain_hint?: string;
-}
-
-/** Sensitive context encrypted to Worker — never stored publicly. */
-export interface TlsnEncryptedContext {
-  /** The actual target URL (may contain session IDs). */
-  target_url: string;
-  /** Custom HTTP headers (e.g., Authorization). */
-  headers?: Record<string, string>;
-  /** HTTP method override (default: GET). */
-  method?: "GET" | "POST";
-  /** Request body for POST requests. */
-  body?: string;
-}
-
-export interface TlsnAttestation {
-  /** Base64-encoded TLSNotary presentation file (.presentation.tlsn). */
-  presentation: string;
-}
-
-/** Cryptographically verified data extracted from a TLSNotary presentation by the oracle. */
-export interface TlsnVerifiedData {
-  server_name: string;
-  revealed_body: string;
-  revealed_headers?: string;
-  /** Session timestamp (unix seconds, from the cryptographic proof). */
-  session_timestamp: number;
-}
+// TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
+// domain re-exports them so existing call sites keep the single import surface.
+import type {
+  TlsnAttestation,
+  TlsnCondition,
+  TlsnEncryptedContext,
+  TlsnRequirement,
+  TlsnVerifiedData,
+} from "@anchr/tlsn-toolkit/tlsn-types";
+export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
 
 export interface QueryInput {
   description: string;
@@ -86,6 +58,8 @@ export interface QueryInput {
   max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
   tlsn_requirements?: TlsnRequirement;
+  /** Proof visibility — required when tlsn_requirements is set. */
+  visibility?: ProofVisibility;
 }
 
 export interface AttachmentRef {
@@ -137,6 +111,8 @@ export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
+  /** Advisory warnings (e.g., ai_check) — informational, do not gate payment. */
+  warnings?: string[];
   /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
   tlsn_verified?: TlsnVerifiedData;
 }
@@ -154,26 +130,54 @@ export interface SubmissionMeta {
 
 export interface BountyInfo {
   amount_sats: number;
-  cashu_token?: string;
+  escrow_token?: string;
 }
 
-/** HTLC escrow information for trustless payment. */
-export interface HtlcInfo {
-  /** SHA-256 hash of the preimage — known to all parties. */
-  hash: string;
-  /** Oracle's Nostr pubkey (hex). */
-  oracle_pubkey: string;
-  /** Requester's Nostr pubkey (hex) — used for HTLC refund. */
+/** Escrow mechanism type — discriminator for the EscrowInfo union. */
+export type EscrowType = "htlc" | "p2pk_frost";
+
+/** Fields shared by every escrow variant. */
+interface EscrowCommonFields {
+  /** Oracle pubkeys (singleton for HTLC, FROST signers for threshold). */
+  oracle_pubkeys: string[];
+  /** Requester's Nostr pubkey (hex) — used for refund. */
   requester_pubkey: string;
   /** Worker's Nostr pubkey (hex) — set after worker selection. */
   worker_pubkey?: string;
-  /** HTLC locktime as unix timestamp (seconds). */
+  /** Locktime as unix timestamp (seconds). */
   locktime: number;
-  /** Encoded Cashu HTLC token (held by Requester until swap). */
+  /** Encoded escrow token (held by Requester until swap). */
   escrow_token?: string;
-  /** Server-verified escrow amount in sats (set after token verification at worker selection). */
+  /** Server-verified escrow amount in sats. */
   verified_escrow_sats?: number;
+  /** Opaque reference for EscrowProvider tracking. */
+  escrow_ref?: string;
 }
+
+/**
+ * NUT-14 hashlocked timelock contract — Oracle reveals a preimage to settle.
+ * The escrow token is locked to `worker_pubkey` AND the hash; both must be
+ * satisfied to redeem.
+ */
+export interface HtlcEscrow extends EscrowCommonFields {
+  type: "htlc";
+  /** SHA-256 hash of the preimage Oracle reveals on a passing verification. */
+  hash: string;
+}
+
+/**
+ * NUT-11 pay-to-pubkey escrow signed by a FROST t-of-n Oracle group.
+ * Settlement is a threshold Schnorr signature instead of a preimage reveal.
+ * See `packages/cashu-frost-oracle/SPEC.md` for the signing flow.
+ */
+export interface P2pkFrostEscrow extends EscrowCommonFields {
+  type: "p2pk_frost";
+  /** BIP-340 x-only FROST group public key (the t-of-n threshold key). */
+  group_pubkey: string;
+}
+
+/** Escrow information for an in-flight Query. Discriminated by `type`. */
+export type EscrowInfo = HtlcEscrow | P2pkFrostEscrow;
 
 /** A quote from a Worker offering to fulfill a query. */
 export interface QuoteInfo {
@@ -187,13 +191,28 @@ export interface QuoteInfo {
   received_at: number;
 }
 
-/** Outcome of submitHtlcResult — includes preimage on success. */
-export interface HtlcSubmitOutcome {
+/**
+ * Outcome of submitEscrowResult. On verification success the worker receives
+ * a settlement artifact whose shape depends on the escrow type:
+ *   - HTLC (`escrow.type === "htlc"`):       `preimage` (SHA-256 preimage hex)
+ *   - P2PK+FROST (`escrow.type === "p2pk_frost"`): `frost_signature` (BIP-340 hex)
+ * Exactly one of `preimage` / `frost_signature` is set on a successful
+ * outcome; neither is set on rejection or expiry.
+ *
+ * **FROST message format (settlement contract):** the FROST signature is over
+ * the UTF-8 bytes of `anchr/query-settle/v1:${query.id}:approved`. Any
+ * downstream redeemer that validates the signature against the P2PK lock
+ * **must** use the same prefix and version. See `query-service-methods.ts`
+ * `doSubmitEscrowResult` for the canonical encoding.
+ */
+export interface EscrowSubmitOutcome {
   ok: boolean;
   query: Query | null;
   message: string;
-  /** Preimage revealed on verification success (Worker uses this to redeem HTLC token). */
+  /** Preimage revealed on HTLC verification success (Worker redeems the HTLC token with this). */
   preimage?: string;
+  /** Aggregated FROST Schnorr signature delivered on P2PK+FROST verification success. */
+  frost_signature?: string;
 }
 
 export interface QuorumConfig {
@@ -233,8 +252,8 @@ export interface Query {
   verification?: VerificationDetail;
   submission_meta?: SubmissionMeta;
   payment_status: PaymentStatus;
-  /** HTLC escrow details (present when Cashu payment is used). */
-  htlc?: HtlcInfo;
+  /** Escrow details (present when payment escrow is used). */
+  escrow?: EscrowInfo;
   /** Worker quotes received for this query. */
   quotes?: QuoteInfo[];
   /** Nostr event ID of the kind 5300 Job Request. */
@@ -251,4 +270,8 @@ export interface Query {
   quorum?: QuorumConfig;
   /** Individual oracle attestations collected during quorum verification. */
   attestations?: OracleAttestationRecord[];
+  /** Proof visibility — controls whether TLSNotary proof is published to relays. */
+  visibility?: ProofVisibility;
+  /** Nostr event IDs of published attestation events. */
+  published_proofs?: string[];
 }

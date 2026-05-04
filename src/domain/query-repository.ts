@@ -1,6 +1,6 @@
-import type { Query, QueryStatus } from "./types";
-import { isExpirable } from "./query-transitions";
-import type { QueryStore } from "./query-store";
+import type { Query, QueryStatus } from "./types.ts";
+import { isExpirable } from "./query-transitions.ts";
+import type { QueryStore } from "./query-store.ts";
 
 export interface QueryRepository {
   get(id: string): Query | null;
@@ -50,7 +50,7 @@ export function createInMemoryQueryRepository(): QueryRepository {
   };
 }
 
-/** Backward-compatible adapter: wrap a QueryStore as a QueryRepository. */
+/** Adapter: wrap a QueryStore as a QueryRepository (call sites switching to the repository port). */
 export function toRepository(store: QueryStore): QueryRepository {
   return {
     get(id) {

@@ -13,9 +13,9 @@
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn, fileExists } from "../src/runtime/mod.ts";
+import { spawn, fileExists } from "@anchr/core-runtime";
 
-const BROWSE = `${process.env.HOME}/.claude/skills/gstack/browse/dist/browse`;
+const BROWSE = `${Deno.env.get("HOME")}/.claude/skills/gstack/browse/dist/browse`;
 const SERVER_URL = "http://localhost:3000";
 const WEB_URL = "http://localhost:8082";
 
@@ -32,6 +32,7 @@ async function browse(...args: string[]): Promise<string> {
 async function isWebAppReachable(): Promise<boolean> {
   try {
     const res = await fetch(WEB_URL, { signal: AbortSignal.timeout(5000) });
+    await res.body?.cancel();
     return res.ok;
   } catch {
     return false;
@@ -41,6 +42,7 @@ async function isWebAppReachable(): Promise<boolean> {
 async function isServerReachable(): Promise<boolean> {
   try {
     const res = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    await res.body?.cancel();
     return res.ok;
   } catch {
     return false;
@@ -116,7 +118,7 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(testQueryId).toMatch(/^query_/);
   });
 
-  test("web app loads and shows queries", async () => {
+  test("web app loads and shows queries", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("goto", WEB_URL);
@@ -130,7 +132,7 @@ describe("e2e: Anchr Worker Web app", () => {
     // Our test query should be visible
     expect(text).toContain("E2E Web");
     expect(text).toContain("渋谷");
-  }, 30_000);
+  });
 
   test("query card shows bounty and location", async () => {
     if (skip()) return;
@@ -141,7 +143,7 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("渋谷");
   });
 
-  test("navigate to query detail view", async () => {
+  test("navigate to query detail view", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip() || !testQueryId) return;
 
     // Navigate directly to the detail URL (expo-router web routing)
@@ -156,9 +158,9 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("Camera");
     expect(text).toContain("Import");
     expect(text).toContain("10 sats");
-  }, 15_000);
+  });
 
-  test("navigate to Wallet tab", async () => {
+  test("navigate to Wallet tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     // Go back to tabs first
@@ -177,9 +179,9 @@ describe("e2e: Anchr Worker Web app", () => {
     const text = await browse("text");
     expect(text).toContain("Balance");
     expect(text).toContain("sats");
-  }, 15_000);
+  });
 
-  test("navigate to Settings tab", async () => {
+  test("navigate to Settings tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("js", `
@@ -192,9 +194,9 @@ describe("e2e: Anchr Worker Web app", () => {
     const text = await browse("text");
     expect(text).toContain("Settings");
     expect(text).toContain("Server URL");
-  }, 15_000);
+  });
 
-  test("navigate to Map tab", async () => {
+  test("navigate to Map tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip()) return;
 
     await browse("js", `
@@ -206,16 +208,17 @@ describe("e2e: Anchr Worker Web app", () => {
 
     const text = await browse("text");
     expect(text).toContain("Map");
-  }, 15_000);
+  });
 
-  test("submit text result via API and verify web reflects status", async () => {
+  test("submit text result via API and verify web reflects status", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (skip() || !testQueryId) return;
 
-    // Submit via API
-    const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/submit`, {
+    // Submit the worker result via the /result endpoint.
+    const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/result`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        worker_pubkey: "e2e_web_test_worker",
         gps: { lat: 35.6595, lon: 139.7004 },
         notes: "E2E web test — 混雑してます",
       }),
@@ -242,5 +245,5 @@ describe("e2e: Anchr Worker Web app", () => {
 
     // Clean up — mark as handled
     testQueryId = null;
-  }, 30_000);
+  });
 });

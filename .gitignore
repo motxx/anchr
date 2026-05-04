@@ -48,6 +48,10 @@ uploads/*
 # ui
 generated.css
 
+# bundled UI outputs (rebuilt by `deno task build:ui`)
+example/prediction-market/ui/main.js
+example/prediction-market/ui/main.js.map
+
 # mobile (expo)
 mobile/.expo/
 mobile/ios/
@@ -55,9 +59,11 @@ mobile/android/
 mobile/node_modules/
 .gstack/
 
+# frost DKG key material
+.frost/
+
 # rust
 crates/*/target/
-crates/*/Cargo.lock
 test-results
 
 # direnv
@@ -65,9 +71,15 @@ test-results
 .envrc
 
 # claude code
-.claude/
+.claude/*
+!.claude/settings.json
+
+# generated reports
+docs/chaos-*.md
 
 # deno
 
 # example apps
 example/bounty-board/node_modules/
+example/bounty-board/.expo/
+.frost-market/

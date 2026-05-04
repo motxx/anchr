@@ -1,10 +1,10 @@
 import { useMemo } from "react";
-import { useQueries } from "./useQueries";
-import { useUserLocation } from "./useUserLocation";
-import { useFeedStore, type FeedFilter } from "../store/feed";
-import { haversineKm } from "../utils/distance";
-import { isExpired } from "../utils/time";
-import type { QuerySummary, GpsCoord } from "../api/types";
+import { useQueries } from "./useQueries.ts";
+import { useUserLocation } from "./useUserLocation.ts";
+import { useFeedStore, type FeedFilter } from "../store/feed.ts";
+import { haversineKm } from "../utils/distance.ts";
+import { isExpired } from "../utils/time.ts";
+import type { QuerySummary, GpsCoord } from "../api/types.ts";
 
 const NEARBY_RADIUS_KM = 50;
 

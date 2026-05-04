@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: v2.x
+
+      - name: Install dependencies (lockfile integrity check)
+        run: deno install --frozen
+
+      - name: Setup Rust (for frost-signer)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build frost-signer
+        run: cd crates/frost-signer && cargo build --release
+
+      - name: Typecheck
+        run: deno check src/**/*.ts
+
+      - name: Cargo dependency audit
+        run: |
+          cargo install cargo-audit --quiet 2>/dev/null || true
+          cd crates/frost-signer && cargo audit --deny warnings 2>&1 || true
+          cd ../tlsn-prover && cargo audit --deny warnings 2>&1 || true
+          cd ../tlsn-server && cargo audit --deny warnings 2>&1 || true
+
+      # Phase 1: Local tests (no Docker)
+      - name: Local tests (lint + unit + protocol + frost + integration + example + pentest)
+        run: deno task test:all
+
+      # Phase 2: Docker-dependent tests
+      - name: Start infrastructure (relay + Blossom + Postgres)
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d relay blossom postgres
+          # Wait for Postgres so the prediction-market order-book tests
+          # don't start before /docker-entrypoint-initdb.d finishes.
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U anchr -d anchr_market > /dev/null 2>&1; then
+              echo "Postgres ready."
+              break
+            fi
+            sleep 2
+          done
+          sleep 5
+
+      - name: E2E tests (relay + Blossom)
+        if: ${{ !cancelled() }}
+        run: deno task test:e2e:relay
+        env:
+          NOSTR_RELAYS: ws://localhost:7777
+          BLOSSOM_SERVERS: http://localhost:3333
+
+      # Phase 3: Regtest Lightning tests
+      - name: Start regtest Lightning stack
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d bitcoind lnd-mint lnd-user
+          sleep 5
+
+      - name: Initialize regtest (wait for LND + fund + open channel)
+        if: ${{ !cancelled() }}
+        run: ./scripts/init-regtest.sh
+
+      - name: Start Cashu mint
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d cashu-mint
+          sleep 5
+          docker compose restart cashu-mint
+          echo "Waiting for Cashu mint..."
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:3338/v1/info > /dev/null 2>&1; then
+              echo "Cashu mint ready."
+              break
+            fi
+            sleep 3
+          done
+
+      - name: Regtest E2E tests (HTLC + Cashu + Postgres)
+        if: ${{ !cancelled() }}
+        run: deno task test:regtest
+        env:
+          CASHU_MINT_URL: http://localhost:3338
+          NOSTR_RELAYS: ws://localhost:7777
+          BLOSSOM_SERVERS: http://localhost:3333
+          DATABASE_URL: postgres://anchr:anchr@localhost:5432/anchr_market
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
+
+      - name: Build deploy image
+        run: docker build -t anchr:${{ github.sha }} .

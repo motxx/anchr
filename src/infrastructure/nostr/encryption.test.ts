@@ -5,8 +5,8 @@ import {
   deriveConversationKey,
   encryptNip44,
   decryptNip44,
-} from "./encryption";
-import { generateEphemeralIdentity } from "./identity";
+} from "./encryption.ts";
+import { generateEphemeralIdentity } from "./identity.ts";
 
 describe("Nostr encryption", () => {
   test("derives deterministic region keys", () => {

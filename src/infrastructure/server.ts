@@ -1,3 +1,3 @@
-import { startReferenceRuntime } from "./runtime";
+import { startReferenceRuntime } from "./runtime.ts";
 
 await startReferenceRuntime();

@@ -1,8 +1,8 @@
 import React from "react";
 import { View } from "react-native";
-import { DSText } from "../ds";
+import { DSText } from "../ds/index.ts";
 import { Ionicons } from "@expo/vector-icons";
-import type { QueryStatus } from "../../api/types";
+import type { QueryStatus } from "../../api/types.ts";
 
 const STEPS: { key: QueryStatus; label: string }[] = [
   { key: "pending", label: "Created" },

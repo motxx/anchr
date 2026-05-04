@@ -1,6 +1,6 @@
-import { verify } from "../verification/verifier";
-import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types";
-import type { Oracle, OracleAttestation, OracleInfo } from "./types";
+import { verify } from "../verification/verifier.ts";
+import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types.ts";
+import type { Oracle, OracleAttestation, OracleInfo } from "./types.ts";
 
 export const BUILT_IN_ORACLE_ID = "built-in";
 

@@ -1,12 +1,16 @@
 .git
 .gitignore
+.env
+.env.*
 .local
 .claude
 .gstack
 node_modules
 mobile
 e2e
-scripts
+scripts/e2e-*
+scripts/run-*
+scripts/launch-*
 Dockerfile
 fly.toml
 fly.blossom.toml

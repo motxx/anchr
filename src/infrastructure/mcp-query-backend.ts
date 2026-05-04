@@ -5,23 +5,17 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "./attachments";
-import { getRuntimeConfig } from "./config";
-import {
-  cancelQuery,
-  createQuery,
-  getQuery,
-  listOpenQueries,
-  submitQueryResult,
-} from "../application/query-service";
-import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types";
+} from "./attachments.ts";
+import { getRuntimeConfig } from "./config.ts";
+import type { QueryService } from "../application/query-service.ts";
+import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
 const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
 
 // --- Shared types for MCP tool responses ---
 
-interface McpQueryBackend {
+export interface McpQueryBackend {
   createQuery(input: QueryInput, ttlSeconds: number, requesterMeta: RequesterMeta, oracleIds?: string[]): Promise<unknown>;
   getQueryStatus(queryId: string): Promise<unknown>;
   listAvailableQueries(): Promise<unknown>;
@@ -144,18 +138,18 @@ function errorPayload(queryId: string, index: number, message: string) {
 
 // --- Default backend (in-memory + relay sync) ---
 
-function createDefaultBackend(): McpQueryBackend {
+function createDefaultBackend(service: QueryService): McpQueryBackend {
   return {
     async createQuery(input, ttlSeconds, requesterMeta, oracleIds) {
-      const query = createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
+      const query = service.createQuery(input, { ttlSeconds, requesterMeta, oracleIds });
       return buildCreatedPayload(query, localBaseUrl);
     },
     async getQueryStatus(queryId) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       return query ? buildStatusPayload(query, localBaseUrl) : { error: "Query not found" };
     },
     async listAvailableQueries() {
-      return listOpenQueries().map((q) => ({
+      return service.listOpenQueries().map((q) => ({
         query_id: q.id,
         description: q.description,
         challenge_rule: q.challenge_rule ?? null,
@@ -164,10 +158,10 @@ function createDefaultBackend(): McpQueryBackend {
       }));
     },
     async cancelQuery(queryId) {
-      return cancelQuery(queryId);
+      return service.cancelQuery(queryId);
     },
     async submitQueryResult(queryId, result, oracleId) {
-      const outcome = await submitQueryResult(queryId, result, { executor_type: "agent", channel: "mcp" }, oracleId);
+      const outcome = await service.submitQueryResult(queryId, result, { executor_type: "agent", channel: "mcp" }, oracleId);
       return {
         ok: outcome.ok,
         message: outcome.message,
@@ -178,7 +172,7 @@ function createDefaultBackend(): McpQueryBackend {
       };
     },
     async getQueryAttachment(queryId, attachmentIndex) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       if (!query) return { error: "Query not found" };
       const attachments = getAttachments(query);
       if (!attachments) return { error: "Query does not have attachments" };
@@ -187,7 +181,7 @@ function createDefaultBackend(): McpQueryBackend {
       return buildAttachmentPayload(query, ref, attachmentIndex, localBaseUrl);
     },
     async getQueryAttachmentPreview(queryId, attachmentIndex, maxDimension) {
-      const query = getQuery(queryId);
+      const query = service.getQuery(queryId);
       if (!query) return errorPayload(queryId, attachmentIndex, "Query not found");
       const attachments = getAttachments(query);
       if (!attachments) return errorPayload(queryId, attachmentIndex, "Query does not have attachments");
@@ -199,6 +193,53 @@ function createDefaultBackend(): McpQueryBackend {
 }
 
 // --- Remote backend (MCP proxy to external server) ---
+
+function enrichQueryStatusWithAttachments(data: Record<string, unknown>, remoteBaseUrl: string): void {
+  const result = data.result as QueryResult | undefined;
+  if (!result?.attachments?.length) return;
+  const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
+    buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
+  );
+  data.attachment_count = attachments.length;
+  data.attachments = attachments;
+  data.attachment_access = attachments.length > 0
+    ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
+    : null;
+}
+
+async function fetchRemotePreview(
+  previewUrl: URL,
+  remoteApiKey: string,
+  queryId: string,
+  attachmentIndex: number,
+  attachment: AttachmentHandle["attachment"],
+  access: AttachmentHandle["access"],
+  metaData: Record<string, unknown>,
+  maxDimension?: number,
+): Promise<{ payload: unknown; image?: { data: string; mimeType: string } }> {
+  const headers = new Headers();
+  if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
+  const response = await fetch(previewUrl, { headers });
+  if (!response.ok) {
+    return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment, access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs." } };
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const mimeType = response.headers.get("content-type") ?? "image/jpeg";
+  return {
+    payload: {
+      query_id: queryId,
+      attachment_index: attachmentIndex,
+      attachment,
+      access: { ...access, preview_url: previewUrl.toString() },
+      original_size_bytes: metaData.size_bytes ?? null,
+      preview_size_bytes: bytes.length,
+      preview_mime_type: mimeType,
+      max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
+    },
+    image: { data: bytes.toString("base64"), mimeType },
+  };
+}
 
 function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQueryBackend {
   async function fetchJson(path: string, init?: RequestInit) {
@@ -225,17 +266,7 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       if (response.status === 404) return { error: "Query not found" };
       if (!response.ok) throw new Error(`Remote query lookup failed: ${response.status}`);
       const data = json as Record<string, unknown>;
-      const result = data.result as QueryResult | undefined;
-      if (result?.attachments?.length) {
-        const attachments = result.attachments.map((att: AttachmentRef, i: number) =>
-          buildAttachmentHandle(String(data.id), i, att, remoteBaseUrl),
-        );
-        data.attachment_count = attachments.length;
-        data.attachments = attachments;
-        data.attachment_access = attachments.length > 0
-          ? "Use get_query_attachment for URLs/paths, or get_query_attachment_preview for a resized preview image through MCP."
-          : null;
-      }
+      enrichQueryStatusWithAttachments(data, remoteBaseUrl);
       return data;
     },
     async listAvailableQueries() {
@@ -281,28 +312,7 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
       );
       if (maxDimension) previewUrl.searchParams.set("max_dimension", String(maxDimension));
 
-      const headers = new Headers();
-      if (remoteApiKey) headers.set("x-api-key", remoteApiKey);
-      const response = await fetch(previewUrl, { headers });
-      if (!response.ok) {
-        return { payload: { query_id: queryId, attachment_index: attachmentIndex, attachment, access, error: "Preview could not be generated", hint: "Use get_query_attachment for original URLs." } };
-      }
-
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const mimeType = response.headers.get("content-type") ?? "image/jpeg";
-      return {
-        payload: {
-          query_id: queryId,
-          attachment_index: attachmentIndex,
-          attachment,
-          access: { ...access, preview_url: previewUrl.toString() },
-          original_size_bytes: metaData.size_bytes ?? null,
-          preview_size_bytes: bytes.length,
-          preview_mime_type: mimeType,
-          max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
-        },
-        image: { data: bytes.toString("base64"), mimeType },
-      };
+      return fetchRemotePreview(previewUrl, remoteApiKey, queryId, attachmentIndex, attachment, access, metaData, maxDimension);
     },
   };
 }
@@ -312,13 +322,14 @@ function createRemoteBackend(remoteBaseUrl: string, remoteApiKey: string): McpQu
 /**
  * Backend selection:
  * 1. REMOTE_QUERY_API_BASE_URL → Remote HTTP proxy
- * 2. Default → In-memory store + Nostr relay sync
+ * 2. Default → In-memory store + Nostr relay sync (uses the supplied
+ *    QueryService so it shares state with the rest of the host).
  */
-export function getMcpQueryBackend(): McpQueryBackend {
-  const remoteBaseUrl = process.env.REMOTE_QUERY_API_BASE_URL?.trim().replace(/\/+$/, "");
-  const remoteApiKey = process.env.REMOTE_QUERY_API_KEY?.trim() || process.env.HTTP_API_KEY?.trim() || "";
+export function getMcpQueryBackend(service: QueryService): McpQueryBackend {
+  const remoteBaseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL")?.trim().replace(/\/+$/, "");
+  const remoteApiKey = Deno.env.get("REMOTE_QUERY_API_KEY")?.trim() || Deno.env.get("HTTP_API_KEY")?.trim() || "";
   if (remoteBaseUrl) {
     return createRemoteBackend(remoteBaseUrl, remoteApiKey);
   }
-  return createDefaultBackend();
+  return createDefaultBackend(service);
 }

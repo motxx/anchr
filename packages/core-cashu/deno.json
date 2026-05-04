@@ -1,0 +1,33 @@
+{
+  "name": "@anchr/core-cashu",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./escrow": "./src/escrow.ts",
+    "./escrow-helpers": "./src/escrow-helpers.ts",
+    "./preimage-store": "./src/preimage-store.ts",
+    "./preimage-port": "./src/preimage-port.ts",
+    "./wallet": "./src/wallet.ts"
+  },
+  "imports": {
+    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
+    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
+    "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
+    "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "deno task lint:arch --errors-only 2>&1"
+          }
+        ]
+      }
+    ]
+  }
+}

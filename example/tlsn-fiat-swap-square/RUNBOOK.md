@@ -1,4 +1,6 @@
-# TLSNotary Fiat Swap (Square) — Runbook
+# 渡(Watari) — Runbook
+
+> *Watari* — a crossing or ferry. Here: trustless fiat ↔ BTC crossing via Square.
 
 Square テスト決済を TLSNotary で証明し、Anchr 経由で BTC と trustless に交換する E2E 手順。
 
@@ -241,9 +243,10 @@ export default {
 ```bash
 QUERY_ID="query_xxxxx"  # seller.ts の出力から
 
-curl -X POST http://localhost:3000/queries/${QUERY_ID}/submit \
+curl -X POST http://localhost:3000/queries/${QUERY_ID}/result \
   -H "Content-Type: application/json" \
-  -d "{\"tlsn_presentation\": \"$(base64 < proof.presentation.tlsn)\"}"
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d "{\"worker_pubkey\":\"buyer\",\"tlsn_presentation\":\"$(base64 < proof.presentation.tlsn)\"}"
 ```
 
 ---

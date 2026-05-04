@@ -12,26 +12,31 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "../nostr/identity";
-import { restoreIdentity } from "../nostr/identity";
-import {
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_RESPONSE,
-  parseOracleResponsePayload,
-  parseFeedbackPayload,
-  type QuoteFeedbackPayload,
-  type OracleResponsePayload,
-} from "../nostr/events";
-import { buildPreimageDM, buildRejectionDM } from "../nostr/dm";
+import type { NostrIdentity } from "../nostr/identity.ts";
+import { restoreIdentity } from "../nostr/identity.ts";
+import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm.ts";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
-} from "../nostr/client";
-import { createPreimageStore, type PreimageStore } from "../cashu/preimage-store";
-import { verify } from "../verification/verifier";
-import type { Query, QueryResult } from "../../domain/types";
+} from "../nostr/client.ts";
+import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
+import type { FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
+import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
+import { coordinateSigning } from "@anchr/cashu-frost-oracle/signing-coordinator";
+import { verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
+import {
+  type WatchedQuery,
+  buildQueryFromPayload,
+  buildResultFromPayload,
+  handleFeedbackEvent,
+  parseResponsePayload,
+} from "./oracle-nostr-handlers.ts";
+
+import { getLogger } from "@anchr/core-runtime/logger";
+const log = getLogger(["anchr", "oracle-nostr"]);
 
 /** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */
 let _publishEventFn: typeof publishEvent = publishEvent;
@@ -54,6 +59,12 @@ export interface OracleNostrServiceConfig {
   relayUrls?: string[];
   /** Preimage store instance (default: in-memory). */
   preimageStore?: PreimageStore;
+  /** FROST coordinator for threshold signing (optional — enables P2PK+FROST flow). */
+  frostCoordinator?: FrostCoordinator;
+  /** FROST threshold oracle config (required when frostCoordinator is set). */
+  frostConfig?: ThresholdOracleConfig;
+  /** Per-node FROST config with key material and peer endpoints. */
+  frostNodeConfig?: FrostNodeConfig;
   /** Callback when a Worker submits a quote. */
   onQuote?: (queryId: string, workerPubkey: string, amountSats?: number) => void;
   /** Callback when verification completes. */
@@ -69,100 +80,39 @@ export interface OracleNostrService {
   recordSelectedWorker(queryId: string, workerPubkey: string): void;
   /** Verify a result and deliver preimage or rejection. */
   verifyAndDeliver(queryId: string, query: Query, result: QueryResult, workerPubkey: string): Promise<boolean>;
+  /** Verify and deliver using FROST signing (P2PK+FROST flow). */
+  verifyAndDeliverFrost(queryId: string, query: Query, result: QueryResult, workerPubkey: string): Promise<boolean>;
   /** Stop watching all queries. */
   stop(): void;
-}
-
-interface WatchedQuery {
-  queryId: string;
-  queryEventId: string;
-  requesterPubkey: string;
-  selectedWorkerPubkey?: string;
-  quotedWorkers: Set<string>;
-  subs: SubCloser[];
 }
 
 export function createOracleNostrService(config: OracleNostrServiceConfig): OracleNostrService {
   const preimageStore = config.preimageStore ?? createPreimageStore();
   const watched = new Map<string, WatchedQuery>();
-  // Map queryId → hash for lookup by query ID
   const queryHashMap = new Map<string, string>();
-
-  function handleFeedbackEvent(queryId: string, event: Event) {
-    const entry = watched.get(queryId);
-    if (!entry) return;
-
-    try {
-      const payload = parseFeedbackPayload(
-        event.content,
-        config.identity.secretKey,
-        event.pubkey,
-      );
-
-      if (payload.status === "payment-required") {
-        const quote = payload as QuoteFeedbackPayload;
-        entry.quotedWorkers.add(quote.worker_pubkey);
-        config.onQuote?.(queryId, quote.worker_pubkey, quote.amount_sats);
-      }
-    } catch {
-      // Cannot decrypt — event not for us, ignore
-    }
-  }
 
   async function handleResponseEvent(queryId: string, event: Event) {
     const entry = watched.get(queryId);
     if (!entry) return;
 
-    // Verify the sender is the selected Worker
     if (entry.selectedWorkerPubkey && event.pubkey !== entry.selectedWorkerPubkey) {
-      console.error(`[oracle-nostr] Ignoring result from non-selected Worker ${event.pubkey}`);
+      log.error(`Ignoring result from non-selected Worker ${event.pubkey}`);
       return;
     }
 
     try {
-      // Parse Oracle-specific payload from tags (NIP-44 encrypted to Oracle)
-      const oraclePayload = parseOracleResponsePayload(event, config.identity.secretKey);
+      const oraclePayload = parseResponsePayload(config.identity, event);
       if (!oraclePayload) {
-        console.error(`[oracle-nostr] No oracle_payload tag in result for ${queryId}`);
+        log.error(`No oracle_payload tag in result for ${queryId}`);
         return;
       }
 
-      // Build a minimal Query and QueryResult for verification
-      const query: Query = {
-        id: queryId,
-        status: "processing",
-        description: "",
-        challenge_nonce: oraclePayload.nonce_echo,
-        challenge_rule: "",
-        verification_requirements: ["gps", "ai_check"],
-        created_at: 0,
-        expires_at: Date.now() + 600_000,
-        payment_status: "htlc_swapped",
-      };
-
-      // Map Oracle payload attachments to QueryResult attachments
-      const result: QueryResult = {
-        attachments: (oraclePayload.attachments ?? []).map((a) => ({
-          id: a.blossom_hash,
-          uri: a.blossom_urls[0] ?? "",
-          mime_type: a.mime,
-          storage_kind: "blossom" as const,
-          blossom_hash: a.blossom_hash,
-          blossom_servers: a.blossom_urls,
-        })),
-        notes: oraclePayload.notes,
-      };
-
-      const passed = await verifyAndDeliverInternal(
-        queryId,
-        query,
-        result,
-        event.pubkey,
-      );
-
+      const query = buildQueryFromPayload(queryId, oraclePayload);
+      const result = buildResultFromPayload(oraclePayload);
+      const passed = await verifyAndDeliverInternal(queryId, query, result, event.pubkey);
       config.onVerification?.(queryId, passed, event.pubkey);
     } catch (error) {
-      console.error(`[oracle-nostr] Failed to process result for ${queryId}:`, error);
+      log.error(`Failed to process result for ${queryId}:`, error);
     }
   }
 
@@ -177,21 +127,37 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     const preimage = hash ? preimageStore.getPreimage(hash) : null;
 
     if (detail.passed && preimage && hash) {
-      // C2PA valid → deliver preimage via NIP-44 DM
       const dm = buildPreimageDM(config.identity, workerPubkey, queryId, preimage);
-      const publishResult = await _publishEventFn(dm, config.relayUrls);
-      if (publishResult.successes.length > 0) {
-        console.error(`[oracle-nostr] Preimage delivered to Worker for ${queryId}`);
+
+      // Retry delivery with exponential backoff — do NOT delete preimage until confirmed
+      const MAX_RETRIES = 3;
+      let delivered = false;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        const publishResult = await _publishEventFn(dm, config.relayUrls);
+        if (publishResult.successes.length > 0) {
+          log.error(`Preimage delivered to Worker for ${queryId} (${publishResult.successes.length} relay(s))`);
+          delivered = true;
+          break;
+        }
+        if (attempt < MAX_RETRIES) {
+          const delaySec = attempt * 2;
+          log.error(`Preimage delivery failed for ${queryId} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
+          await new Promise((r) => setTimeout(r, delaySec * 1000));
+        }
       }
-      preimageStore.delete(hash);
-      queryHashMap.delete(queryId);
+
+      if (delivered) {
+        preimageStore.delete(hash);
+        queryHashMap.delete(queryId);
+      } else {
+        log.error(`Preimage delivery failed for ${queryId} after ${MAX_RETRIES} attempts — preimage retained for HTTP fallback`);
+      }
       return true;
     } else {
-      // C2PA invalid → deliver rejection
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
       await _publishEventFn(dm, config.relayUrls);
-      console.error(`[oracle-nostr] Rejection sent to Worker for ${queryId}: ${reason}`);
+      log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
       return false;
     }
   }
@@ -212,15 +178,13 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
         subs: [],
       };
 
-      // Subscribe to kind 7000 feedback (quotes, selection)
       const feedbackSub = subscribeToFeedback(
         queryEventId,
-        (event) => handleFeedbackEvent(queryId, event),
+        (event) => handleFeedbackEvent(config.identity, watched, queryId, event, config.onQuote),
         config.relayUrls,
       );
       entry.subs.push(feedbackSub);
 
-      // Subscribe to kind 6300 results
       const responseSub = subscribeToResponses(
         queryEventId,
         (event) => handleResponseEvent(queryId, event),
@@ -239,7 +203,61 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
     },
 
     async verifyAndDeliver(queryId, query, result, workerPubkey) {
+      // Auto-dispatch: quorum + FROST configured → threshold signing; otherwise → single Oracle HTLC
+      if (query.quorum && config.frostCoordinator && config.frostConfig) {
+        return this.verifyAndDeliverFrost(queryId, query, result, workerPubkey);
+      }
       return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+    },
+
+    async verifyAndDeliverFrost(queryId, query, result, workerPubkey) {
+      if (!config.frostNodeConfig) {
+        log.error(`FROST node config not available, falling back to HTLC`);
+        return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+      }
+
+      // Step 1: This node verifies independently
+      const detail = await _verifyFn(query, result);
+      if (!detail.passed) {
+        const reason = detail.failures.join(", ") || "Verification failed";
+        const dm = buildRejectionDM(config.identity, workerPubkey, queryId, reason);
+        await _publishEventFn(dm, config.relayUrls);
+        log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
+        return false;
+      }
+
+      // Step 2: Coordinate FROST signing with peer Oracle nodes.
+      // Each peer's /frost/signer/round1 endpoint independently verifies before signing.
+      // Peers that fail verification will refuse to participate → below threshold = no signature.
+      const { sha256 } = await import("@noble/hashes/sha2.js");
+      const { bytesToHex } = await import("@noble/hashes/utils.js");
+      const messageHex = bytesToHex(sha256(new TextEncoder().encode(`anchr:sign:${queryId}`)));
+
+      const sigResult = await coordinateSigning(
+        { nodeConfig: config.frostNodeConfig, query, result },
+        messageHex,
+      );
+
+      if (!sigResult) {
+        log.error(`FROST signing failed for ${queryId} — threshold not met`);
+        const dm = buildRejectionDM(config.identity, workerPubkey, queryId, "FROST threshold not met — insufficient Oracle approvals");
+        await _publishEventFn(dm, config.relayUrls);
+        return false;
+      }
+
+      // Step 3: Deliver FROST group signature to Worker
+      const dm = buildFrostSignatureDM(
+        config.identity,
+        workerPubkey,
+        queryId,
+        sigResult.signature,
+        config.frostNodeConfig.group_pubkey,
+      );
+      const publishResult = await _publishEventFn(dm, config.relayUrls);
+      if (publishResult.successes.length > 0) {
+        log.error(`FROST signature delivered to Worker for ${queryId} (signers: ${sigResult.signers_participated.join(",")})`);
+      }
+      return true;
     },
 
     stop() {
@@ -257,11 +275,11 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
  * Create an Oracle Nostr service from environment variable.
  */
 export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
-  const secretKeyHex = process.env.ORACLE_NOSTR_SECRET_KEY?.trim();
+  const secretKeyHex = Deno.env.get("ORACLE_NOSTR_SECRET_KEY")?.trim();
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = process.env.NOSTR_RELAYS?.split(",").map((u) => u.trim()).filter(Boolean);
+  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",").map((u) => u.trim()).filter(Boolean);
 
   return createOracleNostrService({ identity, relayUrls });
 }

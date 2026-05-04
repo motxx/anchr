@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildOracleApp } from "./oracle-server";
-import { createPreimageStore } from "../cashu/preimage-store";
-import type { Query, QueryResult } from "../../domain/types";
+import { buildOracleApp } from "./oracle-server.ts";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { Query, QueryResult } from "../../domain/types.ts";
+import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const TEST_PORT = 14200 + Math.floor(Math.random() * 100);
 const API_KEY = "oracle-test-key";
@@ -10,15 +11,11 @@ const baseUrl = `http://localhost:${TEST_PORT}`;
 
 const preimageStore = createPreimageStore();
 
-const makeQuery = (id: string): Query => ({
+const makeQuery = (id: string): Query => makeBaseQuery({
   id,
-  status: "pending",
-  description: "Test query",
   verification_requirements: ["ai_check"],
-  created_at: Date.now(),
   expires_at: Date.now() + 60_000,
-  payment_status: "locked",
-}) as Query;
+});
 
 describe("oracle-server HTLC endpoints", () => {
   let server: Deno.HttpServer;
@@ -176,6 +173,88 @@ describe("oracle-server HTLC endpoints", () => {
     expect(body.query_id).toBe(qid);
     expect(typeof body.preimage).toBe("string");
     expect(body.preimage.length).toBeGreaterThan(0);
+  });
+
+  test("POST /preimage returns 404 on second request (preimage deleted after delivery)", async () => {
+    const qid = "q-preimage-once";
+
+    // 1. Create hash
+    const hashRes = await fetch(`${baseUrl}/hash`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query_id: qid }),
+    });
+    await hashRes.json();
+
+    // 2. Run verification
+    const query = makeQuery(qid);
+    const result: QueryResult = { attachments: [], notes: "test" };
+    const verifyRes = await fetch(`${baseUrl}/verify`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query, result }),
+    });
+    const attestation = await verifyRes.json();
+    expect(attestation.passed).toBe(true);
+
+    // 3. First retrieval succeeds
+    const res1 = await fetch(`${baseUrl}/preimage`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query_id: qid }),
+    });
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json();
+    expect(typeof body1.preimage).toBe("string");
+
+    // 4. Second retrieval fails — preimage was deleted
+    const res2 = await fetch(`${baseUrl}/preimage`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query_id: qid }),
+    });
+    expect(res2.status).toBe(403);
+    await res2.body?.cancel();
+  });
+
+  test("GET /hash/:queryId returns 404 after preimage delivery", async () => {
+    const qid = "q-hash-gone";
+
+    // 1. Create hash
+    const hashRes = await fetch(`${baseUrl}/hash`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query_id: qid }),
+    });
+    const created = await hashRes.json();
+    expect(created.hash).toBeTruthy();
+
+    // 2. Verify
+    const query = makeQuery(qid);
+    const result: QueryResult = { attachments: [], notes: "test" };
+    const verifyRes = await fetch(`${baseUrl}/verify`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query, result }),
+    });
+    const attestation = await verifyRes.json();
+    expect(attestation.passed).toBe(true);
+
+    // 3. Retrieve preimage (triggers cleanup)
+    const preRes = await fetch(`${baseUrl}/preimage`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ query_id: qid }),
+    });
+    expect(preRes.status).toBe(200);
+    await preRes.json();
+
+    // 4. Hash lookup should now return 404
+    const getRes = await fetch(`${baseUrl}/hash/${qid}`, {
+      headers: { "authorization": `Bearer ${API_KEY}` },
+    });
+    expect(getRes.status).toBe(404);
+    await getRes.body?.cancel();
   });
 
   test("POST /preimage rejects missing query_id", async () => {

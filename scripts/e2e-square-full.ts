@@ -15,12 +15,13 @@
  */
 import { chromium } from "playwright";
 import { spawn } from "../src/runtime/mod.ts";
+import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
-const SQUARE_ACCESS_TOKEN = process.env.SANDBOX_ACCESS_TOKEN;
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!SQUARE_ACCESS_TOKEN) {
-  console.error("SANDBOX_ACCESS_TOKEN required");
+  console.error("SQUARE_ACCESS_TOKEN required");
   process.exit(1);
 }
 
@@ -82,8 +83,15 @@ const flowBrowser = await pw.chromium.launch({
 });
 const flowPage = await flowBrowser.newPage();
 await flowPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+// Navigate to a real URL first, then inject the HTML via script to ensure JS executes
+await flowPage.goto("about:blank");
 await flowPage.setContent(flowHtml);
-await flowPage.waitForFunction(() => typeof (window as any).flowUpdate === 'function');
+// Poll for JS readiness instead of waitForFunction (avoids headed-mode timeout)
+for (let i = 0; i < 30; i++) {
+  const ready = await flowPage.evaluate(() => typeof (window as any).flowUpdate === 'function');
+  if (ready) break;
+  await new Promise(r => setTimeout(r, 200));
+}
 await flowPage.evaluate((ts) => (window as any).flowSetStart(ts), startTime);
 
 console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Square: bottom-left | Flow: bottom-right`);

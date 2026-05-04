@@ -1,4 +1,4 @@
-import { useAuthStore } from "../store/auth";
+import { useAuthStore } from "../store/auth.ts";
 
 export function useNostrIdentity() {
   const { identity, publicKey, npub, secretKeyHex, loaded } = useAuthStore();

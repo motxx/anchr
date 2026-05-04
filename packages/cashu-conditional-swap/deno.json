@@ -1,0 +1,41 @@
+{
+  "name": "@anchr/cashu-conditional-swap",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./conditional-swap-types": "./src/conditional-swap-types.ts",
+    "./cross-htlc": "./src/cross-htlc.ts",
+    "./dual-preimage-store": "./src/dual-preimage-store.ts",
+    "./frost-conditional-swap": "./src/frost-conditional-swap.ts",
+    "./frost-dual-key-store": "./src/frost-dual-key-store.ts"
+  },
+  "imports": {
+    "@anchr/core-cashu/escrow": "../core-cashu/src/escrow.ts",
+    "@anchr/core-cashu/escrow-helpers": "../core-cashu/src/escrow-helpers.ts",
+    "@anchr/core-cashu/preimage-store": "../core-cashu/src/preimage-store.ts",
+    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
+    "@anchr/cashu-frost-oracle/frost-cli": "../cashu-frost-oracle/src/frost-cli.ts",
+    "@anchr/cashu-frost-oracle/market-frost-config": "../cashu-frost-oracle/src/market-frost-config.ts",
+    "@anchr/cashu-frost-oracle/signing-coordinator": "../cashu-frost-oracle/src/signing-coordinator.ts",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
+    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
+    "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
+    "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
+    "@noble/curves/secp256k1": "npm:@noble/curves@^2/secp256k1.js",
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/expect": "jsr:@std/expect@^1"
+  },
+  "compilerOptions": {
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable",
+      "deno.ns"
+    ],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys"
+  }
+}

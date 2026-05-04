@@ -1,11 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "./cashu/preimage-store";
-import { createOracleRegistry } from "./oracle/registry";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types";
-import { createQueryService, createQueryStore } from "../application/query-service";
-import type { Query, QueryResult } from "../domain/types";
-import { buildWorkerApiApp } from "./worker-api";
+import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createOracleRegistry } from "./oracle/registry.ts";
+import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
+import { createQueryService, createQueryStore } from "../application/query-service.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
+import { buildWorkerApiApp } from "./worker-api.ts";
 
 function makeMockOracle(id: string): Oracle {
   return {
@@ -35,17 +35,17 @@ function makeTestApp() {
 
 function withOpenAuth(fn: () => Promise<void>) {
   return async () => {
-    const savedKey = process.env.HTTP_API_KEY;
-    const savedKeys = process.env.HTTP_API_KEYS;
-    delete process.env.HTTP_API_KEY;
-    delete process.env.HTTP_API_KEYS;
+    const savedKey = Deno.env.get("HTTP_API_KEY");
+    const savedKeys = Deno.env.get("HTTP_API_KEYS");
+    Deno.env.delete("HTTP_API_KEY");
+    Deno.env.delete("HTTP_API_KEYS");
     try {
       await fn();
     } finally {
-      if (savedKey !== undefined) process.env.HTTP_API_KEY = savedKey;
-      else delete process.env.HTTP_API_KEY;
-      if (savedKeys !== undefined) process.env.HTTP_API_KEYS = savedKeys;
-      else delete process.env.HTTP_API_KEYS;
+      if (savedKey !== undefined) Deno.env.set("HTTP_API_KEY", savedKey);
+      else Deno.env.delete("HTTP_API_KEY");
+      if (savedKeys !== undefined) Deno.env.set("HTTP_API_KEYS", savedKeys);
+      else Deno.env.delete("HTTP_API_KEYS");
     }
   };
 }
@@ -95,15 +95,15 @@ describe("buildWorkerApiApp with injected deps", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         description: "Test Store status check",
-        htlc: { hash: "abc123", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
+        escrow: { type: "htlc", hash: "abc123", oracle_pubkeys: ["opub"], requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; description: string; status: string; htlc: { hash: string } };
+    const json = await res.json() as { query_id: string; description: string; status: string; escrow: { hash: string } };
     expect(json.query_id).toMatch(/^query_/);
     expect(json.description).toBe("Test Store status check");
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.htlc.hash).toBe("abc123");
+    expect(json.escrow.hash).toBe("abc123");
     expect(queryService.getQuery(json.query_id)).not.toBeNull();
   }));
 
@@ -123,20 +123,6 @@ describe("buildWorkerApiApp with injected deps", () => {
     const res = await app.request("http://localhost/queries/nonexistent");
     expect(res.status).toBe(404);
   });
-
-  test("POST /queries/:id/submit returns 410 (deprecated)", withOpenAuth(async () => {
-    const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "Test query" });
-    const res = await app.request(`http://localhost/queries/${query.id}/submit`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ attachments: [], notes: "open" }),
-    });
-    expect(res.status).toBe(410);
-    const json = await res.json() as { error: string; hint: string };
-    expect(json.error).toBe("Deprecated");
-    expect(json.hint).toContain("HTLC");
-  }));
 
   test("POST /queries/:id/cancel cancels via injected service", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
@@ -174,9 +160,10 @@ describe("buildWorkerApiApp with injected deps", () => {
 });
 
 describe("HTLC endpoints", () => {
-  const htlcInfo = {
+  const escrowInfo = {
+    type: "htlc" as const,
     hash: "abcd1234",
-    oracle_pubkey: "oracle_pub",
+    oracle_pubkeys: ["oracle_pub"],
     requester_pubkey: "requester_pub",
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
@@ -188,20 +175,20 @@ describe("HTLC endpoints", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         description: "HTLC query",
-        htlc: htlcInfo,
+        escrow: escrowInfo,
       }),
     });
     expect(res.status).toBe(201);
-    const json = await res.json() as { query_id: string; status: string; payment_status: string; htlc: { hash: string } | null };
+    const json = await res.json() as { query_id: string; status: string; payment_status: string; escrow: { hash: string } | null };
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.payment_status).toBe("htlc_locked");
-    expect(json.htlc?.hash).toBe("abcd1234");
-    expect(queryService.getQuery(json.query_id)?.htlc).toBeDefined();
+    expect(json.payment_status).toBe("escrow_locked");
+    expect(json.escrow?.hash).toBe("abcd1234");
+    expect(queryService.getQuery(json.query_id)?.escrow).toBeDefined();
   }));
 
   test("GET /queries/:id/quotes returns quotes", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
     queryService.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
 
     const res = await app.request(`http://localhost/queries/${query.id}/quotes`);
@@ -213,7 +200,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/quotes records a quote", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}/quotes`, {
       method: "POST",
@@ -228,7 +215,7 @@ describe("HTLC endpoints", () => {
 
   test("POST /queries/:id/select selects worker", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}/select`, {
       method: "POST",
@@ -238,13 +225,14 @@ describe("HTLC endpoints", () => {
     expect(res.status).toBe(200);
     const json = await res.json() as { ok: boolean };
     expect(json.ok).toBe(true);
-    expect(queryService.getQuery(query.id)?.status).toBe("processing");
+    expect(queryService.getQuery(query.id)?.status).toBe("worker_selected");
   }));
 
   test("POST /queries/:id/result for HTLC does inline verification", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
+    queryService.beginWork(query.id);
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
@@ -263,13 +251,13 @@ describe("HTLC endpoints", () => {
 
   test("GET /queries/:id includes HTLC info", withOpenAuth(async () => {
     const { app, queryService } = makeTestApp();
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo });
 
     const res = await app.request(`http://localhost/queries/${query.id}`);
     expect(res.status).toBe(200);
     const json = await res.json() as { status: string; payment_status: string };
     expect(json.status).toBe("awaiting_quotes");
-    expect(json.payment_status).toBe("htlc_locked");
+    expect(json.payment_status).toBe("escrow_locked");
   }));
 
   test("HTLC full lifecycle via HTTP (inline verification)", withOpenAuth(async () => {
@@ -279,7 +267,7 @@ describe("HTLC endpoints", () => {
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "Full HTLC lifecycle", htlc: htlcInfo, oracle_ids: ["test-oracle"] }),
+      body: JSON.stringify({ description: "Full HTLC lifecycle", escrow: escrowInfo, oracle_ids: ["test-oracle"] }),
     });
     expect(createRes.status).toBe(201);
     const { query_id } = await createRes.json() as { query_id: string };
@@ -300,6 +288,12 @@ describe("HTLC endpoints", () => {
     });
     expect((await selectRes.json() as { ok: boolean }).ok).toBe(true);
 
+    // Begin work (worker_selected → processing)
+    const beginRes = await app.request(`http://localhost/queries/${query_id}/begin`, {
+      method: "POST",
+    });
+    expect((await beginRes.json() as { ok: boolean }).ok).toBe(true);
+
     // Submit result — now does inline verification for HTLC queries
     const resultRes = await app.request(`http://localhost/queries/${query_id}/result`, {
       method: "POST",
@@ -311,6 +305,101 @@ describe("HTLC endpoints", () => {
     expect(resultJson.oracle_id).toBe("test-oracle");
     expect(resultJson.payment_status).toBe("released");
     expect(queryService.getQuery(query_id)?.status).toBe("approved");
+  }));
+});
+
+describe("P2PK+FROST escrow endpoints", () => {
+  // Smaller surface than HTLC: settlement is a threshold signature delivered
+  // out-of-band by the FROST coordinator (see packages/cashu-frost-oracle),
+  // so the Query API today only exercises wire-shape round-tripping for the
+  // FROST variant. These tests lock down the discriminated-union side of the
+  // schema so HTLC and P2PK+FROST stay distinguishable on the wire.
+  const frostEscrow = {
+    type: "p2pk_frost" as const,
+    group_pubkey: "f".repeat(64),
+    oracle_pubkeys: ["frost_signer_a", "frost_signer_b", "frost_signer_c"],
+    requester_pubkey: "requester_pub",
+    locktime: Math.floor(Date.now() / 1000) + 3600,
+  };
+
+  test("POST /queries accepts a p2pk_frost escrow", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "FROST query",
+        escrow: frostEscrow,
+      }),
+    });
+    expect(res.status).toBe(201);
+    const json = await res.json() as {
+      query_id: string;
+      status: string;
+      payment_status: string;
+      escrow: { type: string; group_pubkey?: string; hash?: string } | null;
+    };
+    expect(json.status).toBe("awaiting_quotes");
+    expect(json.payment_status).toBe("escrow_locked");
+    expect(json.escrow?.type).toBe("p2pk_frost");
+    expect(json.escrow?.group_pubkey).toBe("f".repeat(64));
+    expect(json.escrow?.hash).toBeUndefined();
+
+    const stored = queryService.getQuery(json.query_id);
+    expect(stored?.escrow?.type).toBe("p2pk_frost");
+    if (stored?.escrow?.type === "p2pk_frost") {
+      expect(stored.escrow.group_pubkey).toBe("f".repeat(64));
+      expect(stored.escrow.oracle_pubkeys).toHaveLength(3);
+    }
+  }));
+
+  test("GET /queries/:id round-trips the p2pk_frost discriminator", withOpenAuth(async () => {
+    const { app, queryService } = makeTestApp();
+    const query = queryService.createQuery({ description: "FROST detail" }, { escrow: frostEscrow });
+    const res = await app.request(`http://localhost/queries/${query.id}`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { escrow: { type: string; group_pubkey?: string; hash?: string } | null };
+    expect(json.escrow?.type).toBe("p2pk_frost");
+    expect(json.escrow?.group_pubkey).toBe("f".repeat(64));
+    expect(json.escrow?.hash).toBeUndefined();
+  }));
+
+  test("POST /queries rejects a p2pk_frost escrow missing group_pubkey", withOpenAuth(async () => {
+    const { app } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "FROST without group_pubkey",
+        escrow: {
+          type: "p2pk_frost",
+          // group_pubkey deliberately omitted
+          oracle_pubkeys: ["a", "b"],
+          requester_pubkey: "r",
+          locktime: Math.floor(Date.now() / 1000) + 3600,
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
+  }));
+
+  test("POST /queries rejects an htlc escrow missing hash", withOpenAuth(async () => {
+    const { app } = makeTestApp();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "HTLC without hash",
+        escrow: {
+          type: "htlc",
+          // hash deliberately omitted
+          oracle_pubkeys: ["a"],
+          requester_pubkey: "r",
+          locktime: Math.floor(Date.now() / 1000) + 3600,
+        },
+      }),
+    });
+    expect(res.status).toBe(400);
   }));
 });
 
@@ -360,14 +449,16 @@ describe("HTLC inline verification with preimage", () => {
     const { app, queryService, preimageStore } = makeTestAppWithPreimage();
     // Generate hash first, then create query with it
     const entry = preimageStore.create();
-    const htlcInfo = {
+    const escrowInfo = {
+      type: "htlc" as const,
       hash: entry.hash,
-      oracle_pubkey: "oracle_pub",
+      oracle_pubkeys: ["oracle_pub"],
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
-    const query = queryService.createQuery({ description: "HTLC" }, { htlc: htlcInfo, oracleIds: ["test-oracle"] });
+    const query = queryService.createQuery({ description: "HTLC" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
     await queryService.selectWorker(query.id, "w1");
+    queryService.beginWork(query.id);
 
     const res = await app.request(`http://localhost/queries/${query.id}/result`, {
       method: "POST",
@@ -428,7 +519,7 @@ describe("Quorum via HTTP", () => {
         description: "Quorum query",
         oracle_ids: ["oracle-a", "oracle-b"],
         quorum: { min_approvals: 2 },
-        htlc: { hash: "qhash", oracle_pubkey: "opub", requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
+        escrow: { type: "htlc", hash: "qhash", oracle_pubkeys: ["opub"], requester_pubkey: "rpub", locktime: Math.floor(Date.now() / 1000) + 3600 },
       }),
     });
     expect(res.status).toBe(201);

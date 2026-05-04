@@ -30,12 +30,17 @@ const BUILDS: CssBuild[] = [
     input: join(PROJECT_ROOT, "src/ui/dashboard/globals.css"),
     output: join(PROJECT_ROOT, "src/ui/dashboard/generated.css"),
   },
+  {
+    label: "market",
+    input: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/globals.css"),
+    output: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/generated.css"),
+  },
 ];
 
 async function buildCss(build: CssBuild) {
   console.log(`[build-css:${build.label}] ${build.input} → ${build.output}`);
-  const cmd = new Deno.Command("npx", {
-    args: ["@tailwindcss/cli", "-i", build.input, "-o", build.output],
+  const cmd = new Deno.Command("deno", {
+    args: ["run", "-A", "npm:@tailwindcss/cli", "-i", build.input, "-o", build.output],
     stdout: "inherit",
     stderr: "inherit",
   });

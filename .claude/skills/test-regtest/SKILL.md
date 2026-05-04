@@ -21,8 +21,10 @@ PROJECT_ROOT=$(git rev-parse --show-toplevel)
 # 1. Start infra + init Lightning
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh && docker compose restart cashu-mint && sleep 5
 
-# 2. Run E2E tests
-bun run test:regtest
+# 2. Run E2E tests (30 tests: Cashu bounty lifecycle + HTLC trustless + HTLC attacks)
+#    The `test:regtest` task in deno.json injects CASHU_MINT_URL / NOSTR_RELAYS /
+#    BLOSSOM_SERVERS inline — no manual `export` needed for the main command.
+deno task test:regtest
 ```
 
 **Full runbook (includes mobile app on iOS simulator):**
@@ -32,12 +34,12 @@ Use `/test-regtest full` and follow all phases below.
 
 Phases: `full` (default) | `auto` | `infra` | `server` | `bounty` | `mobile` | `submit` | `teardown`
 
-- `auto` — Start infra, run `bun run test:regtest`, teardown. No mobile UI.
+- `auto` — Start infra, run `deno task test:regtest`, teardown. No mobile UI.
 - `full` — Run all phases 1-6 in order including mobile.
 - Individual phase names run only that phase.
 
 If `$ARGUMENTS` is empty or `full`, run all phases 1-6 in order.
-If `$ARGUMENTS` is `auto`, run infra → `bun run test:regtest` → teardown.
+If `$ARGUMENTS` is `auto`, run infra → `deno task test:regtest` → teardown.
 
 ---
 
@@ -83,12 +85,12 @@ Start the Anchr server with local infrastructure endpoints.
 cd "$PROJECT_ROOT"
 
 # Kill any existing server process first
-pkill -f "bun.*src/server.ts" 2>/dev/null || true
+pkill -f "deno.*server.ts" 2>/dev/null || true
 
 NOSTR_RELAYS=ws://localhost:7777 \
 BLOSSOM_SERVERS=http://localhost:3333 \
 CASHU_MINT_URL=http://localhost:3338 \
-bun run dev &
+deno task dev &
 ```
 
 **Verification checks:**
@@ -108,10 +110,10 @@ Mint Cashu tokens via regtest Lightning and create test queries with bounty.
 cd "$PROJECT_ROOT"
 
 # Photo-required query (default — GPS verification enabled)
-CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts
+CASHU_MINT_URL=http://localhost:3338 deno run --allow-all scripts/create-bounty-query.ts
 
 # Text-only query (for API submit testing — no photo required)
-CASHU_MINT_URL=http://localhost:3338 bun run scripts/create-bounty-query.ts --text-only
+CASHU_MINT_URL=http://localhost:3338 deno run --allow-all scripts/create-bounty-query.ts --text-only
 ```
 
 ### Custom queries via API (with per-query GPS distance)
@@ -153,6 +155,11 @@ curl -s -X POST http://localhost:3000/queries \
 | `verification_requirements` | no | `["gps","ai_check"]` | `["gps","nonce","timestamp","oracle","ai_check"]` |
 | `ttl_seconds` | no | 600 | Query lifetime (60–86400) |
 | `bounty` | no | — | `{amount_sats, cashu_token}` |
+
+Each verification check is independent — pick the subset you need:
+- `["gps"]` — GPS proximity only (photo still required by server)
+- `["gps","ai_check"]` — GPS + AI photo-content validation (default)
+- `[]` — text-only mode (set `--text-only` on the helper script)
 
 ### Query types
 
@@ -237,6 +244,10 @@ Use MCP tools to automate verification:
 
 Since file selection in the simulator is limited, use the API to test the full submit + bounty release flow.
 
+> **Endpoint note:** the `/queries/:id/submit` endpoint returns `410 Deprecated`.
+> All submissions go through `POST /queries/:id/result` and require a non-empty
+> `worker_pubkey` (the schema is in `src/infrastructure/worker-api-schemas.ts`).
+
 ### 5a. Verify GPS-required query rejects empty submission
 
 ```bash
@@ -247,9 +258,10 @@ print(qs[0]['id'] if qs else '')
 ")
 
 # Submit without attachments — should be REJECTED
-curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/result" \
   -H "Content-Type: application/json" \
-  -d '{"gps": {"lat": 35.6595, "lon": 139.7004}, "notes": "text only attempt"}'
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d '{"worker_pubkey":"cli_worker","attachments":[],"gps":{"lat":35.6595,"lon":139.7004},"notes":"text only attempt"}'
 ```
 
 **Expected:** `ok: false`, failure: "no media evidence provided — photos are required when GPS or nonce verification is enabled"
@@ -264,9 +276,10 @@ print(qs[0]['id'] if qs else '')
 ")
 
 # Submit a text result — should PASS
-curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/submit" \
+curl -s -X POST "http://localhost:3000/queries/${QUERY_ID}/result" \
   -H "Content-Type: application/json" \
-  -d '{"gps": {"lat": 35.6595, "lon": 139.7004}, "notes": "混雑してます"}'
+  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
+  -d '{"worker_pubkey":"cli_worker","attachments":[],"gps":{"lat":35.6595,"lon":139.7004},"notes":"混雑してます"}'
 ```
 
 **Expected:** `ok: true`, `payment_status: "released"`, `cashu_token: "cashuB..."` returned
@@ -310,7 +323,7 @@ import json,sys; print(f'{len(json.load(sys.stdin))} queries')
 cd "$PROJECT_ROOT"
 
 # Stop the Anchr server
-pkill -f "bun.*src/server.ts" || true
+pkill -f "deno.*server.ts" || true
 
 # Stop Docker services
 docker compose down
@@ -321,18 +334,59 @@ xcrun simctl location booted clear
 
 ---
 
+## E2E Test Architecture
+
+The automated E2E tests (`deno task test:regtest`) cover 3 test suites with 30 total test steps:
+
+### Test files
+
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `e2e/regtest-cashu.test.ts` | 5 | Cashu bounty lifecycle: mint → create query → submit → release → redeem |
+| `e2e/regtest-htlc-trustless.test.ts` | 18 | HTLC trustless properties: 10 Mint-level attacks + 8 server-side enforcement |
+| `e2e/regtest-htlc-attacks.test.ts` | 7 | Advanced attacks: proof manipulation, timing, multi-party |
+
+### Test patterns
+
+- **Infrastructure gating**: Tests use `describe.ignore` when Docker infra is not reachable (NOT `test.skipIf` — Deno BDD doesn't support it)
+- **Wallet sharing**: `Wallet.loadMint()` runs at module level (top-level await) before describes register, to avoid Deno sanitizer false positives from fetch response body lifecycle
+- **No relay side effects**: `regtest-cashu.test.ts` injects `createQueryService({ hooks: {} })` to prevent fire-and-forget WebSocket connections from `publishQueryToRelay`
+- **Real Cashu Mint**: All HTLC tests run against the real Nutshell mint — not mocked. Attacks are verified at the protocol level
+
+### Running individual suites
+
+```bash
+# Cashu bounty lifecycle only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-cashu.test.ts --allow-all
+
+# HTLC trustless properties only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-htlc-trustless.test.ts --allow-all
+
+# HTLC attack vectors only
+CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 \
+  deno test e2e/regtest-htlc-attacks.test.ts --allow-all
+```
+
+Expected: ~1m12s total, 6 passed (30 steps), 0 failed, 0 leaks.
+
+---
+
 ## Gotchas
 
 These are non-obvious facts discovered through actual testing. The agent WILL get these wrong without being told.
 
 - **Settings load race condition**: Zustand store loads AsyncStorage async. If React Query fires `fetchQueries` before `load()` completes, it uses the default URL (localhost). The fix is `_layout.tsx` awaiting `load()` before rendering children.
 - **Dev-mode URL override**: `settings.ts` had logic to force `localhost` in `__DEV__` mode. This silently overrides any saved server URL (e.g., fly.io). Removed — always use the stored value.
-- **Simulator text input unreliable**: Triple-tap to select-all often fails. Long-press triggers Save button. To change Settings fields reliably, write directly to AsyncStorage's `manifest.json` at `~/Library/Developer/CoreSimulator/Devices/{UDID}/data/Containers/Data/Application/{APP}/Library/Application Support/com.anchr.worker/RCTAsyncLocalStorage_V1/manifest.json`, then restart the app.
+- **Simulator text input unreliable**: Triple-tap to select-all often fails. Long-press triggers Save button. To change Settings fields reliably, write directly to AsyncStorage's `manifest.json` at `~/Library/Developer/CoreSimulator/Devices/{UDID}/data/Containers/Data/Application/{APP}/Library/Application Support/com.anchr.worker/RCTAsyncLocalStorage_V1/manifest.json`, then restart the app. <!-- allow-local-path: generic macOS Simulator path, not user-specific -->
 - **CORS required for web**: The Expo web app runs on a different port (8082) than the server (3000). Without `cors()` middleware on Hono, all fetches fail silently — the app shows "No pending queries" with no visible error.
 - **HEIC images don't render in `<Image>`**: Browsers (except Safari) and react-native-web can't render HEIC. The `ImagePreviewOrFallback` component falls back to a file icon for non-previewable formats.
 - **tsconfig picks up mobile/**: Without `"exclude": ["mobile"]` in the root tsconfig, `tsc --noEmit` fails because mobile's deps (expo, react-native) aren't in the root node_modules. CI will fail on typecheck.
 - **Docker context bloat**: Without `.dockerignore` entries for `mobile/`, `e2e/`, `scripts/`, the build context is ~275MB instead of ~800KB. First deploy will timeout.
 - **testnut.cashu.space is FakeWallet**: All Lightning invoices auto-paid, tokens are worthless test ecash. Not real Bitcoin testnet sats.
+- **Deno sanitizer and external libs**: `@cashu/cashu-ts` `Wallet.loadMint()` creates fetch responses that Deno tracks across scopes. Creating the wallet at module level (before describes) avoids false positive leak detection.
+- **Fire-and-forget relay publish**: `defaultQueryService` has an `onCreated` hook that publishes to Nostr relays via `publishQueryToRelay()` — this is fire-and-forget and leaks WebSocket connections in tests. Inject `createQueryService({ hooks: {} })` to avoid.
 
 ## Troubleshooting
 
@@ -342,6 +396,7 @@ These are non-obvious facts discovered through actual testing. The agent WILL ge
 | `createwallet` error -4 "Database already exists" | Script auto-falls back to `loadwallet`. If still failing, `docker compose down -v` to wipe volumes |
 | `lnd-mint` keeps restarting | Wait longer before init-regtest.sh (increase sleep to 30-40s) |
 | Invoice payment fails | Verify channel is active: `docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009 listchannels` |
+| Deno sanitizer leak errors | Ensure wallet is created at module level, not in `beforeAll`. Ensure `buildWorkerApiApp` uses `createQueryService({ hooks: {} })` |
 | iOS build fails with "duplicate symbol" | Remove `react-native-worklets` from mobile/package.json (conflicts with reanimated 3.17+) |
 | iOS build fails with "undefined_arch" | Use `npx expo run:ios` instead of raw `xcodebuild` |
 | Mobile app can't reach server | Use Mac's IP instead of localhost (e.g., `http://192.168.x.x:3000`) |

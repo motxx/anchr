@@ -1,4 +1,4 @@
-FROM ghcr.io/hzrd149/blossom-server:master
+FROM ghcr.io/hzrd149/blossom-server:master@sha256:7855ce306d00d371554ee10510c02df837acb994805cd4f3112f73d54cb10fa1
 
 COPY blossom-config.yml /app/config.yml
 

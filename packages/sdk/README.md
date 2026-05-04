@@ -1,114 +1,101 @@
-# anchr-sdk
+# @anchr/sdk
 
-AI Agent SDK for Anchr — buy cryptographically verified data with sats.
+Customer + Provider orchestration for the Anchr verified-data exchange:
+Nostr DVM events (NIP-90) over Cashu HTLC settlement.
 
 ## Install
 
-```bash
-bun add anchr-sdk
+```sh
+deno add @anchr/sdk
+# or
+npm i @anchr/sdk
 ```
 
-## Usage
+## Customer
 
-```typescript
-import { Anchr } from "anchr-sdk";
+```ts
+import { createCustomer, createCashuClient, createHttpOracleClient } from "@anchr/sdk";
 
-const anchr = new Anchr({ serverUrl: "https://anchr-app.fly.dev" });
-
-// Get cryptographically verified BTC price
-const result = await anchr.query({
-  description: "BTC price from CoinGecko",
-  targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-  conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
-  maxSats: 21,
+const customer = createCustomer({
+  oracles: ["npub1oracle1..."],
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
+  oracleClient: createHttpOracleClient({
+    endpoint: "https://oracle.example.org",
+    oraclePubkey: "npub1oracle1...",
+  }),
+  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
 });
 
-console.log(result.verified);    // true
-console.log(result.data);        // { bitcoin: { usd: 71000 } }
-console.log(result.serverName);  // "api.coingecko.com"
-console.log(result.proof);       // base64 TLSNotary presentation
-```
-
-## How it works
-
-1. `anchr.query()` creates a query on the Anchr server
-2. A Worker picks up the query and fetches the target URL via MPC-TLS (TLSNotary)
-3. The server cryptographically verifies the proof and checks conditions
-4. Verified data is returned with the cryptographic presentation
-
-No trust required — the proof is independently verifiable.
-
-## API
-
-### `new Anchr(config)`
-
-```typescript
-const anchr = new Anchr({
-  serverUrl: "https://anchr-app.fly.dev",  // or http://localhost:3000 for local dev
-  apiKey: "optional-api-key",          // for authenticated endpoints
-  defaultTimeoutSeconds: 300,          // default query TTL
-  pollIntervalMs: 3000,               // polling interval
+const result = await customer.request({
+  spec: {
+    schema: "io.anchr.tlsn-https.v1",
+    predicate: { target: "https://api.github.com/users/alice" },
+  },
+  payment: { maxAmount: 1000 },
+  sourceProofs: cashuProofsFromYourWallet,
 });
+
+console.log(result.data, result.proof, result.providerPubkey);
 ```
 
-### `anchr.query(options): Promise<QueryResult>`
+## Provider
 
-Buy verified web data via TLSNotary.
+```ts
+import { createProvider, createCashuClient } from "@anchr/sdk";
 
-```typescript
-const result = await anchr.query({
-  description: "What to verify",
-  targetUrl: "https://api.example.com/data",
-  conditions: [
-    { type: "jsonpath", expression: "price", description: "Price exists" },
-    { type: "contains", expression: "bitcoin" },
-    { type: "regex", expression: "\"usd\":\\s*\\d+" },
-  ],
-  maxSats: 21,                  // bounty for the worker
-  timeoutSeconds: 300,          // server-side TTL
-  pollTimeoutSeconds: 60,       // client-side wait time
-  maxAttestationAgeSeconds: 300, // max proof age
+const provider = createProvider({
+  oracles: ["npub1oracle1..."],
+  relays:  ["wss://relay.example.org"],
+  mint:    "https://mint.example.org",
+  privKey: "nsec1...",
+  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
+});
+
+await provider.serve(async (request) => {
+  // Decide whether to quote and at what price; return null to decline.
+  return {
+    amountSats: 100,
+    produce: async () => ({
+      data: { /* schema-specific payload */ },
+      proof: /* schema-specific proof bytes/string */,
+    }),
+  };
 });
 ```
 
-Returns:
-```typescript
-{
-  verified: true,
-  serverName: "api.example.com",
-  data: { price: 42000 },      // parsed JSON (or raw string)
-  rawBody: '{"price":42000}',
-  proof: "base64...",           // TLSNotary presentation
-  timestamp: 1774360000,
-  checks: ["TLSNotary: presentation signature valid", ...],
-  satsPaid: 21,
-  queryId: "query_...",
-}
-```
+## Schema URIs
 
-### `anchr.photo(options): Promise<PhotoResult>`
+The SDK is verification-format-agnostic. Each request carries a `schema` URI;
+the provider's handler interprets it. URIs the SDK ships as constants:
 
-Buy a verified photo via C2PA.
+| URI | Meaning |
+|---|---|
+| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
+| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video |
 
-```typescript
-const result = await anchr.photo({
-  description: "渋谷スクランブル交差点の現在の様子",
-  locationHint: "東京都渋谷区",
-  expectedGps: { lat: 35.6595, lon: 139.7004 },
-  maxGpsDistanceKm: 0.5,
-  maxSats: 100,
+The SDK does not bundle producers or verifiers. Wire your own
+`produce(): Promise<{ data, proof }>` in the provider handler, and pass an
+optional `schemaVerifiers` registry on the customer if you want local
+verification of returned proofs.
+
+## Testing
+
+The default `cashuClient` and `relayClient` open live connections.
+For unit tests, inject your own:
+
+```ts
+import type { CashuWalletAdapter, RelayClient } from "@anchr/sdk";
+
+const customer = createCustomer({
+  /* ... */,
+  cashuClient: createCashuClient({ mintUrl, wallet: fakeWalletAdapter }),
+  relayClient: fakeRelayClient,
 });
 ```
 
-### Worker API
-
-```typescript
-// List available queries
-const queries = await anchr.listOpenQueries({ lat: 35.66, lon: 139.70 });
-
-// Submit a TLSNotary proof
-const result = await anchr.submitPresentation(queryId, presentationBase64);
-```
+Real e2e coverage against a regtest Cashu mint and Nostr relay lives at
+`e2e/sdk-integration.test.ts` in this repo.
 
 ## License
 

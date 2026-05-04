@@ -16,6 +16,7 @@
 
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { spawn } from "../src/runtime/mod.ts";
+import process from "node:process";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

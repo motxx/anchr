@@ -2,9 +2,9 @@ import React from "react";
 import { View, ScrollView, Pressable } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText } from "../../src/components/ds";
-import { ProfileHeader } from "../../src/components/profile/ProfileHeader";
-import { npubDecode } from "../../src/nostr/nip19";
+import { DSText } from "../../src/components/ds/index.ts";
+import { ProfileHeader } from "../../src/components/profile/ProfileHeader.tsx";
+import { npubDecode } from "../../src/nostr/nip19.ts";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function UserProfileScreen() {

@@ -427,7 +427,12 @@ interface QuerySummary {
   description: string;
   bounty?: { amount_sats: number };
   expires_at: number;
-  tlsn_requirements?: { target_url: string };
+  tlsn_requirements?: {
+    target_url: string;
+    domain_hint?: string;
+    conditions?: Array<{ type: string; expression: string; expected?: string; description?: string }>;
+    max_attestation_age_seconds?: number;
+  };
   [key: string]: unknown;
 }
 
@@ -442,8 +447,134 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// Re-export worker
-export { AnchrWorker, type AnchrWorkerConfig, type FulfilledEvent } from "./worker";
-
 // Default export
 export default Anchr;
+// Note: AnchrWorker (Node-only, uses node:fs) is exported from "@anchr/sdk/worker" via package.json subpath.
+
+// --- v0.0.1 Customer / Provider API ---
+//
+// New API matching the README's design target. The wire flow inside
+// Customer.request and Provider.serve is implemented incrementally.
+// See packages/sdk/src/customer.ts and provider.ts for current state.
+
+export {
+  createCustomer,
+  selectCheapestQuote,
+  pickOracleForRequest,
+  validateCustomerOptions,
+  generateQueryId,
+  CustomerConfigError,
+  NoQuotesReceivedError,
+  OracleWhitelistMismatchError,
+  RelayPublishError,
+  ResultTimeoutError,
+  SchemaVerificationError,
+  DEFAULT_LOCKTIME_SECONDS,
+  DEFAULT_QUOTE_WINDOW_MS,
+  DEFAULT_RESULT_TIMEOUT_MS,
+  type Customer,
+} from "./customer.ts";
+
+export {
+  buildPreimageDeliveryEvent,
+  buildQueryRequestEvent,
+  buildQueryResponseEvent,
+  buildQuoteFeedbackEvent,
+  buildSelectionFeedbackEvent,
+  parsePreimageDeliveryEvent,
+  parseQueryRequestEvent,
+  parseQueryResponseEvent,
+  parseQuoteFeedbackEvent,
+  parseSelectionFeedbackEvent,
+  type PreimageDeliveryPayload,
+  type QueryRequestPayload,
+  type QueryResponsePayload,
+  type QuoteFeedbackPayload,
+  type SelectionFeedbackPayload,
+} from "./events.ts";
+
+export {
+  createProvider,
+  validateProviderOptions,
+  shouldQuote,
+  ProviderConfigError,
+  DEFAULT_PREIMAGE_TIMEOUT_MS,
+  DEFAULT_SELECTION_TIMEOUT_MS,
+  type Provider,
+} from "./provider.ts";
+
+export {
+  DEFINED_SCHEMAS,
+  isSchemaUri,
+  resolveProducer,
+  resolveVerifier,
+  UnknownSchemaError,
+  InvalidSchemaUriError,
+  type SchemaUri,
+  type DefinedSchemaUri,
+} from "./schema.ts";
+
+export type {
+  Spec,
+  Payment,
+  RequestResult,
+  Quote,
+  QuoteSelector,
+  CustomerOptions,
+  ProviderOptions,
+  RequestOptions,
+  ProviderRequestEvent,
+  ProviderHandler,
+  ProviderQuote,
+  SchemaProducer,
+  SchemaVerifier,
+  SchemaProducerContext,
+} from "./types.ts";
+
+export {
+  KIND_DIRECT_MESSAGE,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+  createRelayClient,
+  decryptNip44,
+  encryptNip44,
+  findAllTagValues,
+  findTagValue,
+  generateKeypair,
+  normalizePubkey,
+  normalizeSecretKey,
+  publishOnce,
+  signEvent,
+  type Filter,
+  type Keypair,
+  type PublishResult,
+  type RelayClient,
+  type Subscription,
+} from "./nostr.ts";
+
+export {
+  createHttpOracleClient,
+  OracleHttpError,
+  OracleResponseError,
+  type HttpOracleOptions,
+  type OracleClient,
+} from "./oracle.ts";
+
+export {
+  createCashuClient,
+  validateHashHex,
+  validateLocktime,
+  CashuClientError,
+  CashuMintError,
+  type BindProviderParams,
+  type BuildHtlcLockParams,
+  type CashuClient,
+  type CashuClientOptions,
+  type CashuProof,
+  type CashuSendChain,
+  type CashuWalletAdapter,
+  type CashuToken,
+  type RedeemHtlcParams,
+  type RedeemResult,
+} from "./cashu.ts";

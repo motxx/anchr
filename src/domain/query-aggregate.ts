@@ -1,5 +1,5 @@
 import type {
-  HtlcInfo,
+  EscrowInfo,
   PaymentStatus,
   Query,
   QueryInput,
@@ -15,12 +15,14 @@ import type {
   QuorumConfig,
   OracleAttestationRecord,
   RequesterMeta,
-} from "./types";
-import { DEFAULT_VERIFICATION_FACTORS } from "./types";
+} from "./types.ts";
+import { DEFAULT_VERIFICATION_FACTORS } from "./types.ts";
 import { randomBytes } from "node:crypto";
-import { isValidTransition, isCancellable, isExpirable } from "./query-transitions";
-import { validateQueryInput, validateHtlcLocktime, validateQuoteInfo } from "./value-objects";
-import { buildChallengeRule, generateNonce } from "./challenge";
+import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
+import { MIN_ESCROW_LOCKTIME_SECS, validateQueryInput, validateEscrowLocktime, validateQuoteInfo } from "./value-objects.ts";
+
+export { MIN_ESCROW_LOCKTIME_SECS };
+import { buildChallengeRule, generateNonce } from "./challenge.ts";
 
 export type TransitionResult =
   | { ok: true; query: Query }
@@ -31,13 +33,10 @@ export interface CreateQueryAggregateOptions {
   requesterMeta?: RequesterMeta;
   bounty?: BountyInfo;
   oracleIds?: string[];
-  htlc?: HtlcInfo;
+  escrow?: EscrowInfo;
   nostrEventId?: string;
   quorum?: QuorumConfig;
 }
-
-/** Minimum HTLC locktime in seconds (10 minutes). */
-export const MIN_HTLC_LOCKTIME_SECS = 600;
 
 function generateQueryId(): string {
   return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
@@ -53,20 +52,20 @@ export function createQueryAggregate(
 
   const now = Date.now();
 
-  if (options.htlc?.locktime) {
+  if (options.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    const locktimeError = validateHtlcLocktime(options.htlc.locktime, nowSecs, MIN_HTLC_LOCKTIME_SECS);
+    const locktimeError = validateEscrowLocktime(options.escrow.locktime, nowSecs, MIN_ESCROW_LOCKTIME_SECS);
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
   const requirements = input.verification_requirements ?? DEFAULT_VERIFICATION_FACTORS;
   const needsNonce = requirements.includes("nonce");
   const nonce = needsNonce ? generateNonce() : undefined;
-  const isHtlc = options.htlc !== undefined;
+  const isEscrow = options.escrow !== undefined;
 
   const query: Query = {
     id: generateQueryId(),
-    status: isHtlc ? "awaiting_quotes" : "pending",
+    status: isEscrow ? "awaiting_quotes" : "pending",
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
@@ -77,14 +76,15 @@ export function createQueryAggregate(
     requester_meta: options.requesterMeta,
     bounty: options.bounty,
     oracle_ids: options.oracleIds,
-    payment_status: isHtlc ? "htlc_locked" : "locked",
-    htlc: options.htlc,
-    quotes: isHtlc ? [] : undefined,
+    payment_status: isEscrow ? "escrow_locked" : "locked",
+    escrow: options.escrow,
+    quotes: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
     expected_gps: input.expected_gps,
     max_gps_distance_km: input.max_gps_distance_km,
     tlsn_requirements: input.tlsn_requirements,
     quorum: options.quorum,
+    visibility: input.visibility,
   };
 
   return { ok: true, query };
@@ -100,8 +100,8 @@ export function submitResult(
   attestations?: OracleAttestationRecord[],
   blossomKeys?: BlossomKeyMap,
 ): TransitionResult {
-  if (query.htlc !== undefined) {
-    return { ok: false, error: "Use HTLC-specific functions for HTLC queries" };
+  if (query.escrow !== undefined) {
+    return { ok: false, error: "Use the escrow-mode functions for queries with an escrow" };
   }
   if (query.status !== "pending") {
     return { ok: false, error: `Query is ${query.status}, not pending` };
@@ -159,12 +159,12 @@ export function cancelQuery(query: Query): TransitionResult {
   };
 }
 
-// --- HTLC path ---
+// --- Escrow path ---
 
-/** Record a worker quote for an HTLC query. */
+/** Record a worker quote for an escrow query. */
 export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (query.status !== "awaiting_quotes") {
     return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
@@ -176,33 +176,56 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
   return { ok: true, query: { ...query, quotes } };
 }
 
-/** Select a worker and transition awaiting_quotes → processing. */
+/**
+ * Fields that worker selection can mutate. Constrained to runtime-only
+ * fields (token, verified amount, opaque ref) so callers can't switch the
+ * escrow type or hashlock mid-flight.
+ */
+export type EscrowSelectionUpdates = Partial<
+  Pick<EscrowInfo, "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "worker_pubkey">
+>;
+
+/** Select a worker and transition awaiting_quotes → worker_selected. */
 export function selectWorker(
   query: Query,
   workerPubkey: string,
-  htlcUpdates: Partial<HtlcInfo>,
+  escrowUpdates: EscrowSelectionUpdates,
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
-  if (!isValidTransition(query.status, "processing", true)) {
+  if (!isValidTransition(query.status, "worker_selected", true)) {
     return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
   }
 
-  const htlc: HtlcInfo = {
-    ...query.htlc,
+  const escrow: EscrowInfo = {
+    ...query.escrow,
     worker_pubkey: workerPubkey,
-    ...htlcUpdates,
+    ...escrowUpdates,
   };
 
   return {
     ok: true,
     query: {
       ...query,
-      status: "processing",
-      htlc,
-      payment_status: htlcUpdates.escrow_token ? "htlc_swapped" : query.payment_status,
+      status: "worker_selected",
+      escrow,
+      payment_status: escrowUpdates.escrow_token ? "escrow_swapped" : query.payment_status,
     },
+  };
+}
+
+/** Worker acknowledges selection and begins work (worker_selected → processing). */
+export function beginWork(query: Query): TransitionResult {
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
+  }
+  if (!isValidTransition(query.status, "processing", true)) {
+    return { ok: false, error: `Query is ${query.status}, not worker_selected` };
+  }
+  return {
+    ok: true,
+    query: { ...query, status: "processing" },
   };
 }
 
@@ -213,13 +236,13 @@ export function recordResult(
   workerPubkey: string,
   blossomKeys?: BlossomKeyMap,
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "verifying", true)) {
     return { ok: false, error: `Query is ${query.status}, not processing` };
   }
-  if (query.htlc.worker_pubkey && query.htlc.worker_pubkey !== workerPubkey) {
+  if (query.escrow.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
     return { ok: false, error: "Worker pubkey does not match selected worker" };
   }
 
@@ -244,8 +267,8 @@ export function completeVerification(
   oracleId?: string,
   attestations?: OracleAttestationRecord[],
 ): TransitionResult {
-  if (query.htlc === undefined) {
-    return { ok: false, error: "Not an HTLC query" };
+  if (query.escrow === undefined) {
+    return { ok: false, error: "Not an escrow query" };
   }
   const target: QueryStatus = passed ? "approved" : "rejected";
   if (!isValidTransition(query.status, target, true)) {

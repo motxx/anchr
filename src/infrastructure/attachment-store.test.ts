@@ -1,23 +1,23 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { uploadAttachment } from "./attachment-store";
+import { uploadAttachment } from "./attachment-store.ts";
 
 describe("uploadAttachment", () => {
   test("throws when Blossom is not configured", async () => {
-    const saved = process.env.BLOSSOM_SERVERS;
-    delete process.env.BLOSSOM_SERVERS;
+    const saved = Deno.env.get("BLOSSOM_SERVERS");
+    Deno.env.delete("BLOSSOM_SERVERS");
 
     try {
       const file = new File([new Uint8Array([0xFF, 0xD8])], "photo.jpg", { type: "image/jpeg" });
       await expect(uploadAttachment("q1", file)).rejects.toThrow("Blossom is not configured");
     } finally {
-      if (saved !== undefined) process.env.BLOSSOM_SERVERS = saved;
+      if (saved !== undefined) Deno.env.set("BLOSSOM_SERVERS", saved);
     }
   });
 
   test("rejects invalid zip (no photo inside) when Blossom is configured", async () => {
-    const saved = process.env.BLOSSOM_SERVERS;
-    process.env.BLOSSOM_SERVERS = "http://localhost:9999";
+    const saved = Deno.env.get("BLOSSOM_SERVERS");
+    Deno.env.set("BLOSSOM_SERVERS", "http://localhost:9999");
 
     try {
       // PK magic bytes → detected as zip, but contains no photo
@@ -25,14 +25,14 @@ describe("uploadAttachment", () => {
       const file = new File([fakeZip], "bundle.zip", { type: "application/zip" });
       await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");
     } finally {
-      if (saved !== undefined) process.env.BLOSSOM_SERVERS = saved;
-      else delete process.env.BLOSSOM_SERVERS;
+      if (saved !== undefined) Deno.env.set("BLOSSOM_SERVERS", saved);
+      else Deno.env.delete("BLOSSOM_SERVERS");
     }
   });
 
   test("detects zip by magic bytes even without .zip extension", async () => {
-    const saved = process.env.BLOSSOM_SERVERS;
-    process.env.BLOSSOM_SERVERS = "http://localhost:9999";
+    const saved = Deno.env.get("BLOSSOM_SERVERS");
+    Deno.env.set("BLOSSOM_SERVERS", "http://localhost:9999");
 
     try {
       // PK header but named .jpg — should still be treated as zip
@@ -41,8 +41,8 @@ describe("uploadAttachment", () => {
       // Will be detected as zip due to PK magic bytes → "Invalid zip: no photo found"
       await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");
     } finally {
-      if (saved !== undefined) process.env.BLOSSOM_SERVERS = saved;
-      else delete process.env.BLOSSOM_SERVERS;
+      if (saved !== undefined) Deno.env.set("BLOSSOM_SERVERS", saved);
+      else Deno.env.delete("BLOSSOM_SERVERS");
     }
   });
 });

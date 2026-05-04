@@ -2,13 +2,13 @@ import React, { useState } from "react";
 import { View, ScrollView, Image, Pressable } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSButton, DSInput, DSCard, DSSection, DSFeedbackBanner } from "../../../src/components/ds";
-import { uploadPhoto, submitResult, submitQuote } from "../../../src/api/client";
-import { useQueryDetail } from "../../../src/hooks/useQueries";
-import { cameraProvider, type CapturedPhoto } from "../../../src/platform/camera";
-import { filePickerProvider } from "../../../src/platform/file-picker";
+import { DSText, DSButton, DSInput, DSCard, DSSection, DSFeedbackBanner } from "../../../src/components/ds/index.ts";
+import { uploadPhoto, submitResult, submitQuote } from "../../../src/api/client.ts";
+import { useQueryDetail } from "../../../src/hooks/useQueries.ts";
+import { cameraProvider, type CapturedPhoto } from "../../../src/platform/camera.ts";
+import { filePickerProvider } from "../../../src/platform/file-picker.ts";
 import { Ionicons } from "@expo/vector-icons";
-import type { AttachmentRef } from "../../../src/api/types";
+import type { AttachmentRef } from "../../../src/api/types.ts";
 
 export default function SubmitScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

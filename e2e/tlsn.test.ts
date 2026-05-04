@@ -4,24 +4,31 @@
  * Prerequisites:
  *   - Docker Verifier Server: docker compose up tlsn-verifier -d
  *   - Rust binaries built: cd crates/tlsn-prover && cargo build
- *   - Anchr server running: bun run src/index.ts
+ *   - Anchr server running: deno task dev
  *
  * Run:
- *   bun test e2e/tlsn.test.ts
+ *   deno test e2e/tlsn.test.ts --allow-all --no-check
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "../src/runtime/mod.ts";
-import { buildWorkerApiApp } from "../src/worker-api";
-import { createQueryService, createQueryStore } from "../src/query-service";
-import type { QueryInput, QueryResult } from "../src/types";
+import { spawn } from "@anchr/core-runtime";
+import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
+import { createQueryService, createQueryStore } from "../src/application/query-service.ts";
+import type { QueryInput, QueryResult } from "../src/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import process from "node:process";
 
 const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
-const PROVER_BIN = join(import.meta.dir, "../crates/tlsn-prover/target/debug/tlsn-prove");
-const VERIFIER_BIN = join(import.meta.dir, "../crates/tlsn-verifier/target/release/tlsn-verifier");
+const __dirname = import.meta.dirname ?? new URL(".", import.meta.url).pathname;
+const PROVER_BIN = join(__dirname, "../crates/tlsn-prover/target/debug/tlsn-prove");
+const VERIFIER_BIN = join(__dirname, "../crates/tlsn-verifier/target/release/tlsn-verifier");
+
+// bitFlyer public API — ECDSA cert (fast MPC-TLS), no rate limit for reads
+const TARGET_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
+const TARGET_SERVER = "api.bitflyer.com";
+const TARGET_BODY_MARKER = "BTC_JPY";
 
 async function isVerifierReachable(): Promise<boolean> {
   try {
@@ -93,51 +100,49 @@ describe("TLSNotary E2E", () => {
     }
   });
 
-  test("generates and verifies a real TLSNotary presentation", async () => {
+  test("generates and verifies a real TLSNotary presentation", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
     }
 
     // Generate real presentation via MPC-TLS
-    const targetUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
-    const presentationB64 = await generatePresentation(targetUrl);
+    const presentationB64 = await generatePresentation(TARGET_URL);
     expect(presentationB64.length).toBeGreaterThan(100);
 
     // Verify with tlsn-verifier binary
     const result = await verifyPresentation("/tmp/e2e-tlsn.presentation.tlsn");
     expect(result.valid).toBe(true);
-    expect(result.server_name).toBe("api.coingecko.com");
+    expect(result.server_name).toBe(TARGET_SERVER);
     expect(typeof result.revealed_body).toBe("string");
-    expect((result.revealed_body as string)).toContain("bitcoin");
-  }, 60_000);
+    expect((result.revealed_body as string)).toContain(TARGET_BODY_MARKER);
+  });
 
-  test("full Anchr API flow: create query → submit presentation → verify", async () => {
+  test("full Anchr API flow: create query → submit presentation → verify", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
     }
 
     // Generate presentation
-    const targetUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
-    const presentationB64 = await generatePresentation(targetUrl);
+    const presentationB64 = await generatePresentation(TARGET_URL);
 
     // Create query service
     const store = createQueryStore();
     const svc = createQueryService({ store });
 
     const input: QueryInput = {
-      description: "E2E: Verify BTC price",
+      description: "E2E: Verify BTC/JPY price",
       verification_requirements: ["tlsn"],
       tlsn_requirements: {
-        target_url: targetUrl,
-        conditions: [{ type: "jsonpath", expression: "bitcoin.usd", description: "BTC price exists" }],
+        target_url: TARGET_URL,
+        conditions: [{ type: "jsonpath", expression: "product_code", description: "Product code exists" }],
       },
     };
 
     const query = svc.createQuery(input, { ttlSeconds: 600, bounty: { amount_sats: 21 } });
     expect(query.status).toBe("pending");
-    expect(query.tlsn_requirements?.target_url).toBe(targetUrl);
+    expect(query.tlsn_requirements?.target_url).toBe(TARGET_URL);
 
     // Submit with real presentation
     const result: QueryResult = {
@@ -160,13 +165,13 @@ describe("TLSNotary E2E", () => {
     const checks = outcome.query?.verification?.checks ?? [];
     expect(checks.some(c => c.includes("cryptographically verified"))).toBe(true);
     expect(checks.some(c => c.includes("server name matches"))).toBe(true);
-    expect(checks.some(c => c.includes("BTC price exists"))).toBe(true);
+    expect(checks.some(c => c.includes("Product code exists"))).toBe(true);
 
     // Verify tlsn_verified data
     const verified = outcome.query?.verification?.tlsn_verified;
-    expect(verified?.server_name).toBe("api.coingecko.com");
-    expect(verified?.revealed_body).toContain("bitcoin");
-  }, 120_000);
+    expect(verified?.server_name).toBe(TARGET_SERVER);
+    expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
+  });
 
   test("rejects submission without presentation", async () => {
     const store = createQueryStore();
@@ -188,14 +193,14 @@ describe("TLSNotary E2E", () => {
     expect(outcome.query?.verification?.failures.some(f => f.includes("no attestation"))).toBe(true);
   });
 
-  test("extension result with CLI-generated presentation verifies via HTTP API", async () => {
+  test("extension result with CLI-generated presentation verifies via HTTP API", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
     }
 
-    const app = buildWorkerApiApp();
-    const targetUrl = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd";
+    const testService = createQueryService({ hooks: {} });
+    const app = buildWorkerApiApp({ queryService: testService });
 
     // Create query
     const createRes = await app.request("/queries", {
@@ -205,8 +210,8 @@ describe("TLSNotary E2E", () => {
         description: "E2E: extension result test",
         verification_requirements: ["tlsn"],
         tlsn_requirements: {
-          target_url: targetUrl,
-          conditions: [{ type: "jsonpath", expression: "bitcoin.usd", description: "BTC price exists" }],
+          target_url: TARGET_URL,
+          conditions: [{ type: "jsonpath", expression: "product_code", description: "Product code exists" }],
         },
         ttl_seconds: 600,
       }),
@@ -215,34 +220,36 @@ describe("TLSNotary E2E", () => {
     const { query_id } = await createRes.json() as { query_id: string };
 
     // Generate real presentation via CLI prover
-    const presentationB64 = await generatePresentation(targetUrl);
+    const presentationB64 = await generatePresentation(TARGET_URL);
 
-    // Submit as extension result (not CLI attestation) — exercises the extension path in verifier.ts
-    const submitRes = await app.request(`/queries/${query_id}/submit`, {
+    // Submit as extension result — exercises the extension path in verifier.ts
+    const submitRes = await app.request(`/queries/${query_id}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        worker_pubkey: "e2e_tlsn_worker",
         tlsn_extension_result: { presentation: presentationB64 },
       }),
     });
 
     const submitData = await submitRes.json() as Record<string, unknown>;
     expect(submitData.ok).toBe(true);
-    expect((submitData.verification as any)?.passed).toBe(true);
+    expect((submitData.verification as Record<string, unknown>)?.passed).toBe(true);
 
     // Verify that tlsn_verified data is populated
-    const verified = (submitData.verification as any)?.tlsn_verified;
-    expect(verified?.server_name).toBe("api.coingecko.com");
-    expect(verified?.revealed_body).toContain("bitcoin");
-  }, 120_000);
+    const verified = (submitData.verification as Record<string, unknown>)?.tlsn_verified as Record<string, unknown>;
+    expect(verified?.server_name).toBe(TARGET_SERVER);
+    expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
+  });
 
-  test("HTTP API accepts tlsn_presentation field", async () => {
+  test("HTTP API accepts tlsn_presentation field", { sanitizeOps: false, sanitizeResources: false }, async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
     }
 
-    const app = buildWorkerApiApp();
+    const testService = createQueryService({ hooks: {} });
+    const app = buildWorkerApiApp({ queryService: testService });
 
     // Create query
     const createRes = await app.request("/queries", {
@@ -252,8 +259,8 @@ describe("TLSNotary E2E", () => {
         description: "E2E: HTTP API test",
         verification_requirements: ["tlsn"],
         tlsn_requirements: {
-          target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-          conditions: [{ type: "jsonpath", expression: "bitcoin.usd", description: "BTC price" }],
+          target_url: TARGET_URL,
+          conditions: [{ type: "jsonpath", expression: "product_code", description: "BTC/JPY price" }],
         },
         ttl_seconds: 600,
       }),
@@ -262,18 +269,19 @@ describe("TLSNotary E2E", () => {
     const { query_id } = await createRes.json() as { query_id: string };
 
     // Generate and submit real presentation
-    const presentationB64 = await generatePresentation(
-      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-    );
+    const presentationB64 = await generatePresentation(TARGET_URL);
 
-    const submitRes = await app.request(`/queries/${query_id}/submit`, {
+    const submitRes = await app.request(`/queries/${query_id}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tlsn_presentation: presentationB64 }),
+      body: JSON.stringify({
+        worker_pubkey: "e2e_tlsn_worker",
+        tlsn_presentation: presentationB64,
+      }),
     });
 
     const submitData = await submitRes.json() as Record<string, unknown>;
     expect(submitData.ok).toBe(true);
-    expect((submitData.verification as any)?.passed).toBe(true);
-  }, 120_000);
+    expect((submitData.verification as Record<string, unknown>)?.passed).toBe(true);
+  });
 });

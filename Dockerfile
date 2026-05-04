@@ -1,5 +1,5 @@
 # Build tlsn-verifier binary
-FROM rust:1-bookworm AS rust-builder
+FROM rust:1-bookworm@sha256:6ae102bdbf528294bc79ad6e1fae682f6f7c2a6e6621506ba959f9685b308a55 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY crates/tlsn-verifier/Cargo.toml ./crates/tlsn-verifier/
@@ -12,7 +12,7 @@ COPY crates/tlsn-prover/src/ ./crates/tlsn-prover/src/
 RUN cd crates/tlsn-prover && cargo build --release
 
 # Main app
-FROM denoland/deno:2 AS app
+FROM denoland/deno@sha256:9c47e8b8fa41e91fe2dd1448888244a56c4ec90124333d5341319b043a3a6ca0 AS app
 
 WORKDIR /app
 
@@ -26,13 +26,33 @@ RUN apt-get update \
 COPY --from=rust-builder /build/crates/tlsn-verifier/target/release/tlsn-verifier /usr/local/bin/
 COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /usr/local/bin/
 
-COPY deno.json ./
+# Copy the root manifest plus every workspace member's deno.json so that
+# `deno install` can resolve workspace packages before the rest of the
+# source tree lands in the next COPY step.
+COPY deno.json deno.lock ./
+COPY packages/core-runtime/deno.json ./packages/core-runtime/
+COPY packages/core-cashu/deno.json ./packages/core-cashu/
+COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
+COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
+COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
+COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 RUN deno install
 
 COPY . .
 
 # Build frontend
-RUN deno task build:ui && deno task build:css
+RUN deno task build:ui
+# Tailwind CSS v4: @import "tailwindcss" resolves from the input file's
+# directory. Symlink node_modules into /app so the CSS resolver finds it.
+RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null; \
+  ln -sf /tmp/node_modules /app/src/ui/node_modules \
+  && ln -sf /tmp/node_modules /app/src/ui/requester/node_modules \
+  && ln -sf /tmp/node_modules /app/src/ui/dashboard/node_modules \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/globals.css -o /app/dist/ui/generated.css \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/requester/globals.css -o /app/dist/ui/requester/generated.css \
+  && /tmp/node_modules/.bin/tailwindcss -i /app/src/ui/dashboard/globals.css -o /app/dist/ui/dashboard/generated.css \
+  && rm -f /app/src/ui/node_modules /app/src/ui/requester/node_modules /app/src/ui/dashboard/node_modules \
+  && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
 
 ENV NODE_ENV=production
 ENV REFERENCE_APP_PORT=8080
