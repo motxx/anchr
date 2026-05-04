@@ -1,5 +1,5 @@
 import { test, expect, describe, beforeAll } from "bun:test";
-import { Anchr, QueryTimeoutError } from "./index.ts";
+import { Anchr, QueryTimeoutError } from "../../packages/sdk/src/index.ts";
 import { AnchrWorker } from "./worker.ts";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -9,7 +9,7 @@ import { createConnection } from "node:net";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = "http://localhost:3000";
 const VERIFIER_HOST = "localhost:7046";
-const PROVER_BIN = join(__dirname, "../../../crates/tlsn-prover/target/debug/tlsn-prove");
+const PROVER_BIN = join(__dirname, "../../crates/tlsn-prover/target/debug/tlsn-prove");
 
 function checkTcp(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {

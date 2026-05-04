@@ -1,12 +1,16 @@
 /**
- * Anchr Auto-Worker — automatically fulfills TLSNotary queries.
+ * Anchr Auto-Worker — example TLSNotary auto-fulfiller.
  *
- * Polls for open queries, runs tlsn-prove against target URLs,
- * and submits cryptographic presentations to the Anchr server.
+ * This is a TLSNotary-specific reference worker, not part of the
+ * schema-agnostic SDK (`packages/sdk`). It polls the Anchr server for
+ * open queries that declare `verification_requirements: ["tlsn"]`,
+ * runs `tlsn-prove` against the declared target URL, and submits the
+ * resulting presentation back. Use as a template for building workers
+ * around other verification schemas (C2PA, fiat-payment-proof, etc.).
  *
  * @example
  * ```typescript
- * import { AnchrWorker } from "anchr-sdk/worker";
+ * import { AnchrWorker } from "../../example/tlsn-worker/worker.ts";
  *
  * const worker = new AnchrWorker({
  *   serverUrl: "http://localhost:3000",
@@ -14,15 +18,15 @@
  *   proverBin: "./crates/tlsn-prover/target/debug/tlsn-prove",
  * });
  *
- * worker.on("fulfilled", (queryId, result) => {
- *   console.log(`Query ${queryId}: ${result.ok ? "approved" : "rejected"}`);
+ * worker.on("fulfilled", (event) => {
+ *   console.log(`Query ${event.queryId}: ${event.ok ? "approved" : "rejected"}`);
  * });
  *
  * await worker.start();
  * ```
  */
 
-import { Anchr, type QueryCondition } from "./index.ts";
+import { Anchr, type QueryCondition } from "../../packages/sdk/src/index.ts";
 import { statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
