@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-push backstop.
+# Enable with: deno task setup:hooks
+# (which runs `git config core.hooksPath scripts/git-hooks`)
+#
+# Runs the full test gauntlet — lint:strict + unit + protocol + frost +
+# integration + example + pentest, plus the Docker-backed e2e (relay +
+# Blossom + Postgres + regtest Cashu/Lightning). Mirrors the entire CI
+# pipeline; a green run here implies a green CI.
+#
+# Requires Docker to be running. The script starts and tears down its
+# own service containers; it will not contaminate other compose stacks.
+#
+# Bypass with `git push --no-verify` only when you know what you're doing.
+set -e
+deno task test:all:full
