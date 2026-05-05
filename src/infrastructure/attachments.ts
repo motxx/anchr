@@ -9,6 +9,7 @@ import type {
   AttachmentHandle,
   AttachmentRef,
   AttachmentStorageKind,
+  BlossomKeyMaterial,
   QueryResult,
 } from "../domain/types.ts";
 import {
@@ -232,7 +233,7 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: import("../domain/types.ts").BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: BlossomKeyMaterial) {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
   if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
     return readBlossomAttachment(ref, blossomKeyMaterial);

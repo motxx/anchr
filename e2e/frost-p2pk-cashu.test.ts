@@ -30,6 +30,7 @@ import { expect } from "@std/expect";
 import {
   Wallet,
   type Proof,
+  type P2PKOptions,
   P2PKBuilder,
   signP2PKProofs,
 } from "@cashu/cashu-ts";
@@ -85,7 +86,7 @@ async function createP2PKLockedProofs(
   wallet: Wallet,
   sourceProofs: Proof[],
   amountSats: number,
-  p2pkOptions: import("@cashu/cashu-ts").P2PKOptions,
+  p2pkOptions: P2PKOptions,
 ): Promise<Proof[]> {
   const fee = wallet.getFeesForProofs(sourceProofs);
   const sendAmount = amountSats - fee;

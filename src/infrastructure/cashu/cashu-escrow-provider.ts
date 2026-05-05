@@ -1,11 +1,11 @@
 import type { EscrowProvider } from "../../application/escrow-port.ts";
 import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "@anchr/core-cashu/escrow";
 import { verifyToken } from "@anchr/core-cashu/wallet";
-import { getDecodedToken } from "@cashu/cashu-ts";
+import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
 
 export interface CashuEscrowProviderConfig {
   /** Source Cashu proofs for createHold (if known ahead of time). */
-  sourceProofsResolver?: (amount: number) => Promise<import("@cashu/cashu-ts").Proof[]>;
+  sourceProofsResolver?: (amount: number) => Promise<Proof[]>;
 }
 
 export function createCashuEscrowProvider(

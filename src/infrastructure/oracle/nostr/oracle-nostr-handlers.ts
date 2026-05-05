@@ -3,6 +3,7 @@
  */
 
 import type { Event } from "nostr-tools";
+import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../../nostr/crypto/identity.ts";
 import {
   parseOracleResponsePayload,
@@ -18,7 +19,7 @@ export interface WatchedQuery {
   requesterPubkey: string;
   selectedWorkerPubkey?: string;
   quotedWorkers: Set<string>;
-  subs: import("nostr-tools/pool").SubCloser[];
+  subs: SubCloser[];
 }
 
 export function buildQueryFromPayload(queryId: string, oraclePayload: OracleResponsePayload): Query {

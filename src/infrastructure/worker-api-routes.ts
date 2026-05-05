@@ -20,12 +20,13 @@ import {
 } from "./worker-api-presenters.ts";
 import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
+import type { OracleInfo } from "./oracle/index.ts";
 import type { AttachmentRef, BlossomKeyMap, EscrowInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
   pStore?: PreimageStore;
-  doListOracles: () => ReturnType<typeof import("./oracle/index.ts").listOracles>;
+  doListOracles: () => OracleInfo[];
   writeAuth: MiddlewareHandler;
   rateLimit: MiddlewareHandler;
 }

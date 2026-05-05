@@ -1,6 +1,6 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, getDecodedToken, type Proof } from "@cashu/cashu-ts";
 import {
   createCashuEscrowProvider,
 } from "./cashu-escrow-provider.ts";
@@ -48,7 +48,7 @@ function makePlainToken(amount = 100): string {
 }
 
 function createTestableProvider() {
-  const tokenMap = new Map<string, { token: string; escrowToken: { proofs: import("@cashu/cashu-ts").Proof[] } }>();
+  const tokenMap = new Map<string, { token: string; escrowToken: { proofs: Proof[] } }>();
 
   const provider: EscrowProvider & {
     _seed(ref: string, token: string): void;

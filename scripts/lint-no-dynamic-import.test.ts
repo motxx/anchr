@@ -1,8 +1,10 @@
 /**
- * Tests for the dynamic-import guard.
+ * Tests for the dynamic / inline-import guard.
  *
- * Verify the regex catches `await import(...)` in source, that auto-exempt
- * patterns (node:* targets, `if (import.meta.main)` blocks) are honoured,
+ * Verify the regex catches `await import(...)`, floating
+ * `import(...).then(...)` chains, and type-position
+ * `Promise<import("./foo.ts").Bar>` references; that auto-exempt
+ * patterns (node:* targets, `if (import.meta.main)` blocks) are honoured;
  * and that the per-line opt-out works.
  */
 import { test } from "@std/testing/bdd";
@@ -95,4 +97,54 @@ test("matches when there are extra spaces between await/import/paren", () => {
   const text = `const m = await   import  (  "./mod.ts"  );`;
   const hits = scanText(text, "src/a.ts");
   expect(hits.length).toBe(1);
+});
+
+test("catches inline type-position `import(...)` reference", () => {
+  const text =
+    `type Resolver = (n: number) => Promise<import("@cashu/cashu-ts").Proof[]>;`;
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(1);
+});
+
+test("catches `import(...).then(...)` floating call chain (no await)", () => {
+  const text = [
+    "function configure() {",
+    `  import("expo-notifications").then((m) => m.setHandler({}));`,
+    "}",
+  ].join("\n");
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(1);
+  expect(hits[0].line).toBe(2);
+});
+
+test("catches `ReturnType<typeof import(...).fn>` inline reference", () => {
+  const text =
+    `function f(s: ReturnType<typeof import("./store.ts").create>) {}`;
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(1);
+});
+
+test("inline import honours `allow-dynamic-import:` opt-out", () => {
+  const text =
+    `type T = import("./mod.ts").Foo; // allow-dynamic-import: cycle break`;
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(0);
+});
+
+test("does NOT flag `import.meta.url` / `import.meta.main`", () => {
+  const text = [
+    `console.log(import.meta.url);`,
+    `if (import.meta.main) { console.log("hi"); }`,
+  ].join("\n");
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(0);
+});
+
+test("does NOT flag identifiers ending in `import`", () => {
+  const text = [
+    `function reimport(path: string) { return path; }`,
+    `const x = reimport("./mod.ts");`,
+  ].join("\n");
+  const hits = scanText(text, "src/a.ts");
+  expect(hits.length).toBe(0);
 });

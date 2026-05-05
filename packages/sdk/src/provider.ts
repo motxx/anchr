@@ -29,7 +29,7 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri } from "./schema.ts";
-import { createCashuClient } from "./cashu.ts";
+import { createCashuClient, type CashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -182,7 +182,7 @@ export function createProvider(options: ProviderOptions): Provider {
 interface JobContext {
   identity: Keypair;
   oracles: readonly string[];
-  cashuClient: import("./cashu.ts").CashuClient;
+  cashuClient: CashuClient;
   relayClient: RelayClient;
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;

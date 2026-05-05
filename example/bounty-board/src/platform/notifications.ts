@@ -23,7 +23,7 @@ function createNativeProvider(): NotificationProvider {
       return status === "granted";
     },
     configureForegroundHandler() {
-      import("expo-notifications").then((Notifications) => {
+      import("expo-notifications").then((Notifications) => { // allow-dynamic-import: native-only Expo module, browser bundle excludes it
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
             shouldShowAlert: true,

@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle/discovery/registry.ts";
@@ -607,7 +607,7 @@ describe("submitEscrowResult", () => {
   }
 
   /** Create escrowInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: ReturnType<typeof import("@anchr/core-cashu/preimage-store").createPreimageStore>) {
+  function makeHtlcWithHash(preimageStore: PreimageStore) {
     const entry = preimageStore.create();
     return {
       escrowInfo: {

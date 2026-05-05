@@ -1,18 +1,25 @@
 #!/usr/bin/env -S deno run --allow-read --allow-env --allow-run
 /**
- * Dynamic-import guard.
+ * Dynamic / inline-import guard.
  *
- * `await import(...)` defers module loading to runtime. It defeats static
- * analysis, breaks bundler tree-shaking, and frequently hides
- * circular-dependency workarounds or paths that bit-rot silently
- * (the importer compiles fine even if the target file is renamed).
+ * Any `import("...")` call expression — whether `await import(...)`, a
+ * floating `import("...").then(...)` chain, or a type-position
+ * `Promise<import("./mod.ts").Foo>` — defeats static analysis, hides the
+ * dependency from the import block at the top of the file, and breaks
+ * bundler tree-shaking. Type-position inline imports look harmless
+ * because they're erased at compile time, but they still defeat grep,
+ * codemods, and rename-tracking the same way runtime ones do.
  *
- * The CLAUDE.md policy is: no dynamic `await import(...)` anywhere — every
- * legitimate platform conditional or script-mode entry must explain itself
- * via a `// allow-dynamic-import: <reason>` comment on the same line.
+ * The CLAUDE.md policy is: no `import("...")` call expressions in source
+ * — every legitimate platform conditional or script-mode entry must
+ * explain itself via a `// allow-dynamic-import: <reason>` comment on
+ * the same line. For type usage, lift to a top-of-file
+ * `import type { Foo } from "..."` instead.
  *
  * Banned in every `.ts` / `.tsx` file in the repo:
- *   - `await import(...)` expressions
+ *   - `await import("...")` expressions (runtime dynamic load)
+ *   - `import("...").then(...)` and other floating call chains
+ *   - inline type references like `import("./foo.ts").Bar`
  *
  * Auto-exempt (no opt-out comment needed):
  *   - Imports of `node:*` modules — the standard library is inherently
@@ -43,7 +50,17 @@ interface Hit {
   text: string;
 }
 
-const DYNAMIC_IMPORT = /\bawait\s+import\s*\(\s*(["'`])([^"'`]+)\1/;
+/**
+ * Match any `import("...")` call expression. The optional `await\s+`
+ * prefix is no longer required — inline type-position imports
+ * (`Promise<import("./foo.ts").Bar>`) and `import("x").then(...)` chains
+ * carry the same downsides and must lift to a top-of-file static import.
+ *
+ * The `(?<![.\w])` lookbehind keeps the match from firing on
+ * `import.meta` and on identifiers that happen to end in `import`
+ * (e.g. `reimport(...)` if anyone ever wrote one).
+ */
+const DYNAMIC_IMPORT = /(?<![.\w])import\s*\(\s*(["'`])([^"'`]+)\1/;
 const NODE_MODULE = /^node:/;
 const OPT_OUT = /allow-dynamic-import:/;
 
@@ -182,22 +199,24 @@ async function readStdin(): Promise<string> {
 
 function report(hits: Hit[]): void {
   if (hits.length === 0) {
-    console.log("✓ no banned dynamic imports detected");
+    console.log("✓ no banned dynamic or inline imports detected");
     return;
   }
-  console.error(`✗ dynamic import: ${hits.length} hit(s)\n`);
+  console.error(`✗ dynamic / inline import: ${hits.length} hit(s)\n`);
   for (const h of hits) {
     console.error(`  ${h.file}:${h.line}`);
     console.error(`      ${h.text}`);
   }
   console.error(
-    "\nPolicy: prefer static `import` declarations. Dynamic `await\n" +
-      "import(...)` defeats static analysis and breaks bundler tree-shaking.\n" +
-      "Convert the call to a top-of-file static import — or, if a genuine\n" +
-      "platform conditional / script-mode entry / lazy-load is required,\n" +
-      'append "allow-dynamic-import: <reason>" on the same line.\n' +
-      "Auto-exempt patterns: `node:*` targets and lines inside\n" +
-      "`if (import.meta.main) { ... }` blocks.",
+    "\nPolicy: prefer static `import` declarations. `import(...)` call\n" +
+      "expressions — `await import(...)`, `import(...).then(...)`, and\n" +
+      "type-position `Promise<import(\"./foo.ts\").Bar>` — defeat static\n" +
+      "analysis and break bundler tree-shaking. Convert the call to a\n" +
+      "top-of-file `import` (or `import type` for type-only references)\n" +
+      "— or, if a genuine platform conditional / script-mode entry /\n" +
+      'lazy-load is required, append "allow-dynamic-import: <reason>"\n' +
+      "on the same line. Auto-exempt patterns: `node:*` targets and\n" +
+      "lines inside `if (import.meta.main) { ... }` blocks.",
   );
 }
 
