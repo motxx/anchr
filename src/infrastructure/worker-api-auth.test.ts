@@ -2,7 +2,7 @@ import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "./worker-api.ts";
 import { createQueryService, createQueryStore } from "../application/query-service.ts";
-import { createOracleRegistry } from "./oracle/registry.ts";
+import { createOracleRegistry } from "./oracle/discovery/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 

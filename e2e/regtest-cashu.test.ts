@@ -26,7 +26,7 @@ import { spawn } from "@anchr/core-runtime";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
 import { createQueryService } from "../src/application/query-service.ts";
-import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/discovery/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { normalizeQueryResult } from "../src/infrastructure/attachments.ts";
 import {

@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isBlossomEnabled, getBlossomConfig } from "./blossom/client.ts";
+import { isBlossomEnabled, getBlossomConfig } from "@anchr/blossom";
 import { createQueryService } from "../application/query-service.ts";
 import { storeIntegrity } from "@anchr/photo-verification/integrity-store";
 import { buildWorkerApiApp } from "./worker-api.ts";

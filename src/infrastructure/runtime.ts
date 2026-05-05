@@ -5,9 +5,9 @@ import { startMcpServer } from "./mcp-server.ts";
 import { createQueryService } from "../application/query-service.ts";
 import { buildWorkerApiApp } from "./worker-api.ts";
 import { setupServerLogCapture } from "./log-stream.ts";
-import { createOracleRegistry } from "./oracle/registry.ts";
+import { createOracleRegistry } from "./oracle/discovery/registry.ts";
 import { normalizeQueryResult } from "./attachments.ts";
-import { publishQueryToRelay } from "./nostr/relay-publish.ts";
+import { publishQueryToRelay } from "./nostr/transport/relay-publish.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "scheduler"]);

@@ -105,7 +105,7 @@ async function createMcpClient(envOverrides: Record<string, string> = {}, bootst
   // `buildWorkerApiApp({ queryService })` wired by the preamble.
   const setupQueryService = [
     `const { createQueryService } = await import(${JSON.stringify(join(moduleDir(import.meta), "../application/query-service.ts"))});`,
-    `const { createOracleRegistry } = await import(${JSON.stringify(join(moduleDir(import.meta), "oracle/registry.ts"))});`,
+    `const { createOracleRegistry } = await import(${JSON.stringify(join(moduleDir(import.meta), "oracle/discovery/registry.ts"))});`,
     `const { normalizeQueryResult } = await import(${JSON.stringify(join(moduleDir(import.meta), "attachments.ts"))});`,
     `globalThis.__queryService = createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult });`,
   ].join("\n");

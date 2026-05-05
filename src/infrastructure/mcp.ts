@@ -1,6 +1,6 @@
 import { startMcpServer } from "./mcp-server.ts";
 import { createQueryService } from "../application/query-service.ts";
-import { createOracleRegistry } from "./oracle/registry.ts";
+import { createOracleRegistry } from "./oracle/discovery/registry.ts";
 import { normalizeQueryResult } from "./attachments.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 

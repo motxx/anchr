@@ -3,9 +3,9 @@
 
 import { Buffer } from "node:buffer";
 import { stripExif } from "../exif-strip.ts";
-import { generateEphemeralIdentity } from "../nostr/identity.ts";
+import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
 import type { AttachmentRef } from "../../domain/types.ts";
-import { getBlossomConfig, uploadToBlossom, type BlossomUploadResult } from "./client.ts";
+import { getBlossomConfig, uploadToBlossom, type BlossomUploadResult } from "@anchr/blossom";
 
 export interface WorkerUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */

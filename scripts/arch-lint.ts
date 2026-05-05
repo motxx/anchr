@@ -29,6 +29,7 @@
  *   [E015] frost-oracle may only depend on core-runtime
  *   [E016] cashu-conditional-swap may only depend on
  *          core-runtime, core-cashu, frost-oracle
+ *   [E019] blossom may only depend on core-runtime
  *   [E017] sdk must not depend on any host-side @anchr/* package (other
  *          than core-runtime)
  *   [E020] packages/ must not import from src/ (one-way dependency)
@@ -77,6 +78,7 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
   "photo-verification": new Set<string>(["core-runtime"]),
   "frost-oracle": new Set<string>(["core-runtime"]),
   "cashu-conditional-swap": new Set<string>(["core-runtime", "core-cashu", "frost-oracle"]),
+  "blossom": new Set<string>(["core-runtime"]),
   "sdk": new Set<string>(["core-runtime"]),
 };
 

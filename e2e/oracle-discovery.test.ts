@@ -13,13 +13,13 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { generateEphemeralIdentity } from "../src/infrastructure/nostr/identity.ts";
-import { buildOracleAnnouncementEvent } from "../src/infrastructure/nostr/event-builders.ts";
+import { generateEphemeralIdentity } from "../src/infrastructure/nostr/crypto/identity.ts";
+import { buildOracleAnnouncementEvent } from "../src/infrastructure/nostr/events/event-builders.ts";
 import {
   discoverOracles,
   parseOracleAnnouncementEvent,
-} from "../src/infrastructure/oracle/oracle-discovery.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../src/infrastructure/nostr/events.ts";
+} from "../src/infrastructure/oracle/discovery/oracle-discovery.ts";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "../src/infrastructure/nostr/events/events.ts";
 import type { OracleInfo } from "../src/domain/oracle-types.ts";
 
 // ---------------------------------------------------------------------------

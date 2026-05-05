@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { QueryService } from "../application/query-service.ts";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
-import { isNostrEnabled } from "./nostr/client.ts";
+import { isNostrEnabled } from "./nostr/transport/client.ts";
 import { isCashuEnabled } from "@anchr/core-cashu/wallet";
 import type { VerificationFactor, TlsnCondition } from "../domain/types.ts";
 import { VERIFICATION_FACTORS } from "../domain/types.ts";

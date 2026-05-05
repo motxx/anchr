@@ -6,14 +6,14 @@
  * Data Vending Machine event kinds (5300/6300/7000).
  */
 
-export { generateEphemeralIdentity, restoreIdentity, type NostrIdentity } from "./identity.ts";
+export { generateEphemeralIdentity, restoreIdentity, type NostrIdentity } from "./crypto/identity.ts";
 export {
   deriveRegionKey,
   deriveConversationKey,
   encryptNip44,
   decryptNip44,
   regionKeyHex,
-} from "./encryption.ts";
+} from "./crypto/encryption.ts";
 export {
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
@@ -37,13 +37,13 @@ export {
   type PreimageDMPayload,
   type RejectionDMPayload,
   type OracleDMPayload,
-} from "./events.ts";
+} from "./events/events.ts";
 export {
   DM_KIND,
   buildPreimageDM,
   buildRejectionDM,
   parseOracleDM,
-} from "./dm.ts";
+} from "./events/dm.ts";
 export {
   publishEvent,
   subscribeToQueries,
@@ -56,11 +56,11 @@ export {
   isNostrEnabled,
   getNostrConfig,
   closePool,
-} from "./client.ts";
+} from "./transport/client.ts";
 export {
   ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,
   type OracleAttestationPayload,
-} from "./oracle-attestation.ts";
+} from "./events/oracle-attestation.ts";

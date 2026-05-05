@@ -12,9 +12,9 @@
 
 import type { ProofDelivery, ProofPublishResult } from "../../application/proof-delivery.ts";
 import type { OracleAttestationRecord, ProofVisibility, Query } from "../../domain/types.ts";
-import type { NostrIdentity } from "./identity.ts";
-import { buildOracleAttestationEvent } from "./oracle-attestation.ts";
-import { publishEvent } from "./client.ts";
+import type { NostrIdentity } from "./crypto/identity.ts";
+import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
+import { publishEvent } from "./transport/client.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "proof-publisher"]);

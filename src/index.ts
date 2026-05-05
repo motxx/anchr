@@ -52,14 +52,14 @@ export { verify as verifyQueryResult, verifyProof, queryToRequirement, queryResu
 export { stripExif } from "./infrastructure/exif-strip.ts";
 
 export * as nostr from "./infrastructure/nostr/index.ts";
-export * as blossom from "./infrastructure/blossom/client.ts";
+export * as blossom from "@anchr/blossom";
 export { workerUpload } from "./infrastructure/blossom/worker-upload.ts";
 export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload.ts";
 export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment.ts";
 export * as verification from "./infrastructure/verification/index.ts";
 
-export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/oracle-nostr-service.ts";
-export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/oracle-nostr-service.ts";
+export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/nostr/oracle-nostr-service.ts";
+export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/nostr/oracle-nostr-service.ts";
 
 if (import.meta.main) {
   await import("./infrastructure/server.ts");

@@ -162,8 +162,8 @@ No code changes required — the Requester specifies `oracle_ids` and
   `signing-coordinator.test.ts`,
   `frost-cli.test.ts`
 - E2E:
-  `src/infrastructure/oracle/oracle-server-frost.test.ts`,
-  `src/infrastructure/oracle/oracle-nostr-frost.test.ts`,
+  `src/infrastructure/oracle/server/oracle-server-frost.test.ts`,
+  `src/infrastructure/oracle/nostr/oracle-nostr-frost.test.ts`,
   `e2e/frost-threshold.test.ts`
 - Companion Rust binary: `crates/frost-signer/` (frost-secp256k1-tr,
   RFC 9591 / BIP-340 Taproot compatible).

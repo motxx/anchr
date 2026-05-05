@@ -32,7 +32,7 @@ import { getEncodedToken } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
 import { createQueryService, createQueryStore } from "../src/application/query-service.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/discovery/registry.ts";
 import type { Oracle, OracleAttestation } from "../src/domain/oracle-types.ts";
 import type { Query, QueryResult } from "../src/domain/types.ts";
 import {

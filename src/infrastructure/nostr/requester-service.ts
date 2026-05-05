@@ -13,8 +13,8 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "./identity.ts";
-import { generateEphemeralIdentity } from "./identity.ts";
+import type { NostrIdentity } from "./crypto/identity.ts";
+import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -22,8 +22,8 @@ import {
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events.ts";
-import { publishEvent, subscribeToFeedback } from "./client.ts";
+} from "./events/events.ts";
+import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
 import type { EscrowProvider } from "../../application/escrow-port.ts";
 import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types.ts";
 

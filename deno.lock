@@ -2683,6 +2683,15 @@
       "npm:tailwind-merge@3"
     ],
     "members": {
+      "packages/blossom": {
+        "dependencies": [
+          "jsr:@logtape/logtape@2",
+          "jsr:@noble/hashes@2",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1",
+          "npm:nostr-tools@2"
+        ]
+      },
       "packages/cashu-conditional-swap": {
         "dependencies": [
           "jsr:@logtape/logtape@2",

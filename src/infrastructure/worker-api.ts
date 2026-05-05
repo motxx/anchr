@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import type { Context, MiddlewareHandler } from "hono";
 import { getRuntimeConfig } from "./config.ts";
 import { listOracles } from "./oracle/index.ts";
-import type { OracleRegistry } from "./oracle/registry.ts";
+import type { OracleRegistry } from "./oracle/discovery/registry.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { QueryService } from "../application/query-service.ts";
 import {

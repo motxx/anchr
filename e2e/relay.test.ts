@@ -15,10 +15,10 @@ import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
 import { createQueryService } from "../src/application/query-service.ts";
-import { createOracleRegistry } from "../src/infrastructure/oracle/registry.ts";
-import { publishQueryToRelay } from "../src/infrastructure/nostr/relay-publish.ts";
-import { closePool } from "../src/infrastructure/nostr/client.ts";
-import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events.ts";
+import { createOracleRegistry } from "../src/infrastructure/oracle/discovery/registry.ts";
+import { publishQueryToRelay } from "../src/infrastructure/nostr/transport/relay-publish.ts";
+import { closePool } from "../src/infrastructure/nostr/transport/client.ts";
+import { ANCHR_QUERY_REQUEST } from "../src/infrastructure/nostr/events/events.ts";
 import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();

@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { isBlossomEnabled } from "./blossom/client.ts";
+import { isBlossomEnabled } from "@anchr/blossom";
 import { workerUpload } from "./blossom/worker-upload.ts";
 import { validateC2pa } from "@anchr/photo-verification/c2pa-validation";
 import { validateExif } from "@anchr/photo-verification/exif-validation";

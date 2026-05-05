@@ -6,7 +6,7 @@
  *
  *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity.ts";
+import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -21,10 +21,10 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/infrastructure/nostr/events.ts";
-import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm.ts";
-import { publishEvent, closePool } from "../src/infrastructure/nostr/client.ts";
-import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption.ts";
+} from "../src/infrastructure/nostr/events/events.ts";
+import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/events/dm.ts";
+import { publishEvent, closePool } from "../src/infrastructure/nostr/transport/client.ts";
+import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/crypto/encryption.ts";
 import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
 import { createBountyToken } from "../packages/core-cashu/src/wallet.ts";
 import {

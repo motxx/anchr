@@ -4,7 +4,7 @@ import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import {
   createOracleRegistry,
-} from "../infrastructure/oracle/registry.ts";
+} from "../infrastructure/oracle/discovery/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import {
   createQueryService,

@@ -4,7 +4,7 @@ import { createQueryService } from "./query-service.ts";
 import type { ProofDelivery, ProofPublishResult } from "./proof-delivery.ts";
 import type { OracleAttestationRecord, ProofVisibility, Query, QueryResult } from "../domain/types.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import { createOracleRegistry } from "../infrastructure/oracle/registry.ts";
+import { createOracleRegistry } from "../infrastructure/oracle/discovery/registry.ts";
 
 function createMockOracle(id: string, passResult: boolean): Oracle {
   return {

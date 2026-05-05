@@ -12,7 +12,7 @@
 import { buildWorkerApiApp } from "../../src/infrastructure/worker-api.ts";
 import { startMcpServer } from "../../src/infrastructure/mcp-server.ts";
 import { createQueryService } from "../../src/application/query-service.ts";
-import { createOracleRegistry } from "../../src/infrastructure/oracle/registry.ts";
+import { createOracleRegistry } from "../../src/infrastructure/oracle/discovery/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { createListingStore } from "./src/marketplace/listing-store.ts";
 import { registerMarketplaceRoutes } from "./src/marketplace/marketplace-routes.ts";
