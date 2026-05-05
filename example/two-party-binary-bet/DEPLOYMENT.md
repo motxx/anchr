@@ -258,7 +258,7 @@ deno run --allow-all example/two-party-binary-bet/scripts/screenshots.ts
 The script boots the market server in-process on port 3098, drives
 headless Chromium via Playwright through the empty state and the
 create-market form, optionally seeds one demo market, and writes
-the screenshots to `docs/two-party-binary-bet/screenshots/`.
+the screenshots to `screenshots/`.
 
 ## 7. Known gaps (pre-1.0)
 

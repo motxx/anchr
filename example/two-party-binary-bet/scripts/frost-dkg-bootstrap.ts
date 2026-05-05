@@ -25,12 +25,12 @@ import {
   dkgRound2,
   dkgRound3,
   isFrostSignerAvailable,
-} from "@anchr/cashu-frost-oracle/frost-cli";
-import type { PeerConfig } from "@anchr/cashu-frost-oracle/config";
+} from "@anchr/frost-oracle/frost-cli";
+import type { PeerConfig } from "@anchr/frost-oracle/config";
 import {
   saveDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
-} from "@anchr/cashu-frost-oracle/dual-outcome-config";
+} from "@anchr/frost-oracle/dual-outcome-config";
 
 // --- Parse CLI args ---
 

@@ -27,7 +27,7 @@ import type { OrderBook } from "./src/order-book.ts";
 import {
   loadDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
-} from "@anchr/cashu-frost-oracle/dual-outcome-config";
+} from "@anchr/frost-oracle/dual-outcome-config";
 
 const app = new Hono();
 app.use("*", cors());

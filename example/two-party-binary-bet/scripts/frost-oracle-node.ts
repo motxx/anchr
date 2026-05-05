@@ -12,7 +12,7 @@
  *   ORACLE_ID                 Node identifier (optional)
  */
 
-import { loadDualOutcomeFrostNodeConfigAsync } from "@anchr/cashu-frost-oracle/dual-outcome-config";
+import { loadDualOutcomeFrostNodeConfigAsync } from "@anchr/frost-oracle/dual-outcome-config";
 import { buildMarketApiRoutes } from "../src/market-api-routes.ts";
 
 const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "market-oracle";
