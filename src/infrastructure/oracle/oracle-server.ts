@@ -14,9 +14,9 @@
 
 import { Hono } from "hono";
 import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createFrostCoordinator, type FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
-import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
-import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
+import { createFrostCoordinator, type FrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
+import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
 import { buildAuthMiddleware } from "./oracle-server-auth.ts";
 import { registerHtlcRoutes } from "./oracle-htlc-routes.ts";
 import { registerFrostSignerRoutes } from "./oracle-frost-signer-routes.ts";
@@ -114,7 +114,7 @@ if (import.meta.main) {
   const frostConfigPath = Deno.env.get("FROST_CONFIG_PATH")?.trim();
   if (frostConfigPath) {
     try {
-      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("@anchr/cashu-frost-oracle/config"); // allow-dynamic-import: deferred to avoid loading FROST config parser when FROST_CONFIG_PATH is unset
+      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("@anchr/frost-oracle/config"); // allow-dynamic-import: deferred to avoid loading FROST config parser when FROST_CONFIG_PATH is unset
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
       log.info(`FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);

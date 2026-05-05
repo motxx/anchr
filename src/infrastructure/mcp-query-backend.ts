@@ -11,7 +11,7 @@ import type { QueryService } from "../application/query-service.ts";
 import type { AttachmentHandle, AttachmentRef, Query, QueryInput, QueryResult, RequesterMeta } from "../domain/types.ts";
 
 const runtimeConfig = getRuntimeConfig();
-const localBaseUrl = `http://localhost:${runtimeConfig.referenceAppPort}`;
+const localBaseUrl = `http://localhost:${runtimeConfig.httpApiPort}`;
 
 // --- Shared types for MCP tool responses ---
 

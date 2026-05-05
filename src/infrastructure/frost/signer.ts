@@ -15,7 +15,7 @@
 
 import { verifyProof } from "../verification/verifier.ts";
 import type { BlossomKeyMap, VerificationInput, VerificationRequirement } from "../../domain/types.ts";
-import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "@anchr/cashu-frost-oracle/frost-cli";
+import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "@anchr/frost-oracle/frost-cli";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-signer"]);

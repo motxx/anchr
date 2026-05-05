@@ -197,7 +197,7 @@ export interface HtlcEscrow extends EscrowCommonFields {
 /**
  * NUT-11 pay-to-pubkey escrow signed by a FROST t-of-n Oracle group.
  * Settlement is a threshold Schnorr signature instead of a preimage reveal.
- * See `packages/cashu-frost-oracle/SPEC.md` for the signing flow.
+ * See `packages/frost-oracle/SPEC.md` for the signing flow.
  */
 export interface P2pkFrostEscrow extends EscrowCommonFields {
   type: "p2pk_frost";

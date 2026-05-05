@@ -5,7 +5,7 @@
  * Used by the Query lifecycle when an escrow query is approved and the
  * escrow type is `p2pk_frost`. The port abstracts the round-1 / round-2
  * FROST coordinator handshake so the application layer doesn't pull in
- * `packages/cashu-frost-oracle` directly.
+ * `packages/frost-oracle` directly.
  *
  * The reference adapter that wires this port to the actual FROST
  * coordinator lives in `src/infrastructure/frost/`. Tests inject a mock.

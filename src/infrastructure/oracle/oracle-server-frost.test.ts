@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "./oracle-server.ts";
-import { createFrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
-import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
+import { createFrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 
 const API_KEY = "frost-test-key";
 

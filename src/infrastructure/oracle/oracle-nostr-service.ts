@@ -23,10 +23,10 @@ import {
   subscribeToResponses,
 } from "../nostr/client.ts";
 import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
-import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
-import type { FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
-import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
-import { coordinateSigning } from "@anchr/cashu-frost-oracle/signing-coordinator";
+import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
+import type { FrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
+import { coordinateSigning } from "@anchr/frost-oracle/signing-coordinator";
 import { queryResultToInput, queryToRequirement, verify } from "../verification/verifier.ts";
 import type { Query, QueryResult } from "../../domain/types.ts";
 import {

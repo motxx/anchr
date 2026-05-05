@@ -310,7 +310,7 @@ describe("HTLC endpoints", () => {
 
 describe("P2PK+FROST escrow endpoints", () => {
   // Smaller surface than HTLC: settlement is a threshold signature delivered
-  // out-of-band by the FROST coordinator (see packages/cashu-frost-oracle),
+  // out-of-band by the FROST coordinator (see packages/frost-oracle),
   // so the Query API today only exercises wire-shape round-tripping for the
   // FROST variant. These tests lock down the discriminated-union side of the
   // schema so HTLC and P2PK+FROST stay distinguishable on the wire.

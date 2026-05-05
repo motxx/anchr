@@ -117,7 +117,7 @@ export function attachmentPublicBaseUrl(requestUrl?: string): string {
   const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ?? Deno.env.get("PUBLIC_BASE_URL");
   if (configured) return configured.replace(/\/+$/, "");
   if (requestUrl) return new URL("/", requestUrl).toString().replace(/\/+$/, "");
-  return `http://localhost:${getRuntimeConfig().referenceAppPort}`;
+  return `http://localhost:${getRuntimeConfig().httpApiPort}`;
 }
 
 export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: string): string {
