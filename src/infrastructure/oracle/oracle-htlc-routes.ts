@@ -75,12 +75,16 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
       return c.json({ error: "Missing query_id" }, 400);
     }
 
-    const verifiedWorker = verifiedQueries.get(body.query_id);
-    if (!verifiedWorker && verifiedWorker !== "") {
+    // verifiedQueries holds the worker_pubkey (or "" when none was bound at
+    // verify time, e.g. non-escrow flows). Use `.has()` for the gate and
+    // strict equality for the binding check so a missing body pubkey can't
+    // sneak past when a worker WAS bound.
+    if (!verifiedQueries.has(body.query_id)) {
       return c.json({ error: "Verification has not passed for this query" }, 403);
     }
+    const verifiedWorker = verifiedQueries.get(body.query_id)!;
 
-    if (verifiedWorker && body.worker_pubkey && body.worker_pubkey !== verifiedWorker) {
+    if (verifiedWorker !== "" && body.worker_pubkey !== verifiedWorker) {
       return c.json({ error: "Worker pubkey does not match selected worker" }, 403);
     }
 
