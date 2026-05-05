@@ -131,7 +131,7 @@ export interface ProviderQuote {
  * Schema-side hook: produce a proof for the given predicate.
  *
  * Implementations live outside the SDK (e.g. @anchr/tlsn-toolkit,
- * @anchr/photo-bounty). The SDK calls the producer registered for the
+ * @anchr/photo-verification). The SDK calls the producer registered for the
  * incoming request's schema URI; producers return whatever proof bytes
  * the schema document defines.
  */

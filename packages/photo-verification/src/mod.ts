@@ -1,5 +1,5 @@
 /**
- * @anchr/photo-bounty — Photo / video verification primitives.
+ * @anchr/photo-verification — Photo / video verification primitives.
  */
 
 export * from "./geo.ts";

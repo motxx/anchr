@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
 import { checkAttachmentContent } from "./ai-content-check.ts";
-import { validateC2pa } from "@anchr/photo-bounty/c2pa-validation";
-import { haversineKm } from "@anchr/photo-bounty/geo";
-import { getIntegrity, getIntegrityForQuery } from "@anchr/photo-bounty/integrity-store";
+import { validateC2pa } from "@anchr/photo-verification/c2pa-validation";
+import { haversineKm } from "@anchr/photo-verification/geo";
+import { getIntegrity, getIntegrityForQuery } from "@anchr/photo-verification/integrity-store";
 import { validateTlsn } from "@anchr/tlsn-toolkit/tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment.ts";
 import { validateAttachmentUri } from "../url-validation.ts";

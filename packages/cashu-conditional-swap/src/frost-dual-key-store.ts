@@ -15,9 +15,9 @@
 
 import type { DualKeyStore, DualKeyEntry } from "./frost-conditional-swap.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
-import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
-import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
-import { isFrostSignerAvailable } from "@anchr/cashu-frost-oracle/frost-cli";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
+import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/frost-oracle/signing-coordinator";
+import { isFrostSignerAvailable } from "@anchr/frost-oracle/frost-cli";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 

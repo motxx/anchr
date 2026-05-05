@@ -9,7 +9,7 @@ N:M binary outcome conditional swap primitive on Cashu. Brand-neutral — usable
   "imports": {
     "@anchr/cashu-conditional-swap": "jsr:@anchr/cashu-conditional-swap@^0.1",
     "@anchr/core-cashu": "jsr:@anchr/core-cashu@^0.1",
-    "@anchr/cashu-frost-oracle": "jsr:@anchr/cashu-frost-oracle@^0.1"
+    "@anchr/frost-oracle": "jsr:@anchr/frost-oracle@^0.1"
   }
 }
 ```
@@ -68,7 +68,7 @@ Tests cover all HTLC / FROST swap scenarios + 6 attack scenarios (locktime race,
 ## Dependencies
 
 - `@anchr/core-cashu` — `EscrowToken`, escrow helpers, preimage store
-- `@anchr/cashu-frost-oracle` — FROST signing coordination
+- `@anchr/frost-oracle` — FROST signing coordination
 - `@cashu/cashu-ts` — Cashu protocol (P2PK, HTLC builders)
 - `@noble/curves`, `@noble/hashes`, `nostr-tools` — Schnorr signing primitives
 

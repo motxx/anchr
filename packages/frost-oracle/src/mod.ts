@@ -1,5 +1,5 @@
 /**
- * @anchr/cashu-frost-oracle — FROST t-of-n threshold signing for Cashu P2PK.
+ * @anchr/frost-oracle — FROST t-of-n threshold signing for Cashu P2PK.
  */
 
 export * from "./types.ts";

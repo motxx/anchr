@@ -1,4 +1,4 @@
-# @anchr/cashu-frost-oracle
+# @anchr/frost-oracle
 
 FROST t-of-n threshold signing toolkit for Cashu P2PK. Brand-neutral — usable beyond Anchr for any Bitcoin / Cashu app that needs a threshold-signing Oracle.
 
@@ -9,7 +9,7 @@ Use cases: multi-sig Cashu vaults with social recovery, DAO treasuries, dispute-
 ```jsonc
 {
   "imports": {
-    "@anchr/cashu-frost-oracle": "jsr:@anchr/cashu-frost-oracle@^0.1",
+    "@anchr/frost-oracle": "jsr:@anchr/frost-oracle@^0.1",
     "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
   }
 }
@@ -29,23 +29,23 @@ If the binary is absent, signing functions return `null` and the package gracefu
 ## Public API
 
 ```typescript
-import { createFrostCoordinator, type FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
-import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
+import { createFrostCoordinator, type FrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/frost-oracle/signing-coordinator";
 import {
   signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3,
   aggregateSignatures, isFrostSignerAvailable,
-} from "@anchr/cashu-frost-oracle/frost-cli";
+} from "@anchr/frost-oracle/frost-cli";
 import {
   loadFrostNodeConfig, saveFrostNodeConfig,
   type FrostNodeConfig, type PeerConfig,
-} from "@anchr/cashu-frost-oracle/config";
+} from "@anchr/frost-oracle/config";
 import {
   loadMarketFrostNodeConfig,
   type MarketFrostNodeConfig,
-} from "@anchr/cashu-frost-oracle/market-frost-config";
+} from "@anchr/frost-oracle/market-frost-config";
 import type {
   ThresholdOracleConfig, FrostSigningSession, DkgSession,
-} from "@anchr/cashu-frost-oracle/types";
+} from "@anchr/frost-oracle/types";
 ```
 
 ## Tests
@@ -60,7 +60,7 @@ Tests skip gracefully when the `frost-signer` Rust binary is not built.
 
 - `@anchr/core-runtime` — for `spawn` to invoke the Rust binary, plus shared logger
 - `hono` — for the HTTP signing-coordinator (RPC between cluster nodes)
-- `ThresholdOracleConfig` is defined locally at `@anchr/cashu-frost-oracle/types`.
+- `ThresholdOracleConfig` is defined locally at `@anchr/frost-oracle/types`.
 
 ## License
 

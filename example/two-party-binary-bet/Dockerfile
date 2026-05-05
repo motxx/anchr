@@ -31,8 +31,8 @@ COPY deno.json deno.lock ./
 COPY packages/core-runtime/deno.json ./packages/core-runtime/
 COPY packages/core-cashu/deno.json ./packages/core-cashu/
 COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
-COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
-COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
+COPY packages/photo-verification/deno.json ./packages/photo-verification/
+COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install

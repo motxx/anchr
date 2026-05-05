@@ -23,9 +23,9 @@ import {
   type MarketState,
   type MarketRouteContext,
 } from "./server-routes.ts";
-import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
-import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
+import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

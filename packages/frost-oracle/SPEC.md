@@ -1,4 +1,4 @@
-# `@anchr/cashu-frost-oracle` — Implementation Spec
+# `@anchr/frost-oracle` — Implementation Spec
 
 > **Scope:** P2PK+FROST escrow plus the threshold-signing flow that this
 > package owns. The plain-HTLC escrow primitive lives in
@@ -158,7 +158,7 @@ No code changes required — the Requester specifies `oracle_ids` and
 ## Test References
 
 - Unit tests:
-  `packages/cashu-frost-oracle/src/coordinator.test.ts`,
+  `packages/frost-oracle/src/coordinator.test.ts`,
   `signing-coordinator.test.ts`,
   `frost-cli.test.ts`
 - E2E:

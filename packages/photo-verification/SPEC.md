@@ -1,4 +1,4 @@
-# `@anchr/photo-bounty` — Implementation Spec
+# `@anchr/photo-verification` — Implementation Spec
 
 > **Scope:** photo / video evidence verification at the application
 > layer that this package owns. The Oracle interface itself is a
@@ -47,7 +47,7 @@ The Requester specifies `expected_gps: {lat, lon}` and
 distance between the photo's signed GPS coordinates and the expected
 location.
 
-`packages/photo-bounty/src/geo.ts::haversineKm` implements the formula
+`packages/photo-verification/src/geo.ts::haversineKm` implements the formula
 deterministically.
 
 ## C2PA Verification
@@ -92,7 +92,7 @@ fields the prompt builder reads (`description`, `challenge_nonce`,
 
 ## Test References
 
-- Unit: `packages/photo-bounty/src/{geo,c2pa-validation,exif-validation,
+- Unit: `packages/photo-verification/src/{geo,c2pa-validation,exif-validation,
   proofmode-validation,ai-content-check}.test.ts`
 - E2E: `example/c2pa-media-verification/`,
   `example/supply-chain-proof/` (compose this package + Anchr host).

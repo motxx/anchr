@@ -1,7 +1,7 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildMarketApiRoutes } from "./market-api-routes.ts";
-import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
+import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 
 // Ensure we're in single-key mode for these tests
 _setFrostSignerPathForTest(null);

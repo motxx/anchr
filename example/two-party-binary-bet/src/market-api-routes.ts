@@ -19,8 +19,8 @@ import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
-import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
-import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
+import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
 import {
   evaluateCondition,
   calculatePayouts,

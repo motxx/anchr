@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { verify, _setValidateTlsnForTest } from "./verifier.ts";
-import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-bounty/integrity-store";
+import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-verification/integrity-store";
 import type { Query, QueryResult, TlsnAttestation, TlsnRequirement } from "../../domain/types.ts";
 import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";

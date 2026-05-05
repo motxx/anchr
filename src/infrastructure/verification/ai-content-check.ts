@@ -1,6 +1,6 @@
 /**
  * Re-export shim during photo-bounty package extraction (2026-04-26).
- * Canonical location: packages/photo-bounty/src/ai-content-check.ts
+ * Canonical location: packages/photo-verification/src/ai-content-check.ts
  *
  * The package version is dependency-injected (no implicit env / attachment store
  * dependency). This shim wires it up to the host's `getRuntimeConfig` and
@@ -10,13 +10,13 @@
  * their own checker via `createAiContentChecker` from the package.
  */
 
-import { createAiContentChecker } from "@anchr/photo-bounty/ai-content-check";
+import { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
 import type { AttachmentRef } from "../../domain/types.ts";
 
-export type { ContentCheckResult } from "@anchr/photo-bounty/ai-content-check";
-export { createAiContentChecker } from "@anchr/photo-bounty/ai-content-check";
+export type { ContentCheckResult } from "@anchr/photo-verification/ai-content-check";
+export { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
 
 const checker = createAiContentChecker<AttachmentRef>({
   getConfig: () => {

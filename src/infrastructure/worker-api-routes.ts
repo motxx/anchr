@@ -6,7 +6,7 @@ import { uploadAttachment } from "./attachment-store.ts";
 import { materializeAttachmentRef } from "./attachments.ts";
 import { getRuntimeConfig } from "./config.ts";
 import { validateAttachmentUri } from "./url-validation.ts";
-import { haversineKm } from "@anchr/photo-bounty/geo";
+import { haversineKm } from "@anchr/photo-verification/geo";
 import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
 import { getRecentLogs, subscribeLog } from "./log-stream.ts";
 import {

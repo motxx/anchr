@@ -15,7 +15,7 @@ import {
   queryResultToInput,
   _setValidateTlsnForTest,
 } from "./verifier.ts";
-import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-bounty/integrity-store";
+import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-verification/integrity-store";
 import type {
   TlsnAttestation,
   TlsnRequirement,

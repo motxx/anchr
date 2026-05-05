@@ -1,4 +1,4 @@
-# @anchr/photo-bounty
+# @anchr/photo-verification
 
 Cryptographically verified photo / video evidence: C2PA Content Credentials, EXIF metadata, ProofMode bundles, AI-generated detection (heuristic + vision-LLM), GPS Haversine distance, and an in-memory integrity store.
 
@@ -7,7 +7,7 @@ Cryptographically verified photo / video evidence: C2PA Content Credentials, EXI
 ```jsonc
 {
   "imports": {
-    "@anchr/photo-bounty": "jsr:@anchr/photo-bounty@^0.1",
+    "@anchr/photo-verification": "jsr:@anchr/photo-verification@^0.1",
     "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
   }
 }
@@ -22,14 +22,14 @@ Cryptographically verified photo / video evidence: C2PA Content Credentials, EXI
 ## Public API
 
 ```typescript
-import { haversineKm } from "@anchr/photo-bounty/geo";
-import { validateC2pa, isC2paAvailable } from "@anchr/photo-bounty/c2pa-validation";
-import { validateExif, extractExifMetadata } from "@anchr/photo-bounty/exif-validation";
-import { parseProofModeZip } from "@anchr/photo-bounty/proofmode-validation";
-import { createAiContentChecker } from "@anchr/photo-bounty/ai-content-check";
+import { haversineKm } from "@anchr/photo-verification/geo";
+import { validateC2pa, isC2paAvailable } from "@anchr/photo-verification/c2pa-validation";
+import { validateExif, extractExifMetadata } from "@anchr/photo-verification/exif-validation";
+import { parseProofModeZip } from "@anchr/photo-verification/proofmode-validation";
+import { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
 import {
   createIntegrityStore, storeIntegrity, getIntegrity,
-} from "@anchr/photo-bounty/integrity-store";
+} from "@anchr/photo-verification/integrity-store";
 ```
 
 ## AI content check (DI design)

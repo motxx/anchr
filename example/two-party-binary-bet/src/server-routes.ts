@@ -28,8 +28,8 @@ import {
   frostDualKeySignAsync,
   frostSignProofSecretsAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
-import { loadDualOutcomeFrostNodeConfig, type DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
-import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
+import { loadDualOutcomeFrostNodeConfig, type DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
+import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
 import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition, OracleError, verifyMarketResolution } from "./market-oracle.ts";
 import { settleMarket } from "./market-settlement.ts";

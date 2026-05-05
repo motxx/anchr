@@ -100,8 +100,8 @@ already provides:
 |---|---|---|
 | Transport | Request/Result/Feedback events (kinds 5xxx/6xxx/7000), provider competition, encrypted parameters via NIP-44, capability advertisement via NIP-89 | (uses NIP-90 as is) |
 | Settlement | "money in, data out" loosely via Lightning zap — post-delivery, trust-based | **Cashu HTLC pre-lock with locktime refund** (`packages/cashu-conditional-swap`) — atomic settlement, escrow guarantees |
-| Verification | None — the customer trusts the provider | **Standardized proof types** (`packages/photo-bounty` for C2PA/GPS/ProofMode; `packages/tlsn-toolkit` for TLSNotary) |
-| Trust topology | Bilateral (customer ↔ provider) | **Oracle as a third role** that verifies the proof and gates the HTLC release. t-of-n FROST (`packages/cashu-frost-oracle`) for higher-stakes queries |
+| Verification | None — the customer trusts the provider | **Standardized proof types** (`packages/photo-verification` for C2PA/GPS/ProofMode; `packages/tlsn-toolkit` for TLSNotary) |
+| Trust topology | Bilateral (customer ↔ provider) | **Oracle as a third role** that verifies the proof and gates the HTLC release. t-of-n FROST (`packages/frost-oracle`) for higher-stakes queries |
 
 Anchr is not strictly NIP-90-conformant: it uses NIP-90 kind ranges
 with custom semantics (e.g. kind 5300 is reserved for "Nostr Content
@@ -175,7 +175,7 @@ flowchart LR
 ```
 
 Used by: two-party-binary-bet (`example/two-party-binary-bet/`). Imports
-`@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` directly
+`@anchr/cashu-conditional-swap` + `@anchr/frost-oracle` directly
 (no SDK).
 
 ### Verification-only chain (no Cashu)
@@ -210,7 +210,7 @@ Used by:
   gap.
 - **`example/supply-chain-proof/`** — recursive R/W/O along a
   physical multi-hop supply chain. Designed to use
-  `@anchr/photo-bounty` + `@anchr/tlsn-toolkit`. Same pattern as
+  `@anchr/photo-verification` + `@anchr/tlsn-toolkit`. Same pattern as
   royalty-distribution, but in the physical domain — useful precisely
   because it surfaces the photo-to-shipment binding gap that
   fully-digital verification chains don't have.

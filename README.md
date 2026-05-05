@@ -238,14 +238,14 @@ Composition sketches (not products):
 |---|---|
 | [`@anchr/sdk`](packages/sdk/) | Customer/Provider orchestration (main entry) |
 | [`@anchr/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary proof producer/verifier (for TLSN-based Providers) |
-| [`@anchr/photo-bounty`](packages/photo-bounty/) | C2PA + GPS + ProofMode + EXIF + AI heuristic verification (for C2PA-based Providers) |
+| [`@anchr/photo-verification`](packages/photo-verification/) | C2PA + GPS + ProofMode + EXIF + AI heuristic verification (for C2PA-based Providers) |
 
 **Internal** — `@anchr/sdk` depends on these; usually you don't import directly:
 
 | Package | Purpose |
 |---|---|
 | [`@anchr/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Cross-lock primitive (HTLC + FROST P2PK) |
-| [`@anchr/cashu-frost-oracle`](packages/cashu-frost-oracle/) | FROST t-of-n threshold signing wrapper |
+| [`@anchr/frost-oracle`](packages/frost-oracle/) | FROST t-of-n threshold signing wrapper |
 | [`@anchr/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow primitives |
 
 Plus Rust crates: `crates/frost-signer` (FROST signing daemon),

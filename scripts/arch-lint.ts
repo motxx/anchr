@@ -25,10 +25,10 @@
  *   [E010] core-runtime must not depend on any other @anchr/* package
  *   [E012] core-cashu may only depend on core-runtime
  *   [E013] tlsn-toolkit may only depend on core-runtime
- *   [E014] photo-bounty may only depend on core-runtime
- *   [E015] cashu-frost-oracle may only depend on core-runtime
+ *   [E014] photo-verification may only depend on core-runtime
+ *   [E015] frost-oracle may only depend on core-runtime
  *   [E016] cashu-conditional-swap may only depend on
- *          core-runtime, core-cashu, cashu-frost-oracle
+ *          core-runtime, core-cashu, frost-oracle
  *   [E017] sdk must not depend on any host-side @anchr/* package (other
  *          than core-runtime)
  *   [E020] packages/ must not import from src/ (one-way dependency)
@@ -74,9 +74,9 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
   "core-runtime": new Set<string>(),
   "core-cashu": new Set<string>(["core-runtime"]),
   "tlsn-toolkit": new Set<string>(["core-runtime"]),
-  "photo-bounty": new Set<string>(["core-runtime"]),
-  "cashu-frost-oracle": new Set<string>(["core-runtime"]),
-  "cashu-conditional-swap": new Set<string>(["core-runtime", "core-cashu", "cashu-frost-oracle"]),
+  "photo-verification": new Set<string>(["core-runtime"]),
+  "frost-oracle": new Set<string>(["core-runtime"]),
+  "cashu-conditional-swap": new Set<string>(["core-runtime", "core-cashu", "frost-oracle"]),
   "sdk": new Set<string>(["core-runtime"]),
 };
 
@@ -393,8 +393,8 @@ function checkPackageFile(pkg: string, fileRel: string, source: string): Violati
       const code = pkg === "core-runtime" ? "E010"
         : pkg === "core-cashu" ? "E012"
         : pkg === "tlsn-toolkit" ? "E013"
-        : pkg === "photo-bounty" ? "E014"
-        : pkg === "cashu-frost-oracle" ? "E015"
+        : pkg === "photo-verification" ? "E014"
+        : pkg === "frost-oracle" ? "E015"
         : pkg === "cashu-conditional-swap" ? "E016"
         : pkg === "sdk" ? "E017"
         : "E010";
