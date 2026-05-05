@@ -8,19 +8,21 @@ import type { FrostSignaturePort } from "./frost-signature-port.ts";
 import type { ProofDelivery } from "./proof-delivery.ts";
 import { MIN_ESCROW_LOCKTIME_SECS } from "./query-escrow-validation.ts";
 import {
-  doBeginWork,
   doCancelQuery,
-  doCompleteVerification,
   doCreateQuery,
   doExpireQueries,
   doPurgeExpired,
+  doSubmitQueryResult,
+} from "./query-lifecycle-methods.ts";
+import {
+  doBeginWork,
+  doCompleteVerification,
   doRecordQuote,
   doRecordResult,
   doSelectWorker,
   doSubmitEscrowResult,
-  doSubmitQueryResult,
-} from "./query-service-methods.ts";
-import type { ServiceDeps } from "./query-service-methods.ts";
+} from "./escrow-flow-methods.ts";
+import type { ServiceDeps } from "./query-service-deps.ts";
 import type {
   BlossomKeyMap,
   BountyInfo,

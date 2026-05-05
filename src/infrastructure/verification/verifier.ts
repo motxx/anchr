@@ -14,8 +14,10 @@ import type {
   QueryResult,
   TlsnVerifiedData,
   VerificationDetail,
+  VerificationInput,
+  VerificationRequirement,
 } from "../../domain/types.ts";
-/** Module-level seam for testing — matches _setVerifierPathForTest pattern. */
+
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 
 /** Allow tests to override the validateTlsn implementation. Pass null to reset. */
@@ -23,18 +25,8 @@ export function _setValidateTlsnForTest(fn: typeof validateTlsn | null): void {
   _validateTlsnFn = fn ?? validateTlsn;
 }
 
-/** Default maximum distance (km) between reported GPS and expected GPS. */
 const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
 
-/**
- * Verify a query result cryptographically.
- *
- * Oracle checks:
- * 1. Attachments present → C2PA / EXIF integrity
- * 2. AI content check (opt-in, if attachments pass crypto checks)
- * 3. No attachments → reject if bounty/GPS/nonce required, otherwise weak pass
- * 4. Body GPS vs expected GPS proximity check
- */
 interface CheckAccumulator {
   checks: string[];
   failures: string[];
@@ -42,13 +34,11 @@ interface CheckAccumulator {
 }
 
 function verifyEmptySubmission(
-  query: Query,
+  factors: readonly string[],
   hasTlsn: boolean,
   acc: CheckAccumulator,
 ): void {
-  const requiresEvidence =
-    query.verification_requirements.includes("nonce") ||
-    query.verification_requirements.includes("gps");
+  const requiresEvidence = factors.includes("nonce") || factors.includes("gps");
 
   if (requiresEvidence && !hasTlsn) {
     acc.failures.push("no media evidence provided — photos are required when GPS or nonce verification is enabled");
@@ -58,32 +48,32 @@ function verifyEmptySubmission(
 }
 
 function verifyBodyGps(
-  query: Query,
-  result: QueryResult,
+  requirement: VerificationRequirement,
+  input: VerificationInput,
   maxGpsDist: number,
   acc: CheckAccumulator,
 ): void {
-  if (result.gps && query.expected_gps) {
-    const dist = haversineKm(result.gps.lat, result.gps.lon, query.expected_gps.lat, query.expected_gps.lon);
+  if (input.gps && requirement.expected_gps) {
+    const dist = haversineKm(input.gps.lat, input.gps.lon, requirement.expected_gps.lat, requirement.expected_gps.lon);
     if (dist <= maxGpsDist) {
       acc.checks.push(`body GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
     } else {
       acc.failures.push(`body GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
     }
-  } else if (!result.gps && query.expected_gps && query.verification_requirements.includes("gps")) {
+  } else if (!input.gps && requirement.expected_gps && requirement.factors.includes("gps")) {
     acc.failures.push("GPS coordinates missing from submission body — required by verification policy");
   }
 }
 
 async function verifyTlsnExtensionResult(
   extResult: { presentation?: string; results?: Array<{ type: string; part: string; value: string }> },
-  query: Query,
+  requirement: VerificationRequirement,
   acc: CheckAccumulator,
 ): Promise<TlsnVerifiedData | undefined> {
-  if (extResult.presentation && query.tlsn_requirements) {
+  if (extResult.presentation && requirement.tlsn_requirements) {
     const tlsnResult = await _validateTlsnFn(
       { presentation: extResult.presentation },
-      query.tlsn_requirements,
+      requirement.tlsn_requirements,
     );
     acc.checks.push(...tlsnResult.checks);
     acc.failures.push(...tlsnResult.failures);
@@ -97,21 +87,21 @@ async function verifyTlsnExtensionResult(
 }
 
 async function verifyTlsnAttestation(
-  result: QueryResult,
-  query: Query,
+  input: VerificationInput,
+  requirement: VerificationRequirement,
   acc: CheckAccumulator,
 ): Promise<TlsnVerifiedData | undefined> {
-  if (!result.tlsn_attestation) {
+  if (!input.tlsn_attestation) {
     acc.failures.push("TLSNotary: no attestation provided");
     return undefined;
   }
-  if (!query.tlsn_requirements) {
+  if (!requirement.tlsn_requirements) {
     acc.failures.push("TLSNotary: query missing tlsn_requirements");
     return undefined;
   }
   const tlsnResult = await _validateTlsnFn(
-    result.tlsn_attestation,
-    query.tlsn_requirements,
+    input.tlsn_attestation,
+    requirement.tlsn_requirements,
   );
   acc.checks.push(...tlsnResult.checks);
   acc.failures.push(...tlsnResult.failures);
@@ -119,18 +109,18 @@ async function verifyTlsnAttestation(
 }
 
 async function verifyTlsn(
-  query: Query,
-  result: QueryResult,
+  requirement: VerificationRequirement,
+  input: VerificationInput,
   acc: CheckAccumulator,
 ): Promise<TlsnVerifiedData | undefined> {
-  if (result.tlsn_extension_result) {
-    const extResult = result.tlsn_extension_result as {
+  if (input.tlsn_extension_result) {
+    const extResult = input.tlsn_extension_result as {
       presentation?: string;
       results?: Array<{ type: string; part: string; value: string }>;
     };
-    return verifyTlsnExtensionResult(extResult, query, acc);
+    return verifyTlsnExtensionResult(extResult, requirement, acc);
   }
-  return verifyTlsnAttestation(result, query, acc);
+  return verifyTlsnAttestation(input, requirement, acc);
 }
 
 function applyAiContentResult(
@@ -141,36 +131,55 @@ function applyAiContentResult(
   if (aiResult.passed) {
     acc.checks.push(`AI content check passed: ${aiResult.reason}`);
   } else {
-    // AI check is advisory (non-deterministic) — route to warnings, not failures
     acc.warnings.push(`AI content check failed: ${aiResult.reason}`);
   }
 }
 
-export async function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
+/**
+ * Pure, transport-neutral verification. Takes an explicit policy (`requirement`)
+ * and evidence (`input`) instead of a Query/QueryResult pair, so it can be
+ * called directly from any host — NIP-90 reference runtime, a fixed-stakeholder
+ * HTTP service, or a FROST signer node — without coupling to the Query domain.
+ *
+ * The host orchestrator is responsible for the *trust envelope* around this
+ * call: who signed the requirement, replay protection, deadline enforcement.
+ * This function only answers "does the evidence satisfy the policy".
+ */
+export async function verifyProof(
+  requirement: VerificationRequirement,
+  input: VerificationInput,
+  options?: { blossomKeys?: BlossomKeyMap },
+): Promise<VerificationDetail> {
   const acc: CheckAccumulator = { checks: [], failures: [], warnings: [] };
   let tlsnVerifiedData: TlsnVerifiedData | undefined;
-  const maxGpsDist = query.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
+  const maxGpsDist = requirement.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
 
-  const attachments = result.attachments ?? [];
-  const hasTlsn = query.verification_requirements.includes("tlsn");
+  const attachments = input.attachments ?? [];
+  const hasTlsn = requirement.factors.includes("tlsn");
 
   if (attachments.length === 0) {
-    verifyEmptySubmission(query, hasTlsn, acc);
+    verifyEmptySubmission(requirement.factors, hasTlsn, acc);
   }
 
-  verifyBodyGps(query, result, maxGpsDist, acc);
+  verifyBodyGps(requirement, input, maxGpsDist, acc);
 
   if (hasTlsn) {
-    tlsnVerifiedData = await verifyTlsn(query, result, acc);
+    tlsnVerifiedData = await verifyTlsn(requirement, input, acc);
   }
 
   if (attachments.length > 0) {
     acc.checks.push("attachment present");
-    await verifyPhotoIntegrity(query.id, attachments, acc.checks, acc.failures, query.expected_gps, maxGpsDist, blossomKeys);
+    await verifyPhotoIntegrity(requirement.id, attachments, acc.checks, acc.failures, requirement.expected_gps, maxGpsDist, options?.blossomKeys);
   }
 
   if (attachments.length > 0 && acc.failures.length === 0) {
-    applyAiContentResult(await checkAttachmentContent(query, result, blossomKeys), acc);
+    const aiQuery = {
+      description: requirement.description ?? "",
+      challenge_nonce: requirement.challenge_nonce,
+      verification_requirements: requirement.factors,
+    };
+    const aiResult = await checkAttachmentContent(aiQuery, { attachments }, options?.blossomKeys);
+    applyAiContentResult(aiResult, acc);
   }
 
   return {
@@ -180,6 +189,39 @@ export async function verify(query: Query, result: QueryResult, blossomKeys?: Bl
     warnings: acc.warnings.length > 0 ? acc.warnings : undefined,
     tlsn_verified: tlsnVerifiedData,
   };
+}
+
+/** Lossless mapping from the NIP-90 Query envelope to the pure VerificationRequirement. */
+export function queryToRequirement(query: Query): VerificationRequirement {
+  return {
+    id: query.id,
+    factors: query.verification_requirements,
+    description: query.description,
+    challenge_nonce: query.challenge_nonce,
+    expected_gps: query.expected_gps,
+    max_gps_distance_km: query.max_gps_distance_km,
+    tlsn_requirements: query.tlsn_requirements,
+  };
+}
+
+/** Lossless mapping from QueryResult to the pure VerificationInput. */
+export function queryResultToInput(result: QueryResult): VerificationInput {
+  return {
+    attachments: result.attachments,
+    gps: result.gps,
+    tlsn_attestation: result.tlsn_attestation,
+    tlsn_extension_result: result.tlsn_extension_result,
+  };
+}
+
+/**
+ * Query-aware verification — adapter over `verifyProof`.
+ *
+ * Used by the NIP-90 reference host. Standalone callers should construct a
+ * `VerificationRequirement` directly and call `verifyProof`.
+ */
+export function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
+  return verifyProof(queryToRequirement(query), queryResultToInput(result), { blossomKeys });
 }
 
 function checkC2paSignature(
@@ -265,15 +307,8 @@ function checkExifRecord(
   }
 }
 
-/**
- * Verify photo integrity using pre-strip EXIF and C2PA metadata.
- *
- * C2PA is mandatory — photos without valid Content Credentials are rejected.
- * EXIF checks are advisory (GPS, camera model add trust signals but don't fail).
- * C2PA GPS and ProofMode GPS are compared against expected_gps.
- */
 async function verifyPhotoIntegrity(
-  queryId: string,
+  requirementId: string,
   attachments: AttachmentRef[],
   checks: string[],
   failures: string[],
@@ -281,21 +316,17 @@ async function verifyPhotoIntegrity(
   maxGpsDist: number,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
-  // Try to find integrity data for attachments in this result
   const integrityRecords = attachments
     .map((att) => getIntegrity(att.id))
     .filter((m) => m !== null);
 
-  // Also check by queryId for cases where attachment IDs differ
   if (integrityRecords.length === 0) {
-    const byQuery = getIntegrityForQuery(queryId);
+    const byQuery = getIntegrityForQuery(requirementId);
     if (byQuery.length > 0) {
       integrityRecords.push(...byQuery);
     }
   }
 
-  // No pre-upload integrity data — try direct C2PA validation on attachments
-  // This handles the decentralized path (Blossom download → C2PA check)
   if (integrityRecords.length === 0) {
     await verifyC2paFromAttachments(attachments, checks, failures, expectedGps, maxGpsDist, blossomKeys);
     return;

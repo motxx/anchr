@@ -1,4 +1,4 @@
-export { verify } from "./verifier.ts";
+export { verify, verifyProof, queryToRequirement, queryResultToInput } from "./verifier.ts";
 export { checkAttachmentContent, type ContentCheckResult } from "./ai-content-check.ts";
 export {
   validateExif,

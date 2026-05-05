@@ -332,10 +332,9 @@ describe("Application Service — Quorum verification", () => {
 });
 
 describe("Application Service — Aggregate error propagation", () => {
-  test("accepts empty description at service level (no aggregate validation)", () => {
+  test("rejects empty description (delegates validation to aggregate)", () => {
     const { svc } = setup();
-    const query = svc.createQuery({ description: "" });
-    expect(query.description).toBe("");
+    expect(() => svc.createQuery({ description: "" })).toThrow("description must not be empty");
   });
 
   test("rejects HTLC locktime too short at service level", () => {

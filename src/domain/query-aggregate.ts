@@ -8,16 +8,15 @@ import type {
   QuoteInfo,
   SubmissionMeta,
   VerificationDetail,
-  VerificationFactor,
   BlossomKeyMap,
   BountyInfo,
-  GpsCoord,
   QuorumConfig,
   OracleAttestationRecord,
   RequesterMeta,
 } from "./types.ts";
 import { DEFAULT_VERIFICATION_FACTORS } from "./types.ts";
-import { randomBytes } from "node:crypto";
+import type { Clock, DomainServices } from "./ports.ts";
+import { realDomainServices } from "./ports.ts";
 import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
 import { MIN_ESCROW_LOCKTIME_SECS, validateQueryInput, validateEscrowLocktime, validateQuoteInfo } from "./value-objects.ts";
 
@@ -38,19 +37,15 @@ export interface CreateQueryAggregateOptions {
   quorum?: QuorumConfig;
 }
 
-function generateQueryId(): string {
-  return `query_${Date.now()}_${randomBytes(8).toString("hex")}`;
-}
-
-/** Factory: create a new Query from input + options. Pure function except for ID + nonce generation. */
 export function createQueryAggregate(
   input: QueryInput,
   options: CreateQueryAggregateOptions,
+  services: DomainServices = realDomainServices,
 ): TransitionResult {
   const inputError = validateQueryInput(input);
   if (inputError) return { ok: false, error: inputError };
 
-  const now = Date.now();
+  const now = services.clock.now();
 
   if (options.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
@@ -64,7 +59,7 @@ export function createQueryAggregate(
   const isEscrow = options.escrow !== undefined;
 
   const query: Query = {
-    id: generateQueryId(),
+    id: services.idGenerator.newQueryId(),
     status: isEscrow ? "awaiting_quotes" : "pending",
     description: input.description,
     location_hint: input.location_hint,
@@ -99,6 +94,7 @@ export function submitResult(
   oracleId?: string,
   attestations?: OracleAttestationRecord[],
   blossomKeys?: BlossomKeyMap,
+  clock: Clock = realDomainServices.clock,
 ): TransitionResult {
   if (query.escrow !== undefined) {
     return { ok: false, error: "Use the escrow-mode functions for queries with an escrow" };
@@ -106,7 +102,8 @@ export function submitResult(
   if (query.status !== "pending") {
     return { ok: false, error: `Query is ${query.status}, not pending` };
   }
-  if (query.expires_at < Date.now()) {
+  const now = clock.now();
+  if (query.expires_at < now) {
     return {
       ok: true,
       query: { ...query, status: "expired", payment_status: "cancelled" },
@@ -122,7 +119,7 @@ export function submitResult(
     query: {
       ...query,
       status: newStatus,
-      submitted_at: Date.now(),
+      submitted_at: now,
       result,
       verification,
       submission_meta: meta,
@@ -235,6 +232,7 @@ export function recordResult(
   result: QueryResult,
   workerPubkey: string,
   blossomKeys?: BlossomKeyMap,
+  clock: Clock = realDomainServices.clock,
 ): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
@@ -252,7 +250,7 @@ export function recordResult(
       ...query,
       status: "verifying",
       result,
-      submitted_at: Date.now(),
+      submitted_at: clock.now(),
       submission_meta: { executor_type: "human", channel: "worker_api" },
       blossom_keys: blossomKeys,
     },

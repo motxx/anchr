@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getEncodedToken } from "@cashu/cashu-ts";
+import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import {
   createOracleRegistry,
@@ -362,7 +362,6 @@ describe("HTLC lifecycle", () => {
       async verify(_ref, expected_sats) {
         // Decode the ref as a Cashu token to extract amount (ref = token in tests)
         try {
-          const { getDecodedToken } = await import("@cashu/cashu-ts");
           const decoded = getDecodedToken(_ref);
           const total = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
           if (total < expected_sats) {

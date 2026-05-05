@@ -15,7 +15,7 @@ export { isValidTransition, isCancellable, isExpirable, isTerminal } from "./dom
 export {
   validateGpsCoord, validateBountyInfo, validateEscrowLocktime, validateQueryInput, validateQuoteInfo,
 } from "./domain/value-objects.ts";
-export type { EscrowInfo, EscrowType, QuoteInfo } from "./domain/types.ts";
+export type { EscrowInfo, EscrowType, QuoteInfo, VerificationRequirement, VerificationInput, VerificationDetail, VerificationFactor } from "./domain/types.ts";
 
 // --- Application ---
 export { createQueryService, createQueryStore } from "./application/query-service.ts";
@@ -58,9 +58,8 @@ export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./
 
 // --- Infrastructure: Servers & apps ---
 export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server.ts";
-export { startReferenceApp } from "./infrastructure/reference-app.ts";
 export { startReferenceRuntime } from "./infrastructure/runtime.ts";
-export { verify as verifyQueryResult } from "./infrastructure/verification/verifier.ts";
+export { verify as verifyQueryResult, verifyProof, queryToRequirement, queryResultToInput } from "./infrastructure/verification/verifier.ts";
 export { stripExif } from "./infrastructure/exif-strip.ts";
 
 // --- Infrastructure: Nostr, Blossom, Verification ---
