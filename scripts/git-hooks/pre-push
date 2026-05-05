@@ -11,6 +11,30 @@
 # Requires Docker to be running. The script starts and tears down its
 # own service containers; it will not contaminate other compose stacks.
 #
+# Iteration-window bypass: if test:all:full passed within the last 30
+# minutes (marker at $HOME/.claude/.anchr-test-all-last-pass), the push
+# proceeds without re-running. Override with `RUN_TESTS=1 git push`.
 # Bypass with `git push --no-verify` only when you know what you're doing.
 set -e
+
+MARKER="$HOME/.claude/.anchr-test-all-last-pass"
+WINDOW=1800  # 30 minutes
+
+if [ "${RUN_TESTS:-}" = "1" ]; then
+  echo "RUN_TESTS=1 → forcing full test gauntlet."
+elif [ -f "$MARKER" ]; then
+  NOW=$(date +%s)
+  LAST=$(cat "$MARKER" 2>/dev/null || echo 0)
+  AGE=$((NOW - LAST))
+  if [ "$AGE" -lt "$WINDOW" ]; then
+    REMAINING=$(((WINDOW - AGE) / 60 + 1))
+    echo "✓ test:all:full passed $((AGE / 60))m ago — bypass valid ~${REMAINING}m more."
+    echo "  (Override with RUN_TESTS=1 git push, or wait for the marker to expire.)"
+    exit 0
+  fi
+fi
+
 deno task test:all:full
+mkdir -p "$(dirname "$MARKER")"
+date +%s > "$MARKER"
+echo "✓ test-all marker written — pushes within 30m will bypass the gauntlet."

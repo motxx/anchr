@@ -19,7 +19,7 @@ on:
     paths:
       - "example/two-party-binary-bet/**"
       - "packages/cashu-conditional-swap/**"
-      - "packages/cashu-frost-oracle/**"
+      - "packages/frost-oracle/**"
       - "packages/core-cashu/**"
       - "packages/core-runtime/**"
       - "packages/tlsn-toolkit/**"
