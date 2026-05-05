@@ -28,9 +28,9 @@ test("createAdaptiveDualKeyStore falls back to single-key when frost-signer unav
       pubkey_package: {},
       group_pubkey: "aa".repeat(32),
       peers: [],
-      key_package_no: {},
-      pubkey_package_no: {},
-      group_pubkey_no: "bb".repeat(32),
+      key_package_b: {},
+      pubkey_package_b: {},
+      group_pubkey_b: "bb".repeat(32),
     };
 
     const { store, mode } = createAdaptiveDualKeyStore(mockConfig);
@@ -79,9 +79,9 @@ test("createFrostDualKeyStore falls back when frost-signer unavailable", () => {
         pubkey_package: {},
         group_pubkey: "aa".repeat(32),
         peers: [],
-        key_package_no: {},
-        pubkey_package_no: {},
-        group_pubkey_no: "bb".repeat(32),
+        key_package_b: {},
+        pubkey_package_b: {},
+        group_pubkey_b: "bb".repeat(32),
       },
     });
 

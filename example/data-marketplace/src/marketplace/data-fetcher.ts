@@ -5,9 +5,9 @@
  * Caches results per listing_id within max_age_seconds.
  */
 
-import type { TlsnRequirement, TlsnAttestation } from "../../domain/types.ts";
+import type { TlsnRequirement, TlsnAttestation } from "../../../../src/domain/types.ts";
 import { validateTlsn, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
-import { validateAttachmentUri } from "../url-validation.ts";
+import { validateAttachmentUri } from "../../../../src/infrastructure/url-validation.ts";
 
 export interface FetchedData {
   /** The upstream response body. */

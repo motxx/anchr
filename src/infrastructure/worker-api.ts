@@ -13,17 +13,28 @@ import {
   registerHtlcRoutes,
   registerLogRoutes,
 } from "./worker-api-routes.ts";
-import { registerMarketplaceRoutes } from "./marketplace/marketplace-routes.ts";
-import { createListingStore, type ListingStore } from "./marketplace/listing-store.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "security"]);
+
+/**
+ * Hook signature for example apps that extend the core HTTP surface with
+ * their own routes (e.g. data-marketplace). Receives the shared auth /
+ * rate-limit middleware and the preimage store so extensions inherit the
+ * host's security posture without re-implementing it.
+ */
+export interface WorkerApiExtraRouteContext {
+  preimageStore?: PreimageStore;
+  writeAuth: MiddlewareHandler;
+  rateLimit: MiddlewareHandler;
+}
 
 export interface WorkerApiDeps {
   queryService: QueryService;
   oracleRegistry?: OracleRegistry;
   preimageStore?: PreimageStore;
-  listingStore?: ListingStore;
+  /** Called after core routes are registered. Use to layer example-specific routes on top. */
+  extraRoutes?: (app: Hono, ctx: WorkerApiExtraRouteContext) => void;
 }
 
 // --- Auth Middleware ---
@@ -128,9 +139,7 @@ export function buildWorkerApiApp(deps: WorkerApiDeps) {
   registerHtlcRoutes(app, routeCtx);
   registerLogRoutes(app, writeAuth);
 
-  // --- Marketplace routes ---
-  const listingStore = deps.listingStore ?? createListingStore();
-  registerMarketplaceRoutes(app, { listingStore, preimageStore: pStore, writeAuth, rateLimit });
+  deps.extraRoutes?.(app, { preimageStore: pStore, writeAuth, rateLimit });
 
   return app;
 }

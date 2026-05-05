@@ -9,7 +9,7 @@
  *
  * Run:
  *   deno task build:ui && deno task build:css
- *   deno run --allow-all scripts/market-screenshots.ts
+ *   deno task screenshot   # from example/two-party-binary-bet/
  *
  * The script does NOT require Docker — it captures the empty market
  * UI plus the in-page wallet panel banner. For full bet → resolve

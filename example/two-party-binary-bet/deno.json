@@ -7,7 +7,7 @@
     "@anchr/cashu-conditional-swap/frost-dual-key-store": "../../packages/cashu-conditional-swap/src/frost-dual-key-store.ts",
     "@anchr/cashu-conditional-swap/conditional-swap-types": "../../packages/cashu-conditional-swap/src/conditional-swap-types.ts",
     "@anchr/cashu-frost-oracle/frost-cli": "../../packages/cashu-frost-oracle/src/frost-cli.ts",
-    "@anchr/cashu-frost-oracle/market-frost-config": "../../packages/cashu-frost-oracle/src/market-frost-config.ts",
+    "@anchr/cashu-frost-oracle/dual-outcome-config": "../../packages/cashu-frost-oracle/src/dual-outcome-config.ts",
     "@anchr/core-cashu": "../../packages/core-cashu/src/mod.ts",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1",
@@ -20,6 +20,7 @@
   },
   "tasks": {
     "demo": "deno run --allow-all src/demo.ts",
+    "screenshot": "deno run --allow-all scripts/screenshots.ts",
     "migrate": "psql \"$DATABASE_URL\" -f migrations/001_create_orders.sql"
   }
 }

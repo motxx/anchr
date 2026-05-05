@@ -15,7 +15,7 @@
 
 import type { DualKeyStore, DualKeyEntry } from "./frost-conditional-swap.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
-import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
 import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/cashu-frost-oracle/signing-coordinator";
 import { isFrostSignerAvailable } from "@anchr/cashu-frost-oracle/frost-cli";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -29,8 +29,8 @@ const log = getLogger(["anchr", "frost-dual-key-store"]);
 // ---------------------------------------------------------------------------
 
 export interface FrostDualKeyStoreConfig {
-  /** FROST node config for YES group (DKG group 1). */
-  yesConfig: MarketFrostNodeConfig;
+  /** FROST node config — outcome A by default; outcome B is read from the dual-outcome fields. */
+  yesConfig: DualOutcomeFrostNodeConfig;
   /** Timeout for peer signing HTTP calls (ms). */
   peerTimeoutMs?: number;
 }
@@ -42,7 +42,7 @@ export interface FrostDualKeyStoreConfig {
 /**
  * Create a DualKeyStore that delegates signing to a FROST threshold cluster.
  *
- * Keys are pre-generated via `scripts/frost-market-dkg-bootstrap.ts`.
+ * Keys are pre-generated via `scripts/frost-dual-outcome-dkg-bootstrap.ts`.
  * The store does not hold secret key material -- it coordinates signing
  * across peer nodes, each of which holds a key share.
  *
@@ -67,7 +67,7 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       const entry: DualKeyEntry = {
         swap_id,
         pubkey_a: yesConfig.group_pubkey,
-        pubkey_b: yesConfig.group_pubkey_no,
+        pubkey_b: yesConfig.group_pubkey_b,
         // No secret keys in FROST mode -- signing is distributed
         signed: false,
       };
@@ -125,22 +125,22 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
 // ---------------------------------------------------------------------------
 
 /**
- * Perform FROST threshold signing for a two-party binary bet resolution.
+ * Perform FROST threshold signing for a binary-outcome resolution (e.g. binary bet, dispute).
  *
  * This is the async counterpart of `DualKeyStore.sign()`. It coordinates
  * signing across peer Oracle nodes and returns the group signature only
  * if t-of-n signers agree on the outcome.
  *
  * @param config FROST node config (contains key material and peer list)
- * @param outcome Which group key to sign with ("a" = YES, "b" = NO)
- * @param message Message to sign (typically `${market_id}:${outcome}`)
+ * @param outcome Which group key to sign with ("a" = outcome A, "b" = outcome B)
+ * @param message Message to sign (typically `${condition_id}:${outcome}`)
  * @param conditionData Optional condition data for peers to verify independently
  */
 export async function frostDualKeySignAsync(
-  config: MarketFrostNodeConfig,
+  config: DualOutcomeFrostNodeConfig,
   outcome: "a" | "b",
   message: Uint8Array,
-  conditionData?: { market_id: string; resolution_url: string; verified_body: string },
+  conditionData?: { condition_id: string; resolution_url: string; verified_body: string },
 ): Promise<string | null> {
   const messageHex = bytesToHex(message);
 
@@ -160,20 +160,26 @@ export async function frostDualKeySignAsync(
           signer_index: config.signer_index,
           total_signers: config.total_signers,
           threshold: config.threshold,
-          key_package: config.key_package_no,
-          pubkey_package: config.pubkey_package_no,
-          group_pubkey: config.group_pubkey_no,
+          key_package: config.key_package_b,
+          pubkey_package: config.pubkey_package_b,
+          group_pubkey: config.group_pubkey_b,
           peers: config.peers,
         },
     peerTimeoutMs: 15_000,
-    // Pass condition data for peer independent verification
-    query: conditionData ? {
-      id: conditionData.market_id,
-      type: "market_resolution",
-      resolution_url: conditionData.resolution_url,
+    // Forward condition context to peers for independent verification.
+    // The shape is the host-side `VerificationRequirement` / `VerificationInput`
+    // pair the FROST signer route in `oracle-frost-signer-routes.ts` consumes.
+    requirement: conditionData ? {
+      id: conditionData.condition_id,
+      factors: ["tlsn"],
+      tlsn_requirements: {
+        target_url: conditionData.resolution_url,
+        conditions: [],
+      },
     } : undefined,
-    result: conditionData ? {
-      verified_body: conditionData.verified_body,
+    input: conditionData ? {
+      attachments: [],
+      tlsn_attestation: { presentation: conditionData.verified_body },
     } : undefined,
   };
 
@@ -198,15 +204,15 @@ export async function frostDualKeySignAsync(
  * nonce commitments across all secrets in one round-trip.
  *
  * @param config FROST node config
- * @param outcome Which group key to sign with ("a" = YES, "b" = NO)
+ * @param outcome Which group key to sign with ("a" = outcome A, "b" = outcome B)
  * @param proofSecrets Array of proof secret strings to sign
  * @param conditionData Optional condition data for peers to verify independently
  */
 export async function frostSignProofSecretsAsync(
-  config: MarketFrostNodeConfig,
+  config: DualOutcomeFrostNodeConfig,
   outcome: "a" | "b",
   proofSecrets: string[],
-  conditionData?: { market_id: string; resolution_url: string; verified_body: string },
+  conditionData?: { condition_id: string; resolution_url: string; verified_body: string },
 ): Promise<Map<string, string> | null> {
   const result = new Map<string, string>();
 
@@ -233,20 +239,20 @@ export async function frostSignProofSecretsAsync(
 /**
  * Create a DualKeyStore with automatic FROST/single-key selection.
  *
- * - If `marketFrostConfig` is provided and frost-signer is available:
+ * - If `dualOutcomeFrostConfig` is provided and frost-signer is available:
  *   returns a FROST-backed store.
  * - Otherwise: returns the single-key demo store.
  *
- * This is the recommended entry point for market Oracle servers.
+ * This is the recommended entry point for dual-outcome Oracle servers.
  */
 export function createAdaptiveDualKeyStore(
-  marketFrostConfig?: MarketFrostNodeConfig,
-): { store: DualKeyStore; mode: "frost" | "single-key"; config?: MarketFrostNodeConfig } {
-  if (marketFrostConfig && isFrostSignerAvailable()) {
+  dualOutcomeFrostConfig?: DualOutcomeFrostNodeConfig,
+): { store: DualKeyStore; mode: "frost" | "single-key"; config?: DualOutcomeFrostNodeConfig } {
+  if (dualOutcomeFrostConfig && isFrostSignerAvailable()) {
     return {
-      store: createFrostDualKeyStore({ yesConfig: marketFrostConfig }),
+      store: createFrostDualKeyStore({ yesConfig: dualOutcomeFrostConfig }),
       mode: "frost",
-      config: marketFrostConfig,
+      config: dualOutcomeFrostConfig,
     };
   }
 

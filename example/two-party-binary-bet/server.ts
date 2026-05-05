@@ -25,9 +25,9 @@ import {
 } from "./src/order-book-postgres.ts";
 import type { OrderBook } from "./src/order-book.ts";
 import {
-  loadMarketFrostNodeConfigAsync,
-  type MarketFrostNodeConfig,
-} from "@anchr/cashu-frost-oracle/market-frost-config";
+  loadDualOutcomeFrostNodeConfigAsync,
+  type DualOutcomeFrostNodeConfig,
+} from "@anchr/cashu-frost-oracle/dual-outcome-config";
 
 const app = new Hono();
 app.use("*", cors());
@@ -37,11 +37,11 @@ const noopMiddleware: MiddlewareHandler = async (_c, next) => await next();
 
 // Optional FROST cluster config. Plaintext (dev) or AES-256-GCM-encrypted
 // envelope (prod). The passphrase comes from FROST_KEY_PASSPHRASE.
-let frostConfig: MarketFrostNodeConfig | undefined;
+let frostConfig: DualOutcomeFrostNodeConfig | undefined;
 const frostConfigPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
 if (frostConfigPath) {
   try {
-    frostConfig = await loadMarketFrostNodeConfigAsync(frostConfigPath, {
+    frostConfig = await loadDualOutcomeFrostNodeConfigAsync(frostConfigPath, {
       passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
     });
     console.log(`[market] FROST market config loaded from ${frostConfigPath}`);

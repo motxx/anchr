@@ -220,8 +220,8 @@ deno test --allow-all example/two-party-binary-bet/
 deno task test:regtest
 
 # FROST 2-of-3 cluster (after building crates/frost-signer)
-scripts/frost-market-dkg-bootstrap.ts --threshold 2 --total 3
-scripts/frost-market-oracle-cluster.ts
+example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts --threshold 2 --total 3
+example/two-party-binary-bet/scripts/frost-oracle-cluster.ts
 ```
 
 ## Files

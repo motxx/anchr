@@ -2,8 +2,8 @@
 /**
  * FROST Market Oracle Node -- single Oracle server instance for two-party binary bets.
  *
- * Loads a MarketFrostNodeConfig and serves market API routes with FROST signing.
- * Launched by scripts/frost-market-oracle-cluster.ts.
+ * Loads a DualOutcomeFrostNodeConfig and serves market API routes with FROST signing.
+ * Launched by example/two-party-binary-bet/scripts/frost-oracle-cluster.ts.
  *
  * Environment variables:
  *   FROST_MARKET_CONFIG_PATH  Path to signer-N.json (required)
@@ -12,8 +12,8 @@
  *   ORACLE_ID                 Node identifier (optional)
  */
 
-import { loadMarketFrostNodeConfigAsync } from "@anchr/cashu-frost-oracle/market-frost-config";
-import { buildMarketApiRoutes } from "../example/two-party-binary-bet/src/market-api-routes.ts";
+import { loadDualOutcomeFrostNodeConfigAsync } from "@anchr/cashu-frost-oracle/dual-outcome-config";
+import { buildMarketApiRoutes } from "../src/market-api-routes.ts";
 
 const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "market-oracle";
 const ORACLE_PORT = Number(Deno.env.get("ORACLE_PORT")) || 4001;
@@ -22,18 +22,18 @@ const FROST_CONFIG_PATH = Deno.env.get("FROST_MARKET_CONFIG_PATH")?.trim();
 
 if (!FROST_CONFIG_PATH) {
   console.error("ERROR: FROST_MARKET_CONFIG_PATH environment variable is required");
-  console.error("Run: deno run --allow-all scripts/frost-market-dkg-bootstrap.ts");
+  console.error("Run: deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts");
   Deno.exit(1);
 }
 
 try {
-  const marketFrostConfig = await loadMarketFrostNodeConfigAsync(FROST_CONFIG_PATH, {
+  const marketFrostConfig = await loadDualOutcomeFrostNodeConfigAsync(FROST_CONFIG_PATH, {
     passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
   });
   console.log(`[${ORACLE_ID}] Loaded FROST market config from ${FROST_CONFIG_PATH}`);
   console.log(`[${ORACLE_ID}] Signer ${marketFrostConfig.signer_index} of ${marketFrostConfig.total_signers} (threshold: ${marketFrostConfig.threshold})`);
   console.log(`[${ORACLE_ID}] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
-  console.log(`[${ORACLE_ID}] NO  group: ${marketFrostConfig.group_pubkey_no.slice(0, 16)}...`);
+  console.log(`[${ORACLE_ID}] NO  group: ${marketFrostConfig.group_pubkey_b.slice(0, 16)}...`);
 
   const { app } = buildMarketApiRoutes({
     apiKey: API_KEY,

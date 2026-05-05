@@ -4,7 +4,7 @@
  * Oracle cluster with TWO threshold groups (YES and NO outcomes).
  *
  * Usage:
- *   deno run --allow-all scripts/frost-market-dkg-bootstrap.ts \
+ *   deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts \
  *     --threshold 2 --total 3 --output-dir .frost-market --base-port 4001
  *
  * Produces:
@@ -12,7 +12,7 @@
  *   .frost-market/signer-2.json
  *   .frost-market/signer-3.json
  *
- * Each file is a MarketFrostNodeConfig with keys for both outcome groups.
+ * Each file is a DualOutcomeFrostNodeConfig with keys for both outcome groups.
  * The two groups have INDEPENDENT DKG sessions -- different group pubkeys,
  * different key shares -- so signing with one group reveals nothing about
  * the other.
@@ -28,9 +28,9 @@ import {
 } from "@anchr/cashu-frost-oracle/frost-cli";
 import type { PeerConfig } from "@anchr/cashu-frost-oracle/config";
 import {
-  saveMarketFrostNodeConfigAsync,
-  type MarketFrostNodeConfig,
-} from "@anchr/cashu-frost-oracle/market-frost-config";
+  saveDualOutcomeFrostNodeConfigAsync,
+  type DualOutcomeFrostNodeConfig,
+} from "@anchr/cashu-frost-oracle/dual-outcome-config";
 
 // --- Parse CLI args ---
 
@@ -192,7 +192,7 @@ async function main() {
     Deno.exit(1);
   }
 
-  // === Combine into MarketFrostNodeConfig per signer ===
+  // === Combine into DualOutcomeFrostNodeConfig per signer ===
   console.log("\n=== Saving combined configs ===");
 
   for (let i = 0; i < TOTAL; i++) {
@@ -209,7 +209,7 @@ async function main() {
       });
     }
 
-    const marketConfig: MarketFrostNodeConfig = {
+    const marketConfig: DualOutcomeFrostNodeConfig = {
       // Common
       signer_index: i + 1,
       total_signers: TOTAL,
@@ -222,14 +222,14 @@ async function main() {
       group_pubkey: yesConfig.group_pubkey,
 
       // NO group (additional fields)
-      key_package_no: noConfig.key_package,
-      pubkey_package_no: noConfig.pubkey_package,
-      group_pubkey_no: noConfig.group_pubkey,
+      key_package_b: noConfig.key_package,
+      pubkey_package_b: noConfig.pubkey_package,
+      group_pubkey_b: noConfig.group_pubkey,
     };
 
     const path = join(OUTPUT_DIR, `signer-${i + 1}.json`);
     const passphrase = Deno.env.get("FROST_KEY_PASSPHRASE")?.trim();
-    await saveMarketFrostNodeConfigAsync(path, marketConfig, passphrase ? { passphrase } : undefined);
+    await saveDualOutcomeFrostNodeConfigAsync(path, marketConfig, passphrase ? { passphrase } : undefined);
     if (passphrase) {
       console.log(`  ${path} (encrypted, AES-256-GCM, mode 0600)`);
     } else {
@@ -248,7 +248,7 @@ async function main() {
   console.log(`  YES group pubkey: ${yesGroup.group_pubkey}`);
   console.log(`  NO  group pubkey: ${noGroup.group_pubkey}`);
   console.log(`\nTo start the market Oracle cluster:`);
-  console.log(`  deno run --allow-all scripts/frost-market-oracle-cluster.ts`);
+  console.log(`  deno run --allow-all example/two-party-binary-bet/scripts/frost-oracle-cluster.ts`);
 }
 
 main().catch((e) => { console.error(e); Deno.exit(1); });

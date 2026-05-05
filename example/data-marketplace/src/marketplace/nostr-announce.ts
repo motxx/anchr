@@ -7,9 +7,9 @@
 
 import { Buffer } from "node:buffer";
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
-import { publishEvent } from "../nostr/client.ts";
+import { publishEvent } from "../../../../src/infrastructure/nostr/client.ts";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
-import { ANCHR_MARKETPLACE_LISTING } from "../nostr/events.ts";
+import { ANCHR_MARKETPLACE_LISTING } from "../../../../src/infrastructure/nostr/events.ts";
 import type { DataListing } from "./types.ts";
 
 /** Get the Nostr identity keypair. Returns null if not configured. */

@@ -1,14 +1,15 @@
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildWorkerApiApp } from "../worker-api.ts";
+import { buildWorkerApiApp } from "../../../../src/infrastructure/worker-api.ts";
 import { createListingStore } from "./listing-store.ts";
-import { createOracleRegistry } from "../oracle/registry.ts";
-import { createQueryService, createQueryStore } from "../../application/query-service.ts";
-import type { Oracle, OracleAttestation } from "../../domain/oracle-types.ts";
-import type { Query, QueryResult } from "../../domain/types.ts";
+import { createOracleRegistry } from "../../../../src/infrastructure/oracle/registry.ts";
+import { createQueryService, createQueryStore } from "../../../../src/application/query-service.ts";
+import type { Oracle, OracleAttestation } from "../../../../src/domain/oracle-types.ts";
+import type { Query, QueryResult } from "../../../../src/domain/types.ts";
 import { _clearSeenTokensForTest } from "./xcashu-middleware.ts";
 import { _clearPurchaseLogForTest } from "./marketplace-routes.ts";
 import { _clearCacheForTest } from "./data-fetcher.ts";
+import { registerMarketplaceRoutes } from "./marketplace-routes.ts";
 
 function makeMockOracle(id: string): Oracle {
   return {
@@ -32,7 +33,18 @@ function makeTestApp() {
   const registry = createOracleRegistry({ skipBuiltIn: true });
   registry.register(makeMockOracle("test-oracle"));
   const queryService = createQueryService({ store: queryStore, oracleRegistry: registry });
-  const app = buildWorkerApiApp({ queryService, oracleRegistry: registry, listingStore });
+  const app = buildWorkerApiApp({
+    queryService,
+    oracleRegistry: registry,
+    extraRoutes: (app, ctx) => {
+      registerMarketplaceRoutes(app, {
+        listingStore,
+        preimageStore: ctx.preimageStore,
+        writeAuth: ctx.writeAuth,
+        rateLimit: ctx.rateLimit,
+      });
+    },
+  });
   return { app, listingStore };
 }
 

@@ -19,7 +19,7 @@ import {
   createAdaptiveDualKeyStore,
   frostDualKeySignAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
-import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
 import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
 import {
   evaluateCondition,
@@ -41,7 +41,7 @@ export interface MarketApiConfig {
   /** API key for protecting endpoints (optional). */
   apiKey?: string;
   /** Pre-loaded market FROST config (from DKG bootstrap). */
-  marketFrostConfig?: MarketFrostNodeConfig;
+  marketFrostConfig?: DualOutcomeFrostNodeConfig;
   /** Oracle fee in parts per million (default: 5000 = 0.5%). */
   oracleFeePpm?: number;
 }
@@ -60,7 +60,7 @@ export interface MarketApiState {
   /** Resolution mode. */
   mode: "frost" | "single-key";
   /** FROST config (if available). */
-  frostConfig?: MarketFrostNodeConfig;
+  frostConfig?: DualOutcomeFrostNodeConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
   if (mode === "frost" && frostConfig) {
     console.log(`[market-api] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`);
     console.log(`[market-api] YES group pubkey: ${frostConfig.group_pubkey.slice(0, 16)}...`);
-    console.log(`[market-api] NO  group pubkey: ${frostConfig.group_pubkey_no.slice(0, 16)}...`);
+    console.log(`[market-api] NO  group pubkey: ${frostConfig.group_pubkey_b.slice(0, 16)}...`);
   } else {
     console.log("[market-api] Using single-key Schnorr signing (demo mode)");
   }
@@ -116,7 +116,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       threshold: state.frostConfig.threshold,
       total_signers: state.frostConfig.total_signers,
       group_pubkey_yes: state.frostConfig.group_pubkey,
-      group_pubkey_no: state.frostConfig.group_pubkey_no,
+      group_pubkey_no: state.frostConfig.group_pubkey_b,
     } : null,
     oracle_fee_ppm: oracleFeePpm,
   }));
@@ -233,7 +233,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
         swapOutcome,
         message,
         {
-          market_id: marketId,
+          condition_id: marketId,
           resolution_url: market.resolution_url,
           verified_body: body.verified_body,
         },
@@ -339,7 +339,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     const outcomeKey = body.outcome === "yes" ? "a" : "b";
     const keyPackage = outcomeKey === "a"
       ? state.frostConfig.key_package
-      : state.frostConfig.key_package_no;
+      : state.frostConfig.key_package_b;
 
     
     const keyPackageJson = JSON.stringify(keyPackage);
@@ -386,7 +386,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     // Select key package based on the outcome determined in round1
     const keyPackage = nonceEntry.outcomeKey === "a"
       ? state.frostConfig.key_package
-      : state.frostConfig.key_package_no;
+      : state.frostConfig.key_package_b;
 
     
     const keyPackageJson = JSON.stringify(keyPackage);
@@ -434,7 +434,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     }
 
     const outcomeKey = outcome === "yes" ? "a" : "b";
-    const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
+    const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_b;
     
     const result = await signRound1(JSON.stringify(keyPackage));
     if (!result.ok) return c.json({ error: result.error }, 500);
@@ -453,7 +453,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
     pendingMarketNonces.delete(body.nonce_id);
 
-    const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_no;
+    const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_b;
     
     const result = await signRound2(JSON.stringify(keyPackage), stored.nonces, body.commitments, body.message);
     if (!result.ok) return c.json({ error: result.error }, 500);

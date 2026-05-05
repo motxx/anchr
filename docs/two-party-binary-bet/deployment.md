@@ -82,11 +82,11 @@ HTLC preimage. PR-D's encrypted DKG bootstrap covers this.
 #    The output is FROST signer config files, encrypted at rest with
 #    AES-256-GCM and PBKDF2-SHA256 (600k iterations).
 FROST_KEY_PASSPHRASE='choose-a-strong-passphrase' \
-deno run --allow-all scripts/frost-market-dkg-bootstrap.ts \
+deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts \
   --threshold 2 --total 3 --output-dir .frost-market
 
 # 2. Each signer node loads its own config. Boot the cluster.
-deno run --allow-all scripts/frost-market-oracle-cluster.ts
+deno run --allow-all example/two-party-binary-bet/scripts/frost-oracle-cluster.ts
 
 # 3. Boot the market server pointing at signer-1's config.
 FROST_MARKET_CONFIG_PATH=.frost-market/signer-1.json \
@@ -140,7 +140,7 @@ already-deployed Anchr Nostr relay + TLSN verifier.
 ```
 +---------------------- anchr-market.fly.dev ----------------------+
 |                                                                  |
-|  scripts/market-cluster-entrypoint.ts (PID 1, tini)              |
+|  scripts/cluster-entrypoint.ts (PID 1, tini)              |
 |    ├── frost-signer-1   (127.0.0.1:4001)                         |
 |    ├── frost-signer-2   (127.0.0.1:4002)                         |
 |    ├── frost-signer-3   (127.0.0.1:4003)                         |
@@ -190,7 +190,7 @@ flyctl volumes create frost_data --app anchr-market --region nrt --size 1
 # 2. Generate the FROST 2-of-3 DKG output, encrypt with a passphrase,
 #    and emit the `flyctl secrets set` command.
 FROST_KEY_PASSPHRASE=$(openssl rand -hex 32) \
-  deno run --allow-all scripts/frost-market-prepare-secrets.ts --app anchr-market
+  deno run --allow-all example/two-party-binary-bet/scripts/frost-prepare-secrets.ts --app anchr-market
 
 # 3. Run the printed `flyctl secrets set …` command. It uploads the
 #    passphrase + 3 base64-encoded encrypted configs as Fly secrets.
@@ -224,7 +224,7 @@ the HTLC fallback path for those legacy markets.
       (`writeAuth`/`rateLimit`
       currently no-op for the demo). Wire it to your KMS.
 - [ ] Run the screenshot script as a smoke test in CI:
-      `deno run --allow-all scripts/market-screenshots.ts`.
+      `deno run --allow-all example/two-party-binary-bet/scripts/screenshots.ts`.
 
 ## 5. Useful smoke tests
 
@@ -252,7 +252,7 @@ Re-capture them after UI changes:
 
 ```bash
 deno task build:ui && deno task build:css
-deno run --allow-all scripts/market-screenshots.ts
+deno run --allow-all example/two-party-binary-bet/scripts/screenshots.ts
 ```
 
 The script boots the market server in-process on port 3098, drives

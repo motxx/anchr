@@ -14,7 +14,7 @@
  */
 
 import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { finalizeEvent, type EventTemplate } from "nostr-tools";
 import type { NostrIdentity } from "../nostr/identity.ts";
 
@@ -206,8 +206,6 @@ export async function downloadFromBlossom(
 
   const maxRetries = options?.maxRetries ?? 3;
   const retryDelayMs = options?.retryDelayMs ?? 5000;
-
-  const { hexToBytes } = await import("@noble/hashes/utils.js");
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     // Try each server until we get the blob

@@ -63,4 +63,4 @@ USER anchr
 EXPOSE 8080
 
 ENTRYPOINT ["tini", "--"]
-CMD ["deno", "run", "--allow-all", "--config", "deno.json", "scripts/market-cluster-entrypoint.ts"]
+CMD ["deno", "run", "--allow-all", "--config", "deno.json", "scripts/cluster-entrypoint.ts"]

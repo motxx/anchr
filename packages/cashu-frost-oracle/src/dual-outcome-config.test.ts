@@ -1,16 +1,16 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  toYesFrostNodeConfig,
-  toNoFrostNodeConfig,
-  saveMarketFrostNodeConfigAsync,
-  loadMarketFrostNodeConfigAsync,
-  loadMarketFrostNodeConfig,
-  encryptMarketFrostNodeConfig,
-} from "./market-frost-config.ts";
-import type { MarketFrostNodeConfig } from "./market-frost-config.ts";
+  toOutcomeAFrostNodeConfig,
+  toOutcomeBFrostNodeConfig,
+  saveDualOutcomeFrostNodeConfigAsync,
+  loadDualOutcomeFrostNodeConfigAsync,
+  loadDualOutcomeFrostNodeConfig,
+  encryptDualOutcomeFrostNodeConfig,
+} from "./dual-outcome-config.ts";
+import type { DualOutcomeFrostNodeConfig } from "./dual-outcome-config.ts";
 
-function makeMockConfig(): MarketFrostNodeConfig {
+function makeMockConfig(): DualOutcomeFrostNodeConfig {
   return {
     signer_index: 1,
     total_signers: 3,
@@ -23,15 +23,15 @@ function makeMockConfig(): MarketFrostNodeConfig {
       { signer_index: 2, endpoint: "http://localhost:4002" },
       { signer_index: 3, endpoint: "http://localhost:4003" },
     ],
-    key_package_no: { no_key: "no_secret_share" },
-    pubkey_package_no: { no_pubkey: "no_pubkey_package" },
-    group_pubkey_no: "bb".repeat(32),
+    key_package_b: { no_key: "no_secret_share" },
+    pubkey_package_b: { no_pubkey: "no_pubkey_package" },
+    group_pubkey_b: "bb".repeat(32),
   };
 }
 
-test("toYesFrostNodeConfig extracts YES group fields", () => {
+test("toOutcomeAFrostNodeConfig extracts YES group fields", () => {
   const config = makeMockConfig();
-  const yesConfig = toYesFrostNodeConfig(config);
+  const yesConfig = toOutcomeAFrostNodeConfig(config);
 
   expect(yesConfig.signer_index).toBe(1);
   expect(yesConfig.total_signers).toBe(3);
@@ -42,9 +42,9 @@ test("toYesFrostNodeConfig extracts YES group fields", () => {
   expect(yesConfig.peers.length).toBe(3);
 });
 
-test("toNoFrostNodeConfig extracts NO group fields", () => {
+test("toOutcomeBFrostNodeConfig extracts NO group fields", () => {
   const config = makeMockConfig();
-  const noConfig = toNoFrostNodeConfig(config);
+  const noConfig = toOutcomeBFrostNodeConfig(config);
 
   expect(noConfig.signer_index).toBe(1);
   expect(noConfig.total_signers).toBe(3);
@@ -57,24 +57,24 @@ test("toNoFrostNodeConfig extracts NO group fields", () => {
 
 test("YES and NO configs have different group pubkeys", () => {
   const config = makeMockConfig();
-  const yesConfig = toYesFrostNodeConfig(config);
-  const noConfig = toNoFrostNodeConfig(config);
+  const yesConfig = toOutcomeAFrostNodeConfig(config);
+  const noConfig = toOutcomeBFrostNodeConfig(config);
 
   expect(yesConfig.group_pubkey).not.toBe(noConfig.group_pubkey);
 });
 
 test("YES and NO configs share the same peer list", () => {
   const config = makeMockConfig();
-  const yesConfig = toYesFrostNodeConfig(config);
-  const noConfig = toNoFrostNodeConfig(config);
+  const yesConfig = toOutcomeAFrostNodeConfig(config);
+  const noConfig = toOutcomeBFrostNodeConfig(config);
 
   expect(yesConfig.peers).toEqual(noConfig.peers);
 });
 
-test("MarketFrostNodeConfig preserves signer identity across groups", () => {
+test("DualOutcomeFrostNodeConfig preserves signer identity across groups", () => {
   const config = makeMockConfig();
-  const yesConfig = toYesFrostNodeConfig(config);
-  const noConfig = toNoFrostNodeConfig(config);
+  const yesConfig = toOutcomeAFrostNodeConfig(config);
+  const noConfig = toOutcomeBFrostNodeConfig(config);
 
   // Same signer in both groups
   expect(yesConfig.signer_index).toBe(noConfig.signer_index);
@@ -96,8 +96,8 @@ async function withTempFile<T>(fn: (path: string) => Promise<T>): Promise<T> {
 test("plaintext save/load roundtrip preserves all fields", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original);
-    const loaded = await loadMarketFrostNodeConfigAsync(path);
+    await saveDualOutcomeFrostNodeConfigAsync(path, original);
+    const loaded = await loadDualOutcomeFrostNodeConfigAsync(path);
     expect(loaded).toEqual(original);
   });
 });
@@ -106,8 +106,8 @@ test("encrypted save/load roundtrip preserves all fields", async () => {
   const original = makeMockConfig();
   const passphrase = "correct horse battery staple";
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase });
-    const loaded = await loadMarketFrostNodeConfigAsync(path, { passphrase });
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase });
+    const loaded = await loadDualOutcomeFrostNodeConfigAsync(path, { passphrase });
     expect(loaded).toEqual(original);
   });
 });
@@ -115,7 +115,7 @@ test("encrypted save/load roundtrip preserves all fields", async () => {
 test("encrypted file written to disk is an envelope, not plaintext", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase: "pass" });
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "pass" });
     const onDisk = JSON.parse(await Deno.readTextFile(path));
     expect(onDisk.version).toBe(1);
     expect(onDisk.algorithm).toBe("aes-256-gcm");
@@ -133,16 +133,16 @@ test("encrypted file written to disk is an envelope, not plaintext", async () =>
 test("encrypted file cannot be loaded without a passphrase", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase: "pass" });
-    await expect(loadMarketFrostNodeConfigAsync(path)).rejects.toThrow(/encrypted/i);
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "pass" });
+    await expect(loadDualOutcomeFrostNodeConfigAsync(path)).rejects.toThrow(/encrypted/i);
   });
 });
 
 test("encrypted file rejects wrong passphrase with uniform error", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase: "right" });
-    await expect(loadMarketFrostNodeConfigAsync(path, { passphrase: "wrong" }))
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "right" });
+    await expect(loadDualOutcomeFrostNodeConfigAsync(path, { passphrase: "wrong" }))
       .rejects.toThrow(/decryption failed/i);
   });
 });
@@ -150,8 +150,8 @@ test("encrypted file rejects wrong passphrase with uniform error", async () => {
 test("sync loader rejects encrypted file with actionable message", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase: "pass" });
-    expect(() => loadMarketFrostNodeConfig(path)).toThrow(/encrypted/i);
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "pass" });
+    expect(() => loadDualOutcomeFrostNodeConfig(path)).toThrow(/encrypted/i);
   });
 });
 
@@ -160,15 +160,15 @@ test("plaintext loader still works through the async path (back-compat)", async 
   await withTempFile(async (path) => {
     // Write plaintext directly.
     await Deno.writeTextFile(path, JSON.stringify(original));
-    const loaded = await loadMarketFrostNodeConfigAsync(path);
+    const loaded = await loadDualOutcomeFrostNodeConfigAsync(path);
     expect(loaded).toEqual(original);
   });
 });
 
 test("each encryption uses a fresh salt and IV (no nonce reuse)", async () => {
   const original = makeMockConfig();
-  const a = await encryptMarketFrostNodeConfig(original, "pass");
-  const b = await encryptMarketFrostNodeConfig(original, "pass");
+  const a = await encryptDualOutcomeFrostNodeConfig(original, "pass");
+  const b = await encryptDualOutcomeFrostNodeConfig(original, "pass");
   expect(a.salt).not.toBe(b.salt);
   expect(a.iv).not.toBe(b.iv);
   expect(a.ciphertext).not.toBe(b.ciphertext);
@@ -176,7 +176,7 @@ test("each encryption uses a fresh salt and IV (no nonce reuse)", async () => {
 
 test("encryption requires a non-empty passphrase", async () => {
   const original = makeMockConfig();
-  await expect(encryptMarketFrostNodeConfig(original, "")).rejects.toThrow(
+  await expect(encryptDualOutcomeFrostNodeConfig(original, "")).rejects.toThrow(
     /passphrase required/i,
   );
 });
@@ -184,7 +184,7 @@ test("encryption requires a non-empty passphrase", async () => {
 test("tampered ciphertext fails GCM authentication", async () => {
   const original = makeMockConfig();
   await withTempFile(async (path) => {
-    await saveMarketFrostNodeConfigAsync(path, original, { passphrase: "pass" });
+    await saveDualOutcomeFrostNodeConfigAsync(path, original, { passphrase: "pass" });
     const envelope = JSON.parse(await Deno.readTextFile(path));
     // Flip one byte in the base64 ciphertext (re-encode after mutating).
     const ct = atob(envelope.ciphertext);
@@ -195,7 +195,7 @@ test("tampered ciphertext fails GCM authentication", async () => {
     for (const b of bytes) out += String.fromCharCode(b);
     envelope.ciphertext = btoa(out);
     await Deno.writeTextFile(path, JSON.stringify(envelope));
-    await expect(loadMarketFrostNodeConfigAsync(path, { passphrase: "pass" }))
+    await expect(loadDualOutcomeFrostNodeConfigAsync(path, { passphrase: "pass" }))
       .rejects.toThrow(/decryption failed/i);
   });
 });

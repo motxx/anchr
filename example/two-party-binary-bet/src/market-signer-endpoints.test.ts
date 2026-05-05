@@ -23,7 +23,7 @@ import {
   type MarketState,
   type MarketRouteContext,
 } from "./server-routes.ts";
-import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
 import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -78,8 +78,8 @@ function toHex(text: string): string {
     .join("");
 }
 
-/** Build a minimal MarketFrostNodeConfig for testing. */
-function makeFrostConfig(): MarketFrostNodeConfig {
+/** Build a minimal DualOutcomeFrostNodeConfig for testing. */
+function makeFrostConfig(): DualOutcomeFrostNodeConfig {
   return {
     signer_index: 1,
     total_signers: 3,
@@ -87,9 +87,9 @@ function makeFrostConfig(): MarketFrostNodeConfig {
     key_package: { yes_key: "pkg_yes" },
     pubkey_package: { yes_pubkey: "pkg_yes_pub" },
     group_pubkey: "aa".repeat(32),
-    key_package_no: { no_key: "pkg_no" },
-    pubkey_package_no: { no_pubkey: "pkg_no_pub" },
-    group_pubkey_no: "bb".repeat(32),
+    key_package_b: { no_key: "pkg_no" },
+    pubkey_package_b: { no_pubkey: "pkg_no_pub" },
+    group_pubkey_b: "bb".repeat(32),
     peers: [],
   };
 }

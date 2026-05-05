@@ -11,7 +11,7 @@ import type { MiddlewareHandler } from "hono";
 import { createListingSchema } from "./marketplace-schemas.ts";
 import { createPaymentMiddleware } from "./xcashu-middleware.ts";
 import { fetchWithProof, validateMarketplaceProof } from "./data-fetcher.ts";
-import { validateAttachmentUri } from "../url-validation.ts";
+import { validateAttachmentUri } from "../../../../src/infrastructure/url-validation.ts";
 import { announceListingOnNostr } from "./nostr-announce.ts";
 import type { DataListing, MarketplaceEnv, MarketplaceRouteContext, PurchaseRecord } from "./types.ts";
 

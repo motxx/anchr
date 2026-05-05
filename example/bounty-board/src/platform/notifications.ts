@@ -16,7 +16,7 @@ export interface NotificationProvider {
 function createNativeProvider(): NotificationProvider {
   return {
     async requestPermission() {
-      const Notifications = await import("expo-notifications");
+      const Notifications = await import("expo-notifications"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       const { status: existing } = await Notifications.getPermissionsAsync();
       if (existing === "granted") return true;
       const { status } = await Notifications.requestPermissionsAsync();
@@ -34,7 +34,7 @@ function createNativeProvider(): NotificationProvider {
       });
     },
     async scheduleImmediate(content) {
-      const Notifications = await import("expo-notifications");
+      const Notifications = await import("expo-notifications"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       await Notifications.scheduleNotificationAsync({
         content: {
           title: content.title,

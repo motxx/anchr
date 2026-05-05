@@ -117,7 +117,7 @@ export async function settleMarket(
           allProofSecrets,
           opts?.verifiedBody
             ? {
-              market_id: marketId,
+              condition_id: marketId,
               resolution_url: market.resolution_url,
               verified_body: opts.verifiedBody,
             }
@@ -160,7 +160,7 @@ export async function settleMarket(
           signMessage,
           opts?.verifiedBody
             ? {
-              market_id: marketId,
+              condition_id: marketId,
               resolution_url: market.resolution_url,
               verified_body: opts.verifiedBody,
             }

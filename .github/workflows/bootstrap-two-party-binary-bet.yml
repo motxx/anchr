@@ -155,7 +155,7 @@ jobs:
         run: |
           # Generate encrypted FROST shares + emit KEY=VALUE lines on stdout.
           # Stderr carries DKG progress; stdout is fed straight into flyctl.
-          deno run --allow-all scripts/frost-market-prepare-secrets.ts \
+          deno run --allow-all example/two-party-binary-bet/scripts/frost-prepare-secrets.ts \
             --emit-env --app anchr-market \
             | flyctl secrets import --app anchr-market
         env:

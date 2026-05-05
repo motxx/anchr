@@ -40,7 +40,7 @@ const elapsed = () => `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 // ============================================================
 console.log(`[${elapsed()}] === Step 0: Open Anchr UI ===`);
 
-const pw = await import("playwright");
+const pw = await import("playwright"); // allow-dynamic-import: optional heavy dep — only loaded when this CLI script runs interactively
 
 // Layout: 4 windows on screen (logical ~1512x982 for 3024x1964 Retina)
 const SCREEN_W = 1512;
@@ -155,7 +155,7 @@ console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 await flow(2, "active", `Minting ${BOUNTY_SATS} sats...`);
 console.log(`\n[${elapsed()}] === Step 3: Seller mints Cashu bounty ===`);
 
-const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts");
+const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts"); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
 const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
 await cashuWallet.loadMint();
 

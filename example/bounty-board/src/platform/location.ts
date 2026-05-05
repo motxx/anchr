@@ -9,12 +9,12 @@ export interface LocationProvider {
 function createNativeProvider(): LocationProvider {
   return {
     async requestPermission() {
-      const Location = await import("expo-location");
+      const Location = await import("expo-location"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       const { status } = await Location.requestForegroundPermissionsAsync();
       return status === "granted";
     },
     async getCurrentPosition() {
-      const Location = await import("expo-location");
+      const Location = await import("expo-location"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });

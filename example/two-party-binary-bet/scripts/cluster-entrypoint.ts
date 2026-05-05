@@ -95,7 +95,7 @@ async function main() {
         tag: `frost-signer-${i + 1}`,
         cmd: [
           "deno", "run", "--allow-all", "--config", "deno.json",
-          "scripts/frost-market-oracle-node.ts",
+          "example/two-party-binary-bet/scripts/frost-oracle-node.ts",
         ],
         env: {
           ORACLE_ID: `frost-market-${i + 1}`,

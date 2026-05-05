@@ -10,7 +10,7 @@
  *   SQUARE_ACCESS_TOKEN=xxx deno run --allow-all --env scripts/demo-payment-proof.ts
  *
  * Prerequisites:
- *   - Anchr server running (deno run --allow-all --env src/reference-app.ts)
+ *   - Anchr server running (deno task dev)
  *   - TLSNotary verifier running (docker)
  *   - tlsn-prove binary built
  */
@@ -37,7 +37,7 @@ const elapsed = () => `${((Date.now() - startTime) / 1000).toFixed(1)}s`;
 
 // ── Layout: Demo UI (left) + Square browser (right) ──
 
-const pw = await import("playwright");
+const pw = await import("playwright"); // allow-dynamic-import: optional heavy dep — only loaded when this CLI script runs interactively
 
 const SCREEN_W = 1512;
 const SCREEN_H = 982;

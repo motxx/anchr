@@ -3,14 +3,14 @@
  * FROST Market Oracle Cluster -- starts multiple Oracle nodes for
  * two-party binary bet resolution with FROST threshold signing.
  *
- * Each node loads a MarketFrostNodeConfig (with YES + NO group keys)
+ * Each node loads a DualOutcomeFrostNodeConfig (with YES + NO group keys)
  * and serves the market API routes with FROST signing endpoints.
  *
  * Prerequisites:
- *   deno run --allow-all scripts/frost-market-dkg-bootstrap.ts
+ *   deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts
  *
  * Usage:
- *   deno run --allow-all scripts/frost-market-oracle-cluster.ts \
+ *   deno run --allow-all example/two-party-binary-bet/scripts/frost-oracle-cluster.ts \
  *     [--config-dir .frost-market] [--api-key frost-market-key]
  */
 
@@ -36,7 +36,7 @@ async function main() {
 
   if (configs.length === 0) {
     console.error(`No signer configs found in ${CONFIG_DIR}/`);
-    console.error("Run: deno run --allow-all scripts/frost-market-dkg-bootstrap.ts");
+    console.error("Run: deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts");
     Deno.exit(1);
   }
 
@@ -45,7 +45,7 @@ async function main() {
   console.log(`Starting ${configs.length} Market Oracle nodes...`);
   console.log(`  Threshold: ${firstConfig.threshold}-of-${firstConfig.total_signers}`);
   console.log(`  YES group: ${firstConfig.group_pubkey?.slice(0, 16) ?? "?"}...`);
-  console.log(`  NO  group: ${firstConfig.group_pubkey_no?.slice(0, 16) ?? "?"}...`);
+  console.log(`  NO  group: ${firstConfig.group_pubkey_b?.slice(0, 16) ?? "?"}...`);
 
   const processes: Deno.ChildProcess[] = [];
 
@@ -61,7 +61,7 @@ async function main() {
     const child = new Deno.Command("deno", {
       args: [
         "run", "--allow-all", "--env",
-        "scripts/frost-market-oracle-node.ts",
+        "example/two-party-binary-bet/scripts/frost-oracle-node.ts",
       ],
       env: {
         ...Object.fromEntries(Object.entries(Deno.env.toObject())),

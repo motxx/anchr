@@ -13,7 +13,7 @@ export interface FilePickerProvider {
 function createNativeProvider(): FilePickerProvider {
   return {
     async pickFile(accept = ["image/*", "application/zip"]) {
-      const DocumentPicker = await import("expo-document-picker");
+      const DocumentPicker = await import("expo-document-picker"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       const result = await DocumentPicker.getDocumentAsync({
         type: accept,
         copyToCacheDirectory: true,

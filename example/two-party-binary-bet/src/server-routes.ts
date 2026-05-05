@@ -28,7 +28,7 @@ import {
   frostDualKeySignAsync,
   frostSignProofSecretsAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
-import { loadMarketFrostNodeConfig, type MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import { loadDualOutcomeFrostNodeConfig, type DualOutcomeFrostNodeConfig } from "@anchr/cashu-frost-oracle/dual-outcome-config";
 import { signRound1, signRound2 } from "@anchr/cashu-frost-oracle/frost-cli";
 import { resolveMarket } from "./resolution.ts";
 import { evaluateCondition, OracleError, verifyMarketResolution } from "./market-oracle.ts";
@@ -96,7 +96,7 @@ export interface MarketState {
   dualKeyStore: DualKeyStore;
   orderBook: OrderBook;
   frostMode: "frost" | "single-key";
-  frostConfig?: MarketFrostNodeConfig;
+  frostConfig?: DualOutcomeFrostNodeConfig;
   /** Override for getCashuWallet — tests can inject a mock. */
   getCashuWallet?: () => Promise<Wallet | null>;
   /** Nostr identity used to sign published market events. */
@@ -135,7 +135,7 @@ export interface MarketState {
 
 /** Create a fresh MarketState. Used for tests and as default state. */
 export function createMarketState(opts?: {
-  frostConfig?: MarketFrostNodeConfig;
+  frostConfig?: DualOutcomeFrostNodeConfig;
   nostrIdentity?: MarketIdentity;
   nostrRelays?: string[];
   publishMarket?: MarketState["publishMarket"];
@@ -216,15 +216,15 @@ let _defaultState: MarketState | null = null;
 function getDefaultState(): MarketState {
   if (_defaultState) return _defaultState;
 
-  let marketFrostConfig: MarketFrostNodeConfig | undefined;
+  let marketFrostConfig: DualOutcomeFrostNodeConfig | undefined;
   try {
     const configPath = Deno.env.get("FROST_MARKET_CONFIG_PATH");
     if (configPath) {
-      marketFrostConfig = loadMarketFrostNodeConfig(configPath);
+      marketFrostConfig = loadDualOutcomeFrostNodeConfig(configPath);
       console.log(`[market] FROST market config loaded from ${configPath}`);
       console.log(`[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`);
       console.log(`[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
-      console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_no.slice(0, 16)}...`);
+      console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_b.slice(0, 16)}...`);
     }
   } catch { /* FROST not configured — single-key mode */ }
 
@@ -1302,7 +1302,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       }
 
       const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
-      const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
+      const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_b;
       
       const r1 = await signRound1(JSON.stringify(keyPkg));
       if (!r1.ok) return c.json({ error: r1.error }, 500);
@@ -1321,7 +1321,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
       pendingMarketNonces.delete(reqBody.nonce_id);
 
-      const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_no;
+      const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_b;
       
       const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
       if (!r2.ok) return c.json({ error: r2.error }, 500);

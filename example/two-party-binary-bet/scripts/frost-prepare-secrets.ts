@@ -6,7 +6,7 @@
  *
  * Run locally (frost-signer binary required):
  *   FROST_KEY_PASSPHRASE=$(openssl rand -hex 32) \
- *     deno run --allow-all scripts/frost-market-prepare-secrets.ts
+ *     deno run --allow-all example/two-party-binary-bet/scripts/frost-prepare-secrets.ts
  *
  * The script writes the encrypted configs to .frost-market/signer-{1..3}.json
  * (mode 0600) and prints, on stdout, the `flyctl secrets set` invocation
@@ -18,7 +18,7 @@
 
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { encodeBase64 } from "jsr:@std/encoding@^1/base64";
 
 const APP_NAME = Deno.args.includes("--app")
   ? Deno.args[Deno.args.indexOf("--app") + 1]!
@@ -54,7 +54,7 @@ log(`[prepare-secrets] Running ${THRESHOLD}-of-${TOTAL} DKG (output: ${OUTPUT_DI
 const dkgCmd = new Deno.Command("deno", {
   args: [
     "run", "--allow-all", "--config", "deno.json",
-    "scripts/frost-market-dkg-bootstrap.ts",
+    "example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts",
     "--threshold", String(THRESHOLD),
     "--total", String(TOTAL),
     "--output-dir", OUTPUT_DIR,
@@ -113,7 +113,7 @@ After uploading, deploy with:
 
   flyctl deploy --remote-only --config fly.market.toml
 
-The orchestrator (scripts/market-cluster-entrypoint.ts) decrypts the
+The orchestrator (scripts/cluster-entrypoint.ts) decrypts the
 configs at boot, spawns the FROST cluster on 127.0.0.1:4001-4003,
 and starts the market server on :8080.
 

@@ -8,6 +8,7 @@ import { getRuntimeConfig } from "./config.ts";
 import { validateAttachmentUri } from "./url-validation.ts";
 import { haversineKm } from "@anchr/photo-bounty/geo";
 import { createQuerySchema, resultBodySchema } from "./worker-api-schemas.ts";
+import { getRecentLogs, subscribeLog } from "./log-stream.ts";
 import {
   buildAttachmentPayload,
   buildCreatedQueryPayload,
@@ -405,7 +406,6 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
           } catch { /* client gone */ }
         };
 
-        const { getRecentLogs, subscribeLog } = await import("./log-stream.ts");
         for (const entry of getRecentLogs()) send(entry);
         unsubscribe = subscribeLog(send);
 

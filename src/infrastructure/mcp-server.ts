@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import type { QueryService } from "../application/query-service.ts";
+import type { McpQueryBackend } from "./mcp-query-backend.ts";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
 import { isNostrEnabled } from "./nostr/client.ts";
 import { isCashuEnabled } from "@anchr/core-cashu/wallet";
@@ -16,17 +17,14 @@ import {
   handleGetQueryAttachment,
   handleGetQueryAttachmentPreview,
 } from "./mcp-tool-handlers.ts";
-import {
-  handleMarketplaceListData,
-  handleMarketplaceBuyData,
-  handleMarketplaceSearchListings,
-} from "./mcp-marketplace-handlers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "mcp-server"]);
 
 export interface McpServerDeps {
   queryService: QueryService;
+  /** Called after core tools register. Use to layer example-specific MCP tools on top. */
+  extraTools?: (server: McpServer, backend: McpQueryBackend) => void;
 }
 
 export async function startMcpServer(deps: McpServerDeps) {
@@ -135,44 +133,7 @@ export async function startMcpServer(deps: McpServerDeps) {
     },
   );
 
-  // --- Marketplace tools ---
-
-  server.tool(
-    "marketplace_list_data",
-    "List available verified data listings on the Anchr marketplace. " +
-    "Each listing provides TLSNotary-proven API data that can be purchased with Cashu ecash.",
-    {
-      active_only: z.boolean().optional().describe("Only show active listings (default true)"),
-    },
-    async (args: { active_only?: boolean }) => {
-      return handleMarketplaceListData(backend, args.active_only ?? true);
-    },
-  );
-
-  server.tool(
-    "marketplace_buy_data",
-    "Purchase verified data from the Anchr marketplace. " +
-    "Pays with Cashu ecash token (X-Cashu direct mode). " +
-    "Returns the data along with TLSNotary proof of authenticity.",
-    {
-      listing_id: z.string().describe("Listing ID to purchase"),
-      cashu_token: z.string().describe("Cashu ecash token for payment"),
-    },
-    async (args: { listing_id: string; cashu_token: string }) => {
-      return handleMarketplaceBuyData(backend, args.listing_id, args.cashu_token);
-    },
-  );
-
-  server.tool(
-    "marketplace_search_listings",
-    "Search marketplace listings by keyword in name or description.",
-    {
-      query: z.string().describe("Search keyword"),
-    },
-    async (args: { query: string }) => {
-      return handleMarketplaceSearchListings(backend, args.query);
-    },
-  );
+  deps.extraTools?.(server, backend);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

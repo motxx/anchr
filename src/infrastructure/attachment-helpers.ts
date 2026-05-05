@@ -9,6 +9,7 @@ import type {
   BlossomKeyMaterial,
 } from "../domain/types.ts";
 import type { StoredAttachment } from "./attachments.ts";
+import { downloadFromBlossom } from "./blossom/client.ts";
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -79,7 +80,6 @@ export async function readBlossomAttachment(
   ref: AttachmentRef,
   blossomKeyMaterial: BlossomKeyMaterial,
 ): Promise<{ filename: string; mimeType: string; absoluteUrl: string; storageKind: AttachmentStorageKind; data: Buffer } | null> {
-  const { downloadFromBlossom } = await import("./blossom/client.ts");
   const data = await downloadFromBlossom(
     ref.blossom_hash!,
     blossomKeyMaterial.encrypt_key,

@@ -5,7 +5,7 @@
     ".": "./src/mod.ts",
     "./types": "./src/types.ts",
     "./config": "./src/config.ts",
-    "./market-frost-config": "./src/market-frost-config.ts",
+    "./dual-outcome-config": "./src/dual-outcome-config.ts",
     "./coordinator": "./src/coordinator.ts",
     "./signing-coordinator": "./src/signing-coordinator.ts",
     "./frost-cli": "./src/frost-cli.ts"
