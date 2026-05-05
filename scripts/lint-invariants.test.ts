@@ -7,10 +7,7 @@
  */
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-
-// We re-declare the parser here as a black-box test — the production
-// script has `if (import.meta.main)` so importing it is side-effect-free.
-const mod = await import("./lint-invariants.ts");
+import * as mod from "./lint-invariants.ts";
 
 // The production script doesn't export its internals; to keep the blast
 // radius small, these tests exercise the lint() function against a mocked

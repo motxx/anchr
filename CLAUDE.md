@@ -69,20 +69,20 @@ deno task build:ui && deno task build:css && deno task dev
 | Command | Scope | Docker |
 |---------|-------|--------|
 | `deno task lint` | recommended deno-lint rules + no-eval / no-self-compare / default-param-last | No |
-| `deno task lint:strict` | deno lint + arch + invariants + paths + refactor | No |
+| `deno task lint:strict` | deno lint + arch + invariants + paths + types + deprecation + no-history-comments + no-dynamic-import | No |
 | `deno task test:packages` | per-package tests across all 7 workspace members | No |
 | `deno task test:all` | deno lint + arch + invariants + paths + dep audit + unit + protocol + frost + integration + example + pentest | No |
 | `deno task test:all:docker` | e2e relay + regtest (starts/stops Docker) | Yes |
 | `deno task test:all:full` | all of the above combined | Yes |
 | `./scripts/test-all.sh --ci` | same as full, CI-optimized | Yes |
 
-Additional CI invariants beyond what the APIs / Logging sections already require: no `--no-check` in test tasks; no dynamic `await import(...)` in libraries (platform conditionals + scripts only).
+Additional CI invariants beyond what the APIs / Logging sections already require: no `--no-check` in test tasks; no dynamic `await import(...)` in libraries (platform conditionals + scripts only). The dynamic-import rule is enforced by `deno task lint:no-dynamic-import`, which auto-exempts `node:*` targets, lines inside `if (import.meta.main)` blocks, test files, and the `scripts/`/`tools/`/`mobile/`/`e2e/`/`example/` directories. Per-line opt-out: `allow-dynamic-import: <reason>`.
 
 ## Type-safety bar
 
 - `as` casts and `any` are forbidden in `src/` and `packages/`. Narrow with type predicates (`x is T`) or runtime helpers in `src/infrastructure/lib/runtime-types.ts`.
 - `unknown` is allowed only at genuine boundaries (HTTP body parsing, `JSON.parse`, `catch (err)`) — narrow before use.
-- Enforced by `deno task lint:refactor`.
+- Enforced by `deno task lint:types`. (`deno task lint:refactor` is a separate complexity / size lint — files >300 lines, functions >50 lines, cyclomatic complexity >10. Not chained into `lint:strict` by default.)
 
 ## Versioning + deprecation policy
 
@@ -103,16 +103,36 @@ Default to no comments. Delete any comment that restates the code, narrates the 
 
 ## Architecture Lint
 
-`deno task lint:arch` enforces Clean Architecture layer dependencies:
+`deno task lint:arch` enforces Clean Architecture layer dependencies and content rules:
+
+**Import rules (src/):**
 
 | Rule | Layer | Must NOT import from |
 |------|-------|---------------------|
-| E001 | `domain/` | application, infrastructure, ui, runtime |
-| E002 | `runtime/` | domain, application, infrastructure, ui |
-| E003 | `ui/` | infrastructure, application |
+| E001 | `domain/` | application, infrastructure |
 | E004 | Any | `express`, `dotenv`, `ws` (banned packages) |
-| E005 | `application/` | infrastructure, ui, runtime |
+| E005 | `application/` | infrastructure |
+| E009 | non-test code | `src/testing/` |
+| E018 | `src/` | `@anchr/sdk` (the SDK is downstream of the host) |
 | W001 | Any | npm: when JSR equivalent exists |
+
+**Content rules (src/ and packages/):**
+
+| Rule | Layer | Disallowed content |
+|------|-------|-------------------|
+| E007 | `domain/` | `Deno.*` (must wrap behind a port) |
+| E008 | `application/` | `Deno.*` (inject a port) |
+| E021 | `application/`, `infrastructure/` | `console.*` (use `@anchr/core-runtime/logger`; `src/infrastructure/log-stream.ts` is the sanctioned tee) |
+| E022 | `src/`, `packages/` | application-layer vocabulary (`market`, `marketplace`) — concrete apps belong in `example/` |
+
+**Package rules:**
+
+| Rule | Constraint |
+|------|-----------|
+| E010-E017 | Per-package allowed-deps allowlist (see `scripts/arch-lint.ts` `ALLOWED_PACKAGE_DEPS`) |
+| E020 | `packages/` must not import from `src/` (one-way: src → packages, never the reverse) |
+
+Per-line opt-out for content rules: `// allow-arch: <reason>`. Reserve for genuinely sanctioned exceptions; the named-file exemption set in `arch-lint.ts` is preferred for stable carve-outs.
 
 - Runs automatically on every Edit/Write via Claude Code hook (PostToolUse)
 - Runs in CI before typecheck

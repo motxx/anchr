@@ -79,22 +79,23 @@
     "test:all:full": "./scripts/test-all.sh full",
 
     "lint": "deno lint",
-    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments",
+    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import",
     "lint:deps": "cd crates/frost-signer && cargo audit 2>/dev/null; cd ../tlsn-prover && cargo audit 2>/dev/null; cd ../tlsn-server && cargo audit 2>/dev/null; echo 'Cargo audit complete'",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
+    "lint:arch:candidates": "deno run --allow-read scripts/arch-lint-candidates.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
     "lint:paths": "deno run --allow-read --allow-env --allow-run scripts/check-no-local-paths.ts",
     "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",
     "lint:types": "deno run --allow-read scripts/lint-types.ts",
     "lint:deprecation": "deno run --allow-read --allow-env --allow-run scripts/lint-deprecation.ts",
     "lint:no-history-comments": "deno run --allow-read --allow-env --allow-run scripts/lint-no-history-comments.ts",
+    "lint:no-dynamic-import": "deno run --allow-read --allow-env --allow-run scripts/lint-no-dynamic-import.ts",
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
     "build:css": "deno run --allow-all scripts/build-css.ts",
-    "screenshot:market": "deno run --allow-all scripts/market-screenshots.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
-  "exclude": ["mobile", "node_modules", "dist/", "example/two-party-binary-bet/src/demo.ts", "example/two-party-binary-bet/src/nostr-market.ts", "example/two-party-binary-bet/ui/main.js", "example/two-party-binary-bet/ui/main.js.map"],
+  "exclude": ["example/expo-worker-app", "node_modules", "dist/", "example/two-party-binary-bet/src/demo.ts", "example/two-party-binary-bet/src/nostr-market.ts", "example/two-party-binary-bet/ui/main.js", "example/two-party-binary-bet/ui/main.js.map"],
   "lint": {
     "rules": {
       "tags": ["recommended"],
@@ -113,7 +114,7 @@
       ]
     },
     "exclude": [
-      "mobile",
+      "example/expo-worker-app",
       "example/two-party-binary-bet/src/demo.ts",
       "example/two-party-binary-bet/src/nostr-market.ts",
       "example/two-party-binary-bet/ui/main.js",

@@ -56,18 +56,16 @@ cleanup() {
 run_local() {
   step "Phase 1: Lint & Local Tests"
 
-  run_test "deno lint"        deno task lint
-  run_test "arch lint"        deno task lint:arch
-  run_test "invariant lint"   deno task lint:invariants
-  run_test "path leak lint"   deno task lint:paths
-  run_test "type lint"        deno task lint:types
-  run_test "deprecation lint" deno task lint:deprecation
-  run_test "dep audit"        deno task lint:deps
-  run_test "unit tests"       deno task test:unit
-  run_test "protocol tests"   deno task test:protocol
-  run_test "FROST tests"      deno task test:frost
+  # Single chain of every lint that gates merges. Keeping this as
+  # `lint:strict` (defined in deno.json) means CI and pre-commit share one
+  # source of truth — adding a new lint to the chain auto-propagates here.
+  run_test "lint:strict"       deno task lint:strict
+  run_test "dep audit"         deno task lint:deps
+  run_test "unit tests"        deno task test:unit
+  run_test "protocol tests"    deno task test:protocol
+  run_test "FROST tests"       deno task test:frost
   run_test "integration tests" deno task test:integration
-  run_test "example tests"    deno task test:example
+  run_test "example tests"     deno task test:example
 }
 
 # --- Phase 1.5: Pentest (needs app server running) ---
