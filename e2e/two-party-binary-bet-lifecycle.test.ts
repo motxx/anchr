@@ -134,14 +134,14 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
     // decode real cashuB tokens. The market server only needs decode/verify,
     // not signing power, so an independent wallet handle is fine.
     //
-    // The OrderBook is the SQLite-backed implementation — the same code
+    // The MatchingQueue is the SQLite-backed implementation — the same code
     // path production uses — so this test exercises the full SQL stack
     // (insert, partial-index scan, transactional matching) on top of the
     // Cashu/HTLC machinery.
     kannagiStore = openKannagiStore({ path: ":memory:" });
     const hydrated = await kannagiStore.hydrate();
     const state = createMarketState({
-      orderBook: kannagiStore.orderBook,
+      matchingQueue: kannagiStore.matchingQueue,
       initial: hydrated,
       persist: kannagiStore.persist,
     });

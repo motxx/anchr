@@ -35,10 +35,10 @@ import {
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { createInMemoryOrderBook } from "../example/two-party-binary-bet/src/order-book.ts";
+import { createInMemoryMatchingQueue } from "../example/two-party-binary-bet/src/matching-queue.ts";
 import { resolveMarket } from "../example/two-party-binary-bet/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
-import type { OpenOrder, MatchProposal, MatchedBetPair } from "../example/two-party-binary-bet/src/market-types.ts";
+import type { PendingBet, MatchProposal, MatchedBetPair } from "../example/two-party-binary-bet/src/market-types.ts";
 import {
   checkInfraReady,
   createWallet,
@@ -163,7 +163,7 @@ suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary
   // Shared state across the lifecycle tests
   const marketId = "market_btc_100k_2026";
   const dualStore = createDualPreimageStore();
-  const orderBook = createInMemoryOrderBook();
+  const matchingQueue = createInMemoryMatchingQueue();
 
   let yesBettor: { secretKey: string; publicKey: string };
   let noBettor: { secretKey: string; publicKey: string };
@@ -228,7 +228,7 @@ suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary
   // -------------------------------------------------------------------------
 
   test("3. both bettors place orders in the order book (YES and NO)", async () => {
-    const yesOrder: OpenOrder = {
+    const yesOrder: PendingBet = {
       id: "order_yes_1",
       market_id: marketId,
       bettor_pubkey: yesBettor.publicKey,
@@ -238,7 +238,7 @@ suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary
       timestamp: Date.now(),
     };
 
-    const noOrder: OpenOrder = {
+    const noOrder: PendingBet = {
       id: "order_no_1",
       market_id: marketId,
       bettor_pubkey: noBettor.publicKey,
@@ -248,17 +248,17 @@ suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary
       timestamp: Date.now() + 1, // slightly after YES order
     };
 
-    const addedYes = await orderBook.addOrder(yesOrder);
-    const addedNo = await orderBook.addOrder(noOrder);
+    const addedYes = await matchingQueue.enqueue(yesOrder);
+    const addedNo = await matchingQueue.enqueue(noOrder);
 
     expect(addedYes.remaining_sats).toBe(BET_SATS);
     expect(addedNo.remaining_sats).toBe(BET_SATS);
 
     // Verify orders appear in the book
-    const yesOrders = await orderBook.getOpenOrders(marketId, "yes");
-    const noOrders = await orderBook.getOpenOrders(marketId, "no");
-    expect(yesOrders).toHaveLength(1);
-    expect(noOrders).toHaveLength(1);
+    const yesBets = await matchingQueue.listPending(marketId, "yes");
+    const noBets = await matchingQueue.listPending(marketId, "no");
+    expect(yesBets).toHaveLength(1);
+    expect(noBets).toHaveLength(1);
   });
 
   // -------------------------------------------------------------------------
@@ -266,19 +266,19 @@ suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary
   // -------------------------------------------------------------------------
 
   test("4. order book matches YES and NO orders into MatchProposal", async () => {
-    matchProposals = await orderBook.matchOrders(marketId);
+    matchProposals = await matchingQueue.findMatches(marketId);
 
     expect(matchProposals).toHaveLength(1);
-    expect(matchProposals[0]!.yes_order_id).toBe("order_yes_1");
-    expect(matchProposals[0]!.no_order_id).toBe("order_no_1");
+    expect(matchProposals[0]!.yes_bet_id).toBe("order_yes_1");
+    expect(matchProposals[0]!.no_bet_id).toBe("order_no_1");
     expect(matchProposals[0]!.amount_sats).toBe(BET_SATS);
 
     // After matching, remaining_sats should be 0
-    const yesOrders = await orderBook.getOpenOrders(marketId, "yes");
-    const noOrders = await orderBook.getOpenOrders(marketId, "no");
-    // Orders with 0 remaining are excluded from getOpenOrders
-    expect(yesOrders.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
-    expect(noOrders.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
+    const yesBets = await matchingQueue.listPending(marketId, "yes");
+    const noBets = await matchingQueue.listPending(marketId, "no");
+    // Orders with 0 remaining are excluded from listPending
+    expect(yesBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
+    expect(noBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
@@ -442,11 +442,11 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
   const wallet = sharedWallet!;
 
   test("order book handles partial matches correctly", async () => {
-    const ob = createInMemoryOrderBook();
+    const ob = createInMemoryMatchingQueue();
     const marketId = "market_partial_test";
 
     // YES bettor bets 100 sats, two NO bettors bet 40 and 60 sats
-    await ob.addOrder({
+    await ob.enqueue({
       id: "big_yes",
       market_id: marketId,
       bettor_pubkey: "pk_yes",
@@ -455,7 +455,7 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       remaining_sats: 100,
       timestamp: 1,
     });
-    await ob.addOrder({
+    await ob.enqueue({
       id: "small_no_1",
       market_id: marketId,
       bettor_pubkey: "pk_no_1",
@@ -464,7 +464,7 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       remaining_sats: 40,
       timestamp: 2,
     });
-    await ob.addOrder({
+    await ob.enqueue({
       id: "small_no_2",
       market_id: marketId,
       bettor_pubkey: "pk_no_2",
@@ -474,15 +474,15 @@ suite("e2e: the conditional-swap spec — Order book partial matching", () => {
       timestamp: 3,
     });
 
-    const proposals = await ob.matchOrders(marketId);
+    const proposals = await ob.findMatches(marketId);
 
     // Should produce two match proposals
     expect(proposals).toHaveLength(2);
-    expect(proposals[0]!.yes_order_id).toBe("big_yes");
-    expect(proposals[0]!.no_order_id).toBe("small_no_1");
+    expect(proposals[0]!.yes_bet_id).toBe("big_yes");
+    expect(proposals[0]!.no_bet_id).toBe("small_no_1");
     expect(proposals[0]!.amount_sats).toBe(40);
-    expect(proposals[1]!.yes_order_id).toBe("big_yes");
-    expect(proposals[1]!.no_order_id).toBe("small_no_2");
+    expect(proposals[1]!.yes_bet_id).toBe("big_yes");
+    expect(proposals[1]!.no_bet_id).toBe("small_no_2");
     expect(proposals[1]!.amount_sats).toBe(60);
   });
 
