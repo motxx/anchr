@@ -140,7 +140,7 @@ stack).
 ```
 1. Market created → Oracle generates dual preimages (HTLC) or DKG group keys (FROST)
 2. Bettors mint Cashu proofs from their Lightning balance
-3. Order book matches YES / NO orders → MatchProposal
+3. Matching queue matches YES / NO bets → MatchProposal
 4. Match executor cross-locks each bettor's proofs (counterparty pubkey +
    counterparty's outcome hash / FROST group key)
 5. Oracle fetches resolution URL via TLSNotary, verifies server name +
@@ -164,15 +164,15 @@ stack).
 
 | Item | Status |
 |---|---|
-| 1:1 matched orders only (no CLOB / arbitrary probability pricing) | Not implemented |
+| 1:1 matched bets only (no CLOB / arbitrary probability pricing) | Not implemented |
 | Secondary market — exit a position before resolution | Not implemented; once matched, the cross-lock binds redemption to specific pubkeys, so positions are terminal until resolution or locktime refund |
 | Multi-outcome markets (>2 outcomes) | Not implemented; binary YES / NO only |
 | Subjective resolution (UMA-style human dispute) | Not in scope; only deterministic HTTPS conditions |
-| Bookmaker-style 1:N matching | Not supported; current order book is FIFO 1:1 |
+| Bookmaker-style 1:N matching | Not supported; current matching queue is FIFO 1:1 |
 
 ## Persistence
 
-All durable state — the order book plus the six runtime maps (markets,
+All durable state — the matching queue plus the six runtime maps (markets,
 matched pairs, resolved preimages, resolved signatures, per-proof
 signatures, and pending exchange tokens) — lives in a single SQLite file.
 The path is controlled by `KANNAGI_DB_PATH` (default `./kannagi.db`
@@ -212,11 +212,11 @@ example/two-party-binary-bet/scripts/frost-oracle-cluster.ts
 
 ```
 src/
-  server-routes.ts          — Market HTTP API (order book, matching, resolution)
+  server-routes.ts          — Market HTTP API (matching queue, matching, resolution)
   market-types.ts           — Type definitions
   market-oracle.ts          — Condition evaluation, payout calculation
-  order-book.ts             — FIFO matching interface + in-memory impl
-  kannagi-store.ts          — SQLite-backed durable store (order book + 6 runtime maps)
+  matching-queue.ts             — FIFO matching interface + in-memory impl
+  kannagi-store.ts          — SQLite-backed durable store (matching queue + 6 runtime maps)
   resolution.ts             — DualPreimageStore (HTLC) / DualKeyStore (FROST) resolution
   match-coordinator.ts      — Cross-HTLC match execution via @anchr/cashu-conditional-swap
   market-api-routes.ts      — REST endpoints

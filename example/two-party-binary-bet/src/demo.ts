@@ -4,8 +4,8 @@
  * Demonstrates the full lifecycle using the protocol layer:
  *
  *   1. Oracle creates dual-preimage pair (hash_yes / hash_no)
- *   2. Alice places YES order, Bob places NO order
- *   3. Order book matches them (FIFO, partial match support)
+ *   2. Alice places YES bet, Bob places NO bet
+ *   3. Matching queue matches them (FIFO, partial match support)
  *   4. Cross-HTLC tokens created for the matched pair
  *   5. Oracle resolves via TLSNotary → reveals winning preimage
  *   6. Winner redeems loser's tokens with the preimage
@@ -22,7 +22,7 @@ import {
   buildFrostSwapForPartyB,
   createDualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
-import { createInMemoryOrderBook } from "./order-book.ts";
+import { createInMemoryMatchingQueue } from "./matching-queue.ts";
 import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import {
   resolveMarket as resolveMarketOracle,
@@ -35,7 +35,7 @@ import type {
   TwoPartyBinaryBet,
   Bet,
   ResolutionCondition,
-  OpenOrder,
+  PendingBet,
 } from "./market-types.ts";
 
 const BITFLYER_API_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
@@ -111,11 +111,11 @@ console.log(`  Group PK YES:   ${frostKeys.pubkey_a.slice(0, 16)}...`);
 console.log(`  Group PK NO:    ${frostKeys.pubkey_b.slice(0, 16)}...`);
 console.log(`  Deadline:       ${new Date(RESOLUTION_DEADLINE * 1000).toISOString()}`);
 
-console.log("\n--- Step 3: Bettors place orders via order book ---\n");
+console.log("\n--- Step 3: Bettors place bets via matching queue ---\n");
 
-const orderBook = createInMemoryOrderBook();
+const matchingQueue = createInMemoryMatchingQueue();
 
-const aliceOrder: OpenOrder = {
+const aliceBet: PendingBet = {
   id: bytesToHex(randomBytes(16)),
   market_id: marketId,
   bettor_pubkey: alicePubkey,
@@ -125,7 +125,7 @@ const aliceOrder: OpenOrder = {
   timestamp: Math.floor(Date.now() / 1000),
 };
 
-const bobOrder: OpenOrder = {
+const bobBet: PendingBet = {
   id: bytesToHex(randomBytes(16)),
   market_id: marketId,
   bettor_pubkey: bobPubkey,
@@ -135,20 +135,20 @@ const bobOrder: OpenOrder = {
   timestamp: Math.floor(Date.now() / 1000),
 };
 
-await orderBook.addOrder(aliceOrder);
-await orderBook.addOrder(bobOrder);
+await matchingQueue.enqueue(aliceBet);
+await matchingQueue.enqueue(bobBet);
 
 console.log("  Alice (YES): 100 sats");
 console.log("  Bob   (NO):  100 sats");
-console.log(`  Open orders: ${(await orderBook.getOpenOrders(marketId)).length}`);
+console.log(`  Pending bets: ${(await matchingQueue.listPending(marketId)).length}`);
 
-console.log("\n--- Step 4: Order book matching + FROST P2PK ---\n");
+console.log("\n--- Step 4: Matching queue matching + FROST P2PK ---\n");
 
-const matches = await orderBook.matchOrders(marketId);
+const matches = await matchingQueue.findMatches(marketId);
 console.log(`  Matches found: ${matches.length}`);
 
 for (const m of matches) {
-  console.log(`  Match: YES(${m.yes_order_id.slice(0, 8)}...) <-> NO(${m.no_order_id.slice(0, 8)}...) = ${m.amount_sats} sats`);
+  console.log(`  Match: YES(${m.yes_bet_id.slice(0, 8)}...) <-> NO(${m.no_bet_id.slice(0, 8)}...) = ${m.amount_sats} sats`);
 }
 
 console.log("\n  FROST P2PK token structure:");
@@ -180,23 +180,23 @@ market.yes_pool_sats = 100;
 market.no_pool_sats = 100;
 
 const aliceBet: Bet = {
-  id: aliceOrder.id,
+  id: aliceBet.id,
   market_id: marketId,
   bettor_pubkey: alicePubkey,
   side: "yes",
   amount_sats: 100,
   escrow_token: "(cross-htlc-token)",
-  timestamp: aliceOrder.timestamp,
+  timestamp: aliceBet.timestamp,
 };
 
 const bobBet: Bet = {
-  id: bobOrder.id,
+  id: bobBet.id,
   market_id: marketId,
   bettor_pubkey: bobPubkey,
   side: "no",
   amount_sats: 100,
   escrow_token: "(cross-htlc-token)",
-  timestamp: bobOrder.timestamp,
+  timestamp: bobBet.timestamp,
 };
 
 console.log("\n--- Step 5: Oracle resolves market ---\n");
@@ -298,7 +298,7 @@ console.log("  Protocol layer (N:M Conditional Swap):");
 console.log("    - FROST P2PK: 2-of-2 multisig (group_pubkey + counterparty)");
 console.log("    - DualKeyStore: 2 keypairs per swap, winner signs, loser deleted");
 console.log("    - In production: FROST t-of-n DKG for threshold oracle");
-console.log("    - Order book: FIFO matching with partial fills");
+console.log("    - Matching queue: FIFO matching with partial fills");
 console.log("    - 1:1 atomic swap is the N=1, M=1 special case");
 console.log();
 console.log("  Why this beats Polymarket:");

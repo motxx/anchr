@@ -1,7 +1,7 @@
 /**
  * SQLite-backed persistence for the 巫(Kannagi) two-party-binary-bet server.
  *
- * Owns one DB file containing the order book (durable orders + FIFO matching)
+ * Owns one DB file containing the matching queue (durable bets + FIFO matching)
  * plus the six runtime maps so a Fly machine restart recovers full state:
  *
  *   - markets                 (TwoPartyBinaryBet, JSON blob keyed by market_id)
@@ -18,11 +18,11 @@
 
 import { Database } from "@db/sqlite";
 import { getLogger } from "@anchr/core-runtime/logger";
-import type { OrderBook } from "./order-book.ts";
+import type { MatchingQueue } from "./matching-queue.ts";
 import type {
   MatchProposal,
   MatchedBetPair,
-  OpenOrder,
+  PendingBet,
   TwoPartyBinaryBet,
 } from "./market-types.ts";
 
@@ -32,7 +32,7 @@ const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS orders (
+CREATE TABLE IF NOT EXISTS pending_bets (
   id              TEXT PRIMARY KEY,
   market_id       TEXT NOT NULL,
   bettor_pubkey   TEXT NOT NULL,
@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS orders (
   remaining_sats  INTEGER NOT NULL CHECK (remaining_sats >= 0),
   ts              INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_orders_open_fifo
-  ON orders (market_id, side, ts)
+CREATE INDEX IF NOT EXISTS idx_pending_bets_fifo
+  ON pending_bets (market_id, side, ts)
   WHERE remaining_sats > 0;
 
 CREATE TABLE IF NOT EXISTS markets (
@@ -102,8 +102,8 @@ export interface KannagiPersist {
 }
 
 export interface KannagiStore {
-  /** Order book backed by the same DB. Use this to construct MarketState. */
-  readonly orderBook: OrderBook;
+  /** Matching queue backed by the same DB. Use this to construct MarketState. */
+  readonly matchingQueue: MatchingQueue;
   /** Persistence facade — call after each in-memory mutation. */
   readonly persist: KannagiPersist;
   /** Load all state from disk. Call once at server startup. */
@@ -122,11 +122,11 @@ export function openKannagiStore(opts: OpenKannagiStoreOpts): KannagiStore {
   db.exec(SCHEMA_SQL);
   log.info("kannagi store opened", { path: opts.path });
 
-  const orderBook = createSqliteOrderBook(db);
+  const matchingQueue = createSqliteMatchingQueue(db);
   const persist = createPersist(db);
 
   return {
-    orderBook,
+    matchingQueue,
     persist,
     hydrate: () => Promise.resolve(hydrateAll(db)),
     close: () => {
@@ -282,10 +282,10 @@ function createPersist(db: Database): KannagiPersist {
 }
 
 // ---------------------------------------------------------------------------
-// SQLite OrderBook
+// SQLite MatchingQueue
 // ---------------------------------------------------------------------------
 
-interface OrderRow {
+interface PendingBetRow {
   id: string;
   market_id: string;
   bettor_pubkey: string;
@@ -295,7 +295,7 @@ interface OrderRow {
   ts: number;
 }
 
-function rowToOrder(row: OrderRow): OpenOrder {
+function rowToBet(row: PendingBetRow): PendingBet {
   return {
     id: row.id,
     market_id: row.market_id,
@@ -307,67 +307,67 @@ function rowToOrder(row: OrderRow): OpenOrder {
   };
 }
 
-function createSqliteOrderBook(db: Database): OrderBook {
-  const insertOrder = db.prepare(
-    "INSERT INTO orders (id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts) " +
+function createSqliteMatchingQueue(db: Database): MatchingQueue {
+  const insertBet = db.prepare(
+    "INSERT INTO pending_bets (id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts) " +
       "VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
-  const deleteOrder = db.prepare("DELETE FROM orders WHERE id = ?");
-  const selectOpenAll = db.prepare(
+  const deleteBet = db.prepare("DELETE FROM pending_bets WHERE id = ?");
+  const selectPendingAll = db.prepare(
     "SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts " +
-      "FROM orders WHERE market_id = ? AND remaining_sats > 0 ORDER BY ts ASC",
+      "FROM pending_bets WHERE market_id = ? AND remaining_sats > 0 ORDER BY ts ASC",
   );
-  const selectOpenSide = db.prepare(
+  const selectPendingSide = db.prepare(
     "SELECT id, market_id, bettor_pubkey, side, amount_sats, remaining_sats, ts " +
-      "FROM orders WHERE market_id = ? AND side = ? AND remaining_sats > 0 ORDER BY ts ASC",
+      "FROM pending_bets WHERE market_id = ? AND side = ? AND remaining_sats > 0 ORDER BY ts ASC",
   );
   const updateRemaining = db.prepare(
-    "UPDATE orders SET remaining_sats = ? WHERE id = ?",
+    "UPDATE pending_bets SET remaining_sats = ? WHERE id = ?",
   );
 
   return {
-    addOrder(order) {
-      const remaining = order.remaining_sats ?? order.amount_sats;
-      insertOrder.run(
-        order.id,
-        order.market_id,
-        order.bettor_pubkey,
-        order.side,
-        order.amount_sats,
+    enqueue(bet) {
+      const remaining = bet.remaining_sats ?? bet.amount_sats;
+      insertBet.run(
+        bet.id,
+        bet.market_id,
+        bet.bettor_pubkey,
+        bet.side,
+        bet.amount_sats,
         remaining,
-        order.timestamp,
+        bet.timestamp,
       );
-      return Promise.resolve({ ...order, remaining_sats: remaining });
+      return Promise.resolve({ ...bet, remaining_sats: remaining });
     },
 
-    cancelOrder(id) {
-      const changes = deleteOrder.run(id);
+    cancel(id) {
+      const changes = deleteBet.run(id);
       return Promise.resolve(changes > 0);
     },
 
-    getOpenOrders(market_id, side) {
+    listPending(market_id, side) {
       const rows = side
-        ? selectOpenSide.all<OrderRow>(market_id, side)
-        : selectOpenAll.all<OrderRow>(market_id);
-      return Promise.resolve(rows.map(rowToOrder));
+        ? selectPendingSide.all<PendingBetRow>(market_id, side)
+        : selectPendingAll.all<PendingBetRow>(market_id);
+      return Promise.resolve(rows.map(rowToBet));
     },
 
-    matchOrders(market_id) {
+    findMatches(market_id) {
       // SQLite uses database-level write locks; wrapping match+update in a
       // transaction serialises concurrent matchers in this process. The Fly
       // app runs single-process, so contention is not real today, but the
       // transaction also makes the partial-update step atomic.
       const proposals = db.transaction((): MatchProposal[] => {
-        const yesOrders = selectOpenSide.all<OrderRow>(market_id, "yes").map(rowToOrder);
-        const noOrders = selectOpenSide.all<OrderRow>(market_id, "no").map(rowToOrder);
+        const yesBets = selectPendingSide.all<PendingBetRow>(market_id, "yes").map(rowToBet);
+        const noBets = selectPendingSide.all<PendingBetRow>(market_id, "no").map(rowToBet);
 
         const result: MatchProposal[] = [];
         const changed = new Set<string>();
         let ni = 0;
 
-        for (const yes of yesOrders) {
-          while (ni < noOrders.length && yes.remaining_sats > 0) {
-            const no = noOrders[ni]!;
+        for (const yes of yesBets) {
+          while (ni < noBets.length && yes.remaining_sats > 0) {
+            const no = noBets[ni]!;
             if (no.remaining_sats <= 0) {
               ni++;
               continue;
@@ -375,8 +375,8 @@ function createSqliteOrderBook(db: Database): OrderBook {
 
             const matchAmount = Math.min(yes.remaining_sats, no.remaining_sats);
             result.push({
-              yes_order_id: yes.id,
-              no_order_id: no.id,
+              yes_bet_id: yes.id,
+              no_bet_id: no.id,
               amount_sats: matchAmount,
             });
 
@@ -389,9 +389,9 @@ function createSqliteOrderBook(db: Database): OrderBook {
           }
         }
 
-        for (const order of [...yesOrders, ...noOrders]) {
-          if (!changed.has(order.id)) continue;
-          updateRemaining.run(order.remaining_sats, order.id);
+        for (const bet of [...yesBets, ...noBets]) {
+          if (!changed.has(bet.id)) continue;
+          updateRemaining.run(bet.remaining_sats, bet.id);
         }
 
         return result;

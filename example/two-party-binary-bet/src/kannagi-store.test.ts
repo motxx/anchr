@@ -2,15 +2,15 @@
  * Unit tests for the SQLite-backed Kannagi store.
  *
  * Uses an in-memory database (`:memory:`) so tests run without filesystem
- * side effects. The store and its order-book share one connection, so we
- * also exercise the order-book contract here rather than carrying a
+ * side effects. The store and its matching queue share one connection, so we
+ * also exercise the matching queue contract here rather than carrying a
  * separate Postgres-flavoured e2e suite.
  */
 
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { openKannagiStore } from "./kannagi-store.ts";
-import type { MatchedBetPair, OpenOrder, TwoPartyBinaryBet } from "./market-types.ts";
+import type { MatchedBetPair, PendingBet, TwoPartyBinaryBet } from "./market-types.ts";
 
 function freshMarket(id: string): TwoPartyBinaryBet {
   return {
@@ -40,7 +40,7 @@ function freshMarket(id: string): TwoPartyBinaryBet {
   };
 }
 
-function freshOrder(id: string, market_id: string, side: "yes" | "no", amount: number, ts: number): OpenOrder {
+function freshBet(id: string, market_id: string, side: "yes" | "no", amount: number, ts: number): PendingBet {
   return {
     id,
     market_id,
@@ -146,98 +146,98 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 });
 
-describe("kannagi store: SQLite order book", () => {
-  it("addOrder + getOpenOrders FIFO", async () => {
+describe("kannagi store: SQLite matching queue", () => {
+  it("enqueue + listPending FIFO", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1000, 1));
-    await store.orderBook.addOrder(freshOrder("y2", "m", "yes", 500, 2));
-    await store.orderBook.addOrder(freshOrder("n1", "m", "no", 1000, 3));
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
+    await store.matchingQueue.enqueue(freshBet("y2", "m", "yes", 500, 2));
+    await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 3));
 
-    const yes = await store.orderBook.getOpenOrders("m", "yes");
+    const yes = await store.matchingQueue.listPending("m", "yes");
     expect(yes.map((o) => o.id)).toEqual(["y1", "y2"]);
 
-    const all = await store.orderBook.getOpenOrders("m");
+    const all = await store.matchingQueue.listPending("m");
     expect(all.map((o) => o.id)).toEqual(["y1", "y2", "n1"]);
     await store.close();
   });
 
-  it("matchOrders: equal YES/NO produces one full match and zeros remaining_sats", async () => {
+  it("findMatches: equal YES/NO produces one full match and zeros remaining_sats", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1000, 1));
-    await store.orderBook.addOrder(freshOrder("n1", "m", "no", 1000, 2));
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
+    await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
 
-    const proposals = await store.orderBook.matchOrders("m");
-    expect(proposals).toEqual([{ yes_order_id: "y1", no_order_id: "n1", amount_sats: 1000 }]);
+    const proposals = await store.matchingQueue.findMatches("m");
+    expect(proposals).toEqual([{ yes_bet_id: "y1", no_bet_id: "n1", amount_sats: 1000 }]);
 
-    const open = await store.orderBook.getOpenOrders("m");
+    const open = await store.matchingQueue.listPending("m");
     expect(open).toEqual([]);
     await store.close();
   });
 
-  it("matchOrders: partial match leaves the remainder open", async () => {
+  it("findMatches: partial match leaves the remainder open", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1500, 1));
-    await store.orderBook.addOrder(freshOrder("n1", "m", "no", 1000, 2));
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1500, 1));
+    await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
 
-    const proposals = await store.orderBook.matchOrders("m");
-    expect(proposals).toEqual([{ yes_order_id: "y1", no_order_id: "n1", amount_sats: 1000 }]);
+    const proposals = await store.matchingQueue.findMatches("m");
+    expect(proposals).toEqual([{ yes_bet_id: "y1", no_bet_id: "n1", amount_sats: 1000 }]);
 
-    const open = await store.orderBook.getOpenOrders("m");
+    const open = await store.matchingQueue.listPending("m");
     expect(open.map((o) => ({ id: o.id, remaining: o.remaining_sats }))).toEqual([
       { id: "y1", remaining: 500 },
     ]);
     await store.close();
   });
 
-  it("matchOrders: FIFO across multiple NO orders", async () => {
+  it("findMatches: FIFO across multiple NO bets", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1500, 1));
-    await store.orderBook.addOrder(freshOrder("n1", "m", "no", 600, 2));
-    await store.orderBook.addOrder(freshOrder("n2", "m", "no", 400, 3));
-    await store.orderBook.addOrder(freshOrder("n3", "m", "no", 800, 4));
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1500, 1));
+    await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 600, 2));
+    await store.matchingQueue.enqueue(freshBet("n2", "m", "no", 400, 3));
+    await store.matchingQueue.enqueue(freshBet("n3", "m", "no", 800, 4));
 
-    const proposals = await store.orderBook.matchOrders("m");
+    const proposals = await store.matchingQueue.findMatches("m");
     expect(proposals).toEqual([
-      { yes_order_id: "y1", no_order_id: "n1", amount_sats: 600 },
-      { yes_order_id: "y1", no_order_id: "n2", amount_sats: 400 },
-      { yes_order_id: "y1", no_order_id: "n3", amount_sats: 500 },
+      { yes_bet_id: "y1", no_bet_id: "n1", amount_sats: 600 },
+      { yes_bet_id: "y1", no_bet_id: "n2", amount_sats: 400 },
+      { yes_bet_id: "y1", no_bet_id: "n3", amount_sats: 500 },
     ]);
 
-    const open = await store.orderBook.getOpenOrders("m");
+    const open = await store.matchingQueue.listPending("m");
     expect(open.map((o) => ({ id: o.id, remaining: o.remaining_sats }))).toEqual([
       { id: "n3", remaining: 300 },
     ]);
     await store.close();
   });
 
-  it("matchOrders: idempotent — re-running on already-matched book produces no proposals", async () => {
+  it("findMatches: idempotent — re-running on already-matched book produces no proposals", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1000, 1));
-    await store.orderBook.addOrder(freshOrder("n1", "m", "no", 1000, 2));
-    await store.orderBook.matchOrders("m");
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
+    await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
+    await store.matchingQueue.findMatches("m");
 
-    const proposals = await store.orderBook.matchOrders("m");
+    const proposals = await store.matchingQueue.findMatches("m");
     expect(proposals).toEqual([]);
     await store.close();
   });
 
-  it("cancelOrder removes the row", async () => {
+  it("cancel removes the row", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m", "yes", 1000, 1));
-    expect(await store.orderBook.cancelOrder("y1")).toBe(true);
-    expect(await store.orderBook.cancelOrder("y1")).toBe(false);
-    expect(await store.orderBook.getOpenOrders("m")).toEqual([]);
+    await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
+    expect(await store.matchingQueue.cancel("y1")).toBe(true);
+    expect(await store.matchingQueue.cancel("y1")).toBe(false);
+    expect(await store.matchingQueue.listPending("m")).toEqual([]);
     await store.close();
   });
 
-  it("getOpenOrders filters by side and market_id", async () => {
+  it("listPending filters by side and market_id", async () => {
     const store = openKannagiStore({ path: ":memory:" });
-    await store.orderBook.addOrder(freshOrder("y1", "m1", "yes", 1000, 1));
-    await store.orderBook.addOrder(freshOrder("n1", "m2", "no", 1000, 2));
+    await store.matchingQueue.enqueue(freshBet("y1", "m1", "yes", 1000, 1));
+    await store.matchingQueue.enqueue(freshBet("n1", "m2", "no", 1000, 2));
 
-    expect((await store.orderBook.getOpenOrders("m1", "yes")).map((o) => o.id)).toEqual(["y1"]);
-    expect((await store.orderBook.getOpenOrders("m1", "no")).map((o) => o.id)).toEqual([]);
-    expect((await store.orderBook.getOpenOrders("m2")).map((o) => o.id)).toEqual(["n1"]);
+    expect((await store.matchingQueue.listPending("m1", "yes")).map((o) => o.id)).toEqual(["y1"]);
+    expect((await store.matchingQueue.listPending("m1", "no")).map((o) => o.id)).toEqual([]);
+    expect((await store.matchingQueue.listPending("m2")).map((o) => o.id)).toEqual(["n1"]);
     await store.close();
   });
 });

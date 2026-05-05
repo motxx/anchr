@@ -2,7 +2,7 @@
  * 巫(Kannagi) — Two-party binary bet HTTP route registration.
  *
  * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
- * pattern from worker-api-routes.ts. In-memory market store + order book +
+ * pattern from worker-api-routes.ts. In-memory market store + matching queue +
  * dual preimage store, wired into Hono.
  *
  * State is injectable via `MarketState` for testing. When no state is
@@ -15,11 +15,11 @@ import type { MiddlewareHandler } from "hono";
 import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
 import type {
   TwoPartyBinaryBet,
-  OpenOrder,
+  PendingBet,
   MatchedBetPair,
   MarketStatus,
 } from "./market-types.ts";
-import { createInMemoryOrderBook, type OrderBook } from "./order-book.ts";
+import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queue.ts";
 import type { HydratedState, KannagiPersist } from "./kannagi-store.ts";
 import {
   type DualKeyStore,
@@ -101,7 +101,7 @@ export interface MarketState {
   persist: KannagiPersist;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
-  orderBook: OrderBook;
+  matchingQueue: MatchingQueue;
   frostMode: "frost" | "single-key";
   frostConfig?: DualOutcomeFrostNodeConfig;
   /** Override for getCashuWallet — tests can inject a mock. */
@@ -156,8 +156,8 @@ export function createMarketState(opts?: {
   nostrIdentity?: MarketIdentity;
   nostrRelays?: string[];
   publishMarket?: MarketState["publishMarket"];
-  /** Inject a SQLite-backed (or other) order book. Defaults to in-memory. */
-  orderBook?: OrderBook;
+  /** Inject a SQLite-backed (or other) matching queue. Defaults to in-memory. */
+  matchingQueue?: MatchingQueue;
   /** Inject a custom exchange-token verifier (tests use this). */
   verifyExchangeToken?: MarketState["verifyExchangeToken"];
   /**
@@ -179,7 +179,7 @@ export function createMarketState(opts?: {
     persist: opts?.persist ?? NOOP_PERSIST,
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
-    orderBook: opts?.orderBook ?? createInMemoryOrderBook(),
+    matchingQueue: opts?.matchingQueue ?? createInMemoryMatchingQueue(),
     frostMode,
     frostConfig: opts?.frostConfig,
     nostrIdentity: opts?.nostrIdentity,
@@ -294,7 +294,7 @@ function generateId(prefix: string): string {
 }
 
 function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
-  const orders = Array.from(state.matchedPairs.values()).filter((p) => p.market_id === m.id);
+  const pairs = Array.from(state.matchedPairs.values()).filter((p) => p.market_id === m.id);
   const preimage = state.resolvedPreimages.get(m.id);
   const oracleSignature = state.resolvedSignatures.get(m.id);
   return {
@@ -318,7 +318,7 @@ function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
     group_pubkey_yes: m.group_pubkey_yes,
     group_pubkey_no: m.group_pubkey_no,
     volume_sats: m.yes_pool_sats + m.no_pool_sats,
-    num_bettors: orders.length * 2,
+    num_bettors: pairs.length * 2,
     created_at: Math.floor(Date.now() / 1000),
     nostr_event_id: m.nostr_event_id,
     ...(preimage ? { resolved_preimage: preimage } : {}),
@@ -426,7 +426,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
-    const openOrders = await s.orderBook.getOpenOrders(id);
+    const pendingBets = await s.matchingQueue.listPending(id);
     const matchedPairs = Array.from(s.matchedPairs.values()).filter((b) => b.market_id === id);
 
     // If a pubkey is provided, include that user's matched pairs with win status
@@ -460,7 +460,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       resolution_condition: market.resolution_condition,
       oracle_pubkey: market.oracle_pubkey,
       creator_pubkey: market.creator_pubkey,
-      open_orders: openOrders.length,
+      pending_bets: pendingBets.length,
       matched_pairs: matchedPairs.length,
       ...(userPairs ? { user_pairs: userPairs } : {}),
     });
@@ -645,10 +645,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: `Maximum bet is ${market.max_bet_sats} sats` }, 400);
     }
 
-    // Add order to the book — matchmaker only, no token handling
-    const orderId = generateId("ord");
-    const order: OpenOrder = {
-      id: orderId,
+    // Enqueue the pending bet — matchmaker only, no token handling
+    const betId = generateId("bet");
+    const bet: PendingBet = {
+      id: betId,
       market_id: id,
       bettor_pubkey,
       side,
@@ -656,7 +656,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       remaining_sats: amount_sats,
       timestamp: Math.floor(Date.now() / 1000),
     };
-    await s.orderBook.addOrder(order);
+    await s.matchingQueue.enqueue(bet);
 
     // Update market pool totals
     if (side === "yes") {
@@ -665,16 +665,16 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       market.no_pool_sats += amount_sats;
     }
 
-    // Snapshot order pubkeys BEFORE matching (matching may zero remaining_sats)
-    const allYes = await s.orderBook.getOpenOrders(id, "yes");
-    const allNo = await s.orderBook.getOpenOrders(id, "no");
-    const orderPubkeys = new Map<string, string>();
+    // Snapshot bet pubkeys BEFORE matching (matching may zero remaining_sats)
+    const allYes = await s.matchingQueue.listPending(id, "yes");
+    const allNo = await s.matchingQueue.listPending(id, "no");
+    const betPubkeys = new Map<string, string>();
     for (const o of [...allYes, ...allNo]) {
-      orderPubkeys.set(o.id, o.bettor_pubkey);
+      betPubkeys.set(o.id, o.bettor_pubkey);
     }
 
     // Run matching — pure announcement, no token creation
-    const proposals = await s.orderBook.matchOrders(id);
+    const proposals = await s.matchingQueue.findMatches(id);
     const newPairs: MatchedBetPair[] = [];
 
     // Compute locktimes for the match response
@@ -683,8 +683,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const marketLocktime = market.resolution_deadline + 3600; // deadline + 1h buffer
 
     for (const proposal of proposals) {
-      const yesPubkey = orderPubkeys.get(proposal.yes_order_id) ?? bettor_pubkey;
-      const noPubkey = orderPubkeys.get(proposal.no_order_id) ?? bettor_pubkey;
+      const yesPubkey = betPubkeys.get(proposal.yes_bet_id) ?? bettor_pubkey;
+      const noPubkey = betPubkeys.get(proposal.no_bet_id) ?? bettor_pubkey;
 
       const pairId = generateId("pair");
       const pair: MatchedBetPair = {
@@ -705,7 +705,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
     // Pure matchmaker response: announce matches with info needed to create tokens
     return c.json({
-      order_id: orderId,
+      bet_id: betId,
       side,
       amount_sats,
       matches: newPairs.map((p) => ({
@@ -1099,10 +1099,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   });
 
   // -----------------------------------------------------------------------
-  // GET /markets/:id/orders — open orders for a market
+  // GET /markets/:id/bets — pending bets for a market
   // -----------------------------------------------------------------------
 
-  mkt.get("/:id/orders", async (c) => {
+  mkt.get("/:id/bets", async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
 
@@ -1111,37 +1111,36 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const sideParam = c.req.query("side");
     const side: "yes" | "no" | undefined =
       sideParam === "yes" || sideParam === "no" ? sideParam : undefined;
-    const orders = await s.orderBook.getOpenOrders(id, side);
+    const bets = await s.matchingQueue.listPending(id, side);
 
     return c.json(
-      orders.map((o) => ({
-        id: o.id,
-        side: o.side,
-        amount_sats: o.amount_sats,
-        remaining_sats: o.remaining_sats,
-        bettor_pubkey: o.bettor_pubkey,
-        timestamp: o.timestamp,
+      bets.map((bet) => ({
+        id: bet.id,
+        side: bet.side,
+        amount_sats: bet.amount_sats,
+        remaining_sats: bet.remaining_sats,
+        bettor_pubkey: bet.bettor_pubkey,
+        timestamp: bet.timestamp,
       })),
     );
   });
 
   // -----------------------------------------------------------------------
-  // DELETE /markets/:id/orders/:orderId — cancel an open order
+  // DELETE /markets/:id/bets/:betId — cancel a pending bet
   //
-  // Closes a #3 gap from (deleted, see git history) so
-  // bots / users can replace orders instead of waiting for fill or expiry.
-  // The caller's pubkey must match the order's bettor_pubkey — the server
+  // Bots / users can replace bets instead of waiting for fill or expiry.
+  // The caller's pubkey must match the bet's bettor_pubkey — the server
   // can't sign for them, so this is the trust boundary. Body:
   //   { "bettor_pubkey": "<hex>" }
   //
-  // Idempotent: cancelling a non-existent or already-cancelled order
-  // returns 404 once and 404 thereafter (the order is gone either way).
+  // Idempotent: cancelling a non-existent or already-cancelled bet
+  // returns 404 once and 404 thereafter (the bet is gone either way).
   // -----------------------------------------------------------------------
 
-  mkt.delete("/:id/orders/:orderId", rateLimit, writeAuth, async (c) => {
+  mkt.delete("/:id/bets/:betId", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
-    const orderId = c.req.param("orderId");
-    if (!id || !orderId) return c.json({ error: "Market id and order id are required" }, 400);
+    const betId = c.req.param("betId");
+    if (!id || !betId) return c.json({ error: "Market id and bet id are required" }, 400);
     if (!s.markets.has(id)) return c.json({ error: "Market not found" }, 404);
 
     let body: Record<string, unknown>;
@@ -1153,31 +1152,31 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const bettorPubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
     if (!bettorPubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
 
-    // Look up the order to enforce ownership and recover the unmatched
+    // Look up the bet to enforce ownership and recover the unmatched
     // amount we owe back to the pool aggregates.
-    const orders = await s.orderBook.getOpenOrders(id);
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return c.json({ error: "Order not found or already filled" }, 404);
-    if (order.bettor_pubkey !== bettorPubkey) {
-      return c.json({ error: "You are not the owner of this order" }, 403);
+    const bets = await s.matchingQueue.listPending(id);
+    const bet = bets.find((b) => b.id === betId);
+    if (!bet) return c.json({ error: "Bet not found or already filled" }, 404);
+    if (bet.bettor_pubkey !== bettorPubkey) {
+      return c.json({ error: "You are not the owner of this bet" }, 403);
     }
 
     // Subtract the still-open portion from the displayed pool. Already-
     // matched (committed) sats stay — those represent live escrow pairs.
-    const refundedSats = order.remaining_sats;
+    const refundedSats = bet.remaining_sats;
     const market = s.markets.get(id)!;
-    if (order.side === "yes") {
+    if (bet.side === "yes") {
       market.yes_pool_sats = Math.max(0, market.yes_pool_sats - refundedSats);
     } else {
       market.no_pool_sats = Math.max(0, market.no_pool_sats - refundedSats);
     }
 
-    const removed = await s.orderBook.cancelOrder(orderId);
-    if (!removed) return c.json({ error: "Order not found or already filled" }, 404);
+    const removed = await s.matchingQueue.cancel(betId);
+    if (!removed) return c.json({ error: "Bet not found or already filled" }, 404);
 
     return c.json({
-      order_id: orderId,
-      side: order.side,
+      bet_id: betId,
+      side: bet.side,
       refunded_sats: refundedSats,
       market: { yes_pool_sats: market.yes_pool_sats, no_pool_sats: market.no_pool_sats },
     });

@@ -76,7 +76,7 @@ if (nostrRelays.length > 0) {
 }
 
 // Persistent state: SQLite at KANNAGI_DB_PATH (defaults to /data/kannagi.db
-// on Fly, or ./kannagi.db locally). The same DB owns the order book and the
+// on Fly, or ./kannagi.db locally). The same DB owns the matching queue and the
 // runtime maps so a Fly machine restart recovers full market state.
 const kannagiDbPath = Deno.env.get("KANNAGI_DB_PATH") ?? "./kannagi.db";
 const kannagiStore = openKannagiStore({ path: kannagiDbPath });
@@ -87,7 +87,7 @@ console.log(`[market] kannagi store opened at ${kannagiDbPath}`);
 const state = createMarketState({
   frostConfig,
   nostrRelays,
-  orderBook: kannagiStore.orderBook,
+  matchingQueue: kannagiStore.matchingQueue,
   initial: hydrated,
   persist: kannagiStore.persist,
 });

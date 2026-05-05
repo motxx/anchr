@@ -84,7 +84,7 @@ async function placeBet(
   amount_sats: number,
   bettor_pubkey: string,
 ): Promise<{
-  order_id: string;
+  bet_id: string;
   matches: Array<{
     pair_id: string;
     amount_sats: number;
@@ -102,7 +102,7 @@ async function placeBet(
     body: JSON.stringify({ side, amount_sats, bettor_pubkey }),
   });
   expect(res.status).toBe(201);
-  return res.json() as Promise<{ order_id: string; matches: Array<{ pair_id: string; amount_sats: number; counterparty_pubkey: string; group_pubkey_yes: string; group_pubkey_no: string; locktime_exchange: number; locktime_market: number }> }>;
+  return res.json() as Promise<{ bet_id: string; matches: Array<{ pair_id: string; amount_sats: number; counterparty_pubkey: string; group_pubkey_yes: string; group_pubkey_no: string; locktime_exchange: number; locktime_market: number }> }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,9 +294,9 @@ describe("Market API: CRUD", () => {
     const created = await createMarket(app);
     const res = await app.request(`${BASE}/markets/${created.id}`);
     expect(res.status).toBe(200);
-    const json = await res.json() as { id: string; title: string; open_orders: number; matched_pairs: number };
+    const json = await res.json() as { id: string; title: string; pending_bets: number; matched_pairs: number };
     expect(json.id).toBe(created.id);
-    expect(json.open_orders).toBe(0);
+    expect(json.pending_bets).toBe(0);
     expect(json.matched_pairs).toBe(0);
   });
 
@@ -377,7 +377,7 @@ describe("Market API: betting", () => {
 
   test("POST /markets/:id/bet places a YES bet", async () => {
     const json = await placeBet(app, marketId, "yes", 100, "alice");
-    expect(json.order_id).toMatch(/^ord_/);
+    expect(json.bet_id).toMatch(/^bet_/);
     expect(json.matches).toHaveLength(0);
   });
 
@@ -471,7 +471,7 @@ describe("Market API: matching", () => {
     marketId = created.id as string;
   });
 
-  test("YES + NO orders produce a match with counterparty info", async () => {
+  test("YES + NO bets produce a match with counterparty info", async () => {
     await placeBet(app, marketId, "yes", 100, "alice");
     const json = await placeBet(app, marketId, "no", 100, "bob");
     expect(json.matches).toHaveLength(1);
@@ -494,18 +494,18 @@ describe("Market API: matching", () => {
     expect(json.matches[0]!.amount_sats).toBe(100);
   });
 
-  test("order book FIFO: earlier orders matched first", async () => {
+  test("matching queue FIFO: earlier bets matched first", async () => {
     await placeBet(app, marketId, "yes", 50, "alice");
     await placeBet(app, marketId, "yes", 50, "charlie");
     await placeBet(app, marketId, "no", 50, "bob");
 
-    // alice's order fully matched, charlie's still open
-    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
-    expect(openOrders).toHaveLength(1);
-    expect(openOrders[0]!.remaining_sats).toBe(50);
+    // alice's bet fully matched, charlie's still open
+    const pendingBets = await state.matchingQueue.listPending(marketId, "yes");
+    expect(pendingBets).toHaveLength(1);
+    expect(pendingBets[0]!.remaining_sats).toBe(50);
   });
 
-  test("multiple matches from one large order", async () => {
+  test("multiple matches from one large bet", async () => {
     await placeBet(app, marketId, "yes", 50, "alice");
     await placeBet(app, marketId, "yes", 50, "charlie");
     const json = await placeBet(app, marketId, "no", 100, "bob");
@@ -526,26 +526,26 @@ describe("Market API: matching", () => {
     expect(pairs[0]!.token_no_to_yes).toBe("");
   });
 
-  test("GET /markets/:id/orders returns open orders", async () => {
+  test("GET /markets/:id/bets returns pending bets", async () => {
     await placeBet(app, marketId, "yes", 100, "alice");
-    const res = await app.request(`${BASE}/markets/${marketId}/orders`);
+    const res = await app.request(`${BASE}/markets/${marketId}/bets`);
     expect(res.status).toBe(200);
-    const orders = await res.json() as Array<{ side: string; amount_sats: number }>;
-    expect(orders).toHaveLength(1);
-    expect(orders[0]!.side).toBe("yes");
+    const bets = await res.json() as Array<{ side: string; amount_sats: number }>;
+    expect(bets).toHaveLength(1);
+    expect(bets[0]!.side).toBe("yes");
   });
 
-  test("GET /markets/:id/orders returns 404 for unknown market", async () => {
-    const res = await app.request(`${BASE}/markets/nonexistent/orders`);
+  test("GET /markets/:id/bets returns 404 for unknown market", async () => {
+    const res = await app.request(`${BASE}/markets/nonexistent/bets`);
     expect(res.status).toBe(404);
   });
 
-  test("DELETE /markets/:id/orders/:orderId cancels owner's open order", async () => {
+  test("DELETE /markets/:id/bets/:betId cancels owner's pending bet", async () => {
     const betRes = await placeBet(app, marketId, "yes", 100, "alice");
-    const orderId = betRes.order_id as string;
-    expect(orderId).toMatch(/^ord_/);
+    const betId = betRes.bet_id as string;
+    expect(betId).toMatch(/^bet_/);
 
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/${orderId}`, {
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/${betId}`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bettor_pubkey: "alice" }),
@@ -555,29 +555,29 @@ describe("Market API: matching", () => {
     expect(body.refunded_sats).toBe(100);
     expect(body.market.yes_pool_sats).toBe(0);
 
-    // Order is gone from the book.
-    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
-    expect(openOrders).toHaveLength(0);
+    // Bet is gone from the book.
+    const pendingBets = await state.matchingQueue.listPending(marketId, "yes");
+    expect(pendingBets).toHaveLength(0);
   });
 
   test("DELETE rejects non-owner", async () => {
     const betRes = await placeBet(app, marketId, "yes", 100, "alice");
-    const orderId = betRes.order_id as string;
+    const betId = betRes.bet_id as string;
 
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/${orderId}`, {
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/${betId}`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bettor_pubkey: "mallory" }),
     });
     expect(cancelRes.status).toBe(403);
 
-    // Order remains in the book.
-    const openOrders = await state.orderBook.getOpenOrders(marketId, "yes");
-    expect(openOrders).toHaveLength(1);
+    // Bet remains in the queue.
+    const pendingBets = await state.matchingQueue.listPending(marketId, "yes");
+    expect(pendingBets).toHaveLength(1);
   });
 
-  test("DELETE returns 404 for unknown order", async () => {
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/orders/ord_nonexistent`, {
+  test("DELETE returns 404 for unknown bet", async () => {
+    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/bet_nonexistent`, {
       method: "DELETE",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ bettor_pubkey: "alice" }),

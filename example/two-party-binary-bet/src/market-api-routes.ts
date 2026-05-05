@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { createInMemoryOrderBook, type OrderBook } from "./order-book.ts";
+import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queue.ts";
 import { createDualPreimageStore, type DualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import type { DualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
@@ -47,8 +47,8 @@ export interface MarketApiState {
   markets: Map<string, TwoPartyBinaryBet>;
   /** All bets placed. */
   bets: Map<string, Bet[]>;
-  /** Order book for matching. */
-  orderBook: OrderBook;
+  /** Matching queue for matching. */
+  matchingQueue: MatchingQueue;
   /** Dual preimage store (HTLC fallback). */
   dualPreimageStore: DualPreimageStore;
   /** Dual key store (single-key or FROST). */
@@ -78,7 +78,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
   const state: MarketApiState = {
     markets: new Map(),
     bets: new Map(),
-    orderBook: createInMemoryOrderBook(),
+    matchingQueue: createInMemoryMatchingQueue(),
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
     mode,
