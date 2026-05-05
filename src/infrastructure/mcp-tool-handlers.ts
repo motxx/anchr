@@ -27,6 +27,7 @@ interface CreateQueryArgs {
   target_url?: string;
   target_method?: "GET" | "POST";
   conditions?: TlsnCondition[];
+  visibility?: "public" | "requester_only";
 }
 
 type McpTextResult = { content: Array<{ type: "text"; text: string }> };
@@ -43,7 +44,7 @@ export async function handleCreateQuery(
   backend: McpQueryBackend,
   args: CreateQueryArgs,
 ): Promise<McpTextResult> {
-  const { description, location_hint, verification_requirements, target_url, target_method, conditions, ttl_seconds, oracle_ids } = args;
+  const { description, location_hint, verification_requirements, target_url, target_method, conditions, ttl_seconds, oracle_ids, visibility } = args;
   const input: QueryInput = {
     description,
     location_hint,
@@ -53,6 +54,7 @@ export async function handleCreateQuery(
       method: target_method,
       conditions,
     } : undefined,
+    visibility,
   };
   const payload = await backend.createQuery(input, ttl_seconds ?? 600, buildRequesterMeta(), oracle_ids);
   return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };

@@ -217,6 +217,7 @@ Deno.test({ name: "mcp create_query supports TLSNotary parameters", sanitizeReso
           { type: "jsonpath", expression: "bitcoin.usd", description: "BTC price exists" },
         ],
         ttl_seconds: 120,
+        visibility: "public",
       },
     });
     const json = parseTextPayload(created as { content: Array<{ type: string; text?: string }> });

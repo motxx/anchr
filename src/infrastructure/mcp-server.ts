@@ -58,9 +58,18 @@ export async function startMcpServer(deps: McpServerDeps) {
         expected: z.string().optional().describe("Expected value (for jsonpath/regex)"),
         description: z.string().optional().describe("Human-readable description of what this checks"),
       })).optional().describe("Conditions to verify against the proven response body."),
+      visibility: z.enum(["public", "requester_only"]).optional().describe(
+        "Required when verification_requirements includes 'tlsn'. " +
+        "'public' publishes the proof to Nostr relays for anyone to verify; " +
+        "'requester_only' keeps the proof private to the requester. Default: 'requester_only'.",
+      ),
     },
-    async (args: { description: string; location_hint?: string; ttl_seconds?: number; oracle_ids?: string[]; verification_requirements?: VerificationFactor[]; target_url?: string; target_method?: "GET" | "POST"; conditions?: TlsnCondition[] }) => {
-      return handleCreateQuery(backend, args);
+    async (args: { description: string; location_hint?: string; ttl_seconds?: number; oracle_ids?: string[]; verification_requirements?: VerificationFactor[]; target_url?: string; target_method?: "GET" | "POST"; conditions?: TlsnCondition[]; visibility?: "public" | "requester_only" }) => {
+      const tlsnRequested = args.verification_requirements?.includes("tlsn");
+      return handleCreateQuery(backend, {
+        ...args,
+        visibility: args.visibility ?? (tlsnRequested ? "requester_only" : undefined),
+      });
     },
   );
 
