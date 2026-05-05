@@ -63,7 +63,18 @@ run_local() {
   run_test "dep audit"         deno task lint:deps
   run_test "unit tests"        deno task test:unit
   run_test "protocol tests"    deno task test:protocol
-  run_test "FROST tests"       deno task test:frost
+
+  # CI builds frost-signer in a dedicated step before tests run. Mirror that
+  # here so e2e/frost-threshold.test.ts actually exercises against the binary
+  # locally — without it the FROST tests silently skip and a green pre-push
+  # masks failures that would surface on CI.
+  echo "  Building frost-signer..."
+  if (cd crates/frost-signer && cargo build --release 2>&1); then
+    run_test "FROST tests"     deno task test:frost
+  else
+    fail "frost-signer build"
+  fi
+
   run_test "integration tests" deno task test:integration
   run_test "example tests"     deno task test:example
 }

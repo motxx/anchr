@@ -372,8 +372,8 @@ suite("e2e: FROST 2-of-3 independent Oracle threshold (Anchr / CommunityOracle-A
 suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verification)", () => {
   const API_KEY = "frost-e2e-key";
 
-  test("/frost/signer/round1 rejects missing query+result (400)", async () => {
-    
+  test("/frost/signer/round1 rejects missing requirement+input (400)", async () => {
+
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,
@@ -388,7 +388,6 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
       },
     });
 
-    // Missing query and result → must be rejected
     const res = await app.request("/frost/signer/round1", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": API_KEY },
@@ -401,7 +400,7 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
   });
 
   test("/frost/signer/round1 rejects failed verification (403)", async () => {
-    
+
     const app = buildOracleApp({
       oracleId: "test",
       apiKey: API_KEY,
@@ -416,22 +415,17 @@ suite("e2e: FROST Oracle HTTP signer endpoints (nonce_id + mandatory verificatio
       },
     });
 
-    // Provide query+result that will fail verification (no attachments, requires GPS)
     const res = await app.request("/frost/signer/round1", {
       method: "POST",
       headers: { "content-type": "application/json", "x-api-key": API_KEY },
       body: JSON.stringify({
         message: "deadbeef",
-        query: {
+        requirement: {
           id: "q1",
-          status: "verifying",
+          factors: ["gps"],
           description: "test",
-          verification_requirements: ["gps"],
-          created_at: Date.now(),
-          expires_at: Date.now() + 60_000,
-          payment_status: "locked",
         },
-        result: { attachments: [] },
+        input: { attachments: [] },
       }),
     });
 
