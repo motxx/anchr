@@ -20,6 +20,7 @@ import type {
   MarketStatus,
 } from "./market-types.ts";
 import { createInMemoryOrderBook, type OrderBook } from "./order-book.ts";
+import type { HydratedState, KannagiPersist } from "./kannagi-store.ts";
 import {
   type DualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
@@ -92,6 +93,12 @@ export interface MarketState {
    * Server verifies P2PK conditions but cannot spend (enforced by P2PK).
    */
   pendingExchangeTokens: Map<string, string>;
+  /**
+   * Write-through persistence — call after each mutation to the maps above.
+   * Defaults to a no-op for tests; production injects a SQLite-backed
+   * implementation via `openKannagiStore`.
+   */
+  persist: KannagiPersist;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
   orderBook: OrderBook;
@@ -133,25 +140,43 @@ export interface MarketState {
 }
 
 
+const NOOP_PERSIST: KannagiPersist = {
+  market: () => Promise.resolve(),
+  pair: () => Promise.resolve(),
+  preimage: () => Promise.resolve(),
+  signature: () => Promise.resolve(),
+  proofSignatures: () => Promise.resolve(),
+  pendingExchangeToken: () => Promise.resolve(),
+  deletePendingExchangeToken: () => Promise.resolve(),
+};
+
 /** Create a fresh MarketState. Used for tests and as default state. */
 export function createMarketState(opts?: {
   frostConfig?: DualOutcomeFrostNodeConfig;
   nostrIdentity?: MarketIdentity;
   nostrRelays?: string[];
   publishMarket?: MarketState["publishMarket"];
-  /** Inject a Postgres-backed (or other) order book. Defaults to in-memory. */
+  /** Inject a SQLite-backed (or other) order book. Defaults to in-memory. */
   orderBook?: OrderBook;
   /** Inject a custom exchange-token verifier (tests use this). */
   verifyExchangeToken?: MarketState["verifyExchangeToken"];
+  /**
+   * Pre-loaded state from disk. When the SQLite store is wired up the
+   * caller passes `store.hydrate()`; otherwise fresh empty maps are used.
+   */
+  initial?: HydratedState;
+  /** Write-through persistence — defaults to no-op (tests / in-memory). */
+  persist?: KannagiPersist;
 }): MarketState {
   const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
   return {
-    markets: new Map(),
-    matchedPairs: new Map(),
-    resolvedPreimages: new Map(),
-    resolvedSignatures: new Map(),
-    resolvedProofSignatures: new Map(),
-    pendingExchangeTokens: new Map(),
+    markets: opts?.initial?.markets ?? new Map(),
+    matchedPairs: opts?.initial?.matchedPairs ?? new Map(),
+    resolvedPreimages: opts?.initial?.resolvedPreimages ?? new Map(),
+    resolvedSignatures: opts?.initial?.resolvedSignatures ?? new Map(),
+    resolvedProofSignatures: opts?.initial?.resolvedProofSignatures ?? new Map(),
+    pendingExchangeTokens: opts?.initial?.pendingExchangeTokens ?? new Map(),
+    persist: opts?.persist ?? NOOP_PERSIST,
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
     orderBook: opts?.orderBook ?? createInMemoryOrderBook(),
@@ -563,6 +588,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     };
 
     s.markets.set(id, market);
+    await s.persist.market(market);
 
     // Publish to Nostr (best-effort; failure is logged, not blocking).
     // The market is queryable via HTTP regardless; Nostr publication makes
@@ -673,6 +699,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         status: "pending",
       };
       s.matchedPairs.set(pairId, pair);
+      await s.persist.pair(pair);
       newPairs.push(pair);
     }
 
@@ -808,6 +835,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     // Store the token
     const tokenKey = `${pair_id}_${side}`;
     s.pendingExchangeTokens.set(tokenKey, cashu_token);
+    await s.persist.pendingExchangeToken(pair_id, side, cashu_token);
 
     // Check if both sides have submitted
     const yesToken = s.pendingExchangeTokens.get(`${pair_id}_yes`);
@@ -818,10 +846,13 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       pair.token_yes_to_no = yesToken;
       pair.token_no_to_yes = noToken;
       pair.status = "locked";
+      await s.persist.pair(pair);
 
       // Clean up pending tokens
       s.pendingExchangeTokens.delete(`${pair_id}_yes`);
       s.pendingExchangeTokens.delete(`${pair_id}_no`);
+      await s.persist.deletePendingExchangeToken(pair_id, "yes");
+      await s.persist.deletePendingExchangeToken(pair_id, "no");
 
       return c.json({
         pair_id,
@@ -1238,6 +1269,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
           proofSigs.set(k, v);
         }
       }
+      // Snapshot to disk. The persist layer upserts each (market, secret)
+      // row, so re-passing the full map after a merge correctly stores only
+      // the new rows without dropping the old ones.
+      await s.persist.proofSignatures(id, newSigs);
     }
 
     // Collect signatures for the requested secrets

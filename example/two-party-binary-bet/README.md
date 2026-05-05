@@ -172,37 +172,21 @@ stack).
 
 ## Persistence
 
-The order book is in-memory by default — fine for tests and demos, but
-**open orders are lost on server restart**. For any deployment that
-matters, point the server at a Postgres database via `DATABASE_URL`:
+All durable state — the order book plus the six runtime maps (markets,
+matched pairs, resolved preimages, resolved signatures, per-proof
+signatures, and pending exchange tokens) — lives in a single SQLite file.
+The path is controlled by `KANNAGI_DB_PATH` (default `./kannagi.db`
+locally; set to `/data/kannagi.db` in production so the Fly volume is
+used).
 
-```bash
-# 1. Create the schema (idempotent)
-psql "$DATABASE_URL" -f example/two-party-binary-bet/migrations/001_create_orders.sql
-
-# 2. Start the server with persistence on
-DATABASE_URL=postgres://user:pass@host:5432/anchr_market \
-  deno run --allow-all example/two-party-binary-bet/server.ts
-```
-
-When `DATABASE_URL` is unset, the server falls back to the in-memory book
-and logs a warning. When set, FIFO matching runs inside a single Postgres
-transaction with `SELECT ... FOR UPDATE` locks on the open orders, which
-serializes concurrent matchers correctly.
+The schema is created automatically on first open; there is no separate
+migration step. SQLite WAL mode gives concurrent readers + a single
+writer, which fits the Kannagi architecture (single Fly machine, FROST
+signers in-process on 127.0.0.1:4001-4003).
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | unset | Postgres connection string. If unset, in-memory. |
-| `DATABASE_POOL_SIZE` | `10` | Max Postgres connections in the pool. |
-
-For local dev the `postgres` service in `docker-compose.yml` provisions a
-ready-to-use database (`postgres://anchr:anchr@localhost:5432/anchr_market`)
-and auto-applies the migration on first start. CI runs the regtest test
-suite with `DATABASE_URL` pointed at it, so both
-`two-party-binary-bet-orderbook-pg.test.ts` (direct PG order-book coverage:
-CRUD, FIFO, partial matches, concurrent `FOR UPDATE` matchers) and
-`two-party-binary-bet-lifecycle.test.ts` (full Cashu lifecycle on Postgres)
-exercise the production code path.
+| `KANNAGI_DB_PATH` | `./kannagi.db` | SQLite DB path. Use `:memory:` for tests. |
 
 ## Running
 
@@ -232,7 +216,7 @@ src/
   market-types.ts           — Type definitions
   market-oracle.ts          — Condition evaluation, payout calculation
   order-book.ts             — FIFO matching interface + in-memory impl
-  order-book-postgres.ts    — Postgres-backed impl (used when DATABASE_URL set)
+  kannagi-store.ts          — SQLite-backed durable store (order book + 6 runtime maps)
   resolution.ts             — DualPreimageStore (HTLC) / DualKeyStore (FROST) resolution
   match-coordinator.ts      — Cross-HTLC match execution via @anchr/cashu-conditional-swap
   market-api-routes.ts      — REST endpoints

@@ -130,35 +130,22 @@ start_docker_services() {
   step "Phase 2: Start Docker Services"
 
   # Wipe any prior state — left-over containers from a previous dev
-  # session (anchr-postgres-1, anchr-cashu-mint-1, anchr-lnd-*) stash
-  # chain height / wallet / Postgres rows that drift from what
-  # init-regtest.sh expects, and the LND mine-150-blocks step racing
-  # against an already-mined chain is the classic flake. Volumes and
-  # orphan containers go too, so each run starts deterministic.
+  # session (anchr-cashu-mint-1, anchr-lnd-*) stash chain height / wallet
+  # data that drifts from what init-regtest.sh expects, and the LND
+  # mine-150-blocks step racing against an already-mined chain is the
+  # classic flake. Volumes and orphan containers go too, so each run
+  # starts deterministic.
   echo "  Resetting previous Docker state..."
   docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
 
-  # Start relay + blossom + postgres
-  echo "  Starting relay + blossom + postgres..."
-  docker compose up -d relay blossom postgres
+  echo "  Starting relay + blossom..."
+  docker compose up -d relay blossom
   DOCKER_STARTED=1
 
   wait_for_service "Nostr relay" "http://localhost:7777" 15 || return 2
   wait_for_service "Blossom"     "http://localhost:3333" 15 || return 2
 
-  # Postgres has no HTTP endpoint — poll pg_isready inside the container.
-  # The migration in /docker-entrypoint-initdb.d runs on first init, so by
-  # the time pg_isready returns the order-book table already exists.
-  echo "  Waiting for Postgres..."
-  for i in $(seq 1 30); do
-    if docker compose exec -T postgres pg_isready -U anchr -d anchr_market > /dev/null 2>&1; then
-      echo "  Postgres ready."
-      break
-    fi
-    sleep 2
-  done
-
-  pass "relay + blossom + postgres"
+  pass "relay + blossom"
 }
 
 start_regtest() {
@@ -192,15 +179,11 @@ run_docker_tests() {
   BLOSSOM_SERVERS=http://localhost:3333 \
   run_test "relay e2e" deno task test:e2e:relay
 
-  step "Phase 3: Regtest Tests (HTLC + Cashu + Postgres)"
+  step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
-  # DATABASE_URL plumbs the Postgres-backed OrderBook through the
-  # two-party-binary-bet lifecycle and order-book PG tests. Without it those
-  # tests skip themselves and the lifecycle test runs against in-memory.
   CASHU_MINT_URL=http://localhost:3338 \
   NOSTR_RELAYS=ws://localhost:7777 \
   BLOSSOM_SERVERS=http://localhost:3333 \
-  DATABASE_URL=postgres://anchr:anchr@localhost:5432/anchr_market \
   run_test "regtest e2e" deno task test:regtest
 }
 

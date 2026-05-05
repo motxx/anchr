@@ -3,7 +3,7 @@
  *
  * Two implementations:
  *   - createInMemoryOrderBook (this file) — Map-backed, ephemeral; for tests/dev
- *   - createPostgresOrderBook (./order-book-postgres.ts) — durable, transactional
+ *   - SQLite-backed (./kannagi-store.ts:createSqliteOrderBook) — durable
  *
  * Greedy FIFO matching: earliest orders matched first. Partial matches split
  * an order into a matched portion and a remainder (the order stays open with

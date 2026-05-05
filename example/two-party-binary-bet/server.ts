@@ -19,11 +19,7 @@ import { serveStatic } from "hono/deno";
 import type { MiddlewareHandler } from "hono";
 import { createMarketState, registerMarketRoutes } from "./src/server-routes.ts";
 import { startAutoResolver } from "./src/auto-resolver.ts";
-import {
-  createPostgresOrderBook,
-  type PostgresOrderBook,
-} from "./src/order-book-postgres.ts";
-import type { OrderBook } from "./src/order-book.ts";
+import { openKannagiStore } from "./src/kannagi-store.ts";
 import {
   loadDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
@@ -79,25 +75,22 @@ if (nostrRelays.length > 0) {
   console.log("[market] NOSTR_RELAYS not set — UI wallet uses localStorage only.");
 }
 
-// Order book backend: durable Postgres if DATABASE_URL is set, otherwise
-// in-memory (good for tests/dev, but open orders are lost on restart).
-let orderBook: OrderBook | undefined;
-let orderBookCloser: (() => Promise<void>) | undefined;
-const databaseUrl = Deno.env.get("DATABASE_URL");
-if (databaseUrl) {
-  const pgOb: PostgresOrderBook = await createPostgresOrderBook({
-    connectionUrl: databaseUrl,
-    maxConnections: Number(Deno.env.get("DATABASE_POOL_SIZE")) || 10,
-  });
-  orderBook = pgOb;
-  orderBookCloser = () => pgOb.close();
-  console.log("[market] order book: Postgres (DATABASE_URL set)");
-} else {
-  console.log("[market] order book: in-memory (set DATABASE_URL to persist)");
-}
+// Persistent state: SQLite at KANNAGI_DB_PATH (defaults to /data/kannagi.db
+// on Fly, or ./kannagi.db locally). The same DB owns the order book and the
+// runtime maps so a Fly machine restart recovers full market state.
+const kannagiDbPath = Deno.env.get("KANNAGI_DB_PATH") ?? "./kannagi.db";
+const kannagiStore = openKannagiStore({ path: kannagiDbPath });
+const hydrated = await kannagiStore.hydrate();
+console.log(`[market] kannagi store opened at ${kannagiDbPath}`);
 
 // Construct state explicitly so we can also hand it to the auto-resolver.
-const state = createMarketState({ frostConfig, nostrRelays, orderBook });
+const state = createMarketState({
+  frostConfig,
+  nostrRelays,
+  orderBook: kannagiStore.orderBook,
+  initial: hydrated,
+  persist: kannagiStore.persist,
+});
 
 registerMarketRoutes(app, {
   writeAuth: noopMiddleware,
@@ -114,9 +107,7 @@ if (Deno.env.get("AUTO_RESOLVE_DISABLED") !== "1") {
   // Stop on SIGINT so the scheduler doesn't keep the process alive.
   Deno.addSignalListener("SIGINT", () => {
     handle.stop();
-    if (orderBookCloser) {
-      orderBookCloser().catch(() => {});
-    }
+    kannagiStore.close().catch(() => {});
     Deno.exit(0);
   });
 }
