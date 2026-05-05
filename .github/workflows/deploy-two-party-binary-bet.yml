@@ -2,9 +2,9 @@ name: Deploy Two-party binary bet
 
 # Auto-deploys the 巫(Kannagi) two-party binary bet app to Fly when:
 #   - push to main, AND
-#   - the change touches example/two-party-binary-bet/, the src/ &
-#     packages/ paths the market server depends on at build time,
-#     or the deploy config / Dockerfile.
+#   - the change touches example/two-party-binary-bet/, the packages/
+#     paths the market server depends on at build time, or the deploy
+#     config / Dockerfile.
 #
 # Independent of deploy.yml — that workflow orchestrates the
 # protocol-server stack (relay + blossom + tlsn-verifier + worker +
@@ -23,8 +23,8 @@ on:
       - "packages/core-cashu/**"
       - "packages/core-runtime/**"
       - "packages/tlsn-toolkit/**"
-      - "src/infrastructure/**"
-      - "src/ui/**"
+      - "packages/blossom/**"
+      - "packages/runtime/**"
       - "scripts/build-ui.ts"
       - "scripts/build-css.ts"
       - "fly.market.toml"
