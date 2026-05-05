@@ -26,12 +26,12 @@ them.
 | Topic | Home | Why it's not in `specs/` |
 |---|---|---|
 | Protocol overview / elevator pitch / role flow | Root [`README.md`](../README.md) | Lives with the project landing page. |
-| `Query` state machine | [`docs/host-query-lifecycle.md`](../docs/host-query-lifecycle.md) | Host-internal (`src/domain/query-store.ts`); other implementations are free to model state differently. |
+| `Query` state machine | `src/domain/query-transitions.ts` | Host-internal; other implementations are free to model state differently. The code is the spec. |
 | Cashu HTLC escrow (NUT-11 / NUT-14) | [`packages/core-cashu/SPEC.md`](../packages/core-cashu/SPEC.md) | Cashu mint / wallet usage and the `EscrowProvider` interface that this package implements. |
-| FROST DKG + threshold P2PK escrow | [`packages/cashu-frost-oracle/SPEC.md`](../packages/cashu-frost-oracle/SPEC.md) | DKG flow, threshold signing, and the P2PK + FROST escrow this package wires up. |
+| FROST DKG + threshold P2PK escrow | [`packages/frost-oracle/SPEC.md`](../packages/frost-oracle/SPEC.md) | DKG flow, threshold signing, and the P2PK + FROST escrow this package wires up. |
 | TLSNotary application-layer hardening | [`packages/tlsn-toolkit/SPEC.md`](../packages/tlsn-toolkit/SPEC.md) | Replay defence, ReDoS-safe conditions, freshness, credential-leakage guard. |
-| Photo / GPS / C2PA verification | [`packages/photo-bounty/SPEC.md`](../packages/photo-bounty/SPEC.md) | C2PA / ProofMode / GPS / vision-LLM verifier specifics. |
-| Encrypted Blossom storage + NIP-44 key delivery | [`docs/host-storage.md`](../docs/host-storage.md) | Reference host's choice; Blossom itself is specified externally in BUD-01–06. |
+| Photo / GPS / C2PA verification | [`packages/photo-verification/SPEC.md`](../packages/photo-verification/SPEC.md) | C2PA / ProofMode / GPS / vision-LLM verifier specifics. |
+| Encrypted Blossom storage + NIP-44 key delivery | `src/infrastructure/blossom/` | Reference host's wiring; Blossom itself is specified externally in BUD-01–06. |
 
 The cryptographic + protocol-state invariants that anchor security
 claims are tracked in [`docs/threat-model.md`](../docs/threat-model.md)

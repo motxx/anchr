@@ -5,7 +5,7 @@
  * Boots the standalone market server in-process, drives a headless
  * Chromium via Playwright through the empty state and the
  * create-market form, and writes screenshots into
- * docs/two-party-binary-bet/screenshots/.
+ * screenshots/.
  *
  * Run:
  *   deno task build:ui && deno task build:css
@@ -22,7 +22,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
-const SCREENSHOT_DIR = join(PROJECT_ROOT, "docs/two-party-binary-bet/screenshots");
+const SCREENSHOT_DIR = join(PROJECT_ROOT, "screenshots");
 const PORT = 3098;
 
 if (!existsSync(SCREENSHOT_DIR)) mkdirSync(SCREENSHOT_DIR, { recursive: true });

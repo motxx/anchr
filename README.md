@@ -96,8 +96,10 @@ Wire-compatible with
 request, 6300 = result, 7000 = status — so DVM-aware clients can
 interoperate.
 
-For event kinds, locktime semantics, oracle threshold signing, and the
-encrypted DM flow, see [docs/architecture.md](docs/architecture.md).
+For wire-format details (event kinds, payload shapes, oracle discovery,
+conditional-swap primitive), see [`specs/`](specs/). For the layer
+dependency rules and composition patterns, see
+[`docs/architecture.md`](docs/architecture.md).
 
 ## Install
 
@@ -159,21 +161,10 @@ const { data, proof, providerPubkey } = await customer.request({
 
 The Customer broadcasts to any Provider subscribed to the schema. The
 SDK auto-selects the cheapest valid quote; pass `provider: "npub1..."`
-to target a specific Provider directly.
-
-Config asymmetries:
-
-| Field          | Customer | Provider | Why |
-|---|---|---|---|
-| `oracleClient` | required | — | Provider's only Oracle interaction is receiving the unlock secret via Nostr DM |
-| `privKey`      | — (ephemeral) | required | Provider needs a stable identity for HTLC redemption; Customer signs each request with a fresh key |
-| `notary`       | — | TLSN schemas only | Proof embeds the notary's pubkey, so the Customer can verify without an external notary URL |
-| `cashuClient`  | optional | optional | SDK auto-builds from `mint` |
-
-The Customer's `oracleClient.oraclePubkey` must match one of the entries
-in `oracles` (the whitelist). The intersection between Customer and
-Provider whitelists is computed at request time; the SDK picks one
-oracle from it and routes through the Customer's `oracleClient`.
+to target a specific Provider directly. Customer and Provider config
+fields differ slightly (Provider keeps a stable Nostr key for
+redemption; Customer signs with an ephemeral one) — see the SDK's
+`CustomerOptions` / `ProviderOptions` types.
 
 ```ts
 // Provider side

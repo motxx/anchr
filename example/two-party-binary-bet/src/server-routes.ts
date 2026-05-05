@@ -1097,7 +1097,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // -----------------------------------------------------------------------
   // DELETE /markets/:id/orders/:orderId — cancel an open order
   //
-  // Closes a #3 gap from docs/two-party-binary-bet/market-maker-gaps.md so
+  // Closes a #3 gap from (deleted, see git history) so
   // bots / users can replace orders instead of waiting for fill or expiry.
   // The caller's pubkey must match the order's bettor_pubkey — the server
   // can't sign for them, so this is the trust boundary. Body:

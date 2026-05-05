@@ -31,8 +31,8 @@ Default factor set for photo queries: `["gps", "ai_check"]`.
    manifest archive.
 3. Worker strips EXIF metadata for privacy (the host does this via
    `exif-strip-helpers`); the C2PA manifest is preserved.
-4. Worker uploads the encrypted blob to Blossom (see
-   `docs/host-storage.md`) and submits the proof.
+4. Worker uploads the encrypted blob to Blossom (BUD-01–06) and submits
+   the proof.
 5. Oracle independently verifies:
    - C2PA signature chain (via the `c2patool` companion binary)
    - ProofMode signature chain (via `gpg` companion binary)

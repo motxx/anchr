@@ -6,7 +6,7 @@
 
 > **Status: Testnet.** Live deployment at <https://anchr-market.fly.dev>; testnut ecash, not real BTC.
 
-> **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
+> **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
 > **Pattern:** two-party bet (two counterparties cross-lock; Oracle reveals outcome).
 
 > **What this is**
@@ -32,10 +32,10 @@
 > the public testnut Cashu mint (<https://testnut.cashu.space>), the
 > Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
 
-> **Operator runbook:** [`docs/two-party-binary-bet/deployment.md`](../../docs/two-party-binary-bet/deployment.md)
+> **Operator runbook:** [`DEPLOYMENT.md`](../../DEPLOYMENT.md)
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
-> the running UI live in [`docs/two-party-binary-bet/screenshots/`](../../docs/two-party-binary-bet/screenshots/).
+> the running UI live in [`screenshots/`](../../screenshots/).
 
 ## What you can build with this primitive
 
