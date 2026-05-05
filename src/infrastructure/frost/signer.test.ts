@@ -40,23 +40,18 @@ describe("FrostSigner verification gating", () => {
     _setFrostSignerPathForTest(undefined);
   });
 
-  test("verifyAndSign returns null when verification fails (expired query)", async () => {
+  test("verifyAndSign returns null when verification fails (no evidence + GPS required)", async () => {
     const signer = createFrostSigner(signerConfig);
 
-    // An expired query should fail the timestamp/expiry verification check
-    const query = {
-      id: "q-expired",
-      status: "verifying" as const,
-      description: "test",
-      verification_requirements: ["nonce" as const],
-      challenge_nonce: "ABC123",
-      created_at: Date.now() - 120_000,
-      expires_at: Date.now() - 60_000, // Already expired
-      payment_status: "locked" as const,
+    // Empty submission with GPS required — the verifier rejects this
+    const requirement = {
+      id: "q-no-evidence",
+      factors: ["gps" as const],
+      expected_gps: { lat: 35.0, lon: 139.0 },
     };
-    const result = { attachments: [] as AttachmentRef[], notes: "no nonce echo" };
+    const input = { attachments: [] as AttachmentRef[] };
 
-    const output = await signer.verifyAndSign(query, result, "deadbeef");
+    const output = await signer.verifyAndSign(requirement, input, "deadbeef");
     expect(output).toBeNull();
   });
 
@@ -113,20 +108,15 @@ binaryDescribe("FrostSigner with real binary", () => {
       keyPackage: JSON.stringify(r1Result.data),
     });
 
-    // A simple query that will pass ai_check verification
-    // (ai_check is a soft check that passes by default in tests)
-    const query = {
+    // ai_check is a soft check that passes by default in tests
+    const requirement = {
       id: "q-sign-test",
-      status: "verifying" as const,
+      factors: ["ai_check" as const],
       description: "test query for signing",
-      verification_requirements: ["ai_check" as const],
-      created_at: Date.now(),
-      expires_at: Date.now() + 600_000,
-      payment_status: "locked" as const,
     };
-    const result = { attachments: [] as AttachmentRef[] };
+    const input = { attachments: [] as AttachmentRef[] };
 
-    const output = await signer.verifyAndSign(query, result, "test_message");
+    const output = await signer.verifyAndSign(requirement, input, "test_message");
     // The sign-round1 CLI command may or may not work with a DKG round1 result
     // as a key_package. If it returns a commitment, validate the structure.
     if (output) {

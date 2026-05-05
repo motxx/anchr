@@ -16,9 +16,15 @@ export interface SigningCoordinatorConfig {
   nodeConfig: FrostNodeConfig;
   /** Timeout for HTTP calls to peers (ms). */
   peerTimeoutMs?: number;
-  /** Query and result for peer independent verification. */
-  query?: unknown;
-  result?: unknown;
+  /**
+   * Verification requirement + evidence forwarded to each peer's
+   * independent verify-and-sign step. Treated opaquely here; the host
+   * side defines the concrete shape (`VerificationRequirement` /
+   * `VerificationInput` in `src/domain/types.ts`).
+   */
+  requirement?: unknown;
+  input?: unknown;
+  blossomKeys?: unknown;
 }
 
 export interface SigningCoordinatorResult {
@@ -73,8 +79,9 @@ export async function coordinateSigning(
           headers: buildHeaders(peer.api_key),
           body: JSON.stringify({
             message: messageHex,
-            query: config.query,
-            result: config.result,
+            requirement: config.requirement,
+            input: config.input,
+            blossom_keys: config.blossomKeys,
           }),
         },
         timeoutMs,

@@ -12,6 +12,8 @@
  */
 
 import type { Event } from "nostr-tools";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import type { NostrIdentity } from "../nostr/identity.ts";
 import { restoreIdentity } from "../nostr/identity.ts";
 import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/dm.ts";
@@ -25,7 +27,7 @@ import type { ThresholdOracleConfig } from "@anchr/cashu-frost-oracle/types";
 import type { FrostCoordinator } from "@anchr/cashu-frost-oracle/coordinator";
 import type { FrostNodeConfig } from "@anchr/cashu-frost-oracle/config";
 import { coordinateSigning } from "@anchr/cashu-frost-oracle/signing-coordinator";
-import { verify } from "../verification/verifier.ts";
+import { queryResultToInput, queryToRequirement, verify } from "../verification/verifier.ts";
 import type { Query, QueryResult } from "../../domain/types.ts";
 import {
   type WatchedQuery,
@@ -229,12 +231,14 @@ export function createOracleNostrService(config: OracleNostrServiceConfig): Orac
       // Step 2: Coordinate FROST signing with peer Oracle nodes.
       // Each peer's /frost/signer/round1 endpoint independently verifies before signing.
       // Peers that fail verification will refuse to participate → below threshold = no signature.
-      const { sha256 } = await import("@noble/hashes/sha2.js");
-      const { bytesToHex } = await import("@noble/hashes/utils.js");
       const messageHex = bytesToHex(sha256(new TextEncoder().encode(`anchr:sign:${queryId}`)));
 
       const sigResult = await coordinateSigning(
-        { nodeConfig: config.frostNodeConfig, query, result },
+        {
+          nodeConfig: config.frostNodeConfig,
+          requirement: queryToRequirement(query),
+          input: queryResultToInput(result),
+        },
         messageHex,
       );
 

@@ -258,16 +258,16 @@ describe("coordinateSigning", { sanitizeOps: false, sanitizeResources: false }, 
     const nodeConfig = makeNodeConfig();
     const config: SigningCoordinatorConfig = {
       nodeConfig,
-      query: { id: "q-test", description: "test query" },
-      result: { value: 42 },
+      requirement: { id: "q-test", factors: ["ai_check"] },
+      input: { attachments: [] },
     };
 
     await coordinateSigning(config, "cafebabe");
 
     expect(capturedBody).not.toBeNull();
     expect(capturedBody!.message).toBe("cafebabe");
-    expect(capturedBody!.query).toEqual({ id: "q-test", description: "test query" });
-    expect(capturedBody!.result).toEqual({ value: 42 });
+    expect(capturedBody!.requirement).toEqual({ id: "q-test", factors: ["ai_check"] });
+    expect(capturedBody!.input).toEqual({ attachments: [] });
   });
 
   test("below threshold: only 1 peer responds (and it errors) -> returns null", async () => {

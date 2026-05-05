@@ -1,14 +1,20 @@
 /**
- * FROST Signer -- runs on each signer node.
+ * FROST Signer — runs on each signer node.
  *
- * Each signer independently verifies the query result before
- * participating in the signing round. If verification fails,
- * the signer refuses to sign -> group signature cannot be formed
- * without threshold honest signers.
+ * Each signer independently verifies the supplied requirement / evidence
+ * before participating in the signing round. If verification fails the
+ * signer refuses to sign — the group signature cannot be formed without
+ * a threshold of honest signers.
+ *
+ * The interface is `(requirement, input)` — the same shape the standalone
+ * `verifyProof()` accepts — so this signer is reachable equally from a
+ * NIP-90 host (which adapts via `queryToRequirement` / `queryResultToInput`)
+ * and from a fixed-stakeholder caller that constructs the requirement
+ * directly.
  */
 
-import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult, BlossomKeyMap } from "../../domain/types.ts";
+import { verifyProof } from "../verification/verifier.ts";
+import type { BlossomKeyMap, VerificationInput, VerificationRequirement } from "../../domain/types.ts";
 import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "@anchr/cashu-frost-oracle/frost-cli";
 
 import { getLogger } from "@anchr/core-runtime/logger";
@@ -25,10 +31,13 @@ export interface FrostSigner {
   /** Execute a DKG round. */
   dkgRound(round: 1 | 2 | 3, input: DkgRoundInput): Promise<DkgRoundOutput | null>;
 
-  /** Independently verify query result and produce signing material if valid. */
+  /**
+   * Independently verify the requirement / evidence pair and produce
+   * signing material if the check passes.
+   */
   verifyAndSign(
-    query: Query,
-    result: QueryResult,
+    requirement: VerificationRequirement,
+    input: VerificationInput,
     message: string,
     commitmentsJson?: string,
     blossomKeys?: BlossomKeyMap,
@@ -109,12 +118,11 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       return null;
     },
 
-    async verifyAndSign(query, result, message, commitmentsJson, blossomKeys) {
-      // Step 1: Independent verification using existing oracle verify
-      const detail = await verify(query, result, blossomKeys);
+    async verifyAndSign(requirement, input, message, commitmentsJson, blossomKeys) {
+      const detail = await verifyProof(requirement, input, { blossomKeys });
       if (!detail.passed) {
-        log.error(`Verification failed for ${query.id}: ${detail.failures.join(", ")}`);
-        return null; // Refuse to sign
+        log.error(`Verification failed for ${requirement.id}: ${detail.failures.join(", ")}`);
+        return null;
       }
 
       // Step 2: If no commitments, this is round 1 — generate nonce commitments
