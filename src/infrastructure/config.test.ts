@@ -6,7 +6,7 @@ import { withEnv } from "../testing/helpers.ts";
 describe("getRuntimeConfig", () => {
   // Save and clear env vars that affect config
   const envKeys = [
-    "REFERENCE_APP_PORT", "PORT", "QUERY_SWEEP_INTERVAL_MS",
+    "HTTP_API_PORT", "PORT", "QUERY_SWEEP_INTERVAL_MS",
     "PREVIEW_MAX_DIMENSION", "PREVIEW_JPEG_QUALITY",
     "HTTP_API_KEYS", "HTTP_API_KEY",
     "ANTHROPIC_API_KEY", "AI_CONTENT_CHECK",
@@ -21,7 +21,7 @@ describe("getRuntimeConfig", () => {
 
     withEnv(clear, () => {
       const config = getRuntimeConfig();
-      expect(config.referenceAppPort).toBe(3000);
+      expect(config.httpApiPort).toBe(3000);
       expect(config.querySweepIntervalMs).toBe(30_000);
       expect(config.previewMaxDimension).toBe(768);
       expect(config.previewJpegQuality).toBe(75);
@@ -33,27 +33,27 @@ describe("getRuntimeConfig", () => {
   });
 
   test("reads numeric env vars", () => {
-    withEnv({ PORT: "4000", REFERENCE_APP_PORT: undefined }, () => {
-      expect(getRuntimeConfig().referenceAppPort).toBe(4000);
+    withEnv({ PORT: "4000", HTTP_API_PORT: undefined }, () => {
+      expect(getRuntimeConfig().httpApiPort).toBe(4000);
     });
 
-    withEnv({ REFERENCE_APP_PORT: "5000", PORT: "4000" }, () => {
-      // REFERENCE_APP_PORT takes precedence over PORT
-      expect(getRuntimeConfig().referenceAppPort).toBe(5000);
+    withEnv({ HTTP_API_PORT: "5000", PORT: "4000" }, () => {
+      // HTTP_API_PORT takes precedence over PORT
+      expect(getRuntimeConfig().httpApiPort).toBe(5000);
     });
   });
 
   test("falls back on invalid numeric values", () => {
-    withEnv({ PORT: "not-a-number", REFERENCE_APP_PORT: undefined }, () => {
-      expect(getRuntimeConfig().referenceAppPort).toBe(3000);
+    withEnv({ PORT: "not-a-number", HTTP_API_PORT: undefined }, () => {
+      expect(getRuntimeConfig().httpApiPort).toBe(3000);
     });
 
-    withEnv({ PORT: "-1", REFERENCE_APP_PORT: undefined }, () => {
-      expect(getRuntimeConfig().referenceAppPort).toBe(3000);
+    withEnv({ PORT: "-1", HTTP_API_PORT: undefined }, () => {
+      expect(getRuntimeConfig().httpApiPort).toBe(3000);
     });
 
-    withEnv({ PORT: "0", REFERENCE_APP_PORT: undefined }, () => {
-      expect(getRuntimeConfig().referenceAppPort).toBe(3000);
+    withEnv({ PORT: "0", HTTP_API_PORT: undefined }, () => {
+      expect(getRuntimeConfig().httpApiPort).toBe(3000);
     });
   });
 

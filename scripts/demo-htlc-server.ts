@@ -58,6 +58,22 @@ const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ?? "ws://local
 const BLOSSOM_URL = process.env.BLOSSOM_SERVERS?.split(",")[0]?.trim() ?? "http://localhost:3333";
 const CASHU_MINT_URL = process.env.CASHU_MINT_URL?.trim() ?? "http://localhost:3338";
 
+const DEMO_HTML = `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anchr · HTLC Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root">Open this in a browser with WebSocket DevTools — events stream from <code>/demo</code>.</div>
+</body>
+</html>
+`;
+
 // --- Helpers ---
 
 async function checkRelay(): Promise<boolean> {
@@ -558,10 +574,7 @@ Deno.serve({ port: PORT }, (req) => {
   }
 
   if (url.pathname === "/") {
-    // Serve the demo HTML file
-    return Deno.readFile("./example/reference-app/ui/demo/index.html").then(
-      (data) => new Response(data, { headers: { "content-type": "text/html; charset=utf-8" } })
-    );
+    return new Response(DEMO_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
   return new Response("Not Found", { status: 404 });

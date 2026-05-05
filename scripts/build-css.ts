@@ -16,21 +16,6 @@ interface CssBuild {
 
 const BUILDS: CssBuild[] = [
   {
-    label: "worker",
-    input: join(PROJECT_ROOT, "example/reference-app/ui/globals.css"),
-    output: join(PROJECT_ROOT, "example/reference-app/ui/generated.css"),
-  },
-  {
-    label: "requester",
-    input: join(PROJECT_ROOT, "example/reference-app/ui/requester/globals.css"),
-    output: join(PROJECT_ROOT, "example/reference-app/ui/requester/generated.css"),
-  },
-  {
-    label: "dashboard",
-    input: join(PROJECT_ROOT, "example/reference-app/ui/dashboard/globals.css"),
-    output: join(PROJECT_ROOT, "example/reference-app/ui/dashboard/generated.css"),
-  },
-  {
     label: "market",
     input: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/globals.css"),
     output: join(PROJECT_ROOT, "example/two-party-binary-bet/ui/generated.css"),

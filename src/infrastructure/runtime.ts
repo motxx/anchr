@@ -3,13 +3,15 @@ import { getRuntimeConfig } from "./config.ts";
 import { purgeExpiredQueries } from "../application/data-purge.ts";
 import { startMcpServer } from "./mcp-server.ts";
 import { createQueryService } from "../application/query-service.ts";
-import { startReferenceApp } from "./reference-app.ts";
+import { buildWorkerApiApp } from "./worker-api.ts";
+import { setupServerLogCapture } from "./log-stream.ts";
 import { createOracleRegistry } from "./oracle/registry.ts";
 import { normalizeQueryResult } from "./attachments.ts";
 import { publishQueryToRelay } from "./nostr/relay-publish.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "scheduler"]);
+const apiLog = getLogger(["anchr", "http-api"]);
 
 export interface ReferenceRuntime {
   stopScheduler(): void;
@@ -41,9 +43,10 @@ export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
     }
   }, config.querySweepIntervalMs);
 
-  startReferenceApp({ queryService, preimageStore, oracleRegistry }).catch((err: unknown) =>
-    log.error("Failed to start:", err)
-  );
+  setupServerLogCapture();
+  const app = buildWorkerApiApp({ queryService, preimageStore, oracleRegistry });
+  Deno.serve({ port: config.httpApiPort }, app.fetch);
+  apiLog.error(`HTTP API → http://localhost:${config.httpApiPort}`);
 
   await startMcpServer({ queryService });
 

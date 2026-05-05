@@ -2659,14 +2659,6 @@
           "npm:nostr-tools@2"
         ]
       },
-      "packages/cashu-frost-oracle": {
-        "dependencies": [
-          "jsr:@hono/hono@4",
-          "jsr:@logtape/logtape@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1"
-        ]
-      },
       "packages/core-cashu": {
         "dependencies": [
           "jsr:@logtape/logtape@2",
@@ -2681,7 +2673,15 @@
           "jsr:@logtape/logtape@2"
         ]
       },
-      "packages/photo-bounty": {
+      "packages/frost-oracle": {
+        "dependencies": [
+          "jsr:@hono/hono@4",
+          "jsr:@logtape/logtape@2",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1"
+        ]
+      },
+      "packages/photo-verification": {
         "dependencies": [
           "jsr:@logtape/logtape@2",
           "jsr:@noble/hashes@2",

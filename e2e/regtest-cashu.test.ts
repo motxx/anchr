@@ -57,7 +57,7 @@ const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
 // Wire oracleRegistry + preimageStore so verification can actually succeed
-// (mirrors production composition in src/infrastructure/reference-app.ts).
+// (mirrors production composition in src/infrastructure/runtime.ts).
 const testOracleRegistry = createOracleRegistry();
 const testPreimageStore = createPreimageStore();
 const testService = createQueryService({
