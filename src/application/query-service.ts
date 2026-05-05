@@ -1,11 +1,13 @@
 import { createQueryStore } from "../domain/query-store.ts";
 import { isOpenStatus } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
-import type { OracleRegistry } from "./oracle-port.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
-import type { EscrowProvider } from "./escrow-port.ts";
-import type { FrostSignaturePort } from "./frost-signature-port.ts";
-import type { ProofDelivery } from "./proof-delivery.ts";
+import type {
+  EscrowProvider,
+  FrostSignaturePort,
+  OracleRegistry,
+  ProofDelivery,
+} from "./ports.ts";
 import { MIN_ESCROW_LOCKTIME_SECS } from "./query-escrow-validation.ts";
 import {
   doCancelQuery,

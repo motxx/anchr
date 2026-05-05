@@ -4,8 +4,6 @@ import { z } from "zod";
 import type { QueryService } from "../application/query-service.ts";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
-import { isNostrEnabled } from "./nostr/transport/client.ts";
-import { isCashuEnabled } from "@anchr/core-cashu/wallet";
 import type { VerificationFactor, TlsnCondition } from "../domain/types.ts";
 import { VERIFICATION_FACTORS } from "../domain/types.ts";
 import {
@@ -21,8 +19,16 @@ import {
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "mcp-server"]);
 
+export interface McpServerCapabilities {
+  /** True when the host can settle bounties via Cashu ecash. Surfaced in tool descriptions. */
+  cashu: boolean;
+  /** True when the host publishes queries via Nostr relays. Surfaced in tool descriptions. */
+  nostr: boolean;
+}
+
 export interface McpServerDeps {
   queryService: QueryService;
+  capabilities?: McpServerCapabilities;
   /** Called after core tools register. Use to layer example-specific MCP tools on top. */
   extraTools?: (server: McpServer, backend: McpQueryBackend) => void;
 }
@@ -33,6 +39,8 @@ export async function startMcpServer(deps: McpServerDeps) {
     version: "0.3.0",
   });
   const backend = getMcpQueryBackend(deps.queryService);
+  const cashuEnabled = deps.capabilities?.cashu ?? false;
+  const nostrEnabled = deps.capabilities?.nostr ?? false;
 
   server.tool(
     "create_query",
@@ -41,8 +49,8 @@ export async function startMcpServer(deps: McpServerDeps) {
     "An auto-worker fetches the URL via MPC-TLS and returns a cryptographic proof tied to the server's TLS certificate.\n" +
     "2. Real-world observation (C2PA): Request a human to photograph or observe something. " +
     "The worker submits C2PA-verified media with GPS proof.\n" +
-    (isNostrEnabled() ? "Query is broadcast via Nostr relays. " : "") +
-    (isCashuEnabled() ? "Bounty paid via Cashu ecash (anonymous). " : "") +
+    (nostrEnabled ? "Query is broadcast via Nostr relays. " : "") +
+    (cashuEnabled ? "Bounty paid via Cashu ecash (anonymous). " : "") +
     "Returns a query_id — poll with get_query_status.",
     {
       description: z.string().describe("What to verify, e.g. 'BTC price from CoinGecko' or '渋谷スクランブル交差点の混雑状況'"),

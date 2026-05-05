@@ -10,7 +10,7 @@
  * what was cryptographically verified — no post-hoc modification.
  */
 
-import type { ProofDelivery, ProofPublishResult } from "../../application/proof-delivery.ts";
+import type { ProofDelivery, ProofPublishResult } from "../../application/ports.ts";
 import type { OracleAttestationRecord, ProofVisibility, Query } from "../../domain/types.ts";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";

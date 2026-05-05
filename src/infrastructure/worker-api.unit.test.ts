@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createOracleRegistry } from "./oracle/discovery/registry.ts";
+import { createOracleRegistry } from "./oracle-client/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createQueryService, createQueryStore } from "../application/query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";

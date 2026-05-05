@@ -1,8 +1,7 @@
 import { builtInOracle, BUILT_IN_ORACLE_ID } from "./built-in.ts";
-import type { Oracle, OracleInfo } from "../types.ts";
-import type { OracleRegistry } from "../../../application/oracle-port.ts";
-// Re-export the port type so callers can import OracleRegistry alongside the registry implementation.
-export type { OracleRegistry } from "../../../application/oracle-port.ts";
+import type { Oracle, OracleInfo } from "../../domain/oracle-types.ts";
+import type { OracleRegistry } from "../../application/ports.ts";
+export type { OracleRegistry } from "../../application/ports.ts";
 
 export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): OracleRegistry {
   const oracles = new Map<string, Oracle>();

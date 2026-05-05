@@ -1,4 +1,4 @@
-import type { EscrowProvider } from "./escrow-port.ts";
+import type { EscrowProvider } from "./ports.ts";
 import type { Query, QueryStatus } from "../domain/types.ts";
 
 export interface EscrowTokenLockResult {

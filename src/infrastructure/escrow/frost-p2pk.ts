@@ -8,7 +8,7 @@ import {
   type P2PKOptions,
   getDecodedToken,
 } from "@cashu/cashu-ts";
-import type { EscrowProvider } from "../../application/escrow-port.ts";
+import type { EscrowProvider } from "../../application/ports.ts";
 import {
   getWalletAndConfig,
   encodeProofs,

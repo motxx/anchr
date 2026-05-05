@@ -18,7 +18,7 @@ import { buildOracleAnnouncementEvent } from "../src/infrastructure/nostr/events
 import {
   discoverOracles,
   parseOracleAnnouncementEvent,
-} from "../src/infrastructure/oracle/discovery/oracle-discovery.ts";
+} from "../src/infrastructure/oracle-client/oracle-discovery.ts";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../src/infrastructure/nostr/events/events.ts";
 import type { OracleInfo } from "../src/domain/oracle-types.ts";
 

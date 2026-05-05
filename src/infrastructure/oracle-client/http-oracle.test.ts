@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildOracleApp } from "../server/oracle-server.ts";
+import { buildOracleApp } from "../oracle-service/server.ts";
 import { createHttpOracle } from "./http-oracle.ts";
-import type { Query, QueryResult } from "../../../domain/types.ts";
-import { makeQuery as makeBaseQuery } from "../../../testing/factories.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
+import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const TEST_ORACLE_ID = "test-http-oracle";
 const TEST_API_KEY = "test-secret";

@@ -3,15 +3,15 @@
  * as an Oracle interface so it can be used seamlessly in the registry.
  */
 
-import type { BlossomKeyMap, Query, QueryResult } from "../../../domain/types.ts";
-import type { Oracle, OracleAttestation, OracleInfo } from "../types.ts";
+import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types.ts";
+import type { Oracle, OracleAttestation, OracleInfo } from "../../domain/oracle-types.ts";
 import {
   isRecord,
   optionalNumber,
   optionalStringArray,
   requireBoolean,
   requireStringArray,
-} from "../../lib/runtime-types.ts";
+} from "../lib/runtime-types.ts";
 
 export interface HttpOracleConfig {
   id: string;

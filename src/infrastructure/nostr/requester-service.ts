@@ -24,7 +24,7 @@ import {
   type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
-import type { EscrowProvider } from "../../application/escrow-port.ts";
+import type { EscrowProvider } from "../../application/ports.ts";
 import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";

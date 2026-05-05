@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildOracleApp } from "./oracle-server.ts";
+import { buildOracleApp } from "./server.ts";
 import { createFrostCoordinator } from "@anchr/frost-oracle/coordinator";
 import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 

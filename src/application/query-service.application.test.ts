@@ -2,8 +2,8 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { QueryService, QueryStore } from "./query-service.ts";
-import { createOracleRegistry } from "../infrastructure/oracle/index.ts";
-import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle/index.ts";
+import { createOracleRegistry } from "../infrastructure/oracle-client/index.ts";
+import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle-client/index.ts";
 import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../domain/types.ts";
 
 function makeMockOracle(opts?: {

@@ -1,10 +1,10 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "../../nostr/crypto/identity.ts";
-import { buildOracleAnnouncementEvent } from "../../nostr/events/event-builders.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../../nostr/events/events.ts";
+import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
+import { buildOracleAnnouncementEvent } from "../nostr/events/event-builders.ts";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events/events.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
-import type { OracleInfo } from "../../../domain/oracle-types.ts";
+import type { OracleInfo } from "../../domain/oracle-types.ts";
 
 const FULL_ORACLE_INFO: OracleInfo = {
   id: "test-oracle",

@@ -1,19 +1,17 @@
 /**
  * Data Marketplace — example application built on the Anchr host.
  *
- * Composes the core `buildWorkerApiApp` with marketplace-specific routes
- * (`/marketplace/*`) for x402-style verified-data listings, plus the MCP
- * tools that drive the same listings via tool calls.
+ * Calls `composeHost({extraRoutes})` to get the standard worker-api app
+ * extended with marketplace-specific routes (`/marketplace/*`) for
+ * x402-style verified-data listings, plus the MCP tools that drive the
+ * same listings via tool calls.
  *
  * Usage:
  *   deno run --allow-all example/data-marketplace/server.ts
  */
 
-import { buildWorkerApiApp } from "../../src/infrastructure/worker-api.ts";
+import { composeHost } from "../../src/infrastructure/runtime.ts";
 import { startMcpServer } from "../../src/infrastructure/mcp-server.ts";
-import { createQueryService } from "../../src/application/query-service.ts";
-import { createOracleRegistry } from "../../src/infrastructure/oracle/discovery/registry.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { createListingStore } from "./src/marketplace/listing-store.ts";
 import { registerMarketplaceRoutes } from "./src/marketplace/marketplace-routes.ts";
 import {
@@ -27,16 +25,9 @@ import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "data-marketplace"]);
 
 const HTTP_PORT = Number(Deno.env.get("HTTP_API_PORT")) || 3000;
-
-const oracleRegistry = createOracleRegistry();
-const preimageStore = createPreimageStore();
 const listingStore = createListingStore();
-const queryService = createQueryService({ oracleRegistry, preimageStore });
 
-const app = buildWorkerApiApp({
-  queryService,
-  oracleRegistry,
-  preimageStore,
+const { queryService, app, capabilities } = composeHost({
   extraRoutes: (app, ctx) => {
     registerMarketplaceRoutes(app, {
       listingStore,
@@ -50,6 +41,7 @@ const app = buildWorkerApiApp({
 if (Deno.env.get("MCP_STDIO") === "1") {
   await startMcpServer({
     queryService,
+    capabilities,
     extraTools: (server, backend) => {
       server.tool(
         "marketplace_list_data",

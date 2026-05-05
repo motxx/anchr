@@ -4,14 +4,14 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "../../nostr/crypto/identity.ts";
+import type { NostrIdentity } from "../nostr/crypto/identity.ts";
 import {
   parseOracleResponsePayload,
   parseFeedbackPayload,
   type QuoteFeedbackPayload,
   type OracleResponsePayload,
-} from "../../nostr/events/events.ts";
-import type { Query, QueryResult } from "../../../domain/types.ts";
+} from "../nostr/events/events.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
 
 export interface WatchedQuery {
   queryId: string;

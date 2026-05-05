@@ -42,6 +42,8 @@ export interface RuntimeConfig {
   tlsnVerifierUrl?: string;
   /** TLSNotary WebSocket proxy URL (served to workers). */
   tlsnProxyUrl?: string;
+  /** Persistent preimage-store file (JSON). Survives restarts. */
+  preimageStorePath: string;
 }
 
 export const DEFAULT_RUNTIME_DATA_DIR = Deno.env.get("RUNTIME_DATA_DIR") ?? join(moduleDir(import.meta), "..", ".local");
@@ -59,5 +61,7 @@ export function getRuntimeConfig(): RuntimeConfig {
     trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
     tlsnVerifierUrl: Deno.env.get("TLSN_VERIFIER_URL")?.trim() || undefined,
     tlsnProxyUrl: Deno.env.get("TLSN_PROXY_URL")?.trim() || undefined,
+    preimageStorePath: Deno.env.get("PREIMAGE_STORE_PATH")?.trim() ||
+      join(DEFAULT_RUNTIME_DATA_DIR, "preimages.json"),
   };
 }

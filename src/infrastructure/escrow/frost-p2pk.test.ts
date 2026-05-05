@@ -5,8 +5,8 @@ import {
   buildFrostP2PKOptions,
   createFrostEscrowProvider,
   type FrostEscrowConfig,
-} from "./frost-escrow-provider.ts";
-import type { EscrowProvider } from "../../application/escrow-port.ts";
+} from "./frost-p2pk.ts";
+import type { EscrowProvider } from "../../application/ports.ts";
 
 const WORKER_PUB = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const GROUP_PUB  = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";

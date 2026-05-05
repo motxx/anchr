@@ -14,28 +14,28 @@
 import type { Event } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { NostrIdentity } from "../../nostr/crypto/identity.ts";
-import { restoreIdentity } from "../../nostr/crypto/identity.ts";
-import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../../nostr/events/dm.ts";
+import type { NostrIdentity } from "../nostr/crypto/identity.ts";
+import { restoreIdentity } from "../nostr/crypto/identity.ts";
+import { buildPreimageDM, buildRejectionDM, buildFrostSignatureDM } from "../nostr/events/dm.ts";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
-} from "../../nostr/transport/client.ts";
+} from "../nostr/transport/client.ts";
 import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 import type { FrostCoordinator } from "@anchr/frost-oracle/coordinator";
 import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
 import { coordinateSigning } from "@anchr/frost-oracle/signing-coordinator";
-import { queryResultToInput, queryToRequirement, verify } from "../../verification/verifier.ts";
-import type { Query, QueryResult } from "../../../domain/types.ts";
+import { queryResultToInput, queryToRequirement, verify } from "../verification/verifier.ts";
+import type { Query, QueryResult } from "../../domain/types.ts";
 import {
   type WatchedQuery,
   buildQueryFromPayload,
   buildResultFromPayload,
   handleFeedbackEvent,
   parseResponsePayload,
-} from "./oracle-nostr-handlers.ts";
+} from "./nostr-handlers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-nostr"]);

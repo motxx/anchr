@@ -1,10 +1,10 @@
 import { test, describe } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryService } from "./query-service.ts";
-import type { ProofDelivery, ProofPublishResult } from "./proof-delivery.ts";
+import type { ProofDelivery, ProofPublishResult } from "./ports.ts";
 import type { OracleAttestationRecord, ProofVisibility, Query, QueryResult } from "../domain/types.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import { createOracleRegistry } from "../infrastructure/oracle/discovery/registry.ts";
+import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
 
 function createMockOracle(id: string, passResult: boolean): Oracle {
   return {

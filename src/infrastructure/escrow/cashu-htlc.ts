@@ -1,4 +1,4 @@
-import type { EscrowProvider } from "../../application/escrow-port.ts";
+import type { EscrowProvider } from "../../application/ports.ts";
 import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "@anchr/core-cashu/escrow";
 import { verifyToken } from "@anchr/core-cashu/wallet";
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";

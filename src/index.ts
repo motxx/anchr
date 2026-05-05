@@ -22,8 +22,7 @@ export type {
 } from "./application/query-service.ts";
 export { MIN_ESCROW_LOCKTIME_SECS } from "./application/query-escrow-validation.ts";
 export { purgeExpiredQueries } from "./application/data-purge.ts";
-export type { EscrowProvider } from "./application/escrow-port.ts";
-export type { FrostSignaturePort } from "./application/frost-signature-port.ts";
+export type { EscrowProvider, FrostSignaturePort } from "./application/ports.ts";
 
 export {
   discoverQueries, submitQuote, waitForSelection, encryptAndUpload,
@@ -36,18 +35,20 @@ export {
 } from "./infrastructure/nostr/requester-service.ts";
 export type { RequesterConfig, CreateQueryRequest, RequesterQueryState } from "./infrastructure/nostr/requester-service.ts";
 
-export { createCashuEscrowProvider } from "./infrastructure/cashu/cashu-escrow-provider.ts";
-export { createFrostEscrowProvider } from "./infrastructure/frost/frost-escrow-provider.ts";
+export { createCashuEscrowProvider } from "./infrastructure/escrow/cashu-htlc.ts";
+export { createFrostEscrowProvider } from "./infrastructure/escrow/frost-p2pk.ts";
 
 export type { PreimageStore, PreimageEntry } from "@anchr/core-cashu/preimage-port";
 export { createPreimageStore, createPersistentPreimageStore } from "@anchr/core-cashu/preimage-store";
 
-export type { OracleRegistry } from "./application/oracle-port.ts";
-export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle, buildOracleApp } from "./infrastructure/oracle/index.ts";
-export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./infrastructure/oracle/index.ts";
+export type { OracleRegistry } from "./application/ports.ts";
+export { createOracleRegistry, listOracles, getOracle, registerOracle, resolveOracle, createHttpOracle } from "./infrastructure/oracle-client/index.ts";
+export type { Oracle, OracleInfo, OracleAttestation, HttpOracleConfig } from "./infrastructure/oracle-client/index.ts";
+export { buildOracleApp } from "./infrastructure/oracle-service/index.ts";
 
 export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server.ts";
-export { startReferenceRuntime } from "./infrastructure/runtime.ts";
+export { startReferenceRuntime, composeHost } from "./infrastructure/runtime.ts";
+export type { HostComposition, ComposeHostOptions } from "./infrastructure/runtime.ts";
 export { verify as verifyQueryResult, verifyProof, queryToRequirement, queryResultToInput } from "./infrastructure/verification/verifier.ts";
 export { stripExif } from "./infrastructure/exif-strip.ts";
 
@@ -58,8 +59,8 @@ export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload.
 export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment.ts";
 export * as verification from "./infrastructure/verification/index.ts";
 
-export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle/nostr/oracle-nostr-service.ts";
-export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle/nostr/oracle-nostr-service.ts";
+export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle-service/nostr-service.ts";
+export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle-service/nostr-service.ts";
 
 if (import.meta.main) {
   await import("./infrastructure/server.ts");

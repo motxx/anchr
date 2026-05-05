@@ -4,14 +4,14 @@ import {
   createOracleNostrService,
   _setPublishEventForTest,
   _setVerifyForTest,
-} from "./oracle-nostr-service.ts";
-import type { OracleNostrServiceConfig } from "./oracle-nostr-service.ts";
-import { generateEphemeralIdentity } from "../../nostr/crypto/identity.ts";
+} from "./nostr-service.ts";
+import type { OracleNostrServiceConfig } from "./nostr-service.ts";
+import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { createFrostCoordinator } from "@anchr/frost-oracle/coordinator";
 import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
-import type { AttachmentRef } from "../../../domain/types.ts";
+import type { AttachmentRef } from "../../domain/types.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

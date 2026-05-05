@@ -6,7 +6,7 @@
  * stateless, no cookies, no identity tracking.
  *
  * Usage:
- *   ORACLE_PORT=4000 ORACLE_API_KEY=secret deno run src/infrastructure/oracle/server/oracle-server.ts
+ *   ORACLE_PORT=4000 ORACLE_API_KEY=secret deno run src/infrastructure/oracle-service/server.ts
  *
  * Routes are split across sibling files; this module composes them onto a
  * single Hono app and owns process-level concerns (env, logging, listen).
@@ -17,11 +17,11 @@ import { createPreimageStore, createPersistentPreimageStore, type PreimageStore 
 import { createFrostCoordinator, type FrostCoordinator } from "@anchr/frost-oracle/coordinator";
 import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
-import { buildAuthMiddleware } from "./oracle-server-auth.ts";
-import { registerHtlcRoutes } from "./oracle-htlc-routes.ts";
-import { registerFrostSignerRoutes } from "./oracle-frost-signer-routes.ts";
-import { registerFrostDkgRoutes } from "./oracle-frost-dkg-routes.ts";
-import { registerFrostSignRoutes } from "./oracle-frost-sign-routes.ts";
+import { buildAuthMiddleware } from "./auth.ts";
+import { registerHtlcRoutes } from "./htlc-routes.ts";
+import { registerFrostSignerRoutes } from "./frost-signer-routes.ts";
+import { registerFrostDkgRoutes } from "./frost-dkg-routes.ts";
+import { registerFrostSignRoutes } from "./frost-sign-routes.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "oracle-server"]);

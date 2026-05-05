@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "./worker-api.ts";
 import { createQueryService, createQueryStore } from "../application/query-service.ts";
 import type { QueryService } from "../application/query-service.ts";
-import { createOracleRegistry } from "./oracle/index.ts";
-import type { Oracle, OracleAttestation } from "./oracle/index.ts";
+import { createOracleRegistry } from "./oracle-client/index.ts";
+import type { Oracle, OracleAttestation } from "./oracle-client/index.ts";
 import type { Query, QueryResult, BlossomKeyMap } from "../domain/types.ts";
 
 // --- Mock oracle ---

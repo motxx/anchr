@@ -4,14 +4,14 @@ import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
 import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
 import {
   createOracleRegistry,
-} from "../infrastructure/oracle/discovery/registry.ts";
+} from "../infrastructure/oracle-client/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import {
   createQueryService,
   createQueryStore,
 } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
-import type { EscrowProvider } from "./escrow-port.ts";
+import type { EscrowProvider } from "./ports.ts";
 import { createIntegrityStore } from "@anchr/photo-verification/integrity-store";
 
 function makeFakeToken(amountSats: number): string {

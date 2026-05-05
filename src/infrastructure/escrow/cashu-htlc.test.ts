@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import { getEncodedToken, getDecodedToken, type Proof } from "@cashu/cashu-ts";
 import {
   createCashuEscrowProvider,
-} from "./cashu-escrow-provider.ts";
-import type { EscrowProvider } from "../../application/escrow-port.ts";
+} from "./cashu-htlc.ts";
+import type { EscrowProvider } from "../../application/ports.ts";
 
 const WORKER_PUB  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OTHER_PUB   = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";

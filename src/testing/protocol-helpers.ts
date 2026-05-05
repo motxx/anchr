@@ -5,10 +5,10 @@
  */
 
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
-import { createOracleRegistry } from "../infrastructure/oracle/discovery/registry.ts";
+import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
 import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import type { EscrowProvider } from "../application/escrow-port.ts";
+import type { EscrowProvider } from "../application/ports.ts";
 import { createQueryService, createQueryStore } from "../application/query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 
