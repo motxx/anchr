@@ -130,7 +130,7 @@ time. Run your own, or use third-party infrastructure.
 
 The snippets below show API shape only. For runnable Customer/Provider
 code (with adapter setup), see
-[`example/two-party-binary-bet/`](example/two-party-binary-bet/).
+[`example/c2pa-media-verification/`](example/c2pa-media-verification/).
 
 ```ts
 // Customer side — the SDK generates an ephemeral Nostr key per request,
@@ -204,40 +204,92 @@ by publishing a schema, not by upgrading the SDK.
 Schemas are themselves Nostr events (versioned and discoverable by URI),
 defining the predicate shape, proof format, and verification rules.
 
+## Composition patterns
+
+`@anchr/sdk` (Customer/Provider) is the headline shape, but Anchr's
+primitives compose into four shapes — each serving a different
+counterparty topology:
+
+1. **Bounty** (1:N, single-hop) — one Customer pays one of many
+   competing Providers for verified data. The default `@anchr/sdk` flow.
+2. **Chained Bounty** (N hops) — a chain of Customer/Provider
+   transactions where each hop verifies the prior hop's attestation
+   and adds its own. Settlement happens at every hop (or off-protocol
+   for fiat-leg cases).
+3. **Conditional Swap / Market** (2-party, bilateral) — both parties
+   lock counter-tokens against opposing outcomes; an oracle reveals one
+   preimage and the winner sweeps. **Narrow scope on purpose**: tied to
+   verifiable events. Continuous order books, AMMs, and dynamic-
+   counterparty matching are out of scope — Lightning + DLC fits those
+   better.
+4. **Verification-only** (no payment) — attestation chains that don't
+   need settlement (sybil shielding, audit trails).
+
 ## Examples
 
-Use this SDK to build the products below. Status shows current
-implementation — see each example's README for what runs today.
+Status reflects current implementation; see each example's README for
+what runs today.
+
+### Bounty (Customer/Provider, single-hop)
 
 | Product | Status |
 |---|---|
 | Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/)) | Testnet |
-| Two-party binary bet ([Kannagi](example/two-party-binary-bet/)) | Testnet |
-| Airdrop sybil resistance ([Katashiro](example/airdrop-bot-shield/)) | Simulation |
 | Browser auto-claim ([Auto-claim](example/auto-claim/)) | Concept |
 | Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Concept (TLSN-on-Square compatibility risk) |
 
-Composition sketches (not products):
-[Royalty distribution](example/royalty-distribution/),
-[Supply-chain proof](example/supply-chain-proof/).
+### Chained Bounty (multi-hop, settlement per hop)
+
+| Product | Status |
+|---|---|
+| [Royalty distribution](example/royalty-distribution/) | Composition sketch |
+| [Supply-chain proof](example/supply-chain-proof/) | Composition sketch |
+
+Each hop is a Customer/Provider transaction (settlement on-protocol
+via Cashu, or off-protocol fiat for supply-chain finance); the chain
+itself is application-orchestrated.
+
+### Conditional Swap / Market (2-party, bilateral)
+
+| Product | Status |
+|---|---|
+| Two-party binary bet ([Kannagi](example/two-party-binary-bet/)) | Testnet |
+
+Uses `@anchr/cashu-conditional-swap` directly (no `@anchr/sdk` —
+Customer/Provider doesn't fit symmetric counterparties). FIFO matching
+queue pairs YES/NO bets at fixed 1:1 odds.
+
+### Verification-only (attestations, no settlement)
+
+| Product | Status |
+|---|---|
+| Airdrop sybil resistance ([Katashiro](example/airdrop-bot-shield/)) | Simulation |
 
 ## Underlying packages
 
-**User-facing** — what you import directly:
+**User-facing — Bounty / Chained Bounty:**
 
 | Package | Purpose |
 |---|---|
 | [`@anchr/sdk`](packages/sdk/) | Customer/Provider orchestration (main entry) |
-| [`@anchr/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary proof producer/verifier (for TLSN-based Providers) |
-| [`@anchr/photo-verification`](packages/photo-verification/) | C2PA + GPS + ProofMode + EXIF + AI heuristic verification (for C2PA-based Providers) |
+| [`@anchr/tlsn-toolkit`](packages/tlsn-toolkit/) | TLSNotary proof producer/verifier |
+| [`@anchr/photo-verification`](packages/photo-verification/) | C2PA + GPS + ProofMode + EXIF + AI heuristic |
 
-**Internal** — `@anchr/sdk` depends on these; usually you don't import directly:
+**User-facing — Conditional Swap / Market:**
 
 | Package | Purpose |
 |---|---|
-| [`@anchr/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Cross-lock primitive (HTLC + FROST P2PK) |
+| [`@anchr/cashu-conditional-swap`](packages/cashu-conditional-swap/) | Cross-lock primitive (HTLC + FROST P2PK) for verifiable-outcome bilateral swaps |
 | [`@anchr/frost-oracle`](packages/frost-oracle/) | FROST t-of-n threshold signing wrapper |
+
+**Host-side / internal — usually you don't import directly:**
+
+| Package | Purpose |
+|---|---|
+| [`@anchr/runtime`](packages/runtime/) | Anchr role runtime — Query lifecycle, escrow, oracle-client/service, worker-api (HTTP), MCP (stdio). Embed via `composeHost(extras)` |
 | [`@anchr/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow primitives |
+| [`@anchr/blossom`](packages/blossom/) | Encrypted attachment store (BUD-01–06 client) |
+| [`@anchr/core-runtime`](packages/core-runtime/) | Cross-runtime helpers (spawn, fs, which, env, logger) |
 
 Plus Rust crates: `crates/frost-signer` (FROST signing daemon),
 `crates/tlsn-*` (TLSNotary integrations).
