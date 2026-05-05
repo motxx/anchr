@@ -54,10 +54,18 @@ ENV NODE_ENV=production
 ENV MARKET_PORT=8080
 ENV PATH="/usr/local/bin:${PATH}"
 
+# Pre-fetch the @db/sqlite native library into the deno cache so the
+# runtime user (anchr) doesn't need outbound network or write access to
+# /deno-dir at boot. Without this, the first import of "@db/sqlite"
+# tries to mkdir /deno-dir/plug as anchr and fails.
+RUN deno eval --config deno.json \
+    'import { Database } from "@db/sqlite"; const d = new Database(":memory:"); d.close();'
+
 # The orchestrator decrypts the FROST signer configs from env, spawns
 # the three signer nodes in this VM, then starts the market server.
 RUN adduser --disabled-password --gecos "" anchr
 RUN mkdir -p /data && chown -R anchr:anchr /data
+RUN chown -R anchr:anchr /deno-dir
 USER anchr
 
 EXPOSE 8080

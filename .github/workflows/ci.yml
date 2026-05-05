@@ -65,20 +65,11 @@ jobs:
         run: deno task test:all
 
       # Phase 2: Docker-dependent tests
-      - name: Start infrastructure (relay + Blossom + Postgres)
+      - name: Start infrastructure (relay + Blossom)
         if: ${{ !cancelled() }}
         run: |
-          docker compose up -d relay blossom postgres
-          # Wait for Postgres so the two-party-binary-bet order-book tests
-          # don't start before /docker-entrypoint-initdb.d finishes.
-          for i in $(seq 1 30); do
-            if docker compose exec -T postgres pg_isready -U anchr -d anchr_market > /dev/null 2>&1; then
-              echo "Postgres ready."
-              break
-            fi
-            sleep 2
-          done
-          sleep 5
+          docker compose up -d relay blossom
+          sleep 3
 
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
@@ -113,14 +104,13 @@ jobs:
             sleep 3
           done
 
-      - name: Regtest E2E tests (HTLC + Cashu + Postgres)
+      - name: Regtest E2E tests (HTLC + Cashu)
         if: ${{ !cancelled() }}
         run: deno task test:regtest
         env:
           CASHU_MINT_URL: http://localhost:3338
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
-          DATABASE_URL: postgres://anchr:anchr@localhost:5432/anchr_market
 
       - name: Stop infrastructure
         if: always()
