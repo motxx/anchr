@@ -63,19 +63,13 @@ test("losing preimage cannot be recovered after resolve", () => {
   const store = createDualPreimageStore();
   const { hash_a, hash_b } = store.create("market-1");
 
-  // Resolve YES → preimage_a revealed, preimage_b deleted
+  // YES wins → preimage_a revealed, preimage_b deleted permanently.
   const result = resolveMarket("market-1", "yes", store);
   expect(result).not.toBeNull();
 
-  // Store is now marked as revealed — no further reveals possible
-  // This guarantees the losing side's preimage is irrecoverable
   expect(store.reveal("market-1", "b")).toBeNull();
   expect(store.reveal("market-1", "a")).toBeNull();
 });
-
-// ---------------------------------------------------------------------------
-// Per-proof FROST resolution tests (NUT-11 P2PK)
-// ---------------------------------------------------------------------------
 
 test("resolveMarketFrostPerProof signs each proof secret individually", () => {
   const keyStore = createDualKeyStore();
@@ -94,7 +88,6 @@ test("resolveMarketFrostPerProof signs each proof secret individually", () => {
   expect(result!.outcome).toBe("yes");
   expect(result!.proof_signatures.size).toBe(3);
 
-  // Each signature should be valid for SHA256(proof.secret) under pubkey_a
   for (const [secret, sig] of result!.proof_signatures) {
     const msgHash = sha256(new TextEncoder().encode(secret));
     const valid = schnorr.verify(hexToBytes(sig), msgHash, hexToBytes(pubkeys.pubkey_a));
@@ -134,7 +127,8 @@ test("resolveMarketFrostPerProof signature matches NUT-11 format (SHA256 of secr
   keyStore.create("market-nut11");
   const pubkeys = keyStore.getPubkeys("market-nut11")!;
 
-  // This is what a real NUT-11 P2PK proof secret looks like
+  // Realistic NUT-11 P2PK secret — the signing message must match what
+  // cashu-ts signP2PKProofs computes (SHA256 of the secret bytes).
   const realSecret = '["P2PK",{"data":"02abc123","nonce":"deadbeef","tags":[["pubkeys","02abc","02def"],["n_sigs","2"],["sigflag","SIG_ALL"]]}]';
 
   const result = resolveMarketFrostPerProof("market-nut11", "yes", [realSecret], keyStore);
@@ -142,10 +136,8 @@ test("resolveMarketFrostPerProof signature matches NUT-11 format (SHA256 of secr
 
   const sig = result!.proof_signatures.get(realSecret)!;
   expect(sig).toBeTruthy();
-  expect(sig.length).toBe(128); // 64-byte Schnorr sig as hex
+  expect(sig.length).toBe(128);
 
-  // Verify: the signing message must be SHA256(proof.secret) as bytes
-  // This is exactly what cashu-ts signP2PKProofs does internally
   const expectedMsg = sha256(new TextEncoder().encode(realSecret));
   const valid = schnorr.verify(hexToBytes(sig), expectedMsg, hexToBytes(pubkeys.pubkey_a));
   expect(valid).toBe(true);

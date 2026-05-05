@@ -568,7 +568,6 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     resultTimeoutMs: 50,
   });
 
-  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
@@ -579,12 +578,9 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
 
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
-  expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey); // cheapest
-  // Phase-2 receives the Phase-1 proofs directly (passed by value through
-  // the Customer flow rather than re-decoded from the broadcast token).
+  expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);
   expect(bindRecorder.params.initialProofs).toEqual([]);
 
-  // Two events published: kind 5300 request + kind 7000 selection.
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
   expect(publishedEvents[1].kind).toBe(7000);
@@ -605,7 +601,7 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
         const expensive = buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: provider.publicKey,
-          amount_sats: 9999, // over budget
+          amount_sats: 9999,
         });
         onEvent(expensive);
       });
@@ -642,7 +638,6 @@ test("Customer.request honors `provider` pinning when set", async () => {
     subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const id = requestEventId.id ?? "unknown";
-        // The "wrong" provider quotes too; the customer must reject it.
         onEvent(buildQuoteFeedbackEvent(otherProvider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: otherProvider.publicKey,
@@ -672,7 +667,6 @@ test("Customer.request honors `provider` pinning when set", async () => {
     resultTimeoutMs: 50,
   });
 
-  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },

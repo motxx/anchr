@@ -101,9 +101,7 @@ describe("publishEvent", () => {
       nonce: "X",
       expires_at: Date.now() + 60_000,
     });
-    // publishEvent should not throw even with bad relay URLs
     const result = await publishEvent(event, ["ws://localhost:1"]);
-    // nostr-tools pool.publish resolves per relay; result varies by connectivity
     expect(result.successes.length + result.failures.length).toBe(1);
   });
 });
