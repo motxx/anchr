@@ -118,6 +118,15 @@ wait_for_service() {
 start_docker_services() {
   step "Phase 2: Start Docker Services"
 
+  # Wipe any prior state — left-over containers from a previous dev
+  # session (anchr-postgres-1, anchr-cashu-mint-1, anchr-lnd-*) stash
+  # chain height / wallet / Postgres rows that drift from what
+  # init-regtest.sh expects, and the LND mine-150-blocks step racing
+  # against an already-mined chain is the classic flake. Volumes and
+  # orphan containers go too, so each run starts deterministic.
+  echo "  Resetting previous Docker state..."
+  docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
+
   # Start relay + blossom + postgres
   echo "  Starting relay + blossom + postgres..."
   docker compose up -d relay blossom postgres

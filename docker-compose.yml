@@ -1,3 +1,10 @@
+# Pin the compose project name so every worktree (anchr, anchr-wt/main, …)
+# attaches to the same set of containers + volumes. Without this, each
+# worktree directory becomes its own project and they fight over the host
+# ports — `0.0.0.0:8081 already allocated` etc. test-all.sh's reset can
+# only down what it owns; a pinned project lets it own everything.
+name: anchr
+
 services:
   relay:
     image: scsibug/nostr-rs-relay:latest
