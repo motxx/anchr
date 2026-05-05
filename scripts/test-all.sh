@@ -91,7 +91,7 @@ run_pentest() {
   # this ceiling to verify the limiter actually trips.
   local port=8091
   HTTP_API_KEYS=pentest-key-001 PORT=$port RATE_LIMIT_MAX=500 \
-    deno run --allow-all packages/runtime/src/infrastructure/server.ts &
+    deno run --allow-all example/anchr-reference-host/server.ts &
   local server_pid=$!
 
   # Poll /health for up to 30s — CI cold-start (tailwind CSS build + Deno cache)
