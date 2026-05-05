@@ -10,8 +10,8 @@
  *   deno run --allow-all example/data-marketplace/server.ts
  */
 
-import { composeHost } from "../../src/infrastructure/runtime.ts";
-import { startMcpServer } from "../../src/infrastructure/mcp-server.ts";
+import { composeHost } from "@anchr/runtime";
+import { startMcpServer } from "@anchr/runtime/mcp-server";
 import { createListingStore } from "./src/marketplace/listing-store.ts";
 import { registerMarketplaceRoutes } from "./src/marketplace/marketplace-routes.ts";
 import {

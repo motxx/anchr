@@ -1,4 +1,7 @@
 {
+  "imports": {
+    "@anchr/sdk": "../../packages/sdk/src/index.ts"
+  },
   "tasks": {
     "start": "deno run --allow-all cli.ts"
   }

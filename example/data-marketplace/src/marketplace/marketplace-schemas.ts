@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tlsnRequirementSchema } from "../../../../src/infrastructure/worker-api-schemas.ts";
+import { tlsnRequirementSchema } from "@anchr/runtime/worker-api-schemas";
 
 export const createListingSchema = z.object({
   name: z.string().min(1).max(200),

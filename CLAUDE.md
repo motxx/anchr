@@ -14,13 +14,13 @@ the code and `docs/`.
 
 ## Logging
 `getLogger(["anchr", "<name>"])` from `@anchr/core-runtime/logger`.
-**No `console.*`** in `src/(application|infrastructure)/` or `packages/`
-(E021). Level read from `ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
+**No `console.*`** in `packages/runtime/src/(application|infrastructure)/`
+or any `packages/` (E021). Level read from `ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
 
 ## Type bar
-`as` and `any` forbidden in `src/` and `packages/`. Narrow with type
-predicates or `src/infrastructure/lib/runtime-types.ts`. `unknown` only
-at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
+`as` and `any` forbidden everywhere in `packages/`. Narrow with type
+predicates or `packages/runtime/src/infrastructure/lib/runtime-types.ts`.
+`unknown` only at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
 
 ## Versioning (pre-1.0)
 Delete replaced paths outright. No `@deprecated`, "legacy", or
@@ -49,17 +49,22 @@ every Edit/Write via PostToolUse hook and on every `git push` via
 pre-commit hook.
 
 ## Layout
-- `src/` — reference Anchr host (Hono on Deno) composing the packages
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
-  `frost-oracle`, `cashu-conditional-swap`, `sdk`)
-- `example/<app>/` — concrete apps; their own deno.json + design system
+  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `runtime`,
+  `sdk`). The host implementation (Query lifecycle, escrow,
+  oracle-client/service, worker-api, MCP) lives in
+  `packages/runtime/src/{domain,application,infrastructure}/`.
+- `example/<app>/` — concrete apps; their own deno.json + design
+  system. **Must reach Anchr through `@anchr/*` only** — relative
+  paths into `packages/<pkg>/src/...` are an E023 violation. The
+  reference deployment is `example/anchr-reference-host/`.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
 
 Application vocabulary (`market`, `marketplace`, …) is forbidden in
-`src/` and `packages/` (E022). Concrete apps own their vocabulary in
+`packages/` (E022). Concrete apps own their vocabulary in
 `example/<app>/`.
 
 ## Skill routing

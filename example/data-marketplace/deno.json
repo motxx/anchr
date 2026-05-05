@@ -1,19 +1,4 @@
 {
-  "imports": {
-    "@anchr/core-runtime": "../../packages/core-runtime/src/mod.ts",
-    "@anchr/core-runtime/logger": "../../packages/core-runtime/src/logger.ts",
-    "@anchr/core-cashu/preimage-store": "../../packages/core-cashu/src/preimage-store.ts",
-    "@anchr/tlsn-toolkit/tlsn-validation": "../../packages/tlsn-toolkit/src/tlsn-validation.ts",
-    "hono": "jsr:@hono/hono@^4",
-    "zod": "jsr:@zod/zod@^4",
-    "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
-    "nostr-tools": "npm:nostr-tools@^2",
-    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
-    "@logtape/logtape": "jsr:@logtape/logtape@^2",
-    "@modelcontextprotocol/sdk/server/mcp.js": "npm:@modelcontextprotocol/sdk@^1/server/mcp.js",
-    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
-    "@std/expect": "jsr:@std/expect@^1"
-  },
   "tasks": {
     "start": "deno run --allow-all server.ts"
   }

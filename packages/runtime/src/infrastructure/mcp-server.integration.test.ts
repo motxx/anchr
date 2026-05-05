@@ -139,7 +139,7 @@ Deno.test({ name: "mcp tools expose query status and attachment metadata", sanit
   // Bootstrap: create query + submit result inside the MCP subprocess so
   // the in-memory store has the data when MCP tools read it.
   const setupPreamble = [
-    `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "../../packages/photo-verification/src/integrity-store.ts"))});`,
+    `const { storeIntegrity } = await import(${JSON.stringify(join(moduleDir(import.meta), "../../../photo-verification/src/integrity-store.ts"))});`,
     `const query = globalThis.__queryService.createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
     `globalThis.__testQueryId = query.id;`,
     `globalThis.__testNonce = query.challenge_nonce;`,

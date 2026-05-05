@@ -1,9 +1,9 @@
 # Architecture
 
-Anchr is seven independently typecheckable packages, plus a reference
-Hono / Deno server that composes them as one example deployment. No
-package depends on host-side code; each is isolated under `deno task
-test:packages`.
+Anchr is nine independently typecheckable packages. Concrete deployments
+live in `example/`; the reference host is `example/anchr-reference-host/`.
+No package depends on `example/` code — packages flow into examples,
+never the other way.
 
 ```
 packages/
@@ -13,10 +13,16 @@ packages/
 ├── photo-verification/        C2PA + EXIF + ProofMode + AI content check + GPS Haversine
 ├── frost-oracle/              FROST t-of-n threshold-signing primitives (BIP-340 Schnorr)
 ├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
+├── blossom/                   Encrypted attachment store (BUD-01–06 client)
+├── runtime/                   Anchr role runtime — Query lifecycle, escrow, oracle-client/service,
+│                              worker-api (HTTP), MCP (stdio). Embed via `composeHost(extras)`.
 └── sdk/                       anchr-sdk: Customer / Provider API for downstream consumers
 
-src/                           Reference host server (Hono on Deno) — composes the packages above
-example/                       Runnable examples; each owns its design system + deno.json
+example/                       Runnable apps; each owns its design system + deno.json
+  ├── anchr-reference-host/    Minimal `startReferenceRuntime()` deployment
+  ├── data-marketplace/        Bounty pattern with extra `/marketplace/*` routes via composeHost(extras)
+  ├── two-party-binary-bet/    Market pattern (no host needed)
+  └── …                        SDK consumers + standalone primitives demos
 crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
 specs/                         Wire-format specs (CC0)
 docs/                          Architecture + threat model
@@ -25,22 +31,29 @@ docs/                          Architecture + threat model
 ## Layer dependency rules
 
 The package graph is one-directional. `scripts/arch-lint.ts` enforces
-the allow-list; the rule codes (E001-E022) are the canonical reference.
+the allow-list; the rule codes (E001-E024) are the canonical reference.
 Highlights:
 
-- `domain/` is pure — no `Date.now()`, no `randomBytes`, no
-  `Deno.*`. Side effects come from injected ports (`Clock` /
-  `IdGenerator` / `NonceGenerator` in `src/domain/ports.ts`).
-- `application/` orchestrates use cases and defines ports. No
-  `Deno.*` direct calls.
-- `infrastructure/` implements ports. The only layer allowed to call
-  `Deno.*` and external SDKs.
-- `packages/` may not import from `src/` (one-way: src → packages).
-- `src/` may not import from `@anchr/sdk` (the SDK is downstream of
-  the host).
-- Application vocabulary (`market`, `marketplace`, …) is forbidden in
-  `src/` and `packages/`. Concrete apps own their vocabulary in
+- Inside `packages/runtime/src/`:
+  - `domain/` is pure — no `Date.now()`, no `randomBytes`, no
+    `Deno.*`. Side effects come from injected ports (`Clock` /
+    `IdGenerator` / `NonceGenerator` in
+    `packages/runtime/src/domain/ports.ts`).
+  - `application/` orchestrates use cases and defines ports. No
+    `Deno.*` direct calls.
+  - `infrastructure/` implements ports. The only layer allowed to
+    call `Deno.*` and external SDKs.
+- `packages/runtime/` may import any non-sdk primitive package. Other
+  packages may only depend on the small allow-list under E010-E019.
+- `runtime` (and any package) must not import from `@anchr/sdk`
+  (the SDK is downstream of the host).
+- Application vocabulary (`market`, `marketplace`, …) is forbidden
+  inside `packages/`. Concrete apps own their vocabulary in
   `example/<app>/`.
+- `example/<app>/` reaches Anchr through `@anchr/*` only — relative
+  paths into `packages/<pkg>/src/...` are an E023 violation. The
+  expo-worker-app and bounty-board mobile apps are excluded (they
+  speak HTTP only).
 
 ## Attachment registry (Blossom)
 
@@ -52,11 +65,10 @@ delivery via NIP-44 `blossom_keys` field). The wire spec uses
 / custom and stay protocol-compatible. Blossom itself is specified
 externally in [BUD-01–06](https://github.com/hzrd149/blossom).
 
-The integration lives in `src/infrastructure/blossom/` rather than as a
-package because every current consumer reaches it through the host. A
-future use case that wants the encrypted-store primitive without the
-surrounding bounty / oracle wiring would be the natural moment to lift
-it into `packages/`.
+The thin Anchr integration (worker upload + fetch helpers) lives in
+`packages/runtime/src/infrastructure/blossom/` because the helpers
+decode `AttachmentRef` / `BlossomKeyMaterial` domain types. The
+underlying encrypted-store primitive ships in `packages/blossom/`.
 
 ## Specs and threat model
 

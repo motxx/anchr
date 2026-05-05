@@ -148,7 +148,7 @@ echo "[6/6] Starting Anchr server..."
 NOSTR_RELAYS=ws://localhost:7777 \
 BLOSSOM_SERVERS=http://localhost:3333 \
 CASHU_MINT_URL=http://localhost:3338 \
-deno run --watch --allow-all --env src/infrastructure/server.ts > "$LOGS_DIR/anchr-server.log" 2>&1 &
+deno run --watch --allow-all --env packages/runtime/src/infrastructure/server.ts > "$LOGS_DIR/anchr-server.log" 2>&1 &
 ANCHR_PID=$!
 PIDS+=($ANCHR_PID)
 

@@ -8,7 +8,7 @@
  *
  * Reference types:
  *   - TlsnRequirement, TlsnCondition from ../../../packages/core-domain/src/types
- *   - validateTlsn, evaluateCondition from ../../../src/infrastructure/verification/tlsn-validation
+ *   - validateTlsn, evaluateCondition from ../../../packages/runtime/src/infrastructure/verification/tlsn-validation
  */
 
 /**

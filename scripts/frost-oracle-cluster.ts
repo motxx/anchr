@@ -51,7 +51,7 @@ async function main() {
     const child = new Deno.Command("deno", {
       args: [
         "run", "--allow-all", "--env",
-        "src/infrastructure/oracle-service/server.ts",
+        "packages/runtime/src/infrastructure/oracle-service/server.ts",
       ],
       env: {
         ...Object.fromEntries(Object.entries(Deno.env.toObject())),
