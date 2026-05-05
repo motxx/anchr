@@ -28,7 +28,7 @@ export interface NonceGenerator {
 export interface DomainServices {
   clock: Clock;
   idGenerator: IdGenerator;
-  nonceGenerator?: NonceGenerator;
+  nonceGenerator: NonceGenerator;
 }
 
 /** Wall-clock implementation backed by `Date.now()`. */
@@ -55,8 +55,16 @@ export function createDefaultIdGenerator(clock: Clock = realClock): IdGenerator 
 
 export const realIdGenerator: IdGenerator = createDefaultIdGenerator();
 
+import { generateNonce } from "./challenge.ts";
+
+/** Default nonce generator — delegates to the shared `generateNonce()`. */
+export const realNonceGenerator: NonceGenerator = {
+  newChallengeNonce: () => generateNonce(),
+};
+
 /** Convenience bundle for callers that want every default at once. */
 export const realDomainServices: DomainServices = {
   clock: realClock,
   idGenerator: realIdGenerator,
+  nonceGenerator: realNonceGenerator,
 };

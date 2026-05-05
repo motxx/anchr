@@ -21,7 +21,7 @@ import { isValidTransition, isCancellable, isExpirable } from "./query-transitio
 import { MIN_ESCROW_LOCKTIME_SECS, validateQueryInput, validateEscrowLocktime, validateQuoteInfo } from "./value-objects.ts";
 
 export { MIN_ESCROW_LOCKTIME_SECS };
-import { buildChallengeRule, generateNonce } from "./challenge.ts";
+import { buildChallengeRule } from "./challenge.ts";
 
 export type TransitionResult =
   | { ok: true; query: Query }
@@ -55,7 +55,7 @@ export function createQueryAggregate(
 
   const requirements = input.verification_requirements ?? DEFAULT_VERIFICATION_FACTORS;
   const needsNonce = requirements.includes("nonce");
-  const nonce = needsNonce ? generateNonce() : undefined;
+  const nonce = needsNonce ? services.nonceGenerator.newChallengeNonce() : undefined;
   const isEscrow = options.escrow !== undefined;
 
   const query: Query = {
