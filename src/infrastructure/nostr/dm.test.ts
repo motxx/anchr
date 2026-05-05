@@ -12,9 +12,7 @@ describe("NIP-44 DM (Oracle ↔ Worker)", () => {
 
     expect(event.kind).toBe(DM_KIND);
     expect(event.pubkey).toBe(oracle.publicKey);
-    // Content is encrypted, not plaintext
     expect(event.content).not.toContain("preimage");
-    // Has p tag for worker
     const pTag = event.tags.find((t) => t[0] === "p");
     expect(pTag?.[1]).toBe(worker.publicKey);
   });

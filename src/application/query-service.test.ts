@@ -116,7 +116,7 @@ test("query service rejects submission with unacceptable oracle", async () => {
     query.id,
     { attachments: [], notes: "open" },
     { executor_type: "human", channel: "worker_api" },
-    "built-in", // not in oracle_ids
+    "built-in",
   );
 
   expect(outcome.ok).toBe(false);

@@ -1,9 +1,4 @@
-/**
- * Nostr marketplace listing announcement (Kind 38421, NIP-33 replaceable).
- *
- * Compatible with Routstr protocol for provider discovery.
- * Tags: ["d", id], ["u", url], ["mint", mint], ["proof", "tlsnotary"]
- */
+// NIP-33 parameterized replaceable event (kind 38421), Routstr-compatible.
 
 import { Buffer } from "node:buffer";
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
@@ -12,16 +7,12 @@ import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import { ANCHR_MARKETPLACE_LISTING } from "../../../../src/infrastructure/nostr/events.ts";
 import type { DataListing } from "./types.ts";
 
-/** Get the Nostr identity keypair. Returns null if not configured. */
 async function getIdentityKey(): Promise<Uint8Array | null> {
   const hexKey = Deno.env.get("NOSTR_PRIVATE_KEY")?.trim();
   if (!hexKey) return null;
   return Uint8Array.from(Buffer.from(hexKey, "hex"));
 }
 
-/**
- * Build a Kind 38421 (NIP-33 parameterized replaceable) event for a marketplace listing.
- */
 export function buildListingAnnouncementEvent(
   listing: DataListing,
   secretKey: Uint8Array,
@@ -62,9 +53,6 @@ export function buildListingAnnouncementEvent(
   return finalizeEvent(template, secretKey);
 }
 
-/**
- * Announce a listing on Nostr relays.
- */
 export async function announceListingOnNostr(
   listing: DataListing,
   relayUrls?: string[],

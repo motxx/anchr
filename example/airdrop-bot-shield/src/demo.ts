@@ -34,10 +34,6 @@ import {
   type VerifiedProofData,
 } from "./claim-verifier.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function separator(title: string): void {
   console.log(`\n${"=".repeat(70)}`);
   console.log(`  ${title}`);
@@ -51,10 +47,6 @@ function indent(text: string, spaces = 2): string {
     .map((line) => `${pad}${line}`)
     .join("\n");
 }
-
-// ---------------------------------------------------------------------------
-// Step 1: Create Airdrop Campaign
-// ---------------------------------------------------------------------------
 
 separator("Step 1: Project Creates Airdrop Campaign");
 
@@ -85,7 +77,6 @@ for (const [i, cond] of criteria.conditions.entries()) {
   console.log(`      Min:      ${cond.min_value ?? "N/A"}`);
 }
 
-// Validate
 const errors = validateCriteria(criteria);
 if (errors.length > 0) {
   console.error("\nValidation errors:");
@@ -95,10 +86,6 @@ if (errors.length > 0) {
   Deno.exit(1);
 }
 console.log("\nValidation: PASSED (all criteria valid)");
-
-// ---------------------------------------------------------------------------
-// Step 2: Show TLSNotary Proof Requirements
-// ---------------------------------------------------------------------------
 
 separator("Step 2: TLSNotary Proof Requirements");
 
@@ -126,10 +113,6 @@ console.log("  3. The extension runs an MPC-TLS session with a TLSNotary verifie
 console.log("  4. The cryptographic presentation (.presentation.tlsn) is generated");
 console.log("  5. The presentation is submitted to the Anchr oracle for verification");
 
-// ---------------------------------------------------------------------------
-// Step 3: Simulate Verification (Mock Data)
-// ---------------------------------------------------------------------------
-
 separator("Step 3: Simulate Claim Verification");
 
 console.log("Simulating a claim from a legitimate GitHub user...\n");
@@ -153,22 +136,20 @@ const now = Math.floor(Date.now() / 1000);
 const githubVerifiedData: VerifiedProofData = {
   server_name: "api.github.com",
   revealed_body: JSON.stringify(mockGitHubResponse),
-  session_timestamp: now - 30, // 30 seconds ago
+  session_timestamp: now - 30,
 };
 
 // Build the proof map (one proof per condition, all from the same GitHub response)
 const verifiedProofs = new Map<number, VerifiedProofData>();
-verifiedProofs.set(0, githubVerifiedData); // GitHub account age
-verifiedProofs.set(1, githubVerifiedData); // GitHub repos
-verifiedProofs.set(2, githubVerifiedData); // GitHub contributions
+verifiedProofs.set(0, githubVerifiedData);
+verifiedProofs.set(1, githubVerifiedData);
+verifiedProofs.set(2, githubVerifiedData);
 
-// Generate HTLC hash/preimage for this claim
 const { preimage, hash } = generateClaimHash();
 console.log(`\nHTLC escrow:`);
 console.log(`  Preimage: ${preimage.slice(0, 16)}...${preimage.slice(-16)}`);
 console.log(`  Hash:     ${hash.slice(0, 16)}...${hash.slice(-16)}`);
 
-// Verify
 console.log("\nVerifying claim...\n");
 const result = verifyClaim(criteria, verifiedProofs, preimage);
 
@@ -186,10 +167,6 @@ if (result.all_passed) {
   console.log(`\nHTLC preimage released: ${result.preimage?.slice(0, 16)}...`);
   console.log("Claimant can now redeem their Cashu HTLC token.");
 }
-
-// ---------------------------------------------------------------------------
-// Step 4: Cashu HTLC Escrow Flow
-// ---------------------------------------------------------------------------
 
 separator("Step 4: Cashu HTLC Escrow Flow");
 
@@ -246,10 +223,6 @@ console.log("  );");
 console.log(`  // redeemed.amountSats === ${criteria.token_amount_per_claim}`);
 console.log("  ```");
 
-// ---------------------------------------------------------------------------
-// Step 5: Demonstrate Rejection
-// ---------------------------------------------------------------------------
-
 separator("Step 5: Demonstrate Rejection (Bot Account)");
 
 console.log("Simulating a claim from a fresh bot account...\n");
@@ -294,14 +267,10 @@ console.log(`\nOverall: ${botResult.all_passed ? "APPROVED" : "REJECTED"}`);
 console.log("HTLC preimage: NOT released (conditions not met)");
 console.log("Escrowed tokens remain locked and will be refunded to the project after locktime.");
 
-// ---------------------------------------------------------------------------
-// Step 6: Economic Analysis
-// ---------------------------------------------------------------------------
-
 separator("Step 6: Economic Analysis");
 
 const claimValue = criteria.token_amount_per_claim;
-const btcPrice = 90_000; // approximate BTC price in USD
+const btcPrice = 90_000;
 const claimValueUsd = (claimValue / 100_000_000) * btcPrice;
 
 console.log(`Claim value: ${claimValue.toLocaleString()} sats (~$${claimValueUsd.toFixed(2)} at $${btcPrice.toLocaleString()} BTC)\n`);
@@ -334,10 +303,6 @@ if (claimValueUsd < 57) {
 console.log();
 console.log("Adding Twitter follower requirement (>100 followers) would increase farming cost");
 console.log("by an additional $50-150 per identity, making attacks even less economical.");
-
-// ---------------------------------------------------------------------------
-// Summary
-// ---------------------------------------------------------------------------
 
 separator("Summary");
 

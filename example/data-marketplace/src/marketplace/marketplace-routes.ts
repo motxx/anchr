@@ -1,10 +1,3 @@
-/**
- * Marketplace HTTP route registration.
- *
- * All routes are under /marketplace/* and do not touch existing /queries/* routes.
- * Follows the registerXxxRoutes(app, ctx) pattern from worker-api-routes.ts.
- */
-
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
@@ -18,16 +11,14 @@ import type { DataListing, MarketplaceEnv, MarketplaceRouteContext, PurchaseReco
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "marketplace"]);
 
-/** In-memory purchase log (replay defense + audit). */
+// Purchase log doubles as replay defense and audit trail.
 const purchaseLog = new Map<string, PurchaseRecord>();
 
 export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContext): void {
   const { listingStore, preimageStore, writeAuth, rateLimit } = ctx;
   const mkt = new Hono<MarketplaceEnv>();
 
-  // --- Listings CRUD ---
-
-  // Public listing response — omit source_url to prevent leaking internal URLs.
+  // Public listing response omits source_url to avoid leaking internal URLs.
   function publicListing(listing: DataListing): Omit<DataListing, "source_url"> {
     const { source_url: _url, ...rest } = listing;
     return rest;
@@ -60,8 +51,8 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
         }, 400);
       }
       const payload = parsed.data;
-      // Validate source_url at creation time (not just at fetch time) to prevent
-      // storing SSRF targets and leaking them via GET /marketplace/listings.
+      // Validate source_url at creation, not just at fetch, to prevent storing
+      // SSRF targets that GET /marketplace/listings would surface.
       const urlError = validateAttachmentUri(payload.source_url);
       if (urlError) {
         return c.json({ error: `source_url rejected: ${urlError}` }, 400);
@@ -96,8 +87,6 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
     return c.json({ ok: true, id, active: false });
   });
 
-  // --- Data Purchase ---
-
   mkt.get("/data/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Listing id is required" }, 400);
@@ -119,7 +108,7 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
 
   mkt.post("/data/:id", rateLimit, paymentMiddleware, async (c) => {
     const id = c.req.param("id")!;
-    const listing = listingStore.get(id)!; // guaranteed by middleware
+    const listing = listingStore.get(id)!;
     const paymentInfo = c.get("paymentInfo");
 
     const record: PurchaseRecord = {
@@ -173,8 +162,6 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
     }
   });
 
-  // --- Nostr Announcement ---
-
   mkt.post("/listings/:id/announce", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Listing id is required" }, 400);
@@ -194,7 +181,6 @@ export function registerMarketplaceRoutes(app: Hono, ctx: MarketplaceRouteContex
   app.route("/marketplace", mkt);
 }
 
-/** Visible for testing — clear purchase log. */
 export function _clearPurchaseLogForTest(): void {
   purchaseLog.clear();
 }

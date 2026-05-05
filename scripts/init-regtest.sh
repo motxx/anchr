@@ -19,7 +19,6 @@ LNCLI_USER="docker compose exec -T lnd-user lncli --network regtest --rpcserver 
 
 echo "=== Regtest Lightning Init ==="
 
-# 1. Wait for LND nodes to be reachable
 echo "[1/5] Waiting for LND nodes to be reachable..."
 for i in $(seq 1 40); do
   MINT_UP=$(docker compose exec -T lnd-mint lncli --network regtest --rpcserver lnd-mint:10009 getinfo 2>/dev/null && echo "yes" || true)
@@ -32,7 +31,6 @@ for i in $(seq 1 40); do
   sleep 3
 done
 
-# 2. Create wallet & mine blocks (in batches for LND sync)
 echo "[2/5] Creating Bitcoin wallet and mining 150 blocks..."
 $BITCOIN_CLI createwallet cashu 2>/dev/null || $BITCOIN_CLI loadwallet cashu 2>/dev/null || true
 # Mine in batches to let LND process block notifications
@@ -43,7 +41,6 @@ sleep 2
 $BITCOIN_CLI -generate 50 > /dev/null
 echo "      Done. Waiting for LND to sync..."
 
-# Wait for LND to sync the mined blocks
 CHAIN_HEIGHT=$($BITCOIN_CLI getblockcount)
 echo "      Chain height: $CHAIN_HEIGHT. Waiting for LND to reach it..."
 SYNCED=""
@@ -70,7 +67,6 @@ if [ -z "$SYNCED" ]; then
   exit 1
 fi
 
-# 3. Fund LND nodes
 echo "[3/5] Funding LND nodes..."
 MINT_ADDR=$($LNCLI_MINT newaddress p2wkh 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['address'])")
 USER_ADDR=$($LNCLI_USER newaddress p2wkh 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['address'])")
@@ -82,10 +78,8 @@ $BITCOIN_CLI sendtoaddress "$USER_ADDR" 10 > /dev/null
 $BITCOIN_CLI -generate 6 > /dev/null
 echo "      Funded 10 BTC each."
 
-# Wait for funding to be confirmed
 sleep 5
 
-# 4. Open channel: lnd-user -> lnd-mint (10M sats, 5M push)
 echo "[4/5] Opening channel (10M sats)..."
 MINT_PUBKEY=$($LNCLI_MINT getinfo 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; print(json.load(sys.stdin)['identity_pubkey'])")
 $LNCLI_USER connect "${MINT_PUBKEY}@lnd-mint:9735" 2>/dev/null || true
@@ -95,7 +89,6 @@ $LNCLI_USER openchannel "$MINT_PUBKEY" 10000000 5000000 > /dev/null
 $BITCOIN_CLI -generate 6 > /dev/null
 echo "      Channel opened."
 
-# 5. Wait for channel to be active
 echo "[5/5] Waiting for channel to be active..."
 for i in $(seq 1 20); do
   ACTIVE=$($LNCLI_USER listchannels | grep -o '"active": true' || true)
@@ -106,7 +99,6 @@ for i in $(seq 1 20); do
   sleep 3
 done
 
-# Summary
 echo ""
 echo "=== Ready ==="
 MINT_BAL=$($LNCLI_MINT channelbalance 2>/dev/null | tr -d '\r' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('local_balance',{}).get('sat','0'))" 2>/dev/null || echo "0")

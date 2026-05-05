@@ -81,10 +81,7 @@ export interface CancelQueryOutcome {
   message: string;
 }
 
-// --- QueryStore (extracted to domain layer) ---
 export { createQueryStore, type QueryStore } from "../domain/query-store.ts";
-
-// --- QueryService ---
 
 export interface QueryHooks {
   onCreated?: (query: Query) => void;
@@ -99,7 +96,7 @@ export interface QueryServiceDeps {
   frostSignature?: FrostSignaturePort;
   hooks?: QueryHooks;
   proofDelivery?: ProofDelivery;
-  /** Normalize attachment refs in a QueryResult. Defaults to identity. */
+  /** Defaults to identity. */
   normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }
 
@@ -125,19 +122,12 @@ export interface QueryService {
   purgeExpiredFromStore(): Query[];
   clearQueryStore(): void;
 
-  // --- HTLC lifecycle ---
-
-  /** Record a Worker quote for an HTLC query. */
   recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
-  /** Select a Worker and transition to worker_selected. */
   selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<HtlcOutcome>;
-  /** Worker acknowledges selection and begins work (worker_selected → processing). */
   beginWork(queryId: string): HtlcOutcome;
-  /** Record a Worker's result submission (transition to verifying). */
   recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
-  /** Complete Oracle verification (transition to approved/rejected). */
   completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
-  /** Submit result for HTLC query with inline verification — returns preimage on success. */
+  /** Returns preimage on success. */
   submitEscrowResult(
     queryId: string,
     result: QueryResult,
@@ -156,7 +146,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const hooks = deps?.hooks;
   const proofDelivery = deps?.proofDelivery;
 
-  // Oracle resolver callbacks — passed to extracted methods so they don't close over registry.
   const oracleResolver = (oracleId: string | undefined, acceptableIds: string[] | undefined) =>
     registry ? registry.resolve(oracleId, acceptableIds) : null;
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);

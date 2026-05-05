@@ -93,7 +93,7 @@ describe("X-Cashu Payment Middleware", () => {
       method: "POST",
       headers: { "x-cashu": "bad-token" },
     });
-    // Token invalid → 402 (not added to seen set because verification failed before that)
+    // Verification fails before the token is added to the seen set, so 402.
     expect(res1.status).toBe(402);
   });
 });

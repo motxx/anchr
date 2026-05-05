@@ -6,8 +6,6 @@ import { createOracleRegistry } from "../infrastructure/oracle/index.ts";
 import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle/index.ts";
 import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../domain/types.ts";
 
-// --- Mock oracle ---
-
 function makeMockOracle(opts?: {
   id?: string;
   pass?: boolean;
@@ -28,8 +26,6 @@ function makeMockOracle(opts?: {
     }),
   };
 }
-
-// --- Test helpers ---
 
 function setup(oracleOpts?: { pass?: boolean; oracles?: Oracle[] }) {
   const store = createQueryStore();
@@ -82,7 +78,6 @@ describe("Application Service — Simple lifecycle", () => {
   test("create → expire → expired", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, { ttlMs: 1 });
-    // Allow time to pass so the query actually expires
     await new Promise((r) => setTimeout(r, 5));
 
     const expired = svc.expireQueries();
@@ -183,7 +178,6 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup({ pass: true });
     const query = svc.createQuery(defaultInput, htlcOptions());
 
-    // Quote
     const quoteOutcome = svc.recordQuote(query.id, {
       worker_pubkey: "worker1",
       quote_event_id: "evt1",
@@ -191,13 +185,11 @@ describe("Application Service — HTLC lifecycle", () => {
     });
     expect(quoteOutcome.ok).toBe(true);
 
-    // Select worker (no token verification in mock)
     const selectOutcome = await svc.selectWorker(query.id, "worker1");
     svc.beginWork(query.id);
     expect(selectOutcome.ok).toBe(true);
     expect(svc.getQuery(query.id)?.status).toBe("processing");
 
-    // Submit + verify in one call
     const submitOutcome = await svc.submitEscrowResult(
       query.id,
       defaultResult,

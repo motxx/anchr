@@ -14,7 +14,6 @@ import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./escrow-port.ts";
 import { createIntegrityStore } from "@anchr/photo-verification/integrity-store";
 
-/** Create a fake encoded Cashu token with the given total sats. */
 function makeFakeToken(amountSats: number): string {
   return getEncodedToken({
     mint: "https://mint.example.com",
@@ -354,13 +353,11 @@ describe("createQueryService", () => {
 });
 
 describe("HTLC lifecycle", () => {
-  /** Mock EscrowProvider that decodes Cashu tokens for amount verification. */
   function createMockEscrowProvider(): EscrowProvider {
     return {
       async createHold() { return { escrow_ref: "mock_ref" }; },
       async bindWorker(_ref, _wp) { return { escrow_ref: "mock_ref_bound" }; },
       async verify(_ref, expected_sats) {
-        // Decode the ref as a Cashu token to extract amount (ref = token in tests)
         try {
           const decoded = getDecodedToken(_ref);
           const total = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
@@ -476,7 +473,6 @@ describe("HTLC lifecycle", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Insufficient amount");
     expect(outcome.message).toContain("50");
-    // Query should remain in awaiting_quotes
     expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
   });
 
@@ -696,7 +692,6 @@ describe("submitEscrowResult", () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
-    // Still in awaiting_quotes, not processing
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
@@ -742,7 +737,6 @@ describe("submitEscrowResult", () => {
     expect(outcome.preimage).toBeUndefined();
     expect(requested).toHaveLength(1);
     expect(requested[0]!.groupPubkey).toBe("f".repeat(64));
-    // Message bytes are the UTF-8 encoding of `${queryId}:approved`.
     expect(requested[0]!.messageHex.length).toBeGreaterThan(0);
   });
 

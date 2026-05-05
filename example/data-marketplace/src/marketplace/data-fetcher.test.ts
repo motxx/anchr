@@ -13,9 +13,6 @@ describe("fetchWithProof SSRF protection", () => {
     ).rejects.toThrow("Source URL rejected");
   });
 
-  // Note: http://localhost is allowed by validateAttachmentUri for dev convenience.
-  // This is by design — localhost is a trusted dev target.
-
   test("rejects private 10.x.x.x", async () => {
     await expect(
       fetchWithProof("listing_3", "https://10.0.0.1/secret", 60),

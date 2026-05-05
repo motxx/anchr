@@ -1,7 +1,3 @@
-/**
- * Verified Data Marketplace — barrel exports.
- */
-
 export type {
   DataListing,
   MarketplaceEnv,

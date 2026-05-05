@@ -11,10 +11,6 @@
  *   - EscrowInfo        (src/domain/types.ts)
  */
 
-// ---------------------------------------------------------------------------
-// Core supply chain step
-// ---------------------------------------------------------------------------
-
 /** The progression stages a product moves through. */
 export type StepType =
   | "origin"
@@ -79,10 +75,6 @@ export interface SupplyChainStep {
   nostr_event_id?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Product
-// ---------------------------------------------------------------------------
-
 export type ProductCategory =
   | "coffee"
   | "pharmaceutical"
@@ -97,10 +89,6 @@ export interface SupplyChainProduct {
   /** Rules that each step type must satisfy before it is considered valid. */
   verification_requirements: StepRequirement[];
 }
-
-// ---------------------------------------------------------------------------
-// Verification requirements
-// ---------------------------------------------------------------------------
 
 /** Comparison operators for requirement conditions. */
 export type ConditionOperator = "eq" | "gt" | "lt" | "within_km";
@@ -129,10 +117,6 @@ export interface StepRequirement {
   required_proofs: RequiredProof[];
   payment_condition?: PaymentCondition;
 }
-
-// ---------------------------------------------------------------------------
-// Verification report
-// ---------------------------------------------------------------------------
 
 export type StepVerdict = "pass" | "fail" | "skip";
 

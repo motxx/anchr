@@ -6,15 +6,6 @@ import {
   type QueryRequestPayload,
 } from "../infrastructure/nostr/events.ts";
 
-/**
- * Worker service tests — focuses on the pure logic that can be tested
- * without Nostr relay connections: payload parsing, filtering, state types.
- *
- * The actual discoverQueries/submitQuote/waitForSelection functions
- * are thin wrappers around Nostr client subscriptions — their correctness
- * is covered by the nostr/events.test.ts and nostr/dm.test.ts suites.
- */
-
 describe("Worker service — payload parsing and filtering", () => {
   const trustedOracle = "oracle_pubkey_abc";
   const untrustedOracle = "oracle_pubkey_evil";

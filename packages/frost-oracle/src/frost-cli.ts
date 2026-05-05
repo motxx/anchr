@@ -100,8 +100,6 @@ export async function runFrostCommand(
   }
 }
 
-// --- DKG convenience wrappers ---
-
 export async function dkgRound1(index: number, maxSigners: number, minSigners: number) {
   return runFrostCommand("dkg-round1", [
     "--index", String(index),
@@ -128,8 +126,6 @@ export async function dkgRound3(
     "--round2-packages", round2Packages,
   ]);
 }
-
-// --- Signing convenience wrappers ---
 
 export async function signRound1(keyPackage: string) {
   return runFrostCommand("sign-round1", ["--key-package", keyPackage]);

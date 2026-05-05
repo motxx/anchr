@@ -17,14 +17,13 @@ test("encryptBlob produces unique ciphertext each call", async () => {
   const a = await encryptBlob(data);
   const b = await encryptBlob(data);
 
-  // Different key + IV → different ciphertext
   expect(a.encrypted).not.toEqual(b.encrypted);
 });
 
 test("decryptBlob fails with wrong key", async () => {
   const data = new Uint8Array([10, 20, 30]);
   const { encrypted, iv } = await encryptBlob(data);
-  const wrongKey = new Uint8Array(32); // all zeros
+  const wrongKey = new Uint8Array(32);
 
   await expect(decryptBlob(encrypted, wrongKey, iv)).rejects.toThrow();
 });

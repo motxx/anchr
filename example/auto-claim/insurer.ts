@@ -12,7 +12,6 @@
  *   deno run --allow-all --env example/auto-claim/insurer.ts
  */
 
-// Published package: import { Anchr } from "anchr-sdk";
 import { Anchr } from "anchr-sdk";
 
 const SERVER_URL = Deno.env.get("ANCHR_URL") ?? "http://localhost:3000";
@@ -28,7 +27,6 @@ console.log(`Airline: ${AIRLINE_URL}`);
 console.log(`Flight:  ${FLIGHT}`);
 console.log(`Payout:  ${PAYOUT_SATS} sats on delay >= 120 min\n`);
 
-// Create flight delay compensation bounty.
 // Two conditions — both must pass:
 //   1. jsonpath: status field must equal "delayed"
 //   2. regex:    delay_minutes must be >= 120
@@ -54,7 +52,7 @@ const queryId = await anchr.createTlsnQuery({
   ],
   maxSats: PAYOUT_SATS,
   timeoutSeconds: 3600,
-  maxAttestationAgeSeconds: 300, // proof must be < 5 min old
+  maxAttestationAgeSeconds: 300,
 });
 
 console.log("--- Policy Created ---\n");
@@ -64,7 +62,6 @@ console.log(`Payout:    ${PAYOUT_SATS} sats`);
 console.log(`Valid for: 1 hour\n`);
 console.log("Waiting for claim...\n");
 
-// Poll for claim result
 const startTime = Date.now();
 
 while (Date.now() - startTime < 3_600_000) {

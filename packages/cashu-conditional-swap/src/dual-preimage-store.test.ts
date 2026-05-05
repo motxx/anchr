@@ -9,7 +9,7 @@ test("create returns two distinct hashes", () => {
   expect(hash_a).toBeTruthy();
   expect(hash_b).toBeTruthy();
   expect(hash_a).not.toBe(hash_b);
-  expect(hash_a.length).toBe(64); // SHA-256 hex
+  expect(hash_a.length).toBe(64);
   expect(hash_b.length).toBe(64);
 });
 
@@ -60,7 +60,7 @@ test("reveal outcome a returns preimage_a and deletes preimage_b", () => {
   const preimage = store.reveal("swap-1", "a");
   expect(preimage).toBeTruthy();
   expect(typeof preimage).toBe("string");
-  expect(preimage!.length).toBe(64); // hex preimage
+  expect(preimage!.length).toBe(64);
 });
 
 test("reveal outcome b returns preimage_b and deletes preimage_a", () => {
@@ -92,11 +92,8 @@ test("losing preimage is permanently deleted after reveal", () => {
   const store = createDualPreimageStore();
   store.create("swap-1");
 
-  // Reveal outcome a — preimage_b should be deleted from backing store
   store.reveal("swap-1", "a");
 
-  // The swap is marked as revealed, so any further reveal returns null
-  // This proves the losing preimage can never be recovered
   const tryAgain = store.reveal("swap-1", "b");
   expect(tryAgain).toBeNull();
 });
@@ -109,11 +106,9 @@ test("multiple swaps are independent", () => {
   const p1 = store.reveal("swap-1", "a");
   expect(p1).toBeTruthy();
 
-  // swap-2 is unaffected
   const p2 = store.reveal("swap-2", "b");
   expect(p2).toBeTruthy();
 
-  // Both are now revealed
   expect(store.reveal("swap-1", "a")).toBeNull();
   expect(store.reveal("swap-2", "b")).toBeNull();
 });

@@ -1,7 +1,3 @@
-/**
- * Helper functions for wallet store operations.
- */
-
 import type { Proof } from "@cashu/cashu-ts";
 import { getCashuWallet } from "@anchr/core-cashu/wallet";
 

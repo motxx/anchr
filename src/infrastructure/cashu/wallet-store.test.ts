@@ -56,7 +56,6 @@ describe("WalletStore", () => {
       store.addProofs("requester", "pk1", [fakeProof(5)]);
       const locked = store.lockForQuery("requester", "pk1", "q1", 100);
       expect(locked).toBeNull();
-      // Balance unchanged
       expect(store.getBalance("requester", "pk1").balance_sats).toBe(5);
     });
 
@@ -69,7 +68,6 @@ describe("WalletStore", () => {
       ]);
       const locked = store.lockForQuery("requester", "pk1", "q1", 10);
       expect(locked).not.toBeNull();
-      // Should pick 16 first (enough on its own)
       expect(locked!.length).toBe(1);
       expect(locked![0].amount).toBe(16);
     });
@@ -145,7 +143,6 @@ describe("WalletStore", () => {
       });
 
       await Promise.all([p1, p2]);
-      // p2 should wait for p1 to finish
       expect(order).toEqual([1, 2, 3]);
     });
 
@@ -165,7 +162,6 @@ describe("WalletStore", () => {
       });
 
       await Promise.all([p1, p2]);
-      // Both should start before either ends (parallel)
       expect(order.indexOf("b-start")).toBeLessThan(order.indexOf("a-end"));
     });
 

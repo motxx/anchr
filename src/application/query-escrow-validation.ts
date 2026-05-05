@@ -7,13 +7,9 @@ export interface EscrowTokenLockResult {
 }
 
 /**
- * CTF-2: Verify escrow lock conditions via EscrowProvider.
- *
- * Without this, a requester could submit a token locked to their own key
- * instead of the worker's, then redeem after preimage is revealed.
- *
- * Returns `{ ok: true }` when the token passes all checks.
- * A failure returns `{ ok: false, message }`.
+ * CTF-2: Without this check, a requester could submit a token locked to
+ * their own key instead of the worker's, then redeem after preimage is
+ * revealed.
  */
 export async function verifyEscrowLock(
   escrowProvider: EscrowProvider,
@@ -24,13 +20,8 @@ export async function verifyEscrowLock(
   return escrowProvider.verifyLock(escrowRef, paymentHash, workerPubkey);
 }
 
-// MIN_ESCROW_LOCKTIME_SECS is defined in domain/value-objects.ts. Re-export for the
-// callers that import it via the application layer.
 export { MIN_ESCROW_LOCKTIME_SECS } from "../domain/value-objects.ts";
 
-// --- Escrow state machine helpers ---
-
-/** Valid state transitions for escrow queries (HTLC and P2PK+FROST share this lifecycle). */
 export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
   awaiting_quotes: ["worker_selected"],
   worker_selected: ["processing"],
@@ -52,10 +43,6 @@ export interface EscrowAmountResult {
   error?: string;
 }
 
-/**
- * Verify that the escrow carries at least the expected amount.
- * Delegates to EscrowProvider.verify().
- */
 export async function verifyEscrowAmount(
   escrowProvider: EscrowProvider,
   escrowRef: string,

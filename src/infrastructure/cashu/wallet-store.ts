@@ -1,10 +1,3 @@
-/**
- * Proof-based wallet store for Worker and Requester roles.
- *
- * Tracks actual Cashu Proof[] — balance is derived from proof amounts.
- * Verifies proof states against the Cashu mint via checkProofsStates.
- */
-
 import type { Proof } from "@cashu/cashu-ts";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import {

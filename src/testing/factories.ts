@@ -1,7 +1,3 @@
-/**
- * Shared test factories for domain objects.
- */
-
 import type { Query } from "../domain/types.ts";
 
 let queryCounter = 0;

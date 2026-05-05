@@ -1,10 +1,3 @@
-/**
- * Unit tests for Cashu HTLC EscrowProvider.
- *
- * Tests the verify/verifyLock/cancel logic of createCashuEscrowProvider
- * using hand-crafted HTLC proof secrets (no live Cashu mint needed).
- */
-
 import { describe, test, beforeEach } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
@@ -13,13 +6,11 @@ import {
 } from "./cashu-escrow-provider.ts";
 import type { EscrowProvider } from "../../application/escrow-port.ts";
 
-// Valid 32-byte x-only pubkeys (64 hex chars)
 const WORKER_PUB  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OTHER_PUB   = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const REFUND_PUB  = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const PAYMENT_HASH = "deadbeef" + "00".repeat(28);
 
-/** Build a Cashu token with an HTLC secret containing the given hash and pubkeys. */
 function makeHTLCToken(hash: string, pubkeys: string[], amount = 100): string {
   const secret = JSON.stringify([
     "HTLC",
@@ -44,7 +35,6 @@ function makeHTLCToken(hash: string, pubkeys: string[], amount = 100): string {
   });
 }
 
-/** Build a plain (non-HTLC) token. */
 function makePlainToken(amount = 100): string {
   return getEncodedToken({
     mint: "https://mint.example.com",
@@ -57,12 +47,6 @@ function makePlainToken(amount = 100): string {
   });
 }
 
-/**
- * Create a testable Cashu escrow provider with an exposed _seed method
- * to insert tokens into the internal tokenMap without needing a live mint.
- *
- * Mirrors the exact verifyLock and verify logic from cashu-escrow-provider.ts.
- */
 function createTestableProvider() {
   const tokenMap = new Map<string, { token: string; escrowToken: { proofs: import("@cashu/cashu-ts").Proof[] } }>();
 
@@ -97,7 +81,7 @@ function createTestableProvider() {
       try {
         decoded = getDecodedToken(entry.token);
       } catch (err) {
-        // Fail closed (mirrors cashu-escrow-provider.ts).
+        // Fail closed: malformed input must not bypass HTLC + P2PK checks.
         return {
           ok: false,
           message: `Token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
@@ -128,8 +112,6 @@ function createTestableProvider() {
     },
 
     async settle() {
-      // Mirrors cashu-escrow-provider.ts: settle is not wired through
-      // EscrowProvider in production paths.
       return {
         settled: false,
         error: "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
@@ -146,7 +128,6 @@ function createTestableProvider() {
       tokenMap.set(ref, { token, escrowToken: { proofs: decoded.proofs } });
     },
 
-    /** Seed without decoding — used to test malformed-token handling. */
     _seedRaw(ref: string, token: string) {
       tokenMap.set(ref, { token, escrowToken: { proofs: [] } });
     },
@@ -155,16 +136,12 @@ function createTestableProvider() {
   return provider;
 }
 
-// ---------- Cashu HTLC EscrowProvider ----------
-
 describe("Cashu HTLC EscrowProvider", () => {
   let provider: ReturnType<typeof createTestableProvider>;
 
   beforeEach(() => {
     provider = createTestableProvider();
   });
-
-  // --- verify ---
 
   describe("verify()", () => {
     test("returns invalid for unknown escrow reference", async () => {
@@ -219,8 +196,6 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
   });
 
-  // --- verifyLock ---
-
   describe("verifyLock()", () => {
     test("returns failed for unknown escrow reference", async () => {
       const result = await provider.verifyLock("nonexistent_ref", PAYMENT_HASH, WORKER_PUB);
@@ -259,7 +234,6 @@ describe("Cashu HTLC EscrowProvider", () => {
       const token = makeHTLCToken(PAYMENT_HASH, [`02${WORKER_PUB}`]);
       provider._seed("ref_02key", token);
 
-      // Worker sends 02-prefixed key directly
       const result = await provider.verifyLock("ref_02key", PAYMENT_HASH, `02${WORKER_PUB}`);
       expect(result.ok).toBe(true);
     });
@@ -284,11 +258,9 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("passes for plain (non-HTLC) proofs -- skipped gracefully", async () => {
-      // Plain secrets are not HTLC -> verifyLock skips them (continue)
       const plainToken = makePlainToken();
       provider._seed("ref_plain", plainToken);
 
-      // Behavior: non-HTLC proofs are skipped, so verifyLock returns ok
       const result = await provider.verifyLock("ref_plain", PAYMENT_HASH, WORKER_PUB);
       expect(result.ok).toBe(true);
     });
@@ -311,7 +283,6 @@ describe("Cashu HTLC EscrowProvider", () => {
       provider._seed("ref_no_pubkeys", token);
 
       const result = await provider.verifyLock("ref_no_pubkeys", PAYMENT_HASH, WORKER_PUB);
-      // No pubkeys tag means no P2PK check -- passes
       expect(result.ok).toBe(true);
     });
 
@@ -328,16 +299,11 @@ describe("Cashu HTLC EscrowProvider", () => {
       provider._seed("ref_multi_hash", token);
 
       const result = await provider.verifyLock("ref_multi_hash", PAYMENT_HASH, WORKER_PUB);
-      // Second proof has wrong hash -> fails
       expect(result.ok).toBe(false);
       expect(result.message).toContain("hash mismatch");
     });
 
     test("fails closed when token is undecodable (no silent ok=true bypass)", async () => {
-      // verifyLock must fail closed on undecodable input — a malformed string
-      // must not bypass HTLC + P2PK checks via a swallowed decode error
-      // returned as ok=true. Force a decode failure by seeding a non-cashuB
-      // string and assert verifyLock returns ok=false with a clear message.
       provider._seedRaw("ref_undecodable", "(not-a-real-token)");
       const result = await provider.verifyLock(
         "ref_undecodable",
@@ -358,8 +324,6 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
   });
 
-  // --- cancel ---
-
   describe("cancel()", () => {
     test("deletes existing entry from token map", async () => {
       const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB]);
@@ -368,7 +332,6 @@ describe("Cashu HTLC EscrowProvider", () => {
       const result = await provider.cancel("ref_cancel");
       expect(result.cancelled).toBe(true);
 
-      // Verify it's gone
       const verify = await provider.verify("ref_cancel", 100);
       expect(verify.valid).toBe(false);
     });
@@ -389,8 +352,6 @@ describe("Cashu HTLC EscrowProvider", () => {
       expect(lockResult.message).toBe("Unknown escrow reference");
     });
   });
-
-  // --- createHold without sourceProofsResolver ---
 
   describe("createHold()", () => {
     test("returns null when no sourceProofsResolver configured", async () => {

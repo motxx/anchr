@@ -1,10 +1,4 @@
-/**
- * NIP-44 Direct Messages (kind 4) for Oracle ↔ Worker communication.
- *
- * Used for:
- *   - Oracle → Worker: preimage delivery on C2PA verification pass
- *   - Oracle → Worker: rejection notice on verification fail
- */
+// NIP-44 DM (kind 4) for Oracle ↔ Worker preimage / rejection delivery.
 
 import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
 import type { NostrIdentity } from "./identity.ts";
@@ -12,16 +6,8 @@ import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.
 import type { OracleDMPayload, PreimageDMPayload, RejectionDMPayload, FrostSignatureDMPayload } from "./events.ts";
 export type { OracleDMPayload, FrostSignatureDMPayload } from "./events.ts";
 
-/** NIP-04/NIP-44 Direct Message kind. */
 export const DM_KIND = 4;
 
-/**
- * Build a preimage delivery DM (Oracle → Worker).
- *
- * On C2PA verification pass, the Oracle sends the HTLC preimage
- * to the Worker via encrypted DM. The Worker uses this preimage
- * combined with their signature to redeem the HTLC token.
- */
 export function buildPreimageDM(
   oracleIdentity: NostrIdentity,
   workerPubKey: string,
@@ -49,13 +35,6 @@ export function buildPreimageDM(
   return finalizeEvent(template, oracleIdentity.secretKey);
 }
 
-/**
- * Build a rejection DM (Oracle → Worker).
- *
- * On C2PA verification failure, the Oracle notifies the Worker
- * so they can stop waiting. The HTLC will eventually time out
- * and the Requester reclaims automatically.
- */
 export function buildRejectionDM(
   oracleIdentity: NostrIdentity,
   workerPubKey: string,
@@ -83,13 +62,8 @@ export function buildRejectionDM(
   return finalizeEvent(template, oracleIdentity.secretKey);
 }
 
-/**
- * Build a FROST group signature delivery DM (Oracle → Worker).
- *
- * For P2PK+FROST escrow, the Oracle sends the FROST group signature
- * instead of an HTLC preimage. The Worker uses this signature as
- * the second key in the 2-of-2 P2PK redemption.
- */
+// In FROST mode the group signature replaces the HTLC preimage as the
+// second key in the 2-of-2 P2PK redemption.
 export function buildFrostSignatureDM(
   oracleIdentity: NostrIdentity,
   workerPubKey: string,
@@ -119,9 +93,6 @@ export function buildFrostSignatureDM(
   return finalizeEvent(template, oracleIdentity.secretKey);
 }
 
-/**
- * Parse an Oracle DM (preimage, rejection, or FROST signature).
- */
 export function parseOracleDM(
   content: string,
   recipientSecretKey: Uint8Array,

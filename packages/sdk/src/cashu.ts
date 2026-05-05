@@ -110,8 +110,6 @@ export interface CashuToken {
 }
 
 /**
- * Public-facing CashuClient interface.
- *
  * Customer-side methods: `buildHtlcLock`, `bindProvider`.
  * Provider-side method:  `redeemHtlc`.
  */
@@ -211,12 +209,10 @@ export function validateLocktime(locktimeSeconds: number, nowSeconds: number = M
   return locktimeSeconds;
 }
 
-/** Sum the `amount` fields of an array of proofs. */
 function sumAmounts(proofs: Proof[]): number {
   return proofs.reduce((acc, p) => acc + p.amount, 0);
 }
 
-/** Encode a Uint8Array secret key as lowercase hex (no `0x` prefix). */
 function bytesToHexLocal(bytes: Uint8Array): string {
   let s = "";
   for (let i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, "0");
@@ -242,7 +238,6 @@ function buildPhase1P2PKOptions(customerPubkey: string): P2PKOptions {
     .toOptions();
 }
 
-/** Phase-2 P2PK options: hashlock + provider P2PK + locktime + refund(customer). */
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
   return new P2PKBuilder()
     .addHashlock(p.hashHex)
@@ -273,7 +268,6 @@ function isValidProofShape(p: unknown): p is Proof {
   );
 }
 
-/** Attach the HTLC preimage witness, then sign each proof with the provider's privkey. */
 function prepareHtlcRedemption(proofs: Proof[], preimageHex: string, privkeyHex: string): Proof[] {
   const withPreimage = proofs.map((p) => ({
     ...p,
@@ -295,8 +289,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
   }
   const mintUrl = options.mintUrl;
 
-  // Lazily construct the wallet so tests that don't actually exercise
-  // mint operations don't open a live connection.
+  // Lazy wallet construction — keeps tests that never call the mint offline.
   let walletPromise: Promise<CashuWalletAdapter> | null = null;
   function getWallet(): Promise<CashuWalletAdapter> {
     if (options.wallet !== undefined) return Promise.resolve(options.wallet);
@@ -328,13 +321,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         }
       }
 
-      // Phase 1: swap the caller's source proofs at the mint for new
-      // proofs locked to the customer's pubkey (P2PK only — no hashlock
-      // yet, see `buildPhase1P2PKOptions` for why). The kind 5300 event
-      // can then carry this token in the open without exposing a
-      // bearer instrument: a Nostr-relay subscriber sees the token but
-      // cannot spend it without the customer's signature, which is
-      // only supplied during Phase 2 (`bindProvider`).
       const wallet = await getWallet();
       const sourceProofs = p.sourceProofs as Proof[];
       const fee = wallet.getFeesForProofs(sourceProofs);
@@ -382,9 +368,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         throw new CashuClientError("initialProofs contains no spendable proofs");
       }
 
-      // Mint swap fees are taken from the input proofs. We swap ALL the
-      // input into HTLC-locked output proofs, so the output amount is
-      // `totalAmount - fee` (matches core-cashu's computeNetAmount).
       const fee = wallet.getFeesForProofs(sourceProofs);
       const swapAmount = totalAmount - fee;
       if (swapAmount <= 0) {
@@ -398,10 +381,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
 
       let send: Proof[];
       try {
-        // Phase-1 proofs are P2PK-locked to the customer; provide the
-        // customer's privkey to satisfy the input lock, while applying
-        // the Phase-2 (hashlock + provider P2PK + locktime + refund)
-        // conditions to the output proofs.
         const result = await wallet.ops
           .send(swapAmount, sourceProofs)
           .privkey(customerPrivkeyHex)
@@ -421,9 +400,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
 
     async redeemHtlc(p: RedeemHtlcParams): Promise<RedeemResult> {
       const wallet = await getWallet();
-      // Pass the wallet's known keyset IDs so V4 cashuB tokens (which
-      // truncate keyset IDs to a short form on encode) can be mapped
-      // back to their full IDs on decode.
+      // Pass known keyset IDs to map V4 cashuB tokens' truncated IDs back to full form.
       const knownKeysets = wallet.keyChain.getAllKeysetIds();
       const decoded = getDecodedToken(p.token, [...knownKeysets]);
       const proofs = decoded.proofs;
@@ -431,11 +408,8 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         throw new CashuClientError("redeemHtlc: token has no proofs");
       }
 
-      // Defense in depth: verify the preimage matches each proof's
-      // hashlock locally before submitting to the mint. The mint also
-      // enforces NUT-14, but failing fast here means a malicious oracle
-      // delivering a bogus preimage surfaces as a clear SDK error
-      // instead of a noisy mint round-trip.
+      // Defense in depth: NUT-14 hashlock check locally so a bogus oracle
+      // preimage surfaces as a clean SDK error before the mint round-trip.
       for (let i = 0; i < proofs.length; i++) {
         const proof = proofs[i]!;
         let secret: unknown;
@@ -462,8 +436,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       const signedProofs = prepareHtlcRedemption(proofs, p.preimageHex, privkeyHex);
       const totalAmount = sumAmounts(signedProofs);
 
-      // Mint swap fee comes out of the input proofs (same accounting as
-      // bindProvider above).
       const fee = wallet.getFeesForProofs(signedProofs);
       const swapAmount = totalAmount - fee;
       if (swapAmount <= 0) {
@@ -474,11 +446,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
 
       let received: Proof[];
       try {
-        // Spend the HTLC-locked + provider-signed proofs at the mint
-        // and receive fresh, unlocked proofs of the same amount minus
-        // mint swap fees. (Equivalent to a "receive" but works through
-        // the send builder so we can attach the provider privkey for
-        // the P2PK witness.)
         const result = await wallet.ops
           .send(swapAmount, signedProofs)
           .privkey(privkeyHex)

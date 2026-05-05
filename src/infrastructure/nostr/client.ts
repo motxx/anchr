@@ -1,10 +1,4 @@
-/**
- * Nostr relay client for Anchr (NIP-90 DVM).
- *
- * Handles connection to multiple relays, event publishing,
- * and subscription management. Event kinds follow the NIP-90
- * Data Vending Machine spec (5300/6300/7000).
- */
+// NIP-90 DVM event kinds (5300/6300/7000) over multiple relays.
 
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
@@ -36,12 +30,7 @@ function getPool(): SimplePool {
   return _pool;
 }
 
-/**
- * Publish an event to all configured relays.
- *
- * When `options.minSuccesses` is set, throws if fewer relays
- * than the threshold accepted the event.
- */
+// Throws when fewer than `minSuccesses` relays accept the event.
 export async function publishEvent(
   event: VerifiedEvent,
   relayUrls?: string[],
@@ -82,9 +71,6 @@ export async function publishEvent(
   return { successes, failures };
 }
 
-/**
- * Subscribe to Anchr query request events (DVM kind 5300).
- */
 export function subscribeToQueries(
   onEvent: (event: Event) => void,
   options?: {
@@ -99,7 +85,7 @@ export function subscribeToQueries(
   const filter: Filter = {
     kinds: [ANCHR_QUERY_REQUEST],
     "#t": ["anchr"],
-    since: Math.floor(Date.now() / 1000) - 3600, // last hour
+    since: Math.floor(Date.now() / 1000) - 3600,
   };
 
   if (options?.regionCode) {
@@ -111,9 +97,6 @@ export function subscribeToQueries(
   });
 }
 
-/**
- * Subscribe to responses for a specific query (DVM kind 6300).
- */
 export function subscribeToResponses(
   queryEventId: string,
   onEvent: (event: Event) => void,
@@ -131,9 +114,6 @@ export function subscribeToResponses(
   });
 }
 
-/**
- * Subscribe to settlements for a specific query (DVM kind 7000).
- */
 export function subscribeToSettlements(
   queryEventId: string,
   onEvent: (event: Event) => void,
@@ -151,9 +131,6 @@ export function subscribeToSettlements(
   });
 }
 
-/**
- * Subscribe to all feedback for a query (kind 7000): quotes, selection, completion.
- */
 export function subscribeToFeedback(
   queryEventId: string,
   onEvent: (event: Event) => void,
@@ -171,10 +148,7 @@ export function subscribeToFeedback(
   });
 }
 
-/**
- * Subscribe to NIP-44 DMs addressed to a specific pubkey (kind 4).
- * Used by Workers to receive preimage from Oracle.
- */
+// NIP-44 DM (kind 4) — used to deliver Oracle preimages to Workers.
 export function subscribeToDMs(
   recipientPubkey: string,
   onEvent: (event: Event) => void,
@@ -193,9 +167,6 @@ export function subscribeToDMs(
   });
 }
 
-/**
- * Subscribe to oracle attestations for a specific query.
- */
 export function subscribeToAttestations(
   queryEventId: string,
   onEvent: (event: Event) => void,
@@ -213,9 +184,6 @@ export function subscribeToAttestations(
   });
 }
 
-/**
- * Fetch recent query events from relays.
- */
 export async function fetchRecentQueries(
   options?: {
     regionCode?: string;
@@ -241,16 +209,10 @@ export async function fetchRecentQueries(
   return pool.querySync(urls, filter);
 }
 
-/**
- * Check if Nostr relay connectivity is configured.
- */
 export function isNostrEnabled(): boolean {
   return getNostrConfig() !== null;
 }
 
-/**
- * Close all relay connections.
- */
 export function closePool(): void {
   if (_pool) {
     _pool.close([]);

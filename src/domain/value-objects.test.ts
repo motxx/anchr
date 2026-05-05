@@ -9,7 +9,6 @@ import {
 } from "./value-objects.ts";
 
 describe("validateGpsCoord", () => {
-  // --- Valid ---
   test("origin (0, 0)", () => {
     expect(validateGpsCoord({ lat: 0, lon: 0 })).toBeNull();
   });
@@ -35,7 +34,6 @@ describe("validateGpsCoord", () => {
     expect(validateGpsCoord({ lat: -33.8688, lon: -70.6693 })).toBeNull();
   });
 
-  // --- Invalid ---
   test("lat > 90", () => {
     expect(validateGpsCoord({ lat: 91, lon: 0 })).toContain("lat");
   });

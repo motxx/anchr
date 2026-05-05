@@ -1,18 +1,6 @@
-/**
- * FROST P2PK Escrow Provider -- NUT-11 P2PK 2-of-2 (Worker, group_pubkey).
- *
- * Instead of HTLC hashlock + preimage, the FROST oracle group produces
- * a BIP-340 Schnorr signature that serves as the second key in a
- * 2-of-2 P2PK lock. The Mint sees a standard NUT-11 P2PK token --
- * no Mint changes required.
- *
- * Spending requires:
- *   1. Worker's signature (Worker's private key)
- *   2. FROST group signature (threshold signers cooperate)
- *
- * Refund after locktime:
- *   Requester's signature (single refund key)
- */
+// NUT-11 P2PK 2-of-2 (Worker + group_pubkey). The FROST oracle group's
+// BIP-340 signature serves as the second key — no Mint changes required.
+// Refund after locktime uses the requester's single key.
 
 import {
   P2PKBuilder,
@@ -40,9 +28,6 @@ export interface FrostEscrowConfig {
   sourceProofsResolver?: (amount: number) => Promise<Proof[]>;
 }
 
-/**
- * Build P2PK options for FROST escrow: 2-of-2 (Worker + group_pubkey).
- */
 export function buildFrostP2PKOptions(
   workerPubkey: string,
   groupPubkey: string,

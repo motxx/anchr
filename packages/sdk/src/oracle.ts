@@ -19,7 +19,6 @@
  * different protocol can pass a custom OracleClient implementation.
  */
 
-/** Public-facing oracle client interface. */
 export interface OracleClient {
   /**
    * Request a fresh hash for a query. The oracle commits to releasing
@@ -84,9 +83,7 @@ export function createHttpOracleClient(options: HttpOracleOptions): OracleClient
         let body = "";
         try {
           body = await res.text();
-        } catch {
-          // ignore
-        }
+        } catch { /* body unreadable */ }
         throw new OracleHttpError(res.status, body);
       }
 

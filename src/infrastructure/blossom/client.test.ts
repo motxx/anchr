@@ -9,11 +9,9 @@ describe("Blossom client", () => {
 
     const { encrypted, key, iv } = await encryptBlob(original);
 
-    // Encrypted data should differ from original
     expect(encrypted.length).toBeGreaterThan(original.length); // GCM tag adds 16 bytes
     expect(Buffer.from(encrypted).toString()).not.toBe(Buffer.from(original).toString());
 
-    // Decrypt should recover original
     const decrypted = await decryptBlob(encrypted, key, iv);
     expect(Buffer.from(decrypted).toString()).toBe(Buffer.from(original).toString());
   });
@@ -24,14 +22,11 @@ describe("Blossom client", () => {
     const result1 = await encryptBlob(data);
     const result2 = await encryptBlob(data);
 
-    // Different keys and IVs
     expect(Buffer.from(result1.key)).not.toEqual(Buffer.from(result2.key));
     expect(Buffer.from(result1.iv)).not.toEqual(Buffer.from(result2.iv));
 
-    // Different ciphertexts
     expect(Buffer.from(result1.encrypted)).not.toEqual(Buffer.from(result2.encrypted));
 
-    // Both decrypt to same original
     const d1 = await decryptBlob(result1.encrypted, result1.key, result1.iv);
     const d2 = await decryptBlob(result2.encrypted, result2.key, result2.iv);
     expect(Buffer.from(d1)).toEqual(Buffer.from(d2));

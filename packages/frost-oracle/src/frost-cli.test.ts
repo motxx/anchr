@@ -30,7 +30,6 @@ const realBinary = findRealBinary();
 
 describe("frost-cli wrapper", () => {
   afterEach(() => {
-    // Reset to undefined so findFrostSigner re-discovers on next call
     _setFrostSignerPathForTest(undefined);
   });
 
@@ -57,7 +56,6 @@ describe("frost-cli wrapper", () => {
   });
 });
 
-// Tests that require the actual frost-signer binary
 const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("frost-cli with real binary", () => {
@@ -68,15 +66,12 @@ binaryDescribe("frost-cli with real binary", () => {
   test("dkgRound1 calls through to binary and returns structured JSON", async () => {
     _setFrostSignerPathForTest(realBinary!);
     const result = await dkgRound1(1, 3, 2);
-    // The binary should return ok:true with data containing round1 package
     expect(result.ok).toBe(true);
     expect(result.data).toBeDefined();
   });
 
   test("verifySignature returns ok with valid field", async () => {
     _setFrostSignerPathForTest(realBinary!);
-    // Use dummy values — the binary will likely return ok:true with valid:false
-    // or ok:false with an error; either way the structure should be correct
     const result = await verifySignature("aa".repeat(32), "bb".repeat(32), "cc".repeat(16));
     expect(typeof result.ok).toBe("boolean");
     if (result.ok) {

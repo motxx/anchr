@@ -1,13 +1,5 @@
-/**
- * Encryption utilities for Anchr over Nostr.
- *
- * Two modes:
- * 1. Region-key encryption: Derive a shared key from region code.
- *    Any worker in that region can decrypt. Relays see region tag but not content.
- *
- * 2. NIP-44 encryption: 1-to-1 encrypted messages between requester and worker.
- *    Only the two parties can decrypt.
- */
+// Two modes: region-derived shared key (any worker in the region can read,
+// goal is hiding from relays not adversaries) and NIP-44 1-to-1 encryption.
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";

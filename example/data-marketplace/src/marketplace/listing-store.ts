@@ -1,8 +1,3 @@
-/**
- * In-memory listing store for the Verified Data Marketplace.
- * Follows the same pattern as src/domain/query-store.ts.
- */
-
 import type { DataListing } from "./types.ts";
 
 export interface ListingStore {

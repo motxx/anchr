@@ -38,9 +38,6 @@ export function isBlossomEnabled(): boolean {
   return getBlossomConfig() !== null;
 }
 
-/**
- * Encrypt data with AES-256-GCM. Returns encrypted buffer and key.
- */
 export async function encryptBlob(data: Uint8Array): Promise<{
   encrypted: Uint8Array;
   key: Uint8Array;
@@ -70,9 +67,6 @@ export async function encryptBlob(data: Uint8Array): Promise<{
   };
 }
 
-/**
- * Decrypt AES-256-GCM encrypted data.
- */
 export async function decryptBlob(
   encrypted: Uint8Array,
   key: Uint8Array,
@@ -95,10 +89,7 @@ export async function decryptBlob(
   return new Uint8Array(decrypted);
 }
 
-/**
- * Build a Blossom authorization event (BUD-02).
- * Blossom servers require a signed Nostr event for upload authorization.
- */
+// BUD-02: Blossom servers require a signed Nostr event for upload authorization.
 function buildAuthEvent(
   identity: NostrIdentity,
   hash: string,
@@ -122,19 +113,11 @@ function buildAuthEvent(
 export interface BlossomUploadResult {
   hash: string;
   urls: string[];
-  encryptKey: string; // hex-encoded AES key
-  encryptIv: string;  // hex-encoded IV
+  encryptKey: string;
+  encryptIv: string;
   sizeBytes: number;
 }
 
-/**
- * Upload an encrypted blob to Blossom servers.
- *
- * 1. Encrypt the data with AES-256-GCM
- * 2. Compute SHA-256 hash of the encrypted blob
- * 3. Upload to all configured Blossom servers
- * 4. Return hash + decryption key
- */
 export async function uploadToBlossom(
   data: Uint8Array,
   identity: NostrIdentity,
@@ -144,13 +127,10 @@ export async function uploadToBlossom(
   const urls = serverUrls ?? config?.serverUrls;
   if (!urls || urls.length === 0) return null;
 
-  // Encrypt
   const { encrypted, key, iv } = await encryptBlob(data);
 
-  // Hash the encrypted blob
   const hash = bytesToHex(sha256(encrypted));
 
-  // Upload to all servers
   const successUrls: string[] = [];
 
   await Promise.allSettled(
@@ -187,12 +167,6 @@ export async function uploadToBlossom(
   };
 }
 
-/**
- * Download and decrypt a blob from Blossom servers.
- *
- * Retries the entire server list up to `maxRetries` times (default 3)
- * with a delay of `retryDelayMs` ms (default 5000) between attempts.
- */
 export async function downloadFromBlossom(
   hash: string,
   encryptKey: string,
@@ -208,7 +182,6 @@ export async function downloadFromBlossom(
   const retryDelayMs = options?.retryDelayMs ?? 5000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    // Try each server until we get the blob
     for (const serverUrl of urls) {
       try {
         const response = await fetch(`${serverUrl}/${hash}`);

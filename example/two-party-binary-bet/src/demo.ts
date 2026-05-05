@@ -38,10 +38,6 @@ import type {
   OpenOrder,
 } from "./market-types.ts";
 
-// ============================================================
-// Demo configuration
-// ============================================================
-
 const BITFLYER_API_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
 const RESOLUTION_DEADLINE = Math.floor(Date.now() / 1000) + 86400; // 24h from now
 const ORACLE_FEE_PPM = 5_000;  // 0.5%
@@ -50,10 +46,6 @@ const CREATOR_FEE_PPM = 10_000; // 1.0%
 console.log("=== 巫(Kannagi) — Bitcoin-Native Two-party binary bet Demo (N:M Conditional Swap) ===\n");
 console.log("Powered by Anchr: FROST P2PK Conditional Swap + Nostr + TLSNotary\n");
 console.log("\u2501".repeat(60));
-
-// ============================================================
-// Step 1: Oracle creates dual-preimage pair
-// ============================================================
 
 console.log("\n--- Step 1: Oracle creates FROST keypairs (demo: single Schnorr keys) ---\n");
 
@@ -72,15 +64,10 @@ console.log(`  Two keypairs generated -- one for each outcome.`);
 console.log(`  In production: FROST t-of-n DKG group keys.`);
 console.log(`  Oracle signs with winning key; loser's secret is deleted forever.`);
 
-// Simulated keypairs
 const creatorPubkey = bytesToHex(randomBytes(32));
 const oraclePubkey = bytesToHex(randomBytes(32));
 const alicePubkey = bytesToHex(randomBytes(32));
 const bobPubkey = bytesToHex(randomBytes(32));
-
-// ============================================================
-// Step 2: Market creation with dual hashes
-// ============================================================
 
 console.log("\n--- Step 2: Market creation with dual hashes ---\n");
 
@@ -124,10 +111,6 @@ console.log(`  Group PK YES:   ${frostKeys.pubkey_a.slice(0, 16)}...`);
 console.log(`  Group PK NO:    ${frostKeys.pubkey_b.slice(0, 16)}...`);
 console.log(`  Deadline:       ${new Date(RESOLUTION_DEADLINE * 1000).toISOString()}`);
 
-// ============================================================
-// Step 3: Bettors place orders via order book
-// ============================================================
-
 console.log("\n--- Step 3: Bettors place orders via order book ---\n");
 
 const orderBook = createInMemoryOrderBook();
@@ -159,10 +142,6 @@ console.log("  Alice (YES): 100 sats");
 console.log("  Bob   (NO):  100 sats");
 console.log(`  Open orders: ${(await orderBook.getOpenOrders(marketId)).length}`);
 
-// ============================================================
-// Step 4: Order book matches → Cross-HTLC
-// ============================================================
-
 console.log("\n--- Step 4: Order book matching + FROST P2PK ---\n");
 
 const matches = await orderBook.matchOrders(marketId);
@@ -172,7 +151,6 @@ for (const m of matches) {
   console.log(`  Match: YES(${m.yes_order_id.slice(0, 8)}...) <-> NO(${m.no_order_id.slice(0, 8)}...) = ${m.amount_sats} sats`);
 }
 
-// Build FROST P2PK options (simulated -- real version calls createFrostSwapPairTokens)
 console.log("\n  FROST P2PK token structure:");
 
 const optionsAtoB = buildFrostSwapForPartyA({
@@ -201,7 +179,6 @@ console.log(`    Redeem:    Oracle signs with group_key_yes + Alice signs`);
 market.yes_pool_sats = 100;
 market.no_pool_sats = 100;
 
-// Create simulated bets for payout calculation
 const aliceBet: Bet = {
   id: aliceOrder.id,
   market_id: marketId,
@@ -221,10 +198,6 @@ const bobBet: Bet = {
   escrow_token: "(cross-htlc-token)",
   timestamp: bobOrder.timestamp,
 };
-
-// ============================================================
-// Step 5: Oracle resolves via TLSNotary + dual-preimage
-// ============================================================
 
 console.log("\n--- Step 5: Oracle resolves market ---\n");
 
@@ -254,7 +227,6 @@ const outcome = conditionMet ? "yes" : "no";
 console.log(`\n  Condition: best_bid > 11,000,000 → ${conditionMet ? "MET" : "NOT MET"}`);
 console.log(`  Outcome:   ${outcome.toUpperCase()}`);
 
-// FROST P2PK signing — the core of N:M conditional swap
 console.log("\n  FROST P2PK resolution (Oracle signs with winning key):");
 
 const winningSide: "a" | "b" = outcome === "yes" ? "a" : "b";
@@ -268,14 +240,12 @@ if (oracleSignature) {
   const sigValid = schnorr.verify(hexToBytes(oracleSignature), signMessage, hexToBytes(winningPubkey));
   console.log(`  Signature valid: ${sigValid}`);
 
-  // Verify the losing key cannot be used
   const trySignAgain = keyStore.sign(marketId, winningSide === "a" ? "b" : "a", signMessage);
   console.log(`  Second sign attempt: ${trySignAgain === null ? "null (correctly rejected)" : "ERROR: should be null"}`);
 } else {
   console.log("  ERROR: FROST resolution failed");
 }
 
-// Also demonstrate HTLC preimage reveal — the dual-preimage primitive.
 console.log("\n  HTLC preimage reveal:");
 const htlcResolution = resolveMarketDual(marketId, outcome as "yes" | "no", dualStore);
 if (htlcResolution) {
@@ -283,10 +253,6 @@ if (htlcResolution) {
 } else {
   console.log("  HTLC preimage revealed (or already consumed)");
 }
-
-// ============================================================
-// Step 6: Winner redeems via preimage
-// ============================================================
 
 console.log("\n--- Step 6: Payout distribution ---\n");
 
@@ -320,10 +286,6 @@ for (const p of payouts) {
   const name = p.bettor_pubkey === alicePubkey ? "Alice" : "Bob";
   console.log(`    ${name}: ${p.payout_sats} sats`);
 }
-
-// ============================================================
-// Summary
-// ============================================================
 
 console.log("\n" + "\u2501".repeat(60));
 console.log("\n--- Summary ---\n");

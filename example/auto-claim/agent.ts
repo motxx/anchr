@@ -14,7 +14,6 @@
  *   deno run --allow-all --env example/auto-claim/agent.ts
  */
 
-// Published package: import { Anchr } from "anchr-sdk";
 import { Anchr } from "anchr-sdk";
 import { spawn } from "@anchr/core-runtime";
 
@@ -24,10 +23,9 @@ const CHECK_INTERVAL_MS = Number(Deno.env.get("CHECK_INTERVAL_MS") ?? "10000");
 const USER_PUBKEY = Deno.env.get("USER_PUBKEY") ?? "user-auto-claim";
 
 const anchr = new Anchr({ serverUrl: SERVER_URL });
-const claimed = new Set<string>();  // successfully claimed
-const attempted = new Set<string>(); // proof attempted (avoid retry spam)
+const claimed = new Set<string>();
+const attempted = new Set<string>(); // avoid retry spam after a proof attempt
 
-// --- Local condition evaluation ---
 // Mirrors server-side evaluateCondition() to avoid unnecessary proof generation.
 // Only generate proof when conditions are locally confirmed.
 
@@ -88,8 +86,6 @@ function evaluateLocally(
   return { passed: true, details };
 }
 
-// --- Proof generation ---
-
 async function generateProof(targetUrl: string): Promise<string> {
   const outPath = `/tmp/auto-claim-proof-${Date.now()}.tlsn`;
   const proc = spawn(
@@ -106,8 +102,6 @@ async function generateProof(targetUrl: string): Promise<string> {
   return btoa(String.fromCharCode(...proofBytes));
 }
 
-// --- Display helpers ---
-
 function formatFlight(body: string): string {
   try {
     const d = JSON.parse(body);
@@ -117,8 +111,6 @@ function formatFlight(body: string): string {
   } catch { /* not flight JSON */ }
   return "";
 }
-
-// --- Main loop ---
 
 console.log("=== Auto-Claim Agent ===\n");
 console.log(`Server:         ${SERVER_URL}`);
@@ -146,7 +138,7 @@ while (true) {
 
       if (!reqs?.target_url) continue;
 
-      // 1. Fetch target (lightweight, no proof yet)
+      // Fetch target (lightweight, no proof yet)
       let body: string;
       try {
         const resp = await fetch(reqs.target_url);
@@ -158,7 +150,7 @@ while (true) {
         continue;
       }
 
-      // 2. Evaluate conditions locally
+      // Local evaluation gates proof generation — only prove when conditions pass.
       const conditions = reqs.conditions ?? [];
       const { passed, details } = evaluateLocally(body, conditions);
       const display = formatFlight(body) || reqs.target_url;
@@ -170,14 +162,12 @@ while (true) {
         continue;
       }
 
-      // 3. Conditions met — claim!
       console.log(
         `\n[${new Date().toISOString()}] ${display} — CLAIM TRIGGERED!`,
       );
       for (const d of details) console.log(`  ${d}`);
       console.log(`  Bounty: ${policy.bounty?.amount_sats ?? 0} sats`);
 
-      // 4. Generate TLSNotary proof and submit
       try {
         console.log("  Generating TLSNotary proof...");
         const proof = await generateProof(reqs.target_url);

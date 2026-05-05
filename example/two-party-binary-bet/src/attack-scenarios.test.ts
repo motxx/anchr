@@ -20,10 +20,6 @@ import {
 import { calculatePayouts } from "./market-oracle.ts";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Generate a keypair using nostr-tools (returns x-only pubkey). */
 function makeKeypair() {
   const sk = generateSecretKey();
@@ -61,10 +57,6 @@ function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryB
     ...overrides,
   } as TwoPartyBinaryBet;
 }
-
-// ===========================================================================
-// Attack 1: Locktime Refund Race
-// ===========================================================================
 
 describe("Attack 1: Locktime Refund Race", () => {
   test("server uses market.resolution_deadline as locktime for P2PK tokens", () => {
@@ -146,10 +138,6 @@ describe("Attack 1: Locktime Refund Race", () => {
     expect(locktimeWithBuffer).toBeGreaterThan(resolutionDeadline);
   });
 });
-
-// ===========================================================================
-// Attack 2: Both-sides signature (Oracle collusion)
-// ===========================================================================
 
 describe("Attack 2: Oracle Double-Signing Prevention", () => {
   test("signing both YES and NO should be impossible in single-key mode", () => {
@@ -236,10 +224,6 @@ describe("Attack 2: Oracle Double-Signing Prevention", () => {
     expect(totalPayoutNo - 200).toBe(0);
   });
 });
-
-// ===========================================================================
-// Attack 3: FROST signature not usable as P2PK witness
-// ===========================================================================
 
 describe("Attack 3: Oracle Signature Must Match Proof Secret", () => {
   test("Oracle signature must be on proof.secret, not market message", () => {
@@ -329,10 +313,6 @@ describe("Attack 3: Oracle Signature Must Match Proof Secret", () => {
   });
 });
 
-// ===========================================================================
-// Attack 4: Wrong winner redeem attempt
-// ===========================================================================
-
 describe("Attack 4: Loser Cannot Redeem With Winner's Signature", () => {
   test("loser cannot use winner's Oracle signature to redeem", () => {
     // Setup: YES wins. Oracle signs with group_yes key.
@@ -411,10 +391,6 @@ describe("Attack 4: Loser Cannot Redeem With Winner's Signature", () => {
   });
 });
 
-// ===========================================================================
-// Attack 5: Replay attack — reuse Oracle signature across markets
-// ===========================================================================
-
 describe("Attack 5: Cross-Market Replay Attack", () => {
   test("Oracle signature from market A cannot be used in market B", () => {
     // Each market has its own DualKeyStore entry with unique keypairs.
@@ -488,10 +464,6 @@ describe("Attack 5: Cross-Market Replay Attack", () => {
     expect(uniquePubkeys.size).toBe(allPubkeys.length);
   });
 });
-
-// ===========================================================================
-// Attack 6: Token double-spend after non-custodial distribution
-// ===========================================================================
 
 describe("Attack 6: Insufficient Signatures Without Oracle", () => {
   test("user receives locked token at match time, cannot spend without Oracle sig", () => {

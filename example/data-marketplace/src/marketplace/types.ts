@@ -1,17 +1,10 @@
-/**
- * Verified Data Marketplace types.
- *
- * Supports two payment modes:
- * - X-Cashu (direct): Buyer sends token, provider redeems immediately. Buyer risk.
- * - HTLC escrow: Oracle verifies TLSNotary proof before releasing preimage. Trustless.
- */
+// Two payment modes: cashu-direct (immediate, buyer-risk) and cashu-htlc
+// (Oracle releases preimage only after TLSNotary proof verification).
 
 import type { TlsnRequirement } from "../../../../src/domain/types.ts";
 import type { MiddlewareHandler } from "hono";
 import type { ListingStore } from "./listing-store.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
-
-// --- Data Listing ---
 
 export interface DataListing {
   id: string;
@@ -34,8 +27,6 @@ export interface DataListing {
   provider_pubkey?: string;
 }
 
-// --- Payment ---
-
 export type PaymentMode = "cashu-direct" | "cashu-htlc";
 
 export interface PaymentInfo {
@@ -50,8 +41,6 @@ export interface PaymentInfo {
   htlc_hash?: string;
 }
 
-// --- Purchase Record ---
-
 export interface PurchaseRecord {
   listing_id: string;
   token_hash: string;
@@ -60,15 +49,11 @@ export interface PurchaseRecord {
   purchased_at: number;
 }
 
-// --- Hono Env (typed Variables for c.get/c.set) ---
-
 export type MarketplaceEnv = {
   Variables: {
     paymentInfo: PaymentInfo;
   };
 };
-
-// --- Route Context ---
 
 export interface MarketplaceRouteContext {
   listingStore: ListingStore;

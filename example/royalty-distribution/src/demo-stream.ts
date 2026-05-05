@@ -19,10 +19,6 @@ import type {
   UseEvent,
 } from "./royalty-types.ts";
 
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
 const song: Content = {
   id: "sha256:song-x-2026-q1",
   title: "Song X",
@@ -46,12 +42,7 @@ const platformReport: UseEvent = {
   period_end: 1_714_521_600, // 2026-05-01
 };
 
-// Per-stream rate in sats. Just a number for the demo.
 const RATE_SATS_PER_USE = 1;
-
-// ---------------------------------------------------------------------------
-// Edge construction (this is what the verification engine would do)
-// ---------------------------------------------------------------------------
 
 function buildEdges(
   use: UseEvent,
@@ -76,9 +67,7 @@ function buildEdges(
   });
 }
 
-// In a wired-up build this would call into Anchr's TLSN verifier and
-// reject edges whose proofs don't validate. For the simulation we
-// trust the constructed proofs.
+// Wired build calls Anchr's TLSN verifier; demo trusts the constructed proofs.
 function verifyEdges(edges: DistributionEdge[]): boolean {
   return edges.every((e) => {
     const p = e.proof;
@@ -98,10 +87,6 @@ function buildReport(
     audit_trail_intact: true,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Run
-// ---------------------------------------------------------------------------
 
 const edges = buildEdges(platformReport, songRights, RATE_SATS_PER_USE);
 const report = buildReport(platformReport, edges);
