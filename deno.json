@@ -8,7 +8,8 @@
     "./packages/cashu-conditional-swap",
     "./packages/blossom",
     "./packages/bounty",
-    "./packages/sdk"
+    "./packages/sdk",
+    "./example/airdrop-bot-shield"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
@@ -69,7 +70,7 @@
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $(find packages -name \"*.integration.test.ts\" -type f)'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:examples": "deno test --allow-all example/",
+    "test:examples": "deno test --allow-all example/ --ignore=example/expo-worker-app",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",

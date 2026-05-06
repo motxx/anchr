@@ -4,9 +4,12 @@
 
 **Airdrop bot shield.**
 
-> **Status: Simulation.** The pattern is deliverable with the SDK; current code is mock-stage.
+> **Status: Mainnet-capable operator preview.** The demo remains available,
+> but the example now includes a durable HTTP verifier service with SQLite
+> persistence, TLSNotary sidecar verification, replay protection, per-account
+> nullifiers, and mainnet startup guards.
 
-> **Uses:** `@anchr/tlsn-toolkit` + `@anchr/cashu-conditional-swap` (designed; current code is a simulation).
+> **Uses:** `@anchr/tlsn-toolkit` + Cashu HTLC preimage release.
 > **Pattern:** bounty (Project pays each verified Claimant on TLSN-attested Web2 attribute).
 
 TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are.
@@ -159,6 +162,7 @@ When conditions are combined, the farming cost exceeds the airdrop value. This m
 ### `POST /airdrop/create`
 
 Create a new airdrop campaign with eligibility criteria.
+Requires `Authorization: Bearer $KATASHIRO_ADMIN_TOKEN`.
 
 ```json
 {
@@ -190,7 +194,7 @@ Submit TLSNotary proofs to claim airdrop tokens.
 
 ```json
 {
-  "wallet_address": "0x...",
+  "claimant_pubkey": "02...",
   "proofs": [
     {
       "condition_index": 0,
@@ -208,14 +212,53 @@ Submit TLSNotary proofs to claim airdrop tokens.
 
 ```json
 {
+  "claim_id": "4a4c...",
   "status": "approved",
+  "htlc_hash": "e5...",
   "results": [
     { "condition": "github_account_age", "passed": true, "value": 1423 },
     { "condition": "github_repos", "passed": true, "value": 47 }
   ],
-  "cashu_token": "cashuA..."
+  "settlement": {
+    "type": "cashu_htlc",
+    "status": "released",
+    "cashu_token": "cashuB...",
+    "htlc_hash": "e5..."
+  },
+  "preimage": "7d..."
 }
 ```
+
+The service releases the HTLC preimage, not bearer ecash. Operators should
+lock the claimant's Cashu token against `htlc_hash + claimant_pubkey` before
+the claimant redeems with the returned `preimage`.
+
+### `POST /airdrop/{id}/reserve`
+
+Create a claim slot and HTLC hash before proof submission.
+
+```json
+{
+  "claimant_pubkey": "02..."
+}
+```
+
+Response:
+
+```json
+{
+  "claim_id": "4a4c...",
+  "htlc_hash": "e5...",
+  "status": "reserved",
+  "settlement": {
+    "type": "cashu_htlc",
+    "status": "locked",
+    "cashu_token": "cashuB..."
+  }
+}
+```
+
+Pass `claim_id` to `/claim` to settle against the pre-reserved hash.
 
 ### `GET /airdrop/{id}/status`
 
@@ -251,15 +294,74 @@ The demo simulates the full flow with mock data:
 3. Verifies mock proofs against the criteria (simulating what the oracle does)
 4. Demonstrates the Cashu HTLC escrow and redemption flow
 
-For a real deployment, you would need:
+## Running the HTTP Service
 
-- **Anchr server** running (`deno task dev` from the repo root)
-- **TLSNotary Extension** in the claimant's browser for proof generation
-- **Cashu Mint** for HTLC token escrow (e.g., Nutshell at `http://localhost:3338`)
+Local development:
+
+```bash
+KATASHIRO_ADMIN_TOKEN="$(openssl rand -hex 32)" \
+KATASHIRO_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
+KATASHIRO_DB_PATH=.katashiro/katashiro.db \
+deno run --allow-env --allow-net --allow-read --allow-write --allow-run --allow-ffi \
+  example/airdrop-bot-shield/server.ts
+```
+
+Mainnet mode refuses to start unless release guards pass:
+
+```bash
+NODE_ENV=production \
+KATASHIRO_NETWORK=mainnet \
+KATASHIRO_PUBLIC_BASE_URL=https://katashiro.example.com \
+CASHU_MINT_URL=https://mint.example.com \
+KATASHIRO_REQUESTER_REFUND_PUBKEY=02... \
+KATASHIRO_SOURCE_CASHU_TOKENS='cashuB...' \
+KATASHIRO_ADMIN_TOKEN="$(openssl rand -hex 32)" \
+KATASHIRO_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
+KATASHIRO_DB_PATH=/data/katashiro.db \
+deno run --allow-env --allow-net --allow-read --allow-write --allow-run --allow-ffi \
+  example/airdrop-bot-shield/server.ts
+```
+
+Mainnet requirements:
+
+- `tlsn-verifier` binary built or installed on `PATH`.
+- HTTPS public base URL.
+- HTTPS non-local Cashu mint URL.
+- Cashu HTLC settlement configuration:
+  - `KATASHIRO_REQUESTER_REFUND_PUBKEY` — operator refund pubkey.
+  - `KATASHIRO_SOURCE_CASHU_TOKENS` — whitespace/comma-separated funded
+    source tokens. The service locks each approved claim through
+    `@anchr/core-cashu`.
+  - `KATASHIRO_HTLC_LOCKTIME_SECONDS` — optional Unix timestamp; defaults to
+    seven days from service start.
+- Durable SQLite DB path, not `:memory:`.
+- Strong admin token and nullifier secret.
+- TLSNotary Extension in the claimant's browser for proof generation.
+
+## Mainnet Safety Properties
+
+- TLSNotary presentations are verified by `@anchr/tlsn-toolkit`; claimant
+  self-reported data is never trusted.
+- Reused TLSNotary presentations are rejected durably by SHA-256 hash.
+- One approved claim per Web2 account per campaign is enforced through an
+  HMAC nullifier. The DB stores the nullifier, not the raw GitHub/Twitter ID.
+- Campaign budget is enforced by approved-claim count.
+- The oracle service only releases preimages; it does not custody claimant
+  funds.
 
 ## Files
 
 - **src/airdrop-criteria.ts** — TypeScript types, condition builders, and validation for airdrop eligibility criteria
 - **src/claim-verifier.ts** — Verification logic: evaluates TLSNotary proofs against airdrop conditions
+- **src/katashiro-policy.ts** — Katashiro-specific account identity extraction policy
+- **src/server-routes.ts** — Hono HTTP API
+- **src/release-config.ts** — Mainnet startup guardrails
+- **server.ts** — HTTP service entrypoint
 - **src/demo.ts** — Runnable demo simulating the full airdrop claim flow with mock data
 - **deno.json** — Task definitions for running the example
+
+Reusable production workflow lives in `@anchr/bounty/claim-gate`:
+
+- `ProofGateService` — TLSN verification, replay rejection, nullifier enforcement, budget guard, preimage release
+- `openSqliteProofGateStore` — durable SQLite indexes for campaigns, claims, presentation hashes, and nullifiers
+- `createCashuTokenBankProofGateSettlementProvider` — Cashu HTLC lock/release wiring via `@anchr/core-cashu`

@@ -58,6 +58,7 @@ export { workerUpload } from "./infrastructure/blossom/worker-upload.ts";
 export type { WorkerUploadResult } from "./infrastructure/blossom/worker-upload.ts";
 export { fetchBlossomAttachment } from "./infrastructure/blossom/fetch-attachment.ts";
 export * as verification from "./infrastructure/verification/index.ts";
+export * as claimGate from "./infrastructure/claim-gate/index.ts";
 
 export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./infrastructure/oracle-service/nostr-service.ts";
 export type { OracleNostrServiceConfig, OracleNostrService } from "./infrastructure/oracle-service/nostr-service.ts";
