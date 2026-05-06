@@ -40,6 +40,7 @@ COPY packages/blossom/deno.json ./packages/blossom/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
 COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
+COPY example/tlsn-fiat-swap-square/deno.json ./example/tlsn-fiat-swap-square/
 RUN deno install
 
 COPY . .
