@@ -122,6 +122,7 @@ export async function isRelayReachable(wsUrl: string): Promise<boolean> {
 
 /** Check if both Cashu mint and lnd-user are reachable. Warns on failure. */
 export async function checkInfraReady(mintUrl: string): Promise<boolean> {
+  const requireInfra = Deno.env.get("ANCHR_E2E_REQUIRE_INFRA") === "1";
   const [mintReachable, lndReachable] = await Promise.all([
     isCashuMintReachable(mintUrl),
     isLndUserReachable(),
@@ -132,6 +133,9 @@ export async function checkInfraReady(mintUrl: string): Promise<boolean> {
   }
   if (!lndReachable) {
     console.warn("[e2e] lnd-user not reachable – tests will be ignored.");
+  }
+  if (requireInfra && (!mintReachable || !lndReachable)) {
+    throw new Error("Regtest infrastructure is required but not ready");
   }
   return mintReachable && lndReachable;
 }

@@ -39,6 +39,7 @@ import { isRelayReachable } from "../helpers/regtest.ts";
 const NOSTR_RELAYS_ENV = Deno.env.get("NOSTR_RELAYS")?.trim();
 const RELAY_URL =
   NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const REQUIRE_INFRA = Deno.env.get("ANCHR_E2E_REQUIRE_INFRA") === "1";
 
 const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
 
@@ -50,6 +51,9 @@ if (!NOSTR_RELAYS_ENV) {
   console.warn(
     `[e2e] Relay not reachable at ${RELAY_URL} – two-party binary bet tests skipped. Run: docker compose up -d`,
   );
+}
+if (REQUIRE_INFRA && !RELAY_REACHABLE) {
+  throw new Error("Nostr relay e2e infrastructure is required but not ready");
 }
 
 const suite = RELAY_REACHABLE ? describe : describe.ignore;

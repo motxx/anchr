@@ -42,7 +42,7 @@ class DenoStdioTransport implements Transport {
 
   async start(): Promise<void> {
     this.child = new Deno.Command(Deno.execPath(), {
-      args: ["run", "--allow-all", "--unstable-sloppy-imports", "--unstable-detect-cjs", "--no-check", `--config=${join(moduleDir(import.meta), "../../deno.json")}`, this.scriptPath],
+      args: ["run", "--allow-all", "--unstable-sloppy-imports", "--unstable-detect-cjs", `--config=${join(moduleDir(import.meta), "../../deno.json")}`, this.scriptPath],
       stdin: "piped",
       stdout: "piped",
       stderr: "inherit",

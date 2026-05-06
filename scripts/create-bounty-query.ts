@@ -15,7 +15,7 @@
  */
 
 import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";

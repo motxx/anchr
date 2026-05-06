@@ -22,6 +22,7 @@ import { existsSync } from "node:fs";
 import process from "node:process";
 
 const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
+const REQUIRE_CORE_INFRA = process.env.TLSN_E2E_REQUIRE_CORE === "1";
 const __dirname = import.meta.dirname ?? new URL(".", import.meta.url).pathname;
 const PROVER_BIN = join(__dirname, "../../crates/tlsn-prover/target/debug/tlsn-prove");
 const VERIFIER_BIN = join(__dirname, "../../crates/tlsn-verifier/target/release/tlsn-verifier");
@@ -98,6 +99,10 @@ describe("TLSNotary E2E", () => {
     if (!verifierBinAvailable) {
       console.error("[e2e] tlsn-verifier binary not found at", VERIFIER_BIN);
       console.error("[e2e] Run: cd crates/tlsn-verifier && cargo build --release");
+    }
+
+    if (REQUIRE_CORE_INFRA && (!verifierReachable || !proverAvailable || !verifierBinAvailable)) {
+      throw new Error("TLSNotary core e2e infrastructure is required but not ready");
     }
   });
 

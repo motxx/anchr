@@ -21,7 +21,7 @@
  *   CASHU_MINT_URL=http://localhost:3338 \
  *   NOSTR_RELAYS=ws://localhost:7777 \
  *   BLOSSOM_SERVERS=http://localhost:3333 \
- *   deno test e2e/conditional-swap.test.ts --allow-all --no-check
+ *   deno test e2e/conditional-swap.test.ts --allow-all
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";

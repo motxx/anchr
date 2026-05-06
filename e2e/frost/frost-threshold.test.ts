@@ -64,11 +64,15 @@ let pubkeyPackage: string;
 // Infrastructure readiness
 // ---------------------------------------------------------------------------
 const FROST_AVAILABLE = isFrostSignerAvailable();
+const REQUIRE_CORE_INFRA = Deno.env.get("FROST_E2E_REQUIRE_CORE") === "1";
 const suite = FROST_AVAILABLE ? describe : describe.ignore;
 
 if (!FROST_AVAILABLE) {
   console.warn("[e2e] frost-signer binary not available — FROST tests will be skipped.");
   console.warn("  Run: cd crates/frost-signer && cargo build --release");
+}
+if (REQUIRE_CORE_INFRA && !FROST_AVAILABLE) {
+  throw new Error("FROST e2e infrastructure is required but not ready");
 }
 
 // ---------------------------------------------------------------------------

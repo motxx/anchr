@@ -20,8 +20,8 @@ import {
   dkgRound2,
   dkgRound3,
   isFrostSignerAvailable,
-} from "../packages/bounty/src/infrastructure/frost/frost-cli.ts";
-import type { FrostNodeConfig, PeerConfig } from "../packages/bounty/src/infrastructure/frost/config.ts";
+} from "@anchr/frost-oracle/frost-cli";
+import type { FrostNodeConfig, PeerConfig } from "@anchr/frost-oracle/config";
 
 // --- Parse CLI args ---
 interface ParsedArgs {

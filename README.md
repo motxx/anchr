@@ -10,6 +10,12 @@ they did, atomic over Nostr.
 
 > **Status: experimental.** Testnet only. SDK API design in progress;
 > packages may change.
+>
+> Current maturity: the Cashu HTLC, Nostr transport, C2PA/photo, and
+> FROST/conditional-swap paths have automated unit and e2e coverage. The
+> TLSNotary path runs real prover/verifier e2e in CI, but the lower-level
+> forged-presentation invariant is still tracked as pending in
+> [`docs/threat-model.md`](docs/threat-model.md#inv-01-worker-cant-forge-tlsn-proofs).
 
 ## What you can build
 
@@ -90,11 +96,13 @@ sequenceDiagram
 If no valid proof arrives before the HTLC's locktime, the Customer's
 funds refund automatically.
 
-Wire-compatible with
+Uses
 [NIP-90 DVM](https://github.com/nostr-protocol/nips/blob/master/90.md)
-(Nostr's request/response market protocol) event kinds — 5300 =
-request, 6300 = result, 7000 = status — so DVM-aware clients can
-interoperate.
+(Nostr's request/response market protocol) event shapes — 5300 =
+request, 6300 = result, 7000 = status — so DVM-style clients can
+interoperate where they understand Anchr's payloads. This is a transport
+choice, not a strict NIP-90 conformance claim; see
+[`docs/architecture.md`](docs/architecture.md#relation-to-nip-90).
 
 For wire-format details (event kinds, payload shapes, oracle discovery,
 conditional-swap primitive), see [`specs/`](specs/). For the layer

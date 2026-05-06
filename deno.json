@@ -63,6 +63,7 @@
     "start": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run --allow-sys --env example/anchr-reference-host/server.ts",
     "dev": "deno run --watch --allow-all --env example/anchr-reference-host/server.ts",
 
+    "check": "deno check packages/ e2e/ scripts/",
     "test": "deno task test:unit && deno task test:integration && deno task test:e2e:protocol && deno task test:scripts && deno task test:examples",
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $(find packages -name \"*.integration.test.ts\" -type f)'",
@@ -70,10 +71,10 @@
     "test:examples": "deno test --allow-all example/",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:e2e:relay": "NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:e2e:regtest": "CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi",
-    "test:e2e:frost": "deno test e2e/frost/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:e2e:tlsn": "deno test e2e/tlsn/ --allow-all --no-check",
+    "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e:regtest": "ANCHR_E2E_REQUIRE_INFRA=1 CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi",
+    "test:e2e:frost": "FROST_E2E_REQUIRE_CORE=1 deno test e2e/frost/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e:tlsn": "TLSN_E2E_REQUIRE_CORE=1 deno test e2e/tlsn/ --allow-all",
     "test:e2e:pentest": "deno test e2e/pentest/ --allow-env --allow-read --allow-net --allow-run --allow-sys",
     "test:e2e:web": "deno test e2e/web/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
 
@@ -83,7 +84,7 @@
 
     "lint": "deno lint",
     "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import",
-    "lint:deps": "cd crates/frost-signer && cargo audit 2>/dev/null; cd ../tlsn-prover && cargo audit 2>/dev/null; cd ../tlsn-server && cargo audit 2>/dev/null; echo 'Cargo audit complete'",
+    "lint:deps": "bash scripts/cargo-audit-all.sh",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:arch:candidates": "deno run --allow-read scripts/arch-lint-candidates.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
