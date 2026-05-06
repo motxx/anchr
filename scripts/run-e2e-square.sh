@@ -11,7 +11,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-LOGS_DIR="/tmp/anchr-e2e-logs"
+# Load .env before docker-compose-env so COMPOSE_PROJECT_NAME/port overrides
+# are honored if a developer pins a local stack explicitly.
+if [ -f .env ]; then
+  set -a; source .env; set +a
+fi
+
+export ANCHR_DOCKER_ISOLATION="${ANCHR_DOCKER_ISOLATION:-worktree}"
+source ./scripts/docker-compose-env.sh
+
+LOGS_DIR="/tmp/anchr-e2e-logs-${COMPOSE_PROJECT_NAME}"
 rm -rf "$LOGS_DIR"
 mkdir -p "$LOGS_DIR"
 
@@ -22,8 +31,9 @@ cleanup() {
   for pid in "${PIDS[@]}"; do
     kill "$pid" 2>/dev/null || true
   done
-  # Don't tear down containers — user may want to inspect
-  echo "[cleanup] Done. Containers still running (use 'docker compose down -v' to remove)."
+  echo "[cleanup] Tearing down Docker Compose stack..."
+  docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
+  echo "[cleanup] Done. Containers, networks, and volumes removed."
 }
 trap cleanup EXIT
 
@@ -37,27 +47,23 @@ if [ ! -f crates/tlsn-prover/target/release/tlsn-prove ]; then
   exit 1
 fi
 
-# Load .env if present (Deno loads .env via --env flag, but we need it for shell checks)
-if [ -f .env ]; then
-  set -a; source .env; set +a
-fi
-
 if [ -z "${SQUARE_ACCESS_TOKEN:-}" ]; then
   echo "[error] SQUARE_ACCESS_TOKEN not set (check .env)"
   exit 1
 fi
 
 # In-memory store = stale data, so kill any existing Anchr server.
-if lsof -ti:3000 >/dev/null 2>&1; then
+if lsof -ti:"$ANCHR_HTTP_API_PORT" >/dev/null 2>&1; then
   echo ""
-  echo "[0] Killing existing process on port 3000..."
-  lsof -ti:3000 | xargs kill 2>/dev/null || true
+  echo "[0] Killing existing process on port $ANCHR_HTTP_API_PORT..."
+  lsof -ti:"$ANCHR_HTTP_API_PORT" | xargs kill 2>/dev/null || true
   sleep 1
-  echo "  ✓ Port 3000 freed"
+  echo "  ✓ Port $ANCHR_HTTP_API_PORT freed"
 fi
 
 echo ""
 echo "[1/6] Tearing down containers + volumes (fresh DB)..."
+echo "  Compose project: $COMPOSE_PROJECT_NAME"
 docker compose down -v 2>/dev/null || true
 
 REMAINING=$(docker compose ps -q 2>/dev/null | wc -l | tr -d ' ')
@@ -67,7 +73,7 @@ if [ "$REMAINING" != "0" ]; then
   docker compose down -v --remove-orphans 2>/dev/null || true
 fi
 
-for vol in anchr_relay-data anchr_blossom-data anchr_bitcoin-data anchr_lnd-mint-data anchr_lnd-user-data; do
+for vol in "${COMPOSE_PROJECT_NAME}_relay-data" "${COMPOSE_PROJECT_NAME}_blossom-data" "${COMPOSE_PROJECT_NAME}_bitcoin-data" "${COMPOSE_PROJECT_NAME}_lnd-mint-data" "${COMPOSE_PROJECT_NAME}_lnd-user-data"; do
   if docker volume inspect "$vol" >/dev/null 2>&1; then
     echo "  ⚠ Removing leftover volume $vol..."
     docker volume rm "$vol" 2>/dev/null || true
@@ -145,17 +151,19 @@ echo "  ────────────────────────
 echo ""
 echo "[6/6] Starting Anchr server..."
 
-NOSTR_RELAYS=ws://localhost:7777 \
-BLOSSOM_SERVERS=http://localhost:3333 \
-CASHU_MINT_URL=http://localhost:3338 \
+HTTP_API_PORT="$ANCHR_HTTP_API_PORT" \
+NOSTR_RELAYS="ws://localhost:${ANCHR_RELAY_PORT}" \
+NOSTR_RELAY_URL="ws://localhost:${ANCHR_RELAY_PORT}" \
+BLOSSOM_SERVERS="http://localhost:${ANCHR_BLOSSOM_PORT}" \
+CASHU_MINT_URL="http://localhost:${ANCHR_CASHU_MINT_PORT}" \
 deno run --watch --allow-all --env example/anchr-reference-host/server.ts > "$LOGS_DIR/anchr-server.log" 2>&1 &
 ANCHR_PID=$!
 PIDS+=($ANCHR_PID)
 
 echo "  Waiting for Anchr server..."
 for i in $(seq 1 15); do
-  if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
-    echo "  ✓ Anchr server ready (http://localhost:3000)"
+  if curl -sf "http://localhost:${ANCHR_HTTP_API_PORT}/health" > /dev/null 2>&1; then
+    echo "  ✓ Anchr server ready (http://localhost:${ANCHR_HTTP_API_PORT})"
     break
   fi
   if [ "$i" -eq 15 ]; then
@@ -173,4 +181,7 @@ echo " Running Square E2E..."
 echo "=========================================="
 echo ""
 
+ANCHR_SERVER_URL="http://localhost:${ANCHR_HTTP_API_PORT}" \
+CASHU_MINT_URL="http://localhost:${ANCHR_CASHU_MINT_PORT}" \
+TLSN_VERIFIER_HOST="localhost:${ANCHR_TLSN_TCP_PORT}" \
 deno run --allow-all --env scripts/e2e-square-full.ts

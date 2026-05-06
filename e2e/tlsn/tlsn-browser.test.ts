@@ -38,7 +38,7 @@ function findChromium(): string | null {
 const CHROMIUM = findChromium();
 const EXT_BUILD = process.env.TLSN_EXT_BUILD ??
   "/tmp/tlsn-extension/packages/extension/build";
-const VERIFIER_WS_PORT = 7047;
+const VERIFIER_WS_PORT = Number(process.env.TLSN_VERIFIER_WS_PORT ?? "7047");
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

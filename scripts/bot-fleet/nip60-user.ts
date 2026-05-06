@@ -70,6 +70,7 @@ export class Nip60UserBot {
   private readonly nostrSecret: Uint8Array;
   private readonly cashuWallet: Wallet;
   private readonly nip60: Nip60Wallet;
+  private latestTokenEventIds: string[] = [];
 
   private constructor(
     config: Nip60UserConfig,
@@ -117,7 +118,7 @@ export class Nip60UserBot {
   /** Mint `amountSats` from regtest Lightning and persist as a new kind:7375. */
   async fundFromRegtest(amountSats: number): Promise<void> {
     const proofs = await throttledMintProofs(this.cashuWallet, amountSats);
-    await publishNip60Proofs(this.nip60, proofs);
+    this.latestTokenEventIds = [await publishNip60Proofs(this.nip60, proofs)];
   }
 
   /** Place a bet, submitting tokens for any matches the server returns. */
@@ -180,9 +181,13 @@ export class Nip60UserBot {
     // Replace all prior token events with one fresh kind:7375 covering the
     // change. If the server tendered no matches, runningProofs is unchanged
     // and we still rewrite to consolidate the wallet history.
-    const newEventId = await publishNip60Proofs(this.nip60, runningProofs, runningSupersede);
-    runningSupersede = [newEventId];
-    void runningSupersede; // referenced for clarity; loop is single-pass
+    this.latestTokenEventIds = [
+      await publishNip60Proofs(
+        this.nip60,
+        runningProofs,
+        this.supersedeEventIds(runningSupersede),
+      ),
+    ];
 
     return {
       orderId: betBody.order_id,
@@ -260,7 +265,13 @@ export class Nip60UserBot {
       submittedCount++;
 
       // Persist the new change proofs and supersede the prior NIP-60 events.
-      await publishNip60Proofs(this.nip60, tokenResult.keepProofs, liveEventIds);
+      this.latestTokenEventIds = [
+        await publishNip60Proofs(
+          this.nip60,
+          tokenResult.keepProofs,
+          this.supersedeEventIds(liveEventIds),
+        ),
+      ];
     }
     return submittedCount;
   }
@@ -284,6 +295,10 @@ export class Nip60UserBot {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
+  }
+
+  private supersedeEventIds(relayVisibleEventIds: string[]): string[] {
+    return Array.from(new Set([...relayVisibleEventIds, ...this.latestTokenEventIds]));
   }
 }
 

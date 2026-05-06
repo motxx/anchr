@@ -18,6 +18,8 @@ import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
+const CASHU_MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
+const TLSN_VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
@@ -172,19 +174,21 @@ await flow(2, "active", `Minting ${BOUNTY_SATS} sats...`);
 console.log(`\n[${elapsed()}] === Step 3: Seller mints Cashu bounty ===`);
 
 const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts"); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
-const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
+const cashuWallet = new CashuWallet(CASHU_MINT_URL, { unit: "sat" });
 await cashuWallet.loadMint();
 
 const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-const payProc = spawn(["bash", "-c",
-  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
+const payProc = spawn([
+  "docker", "compose", "exec", "-T", "lnd-user",
+  "lncli", "--network=regtest", "--rpcserver=lnd-user:10009",
+  "payinvoice", "--force", mintQuote.request,
 ], { stdout: "pipe", stderr: "pipe" });
 await payProc.exited;
 const payOut = await new Response(payProc.stdout).text();
 console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
 
 const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
-const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+const cashuToken = getEncodedToken({ mint: CASHU_MINT_URL, proofs });
 await flow(2, "complete", `${BOUNTY_SATS} sats minted`);
 console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
 
@@ -399,7 +403,7 @@ const proveStart = Date.now();
 // ~2.9KB response needs 4096 recv buffer. Proof takes ~60-120s.
 const proc = spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
-  "--verifier", "localhost:7046",
+  "--verifier", TLSN_VERIFIER_HOST,
   "--max-recv-data", "4096",
   "--max-sent-data", "4096",
   "-H", `Authorization: Bearer ${STRIPE_SECRET_KEY}`,
