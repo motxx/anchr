@@ -125,18 +125,6 @@ their own signature to redeem the loser's locked token.
 Used by: two-party-binary-bet. Imports `@anchr/cashu-conditional-swap` +
 `@anchr/frost-oracle` directly (no SDK).
 
-### Verification-only chain (no Cashu)
-
-A multi-hop evidence chain — supply-chain audit, news provenance,
-document authenticity — uses `photo-verification` and `tlsn-toolkit` to
-produce per-hop attestations linked through Nostr, but settlement
-happens off-protocol (typically fiat invoices in supply-chain finance,
-or no settlement at all in pure audit chains).
-
-Used by: `royalty-distribution` (digital rights graph),
-`supply-chain-proof` (physical multi-hop). Neither uses
-`cashu-conditional-swap`.
-
 **Why the three-way distinction matters**: Bounty and Market are
 settlement compositions (payment is on-protocol via Cashu);
 Verification-only is a non-settlement composition (Anchr provides only

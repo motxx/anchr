@@ -218,19 +218,16 @@ defining the predicate shape, proof format, and verification rules.
 ## Composition patterns
 
 `@anchr/sdk` (Customer/Provider) is the headline shape, but Anchr's primitives
-compose into four shapes — each serving a different counterparty topology:
+compose into three shapes — each serving a different counterparty topology:
 
 1. **Bounty** (1:N, single-hop) — one Customer pays one of many competing
    Providers for verified data. The default `@anchr/sdk` flow.
-2. **Chained Bounty** (N hops) — a chain of Customer/Provider transactions where
-   each hop verifies the prior hop's attestation and adds its own. Settlement
-   happens at every hop (or off-protocol for fiat-leg cases).
-3. **Conditional Swap / Market** (2-party, bilateral) — both parties lock
+2. **Conditional Swap / Market** (2-party, bilateral) — both parties lock
    counter-tokens against opposing outcomes; an oracle reveals one preimage and
    the winner sweeps. **Narrow scope on purpose**: tied to verifiable events.
    Continuous order books, AMMs, and dynamic- counterparty matching are out of
    scope — Lightning + DLC fits those better.
-4. **Verification-only** (no payment) — attestation chains that don't need
+3. **Verification-only** (no payment) — attestation chains that don't need
    settlement (sybil shielding, audit trails).
 
 ## Reference Implementations
@@ -254,17 +251,6 @@ incomplete.
 | Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/))   | `@anchr/sdk` + C2PA schema                               | Testnet |
 | Browser auto-claim ([Auto-claim](example/auto-claim/))                    | `@anchr/sdk` + TLSNotary schema                          | Concept |
 | Fiat → BTC swap ([tlsn-fiat-swap-square](example/tlsn-fiat-swap-square/)) | `@anchr/sdk` Customer/Provider + TLSNotary/Square schema | Testnet |
-
-### Chained Bounty (multi-hop, settlement per hop)
-
-| Reference implementation                              | SDK surface exercised                   | Status             |
-| ----------------------------------------------------- | --------------------------------------- | ------------------ |
-| [Royalty distribution](example/royalty-distribution/) | Multi-hop Customer/Provider composition | Composition sketch |
-| [Supply-chain proof](example/supply-chain-proof/)     | Attestation chain + per-hop settlement  | Composition sketch |
-
-Each hop is a Customer/Provider transaction (settlement on-protocol via Cashu,
-or off-protocol fiat for supply-chain finance); the chain itself is
-application-orchestrated.
 
 ### Conditional Swap / Market (2-party, bilateral)
 
@@ -290,7 +276,7 @@ abstraction transfers to a use case the maintainers did not design.
 
 ## Underlying packages
 
-**User-facing — Bounty / Chained Bounty:**
+**User-facing — Bounty:**
 
 | Package                                                     | Purpose                                      |
 | ----------------------------------------------------------- | -------------------------------------------- |
