@@ -10,9 +10,9 @@
  *   - Not an end-to-end test against a real Cashu mint
  *   - Not a verification that NUT-14 HTLC + NIP-44 actually work on the wire
  *
- * The real e2e coverage lives at `e2e/sdk-integration.test.ts` (run via
- * `deno task test:regtest`), which exercises this same flow against the
- * Docker-backed regtest Cashu mint and Nostr relay.
+ * The real e2e coverage lives at `e2e/regtest/sdk-integration.test.ts`
+ * (run via `deno task test:e2e:regtest`), which exercises this same flow
+ * against the Docker-backed regtest Cashu mint and Nostr relay.
  */
 
 import { test } from "@std/testing/bdd";

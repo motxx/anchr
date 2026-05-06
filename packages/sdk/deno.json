@@ -47,9 +47,6 @@
     "strict": true
   },
   "tasks": {
-    "test": "deno test --allow-env --allow-read --allow-net src/customer.test.ts src/provider.test.ts src/schema.test.ts src/nostr.test.ts src/oracle.test.ts src/cashu.test.ts src/events.test.ts src/integration.test.ts"
-  },
-  "test": {
-    "exclude": ["src/index.test.ts", "src/worker.test.ts"]
+    "test": "deno test --allow-env --allow-read --allow-net src/"
   }
 }
