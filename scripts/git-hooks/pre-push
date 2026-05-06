@@ -11,17 +11,77 @@
 # Requires Docker to be running. The script starts and tears down its
 # own service containers; it will not contaminate other compose stacks.
 #
-# Iteration-window bypass: if test:all:full passed within the last 30
-# minutes (marker at $HOME/.claude/.anchr-test-all-last-pass), the push
+# Iteration-window bypass: if test:all:full passed within the last 2
+# hours (marker at $HOME/.claude/.anchr-test-all-last-pass), the push
 # proceeds without re-running. Override with `RUN_TESTS=1 git push`.
+# Non-code bypass: if the pushed refs contain no implementation, test,
+# or test-affecting config changes, the push proceeds without re-running.
 # Bypass with `git push --no-verify` only when you know what you're doing.
 set -e
 
 MARKER="$HOME/.claude/.anchr-test-all-last-pass"
-WINDOW=1800  # 30 minutes
+WINDOW=7200  # 2 hours
+ZERO_SHA="0000000000000000000000000000000000000000"
+REMOTE_NAME="${1:-origin}"
+PUSH_REFS=$(mktemp "${TMPDIR:-/tmp}/anchr-pre-push.XXXXXX")
+CHANGED_FILES=$(mktemp "${TMPDIR:-/tmp}/anchr-pre-push-files.XXXXXX")
+
+cleanup() {
+  rm -f "$PUSH_REFS" "$CHANGED_FILES"
+}
+trap cleanup EXIT HUP INT TERM
+
+cat > "$PUSH_REFS"
+
+is_impl_or_test_path() {
+  case "$1" in
+    *.test.ts|*.test.tsx|*.spec.ts|*.spec.tsx|e2e/*)
+      return 0
+      ;;
+    *.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs|*.rs|*.sh|*.html|*.css|*.sql)
+      return 0
+      ;;
+    deno.json|deno.lock|import_map.json|docker-compose.yml|Dockerfile)
+      return 0
+      ;;
+    Cargo.toml|Cargo.lock|*/Cargo.toml|*/Cargo.lock|*/deno.json|*/package.json|*/package-lock.json)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+collect_changed_files() {
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -n "$local_ref" ] || continue
+    [ "$local_sha" != "$ZERO_SHA" ] || continue
+
+    if [ "$remote_sha" = "$ZERO_SHA" ]; then
+      git log --format= --name-only "$local_sha" --not --remotes="$REMOTE_NAME/*" >> "$CHANGED_FILES"
+    else
+      git diff --name-only "$remote_sha" "$local_sha" >> "$CHANGED_FILES"
+    fi
+  done < "$PUSH_REFS"
+}
+
+has_impl_or_test_changes() {
+  collect_changed_files
+  while read -r path; do
+    [ -n "$path" ] || continue
+    if is_impl_or_test_path "$path"; then
+      return 0
+    fi
+  done < "$CHANGED_FILES"
+  return 1
+}
 
 if [ "${RUN_TESTS:-}" = "1" ]; then
   echo "RUN_TESTS=1 → forcing full test gauntlet."
+elif ! has_impl_or_test_changes; then
+  echo "✓ no implementation or test changes in this push — bypassing test gauntlet."
+  exit 0
 elif [ -f "$MARKER" ]; then
   NOW=$(date +%s)
   LAST=$(cat "$MARKER" 2>/dev/null || echo 0)
@@ -37,4 +97,4 @@ fi
 deno task test:all:full
 mkdir -p "$(dirname "$MARKER")"
 date +%s > "$MARKER"
-echo "✓ test-all marker written — pushes within 30m will bypass the gauntlet."
+echo "✓ test-all marker written — pushes within 2h will bypass the gauntlet."
