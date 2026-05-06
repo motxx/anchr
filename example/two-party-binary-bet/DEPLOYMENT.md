@@ -230,10 +230,10 @@ the HTLC fallback path for those legacy markets.
 
 ```bash
 # In-process test of the full lifecycle (skips when mint isn't reachable):
-deno test --allow-all e2e/two-party-binary-bet-lifecycle.test.ts
+deno test --allow-all e2e/regtest/two-party-binary-bet-lifecycle.test.ts
 
 # Just the unit + route tests (no Docker needed):
-deno task test:example
+deno task test:examples
 
 # Full local run:
 deno task test:all

@@ -120,8 +120,8 @@ layers:
 |---|---|---|
 | Unit (no infra) | `packages/cashu-conditional-swap/src/cross-htlc.test.ts` | `buildCrossHtlcForPartyA/B` produce HTLC P2PK options with the **counterparty's** hash and pubkey. 4 tests. |
 | Unit (no infra) | `packages/cashu-conditional-swap/src/frost-conditional-swap.test.ts` | `buildFrostSwapForPartyA/B` produce **2-of-2** P2PK options containing the FROST group pubkey **and** the counterparty pubkey; `DualKeyStore.sign` deletes the losing key on first sign and refuses to sign twice. 22 tests. |
-| E2E on regtest | `e2e/conditional-swap.test.ts` | Mints real Cashu proofs via Lightning, executes a YES/NO match, asserts each proof's HTLC secret carries `hash_a` / `hash_b` (not Oracle pubkey), oracle reveals `preimage_a`, **YES bettor** redeems NO's locked tokens with `preimage + YES private key`. 11 steps. Run via `deno task test:regtest`. |
-| E2E on regtest | `e2e/frost-p2pk-cashu.test.ts` | Locks Alice's proofs to `[group_pubkey_no, bob]` 2-of-2 and Bob's to `[group_pubkey_yes, alice]`; verifies that **only `[oracle_yes_sk, alice_sk]` together** can redeem Bob's proofs, and that Bob alone, the wrong group key, or a random third party each fail (only 1 of 2 required signatures). 9 lifecycle steps + 3 structural tests. |
+| E2E on regtest | `e2e/regtest/conditional-swap.test.ts` | Mints real Cashu proofs via Lightning, executes a YES/NO match, asserts each proof's HTLC secret carries `hash_a` / `hash_b` (not Oracle pubkey), oracle reveals `preimage_a`, **YES bettor** redeems NO's locked tokens with `preimage + YES private key`. 11 steps. Run via `deno task test:e2e:regtest`. |
+| E2E on regtest | `e2e/regtest/frost-p2pk-cashu.test.ts` | Locks Alice's proofs to `[group_pubkey_no, bob]` 2-of-2 and Bob's to `[group_pubkey_yes, alice]`; verifies that **only `[oracle_yes_sk, alice_sk]` together** can redeem Bob's proofs, and that Bob alone, the wrong group key, or a random third party each fail (only 1 of 2 required signatures). 9 lifecycle steps + 3 structural tests. |
 
 Run the unit subset locally without Docker:
 
@@ -201,7 +201,7 @@ deno run --allow-all example/two-party-binary-bet/server.ts
 deno test --allow-all example/two-party-binary-bet/
 
 # Real Cashu mint E2E (requires `docker compose up -d` + init-regtest.sh)
-deno task test:regtest
+deno task test:e2e:regtest
 
 # FROST 2-of-3 cluster (after building crates/frost-signer)
 example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts --threshold 2 --total 3

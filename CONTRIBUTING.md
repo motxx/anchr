@@ -4,24 +4,44 @@ Issues and PRs welcome.
 
 ## Running the test suite
 
+Three tiers, mapped 1:1 to deno tasks:
+
+| Tier | Suffix / location | Task |
+|---|---|---|
+| **unit** | `packages/<pkg>/src/**/*.test.ts` (no I/O) | `deno task test:unit` |
+| **integration** | `packages/<pkg>/src/**/*.integration.test.ts` (in-process HTTP/WS, no Docker) | `deno task test:integration` |
+| **e2e** | `e2e/<bucket>/*.test.ts` (one bucket per infra profile) | `deno task test:e2e:<bucket>` |
+
 ```bash
-deno task lint:strict          # deno lint + arch + invariants + paths + types
-deno task test:unit            # unit tests across packages
-deno task test:packages        # per-package tests, each in isolation
-deno task test:bounty          # Bounty pattern invariants (trustless / attacks / vulns / quorum)
-deno task test:frost           # FROST threshold signing
-deno task test:integration     # worker-api + MCP HTTP/stdio surface
-deno task test:example         # all example apps
-deno task test:scripts         # lint script self-tests
-deno task test:pentest         # penetration tests
-deno task test:relay           # Nostr relay + Blossom E2E (Docker)
-deno task test:regtest         # full Cashu + Lightning E2E (Docker)
-deno task test:tlsn            # TLSNotary E2E (needs verifier server + Rust prover binary)
-./scripts/test-all.sh --local  # what CI runs in Phase 1
+deno task lint:strict           # deno lint + arch + invariants + paths + types
+deno task test                  # unit + integration + e2e:protocol + scripts + examples (no Docker)
+deno task test:unit             # all unit tests under packages/
+deno task test:integration      # all *.integration.test.ts under packages/
+deno task test:scripts          # lint script self-tests
+deno task test:examples         # all example apps
+
+# E2E buckets — directory = task = infra profile
+deno task test:e2e:protocol     # pure protocol (no infra)
+deno task test:e2e:relay        # Nostr relay + Blossom (Docker)
+deno task test:e2e:regtest      # full Cashu + Lightning (Docker)
+deno task test:e2e:frost        # FROST threshold signing (needs frost-signer binary)
+deno task test:e2e:tlsn         # TLSNotary (needs verifier Docker + Rust prover binary)
+deno task test:e2e:pentest      # pentest (needs anchr server)
+deno task test:e2e:web          # browser flow (needs anchr server + expo web)
+
+./scripts/test-all.sh --local   # everything that does not need Docker (= what CI Phase 1 runs)
+./scripts/test-all.sh --docker  # Docker-backed e2e buckets (relay + regtest + tlsn)
+deno task test:all              # alias for --local
+deno task test:all:docker       # alias for --docker
 ```
 
-CI gates `./scripts/test-all.sh --local` plus `test:all:docker` for the
-relay + regtest phases. Run the local script before pushing.
+**Adding a new test:**
+- Pure logic with no I/O → drop a `*.test.ts` next to the source under `packages/<pkg>/src/`.
+- Needs in-process HTTP / WebSocket / Blossom → name it `*.integration.test.ts`.
+- Needs external services → drop into the matching `e2e/<bucket>/`. The bucket *is* the deno task — no `deno.json` edit required.
+
+CI gates `./scripts/test-all.sh --local` plus the Docker-backed e2e buckets.
+Run the local script before pushing.
 
 ## Quality bar
 
@@ -44,7 +64,7 @@ and Blossom storage:
 
 ```bash
 docker compose up -d && sleep 25 && ./scripts/init-regtest.sh
-deno task test:regtest
+deno task test:e2e:regtest
 ```
 
 The [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
