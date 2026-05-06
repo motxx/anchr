@@ -1,7 +1,7 @@
 /**
  * Shared protocol test helpers for HTLC query lifecycle tests.
  *
- * Used by protocol-attacks.test.ts, protocol-trustless.test.ts, protocol-exploits.test.ts.
+ * Used by e2e/bounty-attacks.test.ts, e2e/bounty-trustless.test.ts, e2e/bounty-vulns.test.ts.
  */
 
 import { getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
