@@ -7,12 +7,12 @@
  */
 
 import {
-  KIND_QUERY_REQUEST,
-  KIND_QUERY_RESPONSE,
-  KIND_QUERY_FEEDBACK,
-  signEvent,
   type Event,
   type Keypair,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+  signEvent,
 } from "./nostr.ts";
 
 /**
@@ -86,7 +86,9 @@ export function buildQueryRequestEvent(
  * means the event was published by someone speaking a different
  * payload format and should be ignored).
  */
-export function parseQueryRequestEvent(event: Event): QueryRequestPayload | null {
+export function parseQueryRequestEvent(
+  event: Event,
+): QueryRequestPayload | null {
   if (event.kind !== KIND_QUERY_REQUEST) return null;
   let parsed: unknown;
   try {
@@ -157,7 +159,9 @@ export function buildQuoteFeedbackEvent(
 }
 
 /** Parse a kind 7000 quote payload. Returns null if the event is not a quote. */
-export function parseQuoteFeedbackEvent(event: Event): QuoteFeedbackPayload | null {
+export function parseQuoteFeedbackEvent(
+  event: Event,
+): QuoteFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
   let parsed: unknown;
   try {
@@ -214,7 +218,9 @@ export function buildSelectionFeedbackEvent(
 }
 
 /** Parse a kind 7000 selection payload. Returns null on malformed input. */
-export function parseSelectionFeedbackEvent(event: Event): SelectionFeedbackPayload | null {
+export function parseSelectionFeedbackEvent(
+  event: Event,
+): SelectionFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
   let parsed: unknown;
   try {
@@ -250,6 +256,14 @@ export interface QueryResponsePayload {
   proof: Uint8Array | string;
 }
 
+/** Oracle-readable copy of a provider result, encrypted in a tag. */
+export interface OracleQueryResponsePayload extends QueryResponsePayload {
+  /** Matches the request payload's query_id. */
+  query_id: string;
+  /** Original kind 5300 request event id this result answers. */
+  request_event_id: string;
+}
+
 /**
  * Build a signed kind 6300 result event. The content is NIP-44 v2-
  * encrypted to the customer's pubkey so only the customer can read it.
@@ -264,20 +278,39 @@ export function buildQueryResponseEvent(
   requestEventId: string,
   customerPubkey: string,
   payload: QueryResponsePayload,
+  oraclePubkey?: string,
+  queryId?: string,
 ): Event {
   const proofForJson = payload.proof instanceof Uint8Array
     ? base64Encode(payload.proof)
     : payload.proof;
-  const plaintext = JSON.stringify({
+  const responseBody = {
     schema: payload.schema,
     data: payload.data,
     proof: proofForJson,
-  });
-  const ciphertext = encryptNip44(plaintext, identity.secretKey, customerPubkey);
+  };
+  const plaintext = JSON.stringify(responseBody);
+  const ciphertext = encryptNip44(
+    plaintext,
+    identity.secretKey,
+    customerPubkey,
+  );
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
     ["p", customerPubkey],
   ];
+  if (oraclePubkey !== undefined) {
+    const oraclePlaintext = JSON.stringify({
+      ...responseBody,
+      query_id: queryId ?? requestEventId,
+      request_event_id: requestEventId,
+    });
+    tags.push(["p", oraclePubkey, "", "oracle"]);
+    tags.push([
+      "oracle_payload",
+      encryptNip44(oraclePlaintext, identity.secretKey, oraclePubkey),
+    ]);
+  }
   return signEvent(
     {
       kind: KIND_QUERY_RESPONSE,
@@ -327,6 +360,53 @@ export function parseQueryResponseEvent(
   };
 }
 
+/**
+ * Decrypt + parse the oracle-readable result payload from an
+ * `oracle_payload` tag. This lets the oracle verify the proof and deliver the
+ * preimage by DM without an Anchr-operated result server.
+ */
+export function parseOracleQueryResponseEvent(
+  event: Event,
+  oracleSecretKey: Uint8Array,
+  providerPubkey: string,
+): OracleQueryResponsePayload | null {
+  if (event.kind !== KIND_QUERY_RESPONSE) return null;
+  const tag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
+  if (!tag?.[1]) return null;
+
+  let plaintext: string;
+  try {
+    plaintext = decryptNip44(tag[1], oracleSecretKey, providerPubkey);
+  } catch {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const p = parsed as Record<string, unknown>;
+  if (
+    typeof p.schema !== "string" ||
+    typeof p.query_id !== "string" ||
+    typeof p.request_event_id !== "string" ||
+    !("data" in p) ||
+    typeof p.proof !== "string"
+  ) {
+    return null;
+  }
+  return {
+    schema: p.schema,
+    query_id: p.query_id,
+    request_event_id: p.request_event_id,
+    data: p.data,
+    proof: p.proof,
+  };
+}
+
 function base64Encode(bytes: Uint8Array): string {
   let s = "";
   for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
@@ -354,7 +434,11 @@ export function buildPreimageDeliveryEvent(
   recipientPubkey: string,
   payload: PreimageDeliveryPayload,
 ): Event {
-  const ciphertext = encryptNip44(JSON.stringify(payload), identity.secretKey, recipientPubkey);
+  const ciphertext = encryptNip44(
+    JSON.stringify(payload),
+    identity.secretKey,
+    recipientPubkey,
+  );
   const tags: string[][] = [["p", recipientPubkey]];
   return signEvent(
     {

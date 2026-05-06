@@ -1,101 +1,126 @@
 /**
- * Auto-Claim Demo — Insurance Provider
+ * Auto-Claim Demo - Insurance Provider / Customer
  *
- * Creates a conditional bounty: "if flight NH123 is delayed ≥ 120 min,
- * pay 10,000 sats to whoever submits proof."
+ * Creates a NIP-90 job request: "if flight NH123 is delayed >= 120 min,
+ * pay 10,000 sats to the Provider that returns a valid TLSNotary proof."
  *
- * In production, this would be a parametric insurance protocol that
- * creates bounties automatically when a user purchases a policy.
+ * No Anchr-operated host is involved. The request is announced on Nostr,
+ * Providers quote over Nostr, the selected Provider publishes an encrypted
+ * result event, and the Oracle settles by DMing the preimage to the Provider.
  *
  * Usage:
- *   ANCHR_URL=http://localhost:3000 \
- *   deno run --allow-all --env example/auto-claim/insurer.ts
+ *   NOSTR_RELAYS=ws://localhost:7777 \
+ *   CASHU_MINT_URL=http://localhost:3338 \
+ *   ORACLE_ENDPOINT=http://localhost:3001 \
+ *   ORACLE_PUBKEY=<oracle-pubkey-hex-or-npub> \
+ *   AUTO_CLAIM_SOURCE_PROOFS_JSON='[...]' \
+ *   deno run --allow-env --allow-net --allow-read --env example/auto-claim/insurer.ts
  */
 
-import { Anchr } from "anchr-sdk";
+import {
+  type CashuProof,
+  createCustomer,
+  createHttpOracleClient,
+  DEFINED_SCHEMAS,
+} from "anchr-sdk";
 
-const SERVER_URL = Deno.env.get("ANCHR_URL") ?? "http://localhost:3000";
+const relays = listEnv("NOSTR_RELAYS", ["ws://localhost:7777"]);
+const mint = requiredEnv("CASHU_MINT_URL");
+const oracleEndpoint = requiredEnv("ORACLE_ENDPOINT");
+const oraclePubkey = requiredEnv("ORACLE_PUBKEY");
+const sourceProofs = parseSourceProofs();
+
 const AIRLINE_URL = Deno.env.get("AIRLINE_URL") ?? "http://localhost:4000";
 const FLIGHT = Deno.env.get("FLIGHT") ?? "NH123";
 const PAYOUT_SATS = Number(Deno.env.get("PAYOUT_SATS") ?? "10000");
+const QUOTE_WINDOW_MS = Number(Deno.env.get("QUOTE_WINDOW_MS") ?? "30000");
+const RESULT_TIMEOUT_MS = Number(
+  Deno.env.get("RESULT_TIMEOUT_MS") ?? "3600000",
+);
 
-const anchr = new Anchr({ serverUrl: SERVER_URL });
+const customer = createCustomer({
+  oracles: [oraclePubkey],
+  relays,
+  mint,
+  oracleClient: createHttpOracleClient({
+    endpoint: oracleEndpoint,
+    oraclePubkey,
+    apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
+  }),
+  quoteWindowMs: QUOTE_WINDOW_MS,
+  resultTimeoutMs: RESULT_TIMEOUT_MS,
+});
 
-console.log("=== Auto-Claim — Insurance Provider ===\n");
-console.log(`Anchr:   ${SERVER_URL}`);
+console.log("=== Auto-Claim - Insurance Provider / Customer ===\n");
+console.log(`Relays:  ${relays.join(", ")}`);
+console.log(`Mint:    ${mint}`);
+console.log(`Oracle:  ${oraclePubkey}`);
 console.log(`Airline: ${AIRLINE_URL}`);
 console.log(`Flight:  ${FLIGHT}`);
 console.log(`Payout:  ${PAYOUT_SATS} sats on delay >= 120 min\n`);
 
-// Two conditions — both must pass:
-//   1. jsonpath: status field must equal "delayed"
-//   2. regex:    delay_minutes must be >= 120
-const queryId = await anchr.createTlsnQuery({
-  description: `Auto-claim: ${FLIGHT} delay >= 120 min → ${PAYOUT_SATS} sats`,
-  targetUrl: `${AIRLINE_URL}/api/flights/${FLIGHT}`,
-  conditions: [
-    {
-      type: "jsonpath",
-      expression: "status",
-      expected: "delayed",
-      description: "Flight status must be 'delayed'",
+const result = await customer.request({
+  spec: {
+    schema: DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    description: `Auto-claim: ${FLIGHT} delay >= 120 min`,
+    predicate: {
+      targetUrl: `${AIRLINE_URL}/api/flights/${FLIGHT}`,
+      conditions: [
+        {
+          type: "jsonpath",
+          expression: "status",
+          expected: "delayed",
+          description: "Flight status must be delayed",
+        },
+        {
+          type: "regex",
+          expression: '"delay_minutes":\\s*(1[2-9]\\d|[2-9]\\d{2}|\\d{4,})',
+          description: "Delay must be >= 120 minutes",
+        },
+      ],
+      maxAttestationAgeSeconds: 300,
     },
-    {
-      type: "regex",
-      // Matches delay_minutes >= 120:
-      //   1[2-9]\d  → 120-199
-      //   [2-9]\d{2} → 200-999
-      //   \d{4,}     → 1000+
-      expression: '"delay_minutes":\\s*(1[2-9]\\d|[2-9]\\d{2}|\\d{4,})',
-      description: "Delay must be >= 120 minutes",
-    },
-  ],
-  maxSats: PAYOUT_SATS,
-  timeoutSeconds: 3600,
-  maxAttestationAgeSeconds: 300,
+  },
+  payment: {
+    maxAmount: PAYOUT_SATS,
+    locktimeSeconds: Number(Deno.env.get("LOCKTIME_SECONDS") ?? "7200"),
+  },
+  sourceProofs,
+  provider: Deno.env.get("AUTO_CLAIM_PROVIDER_PUBKEY") ?? undefined,
 });
 
-console.log("--- Policy Created ---\n");
-console.log(`Query ID:  ${queryId}`);
-console.log(`Condition: status = "delayed" AND delay >= 120 min`);
-console.log(`Payout:    ${PAYOUT_SATS} sats`);
-console.log(`Valid for: 1 hour\n`);
-console.log("Waiting for claim...\n");
+console.log("\nClaim proof received.");
+console.log(`Provider: ${result.providerPubkey}`);
+console.log(`Schema:   ${result.schema}`);
+console.log("Data:");
+console.log(JSON.stringify(result.data, null, 2));
+console.log(
+  `Proof:    ${
+    typeof result.proof === "string"
+      ? `${result.proof.length} chars`
+      : `${result.proof.byteLength} bytes`
+  }`,
+);
 
-const startTime = Date.now();
+function requiredEnv(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
 
-while (Date.now() - startTime < 3_600_000) {
-  const status = await anchr.getQueryStatus(queryId);
+function listEnv(name: string, fallback: string[]): string[] {
+  const raw = Deno.env.get(name)?.trim();
+  if (!raw) return fallback;
+  return raw.split(",").map((v) => v.trim()).filter(Boolean);
+}
 
-  if (status.status === "approved") {
-    console.log("\nClaim approved!");
-    console.log(`  Flight ${FLIGHT} was delayed`);
-    console.log(`  ${PAYOUT_SATS} sats paid to claimant`);
-    if (status.verification) {
-      for (const check of status.verification.checks) {
-        console.log(`  ✓ ${check}`);
-      }
-    }
-    break;
+function parseSourceProofs(): CashuProof[] {
+  const raw = requiredEnv("AUTO_CLAIM_SOURCE_PROOFS_JSON");
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error(
+      "AUTO_CLAIM_SOURCE_PROOFS_JSON must be a non-empty JSON array",
+    );
   }
-
-  if (status.status === "rejected") {
-    console.log("\nClaim rejected — proof verification failed");
-    if (status.verification?.failures) {
-      for (const f of status.verification.failures) console.log(`  ✗ ${f}`);
-    }
-    break;
-  }
-
-  if (status.status === "expired") {
-    console.log("\nPolicy expired — no delay occurred during coverage period.");
-    console.log("No sats paid. (This is good news for the insurer.)");
-    break;
-  }
-
-  const elapsed = Math.round((Date.now() - startTime) / 1000);
-  await Deno.stdout.write(
-    new TextEncoder().encode(`\r  Awaiting claim... (${elapsed}s)`),
-  );
-  await new Promise((r) => setTimeout(r, 5000));
+  return parsed as CashuProof[];
 }

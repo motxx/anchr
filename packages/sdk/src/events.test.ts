@@ -3,6 +3,8 @@ import { expect } from "@std/expect";
 
 import {
   buildQueryRequestEvent,
+  buildQueryResponseEvent,
+  parseOracleQueryResponseEvent,
   parseQueryRequestEvent,
   type QueryRequestPayload,
 } from "./events.ts";
@@ -11,9 +13,12 @@ import {
   findTagValue,
   generateKeypair,
   KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
 } from "./nostr.ts";
 
-function samplePayload(overrides?: Partial<QueryRequestPayload>): QueryRequestPayload {
+function samplePayload(
+  overrides?: Partial<QueryRequestPayload>,
+): QueryRequestPayload {
   return {
     query_id: "query_abc",
     schema: "io.anchr.tlsn-https.v1",
@@ -103,4 +108,39 @@ test("parseQueryRequestEvent returns null when required fields are missing", () 
     tags: [],
   };
   expect(parseQueryRequestEvent(event)).toBe(null);
+});
+
+test("buildQueryResponseEvent can include an oracle-readable encrypted payload", () => {
+  const provider = generateKeypair();
+  const customer = generateKeypair();
+  const oracle = generateKeypair();
+  const event = buildQueryResponseEvent(
+    provider,
+    "req123",
+    customer.publicKey,
+    {
+      schema: "io.anchr.tlsn-https.v1",
+      data: { ok: true },
+      proof: "proof-base64",
+    },
+    oracle.publicKey,
+    "query_123",
+  );
+
+  expect(event.kind).toBe(KIND_QUERY_RESPONSE);
+  expect(findAllTagValues(event, "p")).toContain(customer.publicKey);
+  expect(findAllTagValues(event, "p")).toContain(oracle.publicKey);
+  expect(findTagValue(event, "oracle_payload")).toBeTruthy();
+
+  const parsed = parseOracleQueryResponseEvent(
+    event,
+    oracle.secretKey,
+    provider.publicKey,
+  );
+  expect(parsed).not.toBe(null);
+  expect(parsed?.query_id).toBe("query_123");
+  expect(parsed?.request_event_id).toBe("req123");
+  expect(parsed?.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(parsed?.proof).toBe("proof-base64");
+  expect(parsed?.data).toEqual({ ok: true });
 });

@@ -29,7 +29,7 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri } from "./schema.ts";
-import { createCashuClient, type CashuClient } from "./cashu.ts";
+import { type CashuClient, createCashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -72,7 +72,9 @@ export class ProviderConfigError extends Error {
  * any structural issue. Accepts `unknown` and narrows on success so
  * negative tests can pass arbitrary shapes without `as` casts.
  */
-export function validateProviderOptions(options: unknown): asserts options is ProviderOptions {
+export function validateProviderOptions(
+  options: unknown,
+): asserts options is ProviderOptions {
   if (typeof options !== "object" || options === null) {
     throw new ProviderConfigError("options must be an object");
   }
@@ -82,7 +84,9 @@ export function validateProviderOptions(options: unknown): asserts options is Pr
   }
   for (const entry of o.oracles) {
     if (typeof entry !== "string" || entry.length === 0) {
-      throw new ProviderConfigError("oracles entries must be non-empty strings");
+      throw new ProviderConfigError(
+        "oracles entries must be non-empty strings",
+      );
     }
   }
   if (!Array.isArray(o.relays) || o.relays.length === 0) {
@@ -96,7 +100,9 @@ export function validateProviderOptions(options: unknown): asserts options is Pr
   }
   if (o.notary !== undefined) {
     if (typeof o.notary !== "string" || o.notary.length === 0) {
-      throw new ProviderConfigError("notary, when provided, must be a non-empty string");
+      throw new ProviderConfigError(
+        "notary, when provided, must be a non-empty string",
+      );
     }
   }
 }
@@ -124,9 +130,12 @@ export function createProvider(options: ProviderOptions): Provider {
   const relays = [...options.relays];
   const mint = options.mint;
   const notary = options.notary;
-  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
-  const selectionTimeoutMs = options.selectionTimeoutMs ?? DEFAULT_SELECTION_TIMEOUT_MS;
-  const preimageTimeoutMs = options.preimageTimeoutMs ?? DEFAULT_PREIMAGE_TIMEOUT_MS;
+  const cashuClient = options.cashuClient ??
+    createCashuClient({ mintUrl: mint });
+  const selectionTimeoutMs = options.selectionTimeoutMs ??
+    DEFAULT_SELECTION_TIMEOUT_MS;
+  const preimageTimeoutMs = options.preimageTimeoutMs ??
+    DEFAULT_PREIMAGE_TIMEOUT_MS;
 
   const secretKey = normalizeSecretKey(options.privKey);
   const pubkey = getPublicKey(secretKey);
@@ -143,7 +152,8 @@ export function createProvider(options: ProviderOptions): Provider {
 
     async serve(handler: ProviderHandler): Promise<void> {
       const ownsRelayClient = options.relayClient === undefined;
-      const relayClient: RelayClient = options.relayClient ?? createRelayClient(relays);
+      const relayClient: RelayClient = options.relayClient ??
+        createRelayClient(relays);
 
       return new Promise<void>((resolveServe) => {
         const sub = relayClient.subscribe(
@@ -254,6 +264,8 @@ async function handleJob(
       data: result.data,
       proof: result.proof,
     },
+    payload.oracle_pubkey,
+    payload.query_id,
   );
   await ctx.relayClient.publish(responseEvent);
 
