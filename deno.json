@@ -59,6 +59,7 @@
     "puppeteer": "npm:puppeteer@^24",
     "playwright": "npm:playwright@^1.58",
     "esbuild": "npm:esbuild@^0.25",
+    "tailwindcss": "npm:tailwindcss@^4.2.2",
     "anchr-sdk": "./packages/sdk/src/index.ts"
   },
   "unstable": ["sloppy-imports", "detect-cjs"],

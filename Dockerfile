@@ -47,13 +47,7 @@ COPY . .
 
 # Build frontend
 RUN deno task build:ui
-# Tailwind CSS v4: @import "tailwindcss" resolves from the input file's
-# directory. Symlink node_modules into /app so the CSS resolver finds it.
-RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null; \
-  ln -sf /tmp/node_modules /app/example/two-party-binary-bet/ui/node_modules \
-  && /tmp/node_modules/.bin/tailwindcss -i /app/example/two-party-binary-bet/ui/globals.css -o /app/example/two-party-binary-bet/ui/generated.css \
-  && rm -f /app/example/two-party-binary-bet/ui/node_modules \
-  && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
+RUN deno task build:css
 
 ENV NODE_ENV=production
 ENV HTTP_API_PORT=8080

@@ -27,6 +27,7 @@
     "npm:@modelcontextprotocol/sdk@1": "1.29.0_zod@3.25.76_hono@4.12.9_ajv@8.18.0_express@5.2.1",
     "npm:@noble/curves@2": "2.0.1",
     "npm:@tailwindcss/cli@*": "4.2.2",
+    "npm:@tailwindcss/cli@4.2.2": "4.2.2",
     "npm:@tanstack/query-core@5": "5.96.1",
     "npm:@tanstack/react-query@5": "5.96.1_react@19.2.4",
     "npm:class-variance-authority@0.7": "0.7.1",
@@ -40,6 +41,7 @@
     "npm:react-dom@19": "19.2.4_react@19.2.4",
     "npm:react@19": "19.2.4",
     "npm:tailwind-merge@3": "3.5.0",
+    "npm:tailwindcss@^4.2.2": "4.2.2",
     "npm:typescript@^5.9.3": "5.9.3"
   },
   "jsr": {
@@ -2693,7 +2695,8 @@
       "npm:radix-ui@1",
       "npm:react-dom@19",
       "npm:react@19",
-      "npm:tailwind-merge@3"
+      "npm:tailwind-merge@3",
+      "npm:tailwindcss@^4.2.2"
     ],
     "members": {
       "example/airdrop-bot-shield": {
