@@ -9,7 +9,7 @@
  * provided, a lazily-constructed module-level state is reused.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
@@ -20,7 +20,11 @@ import type {
   MarketStatus,
 } from "./market-types.ts";
 import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queue.ts";
-import type { HydratedState, KannagiPersist } from "./kannagi-store.ts";
+import type {
+  FaucetTokenRecord,
+  HydratedState,
+  KannagiPersist,
+} from "./kannagi-store.ts";
 import {
   type DualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
@@ -63,6 +67,95 @@ function minMarketLifetimeSecs(): number {
   return Number.isFinite(n) && n >= 0 ? n : 60;
 }
 
+export type FaucetMode = "token_bank" | "regtest" | "external" | "disabled";
+
+function faucetTokenId(token: string): string {
+  return createHash("sha256").update(token).digest("hex").slice(0, 32);
+}
+
+function amountFromCashuToken(token: string): number {
+  try {
+    const decoded = getDecodedToken(token);
+    return decoded.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0);
+  } catch {
+    return 0;
+  }
+}
+
+export function parseFaucetTokens(raw: string | undefined): FaucetTokenRecord[] {
+  if (!raw?.trim()) return [];
+  const records: FaucetTokenRecord[] = [];
+  for (const part of raw.split(/[\s,]+/)) {
+    const item = part.trim();
+    if (!item) continue;
+    const match = item.match(/^(\d+):(cashuB.+)$/);
+    const token = match ? match[2]! : item;
+    if (!token.startsWith("cashuB")) continue;
+    const amount_sats = match ? Number(match[1]) : amountFromCashuToken(token);
+    records.push({
+      id: faucetTokenId(token),
+      token,
+      amount_sats: Number.isFinite(amount_sats) && amount_sats >= 0 ? amount_sats : 0,
+    });
+  }
+  return records;
+}
+
+export async function seedFaucetTokensFromEnv(state: MarketState): Promise<number> {
+  let seeded = 0;
+  for (const token of parseFaucetTokens(Deno.env.get("KANNAGI_FAUCET_TOKENS"))) {
+    const existing = state.faucetTokens.get(token.id);
+    if (existing?.claimed_at) continue;
+    if (!existing) seeded++;
+    state.faucetTokens.set(token.id, existing ? { ...token, ...existing } : token);
+    await state.persist.faucetToken(state.faucetTokens.get(token.id)!);
+  }
+  return seeded;
+}
+
+function unclaimedFaucetTokens(state: MarketState): FaucetTokenRecord[] {
+  return Array.from(state.faucetTokens.values())
+    .filter((token) => token.claimed_at === undefined)
+    .sort((a, b) => a.amount_sats - b.amount_sats);
+}
+
+export function getFaucetStatus(state: MarketState, mintUrl: string | null) {
+  const unclaimed = unclaimedFaucetTokens(state);
+  const externalUrl = Deno.env.get("KANNAGI_FAUCET_URL")?.trim() || undefined;
+  const explicitMode = Deno.env.get("KANNAGI_FAUCET_MODE")?.trim();
+  const maxAmount = Number(Deno.env.get("KANNAGI_FAUCET_MAX_AMOUNT_SATS") ?? "1000");
+  const max_amount_sats = Number.isFinite(maxAmount) && maxAmount > 0 ? maxAmount : 1000;
+  const defaultAmount = unclaimed.find((token) => token.amount_sats > 0)?.amount_sats ??
+    max_amount_sats;
+
+  let mode: FaucetMode = "disabled";
+  if (unclaimed.length > 0) {
+    mode = "token_bank";
+  } else if (explicitMode === "regtest") {
+    mode = "regtest";
+  } else if (externalUrl) {
+    mode = "external";
+  } else if (mintUrl && /^(http:\/\/)?(localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(mintUrl)) {
+    mode = "regtest";
+  }
+
+  return {
+    enabled: mode === "token_bank" || mode === "regtest" || mode === "external",
+    mode,
+    amount_sats: Math.min(defaultAmount, max_amount_sats),
+    max_amount_sats,
+    available_tokens: unclaimed.length,
+    ...(externalUrl ? { external_url: externalUrl } : {}),
+  };
+}
+
+function clientIdFromRequest(c: { req: { header(name: string): string | undefined } }): string {
+  const forwarded = c.req.header("fly-client-ip") ??
+    c.req.header("x-real-ip") ??
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || "unknown";
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -70,6 +163,7 @@ function minMarketLifetimeSecs(): number {
 export interface MarketRouteContext {
   writeAuth: MiddlewareHandler;
   rateLimit: MiddlewareHandler;
+  signerAuth?: MiddlewareHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -93,6 +187,11 @@ export interface MarketState {
    * Server verifies P2PK conditions but cannot spend (enforced by P2PK).
    */
   pendingExchangeTokens: Map<string, string>;
+  /**
+   * Optional public-testnet token bank. Operators preload one-time cashuB
+   * tokens via KANNAGI_FAUCET_TOKENS; the server dispenses each token once.
+   */
+  faucetTokens: Map<string, FaucetTokenRecord>;
   /**
    * Write-through persistence — call after each mutation to the maps above.
    * Defaults to a no-op for tests; production injects a SQLite-backed
@@ -137,6 +236,8 @@ export interface MarketState {
       minLocktime: number;
     },
   ) => { valid: boolean; error?: string };
+  /** Public deployments should settle through auto-resolver or TLSN proof submission. */
+  allowManualResolve: boolean;
 }
 
 
@@ -148,6 +249,8 @@ const NOOP_PERSIST: KannagiPersist = {
   proofSignatures: () => Promise.resolve(),
   pendingExchangeToken: () => Promise.resolve(),
   deletePendingExchangeToken: () => Promise.resolve(),
+  faucetToken: () => Promise.resolve(),
+  claimFaucetToken: () => Promise.resolve(true),
 };
 
 /** Create a fresh MarketState. Used for tests and as default state. */
@@ -160,6 +263,7 @@ export function createMarketState(opts?: {
   matchingQueue?: MatchingQueue;
   /** Inject a custom exchange-token verifier (tests use this). */
   verifyExchangeToken?: MarketState["verifyExchangeToken"];
+  allowManualResolve?: boolean;
   /**
    * Pre-loaded state from disk. When the SQLite store is wired up the
    * caller passes `store.hydrate()`; otherwise fresh empty maps are used.
@@ -176,6 +280,7 @@ export function createMarketState(opts?: {
     resolvedSignatures: opts?.initial?.resolvedSignatures ?? new Map(),
     resolvedProofSignatures: opts?.initial?.resolvedProofSignatures ?? new Map(),
     pendingExchangeTokens: opts?.initial?.pendingExchangeTokens ?? new Map(),
+    faucetTokens: opts?.initial?.faucetTokens ?? new Map(),
     persist: opts?.persist ?? NOOP_PERSIST,
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
@@ -186,6 +291,7 @@ export function createMarketState(opts?: {
     nostrRelays: opts?.nostrRelays ?? [],
     publishMarket: opts?.publishMarket,
     verifyExchangeToken: opts?.verifyExchangeToken,
+    allowManualResolve: opts?.allowManualResolve ?? true,
   };
 }
 
@@ -333,6 +439,7 @@ function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
 // deno-lint-ignore no-explicit-any
 export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, injectedState?: MarketState): void {
   const { writeAuth, rateLimit } = ctx;
+  const signerAuth = ctx.signerAuth ?? writeAuth;
   const s = injectedState ?? getDefaultState();
   const getWallet = s.getCashuWallet ?? getCashuWalletDefault;
   const mkt = new Hono();
@@ -371,26 +478,15 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     // Surface the same relay set the server publishes markets to. The
     // browser-side NIP-60 wallet uses these to persist Cashu proofs as
     // encrypted kind:7375 token events.
-    return c.json({ mint_url: mintUrl, nostr_relays: s.nostrRelays });
+    return c.json({
+      mint_url: mintUrl,
+      nostr_relays: s.nostrRelays,
+      faucet: getFaucetStatus(s, mintUrl),
+    });
   });
 
   mkt.post("/wallet/faucet", rateLimit, async (c) => {
-    const wallet = await getWallet();
-    if (!wallet) {
-      return c.json(
-        { error: "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d" },
-        503,
-      );
-    }
-
-    const mintUrl = Deno.env.get("CASHU_MINT_URL")!;
-    const reachable = await isMintReachable(mintUrl);
-    if (!reachable) {
-      return c.json(
-        { error: "Cashu mint not reachable — ensure docker compose is running" },
-        503,
-      );
-    }
+    const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
 
     let body: Record<string, unknown>;
     try {
@@ -399,15 +495,85 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: "Invalid JSON" }, 400);
     }
 
-    const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 1000;
-    if (amount_sats <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
+    const requestedAmount = typeof body.amount_sats === "number" ? body.amount_sats : 1000;
+    if (requestedAmount <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
+
+    const faucet = getFaucetStatus(s, mintUrl);
+    if (requestedAmount > faucet.max_amount_sats) {
+      return c.json(
+        { error: `amount_sats must be <= ${faucet.max_amount_sats}` },
+        400,
+      );
+    }
+
+    if (faucet.mode === "token_bank") {
+      const token = unclaimedFaucetTokens(s).find((candidate) =>
+        candidate.amount_sats === 0 || candidate.amount_sats >= requestedAmount
+      );
+      if (!token) {
+        return c.json({ error: "Faucet is empty for the requested amount" }, 503);
+      }
+      const claimedAt = Math.floor(Date.now() / 1000);
+      const claimedBy = clientIdFromRequest(c);
+      const claimed = await s.persist.claimFaucetToken(token.id, claimedAt, claimedBy);
+      if (!claimed) {
+        return c.json({ error: "Faucet token was already claimed; retry" }, 409);
+      }
+      token.claimed_at = claimedAt;
+      token.claimed_by = claimedBy;
+      s.faucetTokens.set(token.id, token);
+      return c.json({
+        cashu_token: token.token,
+        amount_sats: token.amount_sats || requestedAmount,
+        source: "token_bank",
+        remaining_tokens: unclaimedFaucetTokens(s).length,
+      });
+    }
+
+    if (faucet.mode === "external") {
+      return c.json(
+        {
+          error: "Use the configured external faucet",
+          external_url: faucet.external_url,
+        },
+        503,
+      );
+    }
+
+    if (faucet.mode !== "regtest") {
+      return c.json(
+        { error: "Faucet is not configured for this deployment" },
+        503,
+      );
+    }
+
+    const wallet = await getWallet();
+    if (!wallet) {
+      return c.json(
+        { error: "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d" },
+        503,
+      );
+    }
+
+    if (!mintUrl) {
+      return c.json({ error: "Cashu mint not configured" }, 503);
+    }
+
+    const reachable = await isMintReachable(mintUrl);
+    if (!reachable) {
+      return c.json(
+        { error: "Cashu mint not reachable — ensure docker compose is running" },
+        503,
+      );
+    }
 
     try {
-      const proofs = await mintProofsFromRegtest(wallet, amount_sats);
+      const proofs = await mintProofsFromRegtest(wallet, requestedAmount);
       const cashu_token = getEncodedToken({ mint: mintUrl, proofs });
       return c.json({
         cashu_token,
-        amount_sats,
+        amount_sats: requestedAmount,
+        source: "regtest",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -877,6 +1043,12 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   mkt.post("/:id/resolve", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
+    if (!s.allowManualResolve) {
+      return c.json({
+        error:
+          "Manual resolution is disabled on this deployment; use /submit-resolution with a TLSNotary proof",
+      }, 403);
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -1306,7 +1478,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const frostCfg = s.frostConfig;
     const pendingMarketNonces = new Map<string, { nonces: string; outcomeKey: "a" | "b" }>();
 
-    app.post("/frost/signer/round1", writeAuth, async (c) => {
+    app.post("/frost/signer/round1", signerAuth, async (c) => {
       const reqBody = await c.req.json<{
         message: string;
         query?: { id: string; resolution_url?: string };
@@ -1346,7 +1518,7 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ commitments: r1.data!.commitments, nonce_id: nonceId });
     });
 
-    app.post("/frost/signer/round2", writeAuth, async (c) => {
+    app.post("/frost/signer/round2", signerAuth, async (c) => {
       const reqBody = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
       if (!reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id || !frostCfg) {
         return c.json({ error: "Missing fields" }, 400);
@@ -1365,4 +1537,3 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     console.log("[market] FROST signer endpoints registered (/frost/signer/round1,2)");
   }
 }
-

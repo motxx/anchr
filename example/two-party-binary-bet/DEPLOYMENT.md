@@ -220,11 +220,42 @@ the HTLC fallback path for those legacy markets.
       *binary* locally to validate submitted presentations).
 - [x] FROST 2-of-3 with passphrase-encrypted shares (PR-D).
 - [x] TLS via Fly (`force_https = true` in `fly.market.toml`).
-- [ ] Add API key or NIP-98 auth middleware in `server.ts`
-      (`writeAuth`/`rateLimit`
-      currently no-op for the demo). Wire it to your KMS.
+- [x] Public write rate limit in `server.ts`
+      (`KANNAGI_RATE_LIMIT_WINDOW_MS`, `KANNAGI_RATE_LIMIT_MAX`).
+- [x] Manual `/markets/:id/resolve` disabled by default on the public server;
+      settlement should use auto-resolver or `/submit-resolution` with a
+      TLSNotary proof. Set `KANNAGI_ALLOW_MANUAL_RESOLVE=1` only for local
+      demos.
+- [x] FROST signer endpoints are split behind internal/API-key middleware
+      (`KANNAGI_SIGNER_API_KEY` or `ORACLE_API_KEY`).
+- [x] Public-testnet faucet mode that does not depend on regtest Docker/LND:
+      preload one-time cashuB tokens with `KANNAGI_FAUCET_TOKENS`.
+- [x] Readiness endpoint: `GET /ready` reports missing mint, relay, faucet,
+      and persistence requirements before advertising the app as playable.
 - [ ] Run the screenshot script as a smoke test in CI:
       `deno run --allow-all example/two-party-binary-bet/scripts/screenshots.ts`.
+
+### Public-testnet faucet
+
+The local regtest faucet pays mint invoices through the `lnd-user` Docker
+container. That cannot work on Fly or any public testnet host. For a public
+preview, seed a small one-time token bank instead:
+
+```bash
+flyctl secrets set \
+  --app anchr-market \
+  KANNAGI_FAUCET_TOKENS='1000:cashuB... 1000:cashuB... 1000:cashuB...'
+```
+
+Each entry is `amount_sats:cashuB_token`. Tokens are persisted in
+`KANNAGI_DB_PATH` and marked claimed on first payout, so a restart does not
+re-issue already claimed ecash. Refill by adding fresh tokens to the secret
+and redeploying. `/markets/wallet/config` exposes the current faucet mode to
+the browser UI.
+
+For deployments that use an external testnet faucet instead, set
+`KANNAGI_FAUCET_URL=https://...`; the UI opens that URL instead of calling the
+server faucet.
 
 ## 5. Useful smoke tests
 

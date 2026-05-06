@@ -17,9 +17,15 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serveStatic } from "hono/deno";
 import type { MiddlewareHandler } from "hono";
-import { createMarketState, registerMarketRoutes } from "./src/server-routes.ts";
+import {
+  createMarketState,
+  getFaucetStatus,
+  registerMarketRoutes,
+  seedFaucetTokensFromEnv,
+} from "./src/server-routes.ts";
 import { startAutoResolver } from "./src/auto-resolver.ts";
 import { openKannagiStore } from "./src/kannagi-store.ts";
+import { isMintReachable } from "./src/market-wallet.ts";
 import {
   loadDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
@@ -28,8 +34,59 @@ import {
 const app = new Hono();
 app.use("*", cors());
 
-// No auth for demo — production should add API key middleware
+function clientIp(c: { req: { header(name: string): string | undefined } }): string {
+  return c.req.header("fly-client-ip") ??
+    c.req.header("x-real-ip") ??
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+}
+
+function createRateLimitMiddleware(): MiddlewareHandler {
+  const windowMs = Number(Deno.env.get("KANNAGI_RATE_LIMIT_WINDOW_MS") ?? "60000");
+  const max = Number(Deno.env.get("KANNAGI_RATE_LIMIT_MAX") ?? "60");
+  const buckets = new Map<string, { resetAt: number; count: number }>();
+  return async (c, next) => {
+    const now = Date.now();
+    const key = clientIp(c);
+    const current = buckets.get(key);
+    const bucket = current && current.resetAt > now
+      ? current
+      : { resetAt: now + windowMs, count: 0 };
+    bucket.count++;
+    buckets.set(key, bucket);
+    if (bucket.count > max) {
+      return c.json(
+        { error: "rate limit exceeded", retry_after_seconds: Math.ceil((bucket.resetAt - now) / 1000) },
+        429,
+      );
+    }
+    await next();
+  };
+}
+
+function createSignerAuthMiddleware(): MiddlewareHandler {
+  const apiKey = Deno.env.get("KANNAGI_SIGNER_API_KEY")?.trim() ||
+    Deno.env.get("ORACLE_API_KEY")?.trim();
+  return async (c, next) => {
+    const supplied = c.req.header("x-api-key") ??
+      c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
+    if (apiKey && supplied === apiKey) {
+      await next();
+      return;
+    }
+    const forwardedClient = c.req.header("fly-client-ip") ??
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+    if (!forwardedClient || forwardedClient === "127.0.0.1" || forwardedClient === "::1") {
+      await next();
+      return;
+    }
+    return c.json({ error: "Signer endpoint is internal" }, 403);
+  };
+}
+
 const noopMiddleware: MiddlewareHandler = async (_c, next) => await next();
+const rateLimitMiddleware = createRateLimitMiddleware();
+const signerAuthMiddleware = createSignerAuthMiddleware();
 
 // Optional FROST cluster config. Plaintext (dev) or AES-256-GCM-encrypted
 // envelope (prod). The passphrase comes from FROST_KEY_PASSPHRASE.
@@ -90,12 +147,49 @@ const state = createMarketState({
   matchingQueue: kannagiStore.matchingQueue,
   initial: hydrated,
   persist: kannagiStore.persist,
+  allowManualResolve: Deno.env.get("KANNAGI_ALLOW_MANUAL_RESOLVE") === "1",
 });
+const seededFaucetTokens = await seedFaucetTokensFromEnv(state);
+if (seededFaucetTokens > 0) {
+  console.log(`[market] seeded ${seededFaucetTokens} public-testnet faucet token(s)`);
+}
 
 registerMarketRoutes(app, {
   writeAuth: noopMiddleware,
-  rateLimit: noopMiddleware,
+  rateLimit: rateLimitMiddleware,
+  signerAuth: signerAuthMiddleware,
 }, state);
+
+app.get("/health", (c) => {
+  const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
+  return c.json({
+    ok: true,
+    app: "kannagi",
+    mode: state.frostMode,
+    markets: state.markets.size,
+    matched_pairs: state.matchedPairs.size,
+    mint_url: mintUrl,
+    nostr_relays: state.nostrRelays,
+    faucet: getFaucetStatus(state, mintUrl),
+  });
+});
+
+app.get("/ready", async (c) => {
+  const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
+  const faucet = getFaucetStatus(state, mintUrl);
+  const checks = {
+    mint_configured: Boolean(mintUrl),
+    mint_reachable: mintUrl ? await isMintReachable(mintUrl) : false,
+    nostr_configured: state.nostrRelays.length > 0,
+    faucet_configured: faucet.enabled,
+    persistence_open: true,
+  };
+  const missing = Object.entries(checks)
+    .filter(([, ok]) => !ok)
+    .map(([name]) => name);
+  const ok = missing.length === 0;
+  return c.json({ ok, checks, missing, faucet }, ok ? 200 : 503);
+});
 
 // Background scheduler — resolves markets once their deadline has passed.
 // Disable with AUTO_RESOLVE_DISABLED=1 (e.g. for tests / dev that want to

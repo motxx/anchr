@@ -16,6 +16,9 @@ primary_region = "sin"
   FROST_MARKET_CONFIG_PATH = "/data/signer-1.json"
   KANNAGI_DB_PATH = "/data/kannagi.db"
   AUTO_RESOLVE_POLL_MS = "60000"
+  KANNAGI_RATE_LIMIT_WINDOW_MS = "60000"
+  KANNAGI_RATE_LIMIT_MAX = "60"
+  KANNAGI_FAUCET_MAX_AMOUNT_SATS = "1000"
 
 [[mounts]]
   source = "frost_data"

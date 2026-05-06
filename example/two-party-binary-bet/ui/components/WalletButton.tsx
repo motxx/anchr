@@ -38,6 +38,8 @@ export function WalletButton() {
   });
   const mintUrl = walletConfig.data?.mint_url ?? null;
   const relays = walletConfig.data?.nostr_relays ?? [];
+  const faucet = walletConfig.data?.faucet;
+  const faucetAmount = faucet?.amount_sats ?? 1000;
 
   // Balance is owned by the wallet module (NIP-60 events or localStorage).
   // useQuery handles the async fetch and re-renders when invalidated.
@@ -65,7 +67,7 @@ export function WalletButton() {
   const faucetMutation = useMutation({
     mutationFn: async () => {
       if (!mintUrl) throw new Error("Mint not configured");
-      const result = await requestFaucet(1000);
+      const result = await requestFaucet(faucetAmount);
       const wallet = await initWallet(mintUrl, relays);
       await receiveToken(wallet, result.cashu_token);
       return result.amount_sats;
@@ -158,13 +160,28 @@ export function WalletButton() {
 
             {walletReady && (
               <div className="space-y-3">
-                <button
-                  onClick={() => faucetMutation.mutate()}
-                  disabled={faucetMutation.isPending}
-                  className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
-                >
-                  {faucetMutation.isPending ? "Minting…" : "Faucet · +1,000 sats"}
-                </button>
+                {faucet?.mode === "external" && faucet.external_url
+                  ? (
+                    <a
+                      href={faucet.external_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center"
+                    >
+                      Open faucet
+                    </a>
+                  )
+                  : (
+                    <button
+                      onClick={() => faucetMutation.mutate()}
+                      disabled={faucetMutation.isPending || faucet?.enabled === false}
+                      className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
+                    >
+                      {faucetMutation.isPending
+                        ? "Minting…"
+                        : `Faucet · +${faucetAmount.toLocaleString()} sats`}
+                    </button>
+                  )}
                 {faucetMutation.isSuccess && (
                   <p className="text-xs text-yes">+{faucetMutation.data?.toLocaleString()} sats</p>
                 )}

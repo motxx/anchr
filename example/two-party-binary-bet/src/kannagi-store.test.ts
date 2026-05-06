@@ -62,6 +62,7 @@ describe("kannagi store: schema bootstrap", () => {
     expect(state.resolvedSignatures.size).toBe(0);
     expect(state.resolvedProofSignatures.size).toBe(0);
     expect(state.pendingExchangeTokens.size).toBe(0);
+    expect(state.faucetTokens.size).toBe(0);
     await store.close();
   });
 });
@@ -142,6 +143,35 @@ describe("kannagi store: persist + hydrate round-trip", () => {
     const state = await store.hydrate();
     expect(state.pendingExchangeTokens.get("p_yes")).toBeUndefined();
     expect(state.pendingExchangeTokens.get("p_no")).toBe("tok-n");
+    await store.close();
+  });
+
+  it("faucet tokens persist and can be claimed only once", async () => {
+    const store = openKannagiStore({ path: ":memory:" });
+    await store.persist.faucetToken({
+      id: "faucet-1",
+      token: "cashuB-test-token",
+      amount_sats: 1000,
+    });
+
+    const firstClaim = await store.persist.claimFaucetToken(
+      "faucet-1",
+      1735689600,
+      "client-a",
+    );
+    const secondClaim = await store.persist.claimFaucetToken(
+      "faucet-1",
+      1735689601,
+      "client-b",
+    );
+    expect(firstClaim).toBe(true);
+    expect(secondClaim).toBe(false);
+
+    const state = await store.hydrate();
+    const token = state.faucetTokens.get("faucet-1");
+    expect(token?.amount_sats).toBe(1000);
+    expect(token?.claimed_at).toBe(1735689600);
+    expect(token?.claimed_by).toBe("client-a");
     await store.close();
   });
 });

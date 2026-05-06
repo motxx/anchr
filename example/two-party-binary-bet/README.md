@@ -187,6 +187,31 @@ signers in-process on 127.0.0.1:4001-4003).
 | Env var | Default | Purpose |
 |---|---|---|
 | `KANNAGI_DB_PATH` | `./kannagi.db` | SQLite DB path. Use `:memory:` for tests. |
+| `KANNAGI_FAUCET_TOKENS` | unset | Public-testnet one-time token bank, as `amount_sats:cashuB...` entries separated by spaces or newlines. |
+| `KANNAGI_FAUCET_URL` | unset | External faucet URL when the server should not dispense tokens itself. |
+| `KANNAGI_FAUCET_MAX_AMOUNT_SATS` | `1000` | Maximum amount accepted by `/markets/wallet/faucet`. |
+| `KANNAGI_RATE_LIMIT_WINDOW_MS` | `60000` | Public write/faucet rate-limit window. |
+| `KANNAGI_RATE_LIMIT_MAX` | `60` | Max public write/faucet requests per client per window. |
+| `KANNAGI_ALLOW_MANUAL_RESOLVE` | unset | Set to `1` only for local demos that need `/markets/:id/resolve`; public deploys use auto-resolver or TLSN proof submission. |
+| `KANNAGI_SIGNER_API_KEY` | unset | Optional API key for FROST signer endpoints; loopback requests remain allowed for the local signer cluster. |
+
+## Public testnet readiness
+
+The public Fly deployment exposes `GET /health` for liveness and
+`GET /ready` for playability. `/ready` fails closed until the mint is
+reachable, at least one Nostr relay is configured, persistence is open,
+and either a token-bank faucet, regtest faucet, or external faucet URL is
+configured.
+
+For Fly/testnet, do not rely on the local regtest faucet. Seed small
+one-time testnut cashuB tokens instead:
+
+```bash
+flyctl secrets set --app anchr-market \
+  KANNAGI_FAUCET_TOKENS='1000:cashuB... 1000:cashuB...'
+```
+
+Each token is persisted and marked claimed after the first payout.
 
 ## Running
 

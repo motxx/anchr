@@ -2,7 +2,7 @@
  * SQLite-backed persistence for the 巫(Kannagi) two-party-binary-bet server.
  *
  * Owns one DB file containing the matching queue (durable bets + FIFO matching)
- * plus the six runtime maps so a Fly machine restart recovers full state:
+ * plus the runtime maps so a Fly machine restart recovers full state:
  *
  *   - markets                 (TwoPartyBinaryBet, JSON blob keyed by market_id)
  *   - matched_pairs           (MatchedBetPair,    JSON blob keyed by pair_id)
@@ -10,6 +10,7 @@
  *   - resolved_signatures     (one Schnorr signature per market)
  *   - resolved_proof_signatures (per-Cashu-proof signatures, denormalised)
  *   - pending_exchange_tokens (transient cashuB tokens during pair exchange)
+ *   - faucet_tokens           (optional public-testnet cashuB token bank)
  *
  * Concurrency: a single Fly machine, single Deno process. SQLite WAL gives
  * us concurrent readers + one writer, which matches our load profile (the
@@ -80,6 +81,16 @@ CREATE TABLE IF NOT EXISTS pending_exchange_tokens (
   token   TEXT NOT NULL,
   PRIMARY KEY (pair_id, side)
 );
+
+CREATE TABLE IF NOT EXISTS faucet_tokens (
+  id           TEXT PRIMARY KEY,
+  token        TEXT NOT NULL,
+  amount_sats INTEGER NOT NULL CHECK (amount_sats >= 0),
+  claimed_at  INTEGER,
+  claimed_by  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_faucet_tokens_unclaimed
+  ON faucet_tokens (claimed_at, amount_sats);
 `;
 
 export interface HydratedState {
@@ -89,6 +100,15 @@ export interface HydratedState {
   resolvedSignatures: Map<string, string>;
   resolvedProofSignatures: Map<string, Map<string, string>>;
   pendingExchangeTokens: Map<string, string>;
+  faucetTokens: Map<string, FaucetTokenRecord>;
+}
+
+export interface FaucetTokenRecord {
+  id: string;
+  token: string;
+  amount_sats: number;
+  claimed_at?: number;
+  claimed_by?: string;
 }
 
 export interface KannagiPersist {
@@ -99,6 +119,8 @@ export interface KannagiPersist {
   proofSignatures(marketId: string, sigs: Map<string, string>): Promise<void>;
   pendingExchangeToken(pairId: string, side: "yes" | "no", token: string): Promise<void>;
   deletePendingExchangeToken(pairId: string, side: "yes" | "no"): Promise<void>;
+  faucetToken(token: FaucetTokenRecord): Promise<void>;
+  claimFaucetToken(id: string, claimedAt: number, claimedBy: string): Promise<boolean>;
 }
 
 export interface KannagiStore {
@@ -190,6 +212,26 @@ function hydrateAll(db: Database): HydratedState {
     pendingExchangeTokens.set(`${row.pair_id}_${row.side}`, row.token);
   }
 
+  const faucetTokens = new Map<string, FaucetTokenRecord>();
+  for (
+    const row of db.prepare("SELECT id, token, amount_sats, claimed_at, claimed_by FROM faucet_tokens")
+      .all<{
+        id: string;
+        token: string;
+        amount_sats: number;
+        claimed_at: number | null;
+        claimed_by: string | null;
+      }>()
+  ) {
+    faucetTokens.set(row.id, {
+      id: row.id,
+      token: row.token,
+      amount_sats: row.amount_sats,
+      ...(row.claimed_at === null ? {} : { claimed_at: row.claimed_at }),
+      ...(row.claimed_by === null ? {} : { claimed_by: row.claimed_by }),
+    });
+  }
+
   log.info("hydrated", {
     markets: markets.size,
     matched_pairs: matchedPairs.size,
@@ -197,6 +239,7 @@ function hydrateAll(db: Database): HydratedState {
     resolved_signatures: resolvedSignatures.size,
     resolved_proof_signatures: resolvedProofSignatures.size,
     pending_exchange_tokens: pendingExchangeTokens.size,
+    faucet_tokens: faucetTokens.size,
   });
 
   return {
@@ -206,6 +249,7 @@ function hydrateAll(db: Database): HydratedState {
     resolvedSignatures,
     resolvedProofSignatures,
     pendingExchangeTokens,
+    faucetTokens,
   };
 }
 
@@ -239,6 +283,13 @@ function createPersist(db: Database): KannagiPersist {
   );
   const deletePendingToken = db.prepare(
     "DELETE FROM pending_exchange_tokens WHERE pair_id = ? AND side = ?",
+  );
+  const upsertFaucetToken = db.prepare(
+    "INSERT INTO faucet_tokens (id, token, amount_sats, claimed_at, claimed_by) VALUES (?, ?, ?, ?, ?) " +
+      "ON CONFLICT(id) DO UPDATE SET token = excluded.token, amount_sats = excluded.amount_sats",
+  );
+  const claimFaucetToken = db.prepare(
+    "UPDATE faucet_tokens SET claimed_at = ?, claimed_by = ? WHERE id = ? AND claimed_at IS NULL",
   );
 
   return {
@@ -277,6 +328,20 @@ function createPersist(db: Database): KannagiPersist {
     deletePendingExchangeToken(pairId, side) {
       deletePendingToken.run(pairId, side);
       return Promise.resolve();
+    },
+    faucetToken(token) {
+      upsertFaucetToken.run(
+        token.id,
+        token.token,
+        token.amount_sats,
+        token.claimed_at ?? null,
+        token.claimed_by ?? null,
+      );
+      return Promise.resolve();
+    },
+    claimFaucetToken(id, claimedAt, claimedBy) {
+      const changes = claimFaucetToken.run(claimedAt, claimedBy, id);
+      return Promise.resolve(changes > 0);
     },
   };
 }

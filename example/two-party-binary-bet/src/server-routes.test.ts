@@ -18,6 +18,7 @@ import type { MiddlewareHandler } from "hono";
 import {
   registerMarketRoutes,
   createMarketState,
+  parseFaucetTokens,
   type MarketState,
   type MarketRouteContext,
 } from "./server-routes.ts";
@@ -670,6 +671,20 @@ describe("Market API: resolution (single-key)", () => {
     expect(res.status).toBe(400);
   });
 
+  test("manual resolve can be disabled for public deployments", async () => {
+    const t = makeTestApp(createMarketState({
+      verifyExchangeToken: () => ({ valid: true }),
+      allowManualResolve: false,
+    }));
+    const created = await createMarket(t.app);
+    const res = await t.app.request(`${BASE}/markets/${created.id}/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ outcome: "yes" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   test("unknown market returns 404", async () => {
     const res = await app.request(`${BASE}/markets/nonexistent/resolve`, {
       method: "POST",
@@ -1079,6 +1094,14 @@ describe("Market API: user pairs in detail", () => {
 // ---------------------------------------------------------------------------
 
 describe("Market API: faucet (non-custodial)", () => {
+  test("parseFaucetTokens accepts amount-prefixed cashuB token bank entries", () => {
+    const tokens = parseFaucetTokens("1000:cashuB_test_one\n2500:cashuB_test_two");
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0]!.amount_sats).toBe(1000);
+    expect(tokens[1]!.amount_sats).toBe(2500);
+    expect(tokens[0]!.id).toHaveLength(32);
+  });
+
   test("faucet returns 503 when no wallet configured", async () => {
     const state = createMarketState();
     state.getCashuWallet = async () => null;
@@ -1089,6 +1112,38 @@ describe("Market API: faucet (non-custodial)", () => {
       body: JSON.stringify({ amount_sats: 1000 }),
     });
     expect(res.status).toBe(503);
+  });
+
+  test("token-bank faucet dispenses each preloaded token only once", async () => {
+    const state = createMarketState();
+    state.faucetTokens.set("tok1", {
+      id: "tok1",
+      token: "cashuB_public_test_token",
+      amount_sats: 1000,
+    });
+    const { app } = makeTestApp(state);
+
+    const first = await app.request(`${BASE}/markets/wallet/faucet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amount_sats: 1000 }),
+    });
+    expect(first.status).toBe(200);
+    const firstJson = await first.json() as {
+      cashu_token: string;
+      source: string;
+      remaining_tokens: number;
+    };
+    expect(firstJson.cashu_token).toBe("cashuB_public_test_token");
+    expect(firstJson.source).toBe("token_bank");
+    expect(firstJson.remaining_tokens).toBe(0);
+
+    const second = await app.request(`${BASE}/markets/wallet/faucet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amount_sats: 1000 }),
+    });
+    expect(second.status).toBe(503);
   });
 });
 
@@ -1102,6 +1157,7 @@ describe("Market API: wallet/config", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.mint_url).toBeNull();
+      expect(body.faucet.mode).toBe("disabled");
     } finally {
       if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
     }
@@ -1116,6 +1172,7 @@ describe("Market API: wallet/config", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.mint_url).toBe("http://mint.example:3338");
+      expect(body.faucet).toBeDefined();
     } finally {
       if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
       else Deno.env.delete("CASHU_MINT_URL");

@@ -125,13 +125,13 @@ export async function loadProofs(wallet: Nip60Wallet): Promise<TokenEntry[]> {
     authors: [wallet.pubkey],
   };
   const events = await wallet.pool.querySync(wallet.relays, filter);
-  // Sort newest first so each event's `del` references existing earlier ids.
+  // Sort for deterministic output. Replacement correctness does not depend on
+  // this order because relays only expose second-resolution `created_at`.
   events.sort((a, b) => b.created_at - a.created_at);
 
   const tombstoned = new Set<string>();
-  const live: TokenEntry[] = [];
+  const entries: TokenEntry[] = [];
   for (const ev of events) {
-    if (tombstoned.has(ev.id)) continue;
     let payload: DecryptedTokenContent;
     try {
       const decrypted = decryptToSelf(wallet, ev.content);
@@ -143,10 +143,9 @@ export async function loadProofs(wallet: Nip60Wallet): Promise<TokenEntry[]> {
     if (payload.del) {
       for (const id of payload.del) tombstoned.add(id);
     }
-    live.push({ eventId: ev.id, mint: payload.mint, proofs: payload.proofs });
+    entries.push({ eventId: ev.id, mint: payload.mint, proofs: payload.proofs });
   }
-  // A later event may have del'd one of the entries we already pushed.
-  return live.filter((entry) => !tombstoned.has(entry.eventId));
+  return entries.filter((entry) => !tombstoned.has(entry.eventId));
 }
 
 /** Aggregate balance across all unspent token events for a single mint. */

@@ -180,6 +180,14 @@ export interface WalletConfig {
   mint_url: string | null;
   /** Nostr relays the NIP-60 wallet client uses for kind:7375 token events. */
   nostr_relays: string[];
+  faucet?: {
+    enabled: boolean;
+    mode: "token_bank" | "regtest" | "external" | "disabled";
+    amount_sats: number;
+    max_amount_sats: number;
+    available_tokens: number;
+    external_url?: string;
+  };
 }
 
 export async function fetchWalletConfig(): Promise<WalletConfig> {
@@ -195,6 +203,8 @@ export async function fetchWalletConfig(): Promise<WalletConfig> {
 export interface FaucetResult {
   cashu_token: string;
   amount_sats: number;
+  source?: "token_bank" | "regtest";
+  remaining_tokens?: number;
 }
 
 /**

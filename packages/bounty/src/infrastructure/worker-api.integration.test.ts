@@ -4,12 +4,30 @@ import { expect } from "@std/expect";
 import { getBlossomConfig, isBlossomEnabled } from "@anchr/blossom";
 import { createQueryService } from "../application/query-service.ts";
 import { storeIntegrity } from "@anchr/photo-verification/integrity-store";
+import { createOracleRegistry } from "./oracle-client/registry.ts";
 import { buildWorkerApiApp } from "./worker-api.ts";
 import { withEnvThunk as withEnv } from "../testing/helpers.ts";
+import type { OracleAttestation } from "../domain/oracle-types.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
 
 // QueryService without relay hooks — avoids fire-and-forget WebSocket leaks
 // that trip Deno's resource sanitizer.
-const testService = createQueryService({ hooks: {} });
+const TEST_ORACLE_ID = "worker-api-integration-oracle";
+const testRegistry = createOracleRegistry({ skipBuiltIn: true });
+testRegistry.register({
+  info: { id: TEST_ORACLE_ID, name: "Worker API integration oracle", fee_ppm: 0 },
+  verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
+    return Promise.resolve({
+      oracle_id: TEST_ORACLE_ID,
+      query_id: query.id,
+      passed: true,
+      checks: ["integration oracle passed"],
+      failures: [],
+      attested_at: Date.now(),
+    });
+  },
+});
+const testService = createQueryService({ hooks: {}, oracleRegistry: testRegistry });
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -53,7 +71,7 @@ describe("worker api photo proof (Blossom)", () => {
       const app = buildWorkerApiApp({ queryService: testService });
       const query = testService.createQuery({
         description: "Worker API integration test",
-      }, { ttlSeconds: 300 });
+      }, { ttlSeconds: 300, oracleIds: [TEST_ORACLE_ID] });
 
       const form = new FormData();
       form.append(
