@@ -7,6 +7,5 @@ minor versions until the SDK API is declared stable.
 
 ## Unreleased
 
-- Added OSS security and contribution operations files.
 - Added package dry-run and SDK npm build checks to CI.
 - Fixed package publish configuration for the SDK.
