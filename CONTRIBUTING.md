@@ -12,6 +12,7 @@ deno task test:bounty          # Bounty pattern invariants (trustless / attacks 
 deno task test:frost           # FROST threshold signing
 deno task test:integration     # worker-api + MCP HTTP/stdio surface
 deno task test:example         # all example apps
+deno task test:scripts         # lint script self-tests
 deno task test:pentest         # penetration tests
 deno task test:relay           # Nostr relay + Blossom E2E (Docker)
 deno task test:regtest         # full Cashu + Lightning E2E (Docker)

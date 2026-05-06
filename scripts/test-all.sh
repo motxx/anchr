@@ -76,6 +76,7 @@ run_local() {
   fi
 
   run_test "integration tests" deno task test:integration
+  run_test "scripts tests"     deno task test:scripts
   run_test "example tests"     deno task test:example
 }
 
