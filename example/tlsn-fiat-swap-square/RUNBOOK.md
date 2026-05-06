@@ -169,6 +169,18 @@ Docker/regtest integration is optional for this example path. Use it when you
 need to validate the live mint/relay/oracle wiring, not for the pure predicate
 and config checks above.
 
+Watari-specific regtest integration uses the real Docker-backed Cashu mint and
+Nostr relay, with Square/TLSNotary represented by a fixture proof:
+
+```bash
+docker compose up -d
+./scripts/init-regtest.sh
+docker compose restart cashu-mint
+ANCHR_E2E_REQUIRE_INFRA=1 deno test --node-modules-dir=false --no-lock \
+  e2e/regtest/watari.test.ts \
+  --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi
+```
+
 ## Troubleshooting
 
 | Problem                 | Action                                                                                                                 |
