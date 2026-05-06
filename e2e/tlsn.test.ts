@@ -15,6 +15,7 @@ import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
 import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
 import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import type { QueryInput, QueryResult } from "../packages/bounty/src/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -175,12 +176,13 @@ describe("TLSNotary E2E", () => {
 
   test("rejects submission without presentation", async () => {
     const store = createQueryStore();
-    const svc = createQueryService({ store });
+    const svc = createQueryService({ store, oracleRegistry: createOracleRegistry() });
 
     const query = svc.createQuery({
       description: "E2E: no attestation",
       verification_requirements: ["tlsn"],
       tlsn_requirements: { target_url: "https://example.com" },
+      visibility: "requester_only",
     }, { ttlSeconds: 120 });
 
     const outcome = await svc.submitQueryResult(

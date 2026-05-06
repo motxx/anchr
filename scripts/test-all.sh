@@ -177,7 +177,7 @@ run_docker_tests() {
 
   NOSTR_RELAYS=ws://localhost:7777 \
   BLOSSOM_SERVERS=http://localhost:3333 \
-  run_test "relay e2e" deno task test:e2e:relay
+  run_test "relay e2e" deno task test:relay
 
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 

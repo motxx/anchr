@@ -6,13 +6,16 @@ Issues and PRs welcome.
 
 ```bash
 deno task lint:strict          # deno lint + arch + invariants + paths + types
-deno task test:unit            # 217 unit tests
-deno task test:packages        # 71 per-package tests, each in isolation
-deno task test:protocol        # protocol invariants (trustless / attacks / quorum)
+deno task test:unit            # unit tests across packages
+deno task test:packages        # per-package tests, each in isolation
+deno task test:protocol        # Bounty protocol invariants (trustless / attacks / vulns / quorum)
 deno task test:frost           # FROST threshold signing
-deno task test:regtest         # full Cashu + Lightning E2E (Docker)
-deno task test:pentest         # penetration tests
+deno task test:integration     # worker-api + MCP HTTP/stdio surface
 deno task test:example         # all example apps
+deno task test:pentest         # penetration tests
+deno task test:relay           # Nostr relay + Blossom E2E (Docker)
+deno task test:regtest         # full Cashu + Lightning E2E (Docker)
+deno task test:tlsn            # TLSNotary E2E (needs verifier server + Rust prover binary)
 ./scripts/test-all.sh --local  # what CI runs in Phase 1
 ```
 

@@ -73,7 +73,7 @@ jobs:
 
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: deno task test:e2e:relay
+        run: deno task test:relay
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
