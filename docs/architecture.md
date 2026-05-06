@@ -14,7 +14,7 @@ packages/
 ├── frost-oracle/              FROST t-of-n threshold-signing primitives (BIP-340 Schnorr)
 ├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
 ├── blossom/                   Encrypted attachment store (BUD-01–06 client)
-├── runtime/                   Anchr role runtime — Query lifecycle, escrow, oracle-client/service,
+├── bounty/                    Anchr Bounty implementation — Query lifecycle, escrow, oracle-client/service,
 │                              worker-api (HTTP), MCP (stdio). Embed via `composeHost(extras)`.
 └── sdk/                       anchr-sdk: Customer / Provider API for downstream consumers
 
@@ -34,18 +34,18 @@ The package graph is one-directional. `scripts/arch-lint.ts` enforces
 the allow-list; the rule codes (E001-E024) are the canonical reference.
 Highlights:
 
-- Inside `packages/runtime/src/`:
+- Inside `packages/bounty/src/`:
   - `domain/` is pure — no `Date.now()`, no `randomBytes`, no
     `Deno.*`. Side effects come from injected ports (`Clock` /
     `IdGenerator` / `NonceGenerator` in
-    `packages/runtime/src/domain/ports.ts`).
+    `packages/bounty/src/domain/ports.ts`).
   - `application/` orchestrates use cases and defines ports. No
     `Deno.*` direct calls.
   - `infrastructure/` implements ports. The only layer allowed to
     call `Deno.*` and external SDKs.
-- `packages/runtime/` may import any non-sdk primitive package. Other
+- `packages/bounty/` may import any non-sdk primitive package. Other
   packages may only depend on the small allow-list under E010-E019.
-- `runtime` (and any package) must not import from `@anchr/sdk`
+- `bounty` (and any package) must not import from `@anchr/sdk`
   (the SDK is downstream of the host).
 - Application vocabulary (`market`, `marketplace`, …) is forbidden
   inside `packages/`. Concrete apps own their vocabulary in
@@ -66,7 +66,7 @@ delivery via NIP-44 `blossom_keys` field). The wire spec uses
 externally in [BUD-01–06](https://github.com/hzrd149/blossom).
 
 The thin Anchr integration (worker upload + fetch helpers) lives in
-`packages/runtime/src/infrastructure/blossom/` because the helpers
+`packages/bounty/src/infrastructure/blossom/` because the helpers
 decode `AttachmentRef` / `BlossomKeyMaterial` domain types. The
 underlying encrypted-store primitive ships in `packages/blossom/`.
 

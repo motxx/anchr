@@ -14,12 +14,12 @@ the code and `docs/`.
 
 ## Logging
 `getLogger(["anchr", "<name>"])` from `@anchr/core-runtime/logger`.
-**No `console.*`** in `packages/runtime/src/(application|infrastructure)/`
+**No `console.*`** in `packages/bounty/src/(application|infrastructure)/`
 or any `packages/` (E021). Level read from `ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
 
 ## Type bar
 `as` and `any` forbidden everywhere in `packages/`. Narrow with type
-predicates or `packages/runtime/src/infrastructure/lib/runtime-types.ts`.
+predicates or `packages/bounty/src/infrastructure/lib/runtime-types.ts`.
 `unknown` only at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
 
 ## Versioning (pre-1.0)
@@ -51,10 +51,10 @@ pre-commit hook.
 ## Layout
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
-  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `runtime`,
+  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `bounty`,
   `sdk`). The host implementation (Query lifecycle, escrow,
   oracle-client/service, worker-api, MCP) lives in
-  `packages/runtime/src/{domain,application,infrastructure}/`.
+  `packages/bounty/src/{domain,application,infrastructure}/`.
 - `example/<app>/` — concrete apps; their own deno.json + design
   system. **Must reach Anchr through `@anchr/*` only** — relative
   paths into `packages/<pkg>/src/...` are an E023 violation. The

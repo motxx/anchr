@@ -286,7 +286,7 @@ queue pairs YES/NO bets at fixed 1:1 odds.
 
 | Package | Purpose |
 |---|---|
-| [`@anchr/runtime`](packages/runtime/) | Anchr role runtime — Query lifecycle, escrow, oracle-client/service, worker-api (HTTP), MCP (stdio). Embed via `composeHost(extras)` |
+| [`@anchr/bounty`](packages/bounty/) | Bounty pattern implementation — Query lifecycle, escrow, oracle-client/service, worker-api (HTTP), MCP (stdio). Embed via `composeHost(extras)` |
 | [`@anchr/core-cashu`](packages/core-cashu/) | Cashu HTLC escrow primitives |
 | [`@anchr/blossom`](packages/blossom/) | Encrypted attachment store (BUD-01–06 client) |
 | [`@anchr/core-runtime`](packages/core-runtime/) | Cross-runtime helpers (spawn, fs, which, env, logger) |

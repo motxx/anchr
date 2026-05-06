@@ -13,12 +13,12 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../packages/runtime/src/infrastructure/worker-api.ts";
-import { createQueryService } from "../packages/runtime/src/application/query-service.ts";
-import { createOracleRegistry } from "../packages/runtime/src/infrastructure/oracle-client/registry.ts";
-import { publishQueryToRelay } from "../packages/runtime/src/infrastructure/nostr/transport/relay-publish.ts";
-import { closePool } from "../packages/runtime/src/infrastructure/nostr/transport/client.ts";
-import { ANCHR_QUERY_REQUEST } from "../packages/runtime/src/infrastructure/nostr/events/events.ts";
+import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService } from "../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { publishQueryToRelay } from "../packages/bounty/src/infrastructure/nostr/transport/relay-publish.ts";
+import { closePool } from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
+import { ANCHR_QUERY_REQUEST } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
 import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();

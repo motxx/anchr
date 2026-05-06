@@ -11,9 +11,9 @@
  *   deno run --allow-all example/airdrop-bot-shield/src/demo.ts
  *
  * Reference modules (not imported at runtime — this example is self-contained):
- *   - TlsnRequirement, TlsnCondition, EscrowInfo from ../../../packages/runtime/src/domain/types.ts
- *   - validateTlsn from ../../../packages/runtime/src/infrastructure/verification/tlsn-validation
- *   - createHtlcToken, redeemHtlcToken from ../../../packages/runtime/src/infrastructure/cashu/escrow
+ *   - TlsnRequirement, TlsnCondition, EscrowInfo from ../../../packages/bounty/src/domain/types.ts
+ *   - validateTlsn from ../../../packages/bounty/src/infrastructure/verification/tlsn-validation
+ *   - createHtlcToken, redeemHtlcToken from ../../../packages/bounty/src/infrastructure/cashu/escrow
  */
 
 import {
@@ -178,7 +178,7 @@ console.log("  - Each claim gets a unique hash/preimage pair");
 console.log("  - Oracle holds the preimage");
 console.log("  - Proofs are held by the project (plain bearer instruments)");
 console.log();
-console.log("  In code (reference: packages/runtime/src/infrastructure/cashu/escrow.ts):");
+console.log("  In code (reference: packages/bounty/src/infrastructure/cashu/escrow.ts):");
 console.log("  ```");
 console.log("  // Phase 1: Create hold token");
 console.log("  const holdToken = await createHtlcToken(");
@@ -318,6 +318,6 @@ console.log("  3. RESIST Sybil attacks through economic cost barriers");
 console.log("     (combined proof requirements make farming unprofitable)");
 console.log();
 console.log("For integration with the full Anchr server, see:");
-console.log("  - packages/runtime/src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
-console.log("  - packages/runtime/src/infrastructure/verification/tlsn-validation.ts (proof verification)");
-console.log("  - packages/runtime/src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");
+console.log("  - packages/bounty/src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
+console.log("  - packages/bounty/src/infrastructure/verification/tlsn-validation.ts (proof verification)");
+console.log("  - packages/bounty/src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");

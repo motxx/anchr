@@ -13,14 +13,14 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { generateEphemeralIdentity } from "../packages/runtime/src/infrastructure/nostr/crypto/identity.ts";
-import { buildOracleAnnouncementEvent } from "../packages/runtime/src/infrastructure/nostr/events/event-builders.ts";
+import { generateEphemeralIdentity } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
+import { buildOracleAnnouncementEvent } from "../packages/bounty/src/infrastructure/nostr/events/event-builders.ts";
 import {
   discoverOracles,
   parseOracleAnnouncementEvent,
-} from "../packages/runtime/src/infrastructure/oracle-client/oracle-discovery.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../packages/runtime/src/infrastructure/nostr/events/events.ts";
-import type { OracleInfo } from "../packages/runtime/src/domain/oracle-types.ts";
+} from "../packages/bounty/src/infrastructure/oracle-client/oracle-discovery.ts";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import type { OracleInfo } from "../packages/bounty/src/domain/oracle-types.ts";
 
 // ---------------------------------------------------------------------------
 // Relay connectivity

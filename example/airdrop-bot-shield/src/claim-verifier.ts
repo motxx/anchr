@@ -12,9 +12,9 @@
  * On full pass, returns the Cashu HTLC preimage for token release.
  *
  * Reference modules:
- *   - validateTlsn, evaluateCondition from ../../../packages/runtime/src/infrastructure/verification/tlsn-validation
+ *   - validateTlsn, evaluateCondition from ../../../packages/bounty/src/infrastructure/verification/tlsn-validation
  *   - TlsnVerifiedData, TlsnAttestation from ../../../packages/core-domain/src/types
- *   - redeemHtlcToken from ../../../packages/runtime/src/infrastructure/cashu/escrow
+ *   - redeemHtlcToken from ../../../packages/bounty/src/infrastructure/cashu/escrow
  */
 
 import type { ProofCondition, AirdropCriteria } from "./airdrop-criteria.ts";

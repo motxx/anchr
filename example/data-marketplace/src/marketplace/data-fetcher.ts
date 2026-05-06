@@ -5,9 +5,9 @@
  * Caches results per listing_id within max_age_seconds.
  */
 
-import type { TlsnRequirement, TlsnAttestation } from "@anchr/runtime/domain-types";
+import type { TlsnRequirement, TlsnAttestation } from "@anchr/bounty/domain-types";
 import { validateTlsn, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
-import { validateAttachmentUri } from "@anchr/runtime/url-validation";
+import { validateAttachmentUri } from "@anchr/bounty/url-validation";
 
 export interface FetchedData {
   /** The upstream response body. */

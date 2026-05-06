@@ -28,7 +28,7 @@ import type {
   SupplyChainStep,
 } from "./supply-chain-types.ts";
 
-// Duplicated from packages/runtime/src/domain/geo.ts so the example is self-contained.
+// Duplicated from packages/bounty/src/domain/geo.ts so the example is self-contained.
 function haversineKm(
   lat1: number,
   lon1: number,

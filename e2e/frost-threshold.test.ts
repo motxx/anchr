@@ -31,7 +31,7 @@ import {
   aggregateSignatures,
   verifySignature,
 } from "@anchr/frost-oracle/frost-cli";
-import { buildOracleApp } from "../packages/runtime/src/infrastructure/oracle-service/server.ts";
+import { buildOracleApp } from "../packages/bounty/src/infrastructure/oracle-service/server.ts";
 
 // ---------------------------------------------------------------------------
 // Oracle operators — all independent, no Requester/Worker

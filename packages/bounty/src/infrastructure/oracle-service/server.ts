@@ -6,7 +6,7 @@
  * stateless, no cookies, no identity tracking.
  *
  * Usage:
- *   ORACLE_PORT=4000 ORACLE_API_KEY=secret deno run packages/runtime/src/infrastructure/oracle-service/server.ts
+ *   ORACLE_PORT=4000 ORACLE_API_KEY=secret deno run packages/bounty/src/infrastructure/oracle-service/server.ts
  *
  * Routes are split across sibling files; this module composes them onto a
  * single Hono app and owns process-level concerns (env, logging, listen).

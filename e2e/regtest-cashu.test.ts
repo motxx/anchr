@@ -24,11 +24,11 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
 import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../packages/runtime/src/infrastructure/worker-api.ts";
-import { createQueryService } from "../packages/runtime/src/application/query-service.ts";
-import { createOracleRegistry } from "../packages/runtime/src/infrastructure/oracle-client/registry.ts";
+import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService } from "../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { normalizeQueryResult } from "../packages/runtime/src/infrastructure/attachments.ts";
+import { normalizeQueryResult } from "../packages/bounty/src/infrastructure/attachments.ts";
 import {
   checkInfraReady,
   payInvoiceViaLndUser,
@@ -57,7 +57,7 @@ const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
 // Wire oracleRegistry + preimageStore so verification can actually succeed
-// (mirrors production composition in packages/runtime/src/infrastructure/runtime.ts).
+// (mirrors production composition in packages/bounty/src/infrastructure/runtime.ts).
 const testOracleRegistry = createOracleRegistry();
 const testPreimageStore = createPreimageStore();
 const testService = createQueryService({

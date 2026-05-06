@@ -2,7 +2,7 @@
 
 Minimal deployment example: starts the standard Anchr host
 (`worker-api` HTTP + MCP stdio + scheduler) backed by the
-`@anchr/runtime` library.
+`@anchr/bounty` library.
 
 ```sh
 deno task start          # run on :3000

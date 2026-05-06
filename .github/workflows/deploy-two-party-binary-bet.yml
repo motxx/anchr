@@ -24,7 +24,7 @@ on:
       - "packages/core-runtime/**"
       - "packages/tlsn-toolkit/**"
       - "packages/blossom/**"
-      - "packages/runtime/**"
+      - "packages/bounty/**"
       - "scripts/build-ui.ts"
       - "scripts/build-css.ts"
       - "fly.market.toml"

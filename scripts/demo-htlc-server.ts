@@ -6,7 +6,7 @@
  *
  *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-import { generateEphemeralIdentity, type NostrIdentity } from "../packages/runtime/src/infrastructure/nostr/crypto/identity.ts";
+import { generateEphemeralIdentity, type NostrIdentity } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -21,10 +21,10 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../packages/runtime/src/infrastructure/nostr/events/events.ts";
-import { buildPreimageDM, parseOracleDM } from "../packages/runtime/src/infrastructure/nostr/events/dm.ts";
-import { publishEvent, closePool } from "../packages/runtime/src/infrastructure/nostr/transport/client.ts";
-import { deriveConversationKey, encryptNip44 } from "../packages/runtime/src/infrastructure/nostr/crypto/encryption.ts";
+} from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import { buildPreimageDM, parseOracleDM } from "../packages/bounty/src/infrastructure/nostr/events/dm.ts";
+import { publishEvent, closePool } from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
+import { deriveConversationKey, encryptNip44 } from "../packages/bounty/src/infrastructure/nostr/crypto/encryption.ts";
 import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
 import { createBountyToken } from "../packages/core-cashu/src/wallet.ts";
 import {
@@ -32,7 +32,7 @@ import {
   redeemHtlcToken,
   inspectEscrowToken,
 } from "../packages/core-cashu/src/escrow.ts";
-import { workerUpload } from "../packages/runtime/src/infrastructure/blossom/worker-upload.ts";
+import { workerUpload } from "../packages/bounty/src/infrastructure/blossom/worker-upload.ts";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";

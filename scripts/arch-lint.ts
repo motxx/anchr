@@ -1,25 +1,25 @@
 #!/usr/bin/env -S deno run --allow-read
 /**
  * Architecture Lint — enforces Clean Architecture layer dependency rules
- * inside `packages/runtime/` AND inter-package dependency rules across
+ * inside `packages/bounty/` AND inter-package dependency rules across
  * `packages/`.
  *
- * Layer rules apply inside `packages/runtime/src/` (the host's
+ * Layer rules apply inside `packages/bounty/src/` (the host's
  * domain/application/infrastructure tree). Other packages are checked
  * by the package-dep allow-list below.
  *
  * Layers (inner → outer):
  *   domain  →  application  →  infrastructure
  *
- * Rules (runtime layers — import / dependency):
+ * Rules (bounty layers —import / dependency):
  *   [E001] domain must not import from application or infrastructure
  *   [E004] Banned packages: express, dotenv, ws
  *   [E005] application must not import from infrastructure
- *   [E009] only test files may import from packages/runtime/src/testing/
- *   [E018] runtime must not depend on @anchr/sdk (downstream-consumer SDK)
+ *   [E009] only test files may import from packages/bounty/src/testing/
+ *   [E018] bounty must not depend on @anchr/sdk (downstream-consumer SDK)
  *   [W001] Prefer JSR over npm for packages that have JSR equivalents
  *
- * Rules (runtime layers — content):
+ * Rules (bounty layers —content):
  *   [E007] Deno.* not allowed in domain/ (must be wrapped behind a port)
  *   [E008] Deno.* not allowed in application/ (use injected ports)
  *   [E021] console.* not allowed in application/ or infrastructure/
@@ -35,7 +35,7 @@
  *   [E016] cashu-conditional-swap may only depend on
  *          core-runtime, core-cashu, frost-oracle
  *   [E019] blossom may only depend on core-runtime
- *   [E024] runtime may depend on every primitive package except sdk
+ *   [E024] bounty may depend on every primitive package except sdk
  *   [E017] sdk must not depend on any host-side @anchr/* package (other
  *          than core-runtime)
  *
@@ -53,7 +53,7 @@ import { walk } from "jsr:@std/fs@^1/walk";
 import { relative } from "jsr:@std/path@^1";
 
 const ROOT = new URL("../", import.meta.url).pathname;
-const RUNTIME_SRC = `${ROOT}packages/runtime/src/`;
+const RUNTIME_SRC = `${ROOT}packages/bounty/src/`;
 const PKG_DIR = `${ROOT}packages/`;
 const EXAMPLE_DIR = `${ROOT}example/`;
 
@@ -91,7 +91,7 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
   "frost-oracle": new Set<string>(["core-runtime"]),
   "cashu-conditional-swap": new Set<string>(["core-runtime", "core-cashu", "frost-oracle"]),
   "blossom": new Set<string>(["core-runtime"]),
-  "runtime": new Set<string>([
+  "bounty": new Set<string>([
     "core-runtime",
     "core-cashu",
     "tlsn-toolkit",
@@ -116,7 +116,7 @@ const JSR_PREFERRED: Record<string, string> = {
 const E021_CONSOLE_EXEMPT = new Set<string>([
   // The sanctioned console tee. Intercepts and re-emits — the only spot
   // where `console.*` is the API, not an accidental logger.
-  "packages/runtime/src/infrastructure/log-stream.ts",
+  "packages/bounty/src/infrastructure/log-stream.ts",
 ]);
 
 // Test fixture files that legitimately contain references to
@@ -261,7 +261,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
         : layer === "application" ? "E005"
         : "E001";
       violations.push({
-        file: `packages/runtime/src/${rel}`,
+        file: `packages/bounty/src/${rel}`,
         line,
         code,
         severity: "error",
@@ -273,7 +273,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     const pkgName = bare.startsWith("@") ? bare.split("/").slice(0, 2).join("/") : bare.split("/")[0];
     if (BANNED_PACKAGES.has(pkgName)) {
       violations.push({
-        file: `packages/runtime/src/${rel}`,
+        file: `packages/bounty/src/${rel}`,
         line,
         code: "E004",
         severity: "error",
@@ -284,7 +284,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     // E018 — src/ must not depend on @anchr/sdk
     if (specifier === "@anchr/sdk" || specifier.startsWith("@anchr/sdk/")) {
       violations.push({
-        file: `packages/runtime/src/${rel}`,
+        file: `packages/bounty/src/${rel}`,
         line,
         code: "E018",
         severity: "error",
@@ -292,7 +292,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
       });
     }
 
-    // E009 — only test files may import from packages/runtime/src/testing/
+    // E009 — only test files may import from packages/bounty/src/testing/
     if (!isTest) {
       const targetIsTesting =
         (specifier.startsWith(".") &&
@@ -306,14 +306,14 @@ function checkSrcFile(rel: string, source: string): Violation[] {
             }
             return resolved[0] === "testing";
           })()) ||
-        specifier.includes("/packages/runtime/src/testing/");
+        specifier.includes("/packages/bounty/src/testing/");
       if (targetIsTesting) {
         violations.push({
-          file: `packages/runtime/src/${rel}`,
+          file: `packages/bounty/src/${rel}`,
           line,
           code: "E009",
           severity: "error",
-          message: `non-test code must not import from packages/runtime/src/testing/ (found "${specifier}")`,
+          message: `non-test code must not import from packages/bounty/src/testing/ (found "${specifier}")`,
         });
       }
     }
@@ -321,7 +321,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     for (const [npmPrefix, jsrAlt] of Object.entries(JSR_PREFERRED)) {
       if (specifier.startsWith(npmPrefix)) {
         violations.push({
-          file: `packages/runtime/src/${rel}`,
+          file: `packages/bounty/src/${rel}`,
           line,
           code: "W001",
           severity: "warn",
@@ -336,7 +336,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     if (layer === "domain") {
       for (const h of scanContentLines(source, DENO_CALL)) {
         violations.push({
-          file: `packages/runtime/src/${rel}`,
+          file: `packages/bounty/src/${rel}`,
           line: h.line,
           code: "E007",
           severity: "error",
@@ -347,7 +347,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     if (layer === "application") {
       for (const h of scanContentLines(source, DENO_CALL)) {
         violations.push({
-          file: `packages/runtime/src/${rel}`,
+          file: `packages/bounty/src/${rel}`,
           line: h.line,
           code: "E008",
           severity: "error",
@@ -355,10 +355,10 @@ function checkSrcFile(rel: string, source: string): Violation[] {
         });
       }
     }
-    if ((layer === "application" || layer === "infrastructure") && !E021_CONSOLE_EXEMPT.has(`packages/runtime/src/${rel}`)) {
+    if ((layer === "application" || layer === "infrastructure") && !E021_CONSOLE_EXEMPT.has(`packages/bounty/src/${rel}`)) {
       for (const h of scanContentLines(source, CONSOLE_CALL)) {
         violations.push({
-          file: `packages/runtime/src/${rel}`,
+          file: `packages/bounty/src/${rel}`,
           line: h.line,
           code: "E021",
           severity: "error",
@@ -368,11 +368,11 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     }
     for (const h of scanContentLines(source, APP_VOCAB)) {
       violations.push({
-        file: `packages/runtime/src/${rel}`,
+        file: `packages/bounty/src/${rel}`,
         line: h.line,
         code: "E022",
         severity: "error",
-        message: `application vocabulary "${h.match}" not allowed in packages/runtime — concrete apps belong in example/`,
+        message: `application vocabulary "${h.match}" not allowed in packages/bounty — concrete apps belong in example/`,
       });
     }
   }
