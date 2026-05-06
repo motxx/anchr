@@ -32,12 +32,15 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
 import {
-  registerMarketRoutes,
   createMarketState,
   type MarketRouteContext,
   type MarketState,
+  registerMarketRoutes,
 } from "../../example/two-party-binary-bet/src/server-routes.ts";
-import { openKannagiStore, type KannagiStore } from "../../example/two-party-binary-bet/src/kannagi-store.ts";
+import {
+  type MarketStore,
+  openMarketStore,
+} from "../../example/two-party-binary-bet/src/market-store.ts";
 import { createLockedToken } from "../../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
@@ -50,7 +53,9 @@ import process from "node:process";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const INFRA_READY = await checkInfraReady(MINT_URL);
 
-const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
+const passthrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
 
 const BASE = "http://localhost";
 
@@ -73,12 +78,19 @@ interface BetResponse {
 function buildMarketApp(state: MarketState) {
   // deno-lint-ignore no-explicit-any
   const app = new Hono<any>();
-  const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+  const ctx: MarketRouteContext = {
+    writeAuth: passthrough,
+    rateLimit: passthrough,
+  };
   registerMarketRoutes(app, ctx, state);
   return app;
 }
 
-async function postJson(app: Hono, path: string, body: unknown): Promise<Response> {
+async function postJson(
+  app: Hono,
+  path: string,
+  body: unknown,
+): Promise<Response> {
   return app.request(`${BASE}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -93,14 +105,14 @@ async function expectJson<T>(res: Response, status: number): Promise<T> {
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-// Run the lifecycle against the SQLite-backed Kannagi store (the production
+// Run the lifecycle against the SQLite-backed two-party binary bet store (the production
 // code path). The store is :memory:, so the test exercises the same persist
 // + hydrate code without any filesystem state leaking between tests.
-let kannagiStore: KannagiStore | undefined;
+let marketStore: MarketStore | undefined;
 
 suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
   afterAll(async () => {
-    if (kannagiStore) await kannagiStore.close();
+    if (marketStore) await marketStore.close();
   });
 
   test("alice (YES) + bob (NO) bet → match → P2PK lock → YES resolve → alice signs proofs", async () => {
@@ -124,7 +136,10 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
     const aliceWallet = await createWallet(MINT_URL);
     const bobWallet = await createWallet(MINT_URL);
     const serverWallet = await createWallet(MINT_URL);
-    const aliceProofs: Proof[] = await throttledMintProofs(aliceWallet, MINT_SATS);
+    const aliceProofs: Proof[] = await throttledMintProofs(
+      aliceWallet,
+      MINT_SATS,
+    );
     const bobProofs: Proof[] = await throttledMintProofs(bobWallet, MINT_SATS);
 
     expect(aliceProofs.reduce((s, p) => s + p.amount, 0)).toBe(MINT_SATS);
@@ -138,12 +153,12 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
     // path production uses — so this test exercises the full SQL stack
     // (insert, partial-index scan, transactional matching) on top of the
     // Cashu/HTLC machinery.
-    kannagiStore = openKannagiStore({ path: ":memory:" });
-    const hydrated = await kannagiStore.hydrate();
+    marketStore = openMarketStore({ path: ":memory:" });
+    const hydrated = await marketStore.hydrate();
     const state = createMarketState({
-      matchingQueue: kannagiStore.matchingQueue,
+      matchingQueue: marketStore.matchingQueue,
       initial: hydrated,
-      persist: kannagiStore.persist,
+      persist: marketStore.persist,
     });
     state.getCashuWallet = async () => serverWallet;
     const app = buildMarketApp(state);
@@ -163,7 +178,9 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
         description: "always YES",
       },
     });
-    const market = await expectJson<{ id: string; group_pubkey_yes: string; group_pubkey_no: string }>(marketRes, 201);
+    const market = await expectJson<
+      { id: string; group_pubkey_yes: string; group_pubkey_no: string }
+    >(marketRes, 201);
     expect(market.id).toBeTruthy();
     expect(market.group_pubkey_yes).toBeTruthy();
     expect(market.group_pubkey_no).toBeTruthy();
@@ -235,7 +252,9 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
 
     // Bob submits — both sides present, server should mark locked and hand
     // each side the counterparty's redeemable token.
-    const bobSubmit = await expectJson<{ status: string; redeemable_token: string }>(
+    const bobSubmit = await expectJson<
+      { status: string; redeemable_token: string }
+    >(
       await postJson(app, `/markets/${market.id}/submit-token`, {
         pair_id: match.pair_id,
         cashu_token: bobToken.token,
@@ -287,11 +306,18 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
     }
 
     // === Phase 7: Loser (bob — held alice's YES-locked token) is rejected ===
-    const decodedAlice = getDecodedToken(aliceToken.token, aliceWallet.keyChain.getAllKeysetIds());
-    const bobSignTry = await postJson(app, `/markets/${market.id}/sign-proofs`, {
-      pubkey: BOB_PK,
-      proof_secrets: decodedAlice.proofs.map((p) => p.secret),
-    });
+    const decodedAlice = getDecodedToken(
+      aliceToken.token,
+      aliceWallet.keyChain.getAllKeysetIds(),
+    );
+    const bobSignTry = await postJson(
+      app,
+      `/markets/${market.id}/sign-proofs`,
+      {
+        pubkey: BOB_PK,
+        proof_secrets: decodedAlice.proofs.map((p) => p.secret),
+      },
+    );
     expect(bobSignTry.status).toBe(403);
   });
 });

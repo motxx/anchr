@@ -1,5 +1,5 @@
 /**
- * Unit tests for the SQLite-backed Kannagi store.
+ * Unit tests for the SQLite-backed two-party binary bet store.
  *
  * Uses an in-memory database (`:memory:`) so tests run without filesystem
  * side effects. The store and its matching queue share one connection, so we
@@ -9,7 +9,7 @@
 
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { openKannagiStore } from "./kannagi-store.ts";
+import { openMarketStore } from "./market-store.ts";
 import type { MatchedBetPair, PendingBet, TwoPartyBinaryBet } from "./market-types.ts";
 
 function freshMarket(id: string): TwoPartyBinaryBet {
@@ -52,9 +52,9 @@ function freshBet(id: string, market_id: string, side: "yes" | "no", amount: num
   };
 }
 
-describe("kannagi store: schema bootstrap", () => {
+describe("market store: schema bootstrap", () => {
   it("opens an empty :memory: DB and hydrates an empty state", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     const state = await store.hydrate();
     expect(state.markets.size).toBe(0);
     expect(state.matchedPairs.size).toBe(0);
@@ -67,9 +67,9 @@ describe("kannagi store: schema bootstrap", () => {
   });
 });
 
-describe("kannagi store: persist + hydrate round-trip", () => {
+describe("market store: persist + hydrate round-trip", () => {
   it("survives close + reopen for a file-backed DB", async () => {
-    const tmp = await Deno.makeTempFile({ prefix: "kannagi-", suffix: ".db" });
+    const tmp = await Deno.makeTempFile({ prefix: "market-", suffix: ".db" });
     try {
       const m = freshMarket("market-1");
       const pair: MatchedBetPair = {
@@ -83,7 +83,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
         status: "locked",
       };
 
-      const w = openKannagiStore({ path: tmp });
+      const w = openMarketStore({ path: tmp });
       await w.persist.market(m);
       await w.persist.pair(pair);
       await w.persist.preimage("market-1", "cafe".repeat(16));
@@ -92,7 +92,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
       await w.persist.pendingExchangeToken("pair-1", "yes", "cashuB-yes");
       await w.close();
 
-      const r = openKannagiStore({ path: tmp });
+      const r = openMarketStore({ path: tmp });
       const state = await r.hydrate();
 
       expect(state.markets.get("market-1")).toEqual(m);
@@ -109,7 +109,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 
   it("market upsert reflects status changes", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     const m = freshMarket("m");
     await store.persist.market(m);
 
@@ -122,7 +122,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 
   it("proof signatures merge new entries without dropping old ones", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.persist.proofSignatures("m", new Map([["a", "sig-a"]]));
     await store.persist.proofSignatures("m", new Map([["b", "sig-b"]]));
 
@@ -135,7 +135,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 
   it("delete pending exchange token removes the row", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.persist.pendingExchangeToken("p", "yes", "tok-y");
     await store.persist.pendingExchangeToken("p", "no", "tok-n");
     await store.persist.deletePendingExchangeToken("p", "yes");
@@ -147,7 +147,7 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 
   it("faucet tokens persist and can be claimed only once", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.persist.faucetToken({
       id: "faucet-1",
       token: "cashuB-test-token",
@@ -176,9 +176,9 @@ describe("kannagi store: persist + hydrate round-trip", () => {
   });
 });
 
-describe("kannagi store: SQLite matching queue", () => {
+describe("market store: SQLite matching queue", () => {
   it("enqueue + listPending FIFO", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
     await store.matchingQueue.enqueue(freshBet("y2", "m", "yes", 500, 2));
     await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 3));
@@ -192,7 +192,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("findMatches: equal YES/NO produces one full match and zeros remaining_sats", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
     await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
 
@@ -205,7 +205,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("findMatches: partial match leaves the remainder open", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1500, 1));
     await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
 
@@ -220,7 +220,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("findMatches: FIFO across multiple NO bets", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1500, 1));
     await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 600, 2));
     await store.matchingQueue.enqueue(freshBet("n2", "m", "no", 400, 3));
@@ -241,7 +241,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("findMatches: idempotent — re-running on already-matched book produces no proposals", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
     await store.matchingQueue.enqueue(freshBet("n1", "m", "no", 1000, 2));
     await store.matchingQueue.findMatches("m");
@@ -252,7 +252,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("cancel removes the row", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m", "yes", 1000, 1));
     expect(await store.matchingQueue.cancel("y1")).toBe(true);
     expect(await store.matchingQueue.cancel("y1")).toBe(false);
@@ -261,7 +261,7 @@ describe("kannagi store: SQLite matching queue", () => {
   });
 
   it("listPending filters by side and market_id", async () => {
-    const store = openKannagiStore({ path: ":memory:" });
+    const store = openMarketStore({ path: ":memory:" });
     await store.matchingQueue.enqueue(freshBet("y1", "m1", "yes", 1000, 1));
     await store.matchingQueue.enqueue(freshBet("n1", "m2", "no", 1000, 2));
 

@@ -166,9 +166,8 @@ export function MarketApp() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-        {/* Hero — Kannagi is the platform; the brand is established in the
-         * header, so the page lands directly on the create CTA. No
-         * redundant tagline or stats above the featured market. */}
+        {/* Hero — the page lands directly on the create CTA. No redundant
+         * tagline or stats above the featured market. */}
         <div className="flex items-center justify-end mb-5">
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
@@ -301,8 +300,8 @@ export function MarketApp() {
         {/* Footer — neutral, no decorative chrome */}
         <footer className="mt-16 pt-6 border-t border-border text-center text-xs text-muted-foreground">
           <p>
-            <span className="font-shrine text-foreground/80">Kannagi</span>
-            <span className="text-muted-foreground/70 ml-2">かんなぎ</span>
+            <span className="font-shrine text-foreground/80">Two-party binary bet</span>
+            <span className="text-muted-foreground/70 ml-2">testnet reference</span>
           </p>
         </footer>
       </main>

@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet API Routes (Hono HTTP server for market operations).
+ * Two-party binary bet API routes (Hono HTTP server for market operations).
  *
  * Supports two resolution modes:
  * - Single-key (demo): Local Schnorr signing via DualKeyStore

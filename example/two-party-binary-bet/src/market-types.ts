@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet Types
+ * Two-party binary bet types
  *
  * Core types for a Bitcoin-native two-party binary bet built on
  * Cashu HTLC + Nostr + TLSNotary. No Ethereum, no bridges, no KYC.

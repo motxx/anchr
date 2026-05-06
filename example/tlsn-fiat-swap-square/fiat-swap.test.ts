@@ -1,22 +1,22 @@
 import { expect } from "@std/expect";
 import {
-  buildWatariPredicate,
-  buildWatariResultData,
-  buildWatariSpec,
-  isWatariPredicate,
+  buildFiatSwapPredicate,
+  buildFiatSwapResultData,
+  buildFiatSwapSpec,
+  FIAT_SWAP_QUERY_TAG,
+  FIAT_SWAP_SCHEMA,
+  FiatSwapConfigError,
+  isFiatSwapPredicate,
   loadBuyerConfig,
   loadSellerConfig,
   predicateMatchesBuyerConfig,
   SQUARE_SANDBOX_HOST,
-  WATARI_QUERY_TAG,
-  WATARI_SCHEMA,
-  WatariConfigError,
-} from "./watari.ts";
+} from "./fiat-swap.ts";
 
 const proof = { id: "keyset", amount: 1000, secret: "secret", C: "commitment" };
 
-Deno.test("Watari predicate is pinned to Square Sandbox and exact payment fields", () => {
-  const predicate = buildWatariPredicate({
+Deno.test("fiat swap predicate is pinned to Square Sandbox and exact payment fields", () => {
+  const predicate = buildFiatSwapPredicate({
     relays: ["ws://localhost:7777"],
     mintUrl: "http://localhost:3338",
     oraclePubkey: "oracle",
@@ -43,17 +43,17 @@ Deno.test("Watari predicate is pinned to Square Sandbox and exact payment fields
       type: "jsonpath",
       expression: "payment.amount_money.amount",
       expected: "100",
-      description: "Square amount matches the Watari quote",
+      description: "Square amount matches the fiat swap quote",
     },
     {
       type: "jsonpath",
       expression: "payment.amount_money.currency",
       expected: "JPY",
-      description: "Square currency matches the Watari quote",
+      description: "Square currency matches the fiat swap quote",
     },
   ]);
-  expect(predicate.watari).toEqual({
-    tag: WATARI_QUERY_TAG,
+  expect(predicate.fiat_swap).toEqual({
+    tag: FIAT_SWAP_QUERY_TAG,
     amount_sats: 1_000,
     fiat_amount_minor: 100,
     fiat_currency: "JPY",
@@ -61,8 +61,8 @@ Deno.test("Watari predicate is pinned to Square Sandbox and exact payment fields
   });
 });
 
-Deno.test("Watari predicate can pin Square payment id and seller location", () => {
-  const predicate = buildWatariPredicate({
+Deno.test("fiat swap predicate can pin Square payment id and seller location", () => {
+  const predicate = buildFiatSwapPredicate({
     relays: ["ws://localhost:7777"],
     mintUrl: "http://localhost:3338",
     oraclePubkey: "oracle",
@@ -84,11 +84,11 @@ Deno.test("Watari predicate can pin Square payment id and seller location", () =
     expected: "LOC123",
     description: "Square location matches the seller",
   });
-  expect(predicate.watari.square_location_id).toBe("LOC123");
+  expect(predicate.fiat_swap.square_location_id).toBe("LOC123");
 });
 
-Deno.test("Watari spec uses Customer/Provider schema instead of reference-host payload", () => {
-  const spec = buildWatariSpec({
+Deno.test("fiat swap spec uses Customer/Provider schema instead of reference-host payload", () => {
+  const spec = buildFiatSwapSpec({
     relays: ["ws://localhost:7777"],
     mintUrl: "http://localhost:3338",
     oraclePubkey: "oracle",
@@ -100,9 +100,9 @@ Deno.test("Watari spec uses Customer/Provider schema instead of reference-host p
     locktimeSeconds: 3_600,
   });
 
-  expect(spec.schema).toBe(WATARI_SCHEMA);
-  expect(spec.description?.includes(WATARI_QUERY_TAG)).toBe(true);
-  expect(isWatariPredicate(spec.predicate)).toBe(true);
+  expect(spec.schema).toBe(FIAT_SWAP_SCHEMA);
+  expect(spec.description?.includes(FIAT_SWAP_QUERY_TAG)).toBe(true);
+  expect(isFiatSwapPredicate(spec.predicate)).toBe(true);
   expect(JSON.stringify(spec)).not.toContain("escrow_token");
   expect(JSON.stringify(spec)).not.toContain("requester_pubkey");
 });
@@ -111,23 +111,23 @@ Deno.test("seller config fails closed without source proofs", () => {
   expect(() =>
     loadSellerConfig({
       SQUARE_PAYMENT_LINK: "https://square.link/u/test",
-      WATARI_ORACLE_ENDPOINT: "http://localhost:3001",
-      WATARI_ORACLE_PUBKEY: "oracle",
+      FIAT_SWAP_ORACLE_ENDPOINT: "http://localhost:3001",
+      FIAT_SWAP_ORACLE_PUBKEY: "oracle",
     })
-  ).toThrow(WatariConfigError);
+  ).toThrow(FiatSwapConfigError);
 });
 
 Deno.test("seller config normalizes operator env", () => {
   const config = loadSellerConfig({
     NOSTR_RELAYS: "ws://localhost:7777, wss://relay.example",
     CASHU_MINT_URL: "http://localhost:3338/",
-    WATARI_ORACLE_ENDPOINT: "http://localhost:3001/",
-    WATARI_ORACLE_PUBKEY: "oracle-a",
-    WATARI_SOURCE_PROOFS_JSON: JSON.stringify([proof]),
+    FIAT_SWAP_ORACLE_ENDPOINT: "http://localhost:3001/",
+    FIAT_SWAP_ORACLE_PUBKEY: "oracle-a",
+    FIAT_SWAP_SOURCE_PROOFS_JSON: JSON.stringify([proof]),
     SQUARE_PAYMENT_LINK: "https://square.link/u/test",
-    WATARI_FIAT_CURRENCY: "jpy",
-    WATARI_AMOUNT_SATS: "2500",
-    WATARI_FIAT_AMOUNT_MINOR: "150",
+    FIAT_SWAP_FIAT_CURRENCY: "jpy",
+    FIAT_SWAP_AMOUNT_SATS: "2500",
+    FIAT_SWAP_FIAT_AMOUNT_MINOR: "150",
   });
 
   expect(config.relays).toEqual(["ws://localhost:7777", "wss://relay.example"]);
@@ -143,20 +143,20 @@ Deno.test("seller config normalizes operator env", () => {
 Deno.test("buyer config requires provider primitive key", () => {
   expect(() =>
     loadBuyerConfig({
-      WATARI_ORACLE_PUBKEY: "oracle",
+      FIAT_SWAP_ORACLE_PUBKEY: "oracle",
     })
-  ).toThrow(WatariConfigError);
+  ).toThrow(FiatSwapConfigError);
 });
 
 Deno.test("buyer predicate matching rejects mismatched fiat terms", () => {
   const config = loadBuyerConfig({
-    WATARI_ORACLE_PUBKEY: "oracle",
-    WATARI_PROVIDER_PRIVKEY: "nsec_or_hex",
-    WATARI_AMOUNT_SATS: "1000",
-    WATARI_FIAT_AMOUNT_MINOR: "100",
-    WATARI_FIAT_CURRENCY: "JPY",
+    FIAT_SWAP_ORACLE_PUBKEY: "oracle",
+    FIAT_SWAP_PROVIDER_PRIVKEY: "nsec_or_hex",
+    FIAT_SWAP_AMOUNT_SATS: "1000",
+    FIAT_SWAP_FIAT_AMOUNT_MINOR: "100",
+    FIAT_SWAP_FIAT_CURRENCY: "JPY",
   });
-  const predicate = buildWatariPredicate({
+  const predicate = buildFiatSwapPredicate({
     ...config,
     fiatAmountMinor: 200,
   });
@@ -166,16 +166,16 @@ Deno.test("buyer predicate matching rejects mismatched fiat terms", () => {
 
 Deno.test("buyer proof result data carries the exact Square payment target", () => {
   const config = loadBuyerConfig({
-    WATARI_ORACLE_PUBKEY: "oracle",
-    WATARI_PROVIDER_PRIVKEY: "nsec_or_hex",
-    WATARI_PAYMENT_ID: "pay_123",
-    WATARI_AMOUNT_SATS: "1000",
-    WATARI_FIAT_AMOUNT_MINOR: "100",
-    WATARI_FIAT_CURRENCY: "JPY",
+    FIAT_SWAP_ORACLE_PUBKEY: "oracle",
+    FIAT_SWAP_PROVIDER_PRIVKEY: "nsec_or_hex",
+    FIAT_SWAP_PAYMENT_ID: "pay_123",
+    FIAT_SWAP_AMOUNT_SATS: "1000",
+    FIAT_SWAP_FIAT_AMOUNT_MINOR: "100",
+    FIAT_SWAP_FIAT_CURRENCY: "JPY",
   });
 
-  expect(buildWatariResultData(config)).toEqual({
-    schema: WATARI_SCHEMA,
+  expect(buildFiatSwapResultData(config)).toEqual({
+    schema: FIAT_SWAP_SCHEMA,
     target_url: `https://${SQUARE_SANDBOX_HOST}/v2/payments/pay_123`,
     domain: SQUARE_SANDBOX_HOST,
     payment_id: "pay_123",

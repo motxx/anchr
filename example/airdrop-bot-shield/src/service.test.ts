@@ -3,8 +3,8 @@ import { expect } from "@std/expect";
 import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
 import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
 import { createProofGateService, openSqliteProofGateStore } from "@anchr/bounty/claim-gate";
-import { buildKatashiroApp } from "./server-routes.ts";
-import { identityPathForKatashiroCondition } from "./katashiro-policy.ts";
+import { buildAirdropBotShieldApp } from "./server-routes.ts";
+import { identityPathForAirdropCondition } from "./identity-policy.ts";
 import {
   buildGitHubAgeCondition,
   buildGitHubReposCondition,
@@ -14,8 +14,8 @@ import {
 
 function campaign(): AirdropCriteria {
   return {
-    id: "katashiro-test",
-    name: "Katashiro Test",
+    id: "airdrop-bot-shield-test",
+    name: "Airdrop Bot Shield Test",
     conditions: [buildGitHubAgeCondition(30), buildGitHubReposCondition(2)],
     token_amount_per_claim: 1000,
     total_budget_sats: 2000,
@@ -39,13 +39,13 @@ function fakeValidator(body: unknown) {
   });
 }
 
-describe("KatashiroService", () => {
+describe("ProofGateService for airdrop bot shield", () => {
   it("approves a TLSN-verified GitHub claim and releases only the preimage", async () => {
     const store = openSqliteProofGateStore<ProofCondition>(":memory:");
     const service = createProofGateService<ProofCondition>({
       store,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: identityPathForKatashiroCondition,
+      identityPathForCondition: identityPathForAirdropCondition,
       accountAgeConditionTypes: new Set(["github_account_age"]),
       validateTlsnFn: fakeValidator({
         id: 123,
@@ -55,7 +55,7 @@ describe("KatashiroService", () => {
     });
     await service.createCampaign(campaign());
 
-    const result = await service.submitClaim("katashiro-test", {
+    const result = await service.submitClaim("airdrop-bot-shield-test", {
       claimant_pubkey: "02" + "11".repeat(32),
       proofs: [
         { condition_index: 0, presentation: "proof-a" },
@@ -74,7 +74,7 @@ describe("KatashiroService", () => {
     const service = createProofGateService<ProofCondition>({
       store,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: identityPathForKatashiroCondition,
+      identityPathForCondition: identityPathForAirdropCondition,
       accountAgeConditionTypes: new Set(["github_account_age"]),
       validateTlsnFn: fakeValidator({
         id: 456,
@@ -84,7 +84,7 @@ describe("KatashiroService", () => {
     });
     await service.createCampaign(campaign());
 
-    await service.submitClaim("katashiro-test", {
+    await service.submitClaim("airdrop-bot-shield-test", {
       claimant_pubkey: "02" + "22".repeat(32),
       proofs: [
         { condition_index: 0, presentation: "proof-c" },
@@ -92,7 +92,7 @@ describe("KatashiroService", () => {
       ],
     });
 
-    await expect(service.submitClaim("katashiro-test", {
+    await expect(service.submitClaim("airdrop-bot-shield-test", {
       claimant_pubkey: "02" + "33".repeat(32),
       proofs: [
         { condition_index: 0, presentation: "proof-e" },
@@ -107,7 +107,7 @@ describe("KatashiroService", () => {
     const service = createProofGateService<ProofCondition>({
       store,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: identityPathForKatashiroCondition,
+      identityPathForCondition: identityPathForAirdropCondition,
       accountAgeConditionTypes: new Set(["github_account_age"]),
       validateTlsnFn: fakeValidator({
         id: 789,
@@ -118,8 +118,8 @@ describe("KatashiroService", () => {
     await service.createCampaign(campaign());
 
     const claimant_pubkey = "02" + "44".repeat(32);
-    const reserved = await service.reserveClaim("katashiro-test", claimant_pubkey);
-    const result = await service.submitClaim("katashiro-test", {
+    const reserved = await service.reserveClaim("airdrop-bot-shield-test", claimant_pubkey);
+    const result = await service.submitClaim("airdrop-bot-shield-test", {
       claim_id: reserved.id,
       claimant_pubkey,
       proofs: [
@@ -135,17 +135,17 @@ describe("KatashiroService", () => {
   });
 });
 
-describe("Katashiro routes", () => {
+describe("airdrop bot shield routes", () => {
   it("requires admin auth to create campaigns and exposes status", async () => {
     const store = openSqliteProofGateStore<ProofCondition>(":memory:");
     const service = createProofGateService<ProofCondition>({
       store,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: identityPathForKatashiroCondition,
+      identityPathForCondition: identityPathForAirdropCondition,
       accountAgeConditionTypes: new Set(["github_account_age"]),
       validateTlsnFn: fakeValidator({ id: 1, created_at: "2020-01-01T00:00:00Z", public_repos: 3 }),
     });
-    const app = buildKatashiroApp({ service, adminToken: "secret".repeat(8), productionReady: true });
+    const app = buildAirdropBotShieldApp({ service, adminToken: "secret".repeat(8), productionReady: true });
 
     const denied = await app.request("/airdrop/create", {
       method: "POST",
@@ -164,7 +164,7 @@ describe("Katashiro routes", () => {
     });
     expect(created.status).toBe(201);
 
-    const status = await app.request("/airdrop/katashiro-test/status");
+    const status = await app.request("/airdrop/airdrop-bot-shield-test/status");
     expect(status.status).toBe(200);
     const body = await status.json();
     expect(body.remaining_claims).toBe(2);

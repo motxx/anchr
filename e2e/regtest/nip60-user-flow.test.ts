@@ -1,5 +1,5 @@
 /**
- * E2E: NIP-60-backed user participating in 巫(Kannagi) two-party binary bet.
+ * E2E: NIP-60-backed user participating in two-party binary bet.
  *
  * Demonstrates the user-facing path:
  *   1. Open a fresh NIP-60 wallet (real Nostr nsec, real relay).
@@ -24,12 +24,16 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { generateSecretKey } from "nostr-tools/pure";
 import {
-  registerMarketRoutes,
   createMarketState,
   type MarketRouteContext,
   type MarketState,
+  registerMarketRoutes,
 } from "../../example/two-party-binary-bet/src/server-routes.ts";
-import { checkInfraReady, createWallet, isRelayReachable } from "../helpers/regtest.ts";
+import {
+  checkInfraReady,
+  createWallet,
+  isRelayReachable,
+} from "../helpers/regtest.ts";
 import { Nip60UserBot } from "../../scripts/bot-fleet/nip60-user.ts";
 import { POLYMARKET_SEED_MARKETS } from "../../scripts/bot-fleet/markets.ts";
 import { MarketMakerBot } from "../../scripts/bot-fleet/bot.ts";
@@ -38,21 +42,27 @@ import process from "node:process";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const RELAY_URL = process.env.NOSTR_RELAY_URL ?? "ws://localhost:7777";
 
-const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable(RELAY_URL);
+const INFRA_READY = await checkInfraReady(MINT_URL) &&
+  await isRelayReachable(RELAY_URL);
 
-const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
+const passthrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
 
 function buildMarketApp(state: MarketState) {
   // deno-lint-ignore no-explicit-any
   const app = new Hono<any>();
-  const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+  const ctx: MarketRouteContext = {
+    writeAuth: passthrough,
+    rateLimit: passthrough,
+  };
   registerMarketRoutes(app, ctx, state);
   return app;
 }
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-suite("e2e: NIP-60 user participates in 巫(Kannagi)", () => {
+suite("e2e: NIP-60 user participates in two-party binary bet", () => {
   test("fund → bet → submit → wallet state persists across reopens", async () => {
     const state = createMarketState();
     state.getCashuWallet = async () => createWallet(MINT_URL);
@@ -60,7 +70,10 @@ suite("e2e: NIP-60 user participates in 巫(Kannagi)", () => {
 
     const port = 5001 + Math.floor(Math.random() * 1000);
     const ac = new AbortController();
-    const server = Deno.serve({ port, signal: ac.signal, onListen: () => {} }, app.fetch);
+    const server = Deno.serve(
+      { port, signal: ac.signal, onListen: () => {} },
+      app.fetch,
+    );
     const serverUrl = `http://localhost:${port}`;
 
     try {
@@ -126,7 +139,9 @@ suite("e2e: NIP-60 user participates in 巫(Kannagi)", () => {
         expect(submitted).toBe(1);
 
         // === Verify pair locked and user's NIP-60 wallet shrunk by BET ===
-        const detail = await fetch(`${serverUrl}/markets/${market.id}?pubkey=${user.nostrPubkey}`)
+        const detail = await fetch(
+          `${serverUrl}/markets/${market.id}?pubkey=${user.nostrPubkey}`,
+        )
           .then((r) => r.json()) as { user_pairs?: Array<{ status: string }> };
         expect(detail.user_pairs?.length).toBe(1);
         expect(detail.user_pairs?.[0]?.status).toBe("locked");

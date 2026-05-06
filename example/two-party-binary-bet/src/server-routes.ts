@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet HTTP route registration.
+ * Two-party binary bet HTTP route registration.
  *
  * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
  * pattern from worker-api-routes.ts. In-memory market store + matching queue +
@@ -23,8 +23,8 @@ import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queu
 import type {
   FaucetTokenRecord,
   HydratedState,
-  KannagiPersist,
-} from "./kannagi-store.ts";
+  MarketPersist,
+} from "./market-store.ts";
 import {
   type DualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
@@ -103,7 +103,7 @@ export function parseFaucetTokens(raw: string | undefined): FaucetTokenRecord[] 
 
 export async function seedFaucetTokensFromEnv(state: MarketState): Promise<number> {
   let seeded = 0;
-  for (const token of parseFaucetTokens(Deno.env.get("KANNAGI_FAUCET_TOKENS"))) {
+  for (const token of parseFaucetTokens(Deno.env.get("MARKET_FAUCET_TOKENS"))) {
     const existing = state.faucetTokens.get(token.id);
     if (existing?.claimed_at) continue;
     if (!existing) seeded++;
@@ -121,9 +121,9 @@ function unclaimedFaucetTokens(state: MarketState): FaucetTokenRecord[] {
 
 export function getFaucetStatus(state: MarketState, mintUrl: string | null) {
   const unclaimed = unclaimedFaucetTokens(state);
-  const externalUrl = Deno.env.get("KANNAGI_FAUCET_URL")?.trim() || undefined;
-  const explicitMode = Deno.env.get("KANNAGI_FAUCET_MODE")?.trim();
-  const maxAmount = Number(Deno.env.get("KANNAGI_FAUCET_MAX_AMOUNT_SATS") ?? "1000");
+  const externalUrl = Deno.env.get("MARKET_FAUCET_URL")?.trim() || undefined;
+  const explicitMode = Deno.env.get("MARKET_FAUCET_MODE")?.trim();
+  const maxAmount = Number(Deno.env.get("MARKET_FAUCET_MAX_AMOUNT_SATS") ?? "1000");
   const max_amount_sats = Number.isFinite(maxAmount) && maxAmount > 0 ? maxAmount : 1000;
   const defaultAmount = unclaimed.find((token) => token.amount_sats > 0)?.amount_sats ??
     max_amount_sats;
@@ -189,15 +189,15 @@ export interface MarketState {
   pendingExchangeTokens: Map<string, string>;
   /**
    * Optional public-testnet token bank. Operators preload one-time cashuB
-   * tokens via KANNAGI_FAUCET_TOKENS; the server dispenses each token once.
+   * tokens via MARKET_FAUCET_TOKENS; the server dispenses each token once.
    */
   faucetTokens: Map<string, FaucetTokenRecord>;
   /**
    * Write-through persistence — call after each mutation to the maps above.
    * Defaults to a no-op for tests; production injects a SQLite-backed
-   * implementation via `openKannagiStore`.
+   * implementation via `openMarketStore`.
    */
-  persist: KannagiPersist;
+  persist: MarketPersist;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
   matchingQueue: MatchingQueue;
@@ -241,7 +241,7 @@ export interface MarketState {
 }
 
 
-const NOOP_PERSIST: KannagiPersist = {
+const NOOP_PERSIST: MarketPersist = {
   market: () => Promise.resolve(),
   pair: () => Promise.resolve(),
   preimage: () => Promise.resolve(),
@@ -270,7 +270,7 @@ export function createMarketState(opts?: {
    */
   initial?: HydratedState;
   /** Write-through persistence — defaults to no-op (tests / in-memory). */
-  persist?: KannagiPersist;
+  persist?: MarketPersist;
 }): MarketState {
   const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
   return {
@@ -1085,9 +1085,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // POST /markets/:id/submit-resolution — anyone can submit a TLSNotary
   // proof of the truth source's response. The server cryptographically
   // verifies the proof, evaluates the condition against the verified body,
-  // and settles the market. This is the trustless settlement path: no one
-  // — not even the server operator — needs to be trusted to read the URL
-  // honestly.
+  // and settles the market. The URL read is externally checkable through
+  // the TLSNotary proof; the operator or Oracle set still applies the
+  // configured condition and settlement action.
   //
   // Race semantics: first valid proof wins. The cryptographic binding is
   // (server name, response body, session timestamp); a proof captured at

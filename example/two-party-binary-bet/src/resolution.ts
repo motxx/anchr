@@ -33,7 +33,7 @@ export interface FrostPerProofResolutionResult {
  *   NO wins  -> outcome "b" (hash_b = hash_no)
  *
  * The winning preimage is returned. The losing preimage is permanently deleted
- * and can never be retrieved -- this is what makes the swap trustless.
+ * and can never be retrieved, so only one outcome path remains usable.
  *
  * @param market_id - Market / swap identifier
  * @param outcome - Determined outcome ("yes" or "no")

@@ -46,15 +46,18 @@ preimage. Oracle does NOT emit a FROST signature share.
 
 - `e2e/tlsn/tlsn.test.ts` — `INV-01: rejects a mutated TLSNotary presentation`.
 
-### INV-02: Oracle can't release preimage without valid proof
+### INV-02: Oracle wrapper does not release preimage when verification fails
 
 **Status:** `enforced`
 
-**Claim:** The Oracle's HTTP wrapper never returns the Cashu HTLC preimage in
-response to a `POST /queries/:id/result` unless verification passes.
+**Claim:** The honest Oracle HTTP wrapper never returns the Cashu HTLC preimage
+in response to a `POST /queries/:id/result` unless verification passes.
 Protocol-layer outcome: regardless of which cryptographic check fails (missing
 presentation, malformed JSON, wrong signature, expired presentation, empty
-worker_pubkey), the response body does not contain `preimage`.
+worker_pubkey), the response body does not contain `preimage`. This is an
+implementation invariant, not a Byzantine-oracle guarantee: a malicious solo
+Oracle or a colluding FROST threshold can still reveal an unlock secret or sign
+the wrong outcome outside this wrapper.
 
 **Attack:** Submit adversarial payloads to `POST /queries/:id/result`: missing
 presentation, malformed JSON, invalid worker_pubkey, oracle not yet registered.

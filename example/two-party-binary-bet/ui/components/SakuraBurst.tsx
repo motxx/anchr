@@ -94,8 +94,7 @@ interface SakuraBurstProps {
  * places a bet, or a market resolves. Each `trigger` increment spawns a
  * fresh batch of petals that fall once and clean themselves up.
  *
- * Brand metaphor: 神和ぎ (kannagi) = the spirit-pacifying ritual; the
- * petals fall when an outcome is decided. Otherwise the chrome is silent.
+ * The petals fall when an outcome is decided. Otherwise the chrome is silent.
  */
 export function SakuraBurst({ trigger, count = 36 }: SakuraBurstProps) {
   // Each fire gets a unique key so React unmounts the previous batch.

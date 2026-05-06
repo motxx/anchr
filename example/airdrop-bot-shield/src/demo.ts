@@ -1,5 +1,5 @@
 /**
- * 形代(Katashiro) — Demo (Airdrop bot shield)
+ * Airdrop bot shield demo
  *
  * Simulates the full airdrop claim flow:
  *   1. Project creates an airdrop campaign with GitHub-based criteria
@@ -306,12 +306,12 @@ console.log("by an additional $50-150 per identity, making attacks even less eco
 
 separator("Summary");
 
-console.log("形代(Katashiro) uses Anchr's TLSNotary + Cashu HTLC stack to:");
+console.log("Airdrop Bot Shield uses Anchr's TLSNotary + Cashu HTLC stack to:");
 console.log();
 console.log("  1. PROVE real-world identity attributes without revealing identity");
 console.log("     (TLSNotary cryptographic proofs of GitHub/Twitter API responses)");
 console.log();
-console.log("  2. DISTRIBUTE tokens trustlessly via Cashu HTLC escrow");
+console.log("  2. DISTRIBUTE tokens through oracle-gated Cashu HTLC escrow");
 console.log("     (NUT-14 hashlock + P2PK, non-custodial, atomic settlement)");
 console.log();
 console.log("  3. RESIST Sybil attacks through economic cost barriers");

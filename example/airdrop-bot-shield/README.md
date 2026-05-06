@@ -1,6 +1,4 @@
-# 形代(Katashiro)
-
-> *Katashiro* — a paper effigy in Japanese tradition that absorbs a person's impurities so the person stays anonymous. Here: a cryptographic stand-in for identity.
+# Airdrop Bot Shield
 
 **Airdrop bot shield.**
 
@@ -29,7 +27,7 @@ The core issue: **on-chain behavior is trivially faked**. A bot can bridge token
 
 ## Solution
 
-Anchr's TLSNotary proof system lets airdrop claimants cryptographically prove attributes from existing Web2 accounts (GitHub, Twitter, etc.) without revealing their identity. Combined with Cashu HTLC escrow, this creates a Sybil-resistant pipeline for trustless token distribution.
+Anchr's TLSNotary proof system lets airdrop claimants cryptographically prove attributes from existing Web2 accounts (GitHub, Twitter, etc.) without revealing their identity. Combined with Cashu HTLC escrow, this creates a Sybil-resistant pipeline where distribution is gated by a chosen Oracle or t-of-n Oracle set rather than by a campaign-operated claims server.
 
 **Key insight:** A GitHub account with 3 years of history, 50+ repos, and 500+ contributions is economically impractical to fake. A Twitter account with 1,000+ organic followers costs far more than an airdrop allocation is worth. TLSNotary lets us verify these attributes cryptographically without requiring users to link their Web2 identity to their wallet.
 
@@ -162,7 +160,7 @@ When conditions are combined, the farming cost exceeds the airdrop value. This m
 ### `POST /airdrop/create`
 
 Create a new airdrop campaign with eligibility criteria.
-Requires `Authorization: Bearer $KATASHIRO_ADMIN_TOKEN`.
+Requires `Authorization: Bearer $AIRDROP_BOT_SHIELD_ADMIN_TOKEN`.
 
 ```json
 {
@@ -299,9 +297,9 @@ The demo simulates the full flow with mock data:
 Local development:
 
 ```bash
-KATASHIRO_ADMIN_TOKEN="$(openssl rand -hex 32)" \
-KATASHIRO_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
-KATASHIRO_DB_PATH=.katashiro/katashiro.db \
+AIRDROP_BOT_SHIELD_ADMIN_TOKEN="$(openssl rand -hex 32)" \
+AIRDROP_BOT_SHIELD_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
+AIRDROP_BOT_SHIELD_DB_PATH=.airdrop-bot-shield/airdrop-bot-shield.db \
 deno run --allow-env --allow-net --allow-read --allow-write --allow-run --allow-ffi \
   example/airdrop-bot-shield/server.ts
 ```
@@ -310,14 +308,14 @@ Mainnet mode refuses to start unless release guards pass:
 
 ```bash
 NODE_ENV=production \
-KATASHIRO_NETWORK=mainnet \
-KATASHIRO_PUBLIC_BASE_URL=https://katashiro.example.com \
+AIRDROP_BOT_SHIELD_NETWORK=mainnet \
+AIRDROP_BOT_SHIELD_PUBLIC_BASE_URL=https://airdrop-bot-shield.example.com \
 CASHU_MINT_URL=https://mint.example.com \
-KATASHIRO_REQUESTER_REFUND_PUBKEY=02... \
-KATASHIRO_SOURCE_CASHU_TOKENS='cashuB...' \
-KATASHIRO_ADMIN_TOKEN="$(openssl rand -hex 32)" \
-KATASHIRO_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
-KATASHIRO_DB_PATH=/data/katashiro.db \
+AIRDROP_BOT_SHIELD_REQUESTER_REFUND_PUBKEY=02... \
+AIRDROP_BOT_SHIELD_SOURCE_CASHU_TOKENS='cashuB...' \
+AIRDROP_BOT_SHIELD_ADMIN_TOKEN="$(openssl rand -hex 32)" \
+AIRDROP_BOT_SHIELD_NULLIFIER_SECRET="$(openssl rand -hex 32)" \
+AIRDROP_BOT_SHIELD_DB_PATH=/data/airdrop-bot-shield.db \
 deno run --allow-env --allow-net --allow-read --allow-write --allow-run --allow-ffi \
   example/airdrop-bot-shield/server.ts
 ```
@@ -328,11 +326,11 @@ Mainnet requirements:
 - HTTPS public base URL.
 - HTTPS non-local Cashu mint URL.
 - Cashu HTLC settlement configuration:
-  - `KATASHIRO_REQUESTER_REFUND_PUBKEY` — operator refund pubkey.
-  - `KATASHIRO_SOURCE_CASHU_TOKENS` — whitespace/comma-separated funded
+  - `AIRDROP_BOT_SHIELD_REQUESTER_REFUND_PUBKEY` — operator refund pubkey.
+  - `AIRDROP_BOT_SHIELD_SOURCE_CASHU_TOKENS` — whitespace/comma-separated funded
     source tokens. The service locks each approved claim through
     `@anchr/core-cashu`.
-  - `KATASHIRO_HTLC_LOCKTIME_SECONDS` — optional Unix timestamp; defaults to
+  - `AIRDROP_BOT_SHIELD_HTLC_LOCKTIME_SECONDS` — optional Unix timestamp; defaults to
     seven days from service start.
 - Durable SQLite DB path, not `:memory:`.
 - Strong admin token and nullifier secret.
@@ -353,7 +351,7 @@ Mainnet requirements:
 
 - **src/airdrop-criteria.ts** — TypeScript types, condition builders, and validation for airdrop eligibility criteria
 - **src/claim-verifier.ts** — Verification logic: evaluates TLSNotary proofs against airdrop conditions
-- **src/katashiro-policy.ts** — Katashiro-specific account identity extraction policy
+- **src/identity-policy.ts** — account identity extraction policy for this example
 - **src/server-routes.ts** — Hono HTTP API
 - **src/release-config.ts** — Mainnet startup guardrails
 - **server.ts** — HTTP service entrypoint

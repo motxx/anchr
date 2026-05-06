@@ -33,19 +33,19 @@ const SubmitClaimSchema = z.object({
   })).min(1),
 });
 
-export interface KatashiroRouteOptions {
+export interface AirdropBotShieldRouteOptions {
   service: ProofGateService<ProofCondition>;
   adminToken?: string;
   productionReady?: boolean;
 }
 
-export function buildKatashiroApp(opts: KatashiroRouteOptions): Hono {
+export function buildAirdropBotShieldApp(opts: AirdropBotShieldRouteOptions): Hono {
   const app = new Hono();
 
   app.get("/health", (c) =>
     c.json({
       ok: true,
-      service: "katashiro",
+      service: "airdrop-bot-shield",
       tlsn_verifier_available: isTlsnVerifierAvailable(),
     })
   );

@@ -21,16 +21,16 @@ export function Header({ onLogoClick }: HeaderProps) {
           className="flex items-center gap-2.5 min-w-0 rounded-md -mx-1 px-1 py-0.5 hover:bg-foreground/5 transition-colors"
           aria-label="Go to markets list"
         >
-          {/* Brand mark — torii in a sumi square. No decorative ornaments. */}
+          {/* App mark — compact and neutral. */}
           <div className="shrink-0 w-8 h-8 rounded-lg bg-foreground/5 ring-1 ring-foreground/10 flex items-center justify-center">
             <ToriiIcon className="text-foreground" size={16} />
           </div>
           <div className="flex items-baseline gap-2 min-w-0">
             <span className="font-shrine text-xl font-semibold text-foreground tracking-tight leading-none">
-              Kannagi
+              Binary Bet
             </span>
             <span className="font-shrine text-xs text-muted-foreground hidden sm:inline">
-              かんなぎ
+              testnet
             </span>
           </div>
         </button>

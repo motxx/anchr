@@ -1,5 +1,5 @@
 /**
- * 渡(Watari) — Seller
+ * TLSN Fiat Swap — Seller / Customer
  *
  * Customer-side flow: lock Cashu proofs, publish a Nostr job request, select
  * a Provider quote, and wait for the Provider's Square Sandbox TLSN result.
@@ -7,14 +7,14 @@
 
 import { createCustomer, createHttpOracleClient } from "anchr-sdk";
 import {
-  buildWatariSpec,
+  buildFiatSwapSpec,
+  FiatSwapConfigError,
   loadSellerConfig,
   type SellerConfig,
-  WatariConfigError,
-} from "./watari.ts";
+} from "./fiat-swap.ts";
 
 function printConfig(config: SellerConfig) {
-  console.log("=== 渡(Watari) Testnet — Seller / Customer ===\n");
+  console.log("=== TLSN Fiat Swap Testnet — Seller / Customer ===\n");
   console.log(`Relays:   ${config.relays.join(", ")}`);
   console.log(`Mint:     ${config.mintUrl}`);
   console.log(`Oracle:   ${config.oraclePubkey}`);
@@ -46,9 +46,11 @@ try {
     resultTimeoutMs: config.resultTimeoutMs,
   });
 
-  console.log("Publishing Watari request and waiting for Provider quotes...");
+  console.log(
+    "Publishing TLSN fiat swap request and waiting for Provider quotes...",
+  );
   const result = await customer.request({
-    spec: buildWatariSpec(config),
+    spec: buildFiatSwapSpec(config),
     payment: {
       maxAmount: config.amountSats,
       locktimeSeconds: config.locktimeSeconds,
@@ -70,7 +72,7 @@ try {
     }`,
   );
 } catch (err) {
-  if (err instanceof WatariConfigError) {
+  if (err instanceof FiatSwapConfigError) {
     console.error(`Config error: ${err.message}`);
   } else {
     console.error(err instanceof Error ? err.message : String(err));

@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet Oracle (Resolution Logic)
+ * Two-party binary bet oracle (resolution logic)
  *
  * The oracle resolves markets by generating a TLSNotary proof from an
  * authoritative URL and evaluating the resolution condition against the
@@ -46,7 +46,7 @@ export function verifyPreimage(preimage: string, expectedHash: string): boolean 
  * Resolve a two-party binary bet from already-verified TLSNotary data.
  *
  * The caller is responsible for cryptographic verification (see
- * `verifyMarketResolution` for the trustless path that does the crypto
+ * `verifyMarketResolution` for the path that verifies the TLSNotary proof
  * itself). This function trusts the caller's claim of `verifiedBody` /
  * `verifiedServerName` / `verifiedTimestamp` — useful for tests and
  * for callers that have already validated the presentation upstream.

@@ -1,5 +1,5 @@
 /**
- * 渡(Watari) — Buyer
+ * TLSN Fiat Swap — Buyer / Provider
  *
  * Provider-side flow: listen for Customer job requests, quote matching
  * Square Sandbox payment predicates, publish a TLSN result after selection,
@@ -8,15 +8,15 @@
 
 import { createProvider } from "anchr-sdk";
 import {
-  buildWatariResultData,
-  isWatariPredicate,
+  buildFiatSwapResultData,
+  FIAT_SWAP_SCHEMA,
+  FiatSwapConfigError,
+  isFiatSwapPredicate,
   loadBuyerConfig,
   predicateMatchesBuyerConfig,
   readProofBase64,
   tlsnProofCommand,
-  WATARI_SCHEMA,
-  WatariConfigError,
-} from "./watari.ts";
+} from "./fiat-swap.ts";
 
 try {
   const config = loadBuyerConfig();
@@ -30,7 +30,7 @@ try {
     preimageTimeoutMs: config.preimageTimeoutMs,
   });
 
-  console.log("=== 渡(Watari) Testnet — Buyer / Provider ===\n");
+  console.log("=== TLSN Fiat Swap Testnet — Buyer / Provider ===\n");
   console.log(`Provider: ${provider.pubkey}`);
   console.log(`Relays:   ${config.relays.join(", ")}`);
   console.log(`Mint:     ${config.mintUrl}`);
@@ -50,7 +50,7 @@ try {
     console.log();
   } else {
     console.log(
-      "Set WATARI_PAYMENT_ID after paying the Square Sandbox link to produce proof data.",
+      "Set FIAT_SWAP_PAYMENT_ID after paying the Square Sandbox link to produce proof data.",
     );
     console.log();
   }
@@ -62,14 +62,16 @@ try {
   Deno.addSignalListener("SIGTERM", stop);
 
   await provider.serve(async (request) => {
-    if (request.spec.schema !== WATARI_SCHEMA) return null;
-    if (!isWatariPredicate(request.spec.predicate)) return null;
+    if (request.spec.schema !== FIAT_SWAP_SCHEMA) return null;
+    if (!isFiatSwapPredicate(request.spec.predicate)) return null;
     if (!predicateMatchesBuyerConfig(request.spec.predicate, config)) {
       return null;
     }
     if (config.amountSats > request.maxAmountSats) return null;
 
-    console.log(`Matched Watari request from ${request.customerPubkey}`);
+    console.log(
+      `Matched TLSN fiat swap request from ${request.customerPubkey}`,
+    );
     console.log(`Quoting ${config.amountSats} sats...`);
 
     return {
@@ -77,19 +79,19 @@ try {
       produce: async () => {
         const proof = await readProofBase64(config);
         if (!proof) {
-          throw new WatariConfigError(
-            "WATARI_PROOF_FILE or WATARI_PROOF_BASE64 is required after selection",
+          throw new FiatSwapConfigError(
+            "FIAT_SWAP_PROOF_FILE or FIAT_SWAP_PROOF_BASE64 is required after selection",
           );
         }
         return {
-          data: buildWatariResultData(config),
+          data: buildFiatSwapResultData(config),
           proof,
         };
       },
     };
   });
 } catch (err) {
-  if (err instanceof WatariConfigError) {
+  if (err instanceof FiatSwapConfigError) {
     console.error(`Config error: ${err.message}`);
   } else {
     console.error(err instanceof Error ? err.message : String(err));

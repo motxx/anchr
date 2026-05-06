@@ -1,13 +1,13 @@
 import type { CashuProof, Spec } from "anchr-sdk";
 
-export const WATARI_SCHEMA = "io.anchr.tlsn-https.v1";
-export const WATARI_QUERY_TAG = "Watari Testnet Square payment";
+export const FIAT_SWAP_SCHEMA = "io.anchr.tlsn-https.v1";
+export const FIAT_SWAP_QUERY_TAG = "TLSN fiat swap Square payment";
 export const SQUARE_SANDBOX_HOST = "connect.squareupsandbox.com";
 
 const DEFAULT_RELAYS = "ws://localhost:7777";
 const DEFAULT_MINT_URL = "http://localhost:3338";
 
-export interface SharedWatariConfig {
+export interface SharedFiatSwapConfig {
   relays: string[];
   mintUrl: string;
   oraclePubkey: string;
@@ -21,7 +21,7 @@ export interface SharedWatariConfig {
   locktimeSeconds: number;
 }
 
-export interface SellerConfig extends SharedWatariConfig {
+export interface SellerConfig extends SharedFiatSwapConfig {
   oracleEndpoint: string;
   oracleApiKey?: string;
   sourceProofs: CashuProof[];
@@ -30,7 +30,7 @@ export interface SellerConfig extends SharedWatariConfig {
   resultTimeoutMs: number;
 }
 
-export interface BuyerConfig extends SharedWatariConfig {
+export interface BuyerConfig extends SharedFiatSwapConfig {
   providerPrivKey: string;
   proofFile?: string;
   proofBase64?: string;
@@ -39,20 +39,20 @@ export interface BuyerConfig extends SharedWatariConfig {
   notaryUrl?: string;
 }
 
-export interface WatariJsonPathCondition {
+export interface FiatSwapJsonPathCondition {
   type: "jsonpath";
   expression: string;
   expected: string;
   description: string;
 }
 
-export interface WatariPredicate {
+export interface FiatSwapPredicate {
   target_url: string;
   domain_hint: typeof SQUARE_SANDBOX_HOST;
-  conditions: WatariJsonPathCondition[];
+  conditions: FiatSwapJsonPathCondition[];
   max_attestation_age_seconds: number;
-  watari: {
-    tag: typeof WATARI_QUERY_TAG;
+  fiat_swap: {
+    tag: typeof FIAT_SWAP_QUERY_TAG;
     amount_sats: number;
     fiat_amount_minor: number;
     fiat_currency: string;
@@ -62,8 +62,8 @@ export interface WatariPredicate {
   };
 }
 
-export interface WatariResultData {
-  schema: typeof WATARI_SCHEMA;
+export interface FiatSwapResultData {
+  schema: typeof FIAT_SWAP_SCHEMA;
   target_url: string;
   domain: typeof SQUARE_SANDBOX_HOST;
   payment_id: string;
@@ -74,10 +74,10 @@ export interface WatariResultData {
   };
 }
 
-export class WatariConfigError extends Error {
+export class FiatSwapConfigError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "WatariConfigError";
+    this.name = "FiatSwapConfigError";
   }
 }
 
@@ -85,7 +85,7 @@ type Env = Record<string, string | undefined>;
 
 function required(env: Env, name: string): string {
   const value = env[name]?.trim();
-  if (!value) throw new WatariConfigError(`${name} is required`);
+  if (!value) throw new FiatSwapConfigError(`${name} is required`);
   return value;
 }
 
@@ -99,16 +99,16 @@ function positiveInt(env: Env, name: string, defaultValue: number): number {
   if (!raw) return defaultValue;
   const value = Number(raw);
   if (!Number.isInteger(value) || value <= 0) {
-    throw new WatariConfigError(`${name} must be a positive integer`);
+    throw new FiatSwapConfigError(`${name} must be a positive integer`);
   }
   return value;
 }
 
 function list(env: Env, name: string, defaultValue?: string): string[] {
   const raw = optional(env, name) ?? defaultValue;
-  if (!raw) throw new WatariConfigError(`${name} is required`);
+  if (!raw) throw new FiatSwapConfigError(`${name} is required`);
   const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
-  if (values.length === 0) throw new WatariConfigError(`${name} is empty`);
+  if (values.length === 0) throw new FiatSwapConfigError(`${name} is empty`);
   return values;
 }
 
@@ -120,7 +120,7 @@ function assertHttpUrl(value: string, name: string): string {
     }
     return url.toString().replace(/\/$/, "");
   } catch {
-    throw new WatariConfigError(`${name} must be an http(s) URL`);
+    throw new FiatSwapConfigError(`${name} must be an http(s) URL`);
   }
 }
 
@@ -132,39 +132,39 @@ function assertRelayUrl(value: string, name: string): string {
     }
     return url.toString().replace(/\/$/, "");
   } catch {
-    throw new WatariConfigError(`${name} entries must be ws(s) URLs`);
+    throw new FiatSwapConfigError(`${name} entries must be ws(s) URLs`);
   }
 }
 
 function normalizeCurrency(value: string): string {
   const currency = value.trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) {
-    throw new WatariConfigError(
-      "WATARI_FIAT_CURRENCY must be a 3-letter ISO currency code",
+    throw new FiatSwapConfigError(
+      "FIAT_SWAP_FIAT_CURRENCY must be a 3-letter ISO currency code",
     );
   }
   return currency;
 }
 
 function parseSourceProofs(env: Env): CashuProof[] {
-  const raw = required(env, "WATARI_SOURCE_PROOFS_JSON");
+  const raw = required(env, "FIAT_SWAP_SOURCE_PROOFS_JSON");
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new WatariConfigError(
-      "WATARI_SOURCE_PROOFS_JSON must be a JSON array of Cashu proofs",
+    throw new FiatSwapConfigError(
+      "FIAT_SWAP_SOURCE_PROOFS_JSON must be a JSON array of Cashu proofs",
     );
   }
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new WatariConfigError(
-      "WATARI_SOURCE_PROOFS_JSON must contain at least one Cashu proof",
+    throw new FiatSwapConfigError(
+      "FIAT_SWAP_SOURCE_PROOFS_JSON must contain at least one Cashu proof",
     );
   }
   return parsed;
 }
 
-function sharedConfig(env: Env): SharedWatariConfig {
+function sharedConfig(env: Env): SharedFiatSwapConfig {
   const relays = list(env, "NOSTR_RELAYS", DEFAULT_RELAYS).map((relay) =>
     assertRelayUrl(relay, "NOSTR_RELAYS")
   );
@@ -174,38 +174,42 @@ function sharedConfig(env: Env): SharedWatariConfig {
       optional(env, "CASHU_MINT_URL") ?? DEFAULT_MINT_URL,
       "CASHU_MINT_URL",
     ),
-    oraclePubkey: required(env, "WATARI_ORACLE_PUBKEY"),
+    oraclePubkey: required(env, "FIAT_SWAP_ORACLE_PUBKEY"),
     paymentLink: optional(env, "SQUARE_PAYMENT_LINK"),
-    paymentId: optional(env, "WATARI_PAYMENT_ID"),
-    amountSats: positiveInt(env, "WATARI_AMOUNT_SATS", 1_000),
-    fiatAmountMinor: positiveInt(env, "WATARI_FIAT_AMOUNT_MINOR", 100),
-    fiatCurrency: normalizeCurrency(env.WATARI_FIAT_CURRENCY ?? "JPY"),
-    squareLocationId: optional(env, "WATARI_SQUARE_LOCATION_ID"),
+    paymentId: optional(env, "FIAT_SWAP_PAYMENT_ID"),
+    amountSats: positiveInt(env, "FIAT_SWAP_AMOUNT_SATS", 1_000),
+    fiatAmountMinor: positiveInt(env, "FIAT_SWAP_FIAT_AMOUNT_MINOR", 100),
+    fiatCurrency: normalizeCurrency(env.FIAT_SWAP_FIAT_CURRENCY ?? "JPY"),
+    squareLocationId: optional(env, "FIAT_SWAP_SQUARE_LOCATION_ID"),
     maxAttestationAgeSeconds: positiveInt(
       env,
-      "WATARI_MAX_ATTESTATION_AGE_SECONDS",
+      "FIAT_SWAP_MAX_ATTESTATION_AGE_SECONDS",
       600,
     ),
-    locktimeSeconds: positiveInt(env, "WATARI_LOCKTIME_SECONDS", 3_600),
+    locktimeSeconds: positiveInt(env, "FIAT_SWAP_LOCKTIME_SECONDS", 3_600),
   };
 }
 
 export function loadSellerConfig(env: Env = Deno.env.toObject()): SellerConfig {
   const shared = sharedConfig(env);
   if (!shared.paymentLink) {
-    throw new WatariConfigError("SQUARE_PAYMENT_LINK is required");
+    throw new FiatSwapConfigError("SQUARE_PAYMENT_LINK is required");
   }
   return {
     ...shared,
     oracleEndpoint: assertHttpUrl(
-      required(env, "WATARI_ORACLE_ENDPOINT"),
-      "WATARI_ORACLE_ENDPOINT",
+      required(env, "FIAT_SWAP_ORACLE_ENDPOINT"),
+      "FIAT_SWAP_ORACLE_ENDPOINT",
     ),
-    oracleApiKey: optional(env, "WATARI_ORACLE_API_KEY"),
+    oracleApiKey: optional(env, "FIAT_SWAP_ORACLE_API_KEY"),
     sourceProofs: parseSourceProofs(env),
-    providerPubkey: optional(env, "WATARI_PROVIDER_PUBKEY"),
-    quoteWindowMs: positiveInt(env, "WATARI_QUOTE_WINDOW_MS", 30_000),
-    resultTimeoutMs: positiveInt(env, "WATARI_RESULT_TIMEOUT_MS", 5 * 60_000),
+    providerPubkey: optional(env, "FIAT_SWAP_PROVIDER_PUBKEY"),
+    quoteWindowMs: positiveInt(env, "FIAT_SWAP_QUOTE_WINDOW_MS", 30_000),
+    resultTimeoutMs: positiveInt(
+      env,
+      "FIAT_SWAP_RESULT_TIMEOUT_MS",
+      5 * 60_000,
+    ),
   };
 }
 
@@ -213,20 +217,20 @@ export function loadBuyerConfig(env: Env = Deno.env.toObject()): BuyerConfig {
   const shared = sharedConfig(env);
   return {
     ...shared,
-    providerPrivKey: required(env, "WATARI_PROVIDER_PRIVKEY"),
-    proofFile: optional(env, "WATARI_PROOF_FILE"),
-    proofBase64: optional(env, "WATARI_PROOF_BASE64"),
+    providerPrivKey: required(env, "FIAT_SWAP_PROVIDER_PRIVKEY"),
+    proofFile: optional(env, "FIAT_SWAP_PROOF_FILE"),
+    proofBase64: optional(env, "FIAT_SWAP_PROOF_BASE64"),
     selectionTimeoutMs: positiveInt(
       env,
-      "WATARI_SELECTION_TIMEOUT_MS",
+      "FIAT_SWAP_SELECTION_TIMEOUT_MS",
       60_000,
     ),
     preimageTimeoutMs: positiveInt(
       env,
-      "WATARI_PREIMAGE_TIMEOUT_MS",
+      "FIAT_SWAP_PREIMAGE_TIMEOUT_MS",
       5 * 60_000,
     ),
-    notaryUrl: optional(env, "WATARI_NOTARY_URL"),
+    notaryUrl: optional(env, "FIAT_SWAP_NOTARY_URL"),
   };
 }
 
@@ -234,10 +238,10 @@ export function squarePaymentUrl(paymentId: string): string {
   return `https://${SQUARE_SANDBOX_HOST}/v2/payments/${paymentId}`;
 }
 
-export function buildWatariPredicate(
-  input: SharedWatariConfig,
-): WatariPredicate {
-  const conditions: WatariJsonPathCondition[] = [
+export function buildFiatSwapPredicate(
+  input: SharedFiatSwapConfig,
+): FiatSwapPredicate {
+  const conditions: FiatSwapJsonPathCondition[] = [
     {
       type: "jsonpath",
       expression: "payment.status",
@@ -248,13 +252,13 @@ export function buildWatariPredicate(
       type: "jsonpath",
       expression: "payment.amount_money.amount",
       expected: String(input.fiatAmountMinor),
-      description: "Square amount matches the Watari quote",
+      description: "Square amount matches the fiat swap quote",
     },
     {
       type: "jsonpath",
       expression: "payment.amount_money.currency",
       expected: input.fiatCurrency,
-      description: "Square currency matches the Watari quote",
+      description: "Square currency matches the fiat swap quote",
     },
   ];
 
@@ -274,8 +278,8 @@ export function buildWatariPredicate(
     domain_hint: SQUARE_SANDBOX_HOST,
     conditions,
     max_attestation_age_seconds: input.maxAttestationAgeSeconds,
-    watari: {
-      tag: WATARI_QUERY_TAG,
+    fiat_swap: {
+      tag: FIAT_SWAP_QUERY_TAG,
       amount_sats: input.amountSats,
       fiat_amount_minor: input.fiatAmountMinor,
       fiat_currency: input.fiatCurrency,
@@ -288,14 +292,14 @@ export function buildWatariPredicate(
   };
 }
 
-export function buildWatariSpec(input: SharedWatariConfig): Spec {
-  const predicate = buildWatariPredicate(input);
+export function buildFiatSwapSpec(input: SharedFiatSwapConfig): Spec {
+  const predicate = buildFiatSwapPredicate(input);
   const fiatMajor = (input.fiatAmountMinor / 100).toFixed(2);
   return {
-    schema: WATARI_SCHEMA,
+    schema: FIAT_SWAP_SCHEMA,
     predicate,
     description:
-      `${WATARI_QUERY_TAG}: ${input.fiatCurrency} ${fiatMajor} for ${input.amountSats} sats.`,
+      `${FIAT_SWAP_QUERY_TAG}: ${input.fiatCurrency} ${fiatMajor} for ${input.amountSats} sats.`,
     context: {
       payment_link: input.paymentLink,
       relays: input.relays,
@@ -304,9 +308,11 @@ export function buildWatariSpec(input: SharedWatariConfig): Spec {
   };
 }
 
-export function isWatariPredicate(value: unknown): value is WatariPredicate {
+export function isFiatSwapPredicate(
+  value: unknown,
+): value is FiatSwapPredicate {
   if (typeof value !== "object" || value === null) return false;
-  const p = value as Partial<WatariPredicate>;
+  const p = value as Partial<FiatSwapPredicate>;
   if (p.domain_hint !== SQUARE_SANDBOX_HOST) return false;
   if (typeof p.target_url !== "string") return false;
   try {
@@ -323,32 +329,34 @@ export function isWatariPredicate(value: unknown): value is WatariPredicate {
   }
   if (!Array.isArray(p.conditions)) return false;
   if (typeof p.max_attestation_age_seconds !== "number") return false;
-  if (typeof p.watari !== "object" || p.watari === null) return false;
-  return p.watari.tag === WATARI_QUERY_TAG &&
-    typeof p.watari.amount_sats === "number" &&
-    typeof p.watari.fiat_amount_minor === "number" &&
-    typeof p.watari.fiat_currency === "string";
+  if (typeof p.fiat_swap !== "object" || p.fiat_swap === null) return false;
+  return p.fiat_swap.tag === FIAT_SWAP_QUERY_TAG &&
+    typeof p.fiat_swap.amount_sats === "number" &&
+    typeof p.fiat_swap.fiat_amount_minor === "number" &&
+    typeof p.fiat_swap.fiat_currency === "string";
 }
 
 export function predicateMatchesBuyerConfig(
-  predicate: WatariPredicate,
+  predicate: FiatSwapPredicate,
   config: BuyerConfig,
 ): boolean {
-  return predicate.watari.amount_sats === config.amountSats &&
-    predicate.watari.fiat_amount_minor === config.fiatAmountMinor &&
-    predicate.watari.fiat_currency === config.fiatCurrency &&
+  return predicate.fiat_swap.amount_sats === config.amountSats &&
+    predicate.fiat_swap.fiat_amount_minor === config.fiatAmountMinor &&
+    predicate.fiat_swap.fiat_currency === config.fiatCurrency &&
     (config.squareLocationId === undefined ||
-      predicate.watari.square_location_id === config.squareLocationId);
+      predicate.fiat_swap.square_location_id === config.squareLocationId);
 }
 
-export function buildWatariResultData(config: BuyerConfig): WatariResultData {
+export function buildFiatSwapResultData(
+  config: BuyerConfig,
+): FiatSwapResultData {
   if (!config.paymentId) {
-    throw new WatariConfigError(
-      "WATARI_PAYMENT_ID is required to produce proof data",
+    throw new FiatSwapConfigError(
+      "FIAT_SWAP_PAYMENT_ID is required to produce proof data",
     );
   }
   return {
-    schema: WATARI_SCHEMA,
+    schema: FIAT_SWAP_SCHEMA,
     target_url: squarePaymentUrl(config.paymentId),
     domain: SQUARE_SANDBOX_HOST,
     payment_id: config.paymentId,

@@ -1,5 +1,5 @@
 /**
- * Standalone 巫(Kannagi) two-party binary bet server.
+ * Standalone two-party binary bet server.
  *
  * Runs the two-party binary bet as an independent application,
  * separate from the Anchr protocol server.
@@ -24,7 +24,7 @@ import {
   seedFaucetTokensFromEnv,
 } from "./src/server-routes.ts";
 import { startAutoResolver } from "./src/auto-resolver.ts";
-import { openKannagiStore } from "./src/kannagi-store.ts";
+import { openMarketStore } from "./src/market-store.ts";
 import { isMintReachable } from "./src/market-wallet.ts";
 import {
   loadDualOutcomeFrostNodeConfigAsync,
@@ -42,8 +42,8 @@ function clientIp(c: { req: { header(name: string): string | undefined } }): str
 }
 
 function createRateLimitMiddleware(): MiddlewareHandler {
-  const windowMs = Number(Deno.env.get("KANNAGI_RATE_LIMIT_WINDOW_MS") ?? "60000");
-  const max = Number(Deno.env.get("KANNAGI_RATE_LIMIT_MAX") ?? "60");
+  const windowMs = Number(Deno.env.get("MARKET_RATE_LIMIT_WINDOW_MS") ?? "60000");
+  const max = Number(Deno.env.get("MARKET_RATE_LIMIT_MAX") ?? "60");
   const buckets = new Map<string, { resetAt: number; count: number }>();
   return async (c, next) => {
     const now = Date.now();
@@ -65,7 +65,7 @@ function createRateLimitMiddleware(): MiddlewareHandler {
 }
 
 function createSignerAuthMiddleware(): MiddlewareHandler {
-  const apiKey = Deno.env.get("KANNAGI_SIGNER_API_KEY")?.trim() ||
+  const apiKey = Deno.env.get("MARKET_SIGNER_API_KEY")?.trim() ||
     Deno.env.get("ORACLE_API_KEY")?.trim();
   return async (c, next) => {
     const supplied = c.req.header("x-api-key") ??
@@ -132,22 +132,22 @@ if (nostrRelays.length > 0) {
   console.log("[market] NOSTR_RELAYS not set — UI wallet uses localStorage only.");
 }
 
-// Persistent state: SQLite at KANNAGI_DB_PATH (defaults to /data/kannagi.db
-// on Fly, or ./kannagi.db locally). The same DB owns the matching queue and the
+// Persistent state: SQLite at MARKET_DB_PATH (defaults to /data/market.db
+// on Fly, or ./market.db locally). The same DB owns the matching queue and the
 // runtime maps so a Fly machine restart recovers full market state.
-const kannagiDbPath = Deno.env.get("KANNAGI_DB_PATH") ?? "./kannagi.db";
-const kannagiStore = openKannagiStore({ path: kannagiDbPath });
-const hydrated = await kannagiStore.hydrate();
-console.log(`[market] kannagi store opened at ${kannagiDbPath}`);
+const marketDbPath = Deno.env.get("MARKET_DB_PATH") ?? "./market.db";
+const marketStore = openMarketStore({ path: marketDbPath });
+const hydrated = await marketStore.hydrate();
+console.log(`[market] market store opened at ${marketDbPath}`);
 
 // Construct state explicitly so we can also hand it to the auto-resolver.
 const state = createMarketState({
   frostConfig,
   nostrRelays,
-  matchingQueue: kannagiStore.matchingQueue,
+  matchingQueue: marketStore.matchingQueue,
   initial: hydrated,
-  persist: kannagiStore.persist,
-  allowManualResolve: Deno.env.get("KANNAGI_ALLOW_MANUAL_RESOLVE") === "1",
+  persist: marketStore.persist,
+  allowManualResolve: Deno.env.get("MARKET_ALLOW_MANUAL_RESOLVE") === "1",
 });
 const seededFaucetTokens = await seedFaucetTokensFromEnv(state);
 if (seededFaucetTokens > 0) {
@@ -164,7 +164,7 @@ app.get("/health", (c) => {
   const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
   return c.json({
     ok: true,
-    app: "kannagi",
+    app: "two-party-binary-bet",
     mode: state.frostMode,
     markets: state.markets.size,
     matched_pairs: state.matchedPairs.size,
@@ -201,7 +201,7 @@ if (Deno.env.get("AUTO_RESOLVE_DISABLED") !== "1") {
   // Stop on SIGINT so the scheduler doesn't keep the process alive.
   Deno.addSignalListener("SIGINT", () => {
     handle.stop();
-    kannagiStore.close().catch(() => {});
+    marketStore.close().catch(() => {});
     Deno.exit(0);
   });
 }
@@ -219,5 +219,5 @@ app.get("/main.js.map", serveStatic({ path: "./example/two-party-binary-bet/ui/m
 app.get("*", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
 
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
-console.log(`巫(Kannagi) two-party binary bet server on http://localhost:${port}`);
+console.log(`Two-party binary bet server on http://localhost:${port}`);
 Deno.serve({ port }, app.fetch);

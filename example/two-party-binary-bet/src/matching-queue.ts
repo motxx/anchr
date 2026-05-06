@@ -3,7 +3,7 @@
  *
  * Two implementations:
  *   - createInMemoryMatchingQueue (this file) — Map-backed, ephemeral; for tests/dev
- *   - SQLite-backed (./kannagi-store.ts:createSqliteMatchingQueue) — durable
+ *   - SQLite-backed (./market-store.ts:createSqliteMatchingQueue) — durable
  *
  * Greedy FIFO matching: earliest bets matched first. Partial matches split
  * a bet into a matched portion and a remainder (the bet stays pending with

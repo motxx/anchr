@@ -244,7 +244,7 @@ export async function lockFundsForMatch(input: {
 //      path as everything else (saveProofs).
 //
 // Result: the winner's Cashu balance grows by the loser's locked amount
-// minus the mint's swap fee, settled trustlessly. Verified end-to-end in
+// minus the mint's swap fee. Verified end-to-end in
 // e2e/redemption-flow.test.ts.
 // ---------------------------------------------------------------------------
 

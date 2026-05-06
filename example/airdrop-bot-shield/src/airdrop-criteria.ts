@@ -1,5 +1,5 @@
 /**
- * 形代(Katashiro) — Criteria Definition & Validation
+ * Airdrop bot shield criteria definition and validation
  *
  * Types and helpers for defining airdrop eligibility criteria that claimants
  * must prove via TLSNotary attestations. Each condition maps to a specific

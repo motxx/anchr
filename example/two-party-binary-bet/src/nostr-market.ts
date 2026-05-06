@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Nostr Integration for Two-party binary bet Discovery
+ * Nostr integration for two-party binary bet discovery
  *
  * Markets are published as Nostr events so anyone can discover and
  * participate without a centralized server. Uses kind 30078

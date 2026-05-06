@@ -1,5 +1,5 @@
 /**
- * SQLite-backed persistence for the 巫(Kannagi) two-party-binary-bet server.
+ * SQLite-backed persistence for the two-party binary bet server.
  *
  * Owns one DB file containing the matching queue (durable bets + FIFO matching)
  * plus the runtime maps so a Fly machine restart recovers full state:
@@ -27,7 +27,7 @@ import type {
   TwoPartyBinaryBet,
 } from "./market-types.ts";
 
-const log = getLogger(["anchr", "two-party-binary-bet", "kannagi-store"]);
+const log = getLogger(["anchr", "two-party-binary-bet", "market-store"]);
 
 const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -111,7 +111,7 @@ export interface FaucetTokenRecord {
   claimed_by?: string;
 }
 
-export interface KannagiPersist {
+export interface MarketPersist {
   market(market: TwoPartyBinaryBet): Promise<void>;
   pair(pair: MatchedBetPair): Promise<void>;
   preimage(marketId: string, preimage: string): Promise<void>;
@@ -123,26 +123,26 @@ export interface KannagiPersist {
   claimFaucetToken(id: string, claimedAt: number, claimedBy: string): Promise<boolean>;
 }
 
-export interface KannagiStore {
+export interface MarketStore {
   /** Matching queue backed by the same DB. Use this to construct MarketState. */
   readonly matchingQueue: MatchingQueue;
   /** Persistence facade — call after each in-memory mutation. */
-  readonly persist: KannagiPersist;
+  readonly persist: MarketPersist;
   /** Load all state from disk. Call once at server startup. */
   hydrate(): Promise<HydratedState>;
   /** Close the underlying SQLite handle. Idempotent. */
   close(): Promise<void>;
 }
 
-export interface OpenKannagiStoreOpts {
+export interface OpenMarketStoreOpts {
   /** Path to the SQLite DB file. Use `:memory:` for tests. */
   path: string;
 }
 
-export function openKannagiStore(opts: OpenKannagiStoreOpts): KannagiStore {
+export function openMarketStore(opts: OpenMarketStoreOpts): MarketStore {
   const db = new Database(opts.path);
   db.exec(SCHEMA_SQL);
-  log.info("kannagi store opened", { path: opts.path });
+  log.info("market store opened", { path: opts.path });
 
   const matchingQueue = createSqliteMatchingQueue(db);
   const persist = createPersist(db);
@@ -257,7 +257,7 @@ function hydrateAll(db: Database): HydratedState {
 // Persist (write-through, called after each in-memory mutation)
 // ---------------------------------------------------------------------------
 
-function createPersist(db: Database): KannagiPersist {
+function createPersist(db: Database): MarketPersist {
   const upsertMarket = db.prepare(
     "INSERT INTO markets (id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json",
   );

@@ -71,13 +71,10 @@
 }
 
 :root {
-  /* Kannagi v2 — Kawaii Pastel Shrine.
-   * Inspired by the 2008 anime かんなぎ:
-   *   - Nagi: 青髪 (blue hair) + 紫眼 (purple eyes) + 紅白 miko outfit + 桜 ribbon
-   *   - World: sunlit Japanese shrine, vermillion torii, sakura petals
-   * Atmosphere: soft sakura-mochi cream paper, pastels float on top,
-   * single sakura-coral brand accent, vermillion held back for "ceremonial"
-   * states only. Tokens documented in DESIGN.md Section 2.
+  /* Two-party binary bet reference UI.
+   * Atmosphere: calm paper-like background, high-density market data,
+   * single coral action accent, and clear YES/NO outcome colors.
+   * Tokens documented in DESIGN.md Section 2.
    */
 
   /* Neutrals — calm shoji-paper cream (no pink tint).
@@ -100,7 +97,7 @@
   --muted: 42 38% 92%;             /* #F1ECDF — light cream */
   --muted-foreground: 30 12% 46%;  /* #837A6F */
 
-  /* Accent — Nagi (ナギ) blue — her signature hair color */
+  /* Accent — soft blue for secondary UI surfaces */
   --accent: 211 60% 82%;           /* #A8C5E8 */
   --accent-foreground: 211 50% 24%;
 

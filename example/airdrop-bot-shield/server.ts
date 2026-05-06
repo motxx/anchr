@@ -4,12 +4,12 @@ import {
   createProofGateService,
   openSqliteProofGateStore,
 } from "@anchr/bounty/claim-gate";
-import { loadKatashiroRuntimeConfig, assertMainnetReleaseConfig } from "./src/release-config.ts";
-import { buildKatashiroApp } from "./src/server-routes.ts";
-import { identityPathForKatashiroCondition } from "./src/katashiro-policy.ts";
+import { loadAirdropBotShieldRuntimeConfig, assertMainnetReleaseConfig } from "./src/release-config.ts";
+import { buildAirdropBotShieldApp } from "./src/server-routes.ts";
+import { identityPathForAirdropCondition } from "./src/identity-policy.ts";
 import type { ProofCondition } from "./src/airdrop-criteria.ts";
 
-const config = loadKatashiroRuntimeConfig();
+const config = loadAirdropBotShieldRuntimeConfig();
 assertMainnetReleaseConfig(config);
 
 if (config.dbPath !== ":memory:") {
@@ -23,18 +23,18 @@ const settlementProvider = config.settlement
 const service = createProofGateService<ProofCondition>({
   store,
   nullifierSecret: config.nullifierSecret,
-  identityPathForCondition: identityPathForKatashiroCondition,
+  identityPathForCondition: identityPathForAirdropCondition,
   accountAgeConditionTypes: new Set(["github_account_age"]),
   settlementProvider,
 });
-const app = buildKatashiroApp({
+const app = buildAirdropBotShieldApp({
   service,
   adminToken: config.adminToken,
   productionReady: config.productionReady,
 });
 
 if (config.warnings.length > 0) {
-  console.warn("[katashiro] not mainnet-ready:", config.warnings.join("; "));
+  console.warn("[airdrop-bot-shield] not mainnet-ready:", config.warnings.join("; "));
 }
-console.log(`[katashiro] listening on :${config.port}`);
+console.log(`[airdrop-bot-shield] listening on :${config.port}`);
 Deno.serve({ port: config.port }, app.fetch);
