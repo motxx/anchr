@@ -2704,6 +2704,11 @@
           "jsr:@zod/zod@4"
         ]
       },
+      "example/tlsn-fiat-swap-square": {
+        "dependencies": [
+          "jsr:@std/expect@1"
+        ]
+      },
       "packages/blossom": {
         "dependencies": [
           "jsr:@logtape/logtape@2",

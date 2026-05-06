@@ -1,97 +1,99 @@
-# 渡(Watari) — Runbook
+# 渡(Watari) — Testnet Runbook
 
-> *Watari* — a crossing or ferry. Here: trustless fiat ↔ BTC crossing via Square.
+Square Sandbox 決済を TLSNotary で証明し、testnet/regtest Cashu ecash
+と交換する手順です。
 
-Square テスト決済を TLSNotary で証明し、Anchr 経由で BTC と trustless に交換する E2E 手順。
+このexampleはCustomer/Provider package primitivesで動きます。必要な通信相手は
+Nostr relay、Cashu mint、Oracleだけです。reference host / middleman の
+`/queries`、`/quotes`、`/select`、`/begin` APIは使いません。
 
-**検証対象**: Square Payments API (`connect.squareupsandbox.com` / `connect.squareup.com`) の JSON レスポンス
-**証明方式**: CLI (`tlsn-prove`) — Square は ECDSA 証明書のため MPC-TLS が **~2秒**で完了 (実測 2.1秒)
+## 0. Square Sandbox
 
-> **なぜ Square か:** Stripe は RSA 証明書を使用しており、MPC-TLS の RSA 署名検証が非常に遅い（数分以上ハング）。Square は ECDSA (P-256) 証明書のため、CoinGecko と同程度の速度で証明が完了する。
+1. https://developer.squareup.com/apps でアプリを作成します。
+2. Sandbox Access Tokenを取得します。
+3. Sandbox DashboardでPayment Linkを作ります。
 
----
+APIでPayment Linkを作る場合:
 
-## 0. 準備
-
-### 0-1. Square Developer アカウント
-
-1. https://developer.squareup.com/apps でアカウント作成
-2. アプリケーションを作成（または既存のものを使用）
-3. **Sandbox** タブから:
-   - **Sandbox Access Token** (`EAAAl...`) をコピー
-   - **Sandbox Application ID** をメモ
-
-### 0-2. Square Sandbox で Payment Link を作成
-
-Sandbox Dashboard でテスト Payment Link を作成:
-- https://squareupsandbox.com/dashboard → Payment Links
-
-または API で作成:
 ```bash
-curl -X POST https://connect.squareup.com/v2/online-checkout/payment-links \
+curl -X POST https://connect.squareupsandbox.com/v2/online-checkout/payment-links \
   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "quick_pay": {
-      "name": "Test Payment",
+      "name": "Watari Test Payment",
       "price_money": { "amount": 100, "currency": "JPY" },
       "location_id": "'$SQUARE_LOCATION_ID'"
     }
-  }' | jq '.payment_link.url'
+  }' | jq -r '.payment_link.url'
 ```
 
----
-
-## 1. インフラ起動
+## 1. Local Infra
 
 ```bash
 docker compose up -d
-docker compose restart cashu-mint  # 必要に応じて
+docker compose restart cashu-mint
 docker compose ps
 ```
 
-## 2. Anchr サーバー起動
+Default endpoints:
+
+- Nostr relay: `ws://localhost:7777`
+- Cashu mint: `http://localhost:3338`
+
+Oracle must also be running. The Customer side needs an Oracle hash endpoint
+such as `http://localhost:3001/hash`; after verifying the Provider's kind 6300
+TLSN result, the Oracle must send the preimage to the Provider over Nostr DM.
+
+## 2. Seller / Customer
+
+Seller locks testnet/regtest Cashu proofs and requests proof that the Square
+payment completed.
+
+Required env:
 
 ```bash
-BLOSSOM_SERVERS=http://localhost:3333 \
-NOSTR_RELAYS=ws://localhost:7777 \
-CASHU_MINT_URL=http://localhost:3338 \
-bun run dev
+export NOSTR_RELAYS=ws://localhost:7777
+export CASHU_MINT_URL=http://localhost:3338
+export WATARI_ORACLE_ENDPOINT=http://localhost:3001
+export WATARI_ORACLE_PUBKEY=<oracle-pubkey-hex>
+
+export SQUARE_PAYMENT_LINK=https://square.link/u/...
+export WATARI_AMOUNT_SATS=1000
+export WATARI_FIAT_AMOUNT_MINOR=100
+export WATARI_FIAT_CURRENCY=JPY
+export WATARI_SQUARE_LOCATION_ID=<seller-square-location-id> # optional
+
+export WATARI_SOURCE_PROOFS_JSON='[{"id":"...","amount":1000,"secret":"...","C":"..."}]'
 ```
 
----
-
-## 3. Seller: オーダー作成
+Optional:
 
 ```bash
-SQUARE_ACCESS_TOKEN=EAAAl... \
-bun example/tlsn-fiat-swap-square/seller.ts
+export WATARI_PROVIDER_PUBKEY=<buyer-provider-pubkey-hex>
+export WATARI_QUOTE_WINDOW_MS=30000
+export WATARI_RESULT_TIMEOUT_MS=300000
+export WATARI_LOCKTIME_SECONDS=3600
 ```
 
-**このターミナルは開いたまま**にする。
-
----
-
-## 4. Buyer: Square で支払い
-
-### 方法 A: Payment Link で支払い
-
-Payment Link を開いて支払いを完了する。
-
-Sandbox テストカード:
-- カード番号: `4532 7597 3454 5858`
-- 有効期限: 任意の未来の日付
-- CVC: `111`
-- 郵便番号: `94103`
-
-### 方法 B: API でテスト決済を作成 (Sandbox)
+Run:
 
 ```bash
-# Location ID を取得
+deno task watari:seller
+```
+
+Keep this terminal open. It publishes a kind 5300 request, waits for Provider
+quotes, binds the selected Provider at the Cashu mint, and waits for the kind
+6300 result.
+
+## 3. Buyer Pays Square
+
+Use the Square Payment Link, or create a Sandbox payment by API:
+
+```bash
 LOCATION_ID=$(curl -s https://connect.squareupsandbox.com/v2/locations \
   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" | jq -r '.locations[0].id')
 
-# テスト決済を作成 (card-nonce-ok = 成功するテストノンス)
 curl -s -X POST https://connect.squareupsandbox.com/v2/payments \
   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
@@ -103,202 +105,76 @@ curl -s -X POST https://connect.squareupsandbox.com/v2/payments \
   }' | jq '{id: .payment.id, status: .payment.status, amount: .payment.amount_money}'
 ```
 
-## 5. Payment ID を取得
-
-支払い後、Square Dashboard または API から Payment ID を取得:
+Get the payment id:
 
 ```bash
 curl -s https://connect.squareupsandbox.com/v2/payments \
   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"sort_order": "DESC", "limit": 1}' | jq '.payments[0] | {id, status, amount_money}'
+  | jq '.payments[0] | {id, status, amount_money}'
 ```
 
-期待される出力:
-```json
-{
-  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "status": "COMPLETED",
-  "amount_money": { "amount": 100, "currency": "JPY" }
-}
-```
+## 4. Buyer / Provider
 
----
-
-## 6. Buyer: TLSNotary proof 生成
-
-Square は ECDSA 証明書のため、CLI / Extension どちらでも ~2秒で完了する。
-
-### 6a. CLI (`tlsn-prove`)
+Buyer runs the Provider primitive. It quotes only matching Watari predicates and
+redeems only after the Oracle releases the preimage.
 
 ```bash
-PAYMENT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # Step 5 で取得
+export NOSTR_RELAYS=ws://localhost:7777
+export CASHU_MINT_URL=http://localhost:3338
+export WATARI_ORACLE_PUBKEY=<oracle-pubkey-hex>
+export WATARI_PROVIDER_PRIVKEY=<nsec-or-hex-secret-key>
 
+export WATARI_AMOUNT_SATS=1000
+export WATARI_FIAT_AMOUNT_MINOR=100
+export WATARI_FIAT_CURRENCY=JPY
+export WATARI_SQUARE_LOCATION_ID=<seller-square-location-id> # if Seller pinned it
+export WATARI_PAYMENT_ID=<square-payment-id>
+```
+
+## 5. TLSNotary Proof
+
+Square uses ECDSA certificates, so the CLI path is fast enough for Testnet.
+
+```bash
 ./crates/tlsn-prover/target/release/tlsn-prove \
   --verifier localhost:7046 \
   --max-recv-data 4096 \
   --max-sent-data 4096 \
   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
-  "https://connect.squareupsandbox.com/v2/payments/$PAYMENT_ID" \
+  "https://connect.squareupsandbox.com/v2/payments/$WATARI_PAYMENT_ID" \
   -o proof.presentation.tlsn
 ```
 
-期待される出力:
-```
-[tlsn-prove] Target: connect.squareupsandbox.com:443/v2/payments/...
-[tlsn-prove] MPC limits: max_sent=4096, max_recv=4096
-[tlsn-prove] MPC connection established
-[tlsn-prove] Connected to connect.squareupsandbox.com:443
-[tlsn-prove] Sending HTTP request...
-[tlsn-prove] Response status: 200 OK
-[tlsn-prove] MPC complete, requesting attestation...
-[tlsn-prove] Presentation saved to proof.presentation.tlsn
-```
-
-### 6b. TLSNotary Extension (DevConsole)
-
-Chrome for Testing を起動:
-```bash
-bun run scripts/launch-chrome-tlsn.ts
-```
-
-DevConsole (`chrome-extension://<id>/devConsole.html`) に以下を貼り付けて **Run Code**:
-
-**`PAYMENT_ID` と `SQUARE_KEY` を実際の値に置き換える:**
-
-```javascript
-// Anchr: prove Square Payment status via API
-const PAYMENT_ID = 'JYQNlEG29vRfsVibEeOiNMr25lbZY';  // ← Step 5 で取得した Payment ID
-const SQUARE_KEY = 'EAAAl...';  // ← Seller から受け取った Square Access Token
-const VERIFIER_URL = 'ws://localhost:7047';
-const PROXY_URL = 'ws://localhost:7047/proxy?token=connect.squareupsandbox.com';
-
-export default {
-  config: {
-    name: 'Anchr: Square API',
-    description: 'Prove Square Payment status',
-    requests: [{
-      method: 'GET',
-      host: 'connect.squareupsandbox.com',
-      pathname: '/**',
-      verifierUrl: VERIFIER_URL,
-    }],
-  },
-  main: async () => {
-    const proof = await prove(
-      {
-        url: `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
-        method: 'GET',
-        headers: {
-          'Host': 'connect.squareupsandbox.com',
-          'Authorization': `Bearer ${SQUARE_KEY}`,
-          'Accept': 'application/json',
-          'Accept-Encoding': 'identity',
-          'Connection': 'close',
-        },
-      },
-      {
-        verifierUrl: VERIFIER_URL,
-        proxyUrl: PROXY_URL,
-        maxRecvData: 4096,
-        maxSentData: 4096,
-        handlers: [
-          { type: 'SENT', part: 'START_LINE', action: 'REVEAL' },
-          { type: 'RECV', part: 'STATUS_CODE', action: 'REVEAL' },
-          { type: 'RECV', part: 'BODY', action: 'REVEAL' },
-          // Authorization ヘッダーは REVEAL しない → proof に API Key が含まれない
-        ],
-      }
-    );
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(proof));
-      console.log('[Anchr] Proof copied to clipboard');
-    } catch (e) {
-      console.log('[Anchr] Proof:', JSON.stringify(proof).slice(0, 200));
-    }
-
-    done(proof);
-  },
-};
-```
-
-**確認ポップアップ** が表示されたら **Allow** をクリック。~2秒で完了。
-
-> **レスポンスサイズの確認:**
-> ```bash
-> curl -s --http1.1 -o /dev/null -w 'headers: %{size_header}\nbody: %{size_download}\n' \
->   -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \
->   -H "Accept: application/json" \
->   -H "Accept-Encoding: identity" \
->   -H "Connection: close" \
->   "https://connect.squareupsandbox.com/v2/payments/$PAYMENT_ID"
-> ```
-> headers + body の合計が 4096 を超える場合は `--max-recv-data` を増やす。
-
----
-
-## 7. Buyer: proof を Anchr に提出
+Then run the Provider:
 
 ```bash
-QUERY_ID="query_xxxxx"  # seller.ts の出力から
-
-curl -X POST http://localhost:3000/queries/${QUERY_ID}/result \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ${HTTP_API_KEY:-test}" \
-  -d "{\"worker_pubkey\":\"buyer\",\"tlsn_presentation\":\"$(base64 < proof.presentation.tlsn)\"}"
+export WATARI_PROOF_FILE=proof.presentation.tlsn
+deno task watari:buyer
 ```
 
----
+The Provider publishes the encrypted kind 6300 result after selection. Once the
+Oracle verifies the result and DMs the preimage, the Provider redeems the Cashu
+HTLC at the mint.
 
-## 8. 検証結果の確認
+## 6. Verification
 
-**Seller 側 (Terminal)**:
-```
-Order completed!
-  Status: approved
-  Payment verified — BTC released to buyer
-  Verification checks:
-    ✓ cryptographically verified from connect.squareup.com
-    ✓ server name matches target_url
-    ✓ "status":"COMPLETED" condition satisfied
-```
-
----
-
-## 9. クリーンアップ
+Run local checks:
 
 ```bash
-docker compose down
+deno task watari:check
+deno task watari:test
 ```
 
----
+Docker/regtest integration is optional for this example path. Use it when you
+need to validate the live mint/relay/oracle wiring, not for the pure predicate
+and config checks above.
 
-## トラブルシューティング
+## Troubleshooting
 
-| 問題 | 対処 |
-|------|------|
-| Square API で 401 | `SQUARE_ACCESS_TOKEN` が正しいか確認。Sandbox トークン (`EAAAl...`) を使う。**Sandbox は `connect.squareupsandbox.com`** (本番は `connect.squareup.com`) |
-| Payment ID が分からない | Step 5 の API コマンドで最新の payment を取得 |
-| レスポンスが 4096 を超える | `--max-recv-data 8192` に増やす (ECDSA なので 8192 でも数秒で完了) |
-| MPC-TLS がハングする | Square は ECDSA なので通常ハングしない。verifier を restart: `docker compose restart tlsn-verifier` |
-
-### 実測データ (2026-03-29)
-
-| 項目 | 値 |
-|---|---|
-| ドメイン | connect.squareupsandbox.com |
-| TLS 証明書 | ECDSA (P-256) |
-| レスポンスサイズ | headers: 899, body: 1406, **合計: 2,305 bytes** |
-| `max_recv_data` | 4096 (余裕: 1,791 bytes) |
-| **MPC-TLS 時間** | **2.1秒** (release ビルド) |
-| Proof サイズ | 6,289 bytes |
-
-### Square vs Stripe: TLS 証明書の比較
-
-| | Square | Stripe |
-|---|---|---|
-| ドメイン | connect.squareupsandbox.com | api.stripe.com |
-| 証明書の鍵 | **ECDSA (P-256)** | RSA |
-| MPC-TLS 時間 | **2.1秒** | ハング (>3分) |
-| 推奨方式 | CLI (`tlsn-prove`) | 非推奨 (RSA ボトルネック) |
+| Problem                 | Action                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Buyer never quotes      | Check `WATARI_AMOUNT_SATS`, fiat amount/currency, optional location id, and Oracle pubkey match the Seller request.    |
+| Seller gets no quotes   | Check both sides use the same `NOSTR_RELAYS` and the Buyer process is running before `WATARI_QUOTE_WINDOW_MS` expires. |
+| Provider cannot produce | Set `WATARI_PAYMENT_ID` and either `WATARI_PROOF_FILE` or `WATARI_PROOF_BASE64`.                                       |
+| Redeem never happens    | The Oracle must verify the kind 6300 result and send the preimage DM to the selected Provider.                         |
+| Square API 401          | Use the Sandbox Access Token against `connect.squareupsandbox.com`.                                                    |

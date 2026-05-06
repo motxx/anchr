@@ -1,105 +1,98 @@
 /**
- * 渡(Watari) — Buyer (has fiat, wants BTC)
+ * 渡(Watari) — Buyer
  *
- * Watari is the trustless fiat ↔ BTC crossing. The buyer:
- *   1. Discovers open 渡(Watari) orders on the Anchr network
- *   2. Pays via the seller's Square Payment Link
- *   3. Receives the Square access token + Payment ID from the seller
- *      (via NIP-44 encrypted_context in the Nostr selection event)
- *   4. Fetches the Payment status from Square API
- *   5. Generates a TLSNotary proof of the JSON response
- *   6. Submits the proof to Anchr to redeem escrowed BTC
- *
- * Square uses ECDSA TLS certificates, so MPC-TLS completes in ~2 seconds
- * (unlike Stripe which uses RSA and hangs).
- *
- * Usage:
- *   bun run example/tlsn-fiat-swap-square/buyer.ts
+ * Provider-side flow: listen for Customer job requests, quote matching
+ * Square Sandbox payment predicates, publish a TLSN result after selection,
+ * and redeem the HTLC when the Oracle releases the preimage.
  */
 
-// Published package: import { Anchr } from "anchr-sdk";
-import { Anchr } from "anchr-sdk";
-import process from "node:process";
+import { createProvider } from "anchr-sdk";
+import {
+  buildWatariResultData,
+  isWatariPredicate,
+  loadBuyerConfig,
+  predicateMatchesBuyerConfig,
+  readProofBase64,
+  tlsnProofCommand,
+  WATARI_SCHEMA,
+  WatariConfigError,
+} from "./watari.ts";
 
-const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
+try {
+  const config = loadBuyerConfig();
+  const provider = createProvider({
+    oracles: [config.oraclePubkey],
+    relays: config.relays,
+    mint: config.mintUrl,
+    privKey: config.providerPrivKey,
+    notary: config.notaryUrl,
+    selectionTimeoutMs: config.selectionTimeoutMs,
+    preimageTimeoutMs: config.preimageTimeoutMs,
+  });
 
-const anchr = new Anchr({ serverUrl: SERVER_URL });
+  console.log("=== 渡(Watari) Testnet — Buyer / Provider ===\n");
+  console.log(`Provider: ${provider.pubkey}`);
+  console.log(`Relays:   ${config.relays.join(", ")}`);
+  console.log(`Mint:     ${config.mintUrl}`);
+  console.log(`Oracle:   ${config.oraclePubkey}`);
+  console.log(
+    `Accept:   ${config.fiatCurrency} ${
+      (config.fiatAmountMinor / 100).toFixed(2)
+    } -> ${config.amountSats} sats`,
+  );
+  console.log();
 
-console.log("=== 渡(Watari) — Buyer ===\n");
-console.log(`Server: ${SERVER_URL}\n`);
-
-// --- Step 1: Discover open 渡(Watari) orders ---
-
-console.log("Step 1: Finding open 渡(Watari) orders...\n");
-
-const orders = await anchr.listOpenQueries();
-const watari = orders.find((o) => o.description.includes("Square payment"));
-
-if (!watari) {
-  console.log("No open 渡(Watari) orders found.");
-  console.log("Run seller.ts first to create one.");
-  process.exit(0);
-}
-
-console.log(`Found order: ${watari.id}`);
-console.log(`  Description: ${watari.description}`);
-console.log(`  Bounty: ${watari.bounty?.amount_sats ?? 0} sats`);
-
-if (watari.tlsn_requirements) {
-  const domain = watari.tlsn_requirements.domain_hint ?? watari.tlsn_requirements.target_url;
-  console.log(`  Domain: ${domain}`);
-  if (watari.tlsn_requirements.conditions) {
-    console.log("  Conditions:");
-    for (const cond of watari.tlsn_requirements.conditions) {
-      console.log(`    - [${cond.type}] "${cond.expression}" — ${cond.description ?? ""}`);
+  if (config.paymentId) {
+    console.log("TLSNotary proof command:");
+    for (const line of tlsnProofCommand(config.paymentId)) {
+      console.log(`  ${line}`);
     }
+    console.log();
+  } else {
+    console.log(
+      "Set WATARI_PAYMENT_ID after paying the Square Sandbox link to produce proof data.",
+    );
+    console.log();
   }
+
+  const stop = () => {
+    void provider.stop();
+  };
+  Deno.addSignalListener("SIGINT", stop);
+  Deno.addSignalListener("SIGTERM", stop);
+
+  await provider.serve(async (request) => {
+    if (request.spec.schema !== WATARI_SCHEMA) return null;
+    if (!isWatariPredicate(request.spec.predicate)) return null;
+    if (!predicateMatchesBuyerConfig(request.spec.predicate, config)) {
+      return null;
+    }
+    if (config.amountSats > request.maxAmountSats) return null;
+
+    console.log(`Matched Watari request from ${request.customerPubkey}`);
+    console.log(`Quoting ${config.amountSats} sats...`);
+
+    return {
+      amountSats: config.amountSats,
+      produce: async () => {
+        const proof = await readProofBase64(config);
+        if (!proof) {
+          throw new WatariConfigError(
+            "WATARI_PROOF_FILE or WATARI_PROOF_BASE64 is required after selection",
+          );
+        }
+        return {
+          data: buildWatariResultData(config),
+          proof,
+        };
+      },
+    };
+  });
+} catch (err) {
+  if (err instanceof WatariConfigError) {
+    console.error(`Config error: ${err.message}`);
+  } else {
+    console.error(err instanceof Error ? err.message : String(err));
+  }
+  Deno.exit(1);
 }
-
-// --- Step 2: Pay via Square ---
-
-console.log("\n--- Step 2: Pay via Square ---\n");
-console.log("Open the seller's Square Payment Link and complete the payment.\n");
-
-// --- Step 3: TLSNotary proof of Square API ---
-
-console.log("--- Step 3: Generate TLSNotary Proof ---\n");
-console.log("After the seller shares the Square access token and Payment ID");
-console.log("(via NIP-44 encrypted_context), prove the Payment status:\n");
-console.log("  Target URL: https://connect.squareupsandbox.com/v2/payments/{payment_id}");
-console.log("  Header: Authorization: Bearer {access_token}");
-console.log();
-console.log("The TLSNotary proof captures the JSON response from connect.squareupsandbox.com:");
-console.log('  { "payment": { "status": "COMPLETED", "amount_money": { ... } } }');
-console.log();
-console.log("The proof cryptographically verifies:");
-console.log("  1. Domain: connect.squareupsandbox.com (from TLS certificate, ECDSA)");
-console.log('  2. Body contains: "status":"COMPLETED"');
-console.log("  3. Attestation is fresh (< max_attestation_age_seconds)");
-
-// --- Step 4: Submit proof ---
-
-console.log("\n--- Step 4: Submit Proof ---\n");
-
-// Square uses ECDSA → both CLI and Extension work in ~2s
-console.log("=== Method A: CLI (tlsn-prove) ===\n");
-console.log("  tlsn-prove \\");
-console.log('    --verifier localhost:7046 \\');
-console.log('    -H "Authorization: Bearer $SQUARE_ACCESS_TOKEN" \\');
-console.log('    "https://connect.squareupsandbox.com/v2/payments/$PAYMENT_ID" \\');
-console.log("    -o proof.presentation.tlsn\n");
-
-console.log("=== Method B: TLSNotary Extension (DevConsole) ===\n");
-console.log("  1. bun run scripts/launch-chrome-tlsn.ts");
-console.log("  2. Open DevConsole → paste plugin code from RUNBOOK Step 6b");
-console.log("  3. Run Code → Allow → proof copied to clipboard\n");
-
-console.log("=== Submit to Anchr ===\n");
-console.log(`  curl -X POST ${SERVER_URL}/queries/${watari.id}/result \\`);
-console.log('    -H "Content-Type: application/json" \\');
-console.log('    -d \'{"worker_pubkey": "<your-pubkey>", "tlsn_presentation": "<base64-of-proof>"}\'');
-console.log();
-console.log("After successful verification:");
-console.log("  - Oracle releases HTLC preimage");
-console.log("  - Buyer redeems Cashu HTLC token with preimage + signature");
-console.log(`  - ${watari.bounty?.amount_sats ?? "100,000"} sats transferred trustlessly`);
