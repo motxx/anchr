@@ -72,8 +72,8 @@
     "test:examples": "deno test --allow-all example/",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:e2e:regtest": "ANCHR_E2E_REQUIRE_INFRA=1 CASHU_MINT_URL=http://localhost:3338 NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 deno test e2e/regtest/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi",
+    "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
+    "test:e2e:regtest": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/regtest/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi",
     "test:e2e:frost": "FROST_E2E_REQUIRE_CORE=1 deno test e2e/frost/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:tlsn": "TLSN_E2E_REQUIRE_CORE=1 deno test e2e/tlsn/ --allow-all",
     "test:e2e:pentest": "deno test e2e/pentest/ --allow-env --allow-read --allow-net --allow-run --allow-sys",

@@ -35,6 +35,13 @@ deno task test:all              # alias for --local
 deno task test:all:docker       # alias for --docker
 ```
 
+`test-all.sh --docker` runs Docker Compose with a worktree-derived project
+name and host port block, so parallel worktrees get separate containers,
+networks, volumes, and port bindings. It also tears down those containers and
+volumes on exit. Plain `docker compose up` keeps the historical shared `anchr`
+project and ports unless you explicitly source `scripts/docker-compose-env.sh`
+with `ANCHR_DOCKER_ISOLATION=worktree`.
+
 **Adding a new test:**
 - Pure logic with no I/O → drop a `*.test.ts` next to the source under `packages/<pkg>/src/`.
 - Needs in-process HTTP / WebSocket / Blossom → name it `*.integration.test.ts`.

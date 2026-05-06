@@ -5,7 +5,7 @@
 #   ./scripts/test-all.sh              # local + docker tests (full suite)
 #   ./scripts/test-all.sh --local      # local tests only (no Docker)
 #   ./scripts/test-all.sh --docker     # docker tests only (assumes services up or starts them)
-#   ./scripts/test-all.sh --ci         # CI mode: same as full but skips docker teardown on failure for logs
+#   ./scripts/test-all.sh --ci         # CI mode: same as full
 #
 # Exit codes:
 #   0 = all passed
@@ -18,9 +18,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+export ANCHR_DOCKER_ISOLATION="${ANCHR_DOCKER_ISOLATION:-worktree}"
+source "$SCRIPT_DIR/docker-compose-env.sh"
+
 MODE="${1:-full}"
 FAILED=0
 DOCKER_STARTED=0
+RELAY_URL="ws://localhost:${ANCHR_RELAY_PORT}"
+BLOSSOM_URL="http://localhost:${ANCHR_BLOSSOM_PORT}"
+CASHU_MINT_URL="http://localhost:${ANCHR_CASHU_MINT_PORT}"
+TLSN_VERIFIER_HOST="localhost:${ANCHR_TLSN_TCP_PORT}"
 
 # Colors (disabled in CI if no tty)
 if [ -t 1 ]; then
@@ -46,8 +53,8 @@ run_test() {
 cleanup() {
   if [ "$DOCKER_STARTED" = "1" ]; then
     step "Teardown"
-    docker compose down --timeout 10 2>/dev/null || true
-    echo "  Docker services stopped."
+    docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
+    echo "  Docker services, networks, and volumes removed."
   fi
 }
 
@@ -150,14 +157,16 @@ start_docker_services() {
   # classic flake. Volumes and orphan containers go too, so each run
   # starts deterministic.
   echo "  Resetting previous Docker state..."
+  echo "  Compose project: ${COMPOSE_PROJECT_NAME}"
+  echo "  Ports: relay=${ANCHR_RELAY_PORT} blossom=${ANCHR_BLOSSOM_PORT} cashu=${ANCHR_CASHU_MINT_PORT} tlsn=${ANCHR_TLSN_TCP_PORT}/${ANCHR_TLSN_WS_PORT}"
   docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
 
   echo "  Starting relay + blossom..."
-  docker compose up -d relay blossom
   DOCKER_STARTED=1
+  docker compose up -d relay blossom
 
-  wait_for_service "Nostr relay" "http://localhost:7777" 15 || return 2
-  wait_for_service "Blossom"     "http://localhost:3333" 15 || return 2
+  wait_for_service "Nostr relay" "http://localhost:${ANCHR_RELAY_PORT}" 15 || return 2
+  wait_for_service "Blossom"     "$BLOSSOM_URL" 15 || return 2
 
   pass "relay + blossom"
 }
@@ -182,26 +191,28 @@ start_regtest() {
   sleep 5
   docker compose restart cashu-mint 2>/dev/null || true
 
-  wait_for_service "Cashu mint" "http://localhost:3338/v1/info" 20 || return 2
+  wait_for_service "Cashu mint" "${CASHU_MINT_URL}/v1/info" 20 || return 2
   pass "cashu mint"
 }
 
 run_docker_tests() {
   step "Phase 2: E2E Tests (relay + blossom)"
 
-  NOSTR_RELAYS=ws://localhost:7777 \
-  BLOSSOM_SERVERS=http://localhost:3333 \
+  NOSTR_RELAYS="$RELAY_URL" \
+  NOSTR_RELAY_URL="$RELAY_URL" \
+  BLOSSOM_SERVERS="$BLOSSOM_URL" \
   run_test "relay e2e" deno task test:e2e:relay
 
   ANCHR_E2E_REQUIRE_INFRA=1 \
-  BLOSSOM_SERVERS=http://localhost:3333 \
+  BLOSSOM_SERVERS="$BLOSSOM_URL" \
   run_test "blossom integration" deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
 
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
-  CASHU_MINT_URL=http://localhost:3338 \
-  NOSTR_RELAYS=ws://localhost:7777 \
-  BLOSSOM_SERVERS=http://localhost:3333 \
+  CASHU_MINT_URL="$CASHU_MINT_URL" \
+  NOSTR_RELAYS="$RELAY_URL" \
+  NOSTR_RELAY_URL="$RELAY_URL" \
+  BLOSSOM_SERVERS="$BLOSSOM_URL" \
   run_test "regtest e2e" deno task test:e2e:regtest
 
   # TLSN bucket — boots its own verifier service and builds the local
@@ -223,10 +234,13 @@ run_docker_tests() {
     fail "tlsn-verifier start"
     return
   fi
-  wait_for_tcp_service "TLSN verifier TCP" "localhost" "7046" 30 || { fail "tlsn-verifier TCP readiness"; return; }
-  wait_for_tcp_service "TLSN verifier WS"  "localhost" "7047" 30 || { fail "tlsn-verifier WS readiness"; return; }
+  wait_for_tcp_service "TLSN verifier TCP" "localhost" "$ANCHR_TLSN_TCP_PORT" 30 || { fail "tlsn-verifier TCP readiness"; return; }
+  wait_for_tcp_service "TLSN verifier WS"  "localhost" "$ANCHR_TLSN_WS_PORT" 30 || { fail "tlsn-verifier WS readiness"; return; }
 
-  TLSN_E2E_REQUIRE_CORE=1 run_test "tlsn e2e" deno task test:e2e:tlsn
+  TLSN_E2E_REQUIRE_CORE=1 \
+  TLSN_VERIFIER_HOST="$TLSN_VERIFIER_HOST" \
+  TLSN_VERIFIER_WS_PORT="$ANCHR_TLSN_WS_PORT" \
+  run_test "tlsn e2e" deno task test:e2e:tlsn
 }
 
 # --- Main ---
