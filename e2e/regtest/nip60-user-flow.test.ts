@@ -28,31 +28,17 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/two-party-binary-bet/src/server-routes.ts";
-import { checkInfraReady, createWallet } from "./helpers/regtest.ts";
-import { Nip60UserBot } from "../scripts/bot-fleet/nip60-user.ts";
-import { POLYMARKET_SEED_MARKETS } from "../scripts/bot-fleet/markets.ts";
-import { MarketMakerBot } from "../scripts/bot-fleet/bot.ts";
+} from "../../example/two-party-binary-bet/src/server-routes.ts";
+import { checkInfraReady, createWallet, isRelayReachable } from "../helpers/regtest.ts";
+import { Nip60UserBot } from "../../scripts/bot-fleet/nip60-user.ts";
+import { POLYMARKET_SEED_MARKETS } from "../../scripts/bot-fleet/markets.ts";
+import { MarketMakerBot } from "../../scripts/bot-fleet/bot.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const RELAY_URL = process.env.NOSTR_RELAY_URL ?? "ws://localhost:7777";
 
-async function isRelayReachable(): Promise<boolean> {
-  try {
-    const ws = new WebSocket(RELAY_URL);
-    const ok = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => { ws.close(); resolve(false); }, 2000);
-      ws.onopen = () => { clearTimeout(timer); ws.close(); resolve(true); };
-      ws.onerror = () => { clearTimeout(timer); resolve(false); };
-    });
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable();
+const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable(RELAY_URL);
 
 const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
 

@@ -18,12 +18,7 @@
  *   ./scripts/init-regtest.sh
  *
  * Run:
- *   deno task test:regtest
- *
- * (Or directly:
- *   CASHU_MINT_URL=http://localhost:3338 \
- *   NOSTR_RELAYS=ws://localhost:7777 \
- *   deno test e2e/sdk-integration.test.ts --allow-all)
+ *   deno task test:e2e:regtest
  */
 
 import { describe, test } from "@std/testing/bdd";
@@ -31,25 +26,25 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { createCustomer } from "../packages/sdk/src/customer.ts";
-import { createProvider } from "../packages/sdk/src/provider.ts";
-import { createCashuClient } from "../packages/sdk/src/cashu.ts";
+import { createCustomer } from "../../packages/sdk/src/customer.ts";
+import { createProvider } from "../../packages/sdk/src/provider.ts";
+import { createCashuClient } from "../../packages/sdk/src/cashu.ts";
 import {
   createRelayClient,
   generateKeypair,
-} from "../packages/sdk/src/nostr.ts";
+} from "../../packages/sdk/src/nostr.ts";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
-} from "../packages/sdk/src/events.ts";
-import type { OracleClient } from "../packages/sdk/src/oracle.ts";
+} from "../../packages/sdk/src/events.ts";
+import type { OracleClient } from "../../packages/sdk/src/oracle.ts";
 import { Wallet, getDecodedToken } from "@cashu/cashu-ts";
 
 import {
   checkInfraReady,
   createWallet,
   throttledMintProofs,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
 const RELAY_URL = (Deno.env.get("NOSTR_RELAYS") ?? "ws://localhost:7777")

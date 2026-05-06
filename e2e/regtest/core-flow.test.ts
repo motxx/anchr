@@ -29,18 +29,18 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
-import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
+import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import type { Oracle, OracleAttestation } from "../packages/bounty/src/domain/oracle-types.ts";
-import type { Query, QueryResult } from "../packages/bounty/src/domain/types.ts";
+import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import type { Oracle, OracleAttestation } from "../../packages/bounty/src/domain/oracle-types.ts";
+import type { Query, QueryResult } from "../../packages/bounty/src/domain/types.ts";
 import {
   checkInfraReady,
   createWallet,
   throttledMintProofs,
   throttleMintOp,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

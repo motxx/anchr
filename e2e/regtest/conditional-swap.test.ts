@@ -35,10 +35,10 @@ import {
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { createInMemoryMatchingQueue } from "../example/two-party-binary-bet/src/matching-queue.ts";
-import { resolveMarket } from "../example/two-party-binary-bet/src/resolution.ts";
+import { createInMemoryMatchingQueue } from "../../example/two-party-binary-bet/src/matching-queue.ts";
+import { resolveMarket } from "../../example/two-party-binary-bet/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
-import type { PendingBet, MatchProposal, MatchedBetPair } from "../example/two-party-binary-bet/src/market-types.ts";
+import type { PendingBet, MatchProposal, MatchedBetPair } from "../../example/two-party-binary-bet/src/market-types.ts";
 import {
   checkInfraReady,
   createWallet,
@@ -46,7 +46,7 @@ import {
   throttleMintOp,
   retryOnRateLimit,
   generateKeypair,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

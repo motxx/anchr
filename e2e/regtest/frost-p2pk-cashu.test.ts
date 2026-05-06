@@ -48,7 +48,7 @@ import {
   throttledMintProofs,
   throttleMintOp,
   retryOnRateLimit,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
 const BET_SATS = 64;

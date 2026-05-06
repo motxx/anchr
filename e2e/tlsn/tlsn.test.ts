@@ -7,24 +7,24 @@
  *   - Anchr server running: deno task dev
  *
  * Run:
- *   deno test e2e/tlsn.test.ts --allow-all --no-check
+ *   deno task test:e2e:tlsn
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
-import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
-import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
-import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import type { QueryInput, QueryResult } from "../packages/bounty/src/domain/types.ts";
+import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import type { QueryInput, QueryResult } from "../../packages/bounty/src/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";
 
 const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
 const __dirname = import.meta.dirname ?? new URL(".", import.meta.url).pathname;
-const PROVER_BIN = join(__dirname, "../crates/tlsn-prover/target/debug/tlsn-prove");
-const VERIFIER_BIN = join(__dirname, "../crates/tlsn-verifier/target/release/tlsn-verifier");
+const PROVER_BIN = join(__dirname, "../../crates/tlsn-prover/target/debug/tlsn-prove");
+const VERIFIER_BIN = join(__dirname, "../../crates/tlsn-verifier/target/release/tlsn-verifier");
 
 // bitFlyer public API — ECDSA cert (fast MPC-TLS), no rate limit for reads
 const TARGET_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";

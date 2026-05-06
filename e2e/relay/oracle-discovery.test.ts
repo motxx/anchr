@@ -13,14 +13,15 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { generateEphemeralIdentity } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
-import { buildOracleAnnouncementEvent } from "../packages/bounty/src/infrastructure/nostr/events/event-builders.ts";
+import { generateEphemeralIdentity } from "../../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
+import { buildOracleAnnouncementEvent } from "../../packages/bounty/src/infrastructure/nostr/events/event-builders.ts";
 import {
   discoverOracles,
   parseOracleAnnouncementEvent,
-} from "../packages/bounty/src/infrastructure/oracle-client/oracle-discovery.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
-import type { OracleInfo } from "../packages/bounty/src/domain/oracle-types.ts";
+} from "../../packages/bounty/src/infrastructure/oracle-client/oracle-discovery.ts";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "../../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import type { OracleInfo } from "../../packages/bounty/src/domain/oracle-types.ts";
+import { isRelayReachable } from "../helpers/regtest.ts";
 
 // ---------------------------------------------------------------------------
 // Relay connectivity
@@ -29,20 +30,7 @@ import type { OracleInfo } from "../packages/bounty/src/domain/oracle-types.ts";
 const NOSTR_RELAYS_ENV = Deno.env.get("NOSTR_RELAYS")?.trim();
 const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
 
-async function isRelayReachable(): Promise<boolean> {
-  try {
-    const ws = new WebSocket(RELAY_URL);
-    return await new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => { ws.close(); resolve(false); }, 2000);
-      ws.onopen = () => { clearTimeout(timeout); ws.close(); resolve(true); };
-      ws.onerror = () => { clearTimeout(timeout); resolve(false); };
-    });
-  } catch {
-    return false;
-  }
-}
-
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable() : false;
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(

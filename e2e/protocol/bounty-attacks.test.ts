@@ -1,15 +1,15 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
+import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
 import {
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
   makeEscrowInfo,
   driveToProcessing,
-} from "../packages/bounty/src/testing/protocol-helpers.ts";
+} from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
 describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {

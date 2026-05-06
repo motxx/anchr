@@ -13,29 +13,17 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
-import { createQueryService } from "../packages/bounty/src/application/query-service.ts";
-import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { publishQueryToRelay } from "../packages/bounty/src/infrastructure/nostr/transport/relay-publish.ts";
-import { closePool } from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
-import { ANCHR_QUERY_REQUEST } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { publishQueryToRelay } from "../../packages/bounty/src/infrastructure/nostr/transport/relay-publish.ts";
+import { closePool } from "../../packages/bounty/src/infrastructure/nostr/transport/client.ts";
+import { ANCHR_QUERY_REQUEST } from "../../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import { isRelayReachable } from "../helpers/regtest.ts";
 import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();
 const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
-
-async function isRelayReachable(): Promise<boolean> {
-  try {
-    const ws = new WebSocket(RELAY_URL);
-    return await new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => { ws.close(); resolve(false); }, 2000);
-      ws.onopen = () => { clearTimeout(timeout); ws.close(); resolve(true); };
-      ws.onerror = () => { clearTimeout(timeout); resolve(false); };
-    });
-  } catch {
-    return false;
-  }
-}
 
 async function waitForRelayEvent(
   relayUrl: string,
@@ -64,7 +52,7 @@ async function waitForRelayEvent(
 
 // Both conditions required: NOSTR_RELAYS env var must be set (so the worker API
 // knows where to publish) AND the relay must be reachable.
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable() : false;
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(`[e2e] NOSTR_RELAYS not set – relay tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay`);

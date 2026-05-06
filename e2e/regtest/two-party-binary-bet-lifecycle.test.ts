@@ -36,15 +36,15 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/two-party-binary-bet/src/server-routes.ts";
-import { openKannagiStore, type KannagiStore } from "../example/two-party-binary-bet/src/kannagi-store.ts";
-import { createLockedToken } from "../example/two-party-binary-bet/src/exchange-protocol.ts";
+} from "../../example/two-party-binary-bet/src/server-routes.ts";
+import { openKannagiStore, type KannagiStore } from "../../example/two-party-binary-bet/src/kannagi-store.ts";
+import { createLockedToken } from "../../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
   createWallet,
   generateKeypair,
   throttledMintProofs,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

@@ -15,7 +15,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService } from "../packages/bounty/src/application/query-service.ts";
+import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
@@ -27,7 +27,7 @@ import {
   makeServiceWithPreimage,
   makeEscrowInfo,
   driveToProcessing,
-} from "../packages/bounty/src/testing/protocol-helpers.ts";
+} from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
 // =============================================================================
 // 1. Oracle cannot steal BTC (NUT-11 P2PK)

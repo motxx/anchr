@@ -36,7 +36,7 @@ import {
   throttleMintOp,
   retryOnRateLimit,
   generateKeypair,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

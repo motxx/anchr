@@ -22,11 +22,11 @@ import {
   createMarketState,
   type MarketRouteContext,
   type MarketState,
-} from "../example/two-party-binary-bet/src/server-routes.ts";
-import { checkInfraReady, createWallet } from "./helpers/regtest.ts";
-import { MarketMakerBot } from "../scripts/bot-fleet/bot.ts";
-import { POLYMARKET_SEED_MARKETS } from "../scripts/bot-fleet/markets.ts";
-import { fundFleet, runOneRound, seedMarkets } from "../scripts/bot-fleet/fleet.ts";
+} from "../../example/two-party-binary-bet/src/server-routes.ts";
+import { checkInfraReady, createWallet } from "../helpers/regtest.ts";
+import { MarketMakerBot } from "../../scripts/bot-fleet/bot.ts";
+import { POLYMARKET_SEED_MARKETS } from "../../scripts/bot-fleet/markets.ts";
+import { fundFleet, runOneRound, seedMarkets } from "../../scripts/bot-fleet/fleet.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";

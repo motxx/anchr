@@ -29,32 +29,19 @@ import {
   fetchIncomingNutzaps,
   redeemNutzap,
   sendNutzap,
-} from "../example/two-party-binary-bet/src/nip61.ts";
+} from "../../example/two-party-binary-bet/src/nip61.ts";
 import {
   checkInfraReady,
   createWallet,
+  isRelayReachable,
   throttledMintProofs,
-} from "./helpers/regtest.ts";
+} from "../helpers/regtest.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const RELAY_URL = process.env.NOSTR_RELAY_URL ?? "ws://localhost:7777";
 
-async function isRelayReachable(): Promise<boolean> {
-  try {
-    const ws = new WebSocket(RELAY_URL);
-    const ok = await new Promise<boolean>((resolve) => {
-      const timer = setTimeout(() => { ws.close(); resolve(false); }, 2000);
-      ws.onopen = () => { clearTimeout(timer); ws.close(); resolve(true); };
-      ws.onerror = () => { clearTimeout(timer); resolve(false); };
-    });
-    return ok;
-  } catch {
-    return false;
-  }
-}
-
-const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable();
+const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable(RELAY_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 

@@ -103,6 +103,23 @@ export function generateKeypair() {
   return { secretKey: bytesToHex(sk), publicKey: pk };
 }
 
+/**
+ * Probe a `ws://host:port` URL by opening a raw TCP connection. Avoids
+ * `new WebSocket()` so the resource cleans up synchronously and does not
+ * trip Deno's resource sanitizer when called from module top level.
+ */
+export async function isRelayReachable(wsUrl: string): Promise<boolean> {
+  try {
+    const parsed = new URL(wsUrl);
+    const port = parsed.port ? Number(parsed.port) : (parsed.protocol === "wss:" ? 443 : 80);
+    const conn = await Deno.connect({ hostname: parsed.hostname, port });
+    conn.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Check if both Cashu mint and lnd-user are reachable. Warns on failure. */
 export async function checkInfraReady(mintUrl: string): Promise<boolean> {
   const [mintReachable, lndReachable] = await Promise.all([

@@ -23,13 +23,14 @@ import {
   publishMarket,
   discoverMarkets,
   type MarketIdentity,
-} from "../example/two-party-binary-bet/src/nostr-market.ts";
-import { createMarketHtlc } from "../example/two-party-binary-bet/src/market-oracle.ts";
+} from "../../example/two-party-binary-bet/src/nostr-market.ts";
+import { createMarketHtlc } from "../../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
   TwoPartyBinaryBet,
   MarketResolution,
   BetEventContent,
-} from "../example/two-party-binary-bet/src/market-types.ts";
+} from "../../example/two-party-binary-bet/src/market-types.ts";
+import { isRelayReachable } from "../helpers/regtest.ts";
 
 // ---------------------------------------------------------------------------
 // Relay connectivity
@@ -39,30 +40,7 @@ const NOSTR_RELAYS_ENV = Deno.env.get("NOSTR_RELAYS")?.trim();
 const RELAY_URL =
   NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
 
-async function isRelayReachable(): Promise<boolean> {
-  try {
-    const ws = new WebSocket(RELAY_URL);
-    return await new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => {
-        ws.close();
-        resolve(false);
-      }, 2000);
-      ws.onopen = () => {
-        clearTimeout(timeout);
-        ws.close();
-        resolve(true);
-      };
-      ws.onerror = () => {
-        clearTimeout(timeout);
-        resolve(false);
-      };
-    });
-  } catch {
-    return false;
-  }
-}
-
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable() : false;
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(

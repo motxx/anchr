@@ -7,7 +7,7 @@
  *   - Puppeteer (npm:puppeteer in deno.json import map)
  *
  * Run:
- *   deno test e2e/tlsn-browser.test.ts --allow-all --no-check
+ *   deno task test:e2e:tlsn
  */
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";

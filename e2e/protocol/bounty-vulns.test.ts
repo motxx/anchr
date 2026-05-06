@@ -1,15 +1,15 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createOracleRegistry } from "../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
-import { MIN_ESCROW_LOCKTIME_SECS } from "../packages/bounty/src/application/query-escrow-validation.ts";
+import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
+import { MIN_ESCROW_LOCKTIME_SECS } from "../../packages/bounty/src/application/query-escrow-validation.ts";
 import {
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage as makeExploitService,
-} from "../packages/bounty/src/testing/protocol-helpers.ts";
+} from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
 describe("VULN-1: Preimage is returned on successful oracle verification", () => {
   test("preimage is returned when oracle verification passes", async () => {

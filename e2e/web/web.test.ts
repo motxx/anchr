@@ -8,7 +8,7 @@
  *   2. Expo web running on localhost:8082 (cd example/expo-worker-app && bun run web -- --port 8082)
  *
  * Run:
- *   bun test e2e/web.test.ts
+ *   deno task test:e2e:web
  */
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
