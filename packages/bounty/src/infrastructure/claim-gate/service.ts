@@ -60,6 +60,19 @@ export interface SubmitProofGateClaimResult<C extends ProofGateCondition = Proof
   nullifier_hash?: string;
 }
 
+export interface ProofGateCampaignStatus<C extends ProofGateCondition = ProofGateCondition> {
+  id: string;
+  name: string;
+  status: ProofGateCampaign<C>["status"];
+  token_amount_per_claim: number;
+  total_budget_sats: number;
+  max_claims: number;
+  approved_claims: number;
+  remaining_claims: number;
+  mint_url?: string;
+  conditions: C[];
+}
+
 export class ProofGateError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
@@ -197,7 +210,7 @@ export class ProofGateService<C extends ProofGateCondition = ProofGateCondition>
     };
   }
 
-  async status(campaignId: string) {
+  async status(campaignId: string): Promise<ProofGateCampaignStatus<C>> {
     const campaign = await this.#store.getCampaign(campaignId);
     if (!campaign) throw new ProofGateError(404, "campaign_not_found", "Campaign not found");
     const approved_claims = await this.#store.approvedClaimCount(campaign.id);

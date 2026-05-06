@@ -37,6 +37,7 @@ COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap
 COPY packages/blossom/deno.json ./packages/blossom/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
+COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
 RUN deno install
 
 COPY . .
