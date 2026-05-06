@@ -73,7 +73,7 @@ run_local() {
   # pre-push masks failures that would surface on CI.
   echo "  Building frost-signer..."
   if (cd crates/frost-signer && cargo build --release 2>&1); then
-    run_test "frost e2e"        deno task test:e2e:frost
+    FROST_E2E_REQUIRE_CORE=1 run_test "frost e2e" deno task test:e2e:frost
   else
     fail "frost-signer build"
   fi
@@ -116,6 +116,20 @@ wait_for_service() {
   local name="$1" url="$2" max_attempts="${3:-30}"
   for i in $(seq 1 "$max_attempts"); do
     if curl -sf "$url" > /dev/null 2>&1; then
+      echo "  $name ready."
+      return 0
+    fi
+    [ "$((i % 5))" = "0" ] && echo "  Waiting for $name... ($i/$max_attempts)"
+    sleep 2
+  done
+  echo "  ERROR: $name not ready after $((max_attempts * 2))s" >&2
+  return 1
+}
+
+wait_for_tcp_service() {
+  local name="$1" host="$2" port="$3" max_attempts="${4:-30}"
+  for i in $(seq 1 "$max_attempts"); do
+    if bash -c ":</dev/tcp/$host/$port" > /dev/null 2>&1; then
       echo "  $name ready."
       return 0
     fi
@@ -179,6 +193,10 @@ run_docker_tests() {
   BLOSSOM_SERVERS=http://localhost:3333 \
   run_test "relay e2e" deno task test:e2e:relay
 
+  ANCHR_E2E_REQUIRE_INFRA=1 \
+  BLOSSOM_SERVERS=http://localhost:3333 \
+  run_test "blossom integration" deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
+
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
   CASHU_MINT_URL=http://localhost:3338 \
@@ -186,13 +204,31 @@ run_docker_tests() {
   BLOSSOM_SERVERS=http://localhost:3333 \
   run_test "regtest e2e" deno task test:e2e:regtest
 
-  # TLSN bucket — boots its own verifier service. Skipped if the
-  # tlsn-prover binary isn't built (test bails early via require checks).
+  # TLSN bucket — boots its own verifier service and builds the local
+  # prover/verifier binaries first so this path cannot pass by skipping all
+  # proof-producing tests.
   step "Phase 4: TLSNotary E2E"
+  echo "  Building tlsn-prover..."
+  if ! (cd crates/tlsn-prover && cargo build 2>&1); then
+    fail "tlsn-prover build"
+    return
+  fi
+
+  echo "  Building tlsn-verifier..."
+  if ! (cd crates/tlsn-verifier && cargo build --release 2>&1); then
+    fail "tlsn-verifier build"
+    return
+  fi
+
   echo "  Starting tlsn-verifier..."
-  docker compose up -d tlsn-verifier 2>&1 || true
-  sleep 3
-  run_test "tlsn e2e" deno task test:e2e:tlsn
+  if ! docker compose up -d tlsn-verifier 2>&1; then
+    fail "tlsn-verifier start"
+    return
+  fi
+  wait_for_tcp_service "TLSN verifier TCP" "localhost" "7046" 30 || { fail "tlsn-verifier TCP readiness"; return; }
+  wait_for_tcp_service "TLSN verifier WS"  "localhost" "7047" 30 || { fail "tlsn-verifier WS readiness"; return; }
+
+  TLSN_E2E_REQUIRE_CORE=1 run_test "tlsn e2e" deno task test:e2e:tlsn
 }
 
 # --- Main ---

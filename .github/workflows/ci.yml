@@ -51,14 +51,12 @@ jobs:
         run: cd crates/frost-signer && cargo build --release
 
       - name: Typecheck
-        run: deno check src/**/*.ts
+        run: deno task check
 
       - name: Cargo dependency audit
         run: |
-          cargo install cargo-audit --quiet 2>/dev/null || true
-          cd crates/frost-signer && cargo audit --deny warnings 2>&1 || true
-          cd ../tlsn-prover && cargo audit --deny warnings 2>&1 || true
-          cd ../tlsn-server && cargo audit --deny warnings 2>&1 || true
+          cargo install cargo-audit --quiet
+          bash scripts/cargo-audit-all.sh
 
       # Phase 1: Local tests (no Docker)
       - name: Local tests (lint + unit + integration + protocol e2e + frost e2e + scripts + examples + pentest)
@@ -69,11 +67,29 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d relay blossom
-          sleep 3
+          for service in "Nostr relay:http://localhost:7777" "Blossom:http://localhost:3333"; do
+            name="${service%%:*}"
+            url="${service#*:}"
+            echo "Waiting for $name..."
+            for i in $(seq 1 30); do
+              if curl -sf "$url" > /dev/null 2>&1; then
+                echo "$name ready."
+                break
+              fi
+              if [ "$i" = "30" ]; then
+                echo "::error::$name not ready at $url"
+                docker compose logs relay blossom
+                exit 1
+              fi
+              sleep 2
+            done
+          done
 
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: deno task test:e2e:relay
+        run: |
+          deno task test:e2e:relay
+          ANCHR_E2E_REQUIRE_INFRA=1 deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
@@ -101,6 +117,11 @@ jobs:
               echo "Cashu mint ready."
               break
             fi
+            if [ "$i" = "20" ]; then
+              echo "::error::Cashu mint not ready"
+              docker compose logs cashu-mint
+              exit 1
+            fi
             sleep 3
           done
 
@@ -113,16 +134,41 @@ jobs:
           BLOSSOM_SERVERS: http://localhost:3333
 
       # Phase 4: TLSNotary E2E — boots its own verifier service.
-      # Tests bail out early when the tlsn-prover binary isn't built.
+      # Build the local binaries first so this path cannot pass by skipping all
+      # proof-producing tests.
+      - name: Build TLSN prover
+        if: ${{ !cancelled() }}
+        run: cd crates/tlsn-prover && cargo build
+
+      - name: Build TLSN verifier CLI
+        if: ${{ !cancelled() }}
+        run: cd crates/tlsn-verifier && cargo build --release
+
       - name: Start TLSN verifier
         if: ${{ !cancelled() }}
         run: |
           docker compose up -d tlsn-verifier
-          sleep 3
+          for port in 7046 7047; do
+            echo "Waiting for TLSN verifier port $port..."
+            for i in $(seq 1 30); do
+              if bash -c ":</dev/tcp/localhost/$port" > /dev/null 2>&1; then
+                echo "TLSN verifier port $port ready."
+                break
+              fi
+              if [ "$i" = "30" ]; then
+                echo "::error::TLSN verifier port $port not ready"
+                docker compose logs tlsn-verifier
+                exit 1
+              fi
+              sleep 2
+            done
+          done
 
       - name: TLSN E2E tests
         if: ${{ !cancelled() }}
         run: deno task test:e2e:tlsn
+        env:
+          TLSN_E2E_REQUIRE_CORE: "1"
 
       - name: Stop infrastructure
         if: always()

@@ -24,6 +24,7 @@ import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();
 const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const REQUIRE_INFRA = process.env.ANCHR_E2E_REQUIRE_INFRA === "1";
 
 async function waitForRelayEvent(
   relayUrl: string,
@@ -58,6 +59,9 @@ if (!NOSTR_RELAYS_ENV) {
   console.warn(`[e2e] NOSTR_RELAYS not set – relay tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay`);
 } else if (!RELAY_REACHABLE) {
   console.warn(`[e2e] Relay not reachable at ${RELAY_URL} – tests will be skipped. Run: docker compose up -d`);
+}
+if (REQUIRE_INFRA && !RELAY_REACHABLE) {
+  throw new Error("Nostr relay e2e infrastructure is required but not ready");
 }
 
 const suite = RELAY_REACHABLE ? describe : describe.ignore;

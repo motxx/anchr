@@ -16,11 +16,7 @@ const PNG_BYTES = Buffer.from(
   "base64",
 );
 
-function requireBlossom() {
-  if (!isBlossomEnabled()) {
-    throw new Error("BLOSSOM_SERVERS must be set. Run: docker compose up -d && export BLOSSOM_SERVERS=http://localhost:3333");
-  }
-}
+const REQUIRE_INFRA = Deno.env.get("ANCHR_E2E_REQUIRE_INFRA") === "1";
 
 async function isBlossomReachable(): Promise<boolean> {
   if (!isBlossomEnabled()) return false;
@@ -35,6 +31,10 @@ describe("worker api photo proof (Blossom)", () => {
   test("supports photo upload, submission, and attachment metadata",
     withEnv({ HTTP_API_KEY: undefined, HTTP_API_KEYS: undefined }, async () => {
     if (!(await isBlossomReachable())) {
+      if (REQUIRE_INFRA) {
+        const reason = isBlossomEnabled() ? "Blossom server not reachable" : "BLOSSOM_SERVERS must be set";
+        throw new Error(`${reason}. Run: docker compose up -d blossom && export BLOSSOM_SERVERS=http://localhost:3333`);
+      }
       console.log("[blossom-test] SKIPPED — Blossom server not reachable");
       return;
     }

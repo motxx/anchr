@@ -14,7 +14,7 @@
  * 10. Verify final status
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";

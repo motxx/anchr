@@ -7,7 +7,7 @@
  * 4. tlsn-prove で proof 生成
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;

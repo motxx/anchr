@@ -95,7 +95,7 @@ const customer = createCustomer({
 ```
 
 Real e2e coverage against a regtest Cashu mint and Nostr relay lives at
-`e2e/sdk-integration.test.ts` in this repo.
+`e2e/regtest/sdk-integration.test.ts` in this repo.
 
 ## License
 

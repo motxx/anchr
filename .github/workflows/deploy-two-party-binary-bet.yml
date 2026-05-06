@@ -74,7 +74,7 @@ jobs:
             example/two-party-binary-bet/src/nip60.ts \
             example/two-party-binary-bet/src/nip61.ts
       - name: Unit tests (market + bot fleet)
-        run: deno test example/two-party-binary-bet/src/ scripts/bot-fleet/ --allow-all --no-check
+        run: deno test example/two-party-binary-bet/src/ scripts/bot-fleet/ --allow-all
       - name: Build UI
         run: deno task build:ui
 

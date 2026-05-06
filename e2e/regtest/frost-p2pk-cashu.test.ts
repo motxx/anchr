@@ -22,7 +22,7 @@
  *
  * Run:
  *   CASHU_MINT_URL=http://localhost:3338 \
- *   deno test e2e/frost-p2pk-cashu.test.ts --allow-all --no-check
+ *   deno test e2e/frost-p2pk-cashu.test.ts --allow-all
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";

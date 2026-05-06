@@ -21,7 +21,7 @@
  *   docker compose restart cashu-mint
  *
  * Run:
- *   deno test e2e/core-flow.test.ts --allow-all --no-check
+ *   deno test e2e/core-flow.test.ts --allow-all
  */
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
