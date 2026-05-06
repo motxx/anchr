@@ -59,25 +59,24 @@ run_local() {
   # Single chain of every lint that gates merges. Keeping this as
   # `lint:strict` (defined in deno.json) means CI and pre-commit share one
   # source of truth — adding a new lint to the chain auto-propagates here.
-  run_test "lint:strict"       deno task lint:strict
-  run_test "dep audit"         deno task lint:deps
-  run_test "unit tests"        deno task test:unit
-  run_test "bounty tests"      deno task test:bounty
+  run_test "lint:strict"        deno task lint:strict
+  run_test "dep audit"          deno task lint:deps
+  run_test "unit tests"         deno task test:unit
+  run_test "integration tests"  deno task test:integration
+  run_test "protocol e2e"       deno task test:e2e:protocol
+  run_test "scripts tests"      deno task test:scripts
+  run_test "example tests"      deno task test:examples
 
   # CI builds frost-signer in a dedicated step before tests run. Mirror that
-  # here so e2e/frost-threshold.test.ts actually exercises against the binary
-  # locally — without it the FROST tests silently skip and a green pre-push
-  # masks failures that would surface on CI.
+  # here so e2e/frost/frost-threshold.test.ts actually exercises against the
+  # binary locally — without it the FROST e2e silently skips and a green
+  # pre-push masks failures that would surface on CI.
   echo "  Building frost-signer..."
   if (cd crates/frost-signer && cargo build --release 2>&1); then
-    run_test "FROST tests"     deno task test:frost
+    run_test "frost e2e"        deno task test:e2e:frost
   else
     fail "frost-signer build"
   fi
-
-  run_test "integration tests" deno task test:integration
-  run_test "scripts tests"     deno task test:scripts
-  run_test "example tests"     deno task test:example
 }
 
 # --- Phase 1.5: Pentest (needs app server running) ---
@@ -105,7 +104,7 @@ run_pentest() {
 
   PENTEST_APP_URL="http://localhost:$port" \
   HTTP_API_KEYS=pentest-key-001 \
-  run_test "pentest" deno task test:pentest
+  run_test "pentest e2e" deno task test:e2e:pentest
 
   kill $server_pid 2>/dev/null || true
   wait $server_pid 2>/dev/null || true
@@ -178,14 +177,22 @@ run_docker_tests() {
 
   NOSTR_RELAYS=ws://localhost:7777 \
   BLOSSOM_SERVERS=http://localhost:3333 \
-  run_test "relay e2e" deno task test:relay
+  run_test "relay e2e" deno task test:e2e:relay
 
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
   CASHU_MINT_URL=http://localhost:3338 \
   NOSTR_RELAYS=ws://localhost:7777 \
   BLOSSOM_SERVERS=http://localhost:3333 \
-  run_test "regtest e2e" deno task test:regtest
+  run_test "regtest e2e" deno task test:e2e:regtest
+
+  # TLSN bucket — boots its own verifier service. Skipped if the
+  # tlsn-prover binary isn't built (test bails early via require checks).
+  step "Phase 4: TLSNotary E2E"
+  echo "  Starting tlsn-verifier..."
+  docker compose up -d tlsn-verifier 2>&1 || true
+  sleep 3
+  run_test "tlsn e2e" deno task test:e2e:tlsn
 }
 
 # --- Main ---

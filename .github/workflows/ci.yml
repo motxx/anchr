@@ -61,7 +61,7 @@ jobs:
           cd ../tlsn-server && cargo audit --deny warnings 2>&1 || true
 
       # Phase 1: Local tests (no Docker)
-      - name: Local tests (lint + unit + protocol + frost + integration + example + pentest)
+      - name: Local tests (lint + unit + integration + protocol e2e + frost e2e + scripts + examples + pentest)
         run: deno task test:all
 
       # Phase 2: Docker-dependent tests
@@ -73,7 +73,7 @@ jobs:
 
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: deno task test:relay
+        run: deno task test:e2e:relay
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
@@ -106,11 +106,23 @@ jobs:
 
       - name: Regtest E2E tests (HTLC + Cashu)
         if: ${{ !cancelled() }}
-        run: deno task test:regtest
+        run: deno task test:e2e:regtest
         env:
           CASHU_MINT_URL: http://localhost:3338
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
+
+      # Phase 4: TLSNotary E2E — boots its own verifier service.
+      # Tests bail out early when the tlsn-prover binary isn't built.
+      - name: Start TLSN verifier
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose up -d tlsn-verifier
+          sleep 3
+
+      - name: TLSN E2E tests
+        if: ${{ !cancelled() }}
+        run: deno task test:e2e:tlsn
 
       - name: Stop infrastructure
         if: always()
