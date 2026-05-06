@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "../oracle-service/server.ts";
 import { createHttpOracle } from "./http-oracle.ts";
@@ -7,51 +7,46 @@ import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const TEST_ORACLE_ID = "test-http-oracle";
 const TEST_API_KEY = "test-secret";
-const TEST_PORT = 14000 + Math.floor(Math.random() * 1000);
 
-const makeQuery = (id: string): Query => makeBaseQuery({
-  id,
-  description: "Test Store status check",
-  challenge_nonce: "nonce",
-  challenge_rule: "rule",
-  verification_requirements: ["ai_check"],
-  expires_at: Date.now() + 60_000,
-});
+const makeQuery = (id: string): Query =>
+  makeBaseQuery({
+    id,
+    description: "Test Store status check",
+    challenge_nonce: "nonce",
+    challenge_rule: "rule",
+    verification_requirements: ["ai_check"],
+    expires_at: Date.now() + 60_000,
+  });
 
-const baseUrl = `http://localhost:${TEST_PORT}`;
+const baseUrl = "http://oracle.test";
+const app = buildOracleApp(TEST_ORACLE_ID, TEST_API_KEY);
+const fetchOracle = async (input: string | URL | Request, init?: RequestInit) =>
+  await app.request(input, init);
 
 describe("http-oracle", () => {
-  let server: Deno.HttpServer;
-
-  beforeAll(() => {
-    const app = buildOracleApp(TEST_ORACLE_ID, TEST_API_KEY);
-    server = Deno.serve({ port: TEST_PORT, onListen() {} }, app.fetch);
-  });
-
-  afterAll(async () => {
-    await server.shutdown();
-  });
-
   // --- Oracle server tests ---
 
   test("oracle server health endpoint", async () => {
-    const res = await fetch(`${baseUrl}/health`);
+    const res = await app.request("/health");
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.oracle_id).toBe(TEST_ORACLE_ID);
   });
 
   test("oracle server info endpoint", async () => {
-    const res = await fetch(`${baseUrl}/info`);
+    const res = await app.request("/info");
     const body = await res.json();
     expect(body.id).toBe(TEST_ORACLE_ID);
   });
 
   test("oracle server rejects unauthenticated verify", async () => {
-    const res = await fetch(`${baseUrl}/verify`, {
+    const res = await app.request("/verify", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: makeQuery("q1"), result: { attachments: [], notes: "open" } }),
+      body: JSON.stringify({
+        query: makeQuery("q1"),
+        result: { attachments: [], notes: "open" },
+      }),
     });
     expect(res.status).toBe(401);
     await res.body?.cancel();
@@ -61,7 +56,7 @@ describe("http-oracle", () => {
     const query = makeQuery("q2");
     const result: QueryResult = { attachments: [], notes: "open" };
 
-    const res = await fetch(`${baseUrl}/verify`, {
+    const res = await app.request("/verify", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -87,6 +82,7 @@ describe("http-oracle", () => {
       endpoint: baseUrl,
       fee_ppm: 50_000,
       apiKey: TEST_API_KEY,
+      fetch: fetchOracle,
     });
 
     expect(oracle.info.id).toBe(TEST_ORACLE_ID);
@@ -107,6 +103,7 @@ describe("http-oracle", () => {
       name: "Test Oracle",
       endpoint: baseUrl,
       fee_ppm: 0,
+      fetch: fetchOracle,
       // no apiKey
     });
 

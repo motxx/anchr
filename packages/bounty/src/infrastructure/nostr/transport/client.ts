@@ -3,7 +3,11 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_RESPONSE, ANCHR_QUERY_FEEDBACK } from "../events/events.ts";
+import {
+  ANCHR_QUERY_FEEDBACK,
+  ANCHR_QUERY_REQUEST,
+  ANCHR_QUERY_RESPONSE,
+} from "../events/events.ts";
 import { DM_KIND } from "../events/dm.ts";
 import { ANCHR_ORACLE_ATTESTATION } from "../events/oracle-attestation.ts";
 
@@ -22,12 +26,19 @@ export function getNostrConfig(): NostrClientConfig | null {
 }
 
 let _pool: SimplePool | null = null;
+const _knownRelayUrls = new Set<string>();
 
 function getPool(): SimplePool {
   if (!_pool) {
     _pool = new SimplePool();
   }
   return _pool;
+}
+
+function rememberRelayUrls(urls: string[]): void {
+  for (const url of urls) {
+    _knownRelayUrls.add(url);
+  }
 }
 
 // Throws when fewer than `minSuccesses` relays accept the event.
@@ -43,6 +54,7 @@ export async function publishEvent(
   }
 
   const pool = getPool();
+  rememberRelayUrls(urls);
   const successes: string[] = [];
   const failures: string[] = [];
 
@@ -81,6 +93,7 @@ export function subscribeToQueries(
   const config = getNostrConfig();
   const urls = options?.relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   const filter: Filter = {
     kinds: [ANCHR_QUERY_REQUEST],
@@ -105,6 +118,7 @@ export function subscribeToResponses(
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
     kinds: [ANCHR_QUERY_RESPONSE],
@@ -122,6 +136,7 @@ export function subscribeToSettlements(
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
     kinds: [ANCHR_QUERY_FEEDBACK],
@@ -139,6 +154,7 @@ export function subscribeToFeedback(
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
     kinds: [ANCHR_QUERY_FEEDBACK],
@@ -157,6 +173,7 @@ export function subscribeToDMs(
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
     kinds: [DM_KIND],
@@ -175,6 +192,7 @@ export function subscribeToAttestations(
   const config = getNostrConfig();
   const urls = relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
     kinds: [ANCHR_ORACLE_ATTESTATION],
@@ -194,6 +212,7 @@ export async function fetchRecentQueries(
   const config = getNostrConfig();
   const urls = options?.relayUrls ?? config?.relayUrls ?? [];
   const pool = getPool();
+  rememberRelayUrls(urls);
 
   const filter: Filter = {
     kinds: [ANCHR_QUERY_REQUEST],
@@ -213,9 +232,11 @@ export function isNostrEnabled(): boolean {
   return getNostrConfig() !== null;
 }
 
-export function closePool(): void {
+export function closePool(relayUrls?: string[]): void {
   if (_pool) {
-    _pool.close([]);
+    const urls = relayUrls ?? [..._knownRelayUrls];
+    _pool.close(urls);
     _pool = null;
   }
+  _knownRelayUrls.clear();
 }

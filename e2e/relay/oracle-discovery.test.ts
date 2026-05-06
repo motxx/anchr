@@ -28,10 +28,18 @@ import { isRelayReachable } from "../helpers/regtest.ts";
 // ---------------------------------------------------------------------------
 
 const NOSTR_RELAYS_ENV = Deno.env.get("NOSTR_RELAYS")?.trim();
-const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ??
+  "ws://localhost:7777";
 const REQUIRE_INFRA = Deno.env.get("ANCHR_E2E_REQUIRE_INFRA") === "1";
+const RELAY_CLOSE_GRACE_MS = 250;
 
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV
+  ? await isRelayReachable(RELAY_URL)
+  : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(
@@ -58,9 +66,10 @@ async function publishToRelay(event: Event): Promise<void> {
   try {
     await Promise.allSettled(pool.publish([RELAY_URL], event));
     // Allow the relay to index the event before querying.
-    await new Promise((r) => setTimeout(r, 500));
+    await delay(500);
   } finally {
     pool.close([RELAY_URL]);
+    await delay(RELAY_CLOSE_GRACE_MS);
   }
 }
 
@@ -69,11 +78,7 @@ async function publishToRelay(event: Event): Promise<void> {
 // ---------------------------------------------------------------------------
 
 suite(
-  {
-    name: "e2e: the oracle-registry spec — Oracle Registry discovery",
-    sanitizeOps: false,
-    sanitizeResources: false,
-  },
+  "e2e: the oracle-registry spec — Oracle Registry discovery",
   () => {
     // Each test uses its own identity to avoid cross-test interference.
 
@@ -96,7 +101,9 @@ suite(
         description: "Oracle for E2E testing",
       };
 
-      const event = buildOracleAnnouncementEvent(identity, oracleInfo, [RELAY_URL]);
+      const event = buildOracleAnnouncementEvent(identity, oracleInfo, [
+        RELAY_URL,
+      ]);
       await publishToRelay(event);
 
       const announcements = await discoverOracles([RELAY_URL], {
@@ -127,7 +134,9 @@ suite(
         supported_escrow_types: ["p2pk_frost"],
       };
 
-      const event = buildOracleAnnouncementEvent(identity, oracleInfo, [RELAY_URL]);
+      const event = buildOracleAnnouncementEvent(identity, oracleInfo, [
+        RELAY_URL,
+      ]);
 
       // Parse the locally-built event without relay round-trip
       const parsed = parseOracleAnnouncementEvent(event);
@@ -163,8 +172,12 @@ suite(
         supported_escrow_types: ["htlc"],
       };
 
-      const tlsnEvent = buildOracleAnnouncementEvent(identity, tlsnOracle, [RELAY_URL]);
-      const gpsEvent = buildOracleAnnouncementEvent(identity, gpsOracle, [RELAY_URL]);
+      const tlsnEvent = buildOracleAnnouncementEvent(identity, tlsnOracle, [
+        RELAY_URL,
+      ]);
+      const gpsEvent = buildOracleAnnouncementEvent(identity, gpsOracle, [
+        RELAY_URL,
+      ]);
 
       await publishToRelay(tlsnEvent);
       await publishToRelay(gpsEvent);
@@ -210,7 +223,9 @@ suite(
         description: "First version",
       };
 
-      const eventV1 = buildOracleAnnouncementEvent(identity, infoV1, [RELAY_URL]);
+      const eventV1 = buildOracleAnnouncementEvent(identity, infoV1, [
+        RELAY_URL,
+      ]);
       await publishToRelay(eventV1);
 
       // Small delay so created_at differs
@@ -226,7 +241,9 @@ suite(
         description: "Updated version",
       };
 
-      const eventV2 = buildOracleAnnouncementEvent(identity, infoV2, [RELAY_URL]);
+      const eventV2 = buildOracleAnnouncementEvent(identity, infoV2, [
+        RELAY_URL,
+      ]);
       await publishToRelay(eventV2);
 
       // Query — for a parametrized replaceable event (kind 30000-39999),
@@ -244,7 +261,10 @@ suite(
       expect(matching[0]!.name).toBe("Oracle V2");
       expect(matching[0]!.fee_ppm).toBe(25_000);
       expect(matching[0]!.supported_factors).toEqual(["gps", "tlsn"]);
-      expect(matching[0]!.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
+      expect(matching[0]!.supported_escrow_types).toEqual([
+        "htlc",
+        "p2pk_frost",
+      ]);
       expect(matching[0]!.description).toBe("Updated version");
     });
 

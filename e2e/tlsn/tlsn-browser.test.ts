@@ -24,7 +24,11 @@ function findChromium(): string | null {
     if (versions.length === 0) return null;
     versions.sort();
     const latest = versions[versions.length - 1]!;
-    const path = join(base, latest, "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing");
+    const path = join(
+      base,
+      latest,
+      "chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing",
+    );
     return existsSync(path) ? path : null;
   } catch {
     return null;
@@ -32,17 +36,25 @@ function findChromium(): string | null {
 }
 
 const CHROMIUM = findChromium();
-const EXT_BUILD = process.env.TLSN_EXT_BUILD ?? "/tmp/tlsn-extension/packages/extension/build";
+const EXT_BUILD = process.env.TLSN_EXT_BUILD ??
+  "/tmp/tlsn-extension/packages/extension/build";
 const VERIFIER_WS_PORT = 7047;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-function hasChromium(): boolean { return CHROMIUM !== null; }
-function hasExtension(): boolean { return existsSync(join(EXT_BUILD, "manifest.json")); }
+function hasChromium(): boolean {
+  return CHROMIUM !== null;
+}
+function hasExtension(): boolean {
+  return existsSync(join(EXT_BUILD, "manifest.json"));
+}
 
 async function isVerifierRunning(): Promise<boolean> {
   try {
-    const conn = await Deno.connect({ hostname: "localhost", port: VERIFIER_WS_PORT });
+    const conn = await Deno.connect({
+      hostname: "localhost",
+      port: VERIFIER_WS_PORT,
+    });
     conn.close();
     return true;
   } catch {
@@ -50,23 +62,32 @@ async function isVerifierRunning(): Promise<boolean> {
   }
 }
 
-// Puppeteer FrameManager creates internal deferred timers on browser.close().
-describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResources: false }, () => {
+describe("TLSNotary Browser Extension E2E", () => {
   let browser: Browser;
   let page: Page;
   let ready = false;
 
   beforeAll(async () => {
-    if (!hasChromium()) { console.error("[e2e] Chromium not found"); return; }
-    if (!hasExtension()) { console.error("[e2e] Extension not found at", EXT_BUILD); return; }
-    if (!(await isVerifierRunning())) { console.error("[e2e] Verifier not running"); return; }
+    if (!hasChromium()) {
+      console.error("[e2e] Chromium not found");
+      return;
+    }
+    if (!hasExtension()) {
+      console.error("[e2e] Extension not found at", EXT_BUILD);
+      return;
+    }
+    if (!(await isVerifierRunning())) {
+      console.error("[e2e] Verifier not running");
+      return;
+    }
 
     browser = await puppeteer.launch({
       headless: false,
       executablePath: CHROMIUM!,
       userDataDir: "/tmp/chromium-e2e-" + Date.now(),
       args: [
-        "--no-first-run", "--disable-default-apps",
+        "--no-first-run",
+        "--disable-default-apps",
         `--disable-extensions-except=${EXT_BUILD}`,
         `--load-extension=${EXT_BUILD}`,
       ],
@@ -76,9 +97,14 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
     await sleep(3000);
 
     const targets = await browser.targets();
-    const extTarget = targets.find((t) => t.url().includes("chrome-extension://"));
+    const extTarget = targets.find((t) =>
+      t.url().includes("chrome-extension://")
+    );
     const extId = extTarget?.url().match(/chrome-extension:\/\/([a-z]+)/)?.[1];
-    if (!extId) { console.error("[e2e] Extension ID not found"); return; }
+    if (!extId) {
+      console.error("[e2e] Extension ID not found");
+      return;
+    }
 
     page = await browser.newPage();
     await page.goto(`chrome-extension://${extId}/devConsole.html`, {
@@ -88,7 +114,9 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
 
     // Poll for WASM init
     for (let i = 0; i < 30; i++) {
-      const ok = await page.evaluate(() => typeof (window as any).tlsn?.execCode === "function");
+      const ok = await page.evaluate(() =>
+        typeof (window as any).tlsn?.execCode === "function"
+      );
       if (ok) break;
       await sleep(200);
     }
@@ -98,14 +126,20 @@ describe("TLSNotary Browser Extension E2E", { sanitizeOps: false, sanitizeResour
   afterAll(async () => {
     if (browser) {
       const proc = browser.process();
-      if (proc?.stderr) { proc.stderr.removeAllListeners(); proc.stderr.destroy(); }
+      if (proc?.stderr) {
+        proc.stderr.removeAllListeners();
+        proc.stderr.destroy();
+      }
       await browser.close();
       if (proc && proc.exitCode === null) proc.kill("SIGKILL");
     }
   });
 
-  test("MPC-TLS proof via browser extension — bitflyer ECDSA", { sanitizeOps: false, sanitizeResources: false }, async () => {
-    if (!ready) { console.error("[e2e] SKIPPED"); return; }
+  test("MPC-TLS proof via browser extension — bitflyer ECDSA", async () => {
+    if (!ready) {
+      console.error("[e2e] SKIPPED");
+      return;
+    }
 
     // Inject plugin code into CodeMirror editor (triggers React setCode via onChange)
     const pluginCode = `\
@@ -151,13 +185,16 @@ export const main = async () => {
       const cmContent = document.querySelector(".cm-content");
       const view = (cmContent as any)?.cmView?.view;
       if (view) {
-        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: code },
+        });
       }
     }, pluginCode);
 
     // Verify injection
     const editorText = await page.evaluate(
-      () => document.querySelector(".cm-content")?.textContent?.slice(0, 80) || "",
+      () =>
+        document.querySelector(".cm-content")?.textContent?.slice(0, 80) || "",
     );
     expect(editorText).toContain("Anchr E2E");
 
@@ -171,11 +208,12 @@ export const main = async () => {
             if (p.url().includes("confirmPopup") && !popupApproved) {
               await sleep(200);
               await p.evaluate(() => {
-                for (const b of document.querySelectorAll("button"))
+                for (const b of document.querySelectorAll("button")) {
                   if (b.textContent?.toLowerCase().includes("allow")) {
                     (b as HTMLButtonElement).click();
                     return;
                   }
+                }
               });
               popupApproved = true;
               console.error("[e2e] Popup approved");
@@ -187,17 +225,21 @@ export const main = async () => {
 
     // Click "Run Code" button — triggers DevConsole's executeCode() → console output
     await page.evaluate(() => {
-      for (const b of document.querySelectorAll("button"))
+      for (const b of document.querySelectorAll("button")) {
         if (b.textContent?.includes("Run")) {
           (b as HTMLButtonElement).click();
           break;
         }
+      }
     });
 
     // Capture browser console messages for debugging
     page.on("console", (msg) => {
       const text = msg.text();
-      if (text.includes("[ProveManager]") || text.includes("WASM") || text.includes("error") || text.includes("Error")) {
+      if (
+        text.includes("[ProveManager]") || text.includes("WASM") ||
+        text.includes("error") || text.includes("Error")
+      ) {
         console.error("[browser]", text);
       }
     });
@@ -207,14 +249,20 @@ export const main = async () => {
     for (let i = 0; i < 45; i++) {
       await sleep(1000);
       resultText = await page.evaluate(() => document.body?.innerText || "");
-      if (resultText.includes("completed in") || resultText.includes("Error after")) break;
+      if (
+        resultText.includes("completed in") ||
+        resultText.includes("Error after")
+      ) break;
     }
     popupApproved = true;
 
     // Log console output
     const execIdx = resultText.indexOf("Executing");
     if (execIdx >= 0) {
-      console.error("[e2e] Console output:", resultText.slice(execIdx, execIdx + 500));
+      console.error(
+        "[e2e] Console output:",
+        resultText.slice(execIdx, execIdx + 500),
+      );
     }
 
     await page.screenshot({ path: "/tmp/tlsn-browser-e2e-result.png" });

@@ -13,9 +13,11 @@
 
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn, fileExists } from "@anchr/core-runtime";
+import { fileExists, spawn } from "@anchr/core-runtime";
 
-const BROWSE = `${Deno.env.get("HOME")}/.claude/skills/gstack/browse/dist/browse`;
+const BROWSE = `${
+  Deno.env.get("HOME")
+}/.claude/skills/gstack/browse/dist/browse`;
 const SERVER_URL = "http://localhost:3000";
 const WEB_URL = "http://localhost:8082";
 
@@ -41,7 +43,9 @@ async function isWebAppReachable(): Promise<boolean> {
 
 async function isServerReachable(): Promise<boolean> {
   try {
-    const res = await fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${SERVER_URL}/health`, {
+      signal: AbortSignal.timeout(3000),
+    });
     await res.body?.cancel();
     return res.ok;
   } catch {
@@ -69,15 +73,27 @@ describe("e2e: Anchr Worker Web app", () => {
       isServerReachable(),
       hasBrowseTool(),
     ]);
-    if (!webReachable) console.warn("[e2e-web] Web app not reachable at", WEB_URL, "— skipping");
-    if (!serverReachable) console.warn("[e2e-web] Server not reachable at", SERVER_URL, "— skipping");
-    if (!browseAvailable) console.warn("[e2e-web] browse tool not found at", BROWSE, "— skipping");
+    if (!webReachable) {
+      console.warn("[e2e-web] Web app not reachable at", WEB_URL, "— skipping");
+    }
+    if (!serverReachable) {
+      console.warn(
+        "[e2e-web] Server not reachable at",
+        SERVER_URL,
+        "— skipping",
+      );
+    }
+    if (!browseAvailable) {
+      console.warn("[e2e-web] browse tool not found at", BROWSE, "— skipping");
+    }
   });
 
   afterAll(async () => {
     // Clean up test query
     if (testQueryId) {
-      await fetch(`${SERVER_URL}/queries/${testQueryId}/cancel`, { method: "POST" }).catch(() => {});
+      await fetch(`${SERVER_URL}/queries/${testQueryId}/cancel`, {
+        method: "POST",
+      }).catch(() => {});
     }
     // Don't stop browse server — it may be shared with other tests/sessions
   });
@@ -118,13 +134,13 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(testQueryId).toMatch(/^query_/);
   });
 
-  test("web app loads and shows queries", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("web app loads and shows queries", async () => {
     if (skip()) return;
 
     await browse("goto", WEB_URL);
     // Wait for React Query to fetch data
     await browse("wait", "--networkidle");
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const text = await browse("text");
     expect(text).toContain("Anchr");
@@ -143,13 +159,13 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("渋谷");
   });
 
-  test("navigate to query detail view", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("navigate to query detail view", async () => {
     if (skip() || !testQueryId) return;
 
     // Navigate directly to the detail URL (expo-router web routing)
     await browse("goto", `${WEB_URL}/${testQueryId}`);
     await browse("wait", "--networkidle");
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const text = await browse("text");
 
@@ -160,77 +176,92 @@ describe("e2e: Anchr Worker Web app", () => {
     expect(text).toContain("10 sats");
   });
 
-  test("navigate to Wallet tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("navigate to Wallet tab", async () => {
     if (skip()) return;
 
     // Go back to tabs first
     await browse("goto", WEB_URL);
     await browse("wait", "--networkidle");
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1500));
 
     // Click Wallet tab
-    await browse("js", `
+    await browse(
+      "js",
+      `
       const tab = [...document.querySelectorAll('[role="button"], a, [role="tab"]')]
         .find(e => e.textContent.includes('Wallet'));
       if (tab) tab.click();
-    `);
-    await new Promise(r => setTimeout(r, 1000));
+    `,
+    );
+    await new Promise((r) => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Balance");
     expect(text).toContain("sats");
   });
 
-  test("navigate to Settings tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("navigate to Settings tab", async () => {
     if (skip()) return;
 
-    await browse("js", `
+    await browse(
+      "js",
+      `
       const tab = [...document.querySelectorAll('[role="button"], a, [role="tab"]')]
         .find(e => e.textContent.includes('Settings'));
       if (tab) tab.click();
-    `);
-    await new Promise(r => setTimeout(r, 1000));
+    `,
+    );
+    await new Promise((r) => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Settings");
     expect(text).toContain("Server URL");
   });
 
-  test("navigate to Map tab", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("navigate to Map tab", async () => {
     if (skip()) return;
 
-    await browse("js", `
+    await browse(
+      "js",
+      `
       const tab = [...document.querySelectorAll('[role="button"], a, [role="tab"]')]
         .find(e => e.textContent.includes('Map'));
       if (tab) tab.click();
-    `);
-    await new Promise(r => setTimeout(r, 1000));
+    `,
+    );
+    await new Promise((r) => setTimeout(r, 1000));
 
     const text = await browse("text");
     expect(text).toContain("Map");
   });
 
-  test("submit text result via API and verify web reflects status", { sanitizeOps: false, sanitizeResources: false }, async () => {
+  test("submit text result via API and verify web reflects status", async () => {
     if (skip() || !testQueryId) return;
 
     // Submit the worker result via the /result endpoint.
-    const submitRes = await fetch(`${SERVER_URL}/queries/${testQueryId}/result`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        worker_pubkey: "e2e_web_test_worker",
-        gps: { lat: 35.6595, lon: 139.7004 },
-        notes: "E2E web test — 混雑してます",
-      }),
-    });
-    const submitJson = (await submitRes.json()) as { ok: boolean; payment_status: string };
+    const submitRes = await fetch(
+      `${SERVER_URL}/queries/${testQueryId}/result`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          worker_pubkey: "e2e_web_test_worker",
+          gps: { lat: 35.6595, lon: 139.7004 },
+          notes: "E2E web test — 混雑してます",
+        }),
+      },
+    );
+    const submitJson = (await submitRes.json()) as {
+      ok: boolean;
+      payment_status: string;
+    };
     expect(submitJson.ok).toBe(true);
     expect(submitJson.payment_status).toBe("released");
 
     // Navigate back to queries tab and verify
     await browse("goto", WEB_URL);
     await browse("wait", "--networkidle");
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const text = await browse("text");
     // Query should no longer be in pending list (it's completed)
@@ -240,7 +271,9 @@ describe("e2e: Anchr Worker Web app", () => {
     const e2eLine = lines.find((l) => l.includes("E2E Web"));
     // If query appears, it should be in completed section, not pending
     if (e2eLine) {
-      expect(text).not.toContain("E2E Web: 渋谷の様子を撮影してください\nPending");
+      expect(text).not.toContain(
+        "E2E Web: 渋谷の様子を撮影してください\nPending",
+      );
     }
 
     // Clean up — mark as handled

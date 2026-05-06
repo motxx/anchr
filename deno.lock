@@ -33,13 +33,14 @@
     "npm:clsx@2": "2.1.1",
     "npm:esbuild@0.25": "0.25.12",
     "npm:lucide-react@0.577": "0.577.0_react@19.2.4",
-    "npm:nostr-tools@2": "2.23.3",
+    "npm:nostr-tools@2": "2.23.3_typescript@5.9.3",
     "npm:playwright@^1.58.0": "1.59.1",
-    "npm:puppeteer@24": "24.40.0_devtools-protocol@0.0.1581282",
+    "npm:puppeteer@24": "24.40.0_typescript@5.9.3",
     "npm:radix-ui@1": "1.4.3_react@19.2.4_react-dom@19.2.4__react@19.2.4",
     "npm:react-dom@19": "19.2.4_react@19.2.4",
     "npm:react@19": "19.2.4",
-    "npm:tailwind-merge@3": "3.5.0"
+    "npm:tailwind-merge@3": "3.5.0",
+    "npm:typescript@^5.9.3": "5.9.3"
   },
   "jsr": {
     "@db/sqlite@0.12.0": {
@@ -1520,13 +1521,17 @@
         "vary"
       ]
     },
-    "cosmiconfig@9.0.1": {
+    "cosmiconfig@9.0.1_typescript@5.9.3": {
       "integrity": "sha512-hr4ihw+DBqcvrsEDioRO31Z17x71pUYoNe/4h6Z0wB72p7MU7/9gH8Q3s12NFhHPfYBBOV3qyfUxmr/Yn3shnQ==",
       "dependencies": [
         "env-paths",
         "import-fresh",
         "js-yaml",
-        "parse-json"
+        "parse-json",
+        "typescript"
+      ],
+      "optionalPeers": [
+        "typescript"
       ]
     },
     "cross-spawn@7.0.6": {
@@ -2076,7 +2081,7 @@
     "node-addon-api@7.1.1": {
       "integrity": "sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ=="
     },
-    "nostr-tools@2.23.3": {
+    "nostr-tools@2.23.3_typescript@5.9.3": {
       "integrity": "sha512-AALyt9k8xPdF4UV2mlLJ2mgCn4kpTB0DZ8t2r6wjdUh6anfx2cTVBsHUlo9U0EY/cKC5wcNyiMAmRJV5OVEalA==",
       "dependencies": [
         "@noble/ciphers",
@@ -2085,7 +2090,11 @@
         "@scure/base",
         "@scure/bip32",
         "@scure/bip39",
-        "nostr-wasm"
+        "nostr-wasm",
+        "typescript"
+      ],
+      "optionalPeers": [
+        "typescript"
       ]
     },
     "nostr-wasm@0.1.0": {
@@ -2224,7 +2233,7 @@
         "ws"
       ]
     },
-    "puppeteer@24.40.0_devtools-protocol@0.0.1581282": {
+    "puppeteer@24.40.0_typescript@5.9.3": {
       "integrity": "sha512-IxQbDq93XHVVLWHrAkFP7F7iHvb9o0mgfsSIMlhHb+JM+JjM1V4v4MNSQfcRWJopx9dsNOr9adYv0U5fm9BJBQ==",
       "dependencies": [
         "@puppeteer/browsers",
@@ -2566,6 +2575,10 @@
     "typed-query-selector@2.12.1": {
       "integrity": "sha512-uzR+FzI8qrUEIu96oaeBJmd9E7CFEiQ3goA5qCVgc4s5llSubcfGHq9yUstZx/k4s9dXHVKsE35YWoFyvEqEHA=="
     },
+    "typescript@5.9.3": {
+      "integrity": "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==",
+      "bin": true
+    },
     "undici-types@7.16.0": {
       "integrity": "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="
     },
@@ -2753,7 +2766,12 @@
           "jsr:@std/testing@1",
           "npm:@cashu/cashu-ts@3",
           "npm:nostr-tools@2"
-        ]
+        ],
+        "packageJson": {
+          "dependencies": [
+            "npm:typescript@^5.9.3"
+          ]
+        }
       },
       "packages/tlsn-toolkit": {
         "dependencies": [

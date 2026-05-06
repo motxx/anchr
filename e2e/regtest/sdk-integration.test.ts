@@ -38,7 +38,7 @@ import {
   parseQueryRequestEvent,
 } from "../../packages/sdk/src/events.ts";
 import type { OracleClient } from "../../packages/sdk/src/oracle.ts";
-import { Wallet, getDecodedToken } from "@cashu/cashu-ts";
+import { getDecodedToken, Wallet } from "@cashu/cashu-ts";
 
 import {
   checkInfraReady,
@@ -57,14 +57,7 @@ const sharedWallet = INFRA_READY ? await createWallet(MINT_URL) : undefined;
 const suite = INFRA_READY ? describe : describe.ignore;
 
 suite(
-  {
-    name: "e2e: SDK Customer ↔ Provider via real Cashu mint + real Nostr relay",
-    // SimplePool keeps long-lived WebSocket connections; cleanup races with
-    // the test runner's leak detector, so we opt out (matches the pattern in
-    // e2e/relay.test.ts and e2e/oracle-discovery.test.ts).
-    sanitizeOps: false,
-    sanitizeResources: false,
-  },
+  "e2e: SDK Customer ↔ Provider via real Cashu mint + real Nostr relay",
   () => {
     test("end-to-end query: customer mints sats, provider redeems HTLC at the mint", async () => {
       // Generate a fresh preimage S and the matching hash H = sha256(S).
@@ -74,7 +67,10 @@ suite(
       const hashHex = bytesToHex(sha256(preimageBytes));
 
       // Mint Cashu proofs into the customer's wallet via Lightning.
-      const customerProofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
+      const customerProofs = await throttledMintProofs(
+        sharedWallet!,
+        BOUNTY_SATS,
+      );
 
       // Generate keys for oracle and provider.
       const oracleKey = generateKeypair();
@@ -207,7 +203,10 @@ suite(
       crypto.getRandomValues(preimageBytes);
       const hashHex = bytesToHex(sha256(preimageBytes));
 
-      const customerProofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
+      const customerProofs = await throttledMintProofs(
+        sharedWallet!,
+        BOUNTY_SATS,
+      );
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
       const customerKey = generateKeypair();
 
@@ -266,7 +265,11 @@ suite(
         body: JSON.stringify({
           inputs: decoded.proofs,
           outputs: [
-            { amount: inputAmount, id: decoded.proofs[0]?.id ?? "00", B_: "02" + "ff".repeat(32) },
+            {
+              amount: inputAmount,
+              id: decoded.proofs[0]?.id ?? "00",
+              B_: "02" + "ff".repeat(32),
+            },
           ],
         }),
       });

@@ -213,13 +213,11 @@ run_docker_tests() {
     fail "tlsn-prover build"
     return
   fi
-
   echo "  Building tlsn-verifier..."
   if ! (cd crates/tlsn-verifier && cargo build --release 2>&1); then
     fail "tlsn-verifier build"
     return
   fi
-
   echo "  Starting tlsn-verifier..."
   if ! docker compose up -d tlsn-verifier 2>&1; then
     fail "tlsn-verifier start"

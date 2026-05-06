@@ -4,7 +4,11 @@
  */
 
 import type { BlossomKeyMap, Query, QueryResult } from "../../domain/types.ts";
-import type { Oracle, OracleAttestation, OracleInfo } from "../../domain/oracle-types.ts";
+import type {
+  Oracle,
+  OracleAttestation,
+  OracleInfo,
+} from "../../domain/oracle-types.ts";
 import {
   isRecord,
   optionalNumber,
@@ -22,6 +26,11 @@ export interface HttpOracleConfig {
   apiKey?: string;
   /** Request timeout in milliseconds (default: 30_000). */
   timeoutMs?: number;
+  /** Injectable fetch implementation for in-process tests and custom runtimes. */
+  fetch?: (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => Promise<Response>;
 }
 
 /**
@@ -42,7 +51,11 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
 
   return {
     info,
-    async verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      result: QueryResult,
+      blossomKeys?: BlossomKeyMap,
+    ): Promise<OracleAttestation> {
       const url = `${config.endpoint.replace(/\/+$/, "")}/verify`;
       const headers: Record<string, string> = {
         "content-type": "application/json",
@@ -52,10 +65,14 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 30_000);
+      const timeout = setTimeout(
+        () => controller.abort(),
+        config.timeoutMs ?? 30_000,
+      );
+      const fetchFn = config.fetch ?? fetch;
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchFn(url, {
           method: "POST",
           headers,
           body: JSON.stringify({ query, result, blossom_keys: blossomKeys }),
@@ -64,12 +81,16 @@ export function createHttpOracle(config: HttpOracleConfig): Oracle {
 
         if (!response.ok) {
           const text = await response.text().catch(() => "");
-          throw new Error(`Oracle ${config.id} returned ${response.status}: ${text}`);
+          throw new Error(
+            `Oracle ${config.id} returned ${response.status}: ${text}`,
+          );
         }
 
         const json: unknown = await response.json();
         if (!isRecord(json)) {
-          throw new Error(`Oracle ${config.id} returned malformed attestation (not an object)`);
+          throw new Error(
+            `Oracle ${config.id} returned malformed attestation (not an object)`,
+          );
         }
 
         return {

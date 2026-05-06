@@ -5,10 +5,13 @@
  * peer HTTP endpoints using Hono test apps so no Rust binary is needed.
  */
 
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
-import { coordinateSigning, type SigningCoordinatorConfig } from "./signing-coordinator.ts";
+import {
+  coordinateSigning,
+  type SigningCoordinatorConfig,
+} from "./signing-coordinator.ts";
 import type { FrostNodeConfig } from "./config.ts";
 
 // ---------------------------------------------------------------------------
@@ -16,7 +19,10 @@ import type { FrostNodeConfig } from "./config.ts";
 // ---------------------------------------------------------------------------
 
 const FAKE_COMMITMENTS_LOCAL = { hiding: "aaa111", binding: "bbb222" };
-const FAKE_NONCES_LOCAL = { hiding_nonce: "nonce_hiding", binding_nonce: "nonce_binding" };
+const FAKE_NONCES_LOCAL = {
+  hiding_nonce: "nonce_hiding",
+  binding_nonce: "nonce_binding",
+};
 const FAKE_COMMITMENTS_PEER2 = { hiding: "ccc333", binding: "ddd444" };
 const FAKE_COMMITMENTS_PEER3 = { hiding: "eee555", binding: "fff666" };
 const FAKE_SHARE_LOCAL = "share_local_01";
@@ -43,9 +49,28 @@ const FAKE_SIGNATURE = "ab".repeat(32);
 // a custom script.
 
 import { _setFrostSignerPathForTest } from "./frost-cli.ts";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(
+      new DOMException("The operation was aborted", "AbortError"),
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new DOMException("The operation was aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Mock frost-signer binary — a shell script that returns fake JSON based
@@ -83,7 +108,9 @@ esac
 
 function teardownMockBinary() {
   _setFrostSignerPathForTest(undefined);
-  try { rmSync(mockDir, { recursive: true, force: true }); } catch { /* ok */ }
+  try {
+    rmSync(mockDir, { recursive: true, force: true });
+  } catch { /* ok */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,13 +150,24 @@ function createMockPeerApp(opts: {
 
   app.post("/frost/signer/round1", async (c) => {
     if (opts.round1Delay) {
-      await new Promise((r) => setTimeout(r, opts.round1Delay));
+      try {
+        await sleep(opts.round1Delay, c.req.raw.signal);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return new Response(null, { status: 499 });
+        }
+        throw error;
+      }
     }
     const resp = opts.round1Response ?? {
       status: 200,
       body: {
-        commitments: opts.signerIndex === 2 ? FAKE_COMMITMENTS_PEER2 : FAKE_COMMITMENTS_PEER3,
-        nonce_id: `nonce-${opts.signerIndex}-${crypto.randomUUID().slice(0, 8)}`,
+        commitments: opts.signerIndex === 2
+          ? FAKE_COMMITMENTS_PEER2
+          : FAKE_COMMITMENTS_PEER3,
+        nonce_id: `nonce-${opts.signerIndex}-${
+          crypto.randomUUID().slice(0, 8)
+        }`,
       },
     };
     return c.json(resp.body as Record<string, unknown>, resp.status as 200);
@@ -137,12 +175,21 @@ function createMockPeerApp(opts: {
 
   app.post("/frost/signer/round2", async (c) => {
     if (opts.round2Delay) {
-      await new Promise((r) => setTimeout(r, opts.round2Delay));
+      try {
+        await sleep(opts.round2Delay, c.req.raw.signal);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return new Response(null, { status: 499 });
+        }
+        throw error;
+      }
     }
     const resp = opts.round2Response ?? {
       status: 200,
       body: {
-        signature_share: opts.signerIndex === 2 ? FAKE_SHARE_PEER2 : FAKE_SHARE_PEER3,
+        signature_share: opts.signerIndex === 2
+          ? FAKE_SHARE_PEER2
+          : FAKE_SHARE_PEER3,
       },
     };
     return c.json(resp.body as Record<string, unknown>, resp.status as 200);
@@ -165,7 +212,11 @@ function installMockFetch(
     input: RequestInfo | URL,
     init?: RequestInit,
   ): Promise<Response> => {
-    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const url = typeof input === "string"
+      ? input
+      : input instanceof URL
+      ? input.toString()
+      : input.url;
 
     for (const [baseUrl, app] of peerApps) {
       if (url.startsWith(baseUrl)) {
@@ -179,13 +230,16 @@ function installMockFetch(
           method: init?.method ?? "GET",
           headers: init?.headers as Record<string, string>,
           body: init?.body as string,
+          signal,
         });
         if (signal) {
           return await Promise.race([
             responsePromise,
             new Promise<never>((_resolve, reject) => {
               signal.addEventListener("abort", () => {
-                reject(new DOMException("The operation was aborted", "AbortError"));
+                reject(
+                  new DOMException("The operation was aborted", "AbortError"),
+                );
               });
             }),
           ]);
@@ -206,7 +260,7 @@ function restoreFetch(original: FetchFn): void {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("coordinateSigning", { sanitizeOps: false, sanitizeResources: false }, () => {
+describe("coordinateSigning", () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
@@ -266,7 +320,10 @@ describe("coordinateSigning", { sanitizeOps: false, sanitizeResources: false }, 
 
     expect(capturedBody).not.toBeNull();
     expect(capturedBody!.message).toBe("cafebabe");
-    expect(capturedBody!.requirement).toEqual({ id: "q-test", factors: ["ai_check"] });
+    expect(capturedBody!.requirement).toEqual({
+      id: "q-test",
+      factors: ["ai_check"],
+    });
     expect(capturedBody!.input).toEqual({ attachments: [] });
   });
 
@@ -324,11 +381,17 @@ describe("coordinateSigning", { sanitizeOps: false, sanitizeResources: false }, 
 
     // Peer 2 succeeds round1 but fails round2
     const peer2App = new Hono();
-    peer2App.post("/frost/signer/round1", (c) =>
-      c.json({ commitments: FAKE_COMMITMENTS_PEER2, nonce_id: "nonce-r2-fail" }),
+    peer2App.post(
+      "/frost/signer/round1",
+      (c) =>
+        c.json({
+          commitments: FAKE_COMMITMENTS_PEER2,
+          nonce_id: "nonce-r2-fail",
+        }),
     );
-    peer2App.post("/frost/signer/round2", (c) =>
-      c.json({ error: "round2 failed" }, 500),
+    peer2App.post(
+      "/frost/signer/round2",
+      (c) => c.json({ error: "round2 failed" }, 500),
     );
 
     const peerApps = new Map<string, Hono>();
@@ -407,7 +470,11 @@ describe("coordinateSigning", { sanitizeOps: false, sanitizeResources: false }, 
     const nodeConfig = makeNodeConfig({
       peers: [
         { signer_index: 1, endpoint: "http://localhost:19901" },
-        { signer_index: 2, endpoint: "http://localhost:19902", api_key: "secret-key-42" },
+        {
+          signer_index: 2,
+          endpoint: "http://localhost:19902",
+          api_key: "secret-key-42",
+        },
       ],
     });
     const config: SigningCoordinatorConfig = { nodeConfig };
@@ -500,8 +567,9 @@ describe("identifierFromIndex (implicit)", () => {
     // Capture what identifier is used for local commitments
     let capturedCommitmentsJson = "";
     const customPeerApp = new Hono();
-    customPeerApp.post("/frost/signer/round1", (c) =>
-      c.json({ commitments: FAKE_COMMITMENTS_PEER2, nonce_id: "n2" }),
+    customPeerApp.post(
+      "/frost/signer/round1",
+      (c) => c.json({ commitments: FAKE_COMMITMENTS_PEER2, nonce_id: "n2" }),
     );
     customPeerApp.post("/frost/signer/round2", async (c) => {
       const body = await c.req.json<{ commitments: string }>();
@@ -520,7 +588,8 @@ describe("identifierFromIndex (implicit)", () => {
 
     // The local identifier for signer_index=1 should be "0000...0001" (64 chars)
     const commitments = JSON.parse(capturedCommitmentsJson);
-    const expectedId = "0000000000000000000000000000000000000000000000000000000000000001";
+    const expectedId =
+      "0000000000000000000000000000000000000000000000000000000000000001";
     expect(commitments[expectedId]).toBeDefined();
   });
 });

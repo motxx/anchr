@@ -32,7 +32,6 @@ jobs:
 
       - name: Secret scan
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -40,6 +39,9 @@ jobs:
         uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
         with:
           deno-version: v2.x
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
 
       - name: Install dependencies (lockfile integrity check)
         run: deno install --frozen
@@ -52,6 +54,12 @@ jobs:
 
       - name: Typecheck
         run: deno task check
+
+      - name: Package dry-run
+        run: deno task publish:dry-run
+
+      - name: SDK npm build
+        run: cd packages/sdk && bun run build
 
       - name: Cargo dependency audit
         run: |
@@ -84,6 +92,12 @@ jobs:
               sleep 2
             done
           done
+
+      - name: Blossom-backed worker API integration
+        if: ${{ !cancelled() }}
+        run: deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
+        env:
+          BLOSSOM_SERVERS: http://localhost:3333
 
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}

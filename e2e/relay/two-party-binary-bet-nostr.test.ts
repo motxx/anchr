@@ -11,24 +11,24 @@
  *   NOSTR_RELAYS=ws://localhost:7777 deno test e2e/two-party-binary-bet-nostr.test.ts --allow-all
  */
 
-import { describe, test, beforeAll } from "@std/testing/bdd";
+import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateSecretKey, getPublicKey } from "nostr-tools";
 import { SimplePool } from "nostr-tools/pool";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import {
-  buildMarketEvent,
   buildBetEvent,
+  buildMarketEvent,
   buildResolutionEvent,
-  publishMarket,
   discoverMarkets,
   type MarketIdentity,
+  publishMarket,
 } from "../../example/two-party-binary-bet/src/nostr-market.ts";
 import { createMarketHtlc } from "../../example/two-party-binary-bet/src/market-oracle.ts";
 import type {
-  TwoPartyBinaryBet,
-  MarketResolution,
   BetEventContent,
+  MarketResolution,
+  TwoPartyBinaryBet,
 } from "../../example/two-party-binary-bet/src/market-types.ts";
 import { isRelayReachable } from "../helpers/regtest.ts";
 
@@ -37,11 +37,18 @@ import { isRelayReachable } from "../helpers/regtest.ts";
 // ---------------------------------------------------------------------------
 
 const NOSTR_RELAYS_ENV = Deno.env.get("NOSTR_RELAYS")?.trim();
-const RELAY_URL =
-  NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ??
+  "ws://localhost:7777";
 const REQUIRE_INFRA = Deno.env.get("ANCHR_E2E_REQUIRE_INFRA") === "1";
+const RELAY_CLOSE_GRACE_MS = 250;
 
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV
+  ? await isRelayReachable(RELAY_URL)
+  : false;
 
 if (!NOSTR_RELAYS_ENV) {
   console.warn(
@@ -79,9 +86,10 @@ async function publishEventToRelay(
   try {
     await Promise.allSettled(pool.publish([RELAY_URL], event));
     // Allow the relay to index the event before querying.
-    await new Promise((r) => setTimeout(r, 500));
+    await delay(500);
   } finally {
     pool.close([RELAY_URL]);
+    await delay(RELAY_CLOSE_GRACE_MS);
   }
 }
 
@@ -124,11 +132,7 @@ function buildTestMarket(
 // ---------------------------------------------------------------------------
 
 suite(
-  {
-    name: "e2e: Two-party binary bet Nostr integration",
-    sanitizeOps: false,
-    sanitizeResources: false,
-  },
+  "e2e: Two-party binary bet Nostr integration",
   () => {
     const creatorIdentity = createIdentity();
     const oracleIdentity = createIdentity();

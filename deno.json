@@ -65,6 +65,7 @@
 
     "check": "deno check packages/ e2e/ scripts/",
     "test": "deno task test:unit && deno task test:integration && deno task test:e2e:protocol && deno task test:scripts && deno task test:examples",
+    "publish:dry-run": "deno publish --dry-run --allow-dirty --config packages/core-runtime/deno.json && deno publish --dry-run --allow-dirty --config packages/core-cashu/deno.json && deno publish --dry-run --allow-dirty --config packages/tlsn-toolkit/deno.json && deno publish --dry-run --allow-dirty --config packages/photo-verification/deno.json && deno publish --dry-run --allow-dirty --config packages/frost-oracle/deno.json && deno publish --dry-run --allow-dirty --config packages/cashu-conditional-swap/deno.json && deno publish --dry-run --allow-dirty --config packages/blossom/deno.json && deno publish --dry-run --allow-dirty --config packages/bounty/deno.json && deno publish --dry-run --allow-dirty --config packages/sdk/deno.json",
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $(find packages -name \"*.integration.test.ts\" -type f)'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
@@ -83,7 +84,7 @@
     "test:all:full": "./scripts/test-all.sh full",
 
     "lint": "deno lint",
-    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import",
+    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import && deno task lint:no-test-sanitizer-bypass && deno task lint:no-unit-network-listener",
     "lint:deps": "bash scripts/cargo-audit-all.sh",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:arch:candidates": "deno run --allow-read scripts/arch-lint-candidates.ts",
@@ -94,12 +95,22 @@
     "lint:deprecation": "deno run --allow-read --allow-env --allow-run scripts/lint-deprecation.ts",
     "lint:no-history-comments": "deno run --allow-read --allow-env --allow-run scripts/lint-no-history-comments.ts",
     "lint:no-dynamic-import": "deno run --allow-read --allow-env --allow-run scripts/lint-no-dynamic-import.ts",
+    "lint:no-test-sanitizer-bypass": "deno run --allow-read --allow-run scripts/lint-no-test-sanitizer-bypass.ts",
+    "lint:no-unit-network-listener": "deno run --allow-read --allow-run scripts/lint-no-unit-network-listener.ts",
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
     "build:css": "deno run --allow-all scripts/build-css.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
-  "exclude": ["example/expo-worker-app", "node_modules", "dist/", "example/two-party-binary-bet/src/demo.ts", "example/two-party-binary-bet/src/nostr-market.ts", "example/two-party-binary-bet/ui/main.js", "example/two-party-binary-bet/ui/main.js.map"],
+  "exclude": [
+    "example/expo-worker-app",
+    "node_modules",
+    "dist/",
+    "example/two-party-binary-bet/src/demo.ts",
+    "example/two-party-binary-bet/src/nostr-market.ts",
+    "example/two-party-binary-bet/ui/main.js",
+    "example/two-party-binary-bet/ui/main.js.map"
+  ],
   "lint": {
     "rules": {
       "tags": ["recommended"],

@@ -13,33 +13,36 @@
  *   deno test e2e/two-party-binary-bet-resolution.test.ts --allow-all
  */
 
-import { beforeAll, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import {
-  resolveMarket as resolveMarketOracle,
+  calculateOracleFee,
+  calculatePayouts,
   evaluateCondition,
   extractJsonValue,
-  calculatePayouts,
-  calculateOracleFee,
-  verifyPreimage,
   OracleError,
+  resolveMarket as resolveMarketOracle,
+  verifyPreimage,
 } from "./market-oracle.ts";
-import type {
-  TwoPartyBinaryBet,
-  ResolutionCondition,
-} from "./market-types.ts";
+import type { ResolutionCondition, TwoPartyBinaryBet } from "./market-types.ts";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const BITFLYER_URL =
-  "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
+const BITFLYER_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
 const BITFLYER_HOST = "api.bitflyer.com";
+const BITFLYER_FIXTURE = {
+  product_code: "BTC_JPY",
+  best_bid: 10_000_000,
+  best_ask: 10_000_500,
+  timestamp: "2026-05-06T00:00:00.000",
+};
+const BITFLYER_BODY = JSON.stringify(BITFLYER_FIXTURE);
 
 const ORACLE_FEE_PPM = 5_000; // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
@@ -95,40 +98,14 @@ function makeMarket(
 // ---------------------------------------------------------------------------
 
 describe("Two-party binary bet Resolution E2E", () => {
-  let bitflyerReachable = false;
-  let bitflyerBody = "";
-  let bitflyerJson: Record<string, unknown> = {};
-
-  beforeAll(async () => {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      const res = await fetch(BITFLYER_URL, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (res.ok) {
-        bitflyerBody = await res.text();
-        bitflyerJson = JSON.parse(bitflyerBody);
-        bitflyerReachable = true;
-      }
-    } catch {
-      console.warn(
-        "[e2e] bitFlyer API unreachable -- tests that need live data will be skipped",
-      );
-    }
-  });
+  const bitflyerBody = BITFLYER_BODY;
+  const bitflyerJson: Record<string, unknown> = BITFLYER_FIXTURE;
 
   // =========================================================================
-  // 1. evaluateCondition with real bitFlyer data
+  // 1. evaluateCondition with deterministic bitFlyer-shaped data
   // =========================================================================
 
-  test("evaluateCondition: jsonpath_gt against live bitFlyer response", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
-    // The threshold 100,000 JPY is far below any realistic BTC/JPY price,
-    // so the condition should evaluate to YES.
+  test("evaluateCondition: jsonpath_gt against bitFlyer-shaped response", () => {
     const condition: ResolutionCondition = {
       type: "jsonpath_gt",
       target_url: BITFLYER_URL,
@@ -142,16 +119,10 @@ describe("Two-party binary bet Resolution E2E", () => {
     const bestBid = extractJsonValue(bitflyerBody, "best_bid") as number;
     expect(typeof bestBid).toBe("number");
     expect(bestBid).toBeGreaterThan(100_000);
-    console.log(`  [live] best_bid = ${bestBid.toLocaleString()}`);
+    console.log(`  [fixture] best_bid = ${bestBid.toLocaleString()}`);
   });
 
-  test("evaluateCondition: price_below against live bitFlyer response", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
-    // Use an absurdly high threshold so this evaluates to YES (below)
+  test("evaluateCondition: price_below against bitFlyer-shaped response", () => {
     const condition: ResolutionCondition = {
       type: "price_below",
       target_url: BITFLYER_URL,
@@ -162,12 +133,7 @@ describe("Two-party binary bet Resolution E2E", () => {
     expect(evaluateCondition(condition, bitflyerBody)).toBe(true);
   });
 
-  test("evaluateCondition: contains_text against live bitFlyer response", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
+  test("evaluateCondition: contains_text against bitFlyer-shaped response", () => {
     const condition: ResolutionCondition = {
       type: "contains_text",
       target_url: BITFLYER_URL,
@@ -181,12 +147,7 @@ describe("Two-party binary bet Resolution E2E", () => {
   // 2. resolveMarketOracle (market-oracle.ts) -- happy path
   // =========================================================================
 
-  test("resolveMarketOracle produces valid YES resolution with live data", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
+  test("resolveMarketOracle produces valid YES resolution with verified data", () => {
     const { preimage, hash } = makePreimage();
     const market = makeMarket({
       htlc_hash_yes: hash,
@@ -218,17 +179,14 @@ describe("Two-party binary bet Resolution E2E", () => {
     expect(resolution.verified_data.server_name).toBe(BITFLYER_HOST);
     expect(resolution.verified_data.revealed_body).toBe(bitflyerBody);
     expect(resolution.verified_data.timestamp).toBe(now);
-    console.log(`  [oracle] resolved market ${market.id.slice(0, 8)}... -> YES`);
+    console.log(
+      `  [oracle] resolved market ${market.id.slice(0, 8)}... -> YES`,
+    );
   });
 
   test("resolveMarketOracle produces NO when condition not met", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
     const { preimage, hash } = makePreimage();
-    // Threshold so high it cannot be met by real BTC/JPY
+    // Threshold so high it cannot be met by the fixture BTC/JPY price.
     const market = makeMarket({
       htlc_hash_yes: hash,
       resolution_condition: {
@@ -324,21 +282,16 @@ describe("Two-party binary bet Resolution E2E", () => {
   });
 
   // =========================================================================
-  // 4. Full pipeline: live fetch -> evaluate -> oracle resolve -> dual reveal
+  // 4. Full pipeline: verified body -> evaluate -> oracle resolve -> dual reveal
   // =========================================================================
 
-  test("full pipeline: fetch bitFlyer -> oracle resolve -> dual preimage reveal -> payout", () => {
-    if (!bitflyerReachable) {
-      console.warn("[e2e] SKIPPED -- bitFlyer unreachable");
-      return;
-    }
-
+  test("full pipeline: bitFlyer-shaped body -> oracle resolve -> dual preimage reveal -> payout", () => {
     // --- Step 1: Create dual preimage store ---
     const dualStore = createDualPreimageStore();
     const marketId = bytesToHex(randomBytes(16));
     const { hash_a: hashYes, hash_b: hashNo } = dualStore.create(marketId);
 
-    // --- Step 2: Build market with real bitFlyer URL ---
+    // --- Step 2: Build market with bitFlyer URL and deterministic verified body ---
     const { preimage: oraclePreimage, hash: oracleHash } = makePreimage();
     const market = makeMarket({
       id: marketId,
@@ -438,7 +391,9 @@ describe("Two-party binary bet Resolution E2E", () => {
       `  [pipeline] ${totalPool} sats pool | oracle fee ${oracleFee} | creator fee ${creatorFee}`,
     );
     console.log(
-      `  [pipeline] payouts: alice=${alicePayout!.payout_sats}, carol=${carolPayout!.payout_sats}`,
+      `  [pipeline] payouts: alice=${alicePayout!.payout_sats}, carol=${
+        carolPayout!.payout_sats
+      }`,
     );
   });
 

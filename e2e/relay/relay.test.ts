@@ -23,8 +23,14 @@ import { isRelayReachable } from "../helpers/regtest.ts";
 import process from "node:process";
 
 const NOSTR_RELAYS_ENV = process.env.NOSTR_RELAYS?.trim();
-const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ?? "ws://localhost:7777";
+const RELAY_URL = NOSTR_RELAYS_ENV?.split(",")[0]?.trim() ??
+  "ws://localhost:7777";
 const REQUIRE_INFRA = process.env.ANCHR_E2E_REQUIRE_INFRA === "1";
+const RELAY_CLOSE_GRACE_MS = 250;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function waitForRelayEvent(
   relayUrl: string,
@@ -33,32 +39,46 @@ async function waitForRelayEvent(
 ): Promise<Event[]> {
   const pool = new SimplePool();
   const events: Event[] = [];
-  return new Promise<Event[]>((resolve) => {
-    const timer = setTimeout(() => { sub.close(); pool.close([]); resolve(events); }, timeoutMs);
-    const sub = pool.subscribeMany([relayUrl], filter, {
-      onevent(event) {
-        events.push(event);
-      },
-      oneose() {
-        clearTimeout(timer);
-        sub.close();
-        pool.close([]);
-        resolve(events);
-      },
+  let sub: { close: () => void } | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await new Promise<Event[]>((resolve) => {
+      const finish = () => resolve(events);
+      timer = setTimeout(finish, timeoutMs);
+      sub = pool.subscribeMany([relayUrl], filter, {
+        onevent(event) {
+          events.push(event);
+        },
+        oneose() {
+          finish();
+        },
+      });
     });
-  });
+  } finally {
+    if (timer) clearTimeout(timer);
+    sub?.close();
+    pool.close([relayUrl]);
+    await delay(RELAY_CLOSE_GRACE_MS);
+  }
 }
 
 // --- Infrastructure readiness (top-level await for describe.ignore) ---
 
 // Both conditions required: NOSTR_RELAYS env var must be set (so the worker API
 // knows where to publish) AND the relay must be reachable.
-const RELAY_REACHABLE = NOSTR_RELAYS_ENV ? await isRelayReachable(RELAY_URL) : false;
+const RELAY_REACHABLE = NOSTR_RELAYS_ENV
+  ? await isRelayReachable(RELAY_URL)
+  : false;
 
 if (!NOSTR_RELAYS_ENV) {
-  console.warn(`[e2e] NOSTR_RELAYS not set – relay tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay`);
+  console.warn(
+    `[e2e] NOSTR_RELAYS not set – relay tests skipped. Run: NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay`,
+  );
 } else if (!RELAY_REACHABLE) {
-  console.warn(`[e2e] Relay not reachable at ${RELAY_URL} – tests will be skipped. Run: docker compose up -d`);
+  console.warn(
+    `[e2e] Relay not reachable at ${RELAY_URL} – tests will be skipped. Run: docker compose up -d`,
+  );
 }
 if (REQUIRE_INFRA && !RELAY_REACHABLE) {
   throw new Error("Nostr relay e2e infrastructure is required but not ready");
@@ -66,17 +86,18 @@ if (REQUIRE_INFRA && !RELAY_REACHABLE) {
 
 const suite = RELAY_REACHABLE ? describe : describe.ignore;
 
-// Relay tests need actual relay hooks (fire-and-forget WebSocket publishes),
-// so we disable Deno's resource/ops sanitizers and clean up via closePool().
+// Relay tests need actual relay hooks (fire-and-forget WebSocket publishes);
+// closePool() in afterAll keeps Deno's leak sanitizers active.
 const relayService = createQueryService({
   oracleRegistry: createOracleRegistry(),
   hooks: { onCreated: publishQueryToRelay },
 });
 
-suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, sanitizeResources: false }, () => {
-  afterAll(() => {
+suite("e2e: full query lifecycle with Nostr relay", () => {
+  afterAll(async () => {
     relayService.clearQueryStore();
     closePool();
+    await delay(RELAY_CLOSE_GRACE_MS);
   });
 
   test("relay is reachable", () => {
@@ -109,7 +130,7 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     expect(createJson.status).toBe("pending");
 
     // Wait for fire-and-forget relay publish to complete
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 1500));
 
     // Verify the event appeared on the relay
     const events = await waitForRelayEvent(RELAY_URL, {
@@ -122,7 +143,9 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
       try {
         const payload = JSON.parse(e.content);
         return payload.description === "E2E Ramen Shop の営業状況";
-      } catch { return false; }
+      } catch {
+        return false;
+      }
     });
 
     expect(matchingEvent).toBeDefined();
@@ -131,7 +154,9 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     // Verify event tags
     const tags = matchingEvent!.tags;
     expect(tags.some((t) => t[0] === "t" && t[1] === "anchr")).toBe(true);
-    expect(tags.some((t) => t[0] === "i" && t[1] === "E2E Ramen Shop の営業状況")).toBe(true);
+    expect(
+      tags.some((t) => t[0] === "i" && t[1] === "E2E Ramen Shop の営業状況"),
+    ).toBe(true);
   });
 
   test("full lifecycle: create → list → submit → verify status", async () => {
@@ -163,20 +188,29 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     // 3. Get query detail
     const detailRes = await app.request(`http://localhost/queries/${query_id}`);
     expect(detailRes.status).toBe(200);
-    const detail = await detailRes.json() as { id: string; status: string; challenge_nonce: string | null };
+    const detail = await detailRes.json() as {
+      id: string;
+      status: string;
+      challenge_nonce: string | null;
+    };
     expect(detail.status).toBe("pending");
     expect(detail.challenge_nonce).toBe(challenge_nonce);
 
     // 4. Submit result
-    const submitRes = await app.request(`http://localhost/queries/${query_id}/result`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        worker_pubkey: "e2e-test-worker",
-        attachments: [],
-        notes: `E2E test observation${challenge_nonce ? ` ${challenge_nonce}` : ""}`,
-      }),
-    });
+    const submitRes = await app.request(
+      `http://localhost/queries/${query_id}/result`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          worker_pubkey: "e2e-test-worker",
+          attachments: [],
+          notes: `E2E test observation${
+            challenge_nonce ? ` ${challenge_nonce}` : ""
+          }`,
+        }),
+      },
+    );
     expect(submitRes.status).toBe(200);
     const submitJson = await submitRes.json() as {
       ok: boolean;
@@ -190,7 +224,10 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     // 5. Verify status is approved
     const statusRes = await app.request(`http://localhost/queries/${query_id}`);
     expect(statusRes.status).toBe(200);
-    const statusJson = await statusRes.json() as { status: string; payment_status: string };
+    const statusJson = await statusRes.json() as {
+      status: string;
+      payment_status: string;
+    };
     expect(statusJson.status).toBe("approved");
     expect(statusJson.payment_status).toBe("released");
   });
@@ -201,13 +238,19 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     const createRes = await app.request("http://localhost/queries", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ description: "E2E Cancel Store", ttl_seconds: 120 }),
+      body: JSON.stringify({
+        description: "E2E Cancel Store",
+        ttl_seconds: 120,
+      }),
     });
     const { query_id } = await createRes.json() as { query_id: string };
 
-    const cancelRes = await app.request(`http://localhost/queries/${query_id}/cancel`, {
-      method: "POST",
-    });
+    const cancelRes = await app.request(
+      `http://localhost/queries/${query_id}/cancel`,
+      {
+        method: "POST",
+      },
+    );
     expect(cancelRes.status).toBe(200);
     const cancelJson = await cancelRes.json() as { ok: boolean };
     expect(cancelJson.ok).toBe(true);
@@ -223,19 +266,23 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     const since = Math.floor(Date.now() / 1000) - 5;
 
     // Create 3 queries in parallel
-    const descriptions = ["E2E Alpha の確認", "E2E Bravo の確認", "E2E Charlie の確認"];
+    const descriptions = [
+      "E2E Alpha の確認",
+      "E2E Bravo の確認",
+      "E2E Charlie の確認",
+    ];
     await Promise.all(
       descriptions.map((desc) =>
         app.request("http://localhost/queries", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ description: desc, ttl_seconds: 120 }),
-        }),
+        })
       ),
     );
 
     // Wait for relay publish
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const events = await waitForRelayEvent(RELAY_URL, {
       kinds: [ANCHR_QUERY_REQUEST],
@@ -246,12 +293,17 @@ suite({ name: "e2e: full query lifecycle with Nostr relay", sanitizeOps: false, 
     const e2eEvents = events.filter((e) => {
       try {
         const p = JSON.parse(e.content);
-        return typeof p.description === "string" && p.description.startsWith("E2E ");
-      } catch { return false; }
+        return typeof p.description === "string" &&
+          p.description.startsWith("E2E ");
+      } catch {
+        return false;
+      }
     });
 
     // At least our 3 should be there
-    const foundDescriptions = e2eEvents.map((e) => JSON.parse(e.content).description);
+    const foundDescriptions = e2eEvents.map((e) =>
+      JSON.parse(e.content).description
+    );
     for (const desc of descriptions) {
       expect(foundDescriptions).toContain(desc);
     }

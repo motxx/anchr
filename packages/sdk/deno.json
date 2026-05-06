@@ -16,6 +16,9 @@
   "publish": {
     "include": [
       "src/index.ts",
+      "src/client.ts",
+      "src/client-types.ts",
+      "src/errors.ts",
       "src/types.ts",
       "src/schema.ts",
       "src/customer.ts",

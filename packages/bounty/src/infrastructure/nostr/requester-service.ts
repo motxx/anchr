@@ -25,7 +25,11 @@ import {
 } from "./events/events.ts";
 import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
 import type { EscrowProvider } from "../../application/ports.ts";
-import type { EscrowInfo, QuoteInfo, TlsnEncryptedContext } from "../../domain/types.ts";
+import type {
+  EscrowInfo,
+  QuoteInfo,
+  TlsnEncryptedContext,
+} from "../../domain/types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "requester"]);
@@ -52,6 +56,11 @@ export interface CreateQueryRequest {
   locktimeSeconds?: number;
 }
 
+type FetchFn = (
+  input: string | URL | Request,
+  init?: RequestInit,
+) => Promise<Response>;
+
 export interface RequesterQueryState {
   queryId: string;
   identity: NostrIdentity;
@@ -70,11 +79,14 @@ export async function requestOracleHash(
   queryId: string,
   oracleEndpoint: string,
   oracleApiKey?: string,
+  fetchFn: FetchFn = fetch,
 ): Promise<{ hash: string }> {
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
   if (oracleApiKey) headers["authorization"] = `Bearer ${oracleApiKey}`;
 
-  const res = await fetch(`${oracleEndpoint}/hash`, {
+  const res = await fetchFn(`${oracleEndpoint}/hash`, {
     method: "POST",
     headers,
     body: JSON.stringify({ query_id: queryId }),
@@ -95,7 +107,9 @@ export async function createHtlcQuery(
   config: RequesterConfig,
   request: CreateQueryRequest,
 ): Promise<RequesterQueryState | null> {
-  const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const queryId = `query_${Date.now()}_${
+    Math.random().toString(36).slice(2, 8)
+  }`;
   const identity = generateEphemeralIdentity();
   const locktimeSeconds = request.locktimeSeconds ?? 3600;
   const locktime = Math.floor(Date.now() / 1000) + locktimeSeconds;
@@ -103,7 +117,11 @@ export async function createHtlcQuery(
   // Step 1: Get hash from Oracle
   let hash: string;
   if (config.oracleEndpoint) {
-    const result = await requestOracleHash(queryId, config.oracleEndpoint, config.oracleApiKey);
+    const result = await requestOracleHash(
+      queryId,
+      config.oracleEndpoint,
+      config.oracleApiKey,
+    );
     hash = result.hash;
   } else {
     throw new Error("Oracle endpoint is required for HTLC flow");
@@ -209,7 +227,10 @@ export async function selectWorker(
   encryptedContext?: TlsnEncryptedContext,
 ): Promise<string | null> {
   // Step 5: Swap escrow to bind Worker via EscrowProvider
-  const bound = await config.escrowProvider.bindWorker(state.escrowRef, workerPubkey);
+  const bound = await config.escrowProvider.bindWorker(
+    state.escrowRef,
+    workerPubkey,
+  );
   if (!bound) return null;
 
   state.selectedWorkerPubkey = workerPubkey;

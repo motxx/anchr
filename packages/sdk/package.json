@@ -14,12 +14,24 @@
   },
   "files": ["dist"],
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node && bunx tsc -p tsconfig.json",
+    "build": "bun run clean && bun build src/index.ts --outdir dist --target node && bunx tsc -p tsconfig.json && bun run scripts/fix-dts-imports.ts",
+    "clean": "rm -rf dist",
     "test": "bun test"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   },
   "publishConfig": {
     "access": "public"
   },
-  "keywords": ["tlsnotary", "oracle", "cashu", "lightning", "nostr", "nip-90", "verified-data"],
+  "keywords": [
+    "tlsnotary",
+    "oracle",
+    "cashu",
+    "lightning",
+    "nostr",
+    "nip-90",
+    "verified-data"
+  ],
   "license": "MIT"
 }
