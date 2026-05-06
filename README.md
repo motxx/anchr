@@ -244,7 +244,7 @@ what runs today.
 |---|---|
 | Verifiable photo marketplace ([C2PA](example/c2pa-media-verification/)) | Testnet |
 | Browser auto-claim ([Auto-claim](example/auto-claim/)) | Concept |
-| Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Concept (TLSN-on-Square compatibility risk) |
+| Fiat → BTC swap ([Watari](example/tlsn-fiat-swap-square/)) | Testnet |
 
 ### Chained Bounty (multi-hop, settlement per hop)
 

@@ -9,7 +9,8 @@
     "./packages/blossom",
     "./packages/bounty",
     "./packages/sdk",
-    "./example/airdrop-bot-shield"
+    "./example/airdrop-bot-shield",
+    "./example/tlsn-fiat-swap-square"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
@@ -57,7 +58,8 @@
     "class-variance-authority": "npm:class-variance-authority@^0.7",
     "puppeteer": "npm:puppeteer@^24",
     "playwright": "npm:playwright@^1.58",
-    "esbuild": "npm:esbuild@^0.25"
+    "esbuild": "npm:esbuild@^0.25",
+    "anchr-sdk": "./packages/sdk/src/index.ts"
   },
   "unstable": ["sloppy-imports", "detect-cjs"],
   "tasks": {
@@ -101,6 +103,10 @@
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
     "build:css": "deno run --allow-all scripts/build-css.ts",
+    "watari:buyer": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net --allow-read example/tlsn-fiat-swap-square/buyer.ts",
+    "watari:seller": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net example/tlsn-fiat-swap-square/seller.ts",
+    "watari:check": "deno check --node-modules-dir=false --no-lock example/tlsn-fiat-swap-square/buyer.ts example/tlsn-fiat-swap-square/seller.ts example/tlsn-fiat-swap-square/watari.ts example/tlsn-fiat-swap-square/watari.test.ts",
+    "watari:test": "deno test --node-modules-dir=false --no-lock --allow-read example/tlsn-fiat-swap-square/watari.test.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": [
