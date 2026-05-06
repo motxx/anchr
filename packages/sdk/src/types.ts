@@ -6,6 +6,10 @@
  * a TLSNotary verifier, and any compatible oracle.
  */
 
+import type { CashuClient, CashuProof } from "./cashu.ts";
+import type { OracleClient } from "./oracle.ts";
+import type { RelayClient } from "./nostr.ts";
+
 /** A specification of what the customer wants to buy. */
 export interface Spec {
   /** Schema URI identifying the proof format and predicate shape (e.g. "io.anchr.tlsn-https.v1"). */
@@ -62,14 +66,18 @@ export interface CustomerOptions {
   /** Cashu mint URL (must support HTLC / NUT-14). */
   mint: string;
   /** Adapter for talking to the oracle (HTTP, Nostr DM, FROST cluster, etc.). */
-  oracleClient: import("./oracle.ts").OracleClient;
-  /** Adapter for talking to the Cashu mint. */
-  cashuClient: import("./cashu.ts").CashuClient;
+  oracleClient: OracleClient;
+  /**
+   * Optional: adapter for talking to the Cashu mint. When omitted the
+   * SDK builds one from `mint`. Pass an explicit client to inject a
+   * specific Wallet (e.g. to share state across requests).
+   */
+  cashuClient?: CashuClient;
   /**
    * Optional: pre-built relay client. When omitted the SDK builds one
    * from `relays` on each request. Tests inject a mock here.
    */
-  relayClient?: import("./nostr.ts").RelayClient;
+  relayClient?: RelayClient;
   /** Optional: how to choose among provider quotes. Default: cheapest within `payment.maxAmount`. */
   quoteSelector?: QuoteSelector;
   /** Optional: how long to wait for quotes before selecting (default: 30000 ms). */
@@ -90,13 +98,17 @@ export interface ProviderOptions {
   mint: string;
   /** Provider's secret key (nsec or hex). Used to sign Nostr events and redeem HTLC. */
   privKey: string;
-  /** Adapter for talking to the Cashu mint (used to redeem the HTLC after the oracle releases the preimage). */
-  cashuClient: import("./cashu.ts").CashuClient;
+  /**
+   * Optional: adapter for talking to the Cashu mint (used to redeem
+   * the HTLC after the oracle releases the preimage). When omitted the
+   * SDK builds one from `mint`.
+   */
+  cashuClient?: CashuClient;
   /**
    * Optional: pre-built relay client. When omitted the SDK builds one
    * from `relays` on each `serve()` call. Tests inject a mock here.
    */
-  relayClient?: import("./nostr.ts").RelayClient;
+  relayClient?: RelayClient;
   /** Optional: TLSN notary URL (only required for TLSN-based schemas). */
   notary?: string;
   /** Optional: how long to wait for a selection event after quoting (default: 60000 ms). */
@@ -123,7 +135,7 @@ export interface ProviderQuote {
  * Schema-side hook: produce a proof for the given predicate.
  *
  * Implementations live outside the SDK (e.g. @anchr/tlsn-toolkit,
- * @anchr/photo-bounty). The SDK calls the producer registered for the
+ * @anchr/photo-verification). The SDK calls the producer registered for the
  * incoming request's schema URI; producers return whatever proof bytes
  * the schema document defines.
  */
@@ -156,7 +168,7 @@ export interface RequestOptions {
   spec: Spec;
   payment: Payment;
   /** Source proofs to lock at the Cashu mint (from the customer's wallet). */
-  sourceProofs: import("./cashu.ts").CashuProof[];
+  sourceProofs: CashuProof[];
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;
 }

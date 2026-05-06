@@ -117,7 +117,7 @@ export async function settleMarket(
           allProofSecrets,
           opts?.verifiedBody
             ? {
-              market_id: marketId,
+              condition_id: marketId,
               resolution_url: market.resolution_url,
               verified_body: opts.verifiedBody,
             }
@@ -141,12 +141,14 @@ export async function settleMarket(
       }
 
       state.resolvedProofSignatures.set(marketId, proofSigs);
+      await state.persist.proofSignatures(marketId, proofSigs);
       proofSigCount = proofSigs.size;
 
       const firstSig = proofSigs.values().next().value;
       if (firstSig) {
         oracleSignature = firstSig;
         state.resolvedSignatures.set(marketId, firstSig);
+        await state.persist.signature(marketId, firstSig);
       }
     } else {
       // Demo mode without Cashu — sign a market-level message.
@@ -160,7 +162,7 @@ export async function settleMarket(
           signMessage,
           opts?.verifiedBody
             ? {
-              market_id: marketId,
+              condition_id: marketId,
               resolution_url: market.resolution_url,
               verified_body: opts.verifiedBody,
             }
@@ -180,6 +182,7 @@ export async function settleMarket(
       }
       oracleSignature = sig;
       state.resolvedSignatures.set(marketId, sig);
+      await state.persist.signature(marketId, sig);
     }
 
     // Also resolve the HTLC side. Dual-mode markets keep both settlement
@@ -198,18 +201,20 @@ export async function settleMarket(
     }
     resolvedPreimage = result.preimage;
     state.resolvedPreimages.set(marketId, result.preimage);
+    await state.persist.preimage(marketId, result.preimage);
   }
 
-  // Update market status.
   const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
   market.status = newStatus;
+  await state.persist.market(market);
 
-  // Mark matched pairs as settled (clients call /redeem to retrieve tokens).
+  // Clients call /redeem to retrieve their share of the matched-pair tokens.
   const settledPairs: SettledPair[] = [];
   for (const pair of state.matchedPairs.values() as IterableIterator<MatchedBetPair>) {
     if (pair.market_id !== marketId) continue;
     if (pair.status !== "locked" && pair.status !== "pending") continue;
     pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
+    await state.persist.pair(pair);
     const winnerPubkey = outcome === "yes" ? pair.yes_pubkey : pair.no_pubkey;
     settledPairs.push({
       pair_id: pair.pair_id,

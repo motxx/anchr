@@ -1,5 +1,3 @@
-/** Shared types mirrored from backend src/types.ts */
-
 export type QueryStatus =
   | "pending"
   | "awaiting_quotes"

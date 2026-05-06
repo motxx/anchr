@@ -5,7 +5,7 @@
  *
  * Prerequisites:
  *   1. Anchr server running on localhost:3000
- *   2. Expo web running on localhost:8082 (cd mobile && bun run web -- --port 8082)
+ *   2. Expo web running on localhost:8082 (cd example/expo-worker-app && bun run web -- --port 8082)
  *
  * Run:
  *   bun test e2e/web.test.ts

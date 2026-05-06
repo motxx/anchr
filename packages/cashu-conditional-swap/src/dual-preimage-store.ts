@@ -65,7 +65,6 @@ export function createDualPreimageStore(
       const winner = outcome === "a" ? entry.entry_a : entry.entry_b;
       const loser = outcome === "a" ? entry.entry_b : entry.entry_a;
 
-      // Get the winning preimage before any deletions
       const preimage = store.getPreimage(winner.hash);
 
       // Permanently delete the losing preimage — irreversible

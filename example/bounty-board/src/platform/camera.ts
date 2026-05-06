@@ -15,7 +15,7 @@ function createNativeProvider(): CameraProvider {
   return {
     hasLiveViewfinder: true,
     async requestPermission() {
-      const { Camera } = await import("expo-camera");
+      const { Camera } = await import("expo-camera"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       const { status } = await Camera.requestCameraPermissionsAsync();
       return status === "granted";
     },

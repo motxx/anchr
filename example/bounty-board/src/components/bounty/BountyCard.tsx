@@ -40,7 +40,6 @@ export function BountyCard({ bounty, userLocation, onPress }: BountyCardProps) {
   return (
     <DSPressableCard onPress={onPress} className="mx-4 mb-2">
       <View className="flex-row items-start gap-3">
-        {/* Type icon */}
         <View className="w-9 h-9 rounded-full bg-surface-raised items-center justify-center mt-0.5">
           <Ionicons
             name={isPhoto ? "camera" : "globe"}
@@ -49,7 +48,6 @@ export function BountyCard({ bounty, userLocation, onPress }: BountyCardProps) {
           />
         </View>
 
-        {/* Content */}
         <View className="flex-1">
           <DSText variant="body" weight="medium" numberOfLines={2}>
             {bounty.description}
@@ -87,7 +85,6 @@ export function BountyCard({ bounty, userLocation, onPress }: BountyCardProps) {
           </View>
         </View>
 
-        {/* Sats */}
         {bounty.bounty && (
           <DSSatsAmount amount={bounty.bounty.amount_sats} size="sm" />
         )}

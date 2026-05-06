@@ -1,7 +1,7 @@
 # `@anchr/core-cashu` — Implementation Spec
 
 > **Scope:** the Cashu HTLC escrow primitive that this package owns. The
-> threshold-signing variant lives in `packages/cashu-frost-oracle/SPEC.md`;
+> threshold-signing variant lives in `packages/frost-oracle/SPEC.md`;
 > the conditional-swap (cross-HTLC + dual-preimage) wire format is in
 > `specs/conditional-swap.md`.
 

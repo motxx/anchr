@@ -10,7 +10,7 @@
  *     for tests with a mock server). The env var must be set explicitly so
  *     production deploys can't accidentally allow it.
  */
-import { validateAttachmentUri } from "../../../src/infrastructure/url-validation.ts";
+import { validateAttachmentUri } from "@anchr/bounty/url-validation";
 
 const PRIVATE_HOST_RE = [
   /^127\./,
@@ -42,12 +42,9 @@ function isPrivateOrLoopbackHost(hostname: string): boolean {
  * on success, error message on failure.
  */
 export function validateTruthSourceUrl(uri: string): string | null {
-  // First pass — same checks as attachment URLs (HTTPS-only in prod, no
-  // private IPs, no embedded credentials).
   const baseError = validateAttachmentUri(uri);
   if (baseError) return baseError;
 
-  // Second pass — truth-source-specific tightening.
   let parsed: URL;
   try {
     parsed = new URL(uri);
@@ -63,8 +60,7 @@ export function validateTruthSourceUrl(uri: string): string | null {
     }
   }
 
-  // Truth sources should always be HTTPS for cryptographic provability later
-  // (TLSNotary requires TLS). Only relax this when the override is set.
+  // TLSNotary requires HTTPS so the resolution path can later be proved.
   if (parsed.protocol !== "https:" && !allowLocal) {
     return "Truth source URL must use https://";
   }

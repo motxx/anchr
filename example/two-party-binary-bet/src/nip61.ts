@@ -86,9 +86,7 @@ export async function sendNutzap(input: NutzapInput): Promise<NutzapSendResult> 
 
   const lockedToken = getEncodedToken({ mint: input.mintUrl, proofs: send });
 
-  // Publish the kind:9321 event. Tags follow NIP-61: ["p", recipient]
-  // for filtering, ["amount", "<sats>"], ["u", mintUrl]. Content is the
-  // locked cashuB token plus an optional plaintext comment.
+  // NIP-61 tag layout: ["p", recipient] for filtering, ["amount", "<sats>"], ["u", mintUrl].
   const tags: string[][] = [
     ["p", input.recipientPubkey],
     ["amount", String(input.amountSats)],
@@ -108,15 +106,10 @@ export async function sendNutzap(input: NutzapInput): Promise<NutzapSendResult> 
   const promises = pool.publish(input.relays, event);
   await Promise.allSettled(promises);
 
-  // Tag for transparency / debugging — also satisfies a few linters.
   void senderPubkey;
 
   return { eventId: event.id, keepProofs: keep ?? [] };
 }
-
-// ---------------------------------------------------------------------------
-// Recipient side
-// ---------------------------------------------------------------------------
 
 export interface IncomingNutzap {
   eventId: string;

@@ -23,16 +23,12 @@ import {
   type MarketState,
   type MarketRouteContext,
 } from "./server-routes.ts";
-import type { MarketFrostNodeConfig } from "@anchr/cashu-frost-oracle/market-frost-config";
+import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
-import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
+import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-
-// ---------------------------------------------------------------------------
-// Mock frost-signer binary
-// ---------------------------------------------------------------------------
 
 let mockDir: string;
 let mockBinaryPath: string;
@@ -41,9 +37,6 @@ function setupMockBinary() {
   mockDir = mkdtempSync(join(tmpdir(), "anchr-market-signer-test-"));
   mockBinaryPath = join(mockDir, "frost-signer");
 
-  // Returns canned responses for sign-round1 and sign-round2.
-  // sign-round1 response includes nonces + commitments.
-  // sign-round2 response includes signature_share.
   const script = `#!/bin/sh
 case "$1" in
   sign-round1)
@@ -67,10 +60,6 @@ function teardownMockBinary() {
   try { rmSync(mockDir, { recursive: true, force: true }); } catch { /* ok */ }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /** Encode a string as hex for the "message" field. */
 function toHex(text: string): string {
   return Array.from(new TextEncoder().encode(text))
@@ -78,8 +67,8 @@ function toHex(text: string): string {
     .join("");
 }
 
-/** Build a minimal MarketFrostNodeConfig for testing. */
-function makeFrostConfig(): MarketFrostNodeConfig {
+/** Build a minimal DualOutcomeFrostNodeConfig for testing. */
+function makeFrostConfig(): DualOutcomeFrostNodeConfig {
   return {
     signer_index: 1,
     total_signers: 3,
@@ -87,9 +76,9 @@ function makeFrostConfig(): MarketFrostNodeConfig {
     key_package: { yes_key: "pkg_yes" },
     pubkey_package: { yes_pubkey: "pkg_yes_pub" },
     group_pubkey: "aa".repeat(32),
-    key_package_no: { no_key: "pkg_no" },
-    pubkey_package_no: { no_pubkey: "pkg_no_pub" },
-    group_pubkey_no: "bb".repeat(32),
+    key_package_b: { no_key: "pkg_no" },
+    pubkey_package_b: { no_pubkey: "pkg_no_pub" },
+    group_pubkey_b: "bb".repeat(32),
     peers: [],
   };
 }
@@ -103,7 +92,6 @@ function buildTestApp(stateOverrides?: Partial<MarketState>): Hono {
   const frostConfig = makeFrostConfig();
   const state = createMarketState({ frostConfig });
 
-  // Apply overrides
   if (stateOverrides) {
     for (const [k, v] of Object.entries(stateOverrides)) {
       // deno-lint-ignore no-explicit-any
@@ -167,10 +155,6 @@ function makeMarket(overrides?: Partial<TwoPartyBinaryBet>): TwoPartyBinaryBet {
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Tests: Message parsing
-// ---------------------------------------------------------------------------
 
 describe("market FROST signer /frost/signer/round1 — message parsing", () => {
   afterEach(() => teardownMockBinary());
@@ -251,10 +235,6 @@ describe("market FROST signer /frost/signer/round1 — message parsing", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests: Condition evaluation
-// ---------------------------------------------------------------------------
-
 describe("market FROST signer /frost/signer/round1 — condition evaluation", () => {
   afterEach(() => teardownMockBinary());
 
@@ -299,8 +279,7 @@ describe("market FROST signer /frost/signer/round1 — condition evaluation", ()
     });
     const { app } = buildTestAppWithMarket(market);
 
-    // Price is 90000 < 100000, so condition NOT met → outcome should be "no"
-    // But we're requesting "yes" → disagreement
+    // Price 90000 < threshold 100000 → "no", but we request "yes" → disagreement.
     const message = toHex("mkt_cond_disagree:yes");
     const res = await app.request("/frost/signer/round1", {
       method: "POST",
@@ -335,7 +314,6 @@ describe("market FROST signer /frost/signer/round1 — condition evaluation", ()
     setupMockBinary();
     const app = buildTestApp();
 
-    // Market "nonexistent" does not exist in state
     const message = toHex("nonexistent:yes");
     const res = await app.request("/frost/signer/round1", {
       method: "POST",
@@ -363,7 +341,6 @@ describe("market FROST signer /frost/signer/round1 — condition evaluation", ()
     });
     const { app } = buildTestAppWithMarket(market);
 
-    // Price 90000 < 100000, condition NOT met → "no"
     const message = toHex("mkt_cond_no:no");
     const res = await app.request("/frost/signer/round1", {
       method: "POST",
@@ -378,10 +355,6 @@ describe("market FROST signer /frost/signer/round1 — condition evaluation", ()
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests: Nonce lifecycle (round1 → round2 → 409 on reuse)
-// ---------------------------------------------------------------------------
-
 describe("market FROST signer nonce lifecycle", () => {
   afterEach(() => teardownMockBinary());
 
@@ -389,7 +362,6 @@ describe("market FROST signer nonce lifecycle", () => {
     setupMockBinary();
     const app = buildTestApp();
 
-    // Round 1
     const message = toHex("mkt_nonce:yes");
     const r1Res = await app.request("/frost/signer/round1", {
       method: "POST",
@@ -401,7 +373,6 @@ describe("market FROST signer nonce lifecycle", () => {
     const nonceId = r1Body.nonce_id;
     expect(typeof nonceId).toBe("string");
 
-    // Round 2 with the nonce_id from round 1
     const r2Res = await app.request("/frost/signer/round2", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -420,7 +391,6 @@ describe("market FROST signer nonce lifecycle", () => {
     setupMockBinary();
     const app = buildTestApp();
 
-    // Round 1
     const message = toHex("mkt_reuse:yes");
     const r1Res = await app.request("/frost/signer/round1", {
       method: "POST",
@@ -430,7 +400,6 @@ describe("market FROST signer nonce lifecycle", () => {
     const r1Body = await r1Res.json();
     const nonceId = r1Body.nonce_id;
 
-    // First round 2 → ok
     const r2Res1 = await app.request("/frost/signer/round2", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -438,7 +407,6 @@ describe("market FROST signer nonce lifecycle", () => {
     });
     expect(r2Res1.status).toBe(200);
 
-    // Second round 2 with same nonce_id → 409
     const r2Res2 = await app.request("/frost/signer/round2", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -466,10 +434,6 @@ describe("market FROST signer nonce lifecycle", () => {
     expect(res.status).toBe(409);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Tests: round2 validation
-// ---------------------------------------------------------------------------
 
 describe("market FROST signer /frost/signer/round2 — validation", () => {
   afterEach(() => teardownMockBinary());
@@ -511,19 +475,14 @@ describe("market FROST signer /frost/signer/round2 — validation", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests: frost-cli failure
-// ---------------------------------------------------------------------------
-
 describe("market FROST signer — frost-cli unavailable", () => {
   afterEach(() => teardownMockBinary());
 
   test("signRound1 failure → 500", async () => {
-    // Build the app with a working binary so FROST endpoints are registered
+    // The app needs a working binary at construction time so the FROST routes
+    // are registered, then we point it at an unavailable path before the call.
     setupMockBinary();
     const app = buildTestApp();
-
-    // Now break the binary so signRound1 returns an error
     _setFrostSignerPathForTest(null);
 
     const message = toHex("mkt_fail:yes");
@@ -539,7 +498,6 @@ describe("market FROST signer — frost-cli unavailable", () => {
   });
 
   test("signRound2 failure → 500", async () => {
-    // First get a nonce_id with a working binary
     setupMockBinary();
     const app = buildTestApp();
 
@@ -551,8 +509,6 @@ describe("market FROST signer — frost-cli unavailable", () => {
     });
     const r1Body = await r1Res.json();
 
-    // Now break the binary for round 2
-    // Create a binary that fails on sign-round2
     const failDir = mkdtempSync(join(tmpdir(), "anchr-market-signer-fail-"));
     const failPath = join(failDir, "frost-signer");
     writeFileSync(failPath, `#!/bin/sh\necho "error" >&2\nexit 1\n`, { mode: 0o755 });
@@ -570,19 +526,13 @@ describe("market FROST signer — frost-cli unavailable", () => {
 
     expect(r2Res.status).toBe(500);
 
-    // Clean up
     try { rmSync(failDir, { recursive: true, force: true }); } catch { /* ok */ }
   });
 });
 
-// ---------------------------------------------------------------------------
-// Tests: FROST endpoints not registered when frostMode !== "frost"
-// ---------------------------------------------------------------------------
-
 describe("market FROST signer — endpoints not registered without FROST config", () => {
   test("/frost/signer/round1 → 404 when frostMode is single-key", async () => {
     const app = new Hono();
-    // createMarketState without frostConfig defaults to single-key mode
     const state = createMarketState();
     expect(state.frostMode).toBe("single-key");
 

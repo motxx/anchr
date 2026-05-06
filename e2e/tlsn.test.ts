@@ -13,9 +13,9 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
-import { buildWorkerApiApp } from "../src/infrastructure/worker-api.ts";
-import { createQueryService, createQueryStore } from "../src/application/query-service.ts";
-import type { QueryInput, QueryResult } from "../src/domain/types.ts";
+import { buildWorkerApiApp } from "../packages/bounty/src/infrastructure/worker-api.ts";
+import { createQueryService, createQueryStore } from "../packages/bounty/src/application/query-service.ts";
+import type { QueryInput, QueryResult } from "../packages/bounty/src/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";

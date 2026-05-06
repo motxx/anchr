@@ -7,7 +7,7 @@ export interface ClipboardProvider {
 function createNativeProvider(): ClipboardProvider {
   return {
     async copyText(text) {
-      const Clipboard = await import("expo-clipboard");
+      const Clipboard = await import("expo-clipboard"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       await Clipboard.setStringAsync(text);
     },
   };

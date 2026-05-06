@@ -23,7 +23,7 @@ export interface MatchInfo {
 }
 
 export interface BetResult {
-  order_id: string;
+  bet_id: string;
   side: string;
   amount_sats: number;
   matches: MatchInfo[];

@@ -5,10 +5,8 @@ import {
   createAdaptiveDualKeyStore,
 } from "./frost-dual-key-store.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
-import { _setFrostSignerPathForTest } from "@anchr/cashu-frost-oracle/frost-cli";
+import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 
-// Ensure frost-signer is NOT available for these unit tests
-// (FROST integration tests require the actual binary)
 const originalPath = null;
 
 test("createAdaptiveDualKeyStore falls back to single-key when no config", () => {
@@ -28,15 +26,14 @@ test("createAdaptiveDualKeyStore falls back to single-key when frost-signer unav
       pubkey_package: {},
       group_pubkey: "aa".repeat(32),
       peers: [],
-      key_package_no: {},
-      pubkey_package_no: {},
-      group_pubkey_no: "bb".repeat(32),
+      key_package_b: {},
+      pubkey_package_b: {},
+      group_pubkey_b: "bb".repeat(32),
     };
 
     const { store, mode } = createAdaptiveDualKeyStore(mockConfig);
     expect(mode).toBe("single-key");
 
-    // Single-key store should work normally
     const entry = store.create("test-swap");
     expect(entry.pubkey_a).toBeTruthy();
     expect(entry.pubkey_b).toBeTruthy();
@@ -56,13 +53,11 @@ test("single-key DualKeyStore create + sign lifecycle", () => {
   expect(entry.pubkey_b).toBeTruthy();
   expect(entry.signed).toBe(false);
 
-  // Sign with outcome A
   const msg = new TextEncoder().encode("swap-1:yes");
   const sig = store.sign("swap-1", "a", msg);
   expect(sig).toBeTruthy();
-  expect(sig!.length).toBe(128); // 64 bytes = 128 hex chars
+  expect(sig!.length).toBe(128);
 
-  // Second sign attempt should fail (one-time)
   const sig2 = store.sign("swap-1", "b", msg);
   expect(sig2).toBeNull();
 });
@@ -79,13 +74,12 @@ test("createFrostDualKeyStore falls back when frost-signer unavailable", () => {
         pubkey_package: {},
         group_pubkey: "aa".repeat(32),
         peers: [],
-        key_package_no: {},
-        pubkey_package_no: {},
-        group_pubkey_no: "bb".repeat(32),
+        key_package_b: {},
+        pubkey_package_b: {},
+        group_pubkey_b: "bb".repeat(32),
       },
     });
 
-    // Should fall back to single-key mode
     const entry = store.create("test-swap");
     expect(entry.pubkey_a).toBeTruthy();
     expect(entry.pubkey_b).toBeTruthy();

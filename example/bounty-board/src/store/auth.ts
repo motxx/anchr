@@ -4,24 +4,15 @@ import { generateIdentity, restoreIdentity, type NostrIdentity } from "../nostr/
 import { npubEncode } from "../nostr/nip19.ts";
 
 interface AuthState {
-  /** Whether auth has been loaded from storage. */
   loaded: boolean;
-  /** Hex-encoded secret key (null if not logged in). */
   secretKeyHex: string | null;
-  /** Hex-encoded public key. */
   publicKey: string | null;
-  /** Bech32-encoded npub. */
   npub: string | null;
-  /** Full identity object (derived from secretKeyHex). */
   identity: NostrIdentity | null;
 
-  /** Load stored identity from SecureStore. */
   load: () => Promise<void>;
-  /** Generate a new identity and persist it. */
   generateAndStore: () => Promise<void>;
-  /** Import an nsec and persist it. */
   importSecretKey: (secretKeyHex: string) => Promise<void>;
-  /** Clear identity and log out. */
   logout: () => Promise<void>;
 }
 

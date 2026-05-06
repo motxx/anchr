@@ -20,7 +20,6 @@ export default function ClaimsScreen() {
     refetch,
   } = useAutoClaims();
 
-  // Combine into sections for FlatList
   type ListItem =
     | { type: "header" }
     | { type: "section"; title: string; count: number }
@@ -61,13 +60,11 @@ export default function ClaimsScreen() {
             if (item.type === "header") {
               return (
                 <View className="px-4 pt-4 pb-2">
-                  {/* App title */}
                   <View className="flex-row items-center gap-2 mb-4">
                     <Ionicons name="airplane" size={20} color="#10b981" />
                     <DSText variant="heading" weight="bold">FlightBack</DSText>
                   </View>
 
-                  {/* Recovery card */}
                   <DSCard className="items-center py-6 mb-1">
                     {totalRecoveredSats > 0 ? (
                       <>

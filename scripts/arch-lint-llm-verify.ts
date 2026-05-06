@@ -33,7 +33,7 @@
  *   - Files under 150 lines. Cohesion / SRP / domain-leakage smells
  *     need substance; small files are usually one-purpose helpers
  *     where these patterns do not manifest.
- *   - Test files, type defs, scripts, examples, mobile, dist.
+ *   - Test files, type defs, scripts, examples, dist.
  *
  * Configuration (via env vars):
  *   - `ARCH_BASE`     — base ref to diff against (default: `origin/main`)

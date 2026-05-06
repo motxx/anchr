@@ -1,7 +1,7 @@
 /**
- * Match coordinator — executes matched order pairs via cross-HTLC.
+ * Match coordinator — executes matched bet pairs via cross-HTLC.
  *
- * Takes a MatchProposal from the order book and creates the actual
+ * Takes a MatchProposal from the matching queue and creates the actual
  * cross-HTLC escrow tokens using the protocol layer primitives.
  */
 
@@ -14,7 +14,7 @@ import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 /**
  * Execute a match proposal by creating cross-HTLC escrow tokens.
  *
- * @param proposal - Match proposal from the order book
+ * @param proposal - Match proposal from the matching queue
  * @param yesProofs - YES bettor's Cashu proofs to lock
  * @param noProofs - NO bettor's Cashu proofs to lock
  * @param swap - Conditional swap definition (hashes + locktime)

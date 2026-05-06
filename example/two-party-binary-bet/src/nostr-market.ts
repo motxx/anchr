@@ -398,7 +398,7 @@ export async function discoverMarkets(
       });
 
       ws.close();
-      break; // Only need one relay to succeed
+      break;
     } catch {
       continue;
     }

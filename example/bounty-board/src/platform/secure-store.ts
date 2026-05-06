@@ -9,15 +9,15 @@ export interface SecureStoreProvider {
 function createNativeProvider(): SecureStoreProvider {
   return {
     async getItem(key) {
-      const SecureStore = await import("expo-secure-store");
+      const SecureStore = await import("expo-secure-store"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       return SecureStore.getItemAsync(key);
     },
     async setItem(key, value) {
-      const SecureStore = await import("expo-secure-store");
+      const SecureStore = await import("expo-secure-store"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       await SecureStore.setItemAsync(key, value);
     },
     async deleteItem(key) {
-      const SecureStore = await import("expo-secure-store");
+      const SecureStore = await import("expo-secure-store"); // allow-dynamic-import: native-only Expo module, browser bundle excludes it
       await SecureStore.deleteItemAsync(key);
     },
   };

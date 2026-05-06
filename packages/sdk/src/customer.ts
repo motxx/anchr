@@ -1,29 +1,12 @@
 /**
  * Customer — buyer-side of the Anchr verified-data exchange.
  *
- * The Customer broadcasts a request to Nostr relays, collects quotes
- * from providers that can fulfill it, locks a Cashu HTLC against the
- * chosen provider, waits for the proof + preimage, decrypts the
- * response, optionally verifies the proof locally, and returns the
- * verified data.
- *
- * Wire flow (each step is implemented in `request()` below):
- *   0. Validate the request shape.
- *   1. Pick an oracle from the configured whitelist.
- *   2. Generate an ephemeral keypair + query id.
- *   3. Ask the oracle for a hash `H` (preimage held by oracle).
- *   4. Build the Phase-1 HTLC lock from the customer's source proofs.
- *   5. Publish a kind 5300 Job Request event.
- *   6. Subscribe to kind 7000 quotes for `quoteWindowMs`.
- *   7. Select a quote, Phase-2-bind the HTLC to the chosen provider,
- *      and announce the selection via kind 7000 status=processing.
- *   8. Subscribe to the kind 6300 result from the selected provider.
- *   9. NIP-44-decrypt the response.
- *  10. Optionally invoke a schema-specific verifier.
- *  11. Return the verified data + proof.
+ * Broadcasts a request to Nostr, collects provider quotes, locks a
+ * Cashu HTLC against the chosen provider, decrypts the response, and
+ * returns the verified data + proof.
  */
 
-import type { CashuToken } from "./cashu.ts";
+import { createCashuClient, type CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
   Quote,
@@ -180,9 +163,6 @@ export function validateCustomerOptions(options: unknown): asserts options is Cu
   if (o.oracleClient === undefined || o.oracleClient === null) {
     throw new CustomerConfigError("oracleClient is required");
   }
-  if (o.cashuClient === undefined || o.cashuClient === null) {
-    throw new CustomerConfigError("cashuClient is required");
-  }
 }
 
 /** Generate a unique query identifier for a single request. */
@@ -204,7 +184,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const relays = [...options.relays];
   const mint = options.mint;
   const oracleClient = options.oracleClient;
-  const cashuClient = options.cashuClient;
+  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
@@ -216,7 +196,6 @@ export function createCustomer(options: CustomerOptions): Customer {
     mint,
 
     async request(req: RequestOptions): Promise<RequestResult> {
-      // [step 0] Validate the schema URI shape eagerly.
       if (!isSchemaUri(req.spec.schema)) {
         throw new InvalidSchemaUriError(req.spec.schema);
       }
@@ -227,24 +206,16 @@ export function createCustomer(options: CustomerOptions): Customer {
         throw new CustomerConfigError("sourceProofs must be an array of Cashu proofs");
       }
 
-      // [step 1] Pick an oracle from the whitelist.
       const expectedOracle = pickOracleForRequest(oracles);
 
-      // [step 2] Generate ephemeral identity + query id for this request.
       const identity: Keypair = generateKeypair();
       const queryId = generateQueryId();
 
-      // [step 3] Get hash from oracle. Verify the response carries the
-      // pubkey we picked; reject if it differs (defense against a
-      // mis-configured oracleClient pointing at a different oracle).
       const { hash, oraclePubkey } = await oracleClient.requestHash(queryId);
       if (oraclePubkey !== expectedOracle) {
         throw new OracleWhitelistMismatchError(expectedOracle, oraclePubkey);
       }
 
-      // [step 4] Build the Phase-1 HTLC lock. The provider is unknown
-      // at this point; the swap that binds the provider happens after
-      // quote selection.
       const locktimeSeconds = Math.floor(Date.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
       const initialLock: CashuToken = await cashuClient.buildHtlcLock({
@@ -255,9 +226,6 @@ export function createCustomer(options: CustomerOptions): Customer {
         sourceProofs: req.sourceProofs,
       });
 
-      // [step 5] Build + publish the kind 5300 Job Request event. Use
-      // an injected RelayClient when available (tests inject a mock);
-      // otherwise build one from the configured relays for this call.
       const ownsRelayClient = options.relayClient === undefined;
       const relayClient: RelayClient = options.relayClient ?? createRelayClient(relays);
 
@@ -282,9 +250,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           throw new RelayPublishError(publishResult);
         }
 
-        // [step 6] Subscribe to kind 7000 quotes referencing our request
-        // event for `quoteWindowMs`. Collect candidate quotes (filtered
-        // by amount ≤ maxAmount and structurally valid) into a buffer.
         const quotes: Quote[] = [];
         let totalReceived = 0;
         const sub = relayClient.subscribe(
@@ -313,19 +278,14 @@ export function createCustomer(options: CustomerOptions): Customer {
           sub.close();
         }
 
-        // [step 7] Apply the selector strategy.
         const selected = selector(quotes);
         if (selected === null) {
           throw new NoQuotesReceivedError(quoteWindowMs, totalReceived);
         }
 
-        // [step 7 cont] Phase-2 swap: bind the chosen provider's pubkey
-        // to the existing HTLC. The Phase-1 proofs are P2PK-locked to
-        // `identity.publicKey`, so the swap requires `identity.secretKey`
-        // to satisfy the input lock. We pass the proofs directly rather
-        // than re-decoding the broadcast token — the encoded V4 form
-        // truncates keyset IDs and would require wallet keychain access
-        // to map them back.
+        // Pass proofs directly rather than re-decoding the broadcast token:
+        // the encoded V4 form truncates keyset IDs and would require wallet
+        // keychain access to map them back.
         const boundLock: CashuToken = await cashuClient.bindProvider({
           initialProofs: initialLock.proofs,
           providerPubkey: selected.providerPubkey,
@@ -335,8 +295,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           customerSecretKey: identity.secretKey,
         });
 
-        // [step 7 cont] Announce the selection so the chosen provider
-        // can begin work.
         const selectionPayload: SelectionFeedbackPayload = {
           status: "processing",
           selected_provider_pubkey: selected.providerPubkey,
@@ -349,8 +307,6 @@ export function createCustomer(options: CustomerOptions): Customer {
         );
         await relayClient.publish(selectionEvent);
 
-        // [step 8] Subscribe to the kind 6300 result event from the
-        // selected provider, referencing our request event id.
         const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
           // Mutable holder so the subscribe callback can reach the
           // eventually-set timeout id (and vice versa).
@@ -376,8 +332,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           }, resultTimeoutMs);
         });
 
-        // [step 9] Decrypt the NIP-44-encrypted response with our
-        // ephemeral secret + provider pubkey.
         const response = parseQueryResponseEvent(
           resultEvent,
           identity.secretKey,
@@ -387,7 +341,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
         }
 
-        // [step 10] Optional schema-specific local verification.
         const verifier = verifiers[req.spec.schema];
         if (verifier !== undefined) {
           const ok = await Promise.resolve(
@@ -398,7 +351,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           }
         }
 
-        // [step 11] Return the verified result.
         return {
           data: response.data,
           proof: response.proof,

@@ -6,7 +6,7 @@
  *
  *   deno run --allow-all --env scripts/demo-htlc-server.ts
  */
-import { generateEphemeralIdentity, type NostrIdentity } from "../src/infrastructure/nostr/identity.ts";
+import { generateEphemeralIdentity, type NostrIdentity } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildQuoteFeedbackEvent,
@@ -21,10 +21,10 @@ import {
   type SelectionFeedbackPayload,
   type QueryResponsePayload,
   ANCHR_QUERY_REQUEST,
-} from "../src/infrastructure/nostr/events.ts";
-import { buildPreimageDM, parseOracleDM } from "../src/infrastructure/nostr/dm.ts";
-import { publishEvent, closePool } from "../src/infrastructure/nostr/client.ts";
-import { deriveConversationKey, encryptNip44 } from "../src/infrastructure/nostr/encryption.ts";
+} from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import { buildPreimageDM, parseOracleDM } from "../packages/bounty/src/infrastructure/nostr/events/dm.ts";
+import { publishEvent, closePool } from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
+import { deriveConversationKey, encryptNip44 } from "../packages/bounty/src/infrastructure/nostr/crypto/encryption.ts";
 import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
 import { createBountyToken } from "../packages/core-cashu/src/wallet.ts";
 import {
@@ -32,7 +32,7 @@ import {
   redeemHtlcToken,
   inspectEscrowToken,
 } from "../packages/core-cashu/src/escrow.ts";
-import { workerUpload } from "../src/infrastructure/blossom/worker-upload.ts";
+import { workerUpload } from "../packages/bounty/src/infrastructure/blossom/worker-upload.ts";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
@@ -57,6 +57,22 @@ interface DemoEvent {
 const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ?? "ws://localhost:7777";
 const BLOSSOM_URL = process.env.BLOSSOM_SERVERS?.split(",")[0]?.trim() ?? "http://localhost:3333";
 const CASHU_MINT_URL = process.env.CASHU_MINT_URL?.trim() ?? "http://localhost:3338";
+
+const DEMO_HTML = `<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anchr · HTLC Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="root">Open this in a browser with WebSocket DevTools — events stream from <code>/demo</code>.</div>
+</body>
+</html>
+`;
 
 // --- Helpers ---
 
@@ -558,10 +574,7 @@ Deno.serve({ port: PORT }, (req) => {
   }
 
   if (url.pathname === "/") {
-    // Serve the demo HTML file
-    return Deno.readFile("./example/reference-app/ui/demo/index.html").then(
-      (data) => new Response(data, { headers: { "content-type": "text/html; charset=utf-8" } })
-    );
+    return new Response(DEMO_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 
   return new Response("Not Found", { status: 404 });

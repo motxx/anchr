@@ -25,10 +25,6 @@ import {
   type Wallet,
 } from "@cashu/cashu-ts";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export interface ExchangeConfig {
   mintUrl: string;
   marketGroupPubkeyYes: string;
@@ -61,10 +57,6 @@ export interface VerificationResult {
   valid: boolean;
   error?: string;
 }
-
-// ---------------------------------------------------------------------------
-// P2PK condition builders (exchange phase — short locktime)
-// ---------------------------------------------------------------------------
 
 /**
  * Build P2PK options for a YES bettor's exchange token.
@@ -116,18 +108,11 @@ function buildExchangeOptionsNo(config: ExchangeConfig, locktime: number): P2PKO
     .toOptions();
 }
 
-/**
- * Build P2PK options based on side and locktime.
- */
 function buildOptionsForSide(config: ExchangeConfig, locktime: number): P2PKOptions {
   return config.mySide === "yes"
     ? buildExchangeOptionsYes(config, locktime)
     : buildExchangeOptionsNo(config, locktime);
 }
-
-// ---------------------------------------------------------------------------
-// Token creation
-// ---------------------------------------------------------------------------
 
 /**
  * Create a P2PK-locked bet token. The token locks until **`marketLocktime`**
@@ -167,10 +152,6 @@ export async function createLockedToken(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Pubkey normalization
-// ---------------------------------------------------------------------------
-
 /**
  * Reduce a hex secp256k1 pubkey to its 32-byte x-only form. Accepts:
  *   - 64 chars (already x-only / BIP-340 / FROST aggregate)
@@ -189,10 +170,6 @@ function toXOnlyPubkey(hex: string): string {
   }
   return lower;
 }
-
-// ---------------------------------------------------------------------------
-// Token verification
-// ---------------------------------------------------------------------------
 
 /**
  * Verify that a received P2PK-locked token has the correct conditions.
@@ -224,7 +201,6 @@ export function verifyReceivedToken(
    */
   knownKeysets?: readonly string[],
 ): VerificationResult {
-  // 1. Decode token (passing known keysets so V4 short IDs can be mapped).
   let decoded;
   try {
     decoded = getDecodedToken(token, knownKeysets ? [...knownKeysets] : undefined);
@@ -237,7 +213,6 @@ export function verifyReceivedToken(
     return { valid: false, error: "Token contains no proofs" };
   }
 
-  // 2. Verify total amount
   const totalAmount = proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
   if (totalAmount < expected.amount) {
     return {
@@ -246,7 +221,6 @@ export function verifyReceivedToken(
     };
   }
 
-  // 3-6. Verify each proof's P2PK conditions
   const expectedGroupX = toXOnlyPubkey(expected.groupPubkey);
   const expectedMineX = toXOnlyPubkey(expected.myPubkey);
   for (const proof of proofs) {
@@ -262,7 +236,6 @@ export function verifyReceivedToken(
     // representation difference.
     const lockKeysX = pubkeys.map(toXOnlyPubkey);
 
-    // 4. Check lock pubkeys include group pubkey AND my pubkey
     if (!lockKeysX.includes(expectedGroupX)) {
       return {
         valid: false,
@@ -276,7 +249,6 @@ export function verifyReceivedToken(
       };
     }
 
-    // 5. Check n_sigs = 2
     if (nSigs !== 2) {
       return {
         valid: false,
@@ -284,7 +256,6 @@ export function verifyReceivedToken(
       };
     }
 
-    // 6. Check locktime
     if (locktime !== undefined && locktime < expected.minLocktime) {
       return {
         valid: false,
@@ -295,10 +266,6 @@ export function verifyReceivedToken(
 
   return { valid: true };
 }
-
-// ---------------------------------------------------------------------------
-// P2PK secret parsing
-// ---------------------------------------------------------------------------
 
 interface P2PKParseResult {
   valid: boolean;
@@ -331,7 +298,6 @@ function parseP2PKSecret(secret: string): P2PKParseResult {
     let nSigs = 1;
     let locktime: number | undefined;
 
-    // The primary pubkey from the data field
     if (payload.data) {
       pubkeys.push(payload.data);
     }

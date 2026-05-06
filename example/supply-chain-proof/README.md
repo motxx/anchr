@@ -1,6 +1,6 @@
 # Supply Chain Proof
 
-> **Uses:** `@anchr/photo-bounty` + `@anchr/tlsn-toolkit` (designed; current code is a simulation).
+> **Uses:** `@anchr/photo-verification` + `@anchr/tlsn-toolkit` (designed; current code is a simulation).
 > **Does not use:** `@anchr/cashu-conditional-swap` — supply-chain settlement is off-protocol (fiat invoices, bank transfers).
 > **Pattern:** verification-only evidence chain (third composition, see [`docs/architecture.md`](../../docs/architecture.md)).
 
@@ -184,11 +184,11 @@ Workshop (Florence) → Authentication Center (Milan) → Shipping → Retail (G
 | Example concept | Anchr Core | Purpose |
 |---|---|---|
 | Per-hop GPS check | `GpsCoord` + `haversineKm()` in `src/domain/` | Proximity verification |
-| Per-hop C2PA check | `packages/photo-bounty/` | Content Credential chain validation |
+| Per-hop C2PA check | `packages/photo-verification/` | Content Credential chain validation |
 | Per-hop API attestation | `packages/tlsn-toolkit/` | TLSNotary proof verification |
 | Per-hop conditional payment | `packages/cashu-conditional-swap/` | Cross-lock HTLC release |
 | Chain audit log | Nostr relay integration | Decentralised event trail |
-| Threshold Oracle | `packages/cashu-frost-oracle/` | FROST t-of-n signing |
+| Threshold Oracle | `packages/frost-oracle/` | FROST t-of-n signing |
 
 ## Implementation status
 
@@ -325,5 +325,5 @@ Returns Nostr event IDs for independent verification by any relay client.
 - [`example/royalty-distribution/`](../royalty-distribution/) — sister verification-only chain example. Same pattern (recursive R/W/O along chain/graph edges, no Cashu settlement) but in the *fully digital* domain, where the physical-binding gap doesn't exist. Useful as the contrast — royalty fits the pattern more cleanly; supply-chain shows where the pattern hits its physical limit.
 - [`docs/architecture.md`](../../docs/architecture.md) — composition patterns (Bounty, Market, Verification-only chain).
 - [`packages/cashu-conditional-swap/README.md`](../../packages/cashu-conditional-swap/README.md) — bilateral cross-lock primitive (not used here).
-- [`packages/photo-bounty/`](../../packages/photo-bounty/) — C2PA + GPS verification primitives.
+- [`packages/photo-verification/`](../../packages/photo-verification/) — C2PA + GPS verification primitives.
 - [`packages/tlsn-toolkit/`](../../packages/tlsn-toolkit/) — TLSNotary verification primitives.

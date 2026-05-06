@@ -2,7 +2,7 @@
  * Shared helpers for Cashu escrow operations.
  */
 
-import type { Proof } from "@cashu/cashu-ts";
+import type { P2PKOptions, Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { getCashuWallet, getCashuConfig } from "./wallet.ts";
 
@@ -26,7 +26,7 @@ export async function loadAndSend(
   wallet: ReturnType<typeof getCashuWallet> & object,
   amountSats: number,
   proofs: Proof[],
-  p2pkOptions?: import("@cashu/cashu-ts").P2PKOptions,
+  p2pkOptions?: P2PKOptions,
   privkey?: string,
   timeoutMs: number = 30_000,
 ): Promise<Proof[]> {

@@ -1,27 +1,9 @@
 /**
  * Provider — fulfillment-side of the Anchr verified-data exchange.
  *
- * The Provider subscribes to Nostr relays for kind 5300 Job Requests
- * addressed to oracles in its whitelist, calls a handler to decide
- * whether (and at what price) to quote, sends a kind 7000 quote, and
- * — once selected — runs the lazy producer the handler returned to
- * generate a proof, NIP-44-encrypts the response to the customer, and
- * publishes a kind 6300 result event.
- *
- * Wire flow (each step is implemented in `handleJob()` below):
- *   1. Parse the kind 5300 payload.
- *   2. Filter by oracle whitelist.
- *   3. Validate the schema URI shape.
- *   4. Call the user-supplied handler for a quote; publish kind 7000
- *      status=payment-required if the handler accepts.
- *   5. Wait for the customer's kind 7000 status=processing selection
- *      addressed to us (otherwise time out and bail).
- *   6. Run the handler's lazy `produce()` to generate proof + data.
- *   7. NIP-44-encrypt the response to the customer's pubkey and
- *      publish a kind 6300 result event.
- *   8. Wait for the oracle's preimage NIP-44 DM (kind 4) carrying our
- *      query id; on timeout, locktime refunds the customer.
- *   9. Redeem the HTLC at the mint with `preimage + provider sig`.
+ * Subscribes to NIP-90 kind 5300 job requests, quotes via kind 7000,
+ * produces proofs after selection, publishes kind 6300 results, and
+ * redeems the HTLC once the oracle releases the preimage.
  */
 
 import {
@@ -47,6 +29,7 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri } from "./schema.ts";
+import { createCashuClient, type CashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -111,9 +94,6 @@ export function validateProviderOptions(options: unknown): asserts options is Pr
   if (typeof o.privKey !== "string" || o.privKey.length === 0) {
     throw new ProviderConfigError("privKey must be a non-empty string");
   }
-  if (o.cashuClient === undefined || o.cashuClient === null) {
-    throw new ProviderConfigError("cashuClient is required");
-  }
   if (o.notary !== undefined) {
     if (typeof o.notary !== "string" || o.notary.length === 0) {
       throw new ProviderConfigError("notary, when provided, must be a non-empty string");
@@ -144,17 +124,14 @@ export function createProvider(options: ProviderOptions): Provider {
   const relays = [...options.relays];
   const mint = options.mint;
   const notary = options.notary;
-  const cashuClient = options.cashuClient;
+  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
   const selectionTimeoutMs = options.selectionTimeoutMs ?? DEFAULT_SELECTION_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ?? DEFAULT_PREIMAGE_TIMEOUT_MS;
 
-  // Resolve the provider's keypair eagerly so failures surface at
-  // construction rather than on the first event.
   const secretKey = normalizeSecretKey(options.privKey);
   const pubkey = getPublicKey(secretKey);
   const identity: Keypair = { secretKey, publicKey: pubkey };
 
-  // Live-loop state captured by serve() / stop().
   const state: { stop?: () => void } = {};
 
   return {
@@ -172,8 +149,8 @@ export function createProvider(options: ProviderOptions): Provider {
         const sub = relayClient.subscribe(
           { kinds: [5300] },
           (event) => {
-            // Each job runs concurrently so a long-running handler
-            // does not block the subscription loop.
+            // Run each job concurrently so a slow handler does not
+            // block the subscription loop.
             handleJob(event, {
               identity,
               oracles,
@@ -182,9 +159,7 @@ export function createProvider(options: ProviderOptions): Provider {
               selectionTimeoutMs,
               preimageTimeoutMs,
             }, handler).catch(() => {
-              // Swallow per-job failures; one bad event should not
-              // tear down the provider's subscription. Consumers can
-              // log inside their handler.
+              // One bad event must not tear down the subscription.
             });
           },
         );
@@ -204,26 +179,15 @@ export function createProvider(options: ProviderOptions): Provider {
   };
 }
 
-/** Internal context shared with handleJob. */
 interface JobContext {
   identity: Keypair;
   oracles: readonly string[];
-  cashuClient: import("./cashu.ts").CashuClient;
+  cashuClient: CashuClient;
   relayClient: RelayClient;
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;
 }
 
-/**
- * Per-event job handler — runs steps 1-4 of the wire flow:
- *   1. Parse request payload
- *   2. Filter by oracle whitelist
- *   3. Validate schema URI shape
- *   4. Call handler for a quote, publish kind 7000 if accepted
- *
- * Steps 5-10 (selection wait, produce, encrypt+publish, preimage,
- * redeem) are tracked as the next provider milestones.
- */
 async function handleJob(
   event: NostrEvent,
   ctx: JobContext,
@@ -249,7 +213,7 @@ async function handleJob(
   try {
     quote = await handler(request);
   } catch {
-    return; // handler errored — decline silently
+    return;
   }
   if (quote === null) return;
   if (typeof quote.amountSats !== "number" || quote.amountSats <= 0) return;
@@ -267,10 +231,6 @@ async function handleJob(
   );
   await ctx.relayClient.publish(quoteEvent);
 
-  // [step 5] Wait for the customer's selection event (kind 7000
-  // status=processing) addressed to us. Time out after
-  // selectionTimeoutMs — the customer may select a different
-  // provider, in which case we never see a matching event.
   const selection = await waitForSelection(
     ctx,
     event.id,
@@ -278,9 +238,6 @@ async function handleJob(
   );
   if (selection === null) return;
 
-  // [step 6] Run the lazy producer to generate the proof. Errors here
-  // mean we cannot fulfill the request — silently bail (locktime
-  // refunds the customer).
   let result: { data: unknown; proof: Uint8Array | string };
   try {
     result = await quote.produce();
@@ -288,8 +245,6 @@ async function handleJob(
     return;
   }
 
-  // [step 7] Build + publish the kind 6300 result event with the
-  // response NIP-44-encrypted to the customer's pubkey.
   const responseEvent = buildQueryResponseEvent(
     ctx.identity,
     event.id,
@@ -302,10 +257,6 @@ async function handleJob(
   );
   await ctx.relayClient.publish(responseEvent);
 
-  // [step 8] Wait for the oracle's preimage NIP-44 DM (kind 4) that
-  // matches our query id. Time out after preimageTimeoutMs (the
-  // customer's HTLC locktime refund kicks in if the oracle never
-  // verifies and never releases).
   const preimage = await waitForPreimage(
     ctx,
     payload.oracle_pubkey,
@@ -314,7 +265,6 @@ async function handleJob(
   );
   if (preimage === null) return;
 
-  // [step 9] Redeem the bound HTLC at the mint.
   try {
     await ctx.cashuClient.redeemHtlc({
       token: selection.bound_token,
@@ -322,7 +272,6 @@ async function handleJob(
       providerSecretKey: ctx.identity.secretKey,
     });
   } catch {
-    // Mint rejected the redemption — locktime refund will kick in.
     return;
   }
 }
@@ -355,8 +304,7 @@ function waitForPreimage(
           oraclePubkey,
         );
         if (parsed === null) return;
-        // Cross-check both query_id and request_event_id so a stale
-        // DM for a different request can't be replayed.
+        // Cross-check both ids so a stale DM for another request can't be replayed.
         if (parsed.query_id !== queryId) return;
         if (parsed.request_event_id !== requestEventId) return;
         handles.sub?.close();
@@ -382,8 +330,6 @@ function waitForSelection(
   customerPubkey: string,
 ): Promise<{ bound_token: string } | null> {
   return new Promise((resolve) => {
-    // Mutable holder so the subscribe callback can clear the timer
-    // and vice versa without `let` reassignment.
     const handles: {
       sub?: { close(): void };
       timeoutId?: ReturnType<typeof setTimeout>;
@@ -395,7 +341,6 @@ function waitForSelection(
         authors: [customerPubkey],
       },
       (event) => {
-        // The customer announces the selected provider via the `p` tag.
         const selectedPubkey = findTagValue(event, "p");
         if (selectedPubkey !== ctx.identity.publicKey) return;
         const parsed = parseSelectionFeedbackEvent(event);

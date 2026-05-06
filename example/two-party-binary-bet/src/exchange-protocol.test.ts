@@ -1,22 +1,9 @@
-/**
- * Exchange Protocol Tests — verifyReceivedToken + P2PK condition verification.
- *
- * Tests verify that:
- * 1. Valid tokens pass verification
- * 2. Invalid tokens (wrong pubkeys, wrong amount, wrong locktime) are rejected
- * 3. P2PK secret parsing handles NUT-11 format correctly
- */
-
 import { test, describe } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { verifyReceivedToken } from "./exchange-protocol.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeKeypair() {
   const sk = generateSecretKey();
@@ -73,10 +60,6 @@ function mockP2PKProof(opts: {
 function encodeProofs(proofs: Proof[]): string {
   return getEncodedToken({ mint: "https://mock-mint.example.com", proofs });
 }
-
-// ---------------------------------------------------------------------------
-// Tests: verifyReceivedToken
-// ---------------------------------------------------------------------------
 
 describe("verifyReceivedToken", () => {
   const groupPubkey = makeKeypair().pubkey;

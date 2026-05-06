@@ -1,19 +1,15 @@
 /**
- * Build UI bundles for Deno static serving.
+ * Build UI bundles with esbuild.
  *
- * Bundles 3 React entry points (worker, requester, dashboard) with esbuild,
- * copies HTML files with <script src="./main.tsx"> rewritten to <script src="./main.js">.
- *
- * Output: dist/ui/
+ * Each entry has its own srcDir + outDir; HTML is copied with
+ * <script src="./main.tsx"> rewritten to <script src="./main.js">.
  */
 
 import * as esbuild from "esbuild";
 import { join, dirname } from "node:path";
-import { copyFile, mkdir, readFile, writeFile, cp } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
-const SRC_UI = join(PROJECT_ROOT, "example/reference-app/ui");
-const DIST_UI = join(PROJECT_ROOT, "dist/ui");
 const MARKET_UI = join(PROJECT_ROOT, "example/two-party-binary-bet/ui");
 
 interface EntryPoint {
@@ -27,9 +23,6 @@ interface EntryPoint {
 }
 
 const ENTRIES: EntryPoint[] = [
-  { name: "worker",    srcDir: SRC_UI,                       outDir: DIST_UI,                          entryTsx: "main.tsx", html: "index.html" },
-  { name: "requester", srcDir: join(SRC_UI, "requester"),    outDir: join(DIST_UI, "requester"),       entryTsx: "main.tsx", html: "index.html" },
-  { name: "dashboard", srcDir: join(SRC_UI, "dashboard"),    outDir: join(DIST_UI, "dashboard"),       entryTsx: "main.tsx", html: "index.html" },
   // Market UI is bundled in-place (server.ts serves directly from the source dir).
   { name: "market",    srcDir: MARKET_UI,                    outDir: MARKET_UI,                        entryTsx: "main.tsx", html: "index.html" },
 ];
@@ -104,16 +97,8 @@ async function buildEntry(entry: EntryPoint) {
 
 async function main() {
   console.log(WATCH ? "[build-ui] Watching..." : "[build-ui] Building UI bundles...");
-  await mkdir(DIST_UI, { recursive: true });
 
   await Promise.all(ENTRIES.map(buildEntry));
-
-  // Copy shared assets (fonts, images) if any exist
-  try {
-    await cp(join(SRC_UI, "assets"), join(DIST_UI, "assets"), { recursive: true });
-  } catch {
-    // No assets directory
-  }
 
   if (WATCH) {
     console.log("[build-ui] Watching all entries — Ctrl+C to stop.");

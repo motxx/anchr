@@ -26,7 +26,7 @@
  * ```
  */
 
-import { Anchr, type QueryCondition } from "../../packages/sdk/src/index.ts";
+import { Anchr, type QueryCondition } from "@anchr/sdk";
 import { statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
@@ -248,7 +248,7 @@ export class AnchrWorker {
     // Selective disclosure: redact sensitive header values from the presentation.
     // Redacted headers are committed to (proving they existed) but their values
     // are not revealed — this is a TLSNotary protocol-level feature, not tampering.
-    // Keep in sync with SENSITIVE_HEADER_NAMES in src/infrastructure/verification/proof-redaction.ts
+    // Keep in sync with SENSITIVE_HEADER_NAMES in packages/bounty/src/infrastructure/verification/proof-redaction.ts
     const sensitiveHeaders = [
       "authorization", "cookie", "set-cookie", "x-api-key",
       "x-auth-token", "proxy-authorization", "x-csrf-token", "x-xsrf-token",

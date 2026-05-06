@@ -8,12 +8,8 @@
  *
  * Reference types:
  *   - TlsnRequirement, TlsnCondition from ../../../packages/core-domain/src/types
- *   - validateTlsn, evaluateCondition from ../../../src/infrastructure/verification/tlsn-validation
+ *   - validateTlsn, evaluateCondition from ../../../packages/bounty/src/infrastructure/verification/tlsn-validation
  */
-
-// ---------------------------------------------------------------------------
-// Core Types
-// ---------------------------------------------------------------------------
 
 /**
  * Proof condition types that can be verified via TLSNotary.
@@ -73,10 +69,6 @@ export interface AirdropCriteria {
   escrow_token?: string;
 }
 
-// ---------------------------------------------------------------------------
-// GitHub API Response Shapes (for documentation and mock generation)
-// ---------------------------------------------------------------------------
-
 /**
  * Subset of the GitHub REST API /users/{username} response.
  * See: https://docs.github.com/en/rest/users/users#get-a-user
@@ -108,10 +100,6 @@ export interface TwitterUserResponse {
     };
   };
 }
-
-// ---------------------------------------------------------------------------
-// Condition Builders
-// ---------------------------------------------------------------------------
 
 /**
  * Build a condition requiring a GitHub account older than `minDaysOld` days.
@@ -216,10 +204,6 @@ export function buildGitHubContributionCondition(minContributions: number): Proo
     description: `At least ${minContributions} GitHub contributions (public gists as proxy)`,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Validation
-// ---------------------------------------------------------------------------
 
 export interface ValidationError {
   field: string;

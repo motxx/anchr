@@ -139,18 +139,11 @@ test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with n
   expect(result.proofs.length).toBe(1);
   expect(result.token.startsWith("cashu")).toBe(true);
 
-  // Phase 1 MUST hit the mint with an asP2PK swap so the broadcast
-  // bounty_token isn't a bearer instrument that any kind 5300 subscriber
-  // could spend.
   expect(calls.length).toBe(1);
   expect(calls[0].amount).toBe(1000);
-  // No customer privkey is needed for Phase 1 — input proofs are plain.
   expect(calls[0].privkey).toBeUndefined();
   expect(calls[0].p2pk).toBeDefined();
   const tagsJson = JSON.stringify(calls[0].p2pk);
-  // Phase 1 locks ONLY to the customer pubkey — no hashlock yet (the
-  // customer needs to be able to swap before the oracle releases the
-  // preimage; see buildPhase1P2PKOptions docstring).
   expect(tagsJson).toContain(CUSTOMER_PUBKEY);
   expect(tagsJson).not.toContain(VALID_HASH);
 });
@@ -243,8 +236,6 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
   const { wallet, calls } = makeFakeWallet({ outputProofs: phase2Output });
   const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
 
-  // Caller-supplied Phase-1 proofs (in the real flow these come from
-  // `buildHtlcLock`'s return value; here we hand them in directly).
   const phase1Proofs = [
     { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
   ];
@@ -262,9 +253,6 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
   expect(result.amountSats).toBe(1000);
   expect(calls.length).toBe(1);
   const phase2Call = calls[0]!;
-  // The Phase-2 call must:
-  //   1. Pass the customer's privkey to satisfy the Phase-1 P2PK input lock.
-  //   2. Apply hashlock + provider P2PK + locktime + refund to the output.
   expect(typeof phase2Call.privkey).toBe("string");
   expect(phase2Call.p2pk).toBeDefined();
   const tagsJson = JSON.stringify(phase2Call.p2pk);
@@ -351,7 +339,6 @@ test("redeemHtlc verifies preimage matches each proof's hashlock before mint rou
   });
   const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
 
-  // Wrong-preimage redemption is rejected client-side without a mint call.
   await expect(
     client.redeemHtlc({
       token: wrongToken,
@@ -361,7 +348,6 @@ test("redeemHtlc verifies preimage matches each proof's hashlock before mint rou
   ).rejects.toThrow(CashuClientError);
   expect(calls.length).toBe(0);
 
-  // Correct preimage redemption proceeds and signs the witness.
   const result = await client.redeemHtlc({
     token: goodToken,
     preimageHex: PREIMAGE_HEX,

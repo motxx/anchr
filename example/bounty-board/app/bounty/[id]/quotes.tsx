@@ -14,7 +14,6 @@ export default function QuotesScreen() {
   const [selecting, setSelecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO: fetch actual quotes from API or Nostr events
   const quotes: QuoteInfo[] = [];
 
   const handleSelect = async (workerPubkey: string) => {

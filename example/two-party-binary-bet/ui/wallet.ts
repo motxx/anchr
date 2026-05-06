@@ -64,9 +64,7 @@ export async function initWallet(
   if (_wallet && _mintUrl === mintUrl && relays.join(",") === _relays.join(",")) {
     return _wallet;
   }
-  // Dynamic import keeps the cashu-ts bundle lazy in case the wallet path
-  // is never used.
-  const { Wallet: CashuWallet } = await import("@cashu/cashu-ts");
+  const { Wallet: CashuWallet } = await import("@cashu/cashu-ts"); // allow-dynamic-import: keeps the cashu-ts bundle lazy — viewers who never open the wallet panel skip the download
   _wallet = new CashuWallet(mintUrl, { unit: "sat" });
   _mintUrl = mintUrl;
   await _wallet.loadMint();

@@ -1,26 +1,12 @@
 /**
  * Schema URI dispatch.
  *
- * The SDK is verification-format-agnostic. Each request carries a
- * `schema` URI; the provider and oracle interpret it. New formats plug
- * in by publishing a schema (out-of-band) and registering a producer /
- * verifier with the SDK at construction time.
- *
- * Built-in schema URIs (Defined):
+ * The SDK dispatches by URI string only — predicate shape, proof format,
+ * and verification rules live in each schema's document. Built-in URIs:
  *   - io.anchr.tlsn-https.v1 — TLSNotary attestation of an HTTPS response
  *   - io.anchr.c2pa-image.v1 — C2PA-signed photo / video with optional GPS predicate
  *
- * Anyone can introduce a new schema URI by:
- *   1. Publishing a schema document (e.g. as a Nostr addressable event,
- *      kind 30xxx, with `d` tag = the URI) defining the predicate shape,
- *      proof format, and verification rules.
- *   2. Registering a producer (provider side) and verifier (customer side)
- *      with the SDK that follow that schema's contract.
- *
- * The URI string is the only thing the SDK looks at when dispatching;
- * resolution of the URI to its document is intentionally pluggable so
- * that a future Nostr-based schema registry, a static JSON file, or any
- * other lookup mechanism can serve the document without SDK changes.
+ * Custom schemas plug in by registering a producer/verifier at construction.
  */
 
 import type { SchemaProducer, SchemaVerifier } from "./types.ts";
@@ -40,7 +26,6 @@ export type DefinedSchemaUri = typeof DEFINED_SCHEMAS[keyof typeof DEFINED_SCHEM
 /** Returns true when the URI is a syntactically plausible schema URI (reverse-DNS + version). */
 export function isSchemaUri(value: unknown): value is SchemaUri {
   if (typeof value !== "string") return false;
-  // Reverse-DNS: at least two dot-segments + ".v<digits>" suffix, only ASCII letters/digits/dashes/dots.
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+\.v\d+$/.test(value);
 }
 

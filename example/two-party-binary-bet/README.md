@@ -6,7 +6,7 @@
 
 > **Status: Testnet.** Live deployment at <https://anchr-market.fly.dev>; testnut ecash, not real BTC.
 
-> **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/cashu-frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
+> **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
 > **Pattern:** two-party bet (two counterparties cross-lock; Oracle reveals outcome).
 
 > **What this is**
@@ -32,10 +32,10 @@
 > the public testnut Cashu mint (<https://testnut.cashu.space>), the
 > Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
 
-> **Operator runbook:** [`docs/two-party-binary-bet/deployment.md`](../../docs/two-party-binary-bet/deployment.md)
+> **Operator runbook:** [`DEPLOYMENT.md`](../../DEPLOYMENT.md)
 > covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
 > resolution, and the public-testnet deploy checklist. Screenshots of
-> the running UI live in [`docs/two-party-binary-bet/screenshots/`](../../docs/two-party-binary-bet/screenshots/).
+> the running UI live in [`screenshots/`](../../screenshots/).
 
 ## What you can build with this primitive
 
@@ -140,7 +140,7 @@ stack).
 ```
 1. Market created → Oracle generates dual preimages (HTLC) or DKG group keys (FROST)
 2. Bettors mint Cashu proofs from their Lightning balance
-3. Order book matches YES / NO orders → MatchProposal
+3. Matching queue matches YES / NO bets → MatchProposal
 4. Match executor cross-locks each bettor's proofs (counterparty pubkey +
    counterparty's outcome hash / FROST group key)
 5. Oracle fetches resolution URL via TLSNotary, verifies server name +
@@ -164,45 +164,29 @@ stack).
 
 | Item | Status |
 |---|---|
-| 1:1 matched orders only (no CLOB / arbitrary probability pricing) | Not implemented |
+| 1:1 matched bets only (no CLOB / arbitrary probability pricing) | Not implemented |
 | Secondary market — exit a position before resolution | Not implemented; once matched, the cross-lock binds redemption to specific pubkeys, so positions are terminal until resolution or locktime refund |
 | Multi-outcome markets (>2 outcomes) | Not implemented; binary YES / NO only |
 | Subjective resolution (UMA-style human dispute) | Not in scope; only deterministic HTTPS conditions |
-| Bookmaker-style 1:N matching | Not supported; current order book is FIFO 1:1 |
+| Bookmaker-style 1:N matching | Not supported; current matching queue is FIFO 1:1 |
 
 ## Persistence
 
-The order book is in-memory by default — fine for tests and demos, but
-**open orders are lost on server restart**. For any deployment that
-matters, point the server at a Postgres database via `DATABASE_URL`:
+All durable state — the matching queue plus the six runtime maps (markets,
+matched pairs, resolved preimages, resolved signatures, per-proof
+signatures, and pending exchange tokens) — lives in a single SQLite file.
+The path is controlled by `KANNAGI_DB_PATH` (default `./kannagi.db`
+locally; set to `/data/kannagi.db` in production so the Fly volume is
+used).
 
-```bash
-# 1. Create the schema (idempotent)
-psql "$DATABASE_URL" -f example/two-party-binary-bet/migrations/001_create_orders.sql
-
-# 2. Start the server with persistence on
-DATABASE_URL=postgres://user:pass@host:5432/anchr_market \
-  deno run --allow-all example/two-party-binary-bet/server.ts
-```
-
-When `DATABASE_URL` is unset, the server falls back to the in-memory book
-and logs a warning. When set, FIFO matching runs inside a single Postgres
-transaction with `SELECT ... FOR UPDATE` locks on the open orders, which
-serializes concurrent matchers correctly.
+The schema is created automatically on first open; there is no separate
+migration step. SQLite WAL mode gives concurrent readers + a single
+writer, which fits the Kannagi architecture (single Fly machine, FROST
+signers in-process on 127.0.0.1:4001-4003).
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | unset | Postgres connection string. If unset, in-memory. |
-| `DATABASE_POOL_SIZE` | `10` | Max Postgres connections in the pool. |
-
-For local dev the `postgres` service in `docker-compose.yml` provisions a
-ready-to-use database (`postgres://anchr:anchr@localhost:5432/anchr_market`)
-and auto-applies the migration on first start. CI runs the regtest test
-suite with `DATABASE_URL` pointed at it, so both
-`two-party-binary-bet-orderbook-pg.test.ts` (direct PG order-book coverage:
-CRUD, FIFO, partial matches, concurrent `FOR UPDATE` matchers) and
-`two-party-binary-bet-lifecycle.test.ts` (full Cashu lifecycle on Postgres)
-exercise the production code path.
+| `KANNAGI_DB_PATH` | `./kannagi.db` | SQLite DB path. Use `:memory:` for tests. |
 
 ## Running
 
@@ -220,19 +204,19 @@ deno test --allow-all example/two-party-binary-bet/
 deno task test:regtest
 
 # FROST 2-of-3 cluster (after building crates/frost-signer)
-scripts/frost-market-dkg-bootstrap.ts --threshold 2 --total 3
-scripts/frost-market-oracle-cluster.ts
+example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts --threshold 2 --total 3
+example/two-party-binary-bet/scripts/frost-oracle-cluster.ts
 ```
 
 ## Files
 
 ```
 src/
-  server-routes.ts          — Market HTTP API (order book, matching, resolution)
+  server-routes.ts          — Market HTTP API (matching queue, matching, resolution)
   market-types.ts           — Type definitions
   market-oracle.ts          — Condition evaluation, payout calculation
-  order-book.ts             — FIFO matching interface + in-memory impl
-  order-book-postgres.ts    — Postgres-backed impl (used when DATABASE_URL set)
+  matching-queue.ts             — FIFO matching interface + in-memory impl
+  kannagi-store.ts          — SQLite-backed durable store (matching queue + 6 runtime maps)
   resolution.ts             — DualPreimageStore (HTLC) / DualKeyStore (FROST) resolution
   match-coordinator.ts      — Cross-HTLC match execution via @anchr/cashu-conditional-swap
   market-api-routes.ts      — REST endpoints

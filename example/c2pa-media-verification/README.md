@@ -1,8 +1,8 @@
 # C2PA Media Verification
 
-> **Status: Testnet.** Backed by `@anchr/photo-bounty` and a testnut mint; not on mainnet.
+> **Status: Testnet.** Backed by `@anchr/photo-verification` and a testnut mint; not on mainnet.
 
-> **Uses:** `anchr-sdk` → reference server (`@anchr/photo-bounty` + `@anchr/cashu-conditional-swap`).
+> **Uses:** `anchr-sdk` → reference server (`@anchr/photo-verification` + `@anchr/cashu-conditional-swap`).
 > **Pattern:** bounty (News desk pays Journalist on verified C2PA + GPS proof).
 
 Prove that a news photo is a real camera capture — not AI-generated — using [C2PA Content Credentials](https://c2pa.org/) and Anchr's decentralized verification network.

@@ -31,9 +31,11 @@ COPY deno.json deno.lock ./
 COPY packages/core-runtime/deno.json ./packages/core-runtime/
 COPY packages/core-cashu/deno.json ./packages/core-cashu/
 COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
-COPY packages/photo-bounty/deno.json ./packages/photo-bounty/
-COPY packages/cashu-frost-oracle/deno.json ./packages/cashu-frost-oracle/
+COPY packages/photo-verification/deno.json ./packages/photo-verification/
+COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
+COPY packages/blossom/deno.json ./packages/blossom/
+COPY packages/runtime/deno.json ./packages/runtime/
 COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
@@ -54,13 +56,21 @@ ENV NODE_ENV=production
 ENV MARKET_PORT=8080
 ENV PATH="/usr/local/bin:${PATH}"
 
+# Pre-fetch the @db/sqlite native library into the deno cache so the
+# runtime user (anchr) doesn't need outbound network or write access to
+# /deno-dir at boot. Without this, the first import of "@db/sqlite"
+# tries to mkdir /deno-dir/plug as anchr and fails.
+RUN deno eval --config deno.json \
+    'import { Database } from "@db/sqlite"; const d = new Database(":memory:"); d.close();'
+
 # The orchestrator decrypts the FROST signer configs from env, spawns
 # the three signer nodes in this VM, then starts the market server.
 RUN adduser --disabled-password --gecos "" anchr
 RUN mkdir -p /data && chown -R anchr:anchr /data
+RUN chown -R anchr:anchr /deno-dir
 USER anchr
 
 EXPOSE 8080
 
 ENTRYPOINT ["tini", "--"]
-CMD ["deno", "run", "--allow-all", "--config", "deno.json", "scripts/market-cluster-entrypoint.ts"]
+CMD ["deno", "run", "--allow-all", "--config", "deno.json", "example/two-party-binary-bet/scripts/cluster-entrypoint.ts"]

@@ -8,16 +8,13 @@ import { generateClaimHash } from "./claim-verifier.ts";
 test("generateClaimHash returns 32-byte hex preimage and matching SHA-256 hash", () => {
   const { preimage, hash } = generateClaimHash();
 
-  // Preimage must be exactly 64 hex chars (32 bytes).
   expect(preimage).toMatch(/^[0-9a-f]{64}$/);
-  // Hash must be exactly 64 hex chars (SHA-256 output).
   expect(hash).toMatch(/^[0-9a-f]{64}$/);
 
   // The hash MUST equal SHA-256(preimage). This is the load-bearing property
   // for the HTLC: the oracle releases `preimage`, and the Cashu mint
   // verifies that sha256(preimage) == hash before letting the provider
-  // spend the locked proofs. A fake hash format (the previous "sha256:..."
-  // truncation) would silently break HTLC redemption.
+  // spend the locked proofs.
   const expected = bytesToHex(sha256(hexToBytes(preimage)));
   expect(hash).toBe(expected);
 });

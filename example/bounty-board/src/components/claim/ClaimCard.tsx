@@ -25,7 +25,6 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
   return (
     <DSPressableCard onPress={onPress} className="mx-4 mb-2.5">
       <View className="flex-row items-center gap-3">
-        {/* Flight icon */}
         <View
           className="w-11 h-11 rounded-xl items-center justify-center"
           style={{ backgroundColor: config.color + "18" }}
@@ -33,7 +32,6 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
           <Ionicons name="airplane" size={22} color={config.color} />
         </View>
 
-        {/* Flight info */}
         <View className="flex-1">
           <View className="flex-row items-center gap-2">
             <DSText variant="body" weight="bold">
@@ -45,7 +43,6 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
           </View>
 
           <View className="flex-row items-center gap-2 mt-1">
-            {/* Status dot + label */}
             <View className="flex-row items-center gap-1">
               <Ionicons name={config.icon} size={12} color={config.color} />
               <DSText variant="caption" color={`text-[${config.color}]`} style={{ color: config.color }}>
@@ -53,7 +50,6 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
               </DSText>
             </View>
 
-            {/* Time info */}
             {claim.status === "monitoring" && (
               <DSText variant="caption" muted>
                 {claim.scheduledDeparture}発 · 残り {timeLeft(claim.expiresAt)}
@@ -62,7 +58,6 @@ export function FlightCard({ claim, onPress }: FlightCardProps) {
           </View>
         </View>
 
-        {/* Payout */}
         <View className="items-end">
           {isClaimed ? (
             <View className="items-end">

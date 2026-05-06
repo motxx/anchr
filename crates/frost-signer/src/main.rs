@@ -154,10 +154,6 @@ fn run(cli: Cli) -> Result<serde_json::Value> {
     }
 }
 
-// ---------------------------------------------------------------------------
-// DKG
-// ---------------------------------------------------------------------------
-
 fn dkg_round1(index: u16, max_signers: u16, min_signers: u16) -> Result<serde_json::Value> {
     let mut rng = thread_rng();
     let identifier = frost::Identifier::try_from(index)
@@ -226,7 +222,7 @@ fn dkg_round3(
     let verifying_key = pubkey_package.verifying_key();
     let vk_bytes = verifying_key.serialize()
         .context("failed to serialize verifying key")?;
-    // BIP-340 x-only: if 33 bytes (compressed), drop prefix; if 32 bytes, use as-is
+    // BIP-340 x-only: 33-byte SEC1 has a parity prefix that must be dropped; 32-byte is already x-only.
     let group_pubkey_hex = if vk_bytes.len() == 33 {
         hex::encode(&vk_bytes[1..])
     } else {
@@ -244,10 +240,6 @@ fn dkg_round3(
         "group_pubkey": group_pubkey_hex,
     }))
 }
-
-// ---------------------------------------------------------------------------
-// Signing
-// ---------------------------------------------------------------------------
 
 fn sign_round1(key_package_str: &str) -> Result<serde_json::Value> {
     let mut rng = thread_rng();
@@ -338,10 +330,6 @@ fn aggregate(
     }))
 }
 
-// ---------------------------------------------------------------------------
-// Verify
-// ---------------------------------------------------------------------------
-
 fn verify(group_pubkey_hex: &str, signature_hex: &str, message_hex: &str) -> Result<serde_json::Value> {
     let pubkey_bytes = hex::decode(group_pubkey_hex)
         .context("invalid group_pubkey hex")?;
@@ -350,8 +338,7 @@ fn verify(group_pubkey_hex: &str, signature_hex: &str, message_hex: &str) -> Res
     let message = hex::decode(message_hex)
         .context("invalid message hex")?;
 
-    // Accept both 32-byte x-only (BIP-340) and 33-byte SEC1 compressed pubkeys.
-    // For 32-byte x-only, prepend 0x02 (even y) to form SEC1 compressed format.
+    // 32-byte x-only pubkeys must be lifted to SEC1 with even-y prefix before deserialize.
     let pubkey_sec1 = if pubkey_bytes.len() == 32 {
         let mut buf = vec![0x02u8];
         buf.extend_from_slice(&pubkey_bytes);

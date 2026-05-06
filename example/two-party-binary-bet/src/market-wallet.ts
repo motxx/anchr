@@ -8,10 +8,6 @@
 import { Wallet, type Proof } from "@cashu/cashu-ts";
 import { spawn } from "@anchr/core-runtime";
 
-// ---------------------------------------------------------------------------
-// Core wallet operations (pure functions on userProofs map)
-// ---------------------------------------------------------------------------
-
 /** Get user balance from stored proofs. */
 export function getUserBalance(
   userProofs: Map<string, Proof[]>,
@@ -46,7 +42,6 @@ export async function debitUser(
   const balance = proofs.reduce((sum, p) => sum + p.amount, 0);
   if (balance < amountSats) return null;
 
-  // Try exact combination first (greedy largest-first)
   const sorted = [...proofs].sort((a, b) => b.amount - a.amount);
   const selected: Proof[] = [];
   let selectedTotal = 0;
@@ -59,7 +54,6 @@ export async function debitUser(
   if (selectedTotal < amountSats) return null;
 
   if (selectedTotal === amountSats) {
-    // Exact match — remove selected from user's store
     const remaining = proofs.filter(
       (p) => !selected.some((s) => s.C === p.C),
     );
@@ -67,11 +61,9 @@ export async function debitUser(
     return selected;
   }
 
-  // Need to split via mint — send exact amount, keep change
   try {
     await wallet.loadMint();
     const { send, keep } = await wallet.ops.send(amountSats, selected).run();
-    // Remove the selected proofs and add back the change
     const remaining = proofs.filter(
       (p) => !selected.some((s) => s.C === p.C),
     );
@@ -85,10 +77,6 @@ export async function debitUser(
     return null;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Factory — dependency-injected wallet for testing
-// ---------------------------------------------------------------------------
 
 export interface MarketWallet {
   getBalance(pubkey: string): number;
@@ -124,10 +112,6 @@ export function createMarketWallet(
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Infrastructure helpers (Cashu wallet + Lightning)
-// ---------------------------------------------------------------------------
 
 /** Check if the Cashu mint is reachable at the given URL. */
 export async function isMintReachable(mintUrl: string): Promise<boolean> {
@@ -172,7 +156,6 @@ export async function mintProofsFromRegtest(
   const mintQuote = await wallet.createMintQuote(amountSats);
   const paid = await payInvoiceViaLndUser(mintQuote.request);
   if (!paid) throw new Error("Failed to pay Lightning invoice via lnd-user");
-  // Brief pause for mint to register the payment
   await new Promise((r) => setTimeout(r, 2000));
   return wallet.mintProofs(amountSats, mintQuote.quote);
 }

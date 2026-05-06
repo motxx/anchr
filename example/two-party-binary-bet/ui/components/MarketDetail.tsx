@@ -133,7 +133,7 @@ function describeBetOutcome(
     const matchCount = result.matches?.length ?? 0;
     const sideLabel = side.toUpperCase();
     if (matchCount === 0) {
-      return { tone: "success", message: `Order placed · ${amount.toLocaleString()} sats on ${sideLabel}` };
+      return { tone: "success", message: `Bet placed · ${amount.toLocaleString()} sats on ${sideLabel}` };
     }
     if (lockOutcome.locked === 0) {
       return { tone: "error", message: lockOutcome.failures[0] ?? "Match found but lock failed" };

@@ -11,9 +11,9 @@
  *   deno run --allow-all example/airdrop-bot-shield/src/demo.ts
  *
  * Reference modules (not imported at runtime — this example is self-contained):
- *   - TlsnRequirement, TlsnCondition, EscrowInfo from ../../../src/domain/types.ts
- *   - validateTlsn from ../../../src/infrastructure/verification/tlsn-validation
- *   - createHtlcToken, redeemHtlcToken from ../../../src/infrastructure/cashu/escrow
+ *   - TlsnRequirement, TlsnCondition, EscrowInfo from ../../../packages/bounty/src/domain/types.ts
+ *   - validateTlsn from ../../../packages/bounty/src/infrastructure/verification/tlsn-validation
+ *   - createHtlcToken, redeemHtlcToken from ../../../packages/bounty/src/infrastructure/cashu/escrow
  */
 
 import {
@@ -34,10 +34,6 @@ import {
   type VerifiedProofData,
 } from "./claim-verifier.ts";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function separator(title: string): void {
   console.log(`\n${"=".repeat(70)}`);
   console.log(`  ${title}`);
@@ -51,10 +47,6 @@ function indent(text: string, spaces = 2): string {
     .map((line) => `${pad}${line}`)
     .join("\n");
 }
-
-// ---------------------------------------------------------------------------
-// Step 1: Create Airdrop Campaign
-// ---------------------------------------------------------------------------
 
 separator("Step 1: Project Creates Airdrop Campaign");
 
@@ -85,7 +77,6 @@ for (const [i, cond] of criteria.conditions.entries()) {
   console.log(`      Min:      ${cond.min_value ?? "N/A"}`);
 }
 
-// Validate
 const errors = validateCriteria(criteria);
 if (errors.length > 0) {
   console.error("\nValidation errors:");
@@ -95,10 +86,6 @@ if (errors.length > 0) {
   Deno.exit(1);
 }
 console.log("\nValidation: PASSED (all criteria valid)");
-
-// ---------------------------------------------------------------------------
-// Step 2: Show TLSNotary Proof Requirements
-// ---------------------------------------------------------------------------
 
 separator("Step 2: TLSNotary Proof Requirements");
 
@@ -126,10 +113,6 @@ console.log("  3. The extension runs an MPC-TLS session with a TLSNotary verifie
 console.log("  4. The cryptographic presentation (.presentation.tlsn) is generated");
 console.log("  5. The presentation is submitted to the Anchr oracle for verification");
 
-// ---------------------------------------------------------------------------
-// Step 3: Simulate Verification (Mock Data)
-// ---------------------------------------------------------------------------
-
 separator("Step 3: Simulate Claim Verification");
 
 console.log("Simulating a claim from a legitimate GitHub user...\n");
@@ -153,22 +136,20 @@ const now = Math.floor(Date.now() / 1000);
 const githubVerifiedData: VerifiedProofData = {
   server_name: "api.github.com",
   revealed_body: JSON.stringify(mockGitHubResponse),
-  session_timestamp: now - 30, // 30 seconds ago
+  session_timestamp: now - 30,
 };
 
 // Build the proof map (one proof per condition, all from the same GitHub response)
 const verifiedProofs = new Map<number, VerifiedProofData>();
-verifiedProofs.set(0, githubVerifiedData); // GitHub account age
-verifiedProofs.set(1, githubVerifiedData); // GitHub repos
-verifiedProofs.set(2, githubVerifiedData); // GitHub contributions
+verifiedProofs.set(0, githubVerifiedData);
+verifiedProofs.set(1, githubVerifiedData);
+verifiedProofs.set(2, githubVerifiedData);
 
-// Generate HTLC hash/preimage for this claim
 const { preimage, hash } = generateClaimHash();
 console.log(`\nHTLC escrow:`);
 console.log(`  Preimage: ${preimage.slice(0, 16)}...${preimage.slice(-16)}`);
 console.log(`  Hash:     ${hash.slice(0, 16)}...${hash.slice(-16)}`);
 
-// Verify
 console.log("\nVerifying claim...\n");
 const result = verifyClaim(criteria, verifiedProofs, preimage);
 
@@ -187,10 +168,6 @@ if (result.all_passed) {
   console.log("Claimant can now redeem their Cashu HTLC token.");
 }
 
-// ---------------------------------------------------------------------------
-// Step 4: Cashu HTLC Escrow Flow
-// ---------------------------------------------------------------------------
-
 separator("Step 4: Cashu HTLC Escrow Flow");
 
 console.log("The token distribution uses Anchr's 2-phase HTLC pattern (NUT-14):\n");
@@ -201,7 +178,7 @@ console.log("  - Each claim gets a unique hash/preimage pair");
 console.log("  - Oracle holds the preimage");
 console.log("  - Proofs are held by the project (plain bearer instruments)");
 console.log();
-console.log("  In code (reference: src/infrastructure/cashu/escrow.ts):");
+console.log("  In code (reference: packages/bounty/src/infrastructure/cashu/escrow.ts):");
 console.log("  ```");
 console.log("  // Phase 1: Create hold token");
 console.log("  const holdToken = await createHtlcToken(");
@@ -245,10 +222,6 @@ console.log("    claimantPrivateKey,");
 console.log("  );");
 console.log(`  // redeemed.amountSats === ${criteria.token_amount_per_claim}`);
 console.log("  ```");
-
-// ---------------------------------------------------------------------------
-// Step 5: Demonstrate Rejection
-// ---------------------------------------------------------------------------
 
 separator("Step 5: Demonstrate Rejection (Bot Account)");
 
@@ -294,14 +267,10 @@ console.log(`\nOverall: ${botResult.all_passed ? "APPROVED" : "REJECTED"}`);
 console.log("HTLC preimage: NOT released (conditions not met)");
 console.log("Escrowed tokens remain locked and will be refunded to the project after locktime.");
 
-// ---------------------------------------------------------------------------
-// Step 6: Economic Analysis
-// ---------------------------------------------------------------------------
-
 separator("Step 6: Economic Analysis");
 
 const claimValue = criteria.token_amount_per_claim;
-const btcPrice = 90_000; // approximate BTC price in USD
+const btcPrice = 90_000;
 const claimValueUsd = (claimValue / 100_000_000) * btcPrice;
 
 console.log(`Claim value: ${claimValue.toLocaleString()} sats (~$${claimValueUsd.toFixed(2)} at $${btcPrice.toLocaleString()} BTC)\n`);
@@ -335,10 +304,6 @@ console.log();
 console.log("Adding Twitter follower requirement (>100 followers) would increase farming cost");
 console.log("by an additional $50-150 per identity, making attacks even less economical.");
 
-// ---------------------------------------------------------------------------
-// Summary
-// ---------------------------------------------------------------------------
-
 separator("Summary");
 
 console.log("形代(Katashiro) uses Anchr's TLSNotary + Cashu HTLC stack to:");
@@ -353,6 +318,6 @@ console.log("  3. RESIST Sybil attacks through economic cost barriers");
 console.log("     (combined proof requirements make farming unprofitable)");
 console.log();
 console.log("For integration with the full Anchr server, see:");
-console.log("  - src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
-console.log("  - src/infrastructure/verification/tlsn-validation.ts (proof verification)");
-console.log("  - src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");
+console.log("  - packages/bounty/src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
+console.log("  - packages/bounty/src/infrastructure/verification/tlsn-validation.ts (proof verification)");
+console.log("  - packages/bounty/src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");

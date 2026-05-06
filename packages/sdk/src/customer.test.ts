@@ -41,8 +41,6 @@ import type {
 } from "./nostr.ts";
 import type { CustomerOptions, Quote } from "./types.ts";
 
-// --- Test doubles ---
-
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
 const HASH_HEX = "deadbeef".repeat(8);
@@ -108,12 +106,9 @@ const validOptions = (): CustomerOptions => ({
   oracleClient: makeOracleClient(),
   cashuClient: makeCashuClient(),
   relayClient: makeRelayClient(),
-  // Short quote window so tests that flow past the publish step
-  // don't sit waiting the 30s default.
+  // Short window so tests don't wait the 30s default.
   quoteWindowMs: 10,
 });
-
-// --- Validation ---
 
 test("validateCustomerOptions accepts a well-formed options object", () => {
   expect(() => validateCustomerOptions(validOptions())).not.toThrow();
@@ -145,10 +140,10 @@ test("validateCustomerOptions rejects missing oracleClient", () => {
   expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
 });
 
-test("validateCustomerOptions rejects missing cashuClient", () => {
+test("validateCustomerOptions accepts missing cashuClient (SDK builds one from mint)", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.cashuClient;
-  expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
+  expect(() => validateCustomerOptions(opts)).not.toThrow();
 });
 
 test("validateCustomerOptions rejects a non-object input", () => {
@@ -156,8 +151,6 @@ test("validateCustomerOptions rejects a non-object input", () => {
   expect(() => validateCustomerOptions(42)).toThrow(CustomerConfigError);
   expect(() => validateCustomerOptions("string")).toThrow(CustomerConfigError);
 });
-
-// --- Constructor ---
 
 test("createCustomer exposes oracles / relays / mint as readonly copies", () => {
   const opts = validOptions();
@@ -173,8 +166,6 @@ test("createCustomer copies arrays so mutating the original does not affect the 
   oracles.push("c".repeat(64));
   expect(customer.oracles).toHaveLength(2);
 });
-
-// --- Request flow ---
 
 test("Customer.request rejects an invalid schema URI synchronously", async () => {
   const customer = createCustomer(validOptions());
@@ -214,14 +205,13 @@ test("Customer.request calls oracleClient.requestHash", async () => {
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(); // wire flow continues but later steps not impl
+  ).rejects.toThrow();
 
   expect(receivedQueryId).toMatch(/^query_\d+_[a-z0-9]+$/);
 });
 
 test("Customer.request rejects when oracleClient returns a pubkey not matching the picked oracle", async () => {
   const oracleClient = makeOracleClient({ fixedOracle: ORACLE_B });
-  // Customer's whitelist[0] is ORACLE_A; oracleClient claims to be ORACLE_B.
   const customer = createCustomer({
     ...validOptions(),
     oracles: [ORACLE_A],
@@ -238,9 +228,6 @@ test("Customer.request rejects when oracleClient returns a pubkey not matching t
 });
 
 test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", async () => {
-  // Wrapper object — TypeScript narrows property access through closures
-  // more reliably than free `let` variables (which get stuck on the
-  // initial-assignment type).
   const recorder: { params: BuildHtlcLockParams | null } = { params: null };
   const cashuClient = makeCashuClient({
     buildHtlcLock: async (params: BuildHtlcLockParams): Promise<CashuToken> => {
@@ -256,7 +243,7 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
       payment: { maxAmount: 1234 },
       sourceProofs: [{ id: "proof1" }],
     }),
-  ).rejects.toThrow(); // wire flow continues but later steps not impl
+  ).rejects.toThrow();
 
   expect(recorder.params).not.toBe(null);
   if (recorder.params === null) throw new Error("unreachable");
@@ -283,7 +270,6 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
 });
 
 test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the window", async () => {
-  // Default mock subscribe delivers no events; quoteWindowMs=10ms is plenty short.
   const customer = createCustomer({ ...validOptions(), quoteWindowMs: 10 });
   await expect(
     customer.request({
@@ -327,7 +313,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     publish: async (event: Event): Promise<PublishResult> => {
       if (event.kind === 5300) {
         requestEventId.id = event.id;
-        // Sniff the customer's ephemeral pubkey from the request event.
         customerEphemeralPubkey.value = event.pubkey;
       }
       return { successes: ["wss://relay.example.org"], failures: [] };
@@ -335,7 +320,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       const filterKinds = filter.kinds ?? [];
       if (filterKinds.includes(7000)) {
-        // Quote subscription — deliver one quote.
         queueMicrotask(() => {
           const id = requestEventId.id ?? "unknown";
           onEvent(buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
@@ -345,7 +329,6 @@ test("Customer.request happy path: returns the verified data + proof from a prov
           }));
         });
       } else if (filterKinds.includes(6300)) {
-        // Result subscription — deliver an encrypted-to-customer result.
         queueMicrotask(() => {
           const id = requestEventId.id ?? "unknown";
           const customerPub = customerEphemeralPubkey.value ?? "00".repeat(32);
@@ -516,7 +499,6 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
           }));
         });
       }
-      // Never deliver a kind 6300 result.
       return { close: () => {} };
     },
   });
@@ -551,9 +533,6 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
-      // The customer subscribes with an `#e` filter referencing the
-      // request event. Synchronously deliver two quotes (cheaper one
-      // should win) once the subscription is opened.
       queueMicrotask(() => {
         const requestId = requestEventRecorder.id ?? "unknown";
         const quoteA = buildQuoteFeedbackEvent(providerA, requestId, "00".repeat(32), {
@@ -589,7 +568,6 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     resultTimeoutMs: 50,
   });
 
-  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
@@ -600,12 +578,9 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
 
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
-  expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey); // cheapest
-  // Phase-2 receives the Phase-1 proofs directly (passed by value through
-  // the Customer flow rather than re-decoded from the broadcast token).
+  expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);
   expect(bindRecorder.params.initialProofs).toEqual([]);
 
-  // Two events published: kind 5300 request + kind 7000 selection.
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
   expect(publishedEvents[1].kind).toBe(7000);
@@ -626,7 +601,7 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
         const expensive = buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: provider.publicKey,
-          amount_sats: 9999, // over budget
+          amount_sats: 9999,
         });
         onEvent(expensive);
       });
@@ -663,7 +638,6 @@ test("Customer.request honors `provider` pinning when set", async () => {
     subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const id = requestEventId.id ?? "unknown";
-        // The "wrong" provider quotes too; the customer must reject it.
         onEvent(buildQuoteFeedbackEvent(otherProvider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: otherProvider.publicKey,
@@ -693,7 +667,6 @@ test("Customer.request honors `provider` pinning when set", async () => {
     resultTimeoutMs: 50,
   });
 
-  // No kind 6300 result delivered → flow times out after selection.
   await expect(
     customer.request({
       spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },

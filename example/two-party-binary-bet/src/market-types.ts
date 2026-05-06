@@ -134,32 +134,32 @@ export interface MatchedBetPair {
   status: "pending" | "locked" | "settled_yes" | "settled_no" | "expired";
 }
 
-// --- Open orders ---
+// --- Pending bets ---
 
-/** An open order waiting to be matched in the order book. */
-export interface OpenOrder {
-  /** Unique order identifier. */
+/** A pending bet waiting to be matched in the matching queue. */
+export interface PendingBet {
+  /** Unique bet identifier. */
   id: string;
-  /** Market this order is for. */
+  /** Market this bet is for. */
   market_id: string;
   /** Bettor's public key (hex). */
   bettor_pubkey: string;
   /** Which side. */
   side: "yes" | "no";
-  /** Total order amount in sats. */
+  /** Total bet amount in sats. */
   amount_sats: number;
   /** Remaining unmatched amount in sats. */
   remaining_sats: number;
-  /** Unix timestamp (seconds) when the order was placed. */
+  /** Unix timestamp (seconds) when the bet was placed. */
   timestamp: number;
 }
 
-/** A match proposal from the order book. */
+/** A match proposal from the matching queue. */
 export interface MatchProposal {
-  /** YES order being matched. */
-  yes_order_id: string;
-  /** NO order being matched. */
-  no_order_id: string;
+  /** YES bet being matched. */
+  yes_bet_id: string;
+  /** NO bet being matched. */
+  no_bet_id: string;
   /** Amount to match in sats. */
   amount_sats: number;
 }

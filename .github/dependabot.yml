@@ -1,37 +1,54 @@
 version: 2
+
+# Cooldown rationale — supply-chain safety.
+# Newly-published packages are the typical attack window for
+# malicious-publish / token-compromise incidents (e.g. ua-parser-js,
+# event-stream, debug). Wait for community signal before adopting.
+# The anchor below is reused across every ecosystem.
+
 updates:
-  # GitHub Actions
+  # GitHub Actions — bundle all action bumps into one weekly PR.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "ci"
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
+    cooldown: &cooldown
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 5
 
-  # npm (deno.lock / package.json)
+  # npm (deno.lock / package.json) — bundle minor+patch; majors stay individual.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
-    # Supply-chain safety: skip versions released too recently.
-    # Newly-published packages are the typical attack window for
-    # malicious-publish / token-compromise incidents (e.g. ua-parser-js,
-    # event-stream, debug). Wait for community signal before adopting.
-    cooldown:
-      default-days: 7
-      semver-major-days: 14
-      semver-minor-days: 7
-      semver-patch-days: 5
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]
+    cooldown: *cooldown
 
-  # Docker
+  # Docker — root + tlsn-server, grouped per Dockerfile location.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "docker"
+    open-pull-requests-limit: 3
+    groups:
+      docker:
+        patterns: ["*"]
+    cooldown: *cooldown
 
   - package-ecosystem: "docker"
     directory: "/crates/tlsn-server"
@@ -39,14 +56,27 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "docker"
+    open-pull-requests-limit: 3
+    groups:
+      docker:
+        patterns: ["*"]
+    cooldown: *cooldown
 
-  # Cargo (Rust crates)
+  # Cargo — one entry per crate (no workspace). Group minor+patch per crate.
+  # Cross-crate consolidation of the same dep (e.g. tokio in 3 crates) is not
+  # possible without a Cargo workspace; grouping at least collapses each crate
+  # into one PR per week.
   - package-ecosystem: "cargo"
     directory: "/crates/tlsn-server"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    open-pull-requests-limit: 3
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    cooldown: *cooldown
 
   - package-ecosystem: "cargo"
     directory: "/crates/tlsn-verifier"
@@ -54,6 +84,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    open-pull-requests-limit: 3
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    cooldown: *cooldown
 
   - package-ecosystem: "cargo"
     directory: "/crates/tlsn-prover"
@@ -61,3 +96,20 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    open-pull-requests-limit: 3
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    cooldown: *cooldown
+
+  - package-ecosystem: "cargo"
+    directory: "/crates/frost-signer"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+    open-pull-requests-limit: 3
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    cooldown: *cooldown

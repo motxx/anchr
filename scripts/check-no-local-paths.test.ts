@@ -54,11 +54,8 @@ test("ignores lines with allow-local-path: marker", () => {
 });
 
 test("repo-level scan passes on HEAD", async () => {
-  // Smoke test — import and run the repo scan directly. If this starts
-  // failing, either a leak was committed or the lint is too aggressive.
-  const mod = await import("./check-no-local-paths.ts");
-  // We only export scanText, so replicate the repo walk at test time via
-  // the binary. Simpler: shell out.
+  // Smoke test — shell out to the binary. The unit tests above exercise
+  // scanText() directly; this run gives us the end-to-end signal.
   const cmd = new Deno.Command(Deno.execPath(), {
     args: [
       "run",
@@ -75,6 +72,5 @@ test("repo-level scan passes on HEAD", async () => {
     console.error(new TextDecoder().decode(stderr));
   }
   expect(code).toBe(0);
-  // touch mod so TS doesn't complain about unused import
-  expect(typeof mod.scanText).toBe("function");
+  expect(typeof scanText).toBe("function");
 });

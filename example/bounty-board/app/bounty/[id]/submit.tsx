@@ -29,7 +29,6 @@ export default function SubmitScreen() {
       setError("Camera permission denied");
       return;
     }
-    // On native, we'd use CameraView. For now, use file picker as fallback.
     const file = await filePickerProvider.pickFile(["image/*"]);
     if (file) {
       setPhoto({ uri: file.uri, filename: file.name, mimeType: file.mimeType });

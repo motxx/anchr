@@ -124,9 +124,7 @@ export function parseQueryRequestEvent(event: Event): QueryRequestPayload | null
   };
 }
 
-// --- kind 7000: quote (provider → customer, status=payment-required) ---
-
-/** Plaintext payload published by a provider quoting on a request. */
+/** Plaintext payload published by a provider quoting on a request (NIP-90 kind 7000, status=payment-required). */
 export interface QuoteFeedbackPayload {
   status: "payment-required";
   /** Provider's hex pubkey (must match the event's pubkey). */
@@ -176,7 +174,6 @@ export function parseQuoteFeedbackEvent(event: Event): QuoteFeedbackPayload | nu
   ) {
     return null;
   }
-  // Provider pubkey in payload must match event signer.
   if (p.provider_pubkey !== event.pubkey) return null;
   return {
     status: "payment-required",
@@ -185,9 +182,7 @@ export function parseQuoteFeedbackEvent(event: Event): QuoteFeedbackPayload | nu
   };
 }
 
-// --- kind 7000: selection (customer → selected provider, status=processing) ---
-
-/** Plaintext payload published by a customer announcing the selected provider. */
+/** Plaintext payload published by a customer announcing the selected provider (NIP-90 kind 7000, status=processing). */
 export interface SelectionFeedbackPayload {
   status: "processing";
   /** Hex pubkey of the selected provider. */
@@ -243,11 +238,9 @@ export function parseSelectionFeedbackEvent(event: Event): SelectionFeedbackPayl
   };
 }
 
-// --- kind 6300: result (provider → customer, NIP-44-encrypted) ---
-
 import { decryptNip44, encryptNip44 } from "./nostr.ts";
 
-/** Plaintext payload that travels NIP-44-encrypted in the kind 6300 content. */
+/** Plaintext payload that travels NIP-44-encrypted in the NIP-90 kind 6300 result content. */
 export interface QueryResponsePayload {
   /** Schema URI under which the proof was produced. */
   schema: string;
@@ -340,11 +333,9 @@ function base64Encode(bytes: Uint8Array): string {
   return btoa(s);
 }
 
-// --- kind 4: preimage delivery (oracle → provider, NIP-44-encrypted DM) ---
-
 import { KIND_DIRECT_MESSAGE } from "./nostr.ts";
 
-/** Plaintext payload that travels NIP-44-encrypted in the kind 4 content. */
+/** Plaintext payload that travels NIP-44-encrypted in the NIP-04 kind 4 DM content. */
 export interface PreimageDeliveryPayload {
   /** Matches the request's query_id (anti-replay). */
   query_id: string;
@@ -414,5 +405,4 @@ export function parsePreimageDeliveryEvent(
   };
 }
 
-// Re-export the kinds so consumers don't need to import nostr.ts just for these.
 export { KIND_QUERY_FEEDBACK, KIND_QUERY_REQUEST, KIND_QUERY_RESPONSE };

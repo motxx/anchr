@@ -37,11 +37,7 @@ import {
   type MarketRouteContext,
   type MarketState,
 } from "../example/two-party-binary-bet/src/server-routes.ts";
-import {
-  createPostgresOrderBook,
-  type PostgresOrderBook,
-} from "../example/two-party-binary-bet/src/order-book-postgres.ts";
-import type { OrderBook } from "../example/two-party-binary-bet/src/order-book.ts";
+import { openKannagiStore, type KannagiStore } from "../example/two-party-binary-bet/src/kannagi-store.ts";
 import { createLockedToken } from "../example/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
@@ -52,7 +48,6 @@ import {
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
-const DATABASE_URL = process.env.DATABASE_URL;
 const INFRA_READY = await checkInfraReady(MINT_URL);
 
 const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
@@ -98,20 +93,14 @@ async function expectJson<T>(res: Response, status: number): Promise<T> {
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-// When DATABASE_URL is set we run the lifecycle against the Postgres-backed
-// OrderBook (the production code path). Otherwise we fall back to the
-// in-memory implementation, which is what `createMarketState()` defaults to.
-// Either way the test asserts the same external behavior.
-let pgOrderBook: PostgresOrderBook | undefined;
-async function buildOrderBook(): Promise<OrderBook | undefined> {
-  if (!DATABASE_URL) return undefined;
-  pgOrderBook = await createPostgresOrderBook({ connectionUrl: DATABASE_URL });
-  return pgOrderBook;
-}
+// Run the lifecycle against the SQLite-backed Kannagi store (the production
+// code path). The store is :memory:, so the test exercises the same persist
+// + hydrate code without any filesystem state leaking between tests.
+let kannagiStore: KannagiStore | undefined;
 
 suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
   afterAll(async () => {
-    if (pgOrderBook) await pgOrderBook.close();
+    if (kannagiStore) await kannagiStore.close();
   });
 
   test("alice (YES) + bob (NO) bet → match → P2PK lock → YES resolve → alice signs proofs", async () => {
@@ -145,12 +134,17 @@ suite("e2e: two-party binary bet lifecycle (regtest Cashu)", () => {
     // decode real cashuB tokens. The market server only needs decode/verify,
     // not signing power, so an independent wallet handle is fine.
     //
-    // When DATABASE_URL is set, the OrderBook is the Postgres-backed
-    // implementation — the same code path production uses — so this test
-    // exercises the full SQL stack (insert, partial-index scan, FOR UPDATE
-    // matching) on top of the Cashu/HTLC machinery.
-    const orderBook = await buildOrderBook();
-    const state = createMarketState({ orderBook });
+    // The MatchingQueue is the SQLite-backed implementation — the same code
+    // path production uses — so this test exercises the full SQL stack
+    // (insert, partial-index scan, transactional matching) on top of the
+    // Cashu/HTLC machinery.
+    kannagiStore = openKannagiStore({ path: ":memory:" });
+    const hydrated = await kannagiStore.hydrate();
+    const state = createMarketState({
+      matchingQueue: kannagiStore.matchingQueue,
+      initial: hydrated,
+      persist: kannagiStore.persist,
+    });
     state.getCashuWallet = async () => serverWallet;
     const app = buildMarketApp(state);
 
