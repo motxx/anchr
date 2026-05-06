@@ -2696,6 +2696,14 @@
       "npm:tailwind-merge@3"
     ],
     "members": {
+      "example/airdrop-bot-shield": {
+        "dependencies": [
+          "jsr:@hono/hono@4",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1",
+          "jsr:@zod/zod@4"
+        ]
+      },
       "packages/blossom": {
         "dependencies": [
           "jsr:@logtape/logtape@2",
@@ -2707,6 +2715,7 @@
       },
       "packages/bounty": {
         "dependencies": [
+          "jsr:@db/sqlite@0.12",
           "jsr:@hono/hono@4",
           "jsr:@logtape/logtape@2",
           "jsr:@noble/hashes@2",
