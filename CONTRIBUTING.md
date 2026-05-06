@@ -8,7 +8,7 @@ Issues and PRs welcome.
 deno task lint:strict          # deno lint + arch + invariants + paths + types
 deno task test:unit            # unit tests across packages
 deno task test:packages        # per-package tests, each in isolation
-deno task test:protocol        # Bounty protocol invariants (trustless / attacks / vulns / quorum)
+deno task test:bounty          # Bounty pattern invariants (trustless / attacks / vulns / quorum)
 deno task test:frost           # FROST threshold signing
 deno task test:integration     # worker-api + MCP HTTP/stdio surface
 deno task test:example         # all example apps

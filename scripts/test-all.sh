@@ -62,7 +62,7 @@ run_local() {
   run_test "lint:strict"       deno task lint:strict
   run_test "dep audit"         deno task lint:deps
   run_test "unit tests"        deno task test:unit
-  run_test "protocol tests"    deno task test:protocol
+  run_test "bounty tests"      deno task test:bounty
 
   # CI builds frost-signer in a dedicated step before tests run. Mirror that
   # here so e2e/frost-threshold.test.ts actually exercises against the binary
