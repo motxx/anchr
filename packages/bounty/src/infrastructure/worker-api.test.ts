@@ -7,20 +7,30 @@ import { createQueryService, createQueryStore } from "../application/query-servi
 import type { Query, QueryResult } from "../domain/types.ts";
 import { buildWorkerApiApp } from "./worker-api.ts";
 
-function makeMockOracle(id: string): Oracle {
+function makeMockOracle(id: string, pass = true): Oracle {
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
     async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
       return {
         oracle_id: id,
         query_id: query.id,
-        passed: true,
-        checks: ["mock passed"],
-        failures: [],
+        passed: pass,
+        checks: pass ? ["mock passed"] : [],
+        failures: pass ? [] : ["mock failed"],
         attested_at: Date.now(),
       };
     },
   };
+}
+
+function makeTestAppWithOracle(opts: { pass?: boolean; oracleId?: string } = {}) {
+  const id = opts.oracleId ?? "test-oracle";
+  const store = createQueryStore();
+  const registry = createOracleRegistry({ skipBuiltIn: true });
+  registry.register(makeMockOracle(id, opts.pass ?? true));
+  const queryService = createQueryService({ store, oracleRegistry: registry });
+  const app = buildWorkerApiApp({ queryService, oracleRegistry: registry });
+  return { app, store, registry, queryService };
 }
 
 function makeTestApp() {
@@ -488,27 +498,11 @@ describe("HTLC inline verification with preimage", () => {
 });
 
 describe("Quorum via HTTP", () => {
-  function makeMockOracleWithPass(id: string, pass: boolean): Oracle {
-    return {
-      info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-      async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
-        return {
-          oracle_id: id,
-          query_id: query.id,
-          passed: pass,
-          checks: pass ? ["mock passed"] : [],
-          failures: pass ? [] : ["mock failed"],
-          attested_at: Date.now(),
-        };
-      },
-    };
-  }
-
   test("POST /queries creates query with quorum config", withOpenAuth(async () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
-    registry.register(makeMockOracleWithPass("oracle-a", true));
-    registry.register(makeMockOracleWithPass("oracle-b", true));
+    registry.register(makeMockOracle("oracle-a"));
+    registry.register(makeMockOracle("oracle-b"));
     const queryService = createQueryService({ store, oracleRegistry: registry });
     const app = buildWorkerApiApp({ queryService, oracleRegistry: registry });
 
@@ -531,8 +525,8 @@ describe("Quorum via HTTP", () => {
   test("GET /queries/:id exposes quorum and attestations", withOpenAuth(async () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
-    registry.register(makeMockOracleWithPass("oracle-a", true));
-    registry.register(makeMockOracleWithPass("oracle-b", true));
+    registry.register(makeMockOracle("oracle-a"));
+    registry.register(makeMockOracle("oracle-b"));
     const queryService = createQueryService({ store, oracleRegistry: registry });
     const app = buildWorkerApiApp({ queryService, oracleRegistry: registry });
 
@@ -552,5 +546,119 @@ describe("Quorum via HTTP", () => {
     expect(json.quorum).toEqual({ min_approvals: 2 });
     expect(json.attestations).toHaveLength(2);
     expect(json.attestations.every((a) => a.passed)).toBe(true);
+  }));
+});
+
+describe("End-to-end HTTP integration", () => {
+  // Domain-level integration: HTTP → Service → Aggregate → Repository.
+  // Covers paths the per-endpoint suites above don't isolate: oracle
+  // rejection, expiry, double-submit, and validation surface.
+
+  test("POST /queries/:id/result with rejecting oracle → 400", withOpenAuth(async () => {
+    const { app } = makeTestAppWithOracle({ pass: false, oracleId: "built-in" });
+    const createRes = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ description: "Photo" }),
+    });
+    const { query_id: id } = await createRes.json() as { query_id: string };
+    const res = await app.request(`http://localhost/queries/${id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "test_worker", attachments: [], notes: "Proof" }),
+    });
+    expect(res.status).toBe(400);
+    const result = await res.json() as { ok: boolean; payment_status: string };
+    expect(result.ok).toBe(false);
+    expect(result.payment_status).toBe("cancelled");
+  }));
+
+  test("POST /queries/:id/result on expired query → fails", withOpenAuth(async () => {
+    const { app, queryService } = makeTestAppWithOracle();
+    const query = queryService.createQuery({ description: "Quick expiry" }, { ttlMs: -1 });
+    queryService.expireQueries();
+    const res = await app.request(`http://localhost/queries/${query.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w", attachments: [] }),
+    });
+    const result = await res.json() as { ok: boolean };
+    expect(result.ok).toBe(false);
+  }));
+
+  test("POST /queries/:id/cancel on already-approved → fails", withOpenAuth(async () => {
+    const { app, queryService } = makeTestAppWithOracle();
+    const query = queryService.createQuery({ description: "Approve then cancel" }, { oracleIds: ["test-oracle"] });
+    await queryService.submitQueryResult(query.id, { attachments: [], notes: "" }, { executor_type: "human", channel: "worker_api" });
+    const cancelRes = await app.request(`http://localhost/queries/${query.id}/cancel`, { method: "POST" });
+    const body = await cancelRes.json() as { ok: boolean };
+    expect(body.ok).toBe(false);
+  }));
+
+  test("double submit to the same query → second call fails", withOpenAuth(async () => {
+    const { app, queryService } = makeTestAppWithOracle();
+    const query = queryService.createQuery({ description: "Double submit" }, { oracleIds: ["test-oracle"] });
+    const submit = () => app.request(`http://localhost/queries/${query.id}/result`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w", attachments: [] }),
+    });
+    expect((await (await submit()).json() as { ok: boolean }).ok).toBe(true);
+    expect((await (await submit()).json() as { ok: boolean }).ok).toBe(false);
+  }));
+
+  test("POST /queries/:id/result on non-existent query → fails", withOpenAuth(async () => {
+    const { app } = makeTestAppWithOracle();
+    const res = await app.request("http://localhost/queries/fake-id/result", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ worker_pubkey: "w", attachments: [] }),
+    });
+    const body = await res.json() as { ok: boolean };
+    expect(body.ok).toBe(false);
+  }));
+
+  test("POST /queries supports verification_requirements + nonce challenge", withOpenAuth(async () => {
+    const { app } = makeTestAppWithOracle();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "GPS query",
+        verification_requirements: ["gps", "nonce"],
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = await res.json() as { verification_requirements: string[]; challenge_nonce: string };
+    expect(body.verification_requirements).toContain("gps");
+    expect(body.verification_requirements).toContain("nonce");
+    expect(body.challenge_nonce).toBeDefined();
+  }));
+
+  test("POST /queries supports expected_gps + max_gps_distance_km", withOpenAuth(async () => {
+    const { app } = makeTestAppWithOracle();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "GPS query",
+        expected_gps: { lat: 35.6762, lon: 139.6503 },
+        max_gps_distance_km: 5,
+      }),
+    });
+    expect(res.status).toBe(201);
+  }));
+
+  test("POST /queries supports bounty payload", withOpenAuth(async () => {
+    const { app } = makeTestAppWithOracle();
+    const res = await app.request("http://localhost/queries", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        description: "Bounty query",
+        bounty: { amount_sats: 100 },
+      }),
+    });
+    expect(res.status).toBe(201);
   }));
 });
