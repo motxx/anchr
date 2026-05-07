@@ -1,39 +1,126 @@
 /**
- * Auto-Claim Agent
+ * Auto-Claim Agent - User / Provider
  *
- * Runs on the user's device (CLI demo; browser extension in production).
- * Discovers insurance bounties, monitors target URLs, evaluates conditions
- * locally, and auto-submits TLSNotary proofs when a claim is triggered.
+ * Runs on the user's device. It listens for NIP-90 job requests over Nostr,
+ * quotes on auto-claim predicates it can satisfy, then waits until the
+ * predicate becomes true before generating a TLSNotary proof.
  *
- * The user installs the extension and browses normally.
- * When a claimable event occurs, proof is generated and submitted
- * without user action. Money they're already owed is auto-recovered.
+ * There is no Anchr server in this flow. The only long-running process here is
+ * the Provider itself, because it must receive requests and produce proofs.
  *
  * Usage:
- *   ANCHR_URL=http://localhost:3000 \
- *   deno run --allow-all --env example/auto-claim/agent.ts
+ *   NOSTR_RELAYS=ws://localhost:7777 \
+ *   CASHU_MINT_URL=http://localhost:3338 \
+ *   ORACLE_PUBKEY=<oracle-pubkey-hex-or-npub> \
+ *   AUTO_CLAIM_PROVIDER_PRIVKEY=<provider-nsec-or-hex> \
+ *   deno run --allow-env --allow-net --allow-read --allow-write --allow-run --env example/auto-claim/agent.ts
  */
 
-import { Anchr } from "anchr-sdk";
+import {
+  createProvider,
+  DEFINED_SCHEMAS,
+  type ProviderRequestEvent,
+} from "anchr-sdk";
 import { spawn } from "@anchr/core-runtime";
 
-const SERVER_URL = Deno.env.get("ANCHR_URL") ?? "http://localhost:3000";
+const relays = listEnv("NOSTR_RELAYS", ["ws://localhost:7777"]);
+const mint = requiredEnv("CASHU_MINT_URL");
+const oraclePubkey = requiredEnv("ORACLE_PUBKEY");
+const privKey = requiredEnv("AUTO_CLAIM_PROVIDER_PRIVKEY");
+
 const VERIFIER_HOST = Deno.env.get("TLSN_VERIFIER_HOST") ?? "localhost:7046";
 const CHECK_INTERVAL_MS = Number(Deno.env.get("CHECK_INTERVAL_MS") ?? "10000");
-const USER_PUBKEY = Deno.env.get("USER_PUBKEY") ?? "user-auto-claim";
-
-const anchr = new Anchr({ serverUrl: SERVER_URL });
-const claimed = new Set<string>();
-const attempted = new Set<string>(); // avoid retry spam after a proof attempt
-
-// Mirrors server-side evaluateCondition() to avoid unnecessary proof generation.
-// Only generate proof when conditions are locally confirmed.
+const PRODUCE_TIMEOUT_MS = Number(
+  Deno.env.get("PRODUCE_TIMEOUT_MS") ?? "3600000",
+);
+const QUOTE_SATS = Number(Deno.env.get("AUTO_CLAIM_QUOTE_SATS") ?? "10000");
 
 interface Condition {
   type: string;
   expression: string;
   expected?: string;
   description?: string;
+}
+
+interface TlsnPredicate {
+  targetUrl: string;
+  conditions?: Condition[];
+  maxAttestationAgeSeconds?: number;
+}
+
+const provider = createProvider({
+  oracles: [oraclePubkey],
+  relays,
+  mint,
+  privKey,
+  notary: Deno.env.get("TLSN_NOTARY_URL") ?? undefined,
+  selectionTimeoutMs: Number(Deno.env.get("SELECTION_TIMEOUT_MS") ?? "120000"),
+  preimageTimeoutMs: Number(Deno.env.get("PREIMAGE_TIMEOUT_MS") ?? "300000"),
+});
+
+console.log("=== Auto-Claim Agent / Provider ===\n");
+console.log(`Provider: ${provider.pubkey}`);
+console.log(`Relays:   ${relays.join(", ")}`);
+console.log(`Mint:     ${mint}`);
+console.log(`Oracle:   ${oraclePubkey}`);
+console.log(`Verifier: ${VERIFIER_HOST}`);
+console.log("\nListening for auto-claim requests...\n");
+
+const stop = () => {
+  void provider.stop();
+};
+Deno.addSignalListener("SIGINT", stop);
+Deno.addSignalListener("SIGTERM", stop);
+
+await provider.serve(async (request: ProviderRequestEvent) => {
+  if (request.spec.schema !== DEFINED_SCHEMAS.TLSN_HTTPS_V1) return null;
+  const predicate = parsePredicate(request.spec.predicate);
+  if (!predicate) return null;
+  if (!request.spec.description?.startsWith("Auto-claim:")) return null;
+
+  console.log(`Matched request from ${request.customerPubkey}`);
+  console.log(`  Target: ${predicate.targetUrl}`);
+  console.log(`  Quote:  ${Math.min(QUOTE_SATS, request.maxAmountSats)} sats`);
+
+  return {
+    amountSats: Math.min(QUOTE_SATS, request.maxAmountSats),
+    produce: async () => {
+      const observed = await waitForTriggeredPredicate(predicate);
+      console.log("  Generating TLSNotary proof...");
+      const proof = await generateProof(predicate.targetUrl);
+      return {
+        data: {
+          targetUrl: predicate.targetUrl,
+          observedAt: new Date().toISOString(),
+          body: observed.body,
+          checks: observed.details,
+        },
+        proof,
+      };
+    },
+  };
+});
+
+function parsePredicate(value: unknown): TlsnPredicate | null {
+  if (typeof value !== "object" || value === null) return null;
+  const p = value as Record<string, unknown>;
+  if (typeof p.targetUrl !== "string") return null;
+  const conditions = Array.isArray(p.conditions)
+    ? p.conditions.filter(isCondition)
+    : [];
+  return {
+    targetUrl: p.targetUrl,
+    conditions,
+    maxAttestationAgeSeconds: typeof p.maxAttestationAgeSeconds === "number"
+      ? p.maxAttestationAgeSeconds
+      : undefined,
+  };
+}
+
+function isCondition(value: unknown): value is Condition {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  return typeof c.type === "string" && typeof c.expression === "string";
 }
 
 function evaluateLocally(
@@ -46,15 +133,13 @@ function evaluateLocally(
     switch (cond.type) {
       case "contains": {
         const ok = body.includes(cond.expression);
-        details.push(`${ok ? "✓" : "✗"} contains "${cond.expression}"`);
+        details.push(`${ok ? "ok" : "fail"} contains "${cond.expression}"`);
         if (!ok) return { passed: false, details };
         break;
       }
       case "regex": {
         const match = new RegExp(cond.expression).exec(body);
-        details.push(
-          `${match ? "✓" : "✗"} regex → ${match ? match[0] : "no match"}`,
-        );
+        details.push(`${match ? "ok" : "fail"} regex ${cond.expression}`);
         if (!match) return { passed: false, details };
         break;
       }
@@ -63,27 +148,65 @@ function evaluateLocally(
           const obj = JSON.parse(body);
           const value = cond.expression
             .split(".")
-            .reduce((o: Record<string, unknown>, k: string) => (o as Record<string, unknown>)?.[k] as Record<string, unknown>, obj);
+            .reduce(
+              (o: unknown, k: string) =>
+                typeof o === "object" && o !== null
+                  ? (o as Record<string, unknown>)[k]
+                  : undefined,
+              obj,
+            );
           const actual = String(value);
           if (cond.expected !== undefined) {
             const ok = actual === cond.expected;
             details.push(
-              `${ok ? "✓" : "✗"} ${cond.expression} = "${actual}" (expected "${cond.expected}")`,
+              `${
+                ok ? "ok" : "fail"
+              } ${cond.expression}=${actual} expected=${cond.expected}`,
             );
             if (!ok) return { passed: false, details };
           } else {
-            details.push(`✓ ${cond.expression} = "${actual}"`);
+            details.push(`ok ${cond.expression}=${actual}`);
           }
         } catch {
-          details.push("✗ JSON parse failed");
+          details.push("fail JSON parse");
           return { passed: false, details };
         }
         break;
       }
+      default:
+        details.push(`fail unsupported condition ${cond.type}`);
+        return { passed: false, details };
     }
   }
 
   return { passed: true, details };
+}
+
+async function waitForTriggeredPredicate(
+  predicate: TlsnPredicate,
+): Promise<{ body: string; details: string[] }> {
+  const deadline = Date.now() + PRODUCE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    let body: string;
+    try {
+      const resp = await fetch(predicate.targetUrl);
+      body = await resp.text();
+    } catch (err) {
+      console.log(`  Fetch failed: ${err}`);
+      await delay(CHECK_INTERVAL_MS);
+      continue;
+    }
+
+    const evaluated = evaluateLocally(body, predicate.conditions ?? []);
+    if (evaluated.passed) {
+      console.log("  Predicate triggered.");
+      return { body, details: evaluated.details };
+    }
+
+    console.log(`  No claim yet (${new Date().toISOString()})`);
+    await delay(CHECK_INTERVAL_MS);
+  }
+  throw new Error("Predicate did not trigger before produce timeout");
 }
 
 async function generateProof(targetUrl: string): Promise<string> {
@@ -98,103 +221,32 @@ async function generateProof(targetUrl: string): Promise<string> {
     throw new Error(`tlsn-prove failed: ${stderr}`);
   }
   const proofBytes = await Deno.readFile(outPath);
-  try { await Deno.remove(outPath); } catch { /* ignore */ }
-  return btoa(String.fromCharCode(...proofBytes));
-}
-
-function formatFlight(body: string): string {
   try {
-    const d = JSON.parse(body);
-    if (d.flight) {
-      return `${d.flight} → ${d.status}${d.delay_minutes > 0 ? ` (${d.delay_minutes} min delay)` : ""}`;
-    }
-  } catch { /* not flight JSON */ }
-  return "";
-}
-
-console.log("=== Auto-Claim Agent ===\n");
-console.log(`Server:         ${SERVER_URL}`);
-console.log(`Check interval: ${CHECK_INTERVAL_MS / 1000}s`);
-console.log(`\nScanning for claimable bounties...\n`);
-
-while (true) {
-  try {
-    const queries = await anchr.listOpenQueries();
-    const policies = queries.filter((q) =>
-      q.description.startsWith("Auto-claim:")
-    );
-
-    if (policies.length === 0) {
-      console.log(`[${new Date().toISOString()}] No active policies found`);
-    }
-
-    for (const policy of policies) {
-      if (claimed.has(policy.id) || attempted.has(policy.id)) continue;
-
-      const reqs = policy.tlsn_requirements as {
-        target_url: string;
-        conditions?: Condition[];
-      } | undefined;
-
-      if (!reqs?.target_url) continue;
-
-      // Fetch target (lightweight, no proof yet)
-      let body: string;
-      try {
-        const resp = await fetch(reqs.target_url);
-        body = await resp.text();
-      } catch (err) {
-        console.log(
-          `[${new Date().toISOString()}] Fetch error: ${err}`,
-        );
-        continue;
-      }
-
-      // Local evaluation gates proof generation — only prove when conditions pass.
-      const conditions = reqs.conditions ?? [];
-      const { passed, details } = evaluateLocally(body, conditions);
-      const display = formatFlight(body) || reqs.target_url;
-
-      if (!passed) {
-        console.log(
-          `[${new Date().toISOString()}] ${display} — no claim`,
-        );
-        continue;
-      }
-
-      console.log(
-        `\n[${new Date().toISOString()}] ${display} — CLAIM TRIGGERED!`,
-      );
-      for (const d of details) console.log(`  ${d}`);
-      console.log(`  Bounty: ${policy.bounty?.amount_sats ?? 0} sats`);
-
-      try {
-        console.log("  Generating TLSNotary proof...");
-        const proof = await generateProof(reqs.target_url);
-        console.log("  Submitting claim...");
-        const result = await anchr.submitPresentation(
-          policy.id,
-          proof,
-          USER_PUBKEY,
-        );
-        if (result.ok) {
-          console.log(`  ✓ Claim accepted! ${result.message}`);
-          claimed.add(policy.id);
-        } else {
-          console.log(`  ✗ Claim rejected: ${result.message}`);
-        }
-      } catch (err) {
-        console.log(`  ✗ Proof generation failed: ${err}`);
-        console.log(
-          "  (In production, the browser extension handles this automatically)",
-        );
-        attempted.add(policy.id);
-      }
-      console.log();
-    }
-  } catch (err) {
-    console.error(`Error: ${err}`);
+    await Deno.remove(outPath);
+  } catch {
+    // best-effort cleanup
   }
+  return base64Encode(proofBytes);
+}
 
-  await new Promise((r) => setTimeout(r, CHECK_INTERVAL_MS));
+function base64Encode(bytes: Uint8Array): string {
+  let out = "";
+  for (const byte of bytes) out += String.fromCharCode(byte);
+  return btoa(out);
+}
+
+function requiredEnv(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function listEnv(name: string, fallback: string[]): string[] {
+  const raw = Deno.env.get(name)?.trim();
+  if (!raw) return fallback;
+  return raw.split(",").map((v) => v.trim()).filter(Boolean);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -5,8 +5,8 @@
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
 Anchr is an experimental SDK for P2P verified work: pay a stranger to fetch data
-or take an action, with payment released only after a whitelisted oracle verifies
-the proof.
+or take an action, with payment released only after a whitelisted oracle
+verifies the proof.
 
 It combines:
 
@@ -90,11 +90,14 @@ const { data, proof, providerPubkey } = await customer.request({
     },
   },
   payment: { maxAmount: 1000 },
+  sourceProofs: cashuProofsFromYourWallet,
 });
 ```
 
-Providers use `createProvider(...)` and attach a proof producer for the requested
-schema. See the examples for Provider setup, adapter wiring, and local stack
+Providers use `createProvider(...)` and attach a proof producer for the
+requested schema. That Provider process can be long-running, because it must
+receive Customer requests and produce proofs, but it is not an Anchr-operated
+middleman. See the examples for Provider setup, adapter wiring, and local stack
 commands.
 
 ## Verification Schemas
@@ -102,20 +105,20 @@ commands.
 The SDK does not bake in a proof format. Each request carries a schema URI, and
 the Provider and Oracle interpret it.
 
-| Schema                   | Use case                                    |
-| ------------------------ | ------------------------------------------- |
-| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response  |
-| `io.anchr.c2pa-image.v1` | C2PA-signed photo/video provenance and GPS  |
+| Schema                   | Use case                                   |
+| ------------------------ | ------------------------------------------ |
+| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
+| `io.anchr.c2pa-image.v1` | C2PA-signed photo/video provenance and GPS |
 
 ## Reference Implementations
 
-| Example                                                                    | What it shows                                  | Status      |
-| -------------------------------------------------------------------------- | ---------------------------------------------- | ----------- |
-| [C2PA photo marketplace](example/c2pa-media-verification/)                 | Customer/Provider flow with photo verification | Testnet     |
-| [TLSN fiat swap](example/tlsn-fiat-swap-square/)                           | Customer/Provider flow with TLSNotary          | Testnet     |
-| [Browser auto-claim](example/auto-claim/)                                  | TLSNotary-based browser automation             | Concept     |
-| [Two-party binary bet](example/two-party-binary-bet/)                      | Conditional swap primitive outside the SDK     | Implemented |
-| [Airdrop bot shield](example/airdrop-bot-shield/)                          | Verification-only attestation flow             | Simulation  |
+| Example                                                    | What it shows                                  | Status      |
+| ---------------------------------------------------------- | ---------------------------------------------- | ----------- |
+| [C2PA photo marketplace](example/c2pa-media-verification/) | Customer/Provider flow with photo verification | Testnet     |
+| [TLSN fiat swap](example/tlsn-fiat-swap-square/)           | Customer/Provider flow with TLSNotary          | Testnet     |
+| [Browser auto-claim](example/auto-claim/)                  | TLSNotary-based browser automation             | Concept     |
+| [Two-party binary bet](example/two-party-binary-bet/)      | Conditional swap primitive outside the SDK     | Implemented |
+| [Airdrop bot shield](example/airdrop-bot-shield/)          | Verification-only attestation flow             | Simulation  |
 
 ## More Detail
 

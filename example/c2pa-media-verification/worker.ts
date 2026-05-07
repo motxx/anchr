@@ -1,159 +1,146 @@
 /**
- * C2PA Media Verification — Worker (On-ground Journalist)
+ * C2PA Media Verification - Journalist / Provider
  *
- * Demonstrates the Worker side of a photo verification flow using the HTTP API directly.
- * The journalist:
- *   1. Discovers open photo queries
- *   2. Uploads a C2PA-signed photo
- *   3. Submits for oracle verification and displays the result
+ * Listens for C2PA image requests on Nostr, quotes matching requests, and
+ * returns the C2PA-signed photo as an encrypted kind 6300 result after
+ * selection. The Oracle reads the oracle_payload tag, verifies the proof, and
+ * DMs the HTLC preimage to this Provider.
+ *
+ * For large media, use a Blossom-backed producer. This minimal example embeds
+ * the signed image bytes as base64 proof data so the flow stays serverless.
  *
  * Usage:
- *   bun run example/c2pa-media-verification/worker.ts [path-to-c2pa-photo]
+ *   NOSTR_RELAYS=ws://localhost:7777 \
+ *   CASHU_MINT_URL=http://localhost:3338 \
+ *   ORACLE_PUBKEY=<oracle-pubkey-hex-or-npub> \
+ *   C2PA_PROVIDER_PRIVKEY=<provider-nsec-or-hex> \
+ *   deno run --allow-env --allow-net --allow-read --env example/c2pa-media-verification/worker.ts signed-photo.jpg
  */
 
-import process from "node:process";
-const SERVER_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
-const PHOTO_PATH = process.argv[2] ?? "signed-photo.jpg";
+import {
+  createProvider,
+  DEFINED_SCHEMAS,
+  type ProviderRequestEvent,
+} from "anchr-sdk";
 
-console.log("=== C2PA Media Verification — Worker (Journalist) ===\n");
-console.log(`Server: ${SERVER_URL}`);
-console.log(`Photo:  ${PHOTO_PATH}\n`);
+const relays = listEnv("NOSTR_RELAYS", ["ws://localhost:7777"]);
+const mint = requiredEnv("CASHU_MINT_URL");
+const oraclePubkey = requiredEnv("ORACLE_PUBKEY");
+const privKey = requiredEnv("C2PA_PROVIDER_PRIVKEY");
+const photoPath = Deno.args[0] ?? Deno.env.get("C2PA_PHOTO_PATH") ??
+  "signed-photo.jpg";
+const quoteSats = Number(Deno.env.get("C2PA_QUOTE_SATS") ?? "100");
 
-// --- Step 1: List open photo queries ---
-
-console.log("Step 1: Finding open photo queries...\n");
-
-const queriesRes = await fetch(`${SERVER_URL}/queries`);
-if (!queriesRes.ok) {
-  console.error(`Failed to list queries: ${queriesRes.status} ${queriesRes.statusText}`);
-  process.exit(1);
+interface C2paPredicate {
+  locationHint?: string;
+  expectedGps?: { lat: number; lon: number };
+  maxGpsDistanceKm?: number;
+  freshnessSeconds?: number;
 }
 
-const queries: Array<{
-  id: string;
-  description: string;
-  status: string;
-  location_hint?: string;
-  expected_gps?: { lat: number; lon: number };
-  max_gps_distance_km?: number;
-  bounty?: { amount_sats: number };
-  verification_requirements: string[];
-}> = await queriesRes.json();
-
-// Find a photo query (has gps and ai_check verification requirements)
-const photoQuery = queries.find(
-  (q) =>
-    q.status === "pending" &&
-    q.verification_requirements.includes("gps") &&
-    q.verification_requirements.includes("ai_check"),
-);
-
-if (!photoQuery) {
-  console.log("No open photo queries found.");
-  console.log("Run requester.ts first to create one.");
-  process.exit(0);
-}
-
-console.log(`Found query: ${photoQuery.id}`);
-console.log(`  Description: ${photoQuery.description}`);
-console.log(`  Location: ${photoQuery.location_hint ?? "N/A"}`);
-if (photoQuery.expected_gps) {
-  console.log(
-    `  Expected GPS: ${photoQuery.expected_gps.lat}°N, ${photoQuery.expected_gps.lon}°E (±${photoQuery.max_gps_distance_km ?? "?"}km)`,
-  );
-}
-console.log(`  Bounty: ${photoQuery.bounty?.amount_sats ?? 0} sats`);
-console.log();
-
-// --- Step 2: Upload the C2PA-signed photo ---
-
-console.log("Step 2: Uploading C2PA-signed photo...\n");
-
-// Read the photo file (works in Deno and Bun)
-let photoBytes: Uint8Array;
-try {
-  photoBytes = await Deno.readFile(PHOTO_PATH);
-} catch {
-  console.error(`Photo not found: ${PHOTO_PATH}`);
-  console.error("Provide a C2PA-signed photo as the first argument.");
-  console.error("You can create one with: c2patool test-photo.jpg -m manifest.json -o signed-photo.jpg");
-  process.exit(1);
-}
-
-const photoBlob = new File([photoBytes as BlobPart], PHOTO_PATH.split("/").pop() ?? "photo.jpg", {
-  type: "image/jpeg",
+const provider = createProvider({
+  oracles: [oraclePubkey],
+  relays,
+  mint,
+  privKey,
+  selectionTimeoutMs: Number(Deno.env.get("SELECTION_TIMEOUT_MS") ?? "120000"),
+  preimageTimeoutMs: Number(Deno.env.get("PREIMAGE_TIMEOUT_MS") ?? "300000"),
 });
 
-const formData = new FormData();
-formData.append("photo", photoBlob);
+console.log("=== C2PA Media Verification - Provider ===\n");
+console.log(`Provider: ${provider.pubkey}`);
+console.log(`Relays:   ${relays.join(", ")}`);
+console.log(`Mint:     ${mint}`);
+console.log(`Oracle:   ${oraclePubkey}`);
+console.log(`Photo:    ${photoPath}\n`);
+console.log("Listening for C2PA photo requests...\n");
 
-const uploadRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/upload`, {
-  method: "POST",
-  body: formData,
+const stop = () => {
+  void provider.stop();
+};
+Deno.addSignalListener("SIGINT", stop);
+Deno.addSignalListener("SIGTERM", stop);
+
+await provider.serve(async (request: ProviderRequestEvent) => {
+  if (request.spec.schema !== DEFINED_SCHEMAS.C2PA_IMAGE_V1) return null;
+  const predicate = parsePredicate(request.spec.predicate);
+  if (!predicate) return null;
+
+  console.log(`Matched request from ${request.customerPubkey}`);
+  console.log(`  Location: ${predicate.locationHint ?? "unspecified"}`);
+  console.log(`  Quote:    ${Math.min(quoteSats, request.maxAmountSats)} sats`);
+
+  return {
+    amountSats: Math.min(quoteSats, request.maxAmountSats),
+    produce: async () => {
+      const bytes = await Deno.readFile(photoPath);
+      const filename = photoPath.split("/").pop() ?? "signed-photo.jpg";
+      return {
+        data: {
+          filename,
+          mimeType: guessMimeType(filename),
+          locationHint: predicate.locationHint,
+          expectedGps: predicate.expectedGps,
+          maxGpsDistanceKm: predicate.maxGpsDistanceKm,
+          capturedAt: new Date().toISOString(),
+          notes: Deno.env.get("C2PA_NOTES") ??
+            "Photo submitted by the selected Provider",
+        },
+        proof: base64Encode(bytes),
+      };
+    },
+  };
 });
 
-if (!uploadRes.ok) {
-  const err = await uploadRes.text();
-  console.error(`Upload failed: ${uploadRes.status} ${err}`);
-  process.exit(1);
+function parsePredicate(value: unknown): C2paPredicate | null {
+  if (typeof value !== "object" || value === null) return null;
+  const p = value as Record<string, unknown>;
+  const expectedGps = parseGps(p.expectedGps);
+  return {
+    locationHint: typeof p.locationHint === "string"
+      ? p.locationHint
+      : undefined,
+    expectedGps,
+    maxGpsDistanceKm: typeof p.maxGpsDistanceKm === "number"
+      ? p.maxGpsDistanceKm
+      : undefined,
+    freshnessSeconds: typeof p.freshnessSeconds === "number"
+      ? p.freshnessSeconds
+      : undefined,
+  };
 }
 
-const uploadResult: {
-  ok: boolean;
-  attachment: { id: string; uri: string; mime_type: string };
-  encryption: { encrypt_key: string; encrypt_iv: string } | null;
-} = await uploadRes.json();
-console.log(`Uploaded: ${uploadResult.attachment.id}`);
-console.log(`  URI: ${uploadResult.attachment.uri}`);
-console.log();
-
-// --- Step 3: Submit the query result ---
-
-console.log("Step 3: Submitting for verification...\n");
-
-// Submit with the attachment ref and optional encryption keys for oracle verification.
-const submitRes = await fetch(`${SERVER_URL}/queries/${photoQuery.id}/result`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    worker_pubkey: "example-journalist",
-    notes: "Photo taken at Shibuya crossing, C2PA signed by camera",
-    attachments: [uploadResult.attachment],
-    ...(uploadResult.encryption && {
-      encryption_keys: { [uploadResult.attachment.id]: uploadResult.encryption },
-    }),
-  }),
-});
-
-const submitResult: {
-  ok: boolean;
-  message: string;
-  verification?: { passed: boolean; checks: string[]; failures: string[] };
-  payment_status?: string;
-} = await submitRes.json();
-console.log(`Submitted: ${submitResult.ok ? "success" : "failed"}`);
-console.log(`  Message: ${submitResult.message}`);
-if (submitResult.payment_status) {
-  console.log(`  Payment: ${submitResult.payment_status}`);
-}
-console.log();
-
-// --- Step 4: Check verification result ---
-
-// The submit response already includes the verification result
-if (submitResult.verification) {
-  console.log("--- Verification Result ---\n");
-  console.log(`Passed: ${submitResult.verification.passed}`);
-  if (submitResult.verification.checks.length > 0) {
-    console.log("Checks passed:");
-    for (const c of submitResult.verification.checks) {
-      console.log(`  ✓ ${c}`);
-    }
+function parseGps(value: unknown): { lat: number; lon: number } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const gps = value as Record<string, unknown>;
+  if (typeof gps.lat !== "number" || typeof gps.lon !== "number") {
+    return undefined;
   }
-  if (submitResult.verification.failures.length > 0) {
-    console.log("Checks failed:");
-    for (const f of submitResult.verification.failures) {
-      console.log(`  ✗ ${f}`);
-    }
-  }
+  return { lat: gps.lat, lon: gps.lon };
+}
+
+function guessMimeType(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".heic")) return "image/heic";
+  if (lower.endsWith(".heif")) return "image/heif";
+  return "image/jpeg";
+}
+
+function base64Encode(bytes: Uint8Array): string {
+  let out = "";
+  for (const byte of bytes) out += String.fromCharCode(byte);
+  return btoa(out);
+}
+
+function requiredEnv(name: string): string {
+  const value = Deno.env.get(name)?.trim();
+  if (!value) throw new Error(`${name} is required`);
+  return value;
+}
+
+function listEnv(name: string, fallback: string[]): string[] {
+  const raw = Deno.env.get(name)?.trim();
+  if (!raw) return fallback;
+  return raw.split(",").map((v) => v.trim()).filter(Boolean);
 }
