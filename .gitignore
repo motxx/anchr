@@ -79,6 +79,7 @@ test-results
 # claude code
 .claude/*
 !.claude/settings.json
+!.claude/skills
 
 # generated reports
 docs/chaos-*.md

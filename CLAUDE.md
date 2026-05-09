@@ -88,3 +88,7 @@ Application vocabulary (`market`, `marketplace`, …) is forbidden in
 When a request matches an available skill, invoke it via `Skill` as the
 first action. Available skills appear in the system reminder; trust
 their own descriptions.
+
+Repository-local skills are shared with Codex. The canonical definitions live in
+`skills/<skill-name>/SKILL.md`; `.claude/skills` and `.codex/skills` are symlinks
+to that directory. Add or edit skills under `skills/` only.
