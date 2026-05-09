@@ -182,5 +182,5 @@ This document defines editorial and distribution policy. The storage substrate
 decision is tracked separately in
 [`docs/publishing-storage-comparison.md`](publishing-storage-comparison.md).
 
-Issue #0010 should use this policy as its input when designing the
-Blossom-first NIP-23 publishing workflow.
+The concrete Blossom-first NIP-23 workflow is defined in
+[`docs/blossom-nip23-blog-publishing.md`](blossom-nip23-blog-publishing.md).
