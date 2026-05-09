@@ -1,37 +1,16 @@
 ---
-name: Bug report
-about: Report a reproducible problem
-title: ""
-labels: bug
+name: Use docs/issues for bug reports
+about: This repository tracks bug reports as Markdown files in docs/issues
+title: "Use docs/issues: "
+labels: ""
 assignees: ""
 ---
 
-## Summary
+This repository does not use GitHub Issues as the source of truth.
 
-## Steps to Reproduce
+Please open a pull request that adds a numbered Markdown file under
+`docs/issues/pending/`. Follow `docs/issues/README.md` for the format.
 
-1.
-2.
-3.
-
-## Expected Behavior
-
-## Actual Behavior
-
-## Environment
-
-- OS:
-- Deno:
-- Bun:
-- Docker:
-- Commit:
-
-## Logs or Output
-
-```text
-```
-
-## Security Impact
-
-If this may expose keys, proofs, private data, or funds, stop and follow
-`SECURITY.md` instead of posting details here.
+If this may expose keys, proofs, private data, funds, or unpatched vulnerability
+details, do not post it here or in `docs/issues`; coordinate privately with
+maintainers instead.

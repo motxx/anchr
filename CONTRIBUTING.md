@@ -1,6 +1,20 @@
 # Contributing
 
-Issues and PRs welcome.
+PRs welcome.
+
+## Issues
+
+This repository tracks issues as Markdown files in [`docs/issues`](docs/issues)
+instead of GitHub Issues.
+
+- Add new work items under `docs/issues/pending/` with the next number from
+  `docs/issues/SEQUENCE`.
+- Close work by moving the same file to `docs/issues/closed/` and adding a
+  resolution note.
+- Do not include sensitive security details in repo-tracked issue files.
+
+See [`docs/issues/README.md`](docs/issues/README.md) for the file format and
+workflow.
 
 ## Running the test suite
 

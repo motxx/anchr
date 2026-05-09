@@ -1,18 +1,12 @@
 ---
-name: Feature request
-about: Propose a scoped improvement
-title: ""
-labels: enhancement
+name: Use docs/issues for feature requests
+about: This repository tracks feature requests as Markdown files in docs/issues
+title: "Use docs/issues: "
+labels: ""
 assignees: ""
 ---
 
-## Problem
+This repository does not use GitHub Issues as the source of truth.
 
-## Proposed Solution
-
-## Alternatives Considered
-
-## Compatibility Notes
-
-Does this affect wire formats, package APIs, settlement behavior, or threat
-model invariants?
+Please open a pull request that adds a numbered Markdown file under
+`docs/issues/pending/`. Follow `docs/issues/README.md` for the format.

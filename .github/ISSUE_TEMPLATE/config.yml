@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: docs/issues workflow
+    url: https://github.com/motxx/anchr/tree/main/docs/issues
+    about: Add or update issue files in docs/issues via pull request.
