@@ -405,7 +405,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   expect(result.proof).toBe("base64proofbytes==");
 });
 
-test("Customer.request runs schemaVerifiers when provided", async () => {
+test("Customer.request runs verifierAdapters when provided", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
@@ -460,16 +460,16 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
     relayClient,
     quoteWindowMs: 30,
     resultTimeoutMs: 1000,
-    schemaVerifiers: {
-      "https://anchr-spec.org/spec/proof/tlsn/v1": (
-        proof,
-        predicate,
-        data,
-      ) => {
-        verifierCalls.push({ proof, predicate, data });
-        return true;
+    verifierAdapters: [
+      {
+        canHandle: (schema) =>
+          schema === "https://anchr-spec.org/spec/proof/tlsn/v1",
+        verify: (proof, predicate, data) => {
+          verifierCalls.push({ proof, predicate, data });
+          return true;
+        },
       },
-    },
+    ],
   });
 
   await customer.request({
@@ -540,9 +540,11 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
     relayClient,
     quoteWindowMs: 30,
     resultTimeoutMs: 1000,
-    schemaVerifiers: {
-      "https://anchr-spec.org/spec/proof/tlsn/v1": () => false,
-    },
+    verifierAdapters: [{
+      canHandle: (schema) =>
+        schema === "https://anchr-spec.org/spec/proof/tlsn/v1",
+      verify: () => false,
+    }],
   });
 
   await expect(

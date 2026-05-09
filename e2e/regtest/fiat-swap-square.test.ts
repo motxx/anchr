@@ -181,12 +181,13 @@ suite(
         relayClient: customerRelay,
         quoteWindowMs: 3_000,
         resultTimeoutMs: 30_000,
-        schemaVerifiers: {
-          [FIAT_SWAP_SCHEMA]: (proof, predicate, data) =>
+        verifierAdapters: [{
+          canHandle: (schema) => schema === FIAT_SWAP_SCHEMA,
+          verify: (proof, predicate, data) =>
             proof === FIXTURE_PROOF &&
             isFiatSwapPredicate(predicate) &&
             JSON.stringify(data) === JSON.stringify(expectedData),
-        },
+        }],
       });
 
       try {

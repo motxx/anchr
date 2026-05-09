@@ -84,8 +84,8 @@ export interface CustomerOptions {
   quoteWindowMs?: number;
   /** Optional: how long to wait for the kind 6300 result event before timing out (default: 300000 ms / 5 min). */
   resultTimeoutMs?: number;
-  /** Optional: schema verifier handlers. The SDK calls these to verify a proof locally. */
-  schemaVerifiers?: SchemaVerifierRegistry;
+  /** Optional: verifier adapters. The SDK calls matching adapters to verify a proof locally. */
+  verifierAdapters?: readonly VerifierAdapter[];
 }
 
 /** Provider-side construction options. */
@@ -162,10 +162,6 @@ export interface VerifierAdapter {
   canHandle(schema: string): boolean;
   verify: SchemaVerifier;
 }
-
-export type SchemaVerifierRegistry =
-  | Record<string, SchemaVerifier>
-  | readonly VerifierAdapter[];
 
 /**
  * Schema-side hook: verify a proof matches the predicate.

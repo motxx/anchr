@@ -11,13 +11,7 @@
  * canHandle(schema).
  */
 
-import type {
-  ProofGenerator,
-  SchemaProducer,
-  SchemaVerifier,
-  SchemaVerifierRegistry,
-  VerifierAdapter,
-} from "./types.ts";
+import type { ProofGenerator, VerifierAdapter } from "./types.ts";
 
 /** HTTPS proof schema URL form. The SDK validates shape and dispatches by URL. */
 export type SchemaUri = string;
@@ -47,34 +41,6 @@ export function isSchemaUri(value: unknown): value is SchemaUri {
   return /^\/spec\/proof\/[a-z0-9-]+\/v\d+$/.test(url.pathname);
 }
 
-/**
- * Resolves a schema URL to its registered producer.
- *
- * Returns null if no handler is registered. Callers MUST handle the null
- * case; the SDK does not silently fall back to a default.
- */
-export function resolveProducer(
-  registry: Record<SchemaUri, SchemaProducer> | readonly ProofGenerator[],
-  uri: SchemaUri,
-): SchemaProducer | null {
-  if (isProofGeneratorList(registry)) {
-    const generator = resolveProofGenerator(registry, uri);
-    return generator?.produce ?? null;
-  }
-  return registry[uri] ?? null;
-}
-
-export function resolveVerifier(
-  registry: SchemaVerifierRegistry,
-  uri: SchemaUri,
-): SchemaVerifier | null {
-  if (isVerifierAdapterList(registry)) {
-    const adapter = resolveVerifierAdapter(registry, uri);
-    return adapter?.verify ?? null;
-  }
-  return registry[uri] ?? null;
-}
-
 export function resolveProofGenerator(
   generators: readonly ProofGenerator[],
   uri: SchemaUri,
@@ -87,18 +53,6 @@ export function resolveVerifierAdapter(
   uri: SchemaUri,
 ): VerifierAdapter | null {
   return adapters.find((adapter) => adapter.canHandle(uri)) ?? null;
-}
-
-function isProofGeneratorList(
-  registry: Record<SchemaUri, SchemaProducer> | readonly ProofGenerator[],
-): registry is readonly ProofGenerator[] {
-  return Array.isArray(registry);
-}
-
-function isVerifierAdapterList(
-  registry: SchemaVerifierRegistry,
-): registry is readonly VerifierAdapter[] {
-  return Array.isArray(registry);
 }
 
 /** Thrown when a schema URL is required but not registered with the SDK. */

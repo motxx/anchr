@@ -5,18 +5,11 @@ import {
   DEFINED_SCHEMAS,
   InvalidSchemaUriError,
   isSchemaUri,
-  resolveProducer,
   resolveProofGenerator,
-  resolveVerifier,
   resolveVerifierAdapter,
   UnknownSchemaError,
 } from "./schema.ts";
-import type {
-  ProofGenerator,
-  SchemaProducer,
-  SchemaVerifier,
-  VerifierAdapter,
-} from "./types.ts";
+import type { ProofGenerator, VerifierAdapter } from "./types.ts";
 
 test("DEFINED_SCHEMAS exposes the v0.0.1 proof schema URLs", () => {
   expect(DEFINED_SCHEMAS.TLSN_HTTPS_V1).toBe(
@@ -63,30 +56,6 @@ test("isSchemaUri rejects malformed strings", () => {
   expect(isSchemaUri(null)).toBe(false);
 });
 
-test("resolveProducer returns the registered handler", () => {
-  const producer: SchemaProducer = async () => ({ data: null, proof: "" });
-  const registry = { [DEFINED_SCHEMAS.TLSN_HTTPS_V1]: producer };
-  expect(resolveProducer(registry, DEFINED_SCHEMAS.TLSN_HTTPS_V1)).toBe(
-    producer,
-  );
-});
-
-test("resolveProducer returns null for unregistered schema", () => {
-  expect(resolveProducer({}, DEFINED_SCHEMAS.TLSN_HTTPS_V1)).toBe(null);
-});
-
-test("resolveVerifier returns the registered handler", () => {
-  const verifier: SchemaVerifier = () => true;
-  const registry = { [DEFINED_SCHEMAS.C2PA_IMAGE_V1]: verifier };
-  expect(resolveVerifier(registry, DEFINED_SCHEMAS.C2PA_IMAGE_V1)).toBe(
-    verifier,
-  );
-});
-
-test("resolveVerifier returns null for unregistered schema", () => {
-  expect(resolveVerifier({}, DEFINED_SCHEMAS.C2PA_IMAGE_V1)).toBe(null);
-});
-
 test("resolveProofGenerator dispatches with canHandle", () => {
   const first: ProofGenerator = {
     canHandle: () => false,
@@ -98,9 +67,15 @@ test("resolveProofGenerator dispatches with canHandle", () => {
   };
   expect(resolveProofGenerator([first, second], DEFINED_SCHEMAS.TLSN_HTTPS_V1))
     .toBe(second);
-  expect(resolveProducer([first, second], DEFINED_SCHEMAS.TLSN_HTTPS_V1)).toBe(
-    second.produce,
-  );
+});
+
+test("resolveProofGenerator returns null for unhandled schema", () => {
+  const generator: ProofGenerator = {
+    canHandle: () => false,
+    produce: async () => ({ data: "unused", proof: "unused" }),
+  };
+  expect(resolveProofGenerator([generator], DEFINED_SCHEMAS.TLSN_HTTPS_V1))
+    .toBe(null);
 });
 
 test("resolveVerifierAdapter dispatches with canHandle", () => {
@@ -115,9 +90,15 @@ test("resolveVerifierAdapter dispatches with canHandle", () => {
   expect(
     resolveVerifierAdapter([first, second], DEFINED_SCHEMAS.C2PA_IMAGE_V1),
   ).toBe(second);
-  expect(resolveVerifier([first, second], DEFINED_SCHEMAS.C2PA_IMAGE_V1)).toBe(
-    second.verify,
-  );
+});
+
+test("resolveVerifierAdapter returns null for unhandled schema", () => {
+  const verifier: VerifierAdapter = {
+    canHandle: () => false,
+    verify: () => true,
+  };
+  expect(resolveVerifierAdapter([verifier], DEFINED_SCHEMAS.C2PA_IMAGE_V1))
+    .toBe(null);
 });
 
 test("UnknownSchemaError carries the offending URI", () => {

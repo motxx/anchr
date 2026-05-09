@@ -80,9 +80,7 @@ export {
   type DefinedSchemaUri,
   InvalidSchemaUriError,
   isSchemaUri,
-  resolveProducer,
   resolveProofGenerator,
-  resolveVerifier,
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
@@ -103,7 +101,6 @@ export type {
   SchemaProducer,
   SchemaProducerContext,
   SchemaVerifier,
-  SchemaVerifierRegistry,
   Spec,
   VerifierAdapter,
 } from "./types.ts";

@@ -76,8 +76,8 @@ the provider's handler interprets it. URLs the SDK ships as constants:
 
 The SDK does not bundle producers or verifiers. Wire your own
 `produce(): Promise<{ data, proof }>` in the provider handler, and pass an
-optional `schemaVerifiers` registry or verifier adapters on the customer if you
-want local verification of returned proofs.
+optional `verifierAdapters` list on the customer if you want local verification
+of returned proofs.
 
 ## Testing
 
