@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-09
 
 ## Priority
 
@@ -28,3 +29,20 @@ Anchr の開発内容を自然言語で公開するための編集方針と配�
 - 誰に何を伝えるのかを、開発ログ、設計ノート、リリース告知、検証記事のような記事種別ごとに定義する。
 - 個人ブログを正本にし、RSS、Nostr 長文投稿、HN 共有を add-on として扱う公開フローを文書化する。
 - SEO 目的の量産や流行語最適化を避ける編集基準を決める。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/development-publishing-strategy.md`
+
+Verified with:
+
+- `deno task lint:strict`
+- `deno task test:all`
+- `deno task test:all:docker`
+
+Follow-up:
+
+- #0010 can now use the editorial and channel policy as input for the
+  Blossom-first NIP-23 workflow design.
