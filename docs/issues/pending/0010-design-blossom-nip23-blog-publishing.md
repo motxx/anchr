@@ -11,7 +11,6 @@ design
 
 Depends on:
 - #0009 - 開発内容の公開方針を定義する
-- #0011 - IPFS と Blossom の公開基盤比較を調査する
 
 Blocks:
 - None

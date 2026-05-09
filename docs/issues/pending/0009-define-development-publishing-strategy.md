@@ -10,7 +10,7 @@ design
 ## Dependencies
 
 Depends on:
-- #0011 - IPFS と Blossom の公開基盤比較を調査する
+- None
 
 Blocks:
 - #0010 - Blossom と NIP-23 のブログ公開基盤を設計する

@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-09
 
 ## Priority
 
@@ -30,3 +31,22 @@ Blocks:
 - Blossom の BUD/Nostr 連携、認証、content-addressing、サーバー選択、可用性モデルを調べる。
 - 個人ブログ用途での比較軸を、自己主権性、移行容易性、読者到達性、運用負荷、検閲耐性に分けてまとめる。
 - 調査結果を `0009` と `0010` の方針へ反映できる形で結論化する。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/publishing-storage-comparison.md`
+- `docs/issues/pending/0009-define-development-publishing-strategy.md`
+- `docs/issues/pending/0010-design-blossom-nip23-blog-publishing.md`
+
+Verified with:
+
+- `deno task lint:strict`
+- `deno task test:all`
+- `deno task test:all:docker`
+
+Follow-up:
+
+- #0009 now depends on none.
+- #0010 now depends only on #0009.
