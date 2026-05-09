@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0009 - 開発内容の公開方針を定義する
+- #0011 - IPFS と Blossom の公開基盤比較を調査する
+
+Blocks:
+- None
+
 ## Summary
 
 個人ブログの記事を Self-host Blossom に保存し、Nostr 長文投稿 NIP-23 へ公開するための content-addressed な公開基盤を設計する。

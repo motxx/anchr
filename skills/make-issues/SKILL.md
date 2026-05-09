@@ -40,6 +40,14 @@ Model: <current agent/model name>
 
 <bug | feature | design | maintenance | investigation>
 
+## Dependencies
+
+Depends on:
+- None
+
+Blocks:
+- None
+
 ## Summary
 
 What needs to change, and why.
@@ -74,6 +82,8 @@ Priority must be one of:
 ## Content Rules
 
 - Keep each issue closeable in one change when possible.
+- Record issue prerequisites in `Depends on` and downstream work in `Blocks`.
+  Use `- None` when there is no known relationship.
 - Include concrete file paths, commands, logs, or docs references only when they
   help the implementer act.
 - Do not include private keys, proofs, personal data, fund-bearing details, or

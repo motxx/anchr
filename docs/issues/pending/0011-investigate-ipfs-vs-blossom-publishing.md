@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 investigation
 
+## Dependencies
+
+Depends on:
+- None
+
+Blocks:
+- #0009 - 開発内容の公開方針を定義する
+- #0010 - Blossom と NIP-23 のブログ公開基盤を設計する
+
 ## Summary
 
 個人ブログの self-sovereign な公開基盤として、IPFS ではなく Blossom を採用する判断を出典付きで検証する。

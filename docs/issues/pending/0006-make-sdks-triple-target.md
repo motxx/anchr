@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 feature
 
+## Dependencies
+
+Depends on:
+- #0002 - bounty を SDK に分割する
+- #0013 - 実験的技術を adapter/plugin に分離する
+
+Blocks:
+- None
+
 ## Summary
 
 Customer SDK と Provider SDK を pure ESM packages としてブラウザー、Node、Deno で動かせるようにする。

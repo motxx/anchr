@@ -147,5 +147,13 @@
       "packages/bounty/src/infrastructure/log-stream.ts"
     ]
   },
+  "fmt": {
+    "exclude": [
+      "docs/issues",
+      "skills",
+      ".claude/skills",
+      ".codex/skills"
+    ]
+  },
   "nodeModulesDir": "auto"
 }

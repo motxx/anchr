@@ -23,6 +23,10 @@ Numbers are never reused, even when an issue is closed or abandoned.
 1. Increment `SEQUENCE`.
 2. Add a Markdown file under `pending/` using the new number.
 3. Keep the issue scoped enough to close in one change when possible.
+4. If the issue cannot be resolved until another issue is closed, record that
+   prerequisite under `Depends on`.
+5. If later work should wait for this issue, record those issue numbers under
+   `Blocks`.
 
 Use this structure:
 
@@ -35,6 +39,14 @@ Model: <model name, if created with an agent>
 ## Priority
 
 <bug | feature | design | maintenance | investigation>
+
+## Dependencies
+
+Depends on:
+- None
+
+Blocks:
+- None
 
 ## Summary
 
@@ -64,6 +76,11 @@ What changed, including important PRs, commits, files, or follow-up notes.
 
 Do not renumber files when moving them. If the work reveals a separate task,
 create a new issue with a new number.
+
+If the issue has unresolved `Depends on` entries, do not close it unless the
+maintainer explicitly accepts the remaining dependency risk. When closing an
+issue, update other pending issues whose `Depends on` or `Blocks` lists should
+change as a result.
 
 ## Security
 

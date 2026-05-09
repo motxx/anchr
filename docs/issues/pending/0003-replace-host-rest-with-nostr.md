@@ -7,6 +7,17 @@ Model: Codex GPT-5
 
 feature
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+- #0002 - bounty を SDK に分割する
+- #0005 - 証明スキーマ URL を定義する
+- #0008 - セキュリティ不変条件を文書化する
+
+Blocks:
+- #0004 - Reference Host を削除する
+
 ## Summary
 
 プロトコル向けの REST、worker-api、Oracle HTTP fallback フローを削除し、Customer、Provider、Oracle の通信を Nostr ベースに置き換える。

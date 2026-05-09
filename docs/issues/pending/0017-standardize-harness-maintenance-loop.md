@@ -7,6 +7,14 @@ Model: Codex GPT-5
 
 maintenance
 
+## Dependencies
+
+Depends on:
+- #0016 - 人間レビュー領域をハーネスへ写像する
+
+Blocks:
+- #0018 - 人間レビュー残差を追跡する
+
 ## Summary
 
 AI の出力を見て人間が発見したズレを、都度どのハーネスへ戻すかの保守手順にする。単発のレビューコメントで終わらせず、再発するズレはテスト、lint、skill、仕様ロック、issue のいずれかへ変換する運用を定義する。

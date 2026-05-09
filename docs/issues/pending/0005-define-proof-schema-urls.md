@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+
+Blocks:
+- #0003 - ホスト REST を Nostr に置き換える
+- #0014 - 普遍部分を specs に昇格する
+
 ## Summary
 
 `ProofGenerator` と `VerifierAdapter` の dispatch に、スキーマ URL ベースの証明キーを採用する。

@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 maintenance
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+- #0002 - bounty を SDK に分割する
+
+Blocks:
+- #0004 - Reference Host を削除する
+
 ## Summary
 
 MCP 対応を core SDK paths から外し、CLI、HTTP gateway、Discord bot、Web UI 統合と並ぶ一つのアダプター兼 example として扱う。

@@ -8,6 +8,21 @@ Completed: 2026-05-09
 
 design
 
+## Dependencies
+
+Depends on:
+- None
+
+Blocks:
+- #0002 - bounty を SDK に分割する
+- #0003 - ホスト REST を Nostr に置き換える
+- #0004 - Reference Host を削除する
+- #0005 - 証明スキーマ URL を定義する
+- #0007 - MCP アダプターを切り出す
+- #0008 - セキュリティ不変条件を文書化する
+- #0012 - component 境界を agnostic に定義する
+- #0015 - 普遍性の境界を設計する
+
 ## Summary
 
 Reference Host をプロトコル上の主体から外し、Customer、Provider、Oracle が Nostr と Cashu を介して直接連携するリファクタリング前のアーキテクチャを決定する。

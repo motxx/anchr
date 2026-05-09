@@ -7,6 +7,14 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0011 - IPFS と Blossom の公開基盤比較を調査する
+
+Blocks:
+- #0010 - Blossom と NIP-23 のブログ公開基盤を設計する
+
 ## Summary
 
 Anchr の開発内容を自然言語で公開するための編集方針と配信方針を定義する。媒体は個人ブログを主軸にし、SEO の時流最適化ではなく、同じ課題を抱える人へ確実に届く経路を重視する。

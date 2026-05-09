@@ -7,6 +7,17 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+- #0015 - 普遍性の境界を設計する
+
+Blocks:
+- #0002 - bounty を SDK に分割する
+- #0013 - 実験的技術を adapter/plugin に分離する
+- #0014 - 普遍部分を specs に昇格する
+
 ## Summary
 
 現在の component 群から、Nostr、Cashu、TLSNotary、Blossom などの具体技術に依存しない責務境界を切り出す。実験的な採用技術は将来取り消される可能性があるため、component の意味を特定実装ではなく protocol 上の役割と入出力契約で表現できるようにする。

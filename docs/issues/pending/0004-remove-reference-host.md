@@ -7,6 +7,17 @@ Model: Codex GPT-5
 
 maintenance
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+- #0002 - bounty を SDK に分割する
+- #0003 - ホスト REST を Nostr に置き換える
+- #0007 - MCP アダプターを切り出す
+
+Blocks:
+- None
+
 ## Summary
 
 直接 SDK を使う examples が用意できたら、`example/anchr-reference-host/` とホスト固有の `@anchr/bounty` ランタイムコードを削除する。

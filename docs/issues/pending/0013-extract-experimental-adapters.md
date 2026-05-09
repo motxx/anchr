@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 feature
 
+## Dependencies
+
+Depends on:
+- #0002 - bounty を SDK に分割する
+- #0012 - component 境界を agnostic に定義する
+
+Blocks:
+- #0006 - SDK を三つの実行環境に対応させる
+
 ## Summary
 
 Nostr、Cashu、TLSNotary、Blossom などの実験的または置換可能な技術を、core component から直接参照される実装ではなく adapter/plugin として差し替えられる構造にする。

@@ -7,6 +7,15 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+
+Blocks:
+- #0012 - component 境界を agnostic に定義する
+- #0016 - 人間レビュー領域をハーネスへ写像する
+
 ## Summary
 
 人間が判断する「普遍性」を、プロトコル不変条件、wire-format、パッケージ境界、example 固有判断から分離して文書化する。AI が実装を進める前に、どの判断が普遍的で、どの判断が一実装の選択なのかを明確にする。

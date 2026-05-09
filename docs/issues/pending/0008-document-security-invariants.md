@@ -7,6 +7,16 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+
+Blocks:
+- #0002 - bounty を SDK に分割する
+- #0003 - ホスト REST を Nostr に置き換える
+- #0014 - 普遍部分を specs に昇格する
+
 ## Summary
 
 セキュリティに関わるフローをリファクタリングする前に、二条件の Cashu lock、Provider preflight、cancel-race behavior を明示する。

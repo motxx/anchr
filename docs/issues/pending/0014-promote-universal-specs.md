@@ -7,6 +7,16 @@ Model: Codex GPT-5
 
 design
 
+## Dependencies
+
+Depends on:
+- #0005 - 証明スキーマ URL を定義する
+- #0008 - セキュリティ不変条件を文書化する
+- #0012 - component 境界を agnostic に定義する
+
+Blocks:
+- None
+
 ## Summary
 
 component agnostic 化で残る普遍的な protocol、message、state transition、security invariant を `specs/` にまとめ、現在の実装が使われなくなっても reference implementation として生きる状態にする。

@@ -6,6 +6,20 @@ Created: 2026-05-09 Model: Codex GPT-5
 
 feature
 
+## Dependencies
+
+Depends on:
+- #0001 - 三者アーキテクチャを確定する
+- #0008 - セキュリティ不変条件を文書化する
+- #0012 - component 境界を agnostic に定義する
+
+Blocks:
+- #0003 - ホスト REST を Nostr に置き換える
+- #0004 - Reference Host を削除する
+- #0006 - SDK を三つの実行環境に対応させる
+- #0007 - MCP アダプターを切り出す
+- #0013 - 実験的技術を adapter/plugin に分離する
+
 ## Summary
 
 `@anchr/bounty` を protocol、customer、provider、oracle
