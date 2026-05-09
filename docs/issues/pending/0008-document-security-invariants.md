@@ -40,6 +40,32 @@ Unexpected Oracle から届いた release material は clean valid release と�
 - expected Oracle が valid proof に対して release しない liveness failure は、Oracle selection policy または FROST threshold 構成で事前に引き受ける risk として扱う。
 - release material は単なる preimage ではなく、payment hash、Provider pubkey、`query_id`、Oracle pubkey または group key、署名を含む構造にする。FROST の場合は expected group key からの release として検証する。この検証は clean settlement / reputation 用であり、spendable token の資金回収可否とは分離する。
 
+## State Transition Sketch
+
+Happy path:
+
+| Phase | Customer | Provider | Oracle | Mint |
+| --- | --- | --- | --- | --- |
+| Request | Query と accepted Oracle を公開し、Oracle hash commitment を取得する | schema、mint、Oracle policy を見て quote 可否を決める | query 用 preimage を保持し hash を返す | まだ final bound lock は持たない |
+| Quote | quote を集め Provider を選ぶ | quote 額と条件を提示する | 待機する | 変化なし |
+| Selection | selected Provider 向け bound token を作る | bound token を受け取り preflight する | selected Provider / query context を観測する | hashlock + Provider lock + refund locktime を持つ token を発行する |
+| Work | result / proof を待つ | preflight ticket を保存して `produce()` する | proof を待つ | token を保持する |
+| Release | result / proof を受け取る | release material を受け取る | valid proof なら release material を送る | token 条件だけを enforcement する |
+| Redeem | redeemed されれば完了扱いにする | preimage + Provider signature で redeem する | clean settlement / anomaly を記録する | 条件を満たせば Provider に支払う |
+| Timeout | 未redeemなら refund を試みる | redeem できなければ loss / dispute evidence を記録する | liveness failure を記録する | locktime 後は refund path を許可する |
+
+Failure handling:
+
+| Condition | Provider action | Clean settlement | Audit / reputation |
+| --- | --- | --- | --- |
+| quote 前に Oracle / schema / mint が policy 外 | quote しない | なし | optional policy log |
+| selection 後 token が amount / mint / hash / Provider lock / locktime を満たさない | preflight reject。`produce()` しない | なし | Customer / implementation anomaly |
+| valid proof 後、expected Oracle が release しない | redeem できない | 失敗 | Oracle liveness failure |
+| release source、signature、`query_id`、`request_event_id` が ticket とずれる | token spendability があれば redeem を妨げない | clean valid release ではない | leak / misdelivery / drift evidence |
+| preimage が bound token hashlock に合わない | redeem しない | 失敗 | bad release / wrong token evidence |
+| token が Provider pubkey に bind されていない | redeem 不能。preflight で止めるべき | 失敗 | Customer / implementation anomaly |
+| locktime が迫っている | preflight では reject。release 後なら即 redeem を試みる | 状況次第 | short-locktime risk |
+
 ## Candidate Invariants
 
 - 盗まれた preimage だけでは escrow を redeem できない。redeem には bound Provider signature も必要である。
