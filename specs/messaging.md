@@ -14,7 +14,9 @@ lifecycle for Customer, Provider, and Oracle actors.
 
 Some current field names still use `requester_*` or `worker_*`. Those names are
 compatibility identifiers for existing events and host-shaped code; new prose
-and SDK APIs use Customer and Provider.
+and SDK APIs use Customer and Provider. Once versioned replacements are
+available, requester/worker names should be removed rather than retained as
+aliases.
 
 ## Event Kinds
 

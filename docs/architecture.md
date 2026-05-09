@@ -79,6 +79,8 @@ Migration rules:
   `@anchr/protocol` introduces versioned replacements.
 - Internal `@anchr/bounty` domain states such as `worker_selected` may remain
   while that package exists. They should not be copied into new SDK APIs.
+- After versioned replacements exist, requester/worker vocabulary should be
+  removed from wire and domain contracts instead of retained as aliases.
 - Adapter names should describe the integration surface, not a protocol role:
   `anchr-mcp`, HTTP gateway, CLI, mobile app, and web UI are adapters.
 
