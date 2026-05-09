@@ -1,6 +1,23 @@
 ---
 name: arch-lint-llm
-description: Review the codebase (or recently-changed files) for SEMANTIC architecture violations the deterministic `deno task lint:arch` cannot catch — cohesion smells (god modules), hidden service locators, parallel implementations across files, inappropriate intimacy, SRP violations within a function, and domain leakage (time / I/O / randomness without injected ports). **Invoke this skill proactively** after structural changes (new ports, new packages, refactors that move logic between layers, files that grow past ~300 lines) and before merging PRs that touch `src/domain/`, `src/application/`, ports, or large `src/infrastructure/` files. Also invoke when the user says "arch review", "architecture review", "semantic arch lint", "/arch-lint-llm", "アーキテクチャレビュー", or "アーキテクチャ違反チェック". This is the LLM-driven counterpart to the deterministic `deno task lint:arch` (codes E001-E021); this skill runs inside the existing Claude Code session, **no API key required**. Background: the static lint cannot see logic-level smells — duplicate state machines in domain + application, mutable module singletons that read env at first call, or domain functions that quietly call `Date.now()` for invariant checks. This skill's job is to find those.
+description: >-
+  Review the codebase (or recently-changed files) for SEMANTIC architecture
+  violations the deterministic `deno task lint:arch` cannot catch — cohesion
+  smells (god modules), hidden service locators, parallel implementations across
+  files, inappropriate intimacy, SRP violations within a function, and domain
+  leakage (time / I/O / randomness without injected ports). **Invoke this skill
+  proactively** after structural changes (new ports, new packages, refactors
+  that move logic between layers, files that grow past ~300 lines) and before
+  merging PRs that touch `src/domain/`, `src/application/`, ports, or large
+  `src/infrastructure/` files. Also invoke when the user says "arch review",
+  "architecture review", "semantic arch lint", "/arch-lint-llm",
+  "アーキテクチャレビュー", or "アーキテクチャ違反チェック". This is the LLM-driven
+  counterpart to the deterministic `deno task lint:arch` (codes E001-E021);
+  this skill runs inside the existing Claude Code session, **no API key
+  required**. Background: the static lint cannot see logic-level smells —
+  duplicate state machines in domain + application, mutable module singletons
+  that read env at first call, or domain functions that quietly call
+  `Date.now()` for invariant checks. This skill's job is to find those.
 disable-model-invocation: false
 argument-hint: "[<file-or-glob>...]"
 ---
