@@ -43,7 +43,10 @@ actor SDK 側に置き、protocol package から adapter や host runtime に依
 - `@anchr/protocol` には Deno、HTTP、MCP、relay client、wallet、storage、proof
   generation、verification implementation に依存する ports を置かない。
 - Customer の escrow と refund ロジックを `@anchr/customer-sdk` に移す。
-- Provider の証明フローと lock 検証ロジックを `@anchr/provider-sdk` に移す。
+- Provider の証明フロー、preflight ticket、redeem gate、lock 検証ロジックを
+  `@anchr/provider-sdk` に移す。Provider policy は preflight で閉じ、redeem
+  時は #0008 で定義する token spendability checks を hard gate にし、clean
+  settlement / audit checks は資金回収と分離する。
 - Oracle の検証と release フローを `@anchr/oracle-sdk` に移す。
 - `requester_*`、`worker_*`、`requester_only`、`worker_selected` は既存
   wire/domain 互換名として扱い、新 SDK API では Customer/Provider の名前を使う。

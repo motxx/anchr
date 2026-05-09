@@ -29,5 +29,6 @@ component agnostic 化で残る普遍的な protocol、message、state transitio
 
 - `specs/` に置くべき universal contract と、`docs/` に置くべき architecture/threat-model 記述を切り分ける。
 - message format、state transition、capability requirements、security invariant を具体技術に依存しない形で文書化する。
+- Provider preflight、preflight ticket、token spendability redeem gate、clean settlement、audit-only correlation fields の universal contract を #0008 から抽出して仕様化する。
 - reference implementation が spec のどの節を実装しているかを追跡できるリンクまたはテスト名の方針を決める。
 - 具体 adapter/plugin の仕様は、universal spec とは別に implementation profile として記録する。
