@@ -1,6 +1,6 @@
 import type { CashuProof, Spec } from "anchr-sdk";
 
-export const FIAT_SWAP_SCHEMA = "io.anchr.tlsn-https.v1";
+export const FIAT_SWAP_SCHEMA = "https://anchr-spec.org/spec/proof/tlsn/v1";
 export const FIAT_SWAP_QUERY_TAG = "TLSN fiat swap Square payment";
 export const SQUARE_SANDBOX_HOST = "connect.squareupsandbox.com";
 

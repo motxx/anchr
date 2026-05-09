@@ -23,12 +23,13 @@ import {
 } from "./nostr.ts";
 import { getPublicKey } from "nostr-tools/pure";
 import type {
+  ProofGenerator,
   ProviderHandler,
   ProviderOptions,
   ProviderQuote,
   ProviderRequestEvent,
 } from "./types.ts";
-import { isSchemaUri } from "./schema.ts";
+import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
 import { type CashuClient, createCashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
@@ -105,6 +106,30 @@ export function validateProviderOptions(
       );
     }
   }
+  if (o.proofGenerators !== undefined) {
+    if (!Array.isArray(o.proofGenerators)) {
+      throw new ProviderConfigError(
+        "proofGenerators, when provided, must be an array",
+      );
+    }
+    for (const entry of o.proofGenerators) {
+      if (typeof entry !== "object" || entry === null) {
+        throw new ProviderConfigError(
+          "proofGenerators entries must be objects",
+        );
+      }
+      const canHandle = "canHandle" in entry ? entry.canHandle : undefined;
+      const produce = "produce" in entry ? entry.produce : undefined;
+      if (
+        typeof canHandle !== "function" ||
+        typeof produce !== "function"
+      ) {
+        throw new ProviderConfigError(
+          "proofGenerators entries must expose canHandle and produce",
+        );
+      }
+    }
+  }
 }
 
 /**
@@ -136,6 +161,7 @@ export function createProvider(options: ProviderOptions): Provider {
     DEFAULT_SELECTION_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ??
     DEFAULT_PREIMAGE_TIMEOUT_MS;
+  const proofGenerators = options.proofGenerators ?? [];
 
   const secretKey = normalizeSecretKey(options.privKey);
   const pubkey = getPublicKey(secretKey);
@@ -168,6 +194,7 @@ export function createProvider(options: ProviderOptions): Provider {
               relayClient,
               selectionTimeoutMs,
               preimageTimeoutMs,
+              proofGenerators,
             }, handler).catch(() => {
               // One bad event must not tear down the subscription.
             });
@@ -196,6 +223,7 @@ interface JobContext {
   relayClient: RelayClient;
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;
+  proofGenerators: readonly ProofGenerator[];
 }
 
 async function handleJob(
@@ -207,6 +235,10 @@ async function handleJob(
   if (payload === null) return;
   if (!shouldQuote(ctx.oracles, payload.oracle_pubkey)) return;
   if (!isSchemaUri(payload.schema)) return;
+  const proofGenerator = ctx.proofGenerators.length === 0
+    ? null
+    : resolveProofGenerator(ctx.proofGenerators, payload.schema);
+  if (ctx.proofGenerators.length > 0 && proofGenerator === null) return;
 
   const request: ProviderRequestEvent = {
     customerPubkey: payload.customer_pubkey,
@@ -217,6 +249,7 @@ async function handleJob(
     },
     maxAmountSats: payload.max_amount_sats,
     oraclePubkey: payload.oracle_pubkey,
+    proofGenerator: proofGenerator ?? undefined,
   };
 
   let quote: ProviderQuote | null;

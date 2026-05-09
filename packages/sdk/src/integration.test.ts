@@ -216,7 +216,7 @@ test("in-process wiring: customer.request returns the provider's data via a shar
 
   const result = await customer.request({
     spec: {
-      schema: "io.anchr.tlsn-https.v1",
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
       predicate: { target: "https://api.example.org" },
     },
     payment: { maxAmount: 1000 },
@@ -224,8 +224,11 @@ test("in-process wiring: customer.request returns the provider's data via a shar
   });
 
   expect(result.providerPubkey).toBe(providerKey.publicKey);
-  expect(result.schema).toBe("io.anchr.tlsn-https.v1");
-  expect(result.data).toEqual({ schema: "io.anchr.tlsn-https.v1", ok: true });
+  expect(result.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
+  expect(result.data).toEqual({
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    ok: true,
+  });
   expect(result.proof).toBe("tlsn-proof-bytes");
 
   // The customer returns as soon as kind 6300 arrives, but the

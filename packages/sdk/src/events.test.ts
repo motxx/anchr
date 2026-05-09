@@ -21,7 +21,7 @@ function samplePayload(
 ): QueryRequestPayload {
   return {
     query_id: "query_abc",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: { target: "https://api.example.org" },
     description: "test",
     customer_pubkey: "11".repeat(32),
@@ -45,7 +45,7 @@ test("buildQueryRequestEvent produces a kind 5300 signed event", () => {
   expect(event.sig).toMatch(/^[0-9a-f]{128}$/);
 });
 
-test("buildQueryRequestEvent emits the d / t / p / schema tags", () => {
+test("buildQueryRequestEvent emits the d / t / p / s tags", () => {
   const identity = generateKeypair();
   const payload = samplePayload();
   const event = buildQueryRequestEvent(identity, payload);
@@ -53,7 +53,7 @@ test("buildQueryRequestEvent emits the d / t / p / schema tags", () => {
   expect(findTagValue(event, "d")).toBe(payload.query_id);
   expect(findAllTagValues(event, "t")).toContain("anchr");
   expect(findTagValue(event, "p")).toBe(payload.oracle_pubkey);
-  expect(findTagValue(event, "schema")).toBe(payload.schema);
+  expect(findTagValue(event, "s")).toBe(payload.schema);
 });
 
 test("parseQueryRequestEvent recovers a payload from the built event (round-trip)", () => {
@@ -104,7 +104,10 @@ test("parseQueryRequestEvent returns null when required fields are missing", () 
     id: "00".repeat(32),
     sig: "00".repeat(64),
     created_at: 0,
-    content: JSON.stringify({ query_id: "abc", schema: "io.x.y.v1" }),
+    content: JSON.stringify({
+      query_id: "abc",
+      schema: "https://example.com/spec/proof/custom/v1",
+    }),
     tags: [],
   };
   expect(parseQueryRequestEvent(event)).toBe(null);
@@ -119,7 +122,7 @@ test("buildQueryResponseEvent can include an oracle-readable encrypted payload",
     "req123",
     customer.publicKey,
     {
-      schema: "io.anchr.tlsn-https.v1",
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
       data: { ok: true },
       proof: "proof-base64",
     },
@@ -140,7 +143,7 @@ test("buildQueryResponseEvent can include an oracle-readable encrypted payload",
   expect(parsed).not.toBe(null);
   expect(parsed?.query_id).toBe("query_123");
   expect(parsed?.request_event_id).toBe("req123");
-  expect(parsed?.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(parsed?.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(parsed?.proof).toBe("proof-base64");
   expect(parsed?.data).toEqual({ ok: true });
 });

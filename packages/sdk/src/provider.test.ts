@@ -28,7 +28,8 @@ import type {
   RedeemResult,
 } from "./cashu.ts";
 import { bytesToHex } from "./test-helpers.ts";
-import type { ProviderOptions } from "./types.ts";
+import { DEFINED_SCHEMAS } from "./schema.ts";
+import type { ProofGenerator, ProviderOptions } from "./types.ts";
 
 // --- Test doubles ---
 
@@ -125,6 +126,22 @@ test("validateProviderOptions accepts missing cashuClient (SDK builds one from m
   expect(() => validateProviderOptions(opts)).not.toThrow();
 });
 
+test("validateProviderOptions accepts proof generator adapters", () => {
+  const generator: ProofGenerator = {
+    canHandle: () => true,
+    produce: async () => ({ data: null, proof: "" }),
+  };
+  expect(() =>
+    validateProviderOptions({ ...validOptions(), proofGenerators: [generator] })
+  ).not.toThrow();
+});
+
+test("validateProviderOptions rejects malformed proof generator adapters", () => {
+  expect(() =>
+    validateProviderOptions({ ...validOptions(), proofGenerators: [{}] })
+  ).toThrow(ProviderConfigError);
+});
+
 test("validateProviderOptions rejects a non-object input", () => {
   expect(() => validateProviderOptions(null)).toThrow(ProviderConfigError);
   expect(() => validateProviderOptions(42)).toThrow(ProviderConfigError);
@@ -206,7 +223,7 @@ test("Provider.serve calls handler only for events whose oracle is in the whitel
   // Event whose oracle IS in our whitelist → handler called.
   const goodEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -219,7 +236,7 @@ test("Provider.serve calls handler only for events whose oracle is in the whitel
   // Event whose oracle is NOT in our whitelist → handler skipped.
   const badEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q2",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: "z".repeat(64),
@@ -237,6 +254,73 @@ test("Provider.serve calls handler only for events whose oracle is in the whitel
 
   expect(handlerCalls).toEqual([1000]);
 });
+
+test("Provider.serve prefilters requests with proof generator canHandle", async () => {
+  const handlerSchemas: string[] = [];
+  let onEventRef: ((e: Event) => void) | null = null;
+  const generator: ProofGenerator = {
+    canHandle: (schema) => schema === DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    produce: async () => ({ data: { ok: true }, proof: "p1" }),
+  };
+
+  const relayClient = makeRelayClient({
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      onEventRef = onEvent;
+      return { close: () => {} };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    proofGenerators: [generator],
+  });
+  const servePromise = provider.serve(async (req) => {
+    handlerSchemas.push(req.spec.schema);
+    expect(req.proofGenerator).toBe(generator);
+    return null;
+  });
+
+  await new Promise((r) => setTimeout(r, 5));
+  const onEvent = requireOnEvent(onEventRef);
+
+  onEvent(buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+  onEvent(buildQueryRequestEvent(customerKey, {
+    query_id: "q2",
+    schema: DEFINED_SCHEMAS.C2PA_IMAGE_V1,
+    predicate: {},
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    mint_url: "https://mint.example.org",
+    bounty_token: "cashuB",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+    expires_at: Date.now() + 60_000,
+  }));
+  await new Promise((r) => setTimeout(r, 10));
+  await provider.stop();
+  await servePromise;
+
+  expect(handlerSchemas).toEqual([DEFINED_SCHEMAS.TLSN_HTTPS_V1]);
+});
+
+function requireOnEvent(
+  onEvent: ((e: Event) => void) | null,
+): (e: Event) => void {
+  if (onEvent === null) throw new Error("subscribe was not called");
+  return onEvent;
+}
 
 test("Provider.serve publishes a kind 7000 quote when handler returns a ProviderQuote", async () => {
   const published: Event[] = [];
@@ -271,7 +355,7 @@ test("Provider.serve publishes a kind 7000 quote when handler returns a Provider
 
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -316,7 +400,7 @@ test("Provider.serve declines requests where handler returns null (no publish)",
 
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -381,7 +465,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   // Customer sends a request.
   const requestEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: { foo: "bar" },
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -432,7 +516,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     providerKey.publicKey,
   );
   const payload = JSON.parse(decrypted);
-  expect(payload.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(payload.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(payload.data).toEqual({ hello: "world" });
   expect(payload.proof).toBe("pf-bytes");
 });
@@ -475,7 +559,7 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   }
   (onRequestEvent as (e: Event) => void)(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -547,7 +631,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   // Customer sends a request bound to our (real) oracle.
   const requestEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q-redeem",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: { foo: "bar" },
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: oracleKey.publicKey,
@@ -627,7 +711,7 @@ test("Provider.serve does not publish a quote that exceeds the request's maxAmou
 
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,

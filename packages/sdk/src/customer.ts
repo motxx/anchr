@@ -13,7 +13,11 @@ import type {
   RequestOptions,
   RequestResult,
 } from "./types.ts";
-import { InvalidSchemaUriError, isSchemaUri } from "./schema.ts";
+import {
+  InvalidSchemaUriError,
+  isSchemaUri,
+  resolveVerifier,
+} from "./schema.ts";
 import {
   createRelayClient,
   type Event as NostrEvent,
@@ -373,8 +377,8 @@ export function createCustomer(options: CustomerOptions): Customer {
           );
         }
 
-        const verifier = verifiers[req.spec.schema];
-        if (verifier !== undefined) {
+        const verifier = resolveVerifier(verifiers, req.spec.schema);
+        if (verifier !== null) {
           const ok = await Promise.resolve(
             verifier(response.proof, req.spec.predicate, response.data),
           );

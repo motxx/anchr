@@ -12,7 +12,7 @@ import type { RelayClient } from "./nostr.ts";
 
 /** A specification of what the customer wants to buy. */
 export interface Spec {
-  /** Schema URI identifying the proof format and predicate shape (e.g. "io.anchr.tlsn-https.v1"). */
+  /** Schema URL identifying the proof format and predicate shape. */
   schema: string;
   /** Schema-specific predicate. The shape is defined by the schema document. */
   predicate: unknown;
@@ -38,7 +38,7 @@ export interface RequestResult {
   proof: Uint8Array | string;
   /** Hex pubkey of the provider that fulfilled the request. */
   providerPubkey: string;
-  /** Schema URI under which the proof was produced. */
+  /** Schema URL under which the proof was produced. */
   schema: string;
 }
 
@@ -84,8 +84,8 @@ export interface CustomerOptions {
   quoteWindowMs?: number;
   /** Optional: how long to wait for the kind 6300 result event before timing out (default: 300000 ms / 5 min). */
   resultTimeoutMs?: number;
-  /** Optional: schema verifier handlers, keyed by schema URI. The SDK calls these to verify a proof locally. */
-  schemaVerifiers?: Record<string, SchemaVerifier>;
+  /** Optional: schema verifier handlers. The SDK calls these to verify a proof locally. */
+  schemaVerifiers?: SchemaVerifierRegistry;
 }
 
 /** Provider-side construction options. */
@@ -115,8 +115,8 @@ export interface ProviderOptions {
   selectionTimeoutMs?: number;
   /** Optional: how long to wait for the oracle's preimage NIP-44 DM (default: 300000 ms / 5 min). */
   preimageTimeoutMs?: number;
-  /** Optional: schema producer handlers, keyed by schema URI. The SDK calls these to produce a proof for an incoming request. */
-  schemaProducers?: Record<string, SchemaProducer>;
+  /** Optional: proof generators used to prefilter request schemas before calling the provider handler. */
+  proofGenerators?: readonly ProofGenerator[];
 }
 
 /** Quote returned by a {@link ProviderHandler} when accepting a request. */
@@ -136,7 +136,7 @@ export interface ProviderQuote {
  *
  * Implementations live outside the SDK (e.g. @anchr/tlsn-toolkit,
  * @anchr/photo-verification). The SDK calls the producer registered for the
- * incoming request's schema URI; producers return whatever proof bytes
+ * incoming request's schema URL; producers return whatever proof bytes
  * the schema document defines.
  */
 export type SchemaProducer = (
@@ -150,6 +150,22 @@ export interface SchemaProducerContext {
   /** Customer's pubkey (hex). Useful for response encryption. */
   customerPubkey: string;
 }
+
+/** Provider-side proof generator selected by schema URL. */
+export interface ProofGenerator {
+  canHandle(schema: string): boolean;
+  produce: SchemaProducer;
+}
+
+/** Oracle/customer-side verifier selected by schema URL. */
+export interface VerifierAdapter {
+  canHandle(schema: string): boolean;
+  verify: SchemaVerifier;
+}
+
+export type SchemaVerifierRegistry =
+  | Record<string, SchemaVerifier>
+  | readonly VerifierAdapter[];
 
 /**
  * Schema-side hook: verify a proof matches the predicate.
@@ -183,6 +199,8 @@ export interface ProviderRequestEvent {
   maxAmountSats: number;
   /** Oracle pubkey (hex) the customer designated for this query. */
   oraclePubkey: string;
+  /** Matching proof generator, when the provider was configured with generator adapters. */
+  proofGenerator?: ProofGenerator;
 }
 
 export type ProviderHandler = (
