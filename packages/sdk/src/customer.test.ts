@@ -12,15 +12,9 @@ import {
   selectCheapestQuote,
   validateCustomerOptions,
 } from "./customer.ts";
-import {
-  buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
-} from "./events.ts";
+import { buildQueryResponseEvent, buildQuoteFeedbackEvent } from "./events.ts";
 import { generateKeypair } from "./nostr.ts";
-import {
-  ResultTimeoutError,
-  SchemaVerificationError,
-} from "./customer.ts";
+import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
 import { CashuMintError } from "./cashu.ts";
 import { InvalidSchemaUriError } from "./schema.ts";
 import type { OracleClient } from "./oracle.ts";
@@ -45,7 +39,12 @@ const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
 const HASH_HEX = "deadbeef".repeat(8);
 
-function makeOracleClient(overrides?: Partial<OracleClient> & { fixedOracle?: string; fixedHash?: string }): OracleClient {
+function makeOracleClient(
+  overrides?: Partial<OracleClient> & {
+    fixedOracle?: string;
+    fixedHash?: string;
+  },
+): OracleClient {
   return {
     requestHash: overrides?.requestHash ?? (
       async (_queryId: string) => ({
@@ -197,7 +196,11 @@ test("Customer.request calls oracleClient.requestHash", async () => {
       return { hash: HASH_HEX, oraclePubkey: ORACLE_A };
     },
   });
-  const customer = createCustomer({ ...validOptions(), oracleClient, quoteWindowMs: 10 });
+  const customer = createCustomer({
+    ...validOptions(),
+    oracleClient,
+    quoteWindowMs: 10,
+  });
 
   await expect(
     customer.request({
@@ -232,10 +235,18 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
   const cashuClient = makeCashuClient({
     buildHtlcLock: async (params: BuildHtlcLockParams): Promise<CashuToken> => {
       recorder.params = params;
-      return { token: "cashuBlocked", amountSats: params.amountSats, proofs: [] };
+      return {
+        token: "cashuBlocked",
+        amountSats: params.amountSats,
+        proofs: [],
+      };
     },
   });
-  const customer = createCustomer({ ...validOptions(), cashuClient, quoteWindowMs: 10 });
+  const customer = createCustomer({
+    ...validOptions(),
+    cashuClient,
+    quoteWindowMs: 10,
+  });
 
   await expect(
     customer.request({
@@ -250,13 +261,16 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
   expect(recorder.params.amountSats).toBe(1234);
   expect(recorder.params.hashHex).toBe(HASH_HEX);
   expect(recorder.params.customerPubkey).toMatch(/^[0-9a-f]{64}$/);
-  expect(recorder.params.locktimeSeconds).toBeGreaterThan(Math.floor(Date.now() / 1000));
+  expect(recorder.params.locktimeSeconds).toBeGreaterThan(
+    Math.floor(Date.now() / 1000),
+  );
   expect(recorder.params.sourceProofs).toHaveLength(1);
 });
 
 test("Customer.request propagates CashuMintError from buildHtlcLock", async () => {
   const cashuClient = makeCashuClient({
-    buildHtlcLock: () => Promise.reject(new CashuMintError("simulated mint failure")),
+    buildHtlcLock: () =>
+      Promise.reject(new CashuMintError("simulated mint failure")),
   });
   const customer = createCustomer({ ...validOptions(), cashuClient });
 
@@ -288,7 +302,11 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
   });
-  const customer = createCustomer({ ...validOptions(), relayClient, quoteWindowMs: 10 });
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    quoteWindowMs: 10,
+  });
 
   await expect(
     customer.request({
@@ -367,7 +385,8 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
-  const verifierCalls: { proof: unknown; predicate: unknown; data: unknown }[] = [];
+  const verifierCalls: { proof: unknown; predicate: unknown; data: unknown }[] =
+    [];
 
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
@@ -381,11 +400,18 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
       const filterKinds = filter.kinds ?? [];
       if (filterKinds.includes(7000)) {
         queueMicrotask(() => {
-          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
-            status: "payment-required",
-            provider_pubkey: provider.publicKey,
-            amount_sats: 100,
-          }));
+          onEvent(
+            buildQuoteFeedbackEvent(
+              provider,
+              requestEventId.id ?? "x",
+              "00".repeat(32),
+              {
+                status: "payment-required",
+                provider_pubkey: provider.publicKey,
+                amount_sats: 100,
+              },
+            ),
+          );
         });
       } else if (filterKinds.includes(6300)) {
         queueMicrotask(() => {
@@ -393,7 +419,11 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
             provider,
             requestEventId.id ?? "x",
             customerEphemeralPubkey.value ?? "00".repeat(32),
-            { schema: "io.anchr.tlsn-https.v1", data: { ok: true }, proof: "p1" },
+            {
+              schema: "io.anchr.tlsn-https.v1",
+              data: { ok: true },
+              proof: "p1",
+            },
           ));
         });
       }
@@ -443,11 +473,18 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
       const filterKinds = filter.kinds ?? [];
       if (filterKinds.includes(7000)) {
         queueMicrotask(() => {
-          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
-            status: "payment-required",
-            provider_pubkey: provider.publicKey,
-            amount_sats: 100,
-          }));
+          onEvent(
+            buildQuoteFeedbackEvent(
+              provider,
+              requestEventId.id ?? "x",
+              "00".repeat(32),
+              {
+                status: "payment-required",
+                provider_pubkey: provider.publicKey,
+                amount_sats: 100,
+              },
+            ),
+          );
         });
       } else if (filterKinds.includes(6300)) {
         queueMicrotask(() => {
@@ -492,11 +529,18 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       if ((filter.kinds ?? []).includes(7000)) {
         queueMicrotask(() => {
-          onEvent(buildQuoteFeedbackEvent(provider, requestEventId.id ?? "x", "00".repeat(32), {
-            status: "payment-required",
-            provider_pubkey: provider.publicKey,
-            amount_sats: 100,
-          }));
+          onEvent(
+            buildQuoteFeedbackEvent(
+              provider,
+              requestEventId.id ?? "x",
+              "00".repeat(32),
+              {
+                status: "payment-required",
+                provider_pubkey: provider.publicKey,
+                amount_sats: 100,
+              },
+            ),
+          );
         });
       }
       return { close: () => {} };
@@ -535,16 +579,26 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const requestId = requestEventRecorder.id ?? "unknown";
-        const quoteA = buildQuoteFeedbackEvent(providerA, requestId, "00".repeat(32), {
-          status: "payment-required",
-          provider_pubkey: providerA.publicKey,
-          amount_sats: 800,
-        });
-        const quoteB = buildQuoteFeedbackEvent(providerB, requestId, "00".repeat(32), {
-          status: "payment-required",
-          provider_pubkey: providerB.publicKey,
-          amount_sats: 500,
-        });
+        const quoteA = buildQuoteFeedbackEvent(
+          providerA,
+          requestId,
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: providerA.publicKey,
+            amount_sats: 800,
+          },
+        );
+        const quoteB = buildQuoteFeedbackEvent(
+          providerB,
+          requestId,
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: providerB.publicKey,
+            amount_sats: 500,
+          },
+        );
         onEvent(quoteA);
         onEvent(quoteB);
       });
@@ -598,11 +652,16 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
     subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const id = requestEventId.id ?? "unknown";
-        const expensive = buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
-          status: "payment-required",
-          provider_pubkey: provider.publicKey,
-          amount_sats: 9999,
-        });
+        const expensive = buildQuoteFeedbackEvent(
+          provider,
+          id,
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 9999,
+          },
+        );
         onEvent(expensive);
       });
       return { close: () => {} };
@@ -715,7 +774,12 @@ test("selectCheapestQuote returns null on empty input", () => {
 
 test("selectCheapestQuote picks the lowest amount", () => {
   const quotes: Quote[] = [
-    { providerPubkey: "a", amountSats: 1000, quoteEventId: "ea", receivedAt: 1 },
+    {
+      providerPubkey: "a",
+      amountSats: 1000,
+      quoteEventId: "ea",
+      receivedAt: 1,
+    },
     { providerPubkey: "b", amountSats: 500, quoteEventId: "eb", receivedAt: 2 },
     { providerPubkey: "c", amountSats: 750, quoteEventId: "ec", receivedAt: 3 },
   ];

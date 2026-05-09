@@ -6,7 +6,7 @@
  */
 
 import * as esbuild from "esbuild";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
@@ -24,7 +24,13 @@ interface EntryPoint {
 
 const ENTRIES: EntryPoint[] = [
   // Market UI is bundled in-place (server.ts serves directly from the source dir).
-  { name: "market",    srcDir: MARKET_UI,                    outDir: MARKET_UI,                        entryTsx: "main.tsx", html: "index.html" },
+  {
+    name: "market",
+    srcDir: MARKET_UI,
+    outDir: MARKET_UI,
+    entryTsx: "main.tsx",
+    html: "index.html",
+  },
 ];
 
 const WATCH = Deno.args.includes("--watch");
@@ -40,7 +46,10 @@ async function copyHtmlAndCss(entry: EntryPoint) {
   }
   if (srcDir !== outDir) {
     try {
-      await copyFile(join(srcDir, "generated.css"), join(outDir, "generated.css"));
+      await copyFile(
+        join(srcDir, "generated.css"),
+        join(outDir, "generated.css"),
+      );
     } catch {
       // generated.css may not exist yet — created by build:css.
     }
@@ -60,7 +69,11 @@ async function buildEntry(entry: EntryPoint) {
     target: "es2022",
     jsx: "automatic" as const,
     jsxImportSource: "react",
-    loader: { ".tsx": "tsx" as const, ".ts": "ts" as const, ".css": "css" as const },
+    loader: {
+      ".tsx": "tsx" as const,
+      ".ts": "ts" as const,
+      ".css": "css" as const,
+    },
     minify: !WATCH,
     sourcemap: true,
     define: {
@@ -77,7 +90,9 @@ async function buildEntry(entry: EntryPoint) {
           setup(build) {
             build.onEnd(async (result) => {
               if (result.errors.length > 0) {
-                console.error(`[build-ui:${name}] ${result.errors.length} error(s)`);
+                console.error(
+                  `[build-ui:${name}] ${result.errors.length} error(s)`,
+                );
               } else {
                 await copyHtmlAndCss(entry);
                 console.log(`[build-ui:${name}] rebuilt → ${outDir}/main.js`);
@@ -96,7 +111,9 @@ async function buildEntry(entry: EntryPoint) {
 }
 
 async function main() {
-  console.log(WATCH ? "[build-ui] Watching..." : "[build-ui] Building UI bundles...");
+  console.log(
+    WATCH ? "[build-ui] Watching..." : "[build-ui] Building UI bundles...",
+  );
 
   await Promise.all(ENTRIES.map(buildEntry));
 

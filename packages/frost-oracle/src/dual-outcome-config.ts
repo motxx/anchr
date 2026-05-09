@@ -29,9 +29,13 @@ export interface DualOutcomeFrostNodeConfig extends FrostNodeConfig {
 }
 
 /** Load a dual-outcome FROST node config from a JSON file (plaintext only). */
-export function loadDualOutcomeFrostNodeConfig(filePath: string): DualOutcomeFrostNodeConfig {
+export function loadDualOutcomeFrostNodeConfig(
+  filePath: string,
+): DualOutcomeFrostNodeConfig {
   const text = Deno.readTextFileSync(filePath);
-  const parsed = JSON.parse(text) as DualOutcomeFrostNodeConfig | EncryptedFrostConfig;
+  const parsed = JSON.parse(text) as
+    | DualOutcomeFrostNodeConfig
+    | EncryptedFrostConfig;
 
   if (isEncryptedEnvelope(parsed)) {
     throw new Error(
@@ -44,7 +48,10 @@ export function loadDualOutcomeFrostNodeConfig(filePath: string): DualOutcomeFro
 }
 
 /** Save a dual-outcome FROST node config to a JSON file (plaintext). */
-export function saveDualOutcomeFrostNodeConfig(filePath: string, config: DualOutcomeFrostNodeConfig): void {
+export function saveDualOutcomeFrostNodeConfig(
+  filePath: string,
+  config: DualOutcomeFrostNodeConfig,
+): void {
   Deno.writeTextFileSync(filePath, JSON.stringify(config, null, 2));
 }
 
@@ -85,16 +92,31 @@ export interface EncryptedFrostConfig {
 }
 
 function isEncryptedEnvelope(x: unknown): x is EncryptedFrostConfig {
-  return typeof x === "object" && x !== null
-    && (x as { version?: unknown }).version === ENCRYPTED_VERSION
-    && (x as { algorithm?: unknown }).algorithm === "aes-256-gcm"
-    && typeof (x as { ciphertext?: unknown }).ciphertext === "string";
+  return typeof x === "object" && x !== null &&
+    (x as { version?: unknown }).version === ENCRYPTED_VERSION &&
+    (x as { algorithm?: unknown }).algorithm === "aes-256-gcm" &&
+    typeof (x as { ciphertext?: unknown }).ciphertext === "string";
 }
 
-function validateDualOutcomeFrostNodeConfig(config: DualOutcomeFrostNodeConfig, where: string): void {
-  if (!config.group_pubkey) throw new Error(`Dual-outcome FROST config missing group_pubkey (outcome A) in ${where}`);
-  if (!config.group_pubkey_b) throw new Error(`Dual-outcome FROST config missing group_pubkey_b (outcome B) in ${where}`);
-  if (!config.key_package_b) throw new Error(`Dual-outcome FROST config missing key_package_b in ${where}`);
+function validateDualOutcomeFrostNodeConfig(
+  config: DualOutcomeFrostNodeConfig,
+  where: string,
+): void {
+  if (!config.group_pubkey) {
+    throw new Error(
+      `Dual-outcome FROST config missing group_pubkey (outcome A) in ${where}`,
+    );
+  }
+  if (!config.group_pubkey_b) {
+    throw new Error(
+      `Dual-outcome FROST config missing group_pubkey_b (outcome B) in ${where}`,
+    );
+  }
+  if (!config.key_package_b) {
+    throw new Error(
+      `Dual-outcome FROST config missing key_package_b in ${where}`,
+    );
+  }
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -125,7 +147,11 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
-async function deriveKey(passphrase: string, salt: ArrayBuffer, iterations: number): Promise<CryptoKey> {
+async function deriveKey(
+  passphrase: string,
+  salt: ArrayBuffer,
+  iterations: number,
+): Promise<CryptoKey> {
   const passKey = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(passphrase).buffer as ArrayBuffer,
@@ -143,7 +169,10 @@ async function deriveKey(passphrase: string, salt: ArrayBuffer, iterations: numb
 }
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
 }
 
 /** Encrypt a config with a passphrase. Caller-supplied passphrase strength matters. */
@@ -154,10 +183,18 @@ export async function encryptDualOutcomeFrostNodeConfig(
   if (!passphrase) throw new Error("passphrase required for encryption");
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
-  const key = await deriveKey(passphrase, toArrayBuffer(salt), PBKDF2_ITERATIONS);
+  const key = await deriveKey(
+    passphrase,
+    toArrayBuffer(salt),
+    PBKDF2_ITERATIONS,
+  );
   const plaintext = new TextEncoder().encode(JSON.stringify(config));
   const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv: toArrayBuffer(iv) }, key, toArrayBuffer(plaintext)),
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      key,
+      toArrayBuffer(plaintext),
+    ),
   );
   return {
     version: ENCRYPTED_VERSION,
@@ -178,16 +215,28 @@ async function decryptDualOutcomeFrostNodeConfig(
   const salt = hexToBytes(envelope.salt);
   const iv = hexToBytes(envelope.iv);
   const ciphertext = base64ToBytes(envelope.ciphertext);
-  const key = await deriveKey(passphrase, toArrayBuffer(salt), envelope.iterations);
+  const key = await deriveKey(
+    passphrase,
+    toArrayBuffer(salt),
+    envelope.iterations,
+  );
   let plaintext: ArrayBuffer;
   try {
-    plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: toArrayBuffer(iv) }, key, toArrayBuffer(ciphertext));
+    plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: toArrayBuffer(iv) },
+      key,
+      toArrayBuffer(ciphertext),
+    );
   } catch {
     // Uniform error message — don't leak whether the failure was wrong
     // passphrase, corrupted ciphertext, or tampered tag.
-    throw new Error("FROST config decryption failed (wrong passphrase or corrupted file)");
+    throw new Error(
+      "FROST config decryption failed (wrong passphrase or corrupted file)",
+    );
   }
-  return JSON.parse(new TextDecoder().decode(plaintext)) as DualOutcomeFrostNodeConfig;
+  return JSON.parse(
+    new TextDecoder().decode(plaintext),
+  ) as DualOutcomeFrostNodeConfig;
 }
 
 /**
@@ -200,7 +249,9 @@ export async function loadDualOutcomeFrostNodeConfigAsync(
   opts?: { passphrase?: string },
 ): Promise<DualOutcomeFrostNodeConfig> {
   const text = await Deno.readTextFile(filePath);
-  const parsed = JSON.parse(text) as DualOutcomeFrostNodeConfig | EncryptedFrostConfig;
+  const parsed = JSON.parse(text) as
+    | DualOutcomeFrostNodeConfig
+    | EncryptedFrostConfig;
 
   if (isEncryptedEnvelope(parsed)) {
     if (!opts?.passphrase) {
@@ -208,7 +259,10 @@ export async function loadDualOutcomeFrostNodeConfigAsync(
         `${filePath} is encrypted. Set FROST_KEY_PASSPHRASE or pass opts.passphrase to loadDualOutcomeFrostNodeConfigAsync.`,
       );
     }
-    const config = await decryptDualOutcomeFrostNodeConfig(parsed, opts.passphrase);
+    const config = await decryptDualOutcomeFrostNodeConfig(
+      parsed,
+      opts.passphrase,
+    );
     validateDualOutcomeFrostNodeConfig(config, filePath);
     return config;
   }
@@ -228,7 +282,10 @@ export async function saveDualOutcomeFrostNodeConfigAsync(
   opts?: { passphrase?: string },
 ): Promise<void> {
   if (opts?.passphrase) {
-    const envelope = await encryptDualOutcomeFrostNodeConfig(config, opts.passphrase);
+    const envelope = await encryptDualOutcomeFrostNodeConfig(
+      config,
+      opts.passphrase,
+    );
     await Deno.writeTextFile(filePath, JSON.stringify(envelope, null, 2));
   } else {
     await Deno.writeTextFile(filePath, JSON.stringify(config, null, 2));
@@ -241,7 +298,9 @@ export async function saveDualOutcomeFrostNodeConfigAsync(
 }
 
 /** Build a standard FrostNodeConfig from outcome A of a dual-outcome config. */
-export function toOutcomeAFrostNodeConfig(config: DualOutcomeFrostNodeConfig): FrostNodeConfig {
+export function toOutcomeAFrostNodeConfig(
+  config: DualOutcomeFrostNodeConfig,
+): FrostNodeConfig {
   return {
     signer_index: config.signer_index,
     total_signers: config.total_signers,
@@ -254,7 +313,9 @@ export function toOutcomeAFrostNodeConfig(config: DualOutcomeFrostNodeConfig): F
 }
 
 /** Build a standard FrostNodeConfig from outcome B of a dual-outcome config. */
-export function toOutcomeBFrostNodeConfig(config: DualOutcomeFrostNodeConfig): FrostNodeConfig {
+export function toOutcomeBFrostNodeConfig(
+  config: DualOutcomeFrostNodeConfig,
+): FrostNodeConfig {
   return {
     signer_index: config.signer_index,
     total_signers: config.total_signers,

@@ -2,7 +2,10 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { buildCrossHtlcForPartyA, buildCrossHtlcForPartyB } from "./cross-htlc.ts";
+import {
+  buildCrossHtlcForPartyA,
+  buildCrossHtlcForPartyB,
+} from "./cross-htlc.ts";
 
 function randomHash(): string {
   return bytesToHex(sha256(randomBytes(32)));

@@ -1,6 +1,6 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { type Proof, type P2PKOptions, getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, type P2PKOptions, type Proof } from "@cashu/cashu-ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 
@@ -89,7 +89,11 @@ function makeFakeWallet(opts: {
 }
 
 /** Build a real cashuB-encoded Phase-2-shaped HTLC token for redeem tests. */
-function makeHtlcToken(hashHex: string, providerPubkey: string, locktime: number): string {
+function makeHtlcToken(
+  hashHex: string,
+  providerPubkey: string,
+  locktime: number,
+): string {
   const secret = JSON.stringify([
     "HTLC",
     {
@@ -122,10 +126,18 @@ test("createCashuClient rejects an empty mint URL", () => {
 
 test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with no hashlock", async () => {
   const phase1Output: Proof[] = [
-    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
+    {
+      id: "k1",
+      amount: 1000,
+      secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
+      C: "C-1",
+    },
   ];
   const { wallet, calls } = makeFakeWallet({ outputProofs: phase1Output });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
 
   const result = await client.buildHtlcLock({
     amountSats: 1000,
@@ -150,7 +162,10 @@ test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with n
 
 test("buildHtlcLock validates hashHex, amountSats, locktimeSeconds, and sourceProofs", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   await expect(
     client.buildHtlcLock({
       amountSats: 1000,
@@ -191,7 +206,10 @@ test("buildHtlcLock validates hashHex, amountSats, locktimeSeconds, and sourcePr
 
 test("buildHtlcLock rejects malformed source proofs (caller misuse)", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   await expect(
     client.buildHtlcLock({
       amountSats: 1000,
@@ -217,7 +235,10 @@ test("buildHtlcLock wraps mint errors in CashuMintError", async () => {
     outputProofs: [],
     errorOnSend: new Error("mint unavailable"),
   });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   await expect(
     client.buildHtlcLock({
       amountSats: 1000,
@@ -231,13 +252,26 @@ test("buildHtlcLock wraps mint errors in CashuMintError", async () => {
 
 test("bindProvider signs Phase-1 input with customer privkey and locks output with hashlock + provider P2PK + locktime + refund", async () => {
   const phase2Output: Proof[] = [
-    { id: "k1", amount: 1000, secret: '["HTLC",{"data":"' + VALID_HASH + '"}]', C: "C-2" },
+    {
+      id: "k1",
+      amount: 1000,
+      secret: '["HTLC",{"data":"' + VALID_HASH + '"}]',
+      C: "C-2",
+    },
   ];
   const { wallet, calls } = makeFakeWallet({ outputProofs: phase2Output });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
 
   const phase1Proofs = [
-    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
+    {
+      id: "k1",
+      amount: 1000,
+      secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
+      C: "C-1",
+    },
   ];
 
   const lockTime = FUTURE_LOCKTIME();
@@ -264,9 +298,17 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
 
 test("bindProvider rejects a missing or wrong-shape customerSecretKey", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   const phase1Proofs = [
-    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
+    {
+      id: "k1",
+      amount: 1000,
+      secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
+      C: "C-1",
+    },
   ];
   await expect(
     client.bindProvider({
@@ -282,7 +324,10 @@ test("bindProvider rejects a missing or wrong-shape customerSecretKey", async ()
 
 test("bindProvider rejects malformed initialProofs (caller misuse)", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   await expect(
     client.bindProvider({
       initialProofs: [],
@@ -307,7 +352,12 @@ test("bindProvider rejects malformed initialProofs (caller misuse)", async () =>
 
 test("bindProvider wraps mint errors in CashuMintError", async () => {
   const phase1Proofs = [
-    { id: "k1", amount: 1000, secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]', C: "C-1" },
+    {
+      id: "k1",
+      amount: 1000,
+      secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
+      C: "C-1",
+    },
   ];
   const failFake = makeFakeWallet({
     outputProofs: [],
@@ -337,7 +387,10 @@ test("redeemHtlc verifies preimage matches each proof's hashlock before mint rou
   const { wallet, calls } = makeFakeWallet({
     outputProofs: [{ id: "k1", amount: 1000, secret: "plain", C: "C-out" }],
   });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
 
   await expect(
     client.redeemHtlc({
@@ -361,12 +414,19 @@ test("redeemHtlc verifies preimage matches each proof's hashlock before mint rou
 });
 
 test("redeemHtlc wraps mint errors in CashuMintError", async () => {
-  const goodToken = makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, FUTURE_LOCKTIME());
+  const goodToken = makeHtlcToken(
+    VALID_HASH,
+    PROVIDER_PUBKEY,
+    FUTURE_LOCKTIME(),
+  );
   const { wallet } = makeFakeWallet({
     outputProofs: [],
     errorOnSend: new Error("nut-14 witness missing"),
   });
-  const client = createCashuClient({ mintUrl: "https://mint.example.org", wallet });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
   await expect(
     client.redeemHtlc({
       token: goodToken,
@@ -378,7 +438,9 @@ test("redeemHtlc wraps mint errors in CashuMintError", async () => {
 
 test("validateHashHex accepts a 64-char hex string and lowercases it", () => {
   expect(validateHashHex(VALID_HASH)).toBe(VALID_HASH.toLowerCase());
-  expect(validateHashHex(VALID_HASH.toUpperCase())).toBe(VALID_HASH.toLowerCase());
+  expect(validateHashHex(VALID_HASH.toUpperCase())).toBe(
+    VALID_HASH.toLowerCase(),
+  );
 });
 
 test("validateHashHex rejects non-hex or wrong-length input", () => {

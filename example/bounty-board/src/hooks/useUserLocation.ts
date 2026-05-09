@@ -8,7 +8,9 @@ export function useUserLocation() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const granted = await locationProvider.requestPermission().catch(() => false);
+      const granted = await locationProvider.requestPermission().catch(() =>
+        false
+      );
       if (!granted || cancelled) return;
       try {
         const coord = await locationProvider.getCurrentPosition();
@@ -17,7 +19,9 @@ export function useUserLocation() {
         // location unavailable
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return location;

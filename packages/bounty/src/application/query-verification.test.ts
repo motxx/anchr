@@ -1,10 +1,10 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  verifyWithQuorum,
-  toAttestationRecord,
-  type OracleResolver,
   type MultiOracleResolver,
+  type OracleResolver,
+  toAttestationRecord,
+  verifyWithQuorum,
 } from "./query-verification.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
@@ -15,7 +15,10 @@ function makeMockOracle(
 ): Oracle {
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    async verify(query: Query, result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      result: QueryResult,
+    ): Promise<OracleAttestation> {
       const passed = passFn ? passFn(query, result) : true;
       return {
         oracle_id: id,
@@ -170,7 +173,12 @@ describe("verifyWithQuorum (single oracle)", () => {
     });
 
     const result = await verifyWithQuorum(
-      query, makeResult(), resolver, undefined, undefined, "oracle-pass",
+      query,
+      makeResult(),
+      resolver,
+      undefined,
+      undefined,
+      "oracle-pass",
     );
 
     expect(result.passed).toBe(true);
@@ -185,11 +193,18 @@ describe("verifyWithQuorum (single oracle)", () => {
     });
 
     const result = await verifyWithQuorum(
-      query, makeResult(), resolver, undefined, undefined, "oracle-fail",
+      query,
+      makeResult(),
+      resolver,
+      undefined,
+      undefined,
+      "oracle-fail",
     );
 
     expect(result.passed).toBe(false);
-    expect(result.verification.failures[0]).toContain("not available or not accepted");
+    expect(result.verification.failures[0]).toContain(
+      "not available or not accepted",
+    );
   });
 });
 
@@ -205,7 +220,12 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
     });
 
     const result = await verifyWithQuorum(
-      query, makeResult(), resolver, undefined, undefined, "malicious-oracle",
+      query,
+      makeResult(),
+      resolver,
+      undefined,
+      undefined,
+      "malicious-oracle",
     );
 
     expect(result.passed).toBe(true);
@@ -223,7 +243,12 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
     });
 
     const result = await verifyWithQuorum(
-      query, makeResult(), resolver, undefined, undefined, "oracle-b",
+      query,
+      makeResult(),
+      resolver,
+      undefined,
+      undefined,
+      "oracle-b",
     );
 
     expect(result.passed).toBe(true);
@@ -237,7 +262,12 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
     const resolver = makeResolver({ "oracle-x": oracleX });
 
     const result = await verifyWithQuorum(
-      query, makeResult(), resolver, undefined, undefined, "oracle-x",
+      query,
+      makeResult(),
+      resolver,
+      undefined,
+      undefined,
+      "oracle-x",
     );
 
     expect(result.passed).toBe(true);
@@ -259,7 +289,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(true);
     expect(result.attestations.length).toBeGreaterThanOrEqual(2);
@@ -279,7 +314,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(false);
     expect(result.verification.passed).toBe(false);
@@ -299,7 +339,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(true);
     const passCount = result.attestations.filter((a) => a.passed).length;
@@ -315,10 +360,17 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(false);
-    expect(result.verification.failures[0]).toContain("Need 3 oracles but only 1 available");
+    expect(result.verification.failures[0]).toContain(
+      "Need 3 oracles but only 1 available",
+    );
   });
 
   test("fails when no MultiOracleResolver is provided", async () => {
@@ -331,7 +383,9 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const result = await verifyWithQuorum(query, makeResult(), resolver);
 
     expect(result.passed).toBe(false);
-    expect(result.verification.failures[0]).toContain("No oracle registry with resolveMultiple support");
+    expect(result.verification.failures[0]).toContain(
+      "No oracle registry with resolveMultiple support",
+    );
   });
 
   test("collects checks and failures from all oracles", async () => {
@@ -347,7 +401,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(true);
     expect(result.verification.checks).toContain("o1 check passed");
@@ -367,7 +426,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     const oracleIds = result.attestations.map((a) => a.oracle_id);
     expect(oracleIds).toContain("o1");
@@ -387,7 +451,12 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
     const resolver = makeResolver({});
     const multiResolver = makeMultiResolver(oracles);
 
-    const result = await verifyWithQuorum(query, makeResult(), resolver, multiResolver);
+    const result = await verifyWithQuorum(
+      query,
+      makeResult(),
+      resolver,
+      multiResolver,
+    );
 
     expect(result.passed).toBe(true);
     const ids = result.attestations.map((a) => a.oracle_id);
@@ -401,14 +470,28 @@ describe("verifyWithQuorum (multi-oracle quorum)", () => {
         info: { id: "independent-1", name: "I1", fee_ppm: 0 },
         async verify(query) {
           callLog.push("independent-1");
-          return { oracle_id: "independent-1", query_id: query.id, passed: true, checks: ["ok"], failures: [], attested_at: Date.now() };
+          return {
+            oracle_id: "independent-1",
+            query_id: query.id,
+            passed: true,
+            checks: ["ok"],
+            failures: [],
+            attested_at: Date.now(),
+          };
         },
       },
       {
         info: { id: "independent-2", name: "I2", fee_ppm: 0 },
         async verify(query) {
           callLog.push("independent-2");
-          return { oracle_id: "independent-2", query_id: query.id, passed: true, checks: ["ok"], failures: [], attested_at: Date.now() };
+          return {
+            oracle_id: "independent-2",
+            query_id: query.id,
+            passed: true,
+            checks: ["ok"],
+            failures: [],
+            attested_at: Date.now(),
+          };
         },
       },
     ];

@@ -5,7 +5,7 @@ import { parseProofModeZip } from "./proofmode-validation.ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { execSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,7 +30,9 @@ function createProofModeZip(opts?: {
     writeFileSync(join(dir, photoName), photo);
 
     const actualHash = bytesToHex(sha256(new Uint8Array(photo)));
-    const hash = opts?.correctHash !== false ? actualHash : "0000000000000000000000000000000000000000000000000000000000000000";
+    const hash = opts?.correctHash !== false
+      ? actualHash
+      : "0000000000000000000000000000000000000000000000000000000000000000";
 
     const proofJson = {
       "File Hash SHA256": hash,
@@ -49,7 +51,10 @@ function createProofModeZip(opts?: {
       "Locale": "ja_JP",
     };
 
-    writeFileSync(join(dir, `${photoName}.proof.json`), JSON.stringify(proofJson));
+    writeFileSync(
+      join(dir, `${photoName}.proof.json`),
+      JSON.stringify(proofJson),
+    );
 
     if (opts?.includeOts) {
       writeFileSync(join(dir, `${photoName}.ots`), "fake-ots-data");
@@ -90,7 +95,9 @@ describe("parseProofModeZip", () => {
 
     expect(result).not.toBeNull();
     expect(result!.hashValid).toBe(false);
-    expect(result!.failures.some((f) => f.includes("SHA256 mismatch"))).toBe(true);
+    expect(result!.failures.some((f) => f.includes("SHA256 mismatch"))).toBe(
+      true,
+    );
   });
 
   test("detects OpenTimestamps presence", async () => {

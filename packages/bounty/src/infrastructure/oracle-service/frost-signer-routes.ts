@@ -30,7 +30,10 @@ export interface FrostSignerRouteDeps {
  * NIP-90 host and from a fixed-stakeholder caller that constructed the
  * requirement directly.
  */
-export function registerFrostSignerRoutes(app: Hono, deps: FrostSignerRouteDeps): void {
+export function registerFrostSignerRoutes(
+  app: Hono,
+  deps: FrostSignerRouteDeps,
+): void {
   const { authMiddleware, pendingNonces } = deps;
 
   app.post("/frost/signer/round1", authMiddleware, async (c) => {
@@ -43,13 +46,20 @@ export function registerFrostSignerRoutes(app: Hono, deps: FrostSignerRouteDeps)
     if (!body?.message || !body?.requirement || !body?.input) {
       return c.json({ error: "Missing message, requirement, or input" }, 400);
     }
-    if (!deps.frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
+    if (!deps.frostNodeConfig) {
+      return c.json({ error: "FROST not configured on this node" }, 503);
+    }
 
     // Mandatory independent verification — without this check a malicious
     // coordinator could produce group signatures for arbitrary garbage.
-    const detail = await verifyProof(body.requirement, body.input, { blossomKeys: body.blossom_keys });
+    const detail = await verifyProof(body.requirement, body.input, {
+      blossomKeys: body.blossom_keys,
+    });
     if (!detail.passed) {
-      return c.json({ error: "Verification failed", failures: detail.failures }, 403);
+      return c.json(
+        { error: "Verification failed", failures: detail.failures },
+        403,
+      );
     }
 
     const keyPackageJson = JSON.stringify(deps.frostNodeConfig.key_package);
@@ -66,18 +76,30 @@ export function registerFrostSignerRoutes(app: Hono, deps: FrostSignerRouteDeps)
   });
 
   app.post("/frost/signer/round2", authMiddleware, async (c) => {
-    const body = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
+    const body = await c.req.json<
+      { commitments: string; message: string; nonce_id: string }
+    >().catch(() => null);
     if (!body?.commitments || !body?.message || !body?.nonce_id) {
-      return c.json({ error: "Missing commitments, message, or nonce_id" }, 400);
+      return c.json(
+        { error: "Missing commitments, message, or nonce_id" },
+        400,
+      );
     }
-    if (!deps.frostNodeConfig) return c.json({ error: "FROST not configured on this node" }, 503);
+    if (!deps.frostNodeConfig) {
+      return c.json({ error: "FROST not configured on this node" }, 503);
+    }
 
     const nonces = pendingNonces.get(body.nonce_id);
     if (!nonces) return c.json({ error: "Unknown or expired nonce_id" }, 409);
     pendingNonces.delete(body.nonce_id); // single-use — consume on read
 
     const keyPackageJson = JSON.stringify(deps.frostNodeConfig.key_package);
-    const result = await signRound2(keyPackageJson, nonces, body.commitments, body.message);
+    const result = await signRound2(
+      keyPackageJson,
+      nonces,
+      body.commitments,
+      body.message,
+    );
 
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });

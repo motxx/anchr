@@ -1,7 +1,14 @@
 import React, { useState } from "react";
-import { View, ScrollView, Alert } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSButton, DSInput, DSSection, DSCard, DSFeedbackBanner } from "../../src/components/ds/index.ts";
+import {
+  DSButton,
+  DSCard,
+  DSFeedbackBanner,
+  DSInput,
+  DSSection,
+  DSText,
+} from "../../src/components/ds/index.ts";
 import { BalanceCard } from "../../src/components/wallet/BalanceCard.tsx";
 import { TransactionList } from "../../src/components/wallet/TransactionList.tsx";
 import { useWallet } from "../../src/hooks/useWallet.ts";
@@ -11,7 +18,9 @@ export default function WalletScreen() {
   const { balance, transactions, fundFromToken } = useWallet();
   const [tokenInput, setTokenInput] = useState("");
   const [funding, setFunding] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<
+    { type: "success" | "error"; message: string } | null
+  >(null);
 
   const handleFund = async () => {
     if (!tokenInput.trim()) return;
@@ -20,10 +29,16 @@ export default function WalletScreen() {
     setFeedback(null);
     try {
       const amount = await fundFromToken(tokenInput.trim());
-      setFeedback({ type: "success", message: `Added ${amount} sats to wallet` });
+      setFeedback({
+        type: "success",
+        message: `Added ${amount} sats to wallet`,
+      });
       setTokenInput("");
     } catch (e) {
-      setFeedback({ type: "error", message: e instanceof Error ? e.message : "Fund failed" });
+      setFeedback({
+        type: "error",
+        message: e instanceof Error ? e.message : "Fund failed",
+      });
     } finally {
       setFunding(false);
     }
@@ -44,7 +59,10 @@ export default function WalletScreen() {
         <DSSection title="FUND WALLET">
           <DSCard className="gap-3">
             {feedback && (
-              <DSFeedbackBanner variant={feedback.type} message={feedback.message} />
+              <DSFeedbackBanner
+                variant={feedback.type}
+                message={feedback.message}
+              />
             )}
             <DSInput
               label="Cashu Token"

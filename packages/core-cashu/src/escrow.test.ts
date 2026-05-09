@@ -1,11 +1,18 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildEscrowP2PKOptions, calculateOracleFee, inspectEscrowToken } from "./escrow.ts";
+import {
+  buildEscrowP2PKOptions,
+  calculateOracleFee,
+  inspectEscrowToken,
+} from "./escrow.ts";
 
 // Valid 32-byte x-only pubkeys (64 hex chars)
-const ORACLE_PUB = "0000000000000000000000000000000000000000000000000000000000000001";
-const WORKER_PUB = "0000000000000000000000000000000000000000000000000000000000000002";
-const REQUESTER_PUB = "0000000000000000000000000000000000000000000000000000000000000003";
+const ORACLE_PUB =
+  "0000000000000000000000000000000000000000000000000000000000000001";
+const WORKER_PUB =
+  "0000000000000000000000000000000000000000000000000000000000000002";
+const REQUESTER_PUB =
+  "0000000000000000000000000000000000000000000000000000000000000003";
 
 test("buildEscrowP2PKOptions creates 2-of-2 with timelock refund", () => {
   const opts = buildEscrowP2PKOptions({

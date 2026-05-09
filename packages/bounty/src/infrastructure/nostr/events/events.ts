@@ -15,13 +15,16 @@
  *   status=success/error     → Completion feedback
  */
 
-import type { TlsnEncryptedContext, VerificationFactor } from "../../../domain/types.ts";
-import { deriveConversationKey, decryptNip44 } from "../crypto/encryption.ts";
+import type {
+  TlsnEncryptedContext,
+  VerificationFactor,
+} from "../../../domain/types.ts";
+import { decryptNip44, deriveConversationKey } from "../crypto/encryption.ts";
 
 // NIP-90 DVM event kinds for Anchr.
-export const ANCHR_QUERY_REQUEST = 5300;   // DVM Job Request
-export const ANCHR_QUERY_RESPONSE = 6300;  // DVM Job Result
-export const ANCHR_QUERY_FEEDBACK = 7000;  // DVM Job Feedback (quotes, selection, settlement)
+export const ANCHR_QUERY_REQUEST = 5300; // DVM Job Request
+export const ANCHR_QUERY_RESPONSE = 6300; // DVM Job Result
+export const ANCHR_QUERY_FEEDBACK = 7000; // DVM Job Feedback (quotes, selection, settlement)
 
 // Oracle announcement (NIP-78 style parameterized replaceable).
 export const ANCHR_ORACLE_ANNOUNCEMENT = 30088;
@@ -130,7 +133,10 @@ export interface FrostSignatureDMPayload {
   group_pubkey: string;
 }
 
-export type OracleDMPayload = PreimageDMPayload | RejectionDMPayload | FrostSignatureDMPayload;
+export type OracleDMPayload =
+  | PreimageDMPayload
+  | RejectionDMPayload
+  | FrostSignatureDMPayload;
 
 /**
  * Oracle-accessible payload embedded in kind 6300 tags.
@@ -151,12 +157,12 @@ export interface OracleResponsePayload {
 // --- Event builders (delegated to event-builders.ts) ---
 
 export {
+  buildOracleAnnouncementEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
+  buildQuerySettlementEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
-  buildQuerySettlementEvent,
-  buildOracleAnnouncementEvent,
 } from "./event-builders.ts";
 
 // --- Parsers ---

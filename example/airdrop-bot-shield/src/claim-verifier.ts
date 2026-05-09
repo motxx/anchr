@@ -17,7 +17,7 @@
  *   - redeemHtlcToken from ../../../packages/bounty/src/infrastructure/cashu/escrow
  */
 
-import type { ProofCondition, AirdropCriteria } from "./airdrop-criteria.ts";
+import type { AirdropCriteria, ProofCondition } from "./airdrop-criteria.ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
@@ -132,17 +132,20 @@ export function evaluateCondition(
     return {
       condition,
       passed: false,
-      reason: `Domain mismatch: expected "${expectedHost}", got "${verifiedData.server_name}"`,
+      reason:
+        `Domain mismatch: expected "${expectedHost}", got "${verifiedData.server_name}"`,
     };
   }
   checks.push(`Domain verified: ${expectedHost}`);
 
-  const ageSeconds = Math.floor(Date.now() / 1000) - verifiedData.session_timestamp;
+  const ageSeconds = Math.floor(Date.now() / 1000) -
+    verifiedData.session_timestamp;
   if (ageSeconds < 0 || ageSeconds > MAX_ATTESTATION_AGE_SECONDS) {
     return {
       condition,
       passed: false,
-      reason: `Attestation too old: ${ageSeconds}s (max ${MAX_ATTESTATION_AGE_SECONDS}s)`,
+      reason:
+        `Attestation too old: ${ageSeconds}s (max ${MAX_ATTESTATION_AGE_SECONDS}s)`,
     };
   }
   checks.push(`Attestation fresh: ${ageSeconds}s old`);
@@ -177,10 +180,13 @@ export function evaluateCondition(
         condition,
         passed: false,
         extracted_value: String(rawValue),
-        reason: `Cannot parse "${rawValue}" as date for account age calculation`,
+        reason:
+          `Cannot parse "${rawValue}" as date for account age calculation`,
       };
     }
-    numericValue = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    numericValue = Math.floor(
+      (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24),
+    );
   } else {
     numericValue = Number(rawValue);
     if (isNaN(numericValue)) {
@@ -188,7 +194,8 @@ export function evaluateCondition(
         condition,
         passed: false,
         extracted_value: String(rawValue),
-        reason: `Expected numeric value at "${condition.jsonpath}", got "${rawValue}"`,
+        reason:
+          `Expected numeric value at "${condition.jsonpath}", got "${rawValue}"`,
       };
     }
   }
@@ -198,7 +205,8 @@ export function evaluateCondition(
       condition,
       passed: false,
       extracted_value: numericValue,
-      reason: `Value ${numericValue} is below minimum ${condition.min_value} (${condition.description})`,
+      reason:
+        `Value ${numericValue} is below minimum ${condition.min_value} (${condition.description})`,
     };
   }
 
@@ -244,7 +252,8 @@ export function verifyClaim(
       const result: ConditionResult = {
         condition,
         passed: false,
-        reason: `No proof submitted for condition ${i}: ${condition.description}`,
+        reason:
+          `No proof submitted for condition ${i}: ${condition.description}`,
       };
       results.push(result);
       failures.push(result.reason);

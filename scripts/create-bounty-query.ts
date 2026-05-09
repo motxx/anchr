@@ -14,7 +14,7 @@
  *   docker compose up -d && ./scripts/init-regtest.sh
  */
 
-import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, type Proof, Wallet } from "@cashu/cashu-ts";
 import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
@@ -30,9 +30,19 @@ const TEXT_ONLY = process.argv.includes("--text-only");
 async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
   try {
     const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-      "payinvoice", "--force", bolt11,
+      "docker",
+      "compose",
+      "exec",
+      "-T",
+      "lnd-user",
+      "lncli",
+      "--network",
+      "regtest",
+      "--rpcserver",
+      "lnd-user:10009",
+      "payinvoice",
+      "--force",
+      bolt11,
     ], { stdout: "pipe", stderr: "pipe" });
     await proc.exited;
     return proc.exitCode === 0;
@@ -44,7 +54,9 @@ async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
 /**
  * Mint Cashu tokens, auto-paying the Lightning invoice if on regtest.
  */
-async function mintTokens(amountSats: number): Promise<{ token: string; proofs: Proof[] }> {
+async function mintTokens(
+  amountSats: number,
+): Promise<{ token: string; proofs: Proof[] }> {
   const wallet = new Wallet(MINT_URL, { unit: "sat" });
   await wallet.loadMint();
 
@@ -77,8 +89,12 @@ async function main() {
   console.log(`    Token: ${bounty.token.slice(0, 40)}...`);
 
   // 2. Create query with bounty
-  const mode = TEXT_ONLY ? "text-only (no photo required)" : "photo-required (GPS verification)";
-  console.log(`\n[2] Creating query with ${AMOUNT_SATS} sats bounty (${mode})...`);
+  const mode = TEXT_ONLY
+    ? "text-only (no photo required)"
+    : "photo-required (GPS verification)";
+  console.log(
+    `\n[2] Creating query with ${AMOUNT_SATS} sats bounty (${mode})...`,
+  );
   const queryPayload: Record<string, unknown> = {
     description: TEXT_ONLY
       ? "渋谷スクランブル交差点の現在の混雑状況を教えてください（テキストでOK）"

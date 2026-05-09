@@ -21,7 +21,8 @@ export const DEFINED_SCHEMAS = {
 } as const;
 
 /** Type-level enumeration of defined URIs. */
-export type DefinedSchemaUri = typeof DEFINED_SCHEMAS[keyof typeof DEFINED_SCHEMAS];
+export type DefinedSchemaUri =
+  typeof DEFINED_SCHEMAS[keyof typeof DEFINED_SCHEMAS];
 
 /** Returns true when the URI is a syntactically plausible schema URI (reverse-DNS + version). */
 export function isSchemaUri(value: unknown): value is SchemaUri {

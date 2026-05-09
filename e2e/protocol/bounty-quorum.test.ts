@@ -15,12 +15,15 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { Query, QueryResult } from "../../packages/bounty/src/domain/types.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../packages/bounty/src/domain/types.ts";
 import {
-  makeMockOracle,
-  makeQuorumService,
   driveQuorumToProcessing,
   driveToProcessing,
+  makeMockOracle,
+  makeQuorumService,
   makeServiceWithPreimage,
 } from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
@@ -32,10 +35,17 @@ describe("Quorum: threshold enforcement", () => {
   test("2-of-3: all 3 approve → passes, preimage revealed", async () => {
     const ids = ["anchr", "oracle-a", "oracle-b"];
     const { service, preimageStore } = makeQuorumService({ oracleIds: ids });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -45,12 +55,19 @@ describe("Quorum: threshold enforcement", () => {
     const ids = ["anchr", "oracle-a", "oracle-b"];
     const { service, preimageStore } = makeQuorumService({
       oracleIds: ids,
-      passFns: { "oracle-b": () => false },  // oracle-b rejects
+      passFns: { "oracle-b": () => false }, // oracle-b rejects
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -65,10 +82,17 @@ describe("Quorum: threshold enforcement", () => {
         "oracle-b": () => false,
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -83,10 +107,17 @@ describe("Quorum: threshold enforcement", () => {
         "oracle-d": () => false,
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      3,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
   });
@@ -101,10 +132,17 @@ describe("Quorum: threshold enforcement", () => {
         "oracle-d": () => false,
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      3,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -120,15 +158,22 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     const { service, preimageStore } = makeQuorumService({
       oracleIds: ids,
       passFns: {
-        "anchr": () => true,     // malicious: approves garbage
-        "oracle-a": () => false,  // honest: rejects
-        "oracle-b": () => false,  // honest: rejects
+        "anchr": () => true, // malicious: approves garbage
+        "oracle-a": () => false, // honest: rejects
+        "oracle-b": () => false, // honest: rejects
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -139,15 +184,22 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     const { service, preimageStore } = makeQuorumService({
       oracleIds: ids,
       passFns: {
-        "anchr": () => false,    // malicious: rejects valid work
-        "oracle-a": () => true,   // honest: approves
-        "oracle-b": () => true,   // honest: approves
+        "anchr": () => false, // malicious: rejects valid work
+        "oracle-a": () => true, // honest: approves
+        "oracle-b": () => true, // honest: approves
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -166,15 +218,22 @@ describe("Quorum: collusion resistance", () => {
     const { service, preimageStore } = makeQuorumService({
       oracleIds: ids,
       passFns: {
-        "anchr": () => true,     // colluder
-        "oracle-a": () => true,   // colluder
-        "oracle-b": () => false,  // honest
+        "anchr": () => true, // colluder
+        "oracle-a": () => true, // colluder
+        "oracle-b": () => false, // honest
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     // 2 colluders meet threshold — this is expected.
     // Security depends on independent Oracle operation, not protocol alone.
@@ -186,17 +245,24 @@ describe("Quorum: collusion resistance", () => {
     const { service, preimageStore } = makeQuorumService({
       oracleIds: ids,
       passFns: {
-        "anchr": () => true,     // colluder
-        "oracle-a": () => true,   // colluder
+        "anchr": () => true, // colluder
+        "oracle-a": () => true, // colluder
         "oracle-b": () => false,
         "oracle-c": () => false,
         "oracle-d": () => false,
       },
     });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 3);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      3,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -211,10 +277,17 @@ describe("Quorum: Oracle availability", () => {
     // One Oracle is unavailable (not registered).
     const ids = ["anchr", "oracle-a"];
     const { service, preimageStore } = makeQuorumService({ oracleIds: ids });
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
   });
@@ -223,13 +296,16 @@ describe("Quorum: Oracle availability", () => {
     const ids = ["anchr"];
     const { service, preimageStore } = makeQuorumService({ oracleIds: ids });
     const { query } = await driveQuorumToProcessing(
-      service, preimageStore,
-      ["anchr", "oracle-a", "oracle-b"],  // query expects 3, but only 1 registered
+      service,
+      preimageStore,
+      ["anchr", "oracle-a", "oracle-b"], // query expects 3, but only 1 registered
       2,
     );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -245,7 +321,9 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     const { query } = await driveToProcessing(service, preimageStore);
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -259,10 +337,17 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     });
 
     // Drive with quorum
-    const { query } = await driveQuorumToProcessing(service, preimageStore, ids, 2);
+    const { query } = await driveQuorumToProcessing(
+      service,
+      preimageStore,
+      ids,
+      2,
+    );
 
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "worker_pub",
+      query.id,
+      { attachments: [] },
+      "worker_pub",
     );
     // 2-of-3 pass (anchr + oracle-a) → approved
     expect(outcome.ok).toBe(true);

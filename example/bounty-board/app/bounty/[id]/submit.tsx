@@ -1,11 +1,25 @@
 import React, { useState } from "react";
-import { View, ScrollView, Image, Pressable } from "react-native";
+import { Image, Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSButton, DSInput, DSCard, DSSection, DSFeedbackBanner } from "../../../src/components/ds/index.ts";
-import { uploadPhoto, submitResult, submitQuote } from "../../../src/api/client.ts";
+import {
+  DSButton,
+  DSCard,
+  DSFeedbackBanner,
+  DSInput,
+  DSSection,
+  DSText,
+} from "../../../src/components/ds/index.ts";
+import {
+  submitQuote,
+  submitResult,
+  uploadPhoto,
+} from "../../../src/api/client.ts";
 import { useQueryDetail } from "../../../src/hooks/useQueries.ts";
-import { cameraProvider, type CapturedPhoto } from "../../../src/platform/camera.ts";
+import {
+  cameraProvider,
+  type CapturedPhoto,
+} from "../../../src/platform/camera.ts";
 import { filePickerProvider } from "../../../src/platform/file-picker.ts";
 import { Ionicons } from "@expo/vector-icons";
 import type { AttachmentRef } from "../../../src/api/types.ts";
@@ -21,7 +35,8 @@ export default function SubmitScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const isQuotePhase = bounty?.status === "pending" || bounty?.status === "awaiting_quotes";
+  const isQuotePhase = bounty?.status === "pending" ||
+    bounty?.status === "awaiting_quotes";
 
   const handleTakePhoto = async () => {
     const granted = await cameraProvider.requestPermission();
@@ -62,7 +77,12 @@ export default function SubmitScreen() {
     setError(null);
 
     try {
-      const uploadRes = await uploadPhoto(id, photo.uri, photo.filename, photo.mimeType);
+      const uploadRes = await uploadPhoto(
+        id,
+        photo.uri,
+        photo.filename,
+        photo.mimeType,
+      );
       if (!uploadRes.ok || !uploadRes.attachment) {
         throw new Error(uploadRes.error ?? "Upload failed");
       }
@@ -121,82 +141,87 @@ export default function SubmitScreen() {
       <View className="px-4 gap-4">
         {error && <DSFeedbackBanner variant="error" message={error} />}
 
-        {isQuotePhase ? (
-          <>
-            <DSCard>
-              <DSText variant="body" muted>
-                Submit a quote to let the requester know you can fulfill this bounty.
-              </DSText>
-            </DSCard>
-            <DSButton
-              label="Submit Quote"
-              icon="hand-right"
-              fullWidth
-              loading={submitting}
-              onPress={handleSubmitQuote}
-            />
-          </>
-        ) : (
-          <>
-            <DSSection title="PHOTO PROOF">
-              <DSCard className="gap-3">
-                {photo ? (
-                  <View>
-                    <Image
-                      source={{ uri: photo.uri }}
-                      className="w-full h-48 rounded-lg"
-                      resizeMode="cover"
-                    />
-                    <Pressable
-                      onPress={() => setPhoto(null)}
-                      className="absolute top-2 right-2 bg-black/60 rounded-full p-1"
-                    >
-                      <Ionicons name="close" size={18} color="#fff" />
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View className="gap-2">
-                    <DSButton
-                      label="Take Photo"
-                      icon="camera"
-                      variant="secondary"
-                      fullWidth
-                      onPress={handleTakePhoto}
-                    />
-                    <DSButton
-                      label="Pick File"
-                      icon="document"
-                      variant="ghost"
-                      fullWidth
-                      onPress={handlePickFile}
-                    />
-                  </View>
-                )}
-              </DSCard>
-            </DSSection>
-
-            <DSSection title="NOTES">
+        {isQuotePhase
+          ? (
+            <>
               <DSCard>
-                <DSInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Optional notes about this submission..."
-                  multiline
-                  numberOfLines={3}
-                />
+                <DSText variant="body" muted>
+                  Submit a quote to let the requester know you can fulfill this
+                  bounty.
+                </DSText>
               </DSCard>
-            </DSSection>
+              <DSButton
+                label="Submit Quote"
+                icon="hand-right"
+                fullWidth
+                loading={submitting}
+                onPress={handleSubmitQuote}
+              />
+            </>
+          )
+          : (
+            <>
+              <DSSection title="PHOTO PROOF">
+                <DSCard className="gap-3">
+                  {photo
+                    ? (
+                      <View>
+                        <Image
+                          source={{ uri: photo.uri }}
+                          className="w-full h-48 rounded-lg"
+                          resizeMode="cover"
+                        />
+                        <Pressable
+                          onPress={() => setPhoto(null)}
+                          className="absolute top-2 right-2 bg-black/60 rounded-full p-1"
+                        >
+                          <Ionicons name="close" size={18} color="#fff" />
+                        </Pressable>
+                      </View>
+                    )
+                    : (
+                      <View className="gap-2">
+                        <DSButton
+                          label="Take Photo"
+                          icon="camera"
+                          variant="secondary"
+                          fullWidth
+                          onPress={handleTakePhoto}
+                        />
+                        <DSButton
+                          label="Pick File"
+                          icon="document"
+                          variant="ghost"
+                          fullWidth
+                          onPress={handlePickFile}
+                        />
+                      </View>
+                    )}
+                </DSCard>
+              </DSSection>
 
-            <DSButton
-              label="Submit Proof"
-              icon="cloud-upload"
-              fullWidth
-              loading={submitting}
-              disabled={!photo}
-              onPress={handleSubmitProof}
-            />
-          </>
-        )}
+              <DSSection title="NOTES">
+                <DSCard>
+                  <DSInput
+                    value={notes}
+                    onChangeText={setNotes}
+                    placeholder="Optional notes about this submission..."
+                    multiline
+                    numberOfLines={3}
+                  />
+                </DSCard>
+              </DSSection>
+
+              <DSButton
+                label="Submit Proof"
+                icon="cloud-upload"
+                fullWidth
+                loading={submitting}
+                disabled={!photo}
+                onPress={handleSubmitProof}
+              />
+            </>
+          )}
       </View>
     </ScrollView>
   );

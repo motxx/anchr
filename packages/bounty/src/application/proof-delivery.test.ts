@@ -1,15 +1,23 @@
-import { test, describe } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryService } from "./query-service.ts";
 import type { ProofDelivery, ProofPublishResult } from "./ports.ts";
-import type { OracleAttestationRecord, ProofVisibility, Query, QueryResult } from "../domain/types.ts";
+import type {
+  OracleAttestationRecord,
+  ProofVisibility,
+  Query,
+  QueryResult,
+} from "../domain/types.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
 
 function createMockOracle(id: string, passResult: boolean): Oracle {
   return {
     info: { id, name: `Mock Oracle ${id}`, fee_ppm: 0 },
-    async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      _result: QueryResult,
+    ): Promise<OracleAttestation> {
       return {
         oracle_id: id,
         query_id: query.id,
@@ -28,13 +36,31 @@ function createMockOracle(id: string, passResult: boolean): Oracle {
   };
 }
 
-function createMockProofDelivery(): { delivery: ProofDelivery; published: Array<{ query_id: string; oracle_id: string; visibility: ProofVisibility }> } {
-  const published: Array<{ query_id: string; oracle_id: string; visibility: ProofVisibility }> = [];
+function createMockProofDelivery(): {
+  delivery: ProofDelivery;
+  published: Array<
+    { query_id: string; oracle_id: string; visibility: ProofVisibility }
+  >;
+} {
+  const published: Array<
+    { query_id: string; oracle_id: string; visibility: ProofVisibility }
+  > = [];
   const delivery: ProofDelivery = {
-    async publish(query, attestation, visibility): Promise<ProofPublishResult | null> {
+    async publish(
+      query,
+      attestation,
+      visibility,
+    ): Promise<ProofPublishResult | null> {
       if (visibility !== "public") return null;
-      published.push({ query_id: query.id, oracle_id: attestation.oracle_id, visibility });
-      return { event_id: `evt_${attestation.oracle_id}`, relays: ["wss://relay.test"] };
+      published.push({
+        query_id: query.id,
+        oracle_id: attestation.oracle_id,
+        visibility,
+      });
+      return {
+        event_id: `evt_${attestation.oracle_id}`,
+        relays: ["wss://relay.test"],
+      };
     },
   };
   return { delivery, published };
@@ -61,7 +87,10 @@ describe("proof-delivery integration", () => {
 
     const result: QueryResult = { attachments: [] };
     const outcome = await svc.submitQueryResult(
-      query.id, result, { executor_type: "human", channel: "worker_api" }, "test-oracle",
+      query.id,
+      result,
+      { executor_type: "human", channel: "worker_api" },
+      "test-oracle",
     );
 
     expect(outcome.ok).toBe(true);
@@ -94,7 +123,10 @@ describe("proof-delivery integration", () => {
 
     const result: QueryResult = { attachments: [] };
     const outcome = await svc.submitQueryResult(
-      query.id, result, { executor_type: "human", channel: "worker_api" }, "test-oracle",
+      query.id,
+      result,
+      { executor_type: "human", channel: "worker_api" },
+      "test-oracle",
     );
 
     expect(outcome.ok).toBe(true);
@@ -131,7 +163,9 @@ describe("proof-delivery integration", () => {
 
     const result: QueryResult = { attachments: [] };
     const outcome = await svc.submitQueryResult(
-      query.id, result, { executor_type: "human", channel: "worker_api" },
+      query.id,
+      result,
+      { executor_type: "human", channel: "worker_api" },
     );
 
     expect(outcome.ok).toBe(true);

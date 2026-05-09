@@ -12,11 +12,16 @@ export interface FrostDkgRouteDeps {
  *   POST /frost/dkg/:sessionId/round/:n     — submit DKG round package (n ∈ {1,2,3})
  *   GET  /frost/dkg/:sessionId              — read DKG session state
  */
-export function registerFrostDkgRoutes(app: Hono, deps: FrostDkgRouteDeps): void {
+export function registerFrostDkgRoutes(
+  app: Hono,
+  deps: FrostDkgRouteDeps,
+): void {
   const { authMiddleware, frostCoordinator } = deps;
 
   app.post("/frost/dkg/init", authMiddleware, async (c) => {
-    const body = await c.req.json<{ threshold: number; total: number }>().catch(() => null);
+    const body = await c.req.json<{ threshold: number; total: number }>().catch(
+      () => null,
+    );
     if (!body?.threshold || !body?.total) {
       return c.json({ error: "Missing threshold or total" }, 400);
     }
@@ -24,7 +29,10 @@ export function registerFrostDkgRoutes(app: Hono, deps: FrostDkgRouteDeps): void
       return c.json({ error: "threshold cannot exceed total" }, 400);
     }
 
-    const session = frostCoordinator.initDkg({ threshold: body.threshold, total: body.total });
+    const session = frostCoordinator.initDkg({
+      threshold: body.threshold,
+      total: body.total,
+    });
     return c.json({
       session_id: session.session_id,
       threshold: session.threshold,
@@ -50,7 +58,11 @@ export function registerFrostDkgRoutes(app: Hono, deps: FrostDkgRouteDeps): void
     }
 
     const result = await frostCoordinator.submitDkgPackage(
-      sessionId, round, body.signer_index, body.package, body.secret_package,
+      sessionId,
+      round,
+      body.signer_index,
+      body.package,
+      body.secret_package,
     );
     if (!result) return c.json({ error: "DKG session not found" }, 404);
     return c.json(result);

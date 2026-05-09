@@ -1,10 +1,15 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createWalletStore, type WalletStore } from "./wallet-store.ts";
 import type { Proof } from "@cashu/cashu-ts";
 
 function fakeProof(amount: number, secret?: string): Proof {
-  return { amount, id: "test", secret: secret ?? `s_${amount}_${Math.random()}`, C: "C" } as Proof;
+  return {
+    amount,
+    id: "test",
+    secret: secret ?? `s_${amount}_${Math.random()}`,
+    C: "C",
+  } as Proof;
 }
 
 describe("WalletStore", () => {
@@ -41,11 +46,17 @@ describe("WalletStore", () => {
 
   describe("lockForQuery", () => {
     test("locks proofs and moves them to pending", () => {
-      store.addProofs("requester", "pk1", [fakeProof(10), fakeProof(20), fakeProof(5)]);
+      store.addProofs("requester", "pk1", [
+        fakeProof(10),
+        fakeProof(20),
+        fakeProof(5),
+      ]);
       const locked = store.lockForQuery("requester", "pk1", "q1", 15);
 
       expect(locked).not.toBeNull();
-      expect(locked!.reduce((s, p) => s + p.amount, 0)).toBeGreaterThanOrEqual(15);
+      expect(locked!.reduce((s, p) => s + p.amount, 0)).toBeGreaterThanOrEqual(
+        15,
+      );
 
       const bal = store.getBalance("requester", "pk1");
       expect(bal.pending_sats).toBeGreaterThanOrEqual(15);

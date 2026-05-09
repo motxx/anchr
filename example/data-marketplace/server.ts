@@ -15,8 +15,8 @@ import { startMcpServer } from "@anchr/bounty/mcp-server";
 import { createListingStore } from "./src/marketplace/listing-store.ts";
 import { registerMarketplaceRoutes } from "./src/marketplace/marketplace-routes.ts";
 import {
-  handleMarketplaceListData,
   handleMarketplaceBuyData,
+  handleMarketplaceListData,
   handleMarketplaceSearchListings,
 } from "./src/mcp-marketplace-handlers.ts";
 import { z } from "zod";
@@ -46,9 +46,11 @@ if (Deno.env.get("MCP_STDIO") === "1") {
       server.tool(
         "marketplace_list_data",
         "List available verified data listings on the Anchr marketplace. " +
-        "Each listing provides TLSNotary-proven API data that can be purchased with Cashu ecash.",
+          "Each listing provides TLSNotary-proven API data that can be purchased with Cashu ecash.",
         {
-          active_only: z.boolean().optional().describe("Only show active listings (default true)"),
+          active_only: z.boolean().optional().describe(
+            "Only show active listings (default true)",
+          ),
         },
         async (args: { active_only?: boolean }) => {
           return handleMarketplaceListData(backend, args.active_only ?? true);
@@ -58,14 +60,18 @@ if (Deno.env.get("MCP_STDIO") === "1") {
       server.tool(
         "marketplace_buy_data",
         "Purchase verified data from the Anchr marketplace. " +
-        "Pays with Cashu ecash token (X-Cashu direct mode). " +
-        "Returns the data along with TLSNotary proof of authenticity.",
+          "Pays with Cashu ecash token (X-Cashu direct mode). " +
+          "Returns the data along with TLSNotary proof of authenticity.",
         {
           listing_id: z.string().describe("Listing ID to purchase"),
           cashu_token: z.string().describe("Cashu ecash token for payment"),
         },
         async (args: { listing_id: string; cashu_token: string }) => {
-          return handleMarketplaceBuyData(backend, args.listing_id, args.cashu_token);
+          return handleMarketplaceBuyData(
+            backend,
+            args.listing_id,
+            args.cashu_token,
+          );
         },
       );
 

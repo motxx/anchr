@@ -1,4 +1,12 @@
-import type { BlossomKeyMap, EscrowType, Query, QueryResult, TlsnVerifiedData, VerificationDetail, VerificationFactor } from "./types.ts";
+import type {
+  BlossomKeyMap,
+  EscrowType,
+  Query,
+  QueryResult,
+  TlsnVerifiedData,
+  VerificationDetail,
+  VerificationFactor,
+} from "./types.ts";
 
 export interface OracleInfo {
   id: string;
@@ -28,11 +36,14 @@ export interface OracleAttestation {
 
 export interface Oracle {
   info: OracleInfo;
-  verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<OracleAttestation>;
+  verify(
+    query: Query,
+    result: QueryResult,
+    blossomKeys?: BlossomKeyMap,
+  ): Promise<OracleAttestation>;
 }
 
 export interface OracleVerificationDetail extends VerificationDetail {
   oracle_id: string;
   attested_at: number;
 }
-

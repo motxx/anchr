@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ScrollView, Pressable } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DSText } from "../../src/components/ds/index.ts";

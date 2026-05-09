@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { DSText, DSButton } from "../../src/components/ds/index.ts";
+import { DSButton, DSText } from "../../src/components/ds/index.ts";
 import { useAuthStore } from "../../src/store/auth.ts";
 import { Ionicons } from "@expo/vector-icons";
 

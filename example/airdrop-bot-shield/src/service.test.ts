@@ -2,13 +2,16 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
 import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
-import { createProofGateService, openSqliteProofGateStore } from "@anchr/bounty/claim-gate";
+import {
+  createProofGateService,
+  openSqliteProofGateStore,
+} from "@anchr/bounty/claim-gate";
 import { buildAirdropBotShieldApp } from "./server-routes.ts";
 import { identityPathForAirdropCondition } from "./identity-policy.ts";
 import {
+  type AirdropCriteria,
   buildGitHubAgeCondition,
   buildGitHubReposCondition,
-  type AirdropCriteria,
   type ProofCondition,
 } from "./airdrop-criteria.ts";
 
@@ -23,12 +26,19 @@ function campaign(): AirdropCriteria {
 }
 
 function fakeValidator(body: unknown) {
-  return async (_attestation: { presentation: string }, req: TlsnRequirement): Promise<TlsnValidationResult> => ({
+  return async (
+    _attestation: { presentation: string },
+    req: TlsnRequirement,
+  ): Promise<TlsnValidationResult> => ({
     available: true,
     signatureValid: true,
     serverIdentityValid: true,
     attestationFresh: true,
-    conditionResults: (req.conditions ?? []).map((condition) => ({ condition, passed: true, actual_value: "ok" })),
+    conditionResults: (req.conditions ?? []).map((condition) => ({
+      condition,
+      passed: true,
+      actual_value: "ok",
+    })),
     verifiedData: {
       server_name: req.domain_hint ?? "api.github.com",
       revealed_body: JSON.stringify(body),
@@ -118,7 +128,10 @@ describe("ProofGateService for airdrop bot shield", () => {
     await service.createCampaign(campaign());
 
     const claimant_pubkey = "02" + "44".repeat(32);
-    const reserved = await service.reserveClaim("airdrop-bot-shield-test", claimant_pubkey);
+    const reserved = await service.reserveClaim(
+      "airdrop-bot-shield-test",
+      claimant_pubkey,
+    );
     const result = await service.submitClaim("airdrop-bot-shield-test", {
       claim_id: reserved.id,
       claimant_pubkey,
@@ -143,9 +156,17 @@ describe("airdrop bot shield routes", () => {
       nullifierSecret: "x".repeat(32),
       identityPathForCondition: identityPathForAirdropCondition,
       accountAgeConditionTypes: new Set(["github_account_age"]),
-      validateTlsnFn: fakeValidator({ id: 1, created_at: "2020-01-01T00:00:00Z", public_repos: 3 }),
+      validateTlsnFn: fakeValidator({
+        id: 1,
+        created_at: "2020-01-01T00:00:00Z",
+        public_repos: 3,
+      }),
     });
-    const app = buildAirdropBotShieldApp({ service, adminToken: "secret".repeat(8), productionReady: true });
+    const app = buildAirdropBotShieldApp({
+      service,
+      adminToken: "secret".repeat(8),
+      productionReady: true,
+    });
 
     const denied = await app.request("/airdrop/create", {
       method: "POST",

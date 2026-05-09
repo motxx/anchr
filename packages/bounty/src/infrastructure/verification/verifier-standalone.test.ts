@@ -9,13 +9,16 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  _setValidateTlsnForTest,
+  queryResultToInput,
+  queryToRequirement,
   verify,
   verifyProof,
-  queryToRequirement,
-  queryResultToInput,
-  _setValidateTlsnForTest,
 } from "./verifier.ts";
-import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-verification/integrity-store";
+import {
+  clearIntegrityStore,
+  storeIntegrity,
+} from "@anchr/photo-verification/integrity-store";
 import type {
   TlsnAttestation,
   TlsnRequirement,
@@ -89,7 +92,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     const verification = await verifyProof(requirement, input);
 
     expect(verification.passed).toBe(true);
-    expect(verification.checks).toContain("no media evidence provided (weak verification)");
+    expect(verification.checks).toContain(
+      "no media evidence provided (weak verification)",
+    );
   });
 
   test("rejects body GPS far from expected location", async () => {
@@ -107,7 +112,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     const verification = await verifyProof(requirement, input);
 
     expect(verification.passed).toBe(false);
-    expect(verification.failures.some((f) => f.includes("from expected location"))).toBe(true);
+    expect(
+      verification.failures.some((f) => f.includes("from expected location")),
+    ).toBe(true);
   });
 
   test("attachment with valid C2PA passes via integrity-store keyed by requirement.id", async () => {
@@ -129,37 +136,50 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     const verification = await verifyProof(requirement, input);
 
     expect(verification.passed).toBe(true);
-    expect(verification.checks).toContain("C2PA: valid Content Credentials signature");
+    expect(verification.checks).toContain(
+      "C2PA: valid Content Credentials signature",
+    );
   });
 
   test("TLSNotary path runs validateTlsn() against the requirement's tlsn_requirements", async () => {
     const tlsnReq: TlsnRequirement = {
       target_url: "https://api.example.com/balance",
-      conditions: [{ type: "contains", expression: "balance", description: "must contain balance" }],
+      conditions: [{
+        type: "contains",
+        expression: "balance",
+        description: "must contain balance",
+      }],
     };
 
     let receivedReq: TlsnRequirement | undefined;
-    _setValidateTlsnForTest(async (_att: TlsnAttestation, req: TlsnRequirement): Promise<TlsnValidationResult> => {
-      receivedReq = req;
-      return {
-        available: true,
-        signatureValid: true,
-        serverIdentityValid: true,
-        conditionResults: [{
-          condition: { type: "contains", expression: "balance" },
-          passed: true,
-          actual_value: "balance: 1000",
-        }],
-        attestationFresh: true,
-        verifiedData: {
-          server_name: "api.example.com",
-          revealed_body: '{"balance": 1000}',
-          session_timestamp: now,
-        },
-        checks: ["TLSNotary: presentation signature valid (cryptographically verified)"],
-        failures: [],
-      };
-    });
+    _setValidateTlsnForTest(
+      async (
+        _att: TlsnAttestation,
+        req: TlsnRequirement,
+      ): Promise<TlsnValidationResult> => {
+        receivedReq = req;
+        return {
+          available: true,
+          signatureValid: true,
+          serverIdentityValid: true,
+          conditionResults: [{
+            condition: { type: "contains", expression: "balance" },
+            passed: true,
+            actual_value: "balance: 1000",
+          }],
+          attestationFresh: true,
+          verifiedData: {
+            server_name: "api.example.com",
+            revealed_body: '{"balance": 1000}',
+            session_timestamp: now,
+          },
+          checks: [
+            "TLSNotary: presentation signature valid (cryptographically verified)",
+          ],
+          failures: [],
+        };
+      },
+    );
 
     const requirement: VerificationRequirement = {
       id: "req_tlsn_standalone",
@@ -202,12 +222,16 @@ describe("queryToRequirement / queryResultToInput — adapter parity", () => {
     };
 
     const viaQuery = await verify(query, result);
-    const viaStandalone = await verifyProof(queryToRequirement(query), queryResultToInput(result));
+    const viaStandalone = await verifyProof(
+      queryToRequirement(query),
+      queryResultToInput(result),
+    );
 
     expect(viaStandalone.passed).toBe(viaQuery.passed);
     expect(viaStandalone.checks).toEqual(viaQuery.checks);
     expect(viaStandalone.failures).toEqual(viaQuery.failures);
-    expect(viaStandalone.checks.some((c) => c.includes("body GPS within 50km"))).toBe(true);
+    expect(viaStandalone.checks.some((c) => c.includes("body GPS within 50km")))
+      .toBe(true);
   });
 
   test("queryToRequirement carries every security-relevant field", () => {

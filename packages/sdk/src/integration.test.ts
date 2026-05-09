@@ -25,9 +25,9 @@ import {
   parseQueryRequestEvent,
 } from "./events.ts";
 import {
-  generateKeypair,
   type Event,
   type Filter,
+  generateKeypair,
   type PublishResult,
   type RelayClient,
   type Subscription,
@@ -89,14 +89,20 @@ class MockRelay {
 }
 
 function matchesFilter(event: Event, filter: Filter): boolean {
-  if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
-  if (filter.authors !== undefined && !filter.authors.includes(event.pubkey)) return false;
+  if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) {
+    return false;
+  }
+  if (filter.authors !== undefined && !filter.authors.includes(event.pubkey)) {
+    return false;
+  }
   for (const key of Object.keys(filter)) {
     if (!key.startsWith("#")) continue;
     const tagKey = key.slice(1);
     const expected = (filter as Record<string, string[] | undefined>)[key];
     if (!Array.isArray(expected)) continue;
-    const tagValues = event.tags.filter((t) => t[0] === tagKey).map((t) => t[1]);
+    const tagValues = event.tags.filter((t) => t[0] === tagKey).map((t) =>
+      t[1]
+    );
     if (!expected.some((v) => tagValues.includes(v))) return false;
   }
   return true;

@@ -6,7 +6,7 @@
  * unit-level and do not require Docker or a running mint.
  */
 
-import { test, describe } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
@@ -28,7 +28,9 @@ function makeKeypair() {
 }
 
 /** Build a minimal TwoPartyBinaryBet for testing payouts. */
-function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
+function makeMarket(
+  overrides: Partial<TwoPartyBinaryBet> = {},
+): TwoPartyBinaryBet {
   return {
     id: bytesToHex(randomBytes(16)),
     title: "Test market",
@@ -166,7 +168,11 @@ describe("Attack 2: Oracle Double-Signing Prevention", () => {
     expect(sig).toBeTruthy();
 
     // Verify the YES signature is valid
-    const valid = schnorr.verify(hexToBytes(sig!), msg, hexToBytes(entry.pubkey_a));
+    const valid = schnorr.verify(
+      hexToBytes(sig!),
+      msg,
+      hexToBytes(entry.pubkey_a),
+    );
     expect(valid).toBe(true);
 
     // The store is now marked as signed — even re-creating won't help
@@ -184,12 +190,20 @@ describe("Attack 2: Oracle Double-Signing Prevention", () => {
     store.create("market-double-resolve");
 
     // First resolution (YES → outcome a) — succeeds
-    const sig1 = store.sign("market-double-resolve", "a", new TextEncoder().encode("market-double-resolve:yes"));
+    const sig1 = store.sign(
+      "market-double-resolve",
+      "a",
+      new TextEncoder().encode("market-double-resolve:yes"),
+    );
     expect(sig1).not.toBeNull();
     expect(typeof sig1).toBe("string");
 
     // Second resolution attempt (NO → outcome b) — fails (one-time op)
-    const sig2 = store.sign("market-double-resolve", "b", new TextEncoder().encode("market-double-resolve:no"));
+    const sig2 = store.sign(
+      "market-double-resolve",
+      "b",
+      new TextEncoder().encode("market-double-resolve:no"),
+    );
     expect(sig2).toBeNull();
   });
 
@@ -210,7 +224,10 @@ describe("Attack 2: Oracle Double-Signing Prevention", () => {
 
     // YES wins: Alice wins her NO bet back but loses her YES bet
     const payoutsYes = calculatePayouts(market, "yes", bets, 0);
-    const totalPayoutYes = payoutsYes.reduce((acc, p) => acc + p.payout_sats, 0);
+    const totalPayoutYes = payoutsYes.reduce(
+      (acc, p) => acc + p.payout_sats,
+      0,
+    );
     // Alice wagered 200 total, gets back 200 (her share of the winning pool)
     expect(totalPayoutYes).toBe(200);
 
@@ -263,12 +280,15 @@ describe("Attack 3: Oracle Signature Must Match Proof Secret", () => {
     // The Oracle must sign each one individually.
     const oracleKeypair = makeKeypair();
 
-    const secrets = Array.from({ length: 3 }, () => bytesToHex(randomBytes(32)));
+    const secrets = Array.from(
+      { length: 3 },
+      () => bytesToHex(randomBytes(32)),
+    );
     const hashes = secrets.map((s) => sha256(new TextEncoder().encode(s)));
 
     // Sign each proof's secret hash individually
     const signatures = hashes.map((h) =>
-      schnorr.sign(h, oracleKeypair.secretKey),
+      schnorr.sign(h, oracleKeypair.secretKey)
     );
 
     // Each signature is valid only for its corresponding proof secret
@@ -444,16 +464,23 @@ describe("Attack 5: Cross-Market Replay Attack", () => {
     const sigForA = schnorr.sign(hashA, oracle.secretKey);
 
     // Signature for A is valid against hash A
-    expect(schnorr.verify(sigForA, hashA, hexToBytes(oracle.pubkey))).toBe(true);
+    expect(schnorr.verify(sigForA, hashA, hexToBytes(oracle.pubkey))).toBe(
+      true,
+    );
 
     // Signature for A is NOT valid against hash B
-    expect(schnorr.verify(sigForA, hashB, hexToBytes(oracle.pubkey))).toBe(false);
+    expect(schnorr.verify(sigForA, hashB, hexToBytes(oracle.pubkey))).toBe(
+      false,
+    );
   });
 
   test("DualKeyStore uses independent keys per market", () => {
     // Create multiple markets and verify complete key independence
     const store = createDualKeyStore();
-    const markets = Array.from({ length: 5 }, (_, i) => store.create(`market-${i}`));
+    const markets = Array.from(
+      { length: 5 },
+      (_, i) => store.create(`market-${i}`),
+    );
 
     // All pubkeys should be unique across markets
     const allPubkeysA = markets.map((m) => m.pubkey_a);
@@ -496,12 +523,20 @@ describe("Attack 6: Insufficient Signatures Without Oracle", () => {
     const aliceSig = schnorr.sign(proofHash, alice.secretKey);
 
     // Alice's signature is valid for her key
-    const aliceSigValid = schnorr.verify(aliceSig, proofHash, hexToBytes(alice.pubkey));
+    const aliceSigValid = schnorr.verify(
+      aliceSig,
+      proofHash,
+      hexToBytes(alice.pubkey),
+    );
     expect(aliceSigValid).toBe(true);
 
     // But Alice cannot forge the Oracle's group_yes signature
     // Her signature does NOT verify against the group_yes pubkey
-    const forgeAttempt = schnorr.verify(aliceSig, proofHash, hexToBytes(entry.pubkey_a));
+    const forgeAttempt = schnorr.verify(
+      aliceSig,
+      proofHash,
+      hexToBytes(entry.pubkey_a),
+    );
     expect(forgeAttempt).toBe(false);
 
     // Without Oracle signing, Alice only has 1 of 2 required signatures
@@ -525,18 +560,28 @@ describe("Attack 6: Insufficient Signatures Without Oracle", () => {
     // Bob's token (token_yes_to_no) needs [group_no, bob] signatures.
     // group_no key was NOT used for signing — its secret was deleted.
     // Bob can only sign with his own key: 1 of 2 required.
-    const proofHash = sha256(new TextEncoder().encode(bytesToHex(randomBytes(32))));
+    const proofHash = sha256(
+      new TextEncoder().encode(bytesToHex(randomBytes(32))),
+    );
     const bobSig = schnorr.sign(proofHash, bob.secretKey);
 
     // Bob's sig verifies for his own key
-    expect(schnorr.verify(bobSig, proofHash, hexToBytes(bob.pubkey))).toBe(true);
+    expect(schnorr.verify(bobSig, proofHash, hexToBytes(bob.pubkey))).toBe(
+      true,
+    );
 
     // Bob's sig does NOT verify for group_no
-    expect(schnorr.verify(bobSig, proofHash, hexToBytes(entry.pubkey_b))).toBe(false);
+    expect(schnorr.verify(bobSig, proofHash, hexToBytes(entry.pubkey_b))).toBe(
+      false,
+    );
 
     // The Oracle's YES signature does NOT verify for group_no either
     expect(
-      schnorr.verify(hexToBytes(oracleSig!), resolutionMsg, hexToBytes(entry.pubkey_b)),
+      schnorr.verify(
+        hexToBytes(oracleSig!),
+        resolutionMsg,
+        hexToBytes(entry.pubkey_b),
+      ),
     ).toBe(false);
 
     // Result: Bob has 0 of 2 valid signatures for his token's lock.

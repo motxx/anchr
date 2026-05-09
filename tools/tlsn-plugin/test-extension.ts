@@ -1,7 +1,8 @@
 import puppeteer from "puppeteer";
 
 const CHROME_PROFILE = "/tmp/chrome-tlsn-test";
-const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME_PATH =
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const EXT_ID = "gnoglgpcamodhflknhmafmjdahcejcgg";
 
 const PLUGIN_CODE = `const VERIFIER_URL = 'ws://localhost:7048';
@@ -18,7 +19,7 @@ export default {
 };`;
 
 async function sleep(ms: number) {
-  await new Promise(r => setTimeout(r, ms));
+  await new Promise((r) => setTimeout(r, ms));
 }
 
 async function main() {
@@ -32,11 +33,14 @@ async function main() {
   ], { detached: true, stdio: "ignore" }).unref();
 
   await sleep(5000);
-  const browser = await puppeteer.connect({ browserURL: "http://127.0.0.1:9222", protocolTimeout: 120000 });
+  const browser = await puppeteer.connect({
+    browserURL: "http://127.0.0.1:9222",
+    protocolTimeout: 120000,
+  });
 
   // Find DevConsole page
   const pages = await browser.pages();
-  const devPage = pages.find(p => p.url().includes("devConsole"));
+  const devPage = pages.find((p) => p.url().includes("devConsole"));
   if (!devPage) {
     console.log("[test] DevConsole not found");
     await browser.disconnect();
@@ -68,7 +72,7 @@ async function main() {
   // Click Run Code
   const btns = await devPage.$$("button");
   for (const btn of btns) {
-    const text = await btn.evaluate(el => el.textContent?.trim());
+    const text = await btn.evaluate((el) => el.textContent?.trim());
     if (text?.includes("Run")) {
       await btn.click();
       console.log("[test] Run clicked");
@@ -97,9 +101,14 @@ async function main() {
           // Find approve/confirm button
           const popupBtns = await p.$$("button");
           for (const b of popupBtns) {
-            const txt = await b.evaluate(el => el.textContent?.trim().toLowerCase());
+            const txt = await b.evaluate((el) =>
+              el.textContent?.trim().toLowerCase()
+            );
             console.log(`[test]   Button: "${txt}"`);
-            if (txt?.includes("confirm") || txt?.includes("approve") || txt?.includes("accept") || txt?.includes("allow")) {
+            if (
+              txt?.includes("confirm") || txt?.includes("approve") ||
+              txt?.includes("accept") || txt?.includes("allow")
+            ) {
               await b.click();
               console.log("[test] Approved!");
               confirmed = true;
@@ -120,12 +129,17 @@ async function main() {
     }
 
     // Check DevConsole for completion
-    const text = await devPage.evaluate(() => document.body?.innerText?.slice(-300) || "");
+    const text = await devPage.evaluate(() =>
+      document.body?.innerText?.slice(-300) || ""
+    );
     if (text.includes("Error") && text.includes("rejected")) {
       console.log("[test] Plugin was rejected (popup not approved in time)");
       break;
     }
-    if (text.includes("completed") || text.includes("result") || text.includes("proof")) {
+    if (
+      text.includes("completed") || text.includes("result") ||
+      text.includes("proof")
+    ) {
       console.log("[test] Plugin completed!");
       completed = true;
       break;
@@ -138,11 +152,13 @@ async function main() {
   await devPage.screenshot({ path: "/tmp/tlsn-devconsole-final.png" });
   console.log("[test] Final screenshot: /tmp/tlsn-devconsole-final.png");
 
-  const finalText = await devPage.evaluate(() => document.body?.innerText?.slice(-500) || "");
+  const finalText = await devPage.evaluate(() =>
+    document.body?.innerText?.slice(-500) || ""
+  );
   console.log("[test] Console output:", finalText.slice(-300));
 
   await browser.disconnect();
   console.log("[test] Done");
 }
 
-main().catch(e => console.error("[test] Error:", e.message));
+main().catch((e) => console.error("[test] Error:", e.message));

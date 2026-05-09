@@ -88,8 +88,9 @@
     "test:all:full": "./scripts/test-all.sh full",
 
     "lint": "deno lint",
-    "lint:strict": "deno lint && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import && deno task lint:no-test-sanitizer-bypass && deno task lint:no-unit-network-listener",
+    "lint:strict": "deno lint && deno task lint:fmt && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import && deno task lint:no-test-sanitizer-bypass && deno task lint:no-unit-network-listener",
     "lint:deps": "bash scripts/cargo-audit-all.sh",
+    "lint:fmt": "deno run --allow-read --allow-run scripts/lint-fmt.ts",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
     "lint:arch:candidates": "deno run --allow-read scripts/arch-lint-candidates.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
@@ -149,7 +150,10 @@
   },
   "fmt": {
     "exclude": [
+      "example/expo-worker-app",
+      "docs",
       "docs/issues",
+      "*.md",
       "skills",
       ".claude/skills",
       ".codex/skills"

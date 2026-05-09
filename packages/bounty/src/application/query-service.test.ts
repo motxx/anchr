@@ -1,15 +1,15 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
+import {
+  createPreimageStore,
+  type PreimageStore,
+} from "@anchr/core-cashu/preimage-store";
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle-client/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import {
-  createQueryService,
-  createQueryStore,
-} from "./query-service.ts";
+import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./ports.ts";
 import { createIntegrityStore } from "@anchr/photo-verification/integrity-store";
@@ -21,10 +21,16 @@ function makeFakeToken(amountSats: number): string {
   });
 }
 
-function makeMockOracle(id: string, passFn?: (query: Query, result: QueryResult) => boolean): Oracle {
+function makeMockOracle(
+  id: string,
+  passFn?: (query: Query, result: QueryResult) => boolean,
+): Oracle {
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    async verify(query: Query, result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      result: QueryResult,
+    ): Promise<OracleAttestation> {
       const passed = passFn ? passFn(query, result) : true;
       return {
         oracle_id: id,
@@ -114,7 +120,10 @@ describe("createQueryService", () => {
   test("createQuery generates nonce when nonce factor is requested", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
-      { description: "Test query", verification_requirements: ["nonce", "gps"] },
+      {
+        description: "Test query",
+        verification_requirements: ["nonce", "gps"],
+      },
     );
     expect(query.challenge_nonce).toBeTruthy();
     expect(query.challenge_nonce!.length).toBe(6);
@@ -198,7 +207,9 @@ describe("createQueryService", () => {
 
   test("submitQueryResult approves valid submission", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
+    const query = service.createQuery({ description: "Test query" }, {
+      oracleIds: ["test-oracle"],
+    });
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -215,7 +226,9 @@ describe("createQueryService", () => {
     const { service } = makeIsolatedService({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["strict-oracle"] });
+    const query = service.createQuery({ description: "Test query" }, {
+      oracleIds: ["strict-oracle"],
+    });
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -256,7 +269,9 @@ describe("createQueryService", () => {
 
   test("submitQueryResult fails for already-submitted query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
+    const query = service.createQuery({ description: "Test query" }, {
+      oracleIds: ["test-oracle"],
+    });
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -306,7 +321,9 @@ describe("createQueryService", () => {
 
   test("cancelQuery fails for already-approved query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Test query" }, { oracleIds: ["test-oracle"] });
+    const query = service.createQuery({ description: "Test query" }, {
+      oracleIds: ["test-oracle"],
+    });
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
@@ -355,23 +372,38 @@ describe("createQueryService", () => {
 describe("HTLC lifecycle", () => {
   function createMockEscrowProvider(): EscrowProvider {
     return {
-      async createHold() { return { escrow_ref: "mock_ref" }; },
-      async bindWorker(_ref, _wp) { return { escrow_ref: "mock_ref_bound" }; },
+      async createHold() {
+        return { escrow_ref: "mock_ref" };
+      },
+      async bindWorker(_ref, _wp) {
+        return { escrow_ref: "mock_ref_bound" };
+      },
       async verify(_ref, expected_sats) {
         try {
           const decoded = getDecodedToken(_ref);
           const total = decoded.proofs.reduce((sum, p) => sum + p.amount, 0);
           if (total < expected_sats) {
-            return { valid: false, amount_sats: total, error: `Insufficient amount: got ${total}, expected ${expected_sats}` };
+            return {
+              valid: false,
+              amount_sats: total,
+              error:
+                `Insufficient amount: got ${total}, expected ${expected_sats}`,
+            };
           }
           return { valid: true, amount_sats: total };
         } catch {
           return { valid: false, error: "Invalid token" };
         }
       },
-      async verifyLock() { return { ok: true }; },
-      async settle() { return { settled: true }; },
-      async cancel() { return { cancelled: true }; },
+      async verifyLock() {
+        return { ok: true };
+      },
+      async settle() {
+        return { settled: true };
+      },
+      async cancel() {
+        return { cancelled: true };
+      },
     };
   }
 
@@ -381,12 +413,23 @@ describe("HTLC lifecycle", () => {
     const oracle: Oracle = {
       info: { id: "test-oracle", name: "Mock test-oracle", fee_ppm: 0 },
       async verify(query: Query): Promise<OracleAttestation> {
-        return { oracle_id: "test-oracle", query_id: query.id, passed: true, checks: ["ok"], failures: [], attested_at: Date.now() };
+        return {
+          oracle_id: "test-oracle",
+          query_id: query.id,
+          passed: true,
+          checks: ["ok"],
+          failures: [],
+          attested_at: Date.now(),
+        };
       },
     };
     registry.register(oracle);
     return {
-      service: createQueryService({ store, oracleRegistry: registry, escrowProvider: createMockEscrowProvider() }),
+      service: createQueryService({
+        store,
+        oracleRegistry: registry,
+        escrowProvider: createMockEscrowProvider(),
+      }),
       store,
     };
   }
@@ -401,7 +444,9 @@ describe("HTLC lifecycle", () => {
 
   test("createQuery with htlc option sets awaiting_quotes status", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     expect(query.status).toBe("awaiting_quotes");
     expect(query.payment_status).toBe("escrow_locked");
     expect(query.escrow?.type).toBe("htlc");
@@ -413,7 +458,9 @@ describe("HTLC lifecycle", () => {
 
   test("recordQuote adds quote to awaiting_quotes query", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     const outcome = service.recordQuote(query.id, {
       worker_pubkey: "worker_pub_1",
       amount_sats: 100,
@@ -439,9 +486,19 @@ describe("HTLC lifecycle", () => {
 
   test("selectWorker transitions awaiting_quotes → worker_selected", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
-    service.recordQuote(query.id, { worker_pubkey: "worker_pub_1", quote_event_id: "evt_1", received_at: Date.now() });
-    const outcome = await service.selectWorker(query.id, "worker_pub_1", "htlc_token_123");
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
+    service.recordQuote(query.id, {
+      worker_pubkey: "worker_pub_1",
+      quote_event_id: "evt_1",
+      received_at: Date.now(),
+    });
+    const outcome = await service.selectWorker(
+      query.id,
+      "worker_pub_1",
+      "htlc_token_123",
+    );
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
     expect(updated.status).toBe("worker_selected");
@@ -456,7 +513,11 @@ describe("HTLC lifecycle", () => {
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(query.id, "worker_pub_1", validToken);
+    const outcome = await service.selectWorker(
+      query.id,
+      "worker_pub_1",
+      validToken,
+    );
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
     expect(updated.escrow?.verified_escrow_sats).toBe(100);
@@ -469,7 +530,11 @@ describe("HTLC lifecycle", () => {
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(query.id, "worker_pub_1", smallToken);
+    const outcome = await service.selectWorker(
+      query.id,
+      "worker_pub_1",
+      smallToken,
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Insufficient amount");
     expect(outcome.message).toContain("50");
@@ -482,7 +547,11 @@ describe("HTLC lifecycle", () => {
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(query.id, "worker_pub_1", "not_a_valid_token");
+    const outcome = await service.selectWorker(
+      query.id,
+      "worker_pub_1",
+      "not_a_valid_token",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Escrow token verification failed");
     expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
@@ -495,14 +564,20 @@ describe("HTLC lifecycle", () => {
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(query.id, "worker_pub_1", bigToken);
+    const outcome = await service.selectWorker(
+      query.id,
+      "worker_pub_1",
+      bigToken,
+    );
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.escrow?.verified_escrow_sats).toBe(200);
   });
 
   test("selectWorker fails on wrong state", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "worker_pub_1");
     const outcome = await service.selectWorker(query.id, "worker_pub_2");
     expect(outcome.ok).toBe(false);
@@ -511,27 +586,40 @@ describe("HTLC lifecycle", () => {
 
   test("recordResult transitions processing → verifying", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
-    const outcome = service.recordResult(query.id, { attachments: [], notes: "done" }, "worker_pub_1");
+    const outcome = service.recordResult(query.id, {
+      attachments: [],
+      notes: "done",
+    }, "worker_pub_1");
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("verifying");
   });
 
   test("recordResult fails for wrong worker", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
-    const outcome = service.recordResult(query.id, { attachments: [] }, "wrong_worker");
+    const outcome = service.recordResult(
+      query.id,
+      { attachments: [] },
+      "wrong_worker",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
   });
 
   test("completeVerification transitions verifying → approved", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
@@ -545,7 +633,9 @@ describe("HTLC lifecycle", () => {
 
   test("completeVerification transitions verifying → rejected", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
@@ -558,25 +648,43 @@ describe("HTLC lifecycle", () => {
   test("listOpenQueries includes HTLC queries in active states", async () => {
     const { service } = makeIsolatedService();
     service.createQuery({ description: "Simple" }, { ttlMs: 60_000 });
-    service.createQuery({ description: "HTLC" }, { escrow: escrowInfo, ttlMs: 60_000 });
+    service.createQuery({ description: "HTLC" }, {
+      escrow: escrowInfo,
+      ttlMs: 60_000,
+    });
     const open = service.listOpenQueries();
     expect(open).toHaveLength(2);
   });
 
   test("full HTLC lifecycle: create → quote → select → result → verify", async () => {
     const { service } = makeIsolatedService();
-    const query = service.createQuery({ description: "Full HTLC" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "Full HTLC" }, {
+      escrow: escrowInfo,
+    });
     expect(query.status).toBe("awaiting_quotes");
 
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
-    service.recordQuote(query.id, { worker_pubkey: "w2", amount_sats: 50, quote_event_id: "e2", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w2",
+      amount_sats: 50,
+      quote_event_id: "e2",
+      received_at: Date.now(),
+    });
     expect(service.getQuery(query.id)?.quotes).toHaveLength(2);
 
     await service.selectWorker(query.id, "w1", "final_htlc_token");
     expect(service.getQuery(query.id)?.status).toBe("worker_selected");
 
     service.beginWork(query.id);
-    service.recordResult(query.id, { attachments: [], notes: "photo taken" }, "w1");
+    service.recordResult(
+      query.id,
+      { attachments: [], notes: "photo taken" },
+      "w1",
+    );
     expect(service.getQuery(query.id)?.status).toBe("verifying");
 
     service.completeVerification(query.id, true, "test-oracle");
@@ -624,7 +732,10 @@ describe("submitEscrowResult", () => {
   test("submitEscrowResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo, entry } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["test-oracle"] });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+      oracleIds: ["test-oracle"],
+    });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
@@ -644,7 +755,10 @@ describe("submitEscrowResult", () => {
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo, oracleIds: ["strict-oracle"] });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+      oracleIds: ["strict-oracle"],
+    });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
@@ -675,7 +789,9 @@ describe("submitEscrowResult", () => {
   test("submitEscrowResult fails for wrong worker", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
@@ -691,7 +807,9 @@ describe("submitEscrowResult", () => {
   test("submitEscrowResult fails for wrong state", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
-    const query = service.createQuery({ description: "HTLC test" }, { escrow: escrowInfo });
+    const query = service.createQuery({ description: "HTLC test" }, {
+      escrow: escrowInfo,
+    });
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
@@ -708,7 +826,9 @@ describe("submitEscrowResult", () => {
       requestSignature: async (groupPubkey: string, message: Uint8Array) => {
         requested.push({
           groupPubkey,
-          messageHex: Array.from(message).map((b) => b.toString(16).padStart(2, "0")).join(""),
+          messageHex: Array.from(message).map((b) =>
+            b.toString(16).padStart(2, "0")
+          ).join(""),
         });
         return "deadbeef".repeat(8);
       },
@@ -716,7 +836,11 @@ describe("submitEscrowResult", () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("test-oracle"));
-    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      frostSignature: mockFrost,
+    });
     const query = service.createQuery({ description: "FROST settlement" }, {
       escrow: {
         type: "p2pk_frost" as const,
@@ -730,7 +854,10 @@ describe("submitEscrowResult", () => {
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [], notes: "frost done" }, "w1", "test-oracle",
+      query.id,
+      { attachments: [], notes: "frost done" },
+      "w1",
+      "test-oracle",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.frost_signature).toBe("deadbeef".repeat(8));
@@ -751,7 +878,11 @@ describe("submitEscrowResult", () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("strict-oracle", () => false));
-    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      frostSignature: mockFrost,
+    });
     const query = service.createQuery({ description: "FROST reject" }, {
       escrow: {
         type: "p2pk_frost" as const,
@@ -765,7 +896,10 @@ describe("submitEscrowResult", () => {
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "w1", "strict-oracle",
+      query.id,
+      { attachments: [] },
+      "w1",
+      "strict-oracle",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.frost_signature).toBeUndefined();
@@ -782,7 +916,11 @@ describe("submitEscrowResult", () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("test-oracle"));
-    const service = createQueryService({ store, oracleRegistry: registry, frostSignature: mockFrost });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      frostSignature: mockFrost,
+    });
     const query = service.createQuery({ description: "FROST throws" }, {
       escrow: {
         type: "p2pk_frost" as const,
@@ -796,7 +934,10 @@ describe("submitEscrowResult", () => {
     await service.selectWorker(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
-      query.id, { attachments: [] }, "w1", "test-oracle",
+      query.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.frost_signature).toBeUndefined();
@@ -806,7 +947,9 @@ describe("submitEscrowResult", () => {
 });
 
 describe("verifyWithQuorum", () => {
-  function makeQuorumService(oracleSpecs: Array<{ id: string; pass: boolean }>) {
+  function makeQuorumService(
+    oracleSpecs: Array<{ id: string; pass: boolean }>,
+  ) {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     for (const spec of oracleSpecs) {
@@ -840,7 +983,9 @@ describe("verifyWithQuorum", () => {
     expect(outcome.ok).toBe(true);
     expect(outcome.query?.status).toBe("approved");
     expect(outcome.query?.attestations).toHaveLength(3);
-    expect(outcome.query?.attestations?.filter((a) => a.passed)).toHaveLength(2);
+    expect(outcome.query?.attestations?.filter((a) => a.passed)).toHaveLength(
+      2,
+    );
   });
 
   test("2-of-3 quorum fails when only 1 oracle approves", async () => {
@@ -892,7 +1037,11 @@ describe("verifyWithQuorum", () => {
     registry.register(makeMockOracle("oracle-a", () => true));
     registry.register(makeMockOracle("oracle-b", () => true));
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      preimageStore,
+    });
 
     const entry = preimageStore.create();
     const escrowInfo = {
@@ -932,8 +1081,25 @@ describe("createIntegrityStore isolation", () => {
       attachmentId: "a.jpg",
       queryId: "q1",
       capturedAt: Date.now(),
-      exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
-      c2pa: { available: false, hasManifest: false, signatureValid: false, manifest: null, checks: [], failures: [] },
+      exif: {
+        hasExif: false,
+        hasCameraModel: false,
+        hasGps: false,
+        hasTimestamp: false,
+        timestampRecent: false,
+        gpsNearHint: null,
+        metadata: {},
+        checks: [],
+        failures: [],
+      },
+      c2pa: {
+        available: false,
+        hasManifest: false,
+        signatureValid: false,
+        manifest: null,
+        checks: [],
+        failures: [],
+      },
     });
     expect(store1.get("a.jpg")).not.toBeNull();
     expect(store2.get("a.jpg")).toBeNull();

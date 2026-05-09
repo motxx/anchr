@@ -31,13 +31,20 @@ export function createInMemoryQueryRepository(): QueryRepository {
       queries.clear();
     },
     findOpen(now) {
-      const openStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+      const openStatuses: QueryStatus[] = [
+        "pending",
+        "awaiting_quotes",
+        "worker_selected",
+        "processing",
+      ];
       return Array.from(queries.values()).filter(
         (q) => openStatuses.includes(q.status) && q.expires_at > now,
       );
     },
     findAll() {
-      return Array.from(queries.values()).sort((a, b) => b.created_at - a.created_at);
+      return Array.from(queries.values()).sort((a, b) =>
+        b.created_at - a.created_at
+      );
     },
     findExpirable(now) {
       return Array.from(queries.values()).filter(
@@ -65,14 +72,23 @@ export function toRepository(store: QueryStore): QueryRepository {
       store.clear();
     },
     findOpen(now) {
-      const openStatuses: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
-      return store.values().filter((q) => openStatuses.includes(q.status) && q.expires_at > now);
+      const openStatuses: QueryStatus[] = [
+        "pending",
+        "awaiting_quotes",
+        "worker_selected",
+        "processing",
+      ];
+      return store.values().filter((q) =>
+        openStatuses.includes(q.status) && q.expires_at > now
+      );
     },
     findAll() {
       return store.values().sort((a, b) => b.created_at - a.created_at);
     },
     findExpirable(now) {
-      return store.values().filter((q) => isExpirable(q.status) && q.expires_at < now);
+      return store.values().filter((q) =>
+        isExpirable(q.status) && q.expires_at < now
+      );
     },
     findByStatus(status) {
       return store.values().filter((q) => q.status === status);

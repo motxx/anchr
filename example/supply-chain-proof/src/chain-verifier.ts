@@ -39,8 +39,7 @@ function haversineKm(
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
+  const a = Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
@@ -86,7 +85,12 @@ function checkGpsPhotoProof(
     };
   }
 
-  const distanceKm = haversineKm(lat, lon, step.location.lat, step.location.lon);
+  const distanceKm = haversineKm(
+    lat,
+    lon,
+    step.location.lat,
+    step.location.lon,
+  );
 
   if (requirement) {
     for (const cond of requirement.conditions) {
@@ -96,7 +100,9 @@ function checkGpsPhotoProof(
             proof_type: "gps_photo",
             passed: false,
             details:
-              `GPS ${lat.toFixed(4)}, ${lon.toFixed(4)} is ${distanceKm.toFixed(1)}km ` +
+              `GPS ${lat.toFixed(4)}, ${lon.toFixed(4)} is ${
+                distanceKm.toFixed(1)
+              }km ` +
               `from expected ${step.location.name} (max: ${cond.value}km)`,
           };
         }
@@ -108,7 +114,9 @@ function checkGpsPhotoProof(
     proof_type: "gps_photo",
     passed: true,
     details:
-      `GPS verified: ${lat.toFixed(4)}, ${lon.toFixed(4)} is ${distanceKm.toFixed(1)}km ` +
+      `GPS verified: ${lat.toFixed(4)}, ${lon.toFixed(4)} is ${
+        distanceKm.toFixed(1)
+      }km ` +
       `from ${step.location.name}`,
   };
 }
@@ -141,7 +149,8 @@ function checkTlsnApiProof(
 
   if (requirement) {
     for (const cond of requirement.conditions) {
-      const fieldValue = data[cond.field] ?? extractJsonPath(revealedBody, cond.field);
+      const fieldValue = data[cond.field] ??
+        extractJsonPath(revealedBody, cond.field);
       if (!evaluateCondition(fieldValue, cond.operator, cond.value)) {
         return {
           proof_type: "tlsn_api",
@@ -157,7 +166,9 @@ function checkTlsnApiProof(
   return {
     proof_type: "tlsn_api",
     passed: true,
-    details: `TLSNotary verified: ${serverName} at ${new Date(sessionTimestamp * 1000).toISOString()}`,
+    details: `TLSNotary verified: ${serverName} at ${
+      new Date(sessionTimestamp * 1000).toISOString()
+    }`,
   };
 }
 
@@ -189,7 +200,9 @@ function checkC2paMediaProof(
   return {
     proof_type: "c2pa_media",
     passed: true,
-    details: `C2PA verified: signed by ${signer} at ${new Date(signatureTime * 1000).toISOString()}`,
+    details: `C2PA verified: signed by ${signer} at ${
+      new Date(signatureTime * 1000).toISOString()
+    }`,
   };
 }
 
@@ -199,7 +212,9 @@ function checkTemperatureLogProof(
   requirement: RequiredProof | undefined,
 ): ProofCheckResult {
   const data = proof.data as Record<string, unknown>;
-  const readings = data.readings as Array<{ celsius: number; timestamp: number }> | undefined;
+  const readings = data.readings as
+    | Array<{ celsius: number; timestamp: number }>
+    | undefined;
 
   if (!readings || readings.length === 0) {
     return {
@@ -217,8 +232,7 @@ function checkTemperatureLogProof(
             return {
               proof_type: "temperature_log",
               passed: false,
-              details:
-                `Temperature violation: ${reading.celsius}C at ` +
+              details: `Temperature violation: ${reading.celsius}C at ` +
                 `${new Date(reading.timestamp * 1000).toISOString()} ` +
                 `(required: ${cond.operator} ${cond.value}C)`,
             };
@@ -234,7 +248,8 @@ function checkTemperatureLogProof(
   return {
     proof_type: "temperature_log",
     passed: true,
-    details: `Temperature log verified: ${readings.length} readings, range ${minC}C-${maxC}C`,
+    details:
+      `Temperature log verified: ${readings.length} readings, range ${minC}C-${maxC}C`,
   };
 }
 
@@ -242,7 +257,10 @@ function extractJsonPath(body: string, path: string): unknown {
   try {
     const obj = JSON.parse(body);
     return path.split(".").reduce((acc: unknown, key: string) => {
-      if (acc && typeof acc === "object" && key in (acc as Record<string, unknown>)) {
+      if (
+        acc && typeof acc === "object" &&
+        key in (acc as Record<string, unknown>)
+      ) {
         return (acc as Record<string, unknown>)[key];
       }
       return undefined;
@@ -309,7 +327,9 @@ function verifyStepProofs(
     for (const reqProof of requirement.required_proofs) {
       const hasProof = step.proofs.some((p) => p.type === reqProof.proof_type);
       if (!hasProof) {
-        issues.push(`Missing required proof: ${reqProof.proof_type} for ${step.step_type}`);
+        issues.push(
+          `Missing required proof: ${reqProof.proof_type} for ${step.step_type}`,
+        );
         proofResults.push({
           proof_type: reqProof.proof_type,
           passed: false,
@@ -319,7 +339,8 @@ function verifyStepProofs(
     }
   }
 
-  const allPassed = proofResults.length > 0 && proofResults.every((r) => r.passed);
+  const allPassed = proofResults.length > 0 &&
+    proofResults.every((r) => r.passed);
   const verdict: StepVerdict = proofResults.length === 0
     ? "skip"
     : allPassed
@@ -377,7 +398,10 @@ function verifyTimeOrdering(steps: SupplyChainStep[]): {
   const stepMap = new Map(steps.map((s) => [s.id, s]));
   const origin = steps.find((s) => !s.previous_step_id);
   if (!origin) {
-    return { ordered: false, issues: ["Cannot check time ordering without origin step"] };
+    return {
+      ordered: false,
+      issues: ["Cannot check time ordering without origin step"],
+    };
   }
 
   const ordered: SupplyChainStep[] = [origin];
@@ -508,11 +532,17 @@ export function printReport(report: ChainVerificationReport): void {
   console.log(`  Chain Intact:   ${report.chain_intact ? "YES" : "NO"}`);
   console.log(`  Time Ordered:   ${report.time_ordered ? "YES" : "NO"}`);
   console.log(`  Sats Released:  ${report.total_sats_released}`);
-  console.log(`  Verified At:    ${new Date(report.verified_at * 1000).toISOString()}`);
+  console.log(
+    `  Verified At:    ${new Date(report.verified_at * 1000).toISOString()}`,
+  );
   console.log();
 
   for (const step of report.step_results) {
-    const icon = step.verdict === "pass" ? "[PASS]" : step.verdict === "fail" ? "[FAIL]" : "[SKIP]";
+    const icon = step.verdict === "pass"
+      ? "[PASS]"
+      : step.verdict === "fail"
+      ? "[FAIL]"
+      : "[SKIP]";
     console.log(`  ${icon} Step: ${step.step_type} (${step.step_id})`);
     for (const proof of step.proof_results) {
       const mark = proof.passed ? "  + " : "  - ";

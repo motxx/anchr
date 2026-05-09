@@ -77,9 +77,9 @@ export async function settleMarket(
     };
   }
 
-  const useFrost = !!market.group_pubkey_yes
-    && !!market.group_pubkey_no
-    && state.dualKeyStore.has(marketId);
+  const useFrost = !!market.group_pubkey_yes &&
+    !!market.group_pubkey_no &&
+    state.dualKeyStore.has(marketId);
 
   let resolvedPreimage: string | undefined;
   let oracleSignature: string | undefined;
@@ -134,7 +134,8 @@ export async function settleMarket(
       if (!proofSigs) {
         return {
           ok: false,
-          error: "Resolution failed — per-proof signing failed (threshold not met or already signed)",
+          error:
+            "Resolution failed — per-proof signing failed (threshold not met or already signed)",
           status: 503,
           mode: "frost_p2pk",
         };
@@ -175,7 +176,8 @@ export async function settleMarket(
       if (!sig) {
         return {
           ok: false,
-          error: "Resolution failed — signing failed (threshold not met or already signed)",
+          error:
+            "Resolution failed — signing failed (threshold not met or already signed)",
           status: 503,
           mode: "frost_p2pk",
         };
@@ -190,7 +192,11 @@ export async function settleMarket(
     revealHtlcPreimage(marketId, outcome, state.dualPreimageStore);
   } else {
     // HTLC preimage mode (fallback).
-    const result = revealHtlcPreimage(marketId, outcome, state.dualPreimageStore);
+    const result = revealHtlcPreimage(
+      marketId,
+      outcome,
+      state.dualPreimageStore,
+    );
     if (!result) {
       return {
         ok: false,
@@ -204,13 +210,19 @@ export async function settleMarket(
     await state.persist.preimage(marketId, result.preimage);
   }
 
-  const newStatus: MarketStatus = outcome === "yes" ? "resolved_yes" : "resolved_no";
+  const newStatus: MarketStatus = outcome === "yes"
+    ? "resolved_yes"
+    : "resolved_no";
   market.status = newStatus;
   await state.persist.market(market);
 
   // Clients call /redeem to retrieve their share of the matched-pair tokens.
   const settledPairs: SettledPair[] = [];
-  for (const pair of state.matchedPairs.values() as IterableIterator<MatchedBetPair>) {
+  for (
+    const pair of state.matchedPairs.values() as IterableIterator<
+      MatchedBetPair
+    >
+  ) {
     if (pair.market_id !== marketId) continue;
     if (pair.status !== "locked" && pair.status !== "pending") continue;
     pair.status = outcome === "yes" ? "settled_yes" : "settled_no";
@@ -231,7 +243,9 @@ export async function settleMarket(
     status: newStatus,
     ...(resolvedPreimage ? { preimage: resolvedPreimage } : {}),
     ...(oracleSignature ? { oracle_signature: oracleSignature } : {}),
-    ...(proofSigCount !== undefined ? { proof_signatures_count: proofSigCount } : {}),
+    ...(proofSigCount !== undefined
+      ? { proof_signatures_count: proofSigCount }
+      : {}),
     yes_pool_sats: market.yes_pool_sats,
     no_pool_sats: market.no_pool_sats,
     settled_pairs: settledPairs,

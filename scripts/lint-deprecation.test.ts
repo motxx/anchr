@@ -64,7 +64,7 @@ test("ignores 'predecessor' (no 'deprecated')", () => {
 
 test("ignores opt-out marker on same line", () => {
   const hits = scanText(
-    '/** @deprecated since v1.2. // allow-deprecation-vocab: post-1.0 SemVer */',
+    "/** @deprecated since v1.2. // allow-deprecation-vocab: post-1.0 SemVer */",
     "x.ts",
   );
   expect(hits.length).toBe(0);

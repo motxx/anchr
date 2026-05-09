@@ -11,7 +11,9 @@ export interface ProofGateCondition {
   description: string;
 }
 
-export interface ProofGateCampaign<C extends ProofGateCondition = ProofGateCondition> {
+export interface ProofGateCampaign<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   id: string;
   name: string;
   conditions: C[];
@@ -30,14 +32,18 @@ export interface ClaimProof {
   presentation: string;
 }
 
-export interface ConditionResult<C extends ProofGateCondition = ProofGateCondition> {
+export interface ConditionResult<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   condition: C;
   passed: boolean;
   extracted_value?: string | number;
   reason: string;
 }
 
-export interface ClaimVerificationResult<C extends ProofGateCondition = ProofGateCondition> {
+export interface ClaimVerificationResult<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   all_passed: boolean;
   results: Array<ConditionResult<C>>;
   preimage?: string;
@@ -46,7 +52,11 @@ export interface ClaimVerificationResult<C extends ProofGateCondition = ProofGat
   failures: string[];
 }
 
-export type ProofGateSettlementStatus = "reserved" | "locked" | "released" | "failed";
+export type ProofGateSettlementStatus =
+  | "reserved"
+  | "locked"
+  | "released"
+  | "failed";
 
 export interface ProofGateSettlement {
   type: "preimage_only" | "cashu_htlc" | string;
@@ -60,7 +70,9 @@ export interface ProofGateSettlement {
   error?: string;
 }
 
-export interface ProofGateClaim<C extends ProofGateCondition = ProofGateCondition> {
+export interface ProofGateClaim<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   id: string;
   campaign_id: string;
   claimant_pubkey: string;
@@ -75,7 +87,9 @@ export interface ProofGateClaim<C extends ProofGateCondition = ProofGateConditio
   updated_at: number;
 }
 
-export interface ProofGateStore<C extends ProofGateCondition = ProofGateCondition> {
+export interface ProofGateStore<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   upsertCampaign(campaign: ProofGateCampaign<C>): Promise<void>;
   getCampaign(id: string): Promise<ProofGateCampaign<C> | undefined>;
   listCampaigns(): Promise<Array<ProofGateCampaign<C>>>;
@@ -83,8 +97,15 @@ export interface ProofGateStore<C extends ProofGateCondition = ProofGateConditio
   getClaim(id: string): Promise<ProofGateClaim<C> | undefined>;
   updateClaim(claim: ProofGateClaim<C>): Promise<void>;
   approvedClaimCount(campaignId: string): Promise<number>;
-  findApprovedByNullifier(campaignId: string, nullifierHash: string): Promise<ProofGateClaim<C> | undefined>;
-  reservePresentationHashes(campaignId: string, claimId: string, hashes: string[]): Promise<boolean>;
+  findApprovedByNullifier(
+    campaignId: string,
+    nullifierHash: string,
+  ): Promise<ProofGateClaim<C> | undefined>;
+  reservePresentationHashes(
+    campaignId: string,
+    claimId: string,
+    hashes: string[],
+  ): Promise<boolean>;
   close(): Promise<void>;
 }
 

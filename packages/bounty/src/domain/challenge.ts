@@ -20,7 +20,10 @@ export function generateNonce(length = 6): string {
   return result;
 }
 
-export function buildChallengeRule(nonce: string | undefined, description: string): string {
+export function buildChallengeRule(
+  nonce: string | undefined,
+  description: string,
+): string {
   if (!nonce) {
     return `対象（${description}）を撮影してください。C2PA対応カメラでの撮影を推奨します。`;
   }

@@ -1,10 +1,17 @@
 import { useCallback } from "react";
 import { useWalletStore } from "../store/wallet.ts";
-import { verifyToken, decodeTokenAmount } from "../cashu/wallet.ts";
+import { decodeTokenAmount, verifyToken } from "../cashu/wallet.ts";
 import { getDecodedToken } from "@cashu/cashu-ts";
 
 export function useWallet() {
-  const { balance, proofs, transactions, addTransaction, addProofs, removeProofs } = useWalletStore();
+  const {
+    balance,
+    proofs,
+    transactions,
+    addTransaction,
+    addProofs,
+    removeProofs,
+  } = useWalletStore();
 
   const fundFromToken = useCallback(async (token: string) => {
     const result = await verifyToken(token);

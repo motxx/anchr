@@ -63,24 +63,24 @@ export interface TwoPartyBinaryBet {
 }
 
 export type MarketStatus =
-  | "open"         // Accepting bets
-  | "closed"       // Deadline passed, awaiting resolution
-  | "resolving"    // Oracle is generating TLSNotary proof
+  | "open" // Accepting bets
+  | "closed" // Deadline passed, awaiting resolution
+  | "resolving" // Oracle is generating TLSNotary proof
   | "resolved_yes" // Oracle proved YES — preimage revealed
-  | "resolved_no"  // Oracle proved NO — HTLC locktime expires
-  | "expired";     // No resolution submitted before timeout
+  | "resolved_no" // Oracle proved NO — HTLC locktime expires
+  | "expired"; // No resolution submitted before timeout
 
 // --- Resolution conditions ---
 
 export interface ResolutionCondition {
   /** How to evaluate the response body from the resolution URL. */
   type:
-    | "price_above"     // JSON numeric value > threshold
-    | "price_below"     // JSON numeric value < threshold
-    | "contains_text"   // Body contains expected string
+    | "price_above" // JSON numeric value > threshold
+    | "price_below" // JSON numeric value < threshold
+    | "contains_text" // Body contains expected string
     | "jsonpath_equals" // JSONPath value === expected
-    | "jsonpath_gt"     // JSONPath value > threshold
-    | "jsonpath_lt";    // JSONPath value < threshold
+    | "jsonpath_gt" // JSONPath value > threshold
+    | "jsonpath_lt"; // JSONPath value < threshold
   /** HTTPS URL to prove (same as market.resolution_url). */
   target_url: string;
   /** Dot-notation path into the JSON response (e.g. "best_bid", "data.price"). */

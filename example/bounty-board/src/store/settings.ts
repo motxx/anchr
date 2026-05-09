@@ -16,7 +16,9 @@ const STORAGE_KEY_SERVER = "anchr_server_url";
 const STORAGE_KEY_RELAYS = "anchr_relay_urls";
 const STORAGE_KEY_MINT = "anchr_mint_url";
 
-const DEFAULT_SERVER_URL = __DEV__ ? "http://localhost:3000" : "https://anchr-app.fly.dev";
+const DEFAULT_SERVER_URL = __DEV__
+  ? "http://localhost:3000"
+  : "https://anchr-app.fly.dev";
 const DEFAULT_RELAY_URLS = ["wss://relay.damus.io", "wss://nos.lol"];
 const DEFAULT_MINT_URL = "https://mint.minibits.cash/Bitcoin";
 

@@ -1,7 +1,12 @@
 import React, { useState } from "react";
 import { View } from "react-native";
 import { router } from "expo-router";
-import { DSText, DSInput, DSButton, DSFeedbackBanner } from "../../src/components/ds/index.ts";
+import {
+  DSButton,
+  DSFeedbackBanner,
+  DSInput,
+  DSText,
+} from "../../src/components/ds/index.ts";
 import { useAuthStore } from "../../src/store/auth.ts";
 import { isValidNsec, nsecDecode } from "../../src/nostr/nip19.ts";
 
@@ -45,9 +50,7 @@ export default function ImportKeyScreen() {
         Paste your Nostr secret key (nsec) to restore your identity.
       </DSText>
 
-      {error && (
-        <DSFeedbackBanner variant="error" message={error} />
-      )}
+      {error && <DSFeedbackBanner variant="error" message={error} />}
 
       <View className="mt-4 gap-4">
         <DSInput

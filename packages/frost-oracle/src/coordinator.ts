@@ -8,14 +8,12 @@
 
 import { randomBytes } from "node:crypto";
 import type {
-  DkgSession,
   DkgRoundResult,
+  DkgSession,
   FrostSigningSession,
   ThresholdOracleConfig,
 } from "./types.ts";
-import {
-  aggregateSignatures,
-} from "./frost-cli.ts";
+import { aggregateSignatures } from "./frost-cli.ts";
 
 export interface FrostCoordinator {
   /** Start a new DKG session. */
@@ -55,7 +53,10 @@ export interface FrostCoordinator {
   ): void;
 
   /** Try to aggregate signatures if threshold is met. Returns signature or null. */
-  tryAggregate(sessionId: string, pubkeyPackage?: string): Promise<{ signature: string } | null>;
+  tryAggregate(
+    sessionId: string,
+    pubkeyPackage?: string,
+  ): Promise<{ signature: string } | null>;
 
   /** Get signing session state. */
   getSigningSession(sessionId: string): FrostSigningSession | undefined;
@@ -88,7 +89,13 @@ export function createFrostCoordinator(): FrostCoordinator {
       return session;
     },
 
-    async submitDkgPackage(sessionId, round, signerIndex, packageJson, secretPackageJson) {
+    async submitDkgPackage(
+      sessionId,
+      round,
+      signerIndex,
+      packageJson,
+      secretPackageJson,
+    ) {
       const session = dkgSessions.get(sessionId);
       if (!session) return null;
 

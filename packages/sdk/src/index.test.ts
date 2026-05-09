@@ -1,6 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { Anchr, AnchrError, QueryTimeoutError, VerificationFailedError } from "./index.ts";
+import {
+  Anchr,
+  AnchrError,
+  QueryTimeoutError,
+  VerificationFailedError,
+} from "./index.ts";
 
 describe("Anchr SDK", () => {
   test("constructor accepts config", () => {

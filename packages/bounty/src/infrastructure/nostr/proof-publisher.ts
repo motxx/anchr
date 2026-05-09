@@ -10,8 +10,15 @@
  * what was cryptographically verified — no post-hoc modification.
  */
 
-import type { ProofDelivery, ProofPublishResult } from "../../application/ports.ts";
-import type { OracleAttestationRecord, ProofVisibility, Query } from "../../domain/types.ts";
+import type {
+  ProofDelivery,
+  ProofPublishResult,
+} from "../../application/ports.ts";
+import type {
+  OracleAttestationRecord,
+  ProofVisibility,
+  Query,
+} from "../../domain/types.ts";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
 import { publishEvent } from "./transport/client.ts";
@@ -24,7 +31,9 @@ export interface NostrProofPublisherConfig {
   relayUrls?: string[];
 }
 
-export function createNostrProofPublisher(config: NostrProofPublisherConfig): ProofDelivery {
+export function createNostrProofPublisher(
+  config: NostrProofPublisherConfig,
+): ProofDelivery {
   return {
     async publish(
       query: Query,
@@ -60,7 +69,8 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
       const result = await publishEvent(event, config.relayUrls);
 
       if (result.successes.length > 0) {
-        log.error(`Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
+        log.error(
+          `Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
         );
         return {
           event_id: event.id,
@@ -68,7 +78,10 @@ export function createNostrProofPublisher(config: NostrProofPublisherConfig): Pr
         };
       }
 
-      log.error(`Failed to publish attestation for query ${query.id}: ${result.failures.join(", ")}`,
+      log.error(
+        `Failed to publish attestation for query ${query.id}: ${
+          result.failures.join(", ")
+        }`,
       );
       return null;
     },

@@ -1,8 +1,15 @@
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
 import { createHtlcToken, swapHtlcBindWorker } from "@anchr/core-cashu/escrow";
-import type { ProofGateCampaign, ProofGateClaim, ProofGateCondition, ProofGateSettlement } from "./types.ts";
+import type {
+  ProofGateCampaign,
+  ProofGateClaim,
+  ProofGateCondition,
+  ProofGateSettlement,
+} from "./types.ts";
 
-export interface ReserveSettlementParams<C extends ProofGateCondition = ProofGateCondition> {
+export interface ReserveSettlementParams<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   campaign: ProofGateCampaign<C>;
   claimId: string;
   claimantPubkey: string;
@@ -10,32 +17,47 @@ export interface ReserveSettlementParams<C extends ProofGateCondition = ProofGat
   amountSats: number;
 }
 
-export interface ReleaseSettlementParams<C extends ProofGateCondition = ProofGateCondition> {
+export interface ReleaseSettlementParams<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   campaign: ProofGateCampaign<C>;
   claim: ProofGateClaim<C>;
   preimage: string;
 }
 
-export interface RejectSettlementParams<C extends ProofGateCondition = ProofGateCondition> {
+export interface RejectSettlementParams<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
   campaign: ProofGateCampaign<C>;
   claim: ProofGateClaim<C>;
   reason: string;
 }
 
-export interface ProofGateSettlementProvider<C extends ProofGateCondition = ProofGateCondition> {
-  reserveClaimSettlement(params: ReserveSettlementParams<C>): Promise<ProofGateSettlement>;
-  releaseClaimSettlement(params: ReleaseSettlementParams<C>): Promise<ProofGateSettlement>;
+export interface ProofGateSettlementProvider<
+  C extends ProofGateCondition = ProofGateCondition,
+> {
+  reserveClaimSettlement(
+    params: ReserveSettlementParams<C>,
+  ): Promise<ProofGateSettlement>;
+  releaseClaimSettlement(
+    params: ReleaseSettlementParams<C>,
+  ): Promise<ProofGateSettlement>;
   rejectClaimSettlement?(params: RejectSettlementParams<C>): Promise<void>;
 }
 
 export interface CoreCashuProofGateSettlementOptions {
   requesterRefundPubkey: string;
   locktimeSeconds: number | ((params: ReserveSettlementParams) => number);
-  sourceProofsResolver: (amountSats: number, params: ReserveSettlementParams) => Promise<Proof[]>;
+  sourceProofsResolver: (
+    amountSats: number,
+    params: ReserveSettlementParams,
+  ) => Promise<Proof[]>;
   mintUrl?: string;
 }
 
-export function createCoreCashuProofGateSettlementProvider<C extends ProofGateCondition = ProofGateCondition>(
+export function createCoreCashuProofGateSettlementProvider<
+  C extends ProofGateCondition = ProofGateCondition,
+>(
   opts: CoreCashuProofGateSettlementOptions,
 ): ProofGateSettlementProvider<C> {
   return {
@@ -43,14 +65,23 @@ export function createCoreCashuProofGateSettlementProvider<C extends ProofGateCo
       const locktime = typeof opts.locktimeSeconds === "function"
         ? opts.locktimeSeconds(params)
         : opts.locktimeSeconds;
-      const sourceProofs = await opts.sourceProofsResolver(params.amountSats, params);
+      const sourceProofs = await opts.sourceProofsResolver(
+        params.amountSats,
+        params,
+      );
       const hold = await createHtlcToken(params.amountSats, {
         hash: params.htlcHash,
         requesterPubkey: opts.requesterRefundPubkey,
         locktimeSeconds: locktime,
       }, sourceProofs);
       if (!hold) {
-        return failedSettlement(params, "cashu_htlc", "failed to create Cashu hold token", locktime, opts.mintUrl);
+        return failedSettlement(
+          params,
+          "cashu_htlc",
+          "failed to create Cashu hold token",
+          locktime,
+          opts.mintUrl,
+        );
       }
       const bound = await swapHtlcBindWorker(hold.proofs, {
         hash: params.htlcHash,
@@ -59,7 +90,13 @@ export function createCoreCashuProofGateSettlementProvider<C extends ProofGateCo
         locktimeSeconds: locktime,
       });
       if (!bound) {
-        return failedSettlement(params, "cashu_htlc", "failed to bind Cashu HTLC token to claimant", locktime, opts.mintUrl);
+        return failedSettlement(
+          params,
+          "cashu_htlc",
+          "failed to bind Cashu HTLC token to claimant",
+          locktime,
+          opts.mintUrl,
+        );
       }
       return {
         type: "cashu_htlc",
@@ -78,7 +115,8 @@ export function createCoreCashuProofGateSettlementProvider<C extends ProofGateCo
         type: settlement?.type ?? "cashu_htlc",
         status: "released",
         htlc_hash: params.claim.htlc_hash,
-        amount_sats: settlement?.amount_sats ?? params.campaign.token_amount_per_claim,
+        amount_sats: settlement?.amount_sats ??
+          params.campaign.token_amount_per_claim,
         claimant_pubkey: params.claim.claimant_pubkey,
         cashu_token: settlement?.cashu_token,
         mint_url: settlement?.mint_url ?? opts.mintUrl,
@@ -95,7 +133,9 @@ export interface TokenBankSettlementOptions {
   mintUrl?: string;
 }
 
-export function createCashuTokenBankProofGateSettlementProvider<C extends ProofGateCondition = ProofGateCondition>(
+export function createCashuTokenBankProofGateSettlementProvider<
+  C extends ProofGateCondition = ProofGateCondition,
+>(
   opts: TokenBankSettlementOptions,
 ): ProofGateSettlementProvider<C> {
   const tokens = [...opts.sourceTokens];
@@ -107,7 +147,10 @@ export function createCashuTokenBankProofGateSettlementProvider<C extends ProofG
       while (tokens.length > 0) {
         const token = tokens.shift()!;
         const decoded = getDecodedToken(token);
-        const amount = decoded.proofs.reduce((sum: number, proof: Proof) => sum + proof.amount, 0);
+        const amount = decoded.proofs.reduce(
+          (sum: number, proof: Proof) => sum + proof.amount,
+          0,
+        );
         if (amount >= amountSats) return decoded.proofs;
       }
       throw new Error("Cashu token bank exhausted");

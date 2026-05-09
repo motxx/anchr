@@ -19,7 +19,10 @@ function buildJpegWithExif(): Buffer {
   const app1 = Buffer.concat([app1Marker, app1Length, app1Payload]);
 
   // APP0 JFIF segment (should be preserved)
-  const jfifData = Buffer.from("JFIF\0\x01\x01\x00\x00\x01\x00\x01\x00\x00", "binary");
+  const jfifData = Buffer.from(
+    "JFIF\0\x01\x01\x00\x00\x01\x00\x01\x00\x00",
+    "binary",
+  );
   const app0Length = Buffer.alloc(2);
   app0Length.writeUInt16BE(jfifData.length + 2);
   const app0Marker = Buffer.from([0xff, 0xe0]);
@@ -33,7 +36,16 @@ function buildJpegWithExif(): Buffer {
   const imageData = Buffer.from([0x00, 0x00, 0x00]); // fake compressed data
   const eoi = Buffer.from([0xff, 0xd9]);
 
-  return Buffer.concat([soi, app0, app1, sos, sosLength, sosPayload, imageData, eoi]);
+  return Buffer.concat([
+    soi,
+    app0,
+    app1,
+    sos,
+    sosLength,
+    sosPayload,
+    imageData,
+    eoi,
+  ]);
 }
 
 describe("EXIF stripping", () => {
@@ -60,7 +72,16 @@ describe("EXIF stripping", () => {
   });
 
   test("preserves non-JPEG files unchanged", async () => {
-    const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const pngData = Buffer.from([
+      0x89,
+      0x50,
+      0x4e,
+      0x47,
+      0x0d,
+      0x0a,
+      0x1a,
+      0x0a,
+    ]);
     const result = await stripExif(pngData, "image.mp4");
     expect(result).toEqual(pngData);
   });

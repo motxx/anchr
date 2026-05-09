@@ -10,7 +10,8 @@ import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "integrity"]);
 
 export function detectZip(rawBuffer: Buffer, filename: string): boolean {
-  return filename.endsWith(".zip") || (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);
+  return filename.endsWith(".zip") ||
+    (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);
 }
 
 export function inferMimeType(filename: string): string {
@@ -20,7 +21,9 @@ export function inferMimeType(filename: string): string {
   return "image/jpeg";
 }
 
-export function extractProofModeIntegrity(pmData: ProofModeData): ProofModeIntegrity {
+export function extractProofModeIntegrity(
+  pmData: ProofModeData,
+): ProofModeIntegrity {
   return {
     proof: pmData.proof,
     hashValid: pmData.hashValid,

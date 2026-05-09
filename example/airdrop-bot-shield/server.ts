@@ -4,7 +4,10 @@ import {
   createProofGateService,
   openSqliteProofGateStore,
 } from "@anchr/bounty/claim-gate";
-import { loadAirdropBotShieldRuntimeConfig, assertMainnetReleaseConfig } from "./src/release-config.ts";
+import {
+  assertMainnetReleaseConfig,
+  loadAirdropBotShieldRuntimeConfig,
+} from "./src/release-config.ts";
 import { buildAirdropBotShieldApp } from "./src/server-routes.ts";
 import { identityPathForAirdropCondition } from "./src/identity-policy.ts";
 import type { ProofCondition } from "./src/airdrop-criteria.ts";
@@ -18,7 +21,9 @@ if (config.dbPath !== ":memory:") {
 
 const store = openSqliteProofGateStore<ProofCondition>(config.dbPath);
 const settlementProvider = config.settlement
-  ? createCashuTokenBankProofGateSettlementProvider<ProofCondition>(config.settlement)
+  ? createCashuTokenBankProofGateSettlementProvider<ProofCondition>(
+    config.settlement,
+  )
   : undefined;
 const service = createProofGateService<ProofCondition>({
   store,
@@ -34,7 +39,10 @@ const app = buildAirdropBotShieldApp({
 });
 
 if (config.warnings.length > 0) {
-  console.warn("[airdrop-bot-shield] not mainnet-ready:", config.warnings.join("; "));
+  console.warn(
+    "[airdrop-bot-shield] not mainnet-ready:",
+    config.warnings.join("; "),
+  );
 }
 console.log(`[airdrop-bot-shield] listening on :${config.port}`);
 Deno.serve({ port: config.port }, app.fetch);

@@ -15,7 +15,13 @@
  * exercise resolution itself, only bet liquidity.
  */
 
-export type MarketCategory = "crypto" | "politics" | "economics" | "sports" | "science" | "culture";
+export type MarketCategory =
+  | "crypto"
+  | "politics"
+  | "economics"
+  | "sports"
+  | "science"
+  | "culture";
 
 export interface SeedMarket {
   /** Short slug; used for logging only — server assigns the real id. */
@@ -25,7 +31,13 @@ export interface SeedMarket {
   category: MarketCategory;
   resolution_url: string;
   resolution_condition: {
-    type: "jsonpath_gt" | "jsonpath_lt" | "jsonpath_equals" | "contains_text" | "price_above" | "price_below";
+    type:
+      | "jsonpath_gt"
+      | "jsonpath_lt"
+      | "jsonpath_equals"
+      | "contains_text"
+      | "price_above"
+      | "price_below";
     jsonpath?: string;
     threshold?: number;
     expected_text?: string;
@@ -47,8 +59,13 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
       "Resolves YES if BTC/USD on CoinGecko prints $200,000 or above at any point in 2026. " +
       "Verified via TLSNotary proof from api.coingecko.com.",
     category: "crypto",
-    resolution_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
-    resolution_condition: { type: "jsonpath_gt", jsonpath: "bitcoin.usd", threshold: 200000 },
+    resolution_url:
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    resolution_condition: {
+      type: "jsonpath_gt",
+      jsonpath: "bitcoin.usd",
+      threshold: 200000,
+    },
     resolution_in_days: 240,
     yes_bias: 0.32,
     typical_bet_sats: 5000,
@@ -56,10 +73,16 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
   {
     slug: "eth-5k-eoy-2026",
     title: "Will ETH/USD trade above $5,000 on December 31, 2026?",
-    description: "Snapshot price on the resolution deadline. Source: CoinGecko.",
+    description:
+      "Snapshot price on the resolution deadline. Source: CoinGecko.",
     category: "crypto",
-    resolution_url: "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
-    resolution_condition: { type: "jsonpath_gt", jsonpath: "ethereum.usd", threshold: 5000 },
+    resolution_url:
+      "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+    resolution_condition: {
+      type: "jsonpath_gt",
+      jsonpath: "ethereum.usd",
+      threshold: 5000,
+    },
     resolution_in_days: 250,
     yes_bias: 0.41,
     typical_bet_sats: 3000,
@@ -70,7 +93,11 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
     description: "Resolves on the basis of aggregated reported flows.",
     category: "crypto",
     resolution_url: "https://api.coingecko.com/api/v3/coins/bitcoin",
-    resolution_condition: { type: "jsonpath_gt", jsonpath: "market_data.market_cap.usd", threshold: 1 },
+    resolution_condition: {
+      type: "jsonpath_gt",
+      jsonpath: "market_data.market_cap.usd",
+      threshold: 1,
+    },
     resolution_in_days: 150,
     yes_bias: 0.78,
     typical_bet_sats: 2000,
@@ -91,7 +118,8 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
   {
     slug: "tokyo-gov-turnout-60",
     title: "Will Tokyo gubernatorial election turnout exceed 60%?",
-    description: "Official Tokyo Metropolitan Government election commission report.",
+    description:
+      "Official Tokyo Metropolitan Government election commission report.",
     category: "politics",
     resolution_url: "https://www.senkyo.metro.tokyo.lg.jp/",
     resolution_condition: { type: "contains_text", expected_text: "60.0" },
@@ -105,7 +133,10 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
     description: "Joint communique from the official G7 host site.",
     category: "politics",
     resolution_url: "https://www.g7.utoronto.ca/",
-    resolution_condition: { type: "contains_text", expected_text: "artificial intelligence" },
+    resolution_condition: {
+      type: "contains_text",
+      expected_text: "artificial intelligence",
+    },
     resolution_in_days: 60,
     yes_bias: 0.65,
     typical_bet_sats: 1200,
@@ -117,15 +148,20 @@ export const POLYMARKET_SEED_MARKETS: SeedMarket[] = [
     title: "Will the Fed cut rates by exactly 25bps at the May 2026 FOMC?",
     description: "FOMC statement published on federalreserve.gov.",
     category: "economics",
-    resolution_url: "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
-    resolution_condition: { type: "contains_text", expected_text: "1/4 percentage point" },
+    resolution_url:
+      "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+    resolution_condition: {
+      type: "contains_text",
+      expected_text: "1/4 percentage point",
+    },
     resolution_in_days: 14,
     yes_bias: 0.58,
     typical_bet_sats: 8000,
   },
   {
     slug: "boj-rate-50bps-by-eoy",
-    title: "Will the BoJ raise the policy rate to 0.5% or higher by end of 2026?",
+    title:
+      "Will the BoJ raise the policy rate to 0.5% or higher by end of 2026?",
     description: "Bank of Japan statement on policy rate.",
     category: "economics",
     resolution_url: "https://www.boj.or.jp/en/announcements/release_2026/",

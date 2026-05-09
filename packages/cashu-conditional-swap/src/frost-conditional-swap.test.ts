@@ -153,7 +153,11 @@ test("DualKeyStore.sign outcome a produces valid Schnorr signature", () => {
   expect(typeof sig).toBe("string");
   expect(sig!.length).toBe(128);
 
-  const valid = schnorr.verify(hexToBytes(sig!), message, hexToBytes(entry.pubkey_a));
+  const valid = schnorr.verify(
+    hexToBytes(sig!),
+    message,
+    hexToBytes(entry.pubkey_a),
+  );
   expect(valid).toBe(true);
 });
 
@@ -165,7 +169,11 @@ test("DualKeyStore.sign outcome b produces valid Schnorr signature", () => {
   const sig = store.sign("swap-1", "b", message);
   expect(sig).toBeTruthy();
 
-  const valid = schnorr.verify(hexToBytes(sig!), message, hexToBytes(entry.pubkey_b));
+  const valid = schnorr.verify(
+    hexToBytes(sig!),
+    message,
+    hexToBytes(entry.pubkey_b),
+  );
   expect(valid).toBe(true);
 });
 
@@ -206,11 +214,15 @@ test("multiple swaps are independent", () => {
 
   const sig1 = store.sign("swap-1", "a", msg1);
   expect(sig1).toBeTruthy();
-  expect(schnorr.verify(hexToBytes(sig1!), msg1, hexToBytes(e1.pubkey_a))).toBe(true);
+  expect(schnorr.verify(hexToBytes(sig1!), msg1, hexToBytes(e1.pubkey_a))).toBe(
+    true,
+  );
 
   const sig2 = store.sign("swap-2", "b", msg2);
   expect(sig2).toBeTruthy();
-  expect(schnorr.verify(hexToBytes(sig2!), msg2, hexToBytes(e2.pubkey_b))).toBe(true);
+  expect(schnorr.verify(hexToBytes(sig2!), msg2, hexToBytes(e2.pubkey_b))).toBe(
+    true,
+  );
 
   expect(store.sign("swap-1", "a", randomBytes(32))).toBeNull();
   expect(store.sign("swap-2", "b", randomBytes(32))).toBeNull();
@@ -232,7 +244,11 @@ test("signProofSecrets signs each proof secret with SHA256 hash", () => {
     expect(sig.length).toBe(128);
 
     const msgHash = sha256(new TextEncoder().encode(secret));
-    const valid = schnorr.verify(hexToBytes(sig), msgHash, hexToBytes(entry.pubkey_a));
+    const valid = schnorr.verify(
+      hexToBytes(sig),
+      msgHash,
+      hexToBytes(entry.pubkey_a),
+    );
     expect(valid).toBe(true);
   }
 });
@@ -248,7 +264,11 @@ test("signProofSecrets outcome b signs with pubkey_b", () => {
 
   const sig = result!.get("proof-secret-x")!;
   const msgHash = sha256(new TextEncoder().encode("proof-secret-x"));
-  const valid = schnorr.verify(hexToBytes(sig), msgHash, hexToBytes(entry.pubkey_b));
+  const valid = schnorr.verify(
+    hexToBytes(sig),
+    msgHash,
+    hexToBytes(entry.pubkey_b),
+  );
   expect(valid).toBe(true);
 });
 
@@ -283,7 +303,8 @@ test("signProofSecrets produces NUT-11 compatible signature (SHA256 of secret st
   const store = createDualKeyStore();
   const entry = store.create("swap-nut11");
 
-  const secret = '["P2PK",{"data":"02abcdef","nonce":"deadbeef","tags":[["pubkeys","02abc","02def"],["n_sigs","2"]]}]';
+  const secret =
+    '["P2PK",{"data":"02abcdef","nonce":"deadbeef","tags":[["pubkeys","02abc","02def"],["n_sigs","2"]]}]';
   const result = store.signProofSecrets("swap-nut11", "a", [secret]);
 
   expect(result).not.toBeNull();
@@ -291,6 +312,10 @@ test("signProofSecrets produces NUT-11 compatible signature (SHA256 of secret st
 
   // NUT-11 signing message: SHA256(proof.secret) where proof.secret is the raw string
   const expectedMsg = sha256(new TextEncoder().encode(secret));
-  const valid = schnorr.verify(hexToBytes(sig), expectedMsg, hexToBytes(entry.pubkey_a));
+  const valid = schnorr.verify(
+    hexToBytes(sig),
+    expectedMsg,
+    hexToBytes(entry.pubkey_a),
+  );
   expect(valid).toBe(true);
 });

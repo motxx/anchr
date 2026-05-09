@@ -8,7 +8,10 @@ import type { Query, QueryResult } from "../../domain/types.ts";
 function makeFakeOracle(id: string): Oracle {
   return {
     info: { id, name: `Fake ${id}`, fee_ppm: 10_000 },
-    async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      _result: QueryResult,
+    ): Promise<OracleAttestation> {
       return {
         oracle_id: id,
         query_id: query.id,
@@ -144,7 +147,10 @@ describe("resolveMultiple", () => {
   test("skips unknown IDs in acceptable list", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeFakeOracle("a"));
-    const result = registry.resolveMultiple(["a", "unknown", "also-unknown"], 5);
+    const result = registry.resolveMultiple(
+      ["a", "unknown", "also-unknown"],
+      5,
+    );
     expect(result).toHaveLength(1);
     expect(result[0]!.info.id).toBe("a");
   });

@@ -27,14 +27,16 @@ import { startAutoResolver } from "./src/auto-resolver.ts";
 import { openMarketStore } from "./src/market-store.ts";
 import { isMintReachable } from "./src/market-wallet.ts";
 import {
-  loadDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
+  loadDualOutcomeFrostNodeConfigAsync,
 } from "@anchr/frost-oracle/dual-outcome-config";
 
 const app = new Hono();
 app.use("*", cors());
 
-function clientIp(c: { req: { header(name: string): string | undefined } }): string {
+function clientIp(
+  c: { req: { header(name: string): string | undefined } },
+): string {
   return c.req.header("fly-client-ip") ??
     c.req.header("x-real-ip") ??
     c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
@@ -42,7 +44,9 @@ function clientIp(c: { req: { header(name: string): string | undefined } }): str
 }
 
 function createRateLimitMiddleware(): MiddlewareHandler {
-  const windowMs = Number(Deno.env.get("MARKET_RATE_LIMIT_WINDOW_MS") ?? "60000");
+  const windowMs = Number(
+    Deno.env.get("MARKET_RATE_LIMIT_WINDOW_MS") ?? "60000",
+  );
   const max = Number(Deno.env.get("MARKET_RATE_LIMIT_MAX") ?? "60");
   const buckets = new Map<string, { resetAt: number; count: number }>();
   return async (c, next) => {
@@ -56,7 +60,10 @@ function createRateLimitMiddleware(): MiddlewareHandler {
     buckets.set(key, bucket);
     if (bucket.count > max) {
       return c.json(
-        { error: "rate limit exceeded", retry_after_seconds: Math.ceil((bucket.resetAt - now) / 1000) },
+        {
+          error: "rate limit exceeded",
+          retry_after_seconds: Math.ceil((bucket.resetAt - now) / 1000),
+        },
         429,
       );
     }
@@ -76,7 +83,10 @@ function createSignerAuthMiddleware(): MiddlewareHandler {
     }
     const forwardedClient = c.req.header("fly-client-ip") ??
       c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
-    if (!forwardedClient || forwardedClient === "127.0.0.1" || forwardedClient === "::1") {
+    if (
+      !forwardedClient || forwardedClient === "127.0.0.1" ||
+      forwardedClient === "::1"
+    ) {
       await next();
       return;
     }
@@ -98,9 +108,15 @@ if (frostConfigPath) {
       passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
     });
     console.log(`[market] FROST market config loaded from ${frostConfigPath}`);
-    console.log(`[market] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`);
+    console.log(
+      `[market] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`,
+    );
   } catch (err) {
-    console.error(`[market] failed to load FROST config: ${err instanceof Error ? err.message : err}`);
+    console.error(
+      `[market] failed to load FROST config: ${
+        err instanceof Error ? err.message : err
+      }`,
+    );
     Deno.exit(1);
   }
 }
@@ -129,7 +145,9 @@ const nostrRelays = resolveNostrRelaysFromEnv();
 if (nostrRelays.length > 0) {
   console.log(`[market] NIP-60 wallet relays: ${nostrRelays.join(", ")}`);
 } else {
-  console.log("[market] NOSTR_RELAYS not set — UI wallet uses localStorage only.");
+  console.log(
+    "[market] NOSTR_RELAYS not set — UI wallet uses localStorage only.",
+  );
 }
 
 // Persistent state: SQLite at MARKET_DB_PATH (defaults to /data/market.db
@@ -151,7 +169,9 @@ const state = createMarketState({
 });
 const seededFaucetTokens = await seedFaucetTokensFromEnv(state);
 if (seededFaucetTokens > 0) {
-  console.log(`[market] seeded ${seededFaucetTokens} public-testnet faucet token(s)`);
+  console.log(
+    `[market] seeded ${seededFaucetTokens} public-testnet faucet token(s)`,
+  );
 }
 
 registerMarketRoutes(app, {
@@ -207,16 +227,31 @@ if (Deno.env.get("AUTO_RESOLVE_DISABLED") !== "1") {
 }
 
 // Serve UI static files
-app.get("/", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
-app.get("/generated.css", serveStatic({ path: "./example/two-party-binary-bet/ui/generated.css" }));
-app.get("/main.js", serveStatic({ path: "./example/two-party-binary-bet/ui/main.js" }));
-app.get("/main.js.map", serveStatic({ path: "./example/two-party-binary-bet/ui/main.js.map" }));
+app.get(
+  "/",
+  serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }),
+);
+app.get(
+  "/generated.css",
+  serveStatic({ path: "./example/two-party-binary-bet/ui/generated.css" }),
+);
+app.get(
+  "/main.js",
+  serveStatic({ path: "./example/two-party-binary-bet/ui/main.js" }),
+);
+app.get(
+  "/main.js.map",
+  serveStatic({ path: "./example/two-party-binary-bet/ui/main.js.map" }),
+);
 
 // SPA catch-all — anything that isn't an API route or a known asset falls
 // through to index.html so deep links like /m/<market-id> hydrate the React
 // app. registerMarketRoutes mounts /markets/* before this, so API requests
 // still take precedence.
-app.get("*", serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }));
+app.get(
+  "*",
+  serveStatic({ path: "./example/two-party-binary-bet/ui/index.html" }),
+);
 
 const port = Number(Deno.env.get("MARKET_PORT")) || 3001;
 console.log(`Two-party binary bet server on http://localhost:${port}`);

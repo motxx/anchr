@@ -1,6 +1,9 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createInMemoryQueryRepository, toRepository } from "./query-repository.ts";
+import {
+  createInMemoryQueryRepository,
+  toRepository,
+} from "./query-repository.ts";
 import { createQueryStore } from "./query-store.ts";
 import type { Query } from "./types.ts";
 import type { QueryRepository } from "./query-repository.ts";
@@ -52,12 +55,28 @@ function runRepositoryTests(name: string, factory: () => QueryRepository) {
 
     test("findOpen returns open non-expired queries", () => {
       const now = Date.now();
-      repo.save(makeQuery({ id: "q1", status: "pending", expires_at: now + 10000 }));
-      repo.save(makeQuery({ id: "q2", status: "approved", expires_at: now + 10000 }));
-      repo.save(makeQuery({ id: "q3", status: "pending", expires_at: now - 1000 }));
-      repo.save(makeQuery({ id: "q4", status: "awaiting_quotes", expires_at: now + 10000 }));
-      repo.save(makeQuery({ id: "q5", status: "processing", expires_at: now + 10000 }));
-      repo.save(makeQuery({ id: "q6", status: "rejected", expires_at: now + 10000 }));
+      repo.save(
+        makeQuery({ id: "q1", status: "pending", expires_at: now + 10000 }),
+      );
+      repo.save(
+        makeQuery({ id: "q2", status: "approved", expires_at: now + 10000 }),
+      );
+      repo.save(
+        makeQuery({ id: "q3", status: "pending", expires_at: now - 1000 }),
+      );
+      repo.save(
+        makeQuery({
+          id: "q4",
+          status: "awaiting_quotes",
+          expires_at: now + 10000,
+        }),
+      );
+      repo.save(
+        makeQuery({ id: "q5", status: "processing", expires_at: now + 10000 }),
+      );
+      repo.save(
+        makeQuery({ id: "q6", status: "rejected", expires_at: now + 10000 }),
+      );
 
       const open = repo.findOpen(now);
       const ids = open.map((q) => q.id).sort();
@@ -66,10 +85,22 @@ function runRepositoryTests(name: string, factory: () => QueryRepository) {
 
     test("findExpirable returns only expirable and past-deadline queries", () => {
       const now = Date.now();
-      repo.save(makeQuery({ id: "q1", status: "pending", expires_at: now - 1000 }));
-      repo.save(makeQuery({ id: "q2", status: "pending", expires_at: now + 10000 }));
-      repo.save(makeQuery({ id: "q3", status: "approved", expires_at: now - 1000 }));
-      repo.save(makeQuery({ id: "q4", status: "awaiting_quotes", expires_at: now - 500 }));
+      repo.save(
+        makeQuery({ id: "q1", status: "pending", expires_at: now - 1000 }),
+      );
+      repo.save(
+        makeQuery({ id: "q2", status: "pending", expires_at: now + 10000 }),
+      );
+      repo.save(
+        makeQuery({ id: "q3", status: "approved", expires_at: now - 1000 }),
+      );
+      repo.save(
+        makeQuery({
+          id: "q4",
+          status: "awaiting_quotes",
+          expires_at: now - 500,
+        }),
+      );
 
       const expirable = repo.findExpirable(now);
       const ids = expirable.map((q) => q.id).sort();
@@ -108,7 +139,10 @@ function runRepositoryTests(name: string, factory: () => QueryRepository) {
   });
 }
 
-runRepositoryTests("createInMemoryQueryRepository", createInMemoryQueryRepository);
+runRepositoryTests(
+  "createInMemoryQueryRepository",
+  createInMemoryQueryRepository,
+);
 
 runRepositoryTests("toRepository(QueryStore)", () => {
   const store = createQueryStore();

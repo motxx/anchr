@@ -8,9 +8,12 @@ if (!STRIPE_SECRET_KEY) {
 }
 
 // Get Payment Intent ID
-const piResp = await fetch("https://api.stripe.com/v1/checkout/sessions?limit=1", {
-  headers: { "Authorization": `Basic ${btoa(STRIPE_SECRET_KEY + ":")}` },
-});
+const piResp = await fetch(
+  "https://api.stripe.com/v1/checkout/sessions?limit=1",
+  {
+    headers: { "Authorization": `Basic ${btoa(STRIPE_SECRET_KEY + ":")}` },
+  },
+);
 const piData = await piResp.json();
 const PAYMENT_INTENT_ID = piData.data?.[0]?.payment_intent;
 if (!PAYMENT_INTENT_ID) {
@@ -21,28 +24,34 @@ console.log("Payment Intent ID:", PAYMENT_INTENT_ID);
 
 // Launch Chrome with TLSNotary Extension
 console.log("Launching Chrome with TLSNotary Extension...");
-const context = await chromium.launchPersistentContext("/tmp/chrome-tlsn-profile", {
-  headless: false,
-  args: [
-    "--disable-extensions-except=/private/tmp/tlsn-extension",
-    "--load-extension=/private/tmp/tlsn-extension",
-    "--no-first-run",
-    "--no-default-browser-check",
-  ],
-});
+const context = await chromium.launchPersistentContext(
+  "/tmp/chrome-tlsn-profile",
+  {
+    headless: false,
+    args: [
+      "--disable-extensions-except=/private/tmp/tlsn-extension",
+      "--load-extension=/private/tmp/tlsn-extension",
+      "--no-first-run",
+      "--no-default-browser-check",
+    ],
+  },
+);
 
 // Wait for Extension service worker
 let extId = "unknown";
 for (let i = 0; i < 30; i++) {
-  const sw = context.serviceWorkers().find(s => s.url().includes("background.bundle.js"));
+  const sw = context.serviceWorkers().find((s) =>
+    s.url().includes("background.bundle.js")
+  );
   if (sw) {
     extId = new URL(sw.url()).hostname;
     break;
   }
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 }
 if (extId === "unknown") {
-  const sw = await context.waitForEvent("serviceworker", { timeout: 10000 }).catch(() => null);
+  const sw = await context.waitForEvent("serviceworker", { timeout: 10000 })
+    .catch(() => null);
   if (sw?.url().includes("background.bundle.js")) {
     extId = new URL(sw.url()).hostname;
   }
@@ -50,7 +59,9 @@ if (extId === "unknown") {
 console.log("Extension ID:", extId);
 
 if (extId === "unknown") {
-  console.error("Failed to detect TLSNotary Extension. Check /tmp/tlsn-extension.");
+  console.error(
+    "Failed to detect TLSNotary Extension. Check /tmp/tlsn-extension.",
+  );
   process.exit(1);
 }
 
@@ -139,7 +150,8 @@ if (hasContentEditable) {
   console.log("Code injected via contenteditable + clipboard");
 } else {
   // Try clicking the code area with line numbers and using keyboard
-  const codeArea = page.locator('.code-editor, .editor, [role="textbox"]').first();
+  const codeArea = page.locator('.code-editor, .editor, [role="textbox"]')
+    .first();
   if (await codeArea.count() > 0) {
     await codeArea.click();
   } else {
@@ -163,19 +175,19 @@ await page.screenshot({ path: "/tmp/devconsole-after-inject.png" });
 console.log("Screenshot saved to /tmp/devconsole-after-inject.png");
 
 // Monitor console output from all pages
-page.on('console', msg => {
+page.on("console", (msg) => {
   console.log(`[devconsole] ${msg.text()}`);
 });
 
 // Listen for new pages (Allow popup may open as new tab/window)
-context.on('page', async (newPage) => {
+context.on("page", async (newPage) => {
   console.log(`[new page] ${newPage.url()}`);
   await newPage.waitForLoadState("domcontentloaded").catch(() => {});
   await newPage.screenshot({ path: "/tmp/new-page.png" }).catch(() => {});
 
   // Try to find and click Allow button
   try {
-    const allowBtn = newPage.locator('button', { hasText: /allow/i }).first();
+    const allowBtn = newPage.locator("button", { hasText: /allow/i }).first();
     if (await allowBtn.count() > 0) {
       await allowBtn.click({ timeout: 5000 });
       console.log("[new page] Clicked Allow!");
@@ -185,7 +197,7 @@ context.on('page', async (newPage) => {
 
 // Click "Run Code" button
 console.log("Clicking 'Run Code'...");
-const runButton = page.locator('button', { hasText: /run/i }).first();
+const runButton = page.locator("button", { hasText: /run/i }).first();
 await runButton.click();
 console.log("Run Code clicked!");
 
@@ -198,7 +210,7 @@ console.log(`Open pages: ${pages.length}`);
 for (const p of pages) {
   console.log(`  - ${p.url()}`);
   try {
-    const allowBtn = p.locator('button', { hasText: /allow/i }).first();
+    const allowBtn = p.locator("button", { hasText: /allow/i }).first();
     if (await allowBtn.count() > 0) {
       await allowBtn.click({ timeout: 3000 });
       console.log(`  -> Clicked Allow on ${p.url()}`);
@@ -208,7 +220,7 @@ for (const p of pages) {
 
 // Also check if Allow is on the same page (might be a modal)
 try {
-  const allowBtn = page.locator('button', { hasText: /allow/i }).first();
+  const allowBtn = page.locator("button", { hasText: /allow/i }).first();
   if (await allowBtn.count() > 0) {
     await allowBtn.click({ timeout: 3000 });
     console.log("Clicked Allow on DevConsole page (modal)!");
@@ -220,7 +232,9 @@ await page.waitForTimeout(2000);
 await page.screenshot({ path: "/tmp/devconsole-after-run.png" });
 console.log("Screenshot saved to /tmp/devconsole-after-run.png");
 
-console.log("Waiting for proof generation (this may take a while for RSA sites)...");
+console.log(
+  "Waiting for proof generation (this may take a while for RSA sites)...",
+);
 
 // Periodically take screenshots and check verifier logs
 for (let i = 0; i < 60; i++) {

@@ -25,14 +25,14 @@
  */
 
 import {
-  Wallet,
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
   getDecodedToken,
   getEncodedToken,
+  P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
   signP2PKProofs,
   verifyHTLCHash,
+  Wallet,
 } from "@cashu/cashu-ts";
 
 /**
@@ -188,7 +188,9 @@ export class CashuClientError extends Error {
  */
 export function validateHashHex(hash: string): string {
   if (!/^[0-9a-fA-F]{64}$/.test(hash)) {
-    throw new CashuClientError(`Invalid hash hex (expected 64-char hex): ${hash}`);
+    throw new CashuClientError(
+      `Invalid hash hex (expected 64-char hex): ${hash}`,
+    );
   }
   return hash.toLowerCase();
 }
@@ -197,9 +199,14 @@ export function validateHashHex(hash: string): string {
  * Validates that a locktime is a future Unix timestamp (seconds).
  * Returns the locktime on success; throws on failure.
  */
-export function validateLocktime(locktimeSeconds: number, nowSeconds: number = Math.floor(Date.now() / 1000)): number {
+export function validateLocktime(
+  locktimeSeconds: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): number {
   if (!Number.isInteger(locktimeSeconds)) {
-    throw new CashuClientError(`Locktime must be an integer: ${locktimeSeconds}`);
+    throw new CashuClientError(
+      `Locktime must be an integer: ${locktimeSeconds}`,
+    );
   }
   if (locktimeSeconds <= nowSeconds) {
     throw new CashuClientError(
@@ -215,7 +222,9 @@ function sumAmounts(proofs: Proof[]): number {
 
 function bytesToHexLocal(bytes: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, "0");
+  for (let i = 0; i < bytes.length; i++) {
+    s += bytes[i].toString(16).padStart(2, "0");
+  }
   return s;
 }
 
@@ -268,7 +277,11 @@ function isValidProofShape(p: unknown): p is Proof {
   );
 }
 
-function prepareHtlcRedemption(proofs: Proof[], preimageHex: string, privkeyHex: string): Proof[] {
+function prepareHtlcRedemption(
+  proofs: Proof[],
+  preimageHex: string,
+  privkeyHex: string,
+): Proof[] {
   const withPreimage = proofs.map((p) => ({
     ...p,
     witness: JSON.stringify({ preimage: preimageHex, signatures: [] }),
@@ -334,7 +347,9 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       const phase1 = buildPhase1P2PKOptions(p.customerPubkey);
       let send: Proof[];
       try {
-        const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(phase1).run();
+        const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(
+          phase1,
+        ).run();
         send = result.send;
       } catch (err) {
         throw new CashuMintError("buildHtlcLock: mint swap failed", err);
@@ -350,22 +365,31 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
     async bindProvider(p: BindProviderParams): Promise<CashuToken> {
       validateHashHex(p.hashHex);
       validateLocktime(p.locktimeSeconds);
-      if (!(p.customerSecretKey instanceof Uint8Array) || p.customerSecretKey.length !== 32) {
-        throw new CashuClientError("customerSecretKey must be a 32-byte Uint8Array");
+      if (
+        !(p.customerSecretKey instanceof Uint8Array) ||
+        p.customerSecretKey.length !== 32
+      ) {
+        throw new CashuClientError(
+          "customerSecretKey must be a 32-byte Uint8Array",
+        );
       }
       if (!Array.isArray(p.initialProofs) || p.initialProofs.length === 0) {
         throw new CashuClientError("initialProofs must be a non-empty array");
       }
       for (const proof of p.initialProofs) {
         if (!isValidProofShape(proof)) {
-          throw new CashuClientError("initialProofs contains a malformed proof");
+          throw new CashuClientError(
+            "initialProofs contains a malformed proof",
+          );
         }
       }
       const wallet = await getWallet();
       const sourceProofs = p.initialProofs as Proof[];
       const totalAmount = sumAmounts(sourceProofs);
       if (totalAmount <= 0) {
-        throw new CashuClientError("initialProofs contains no spendable proofs");
+        throw new CashuClientError(
+          "initialProofs contains no spendable proofs",
+        );
       }
 
       const fee = wallet.getFeesForProofs(sourceProofs);
@@ -416,14 +440,21 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         try {
           secret = JSON.parse(proof.secret);
         } catch {
-          throw new CashuClientError(`redeemHtlc: proof ${i} has malformed secret`);
+          throw new CashuClientError(
+            `redeemHtlc: proof ${i} has malformed secret`,
+          );
         }
         if (!Array.isArray(secret) || secret[0] !== "HTLC") {
-          throw new CashuClientError(`redeemHtlc: proof ${i} is not an HTLC proof`);
+          throw new CashuClientError(
+            `redeemHtlc: proof ${i} is not an HTLC proof`,
+          );
         }
-        const expectedHash = (secret[1] as { data?: unknown } | undefined)?.data;
+        const expectedHash = (secret[1] as { data?: unknown } | undefined)
+          ?.data;
         if (typeof expectedHash !== "string") {
-          throw new CashuClientError(`redeemHtlc: proof ${i} has no hashlock data`);
+          throw new CashuClientError(
+            `redeemHtlc: proof ${i} has no hashlock data`,
+          );
         }
         if (!verifyHTLCHash(p.preimageHex, expectedHash)) {
           throw new CashuClientError(
@@ -433,7 +464,11 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       }
 
       const privkeyHex = bytesToHexLocal(p.providerSecretKey);
-      const signedProofs = prepareHtlcRedemption(proofs, p.preimageHex, privkeyHex);
+      const signedProofs = prepareHtlcRedemption(
+        proofs,
+        p.preimageHex,
+        privkeyHex,
+      );
       const totalAmount = sumAmounts(signedProofs);
 
       const fee = wallet.getFeesForProofs(signedProofs);

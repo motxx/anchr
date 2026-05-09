@@ -13,7 +13,7 @@
  * server-routes / market-api-routes code is storage-agnostic.
  */
 
-import type { PendingBet, MatchProposal } from "./market-types.ts";
+import type { MatchProposal, PendingBet } from "./market-types.ts";
 
 export interface MatchingQueue {
   /** Add a pending bet. Returns the bet with remaining_sats initialized. */
@@ -31,7 +31,10 @@ export function createInMemoryMatchingQueue(): MatchingQueue {
 
   const queue: MatchingQueue = {
     enqueue(bet) {
-      const initialised = { ...bet, remaining_sats: bet.remaining_sats ?? bet.amount_sats };
+      const initialised = {
+        ...bet,
+        remaining_sats: bet.remaining_sats ?? bet.amount_sats,
+      };
       bets.set(initialised.id, initialised);
       return Promise.resolve(initialised);
     },

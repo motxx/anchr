@@ -14,7 +14,9 @@ describe("Worker service — payload parsing and filtering", () => {
     trustedOraclePubkeys: [trustedOracle],
   };
 
-  function makePayload(overrides?: Partial<QueryRequestPayload>): QueryRequestPayload {
+  function makePayload(
+    overrides?: Partial<QueryRequestPayload>,
+  ): QueryRequestPayload {
     return {
       description: "Photo of Tokyo Tower",
       nonce: "ABC123",
@@ -39,19 +41,22 @@ describe("Worker service — payload parsing and filtering", () => {
 
   test("trusted oracle pubkey passes filter", () => {
     const payload = makePayload({ oracle_pubkey: trustedOracle });
-    const passes = !payload.oracle_pubkey || config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
+    const passes = !payload.oracle_pubkey ||
+      config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
     expect(passes).toBe(true);
   });
 
   test("untrusted oracle pubkey is rejected", () => {
     const payload = makePayload({ oracle_pubkey: untrustedOracle });
-    const passes = !payload.oracle_pubkey || config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
+    const passes = !payload.oracle_pubkey ||
+      config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
     expect(passes).toBe(false);
   });
 
   test("missing oracle_pubkey passes filter (no restriction)", () => {
     const payload = makePayload({ oracle_pubkey: undefined });
-    const passes = !payload.oracle_pubkey || config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
+    const passes = !payload.oracle_pubkey ||
+      config.trustedOraclePubkeys.includes(payload.oracle_pubkey);
     expect(passes).toBe(true);
   });
 
@@ -75,7 +80,11 @@ describe("Worker service — payload parsing and filtering", () => {
   });
 
   test("parseQueryRequestPayload handles minimal payload", () => {
-    const minimal = JSON.stringify({ description: "test", nonce: "X", expires_at: Date.now() + 600_000 });
+    const minimal = JSON.stringify({
+      description: "test",
+      nonce: "X",
+      expires_at: Date.now() + 600_000,
+    });
     const parsed = parseQueryRequestPayload(minimal);
     expect(parsed.description).toBe("test");
     expect(parsed.oracle_pubkey).toBeUndefined();

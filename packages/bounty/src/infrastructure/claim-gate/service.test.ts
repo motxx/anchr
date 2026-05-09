@@ -4,15 +4,27 @@ import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
 import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
 import { createProofGateService } from "./service.ts";
 import type { ProofGateSettlementProvider } from "./settlement.ts";
-import type { ProofGateCampaign, ProofGateClaim, ProofGateCondition, ProofGateStore } from "./types.ts";
+import type {
+  ProofGateCampaign,
+  ProofGateClaim,
+  ProofGateCondition,
+  ProofGateStore,
+} from "./types.ts";
 
 function fakeValidator(body: unknown) {
-  return async (_attestation: { presentation: string }, req: TlsnRequirement): Promise<TlsnValidationResult> => ({
+  return async (
+    _attestation: { presentation: string },
+    req: TlsnRequirement,
+  ): Promise<TlsnValidationResult> => ({
     available: true,
     signatureValid: true,
     serverIdentityValid: true,
     attestationFresh: true,
-    conditionResults: (req.conditions ?? []).map((condition) => ({ condition, passed: true, actual_value: "ok" })),
+    conditionResults: (req.conditions ?? []).map((condition) => ({
+      condition,
+      passed: true,
+      actual_value: "ok",
+    })),
     verifiedData: {
       server_name: req.domain_hint ?? "api.github.com",
       revealed_body: JSON.stringify(body),
@@ -55,7 +67,11 @@ function createMemoryStore(): ProofGateStore {
       return Promise.resolve(campaign ? structuredClone(campaign) : undefined);
     },
     listCampaigns() {
-      return Promise.resolve(Array.from(campaigns.values()).map((campaign) => structuredClone(campaign)));
+      return Promise.resolve(
+        Array.from(campaigns.values()).map((campaign) =>
+          structuredClone(campaign)
+        ),
+      );
     },
     createClaim(claim) {
       claims.set(claim.id, structuredClone(claim));
@@ -72,7 +88,9 @@ function createMemoryStore(): ProofGateStore {
     approvedClaimCount(campaignId) {
       let count = 0;
       for (const claim of claims.values()) {
-        if (claim.campaign_id === campaignId && claim.status === "approved") count++;
+        if (claim.campaign_id === campaignId && claim.status === "approved") {
+          count++;
+        }
       }
       return Promise.resolve(count);
     },
@@ -89,7 +107,9 @@ function createMemoryStore(): ProofGateStore {
       return Promise.resolve(undefined);
     },
     reservePresentationHashes(_campaignId, _claimId, hashes) {
-      if (hashes.some((hash) => presentationHashes.has(hash))) return Promise.resolve(false);
+      if (hashes.some((hash) => presentationHashes.has(hash))) {
+        return Promise.resolve(false);
+      }
       for (const hash of hashes) presentationHashes.add(hash);
       return Promise.resolve(true);
     },
@@ -105,7 +125,11 @@ describe("proof-gate service", () => {
     const service = createProofGateService({
       store,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: (condition) => condition.type.startsWith("github") || condition.type === "account_age_days" ? "id" : undefined,
+      identityPathForCondition: (condition) =>
+        condition.type.startsWith("github") ||
+          condition.type === "account_age_days"
+          ? "id"
+          : undefined,
       validateTlsnFn: fakeValidator({
         id: 123,
         created_at: "2020-01-01T00:00:00Z",
@@ -168,7 +192,11 @@ describe("proof-gate service", () => {
       store,
       settlementProvider,
       nullifierSecret: "x".repeat(32),
-      identityPathForCondition: (condition) => condition.type.startsWith("github") || condition.type === "account_age_days" ? "id" : undefined,
+      identityPathForCondition: (condition) =>
+        condition.type.startsWith("github") ||
+          condition.type === "account_age_days"
+          ? "id"
+          : undefined,
       validateTlsnFn: fakeValidator({
         id: 987,
         created_at: "2020-01-01T00:00:00Z",
@@ -183,7 +211,10 @@ describe("proof-gate service", () => {
       token_amount_per_claim: 1000,
       total_budget_sats: 1000,
     });
-    const reserved = await service.reserveClaim("settled", "02" + "33".repeat(32));
+    const reserved = await service.reserveClaim(
+      "settled",
+      "02" + "33".repeat(32),
+    );
     expect(reserved.settlement?.cashu_token).toBe("cashuB-locked");
     expect(reserved.settlement?.htlc_hash).toBe(reservedHash);
 

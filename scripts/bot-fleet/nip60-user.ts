@@ -21,7 +21,7 @@
  * the source of truth.
  */
 
-import { Wallet, type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, type Proof, Wallet } from "@cashu/cashu-ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { SimplePool } from "nostr-tools/pool";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -34,8 +34,8 @@ import {
   closeNip60Wallet,
   createNip60Wallet,
   loadProofs as loadNip60Proofs,
-  publishProofs as publishNip60Proofs,
   type Nip60Wallet,
+  publishProofs as publishNip60Proofs,
 } from "../../example/two-party-binary-bet/src/nip60.ts";
 
 export interface Nip60UserConfig {
@@ -126,13 +126,22 @@ export class Nip60UserBot {
     marketId: string,
     side: "yes" | "no",
     amountSats: number,
-  ): Promise<{ orderId: string; matches: BetMatch[]; submittedCount: number; committedSats: number }> {
+  ): Promise<
+    {
+      orderId: string;
+      matches: BetMatch[];
+      submittedCount: number;
+      committedSats: number;
+    }
+  > {
     const entries = await loadNip60Proofs(this.nip60);
     const allProofs = entries.flatMap((e) => e.proofs);
     const liveEventIds = entries.map((e) => e.eventId);
 
     if (allProofs.reduce((s, p) => s + p.amount, 0) < amountSats) {
-      throw new Error(`${this.label}: insufficient NIP-60 balance for ${amountSats} sats`);
+      throw new Error(
+        `${this.label}: insufficient NIP-60 balance for ${amountSats} sats`,
+      );
     }
 
     const betRes = await this.post(`/markets/${marketId}/bet`, {
@@ -141,9 +150,14 @@ export class Nip60UserBot {
       bettor_pubkey: this.nostrPubkey,
     });
     if (betRes.status !== 201) {
-      throw new Error(`${this.label}: /bet failed ${betRes.status}: ${await betRes.text()}`);
+      throw new Error(
+        `${this.label}: /bet failed ${betRes.status}: ${await betRes.text()}`,
+      );
     }
-    const betBody = await betRes.json() as { order_id: string; matches: BetMatch[] };
+    const betBody = await betRes.json() as {
+      order_id: string;
+      matches: BetMatch[];
+    };
 
     let submittedCount = 0;
     let committedSats = 0;
@@ -151,17 +165,21 @@ export class Nip60UserBot {
     let runningSupersede = liveEventIds;
 
     for (const match of betBody.matches) {
-      const tokenResult = await createLockedToken(this.cashuWallet, runningProofs, {
-        mintUrl: this.mintUrl,
-        marketGroupPubkeyYes: match.group_pubkey_yes,
-        marketGroupPubkeyNo: match.group_pubkey_no,
-        myPubkey: this.nostrPubkey,
-        mySide: side,
-        counterpartyPubkey: match.counterparty_pubkey,
-        amountSats: match.amount_sats,
-        exchangeLocktime: match.locktime_exchange,
-        marketLocktime: match.locktime_market,
-      });
+      const tokenResult = await createLockedToken(
+        this.cashuWallet,
+        runningProofs,
+        {
+          mintUrl: this.mintUrl,
+          marketGroupPubkeyYes: match.group_pubkey_yes,
+          marketGroupPubkeyNo: match.group_pubkey_no,
+          myPubkey: this.nostrPubkey,
+          mySide: side,
+          counterpartyPubkey: match.counterparty_pubkey,
+          amountSats: match.amount_sats,
+          exchangeLocktime: match.locktime_exchange,
+          marketLocktime: match.locktime_market,
+        },
+      );
 
       const submitRes = await this.post(`/markets/${marketId}/submit-token`, {
         pair_id: match.pair_id,
@@ -170,7 +188,9 @@ export class Nip60UserBot {
       });
       const submitText = await submitRes.text();
       if (submitRes.status !== 200) {
-        console.warn(`${this.label}: /submit-token failed ${submitRes.status}: ${submitText}`);
+        console.warn(
+          `${this.label}: /submit-token failed ${submitRes.status}: ${submitText}`,
+        );
         continue;
       }
       submittedCount++;
@@ -203,13 +223,18 @@ export class Nip60UserBot {
    * Side per-pair comes from the server, not the caller — see
    * MarketMakerBot.submitPendingMatches for the rationale.
    */
-  async submitPendingMatches(marketId: string, _legacySideHint?: "yes" | "no"): Promise<number> {
+  async submitPendingMatches(
+    marketId: string,
+    _legacySideHint?: "yes" | "no",
+  ): Promise<number> {
     const detailRes = await fetch(
       `${this.serverUrl}/markets/${marketId}?pubkey=${this.nostrPubkey}`,
     );
     if (!detailRes.ok) {
       const errText = await detailRes.text();
-      console.warn(`${this.label}: market detail failed ${detailRes.status}: ${errText}`);
+      console.warn(
+        `${this.label}: market detail failed ${detailRes.status}: ${errText}`,
+      );
       return 0;
     }
     const detail = await detailRes.json() as {
@@ -236,7 +261,9 @@ export class Nip60UserBot {
       const liveEventIds = entries.map((e) => e.eventId);
       const balance = allProofs.reduce((s, p) => s + p.amount, 0);
       if (balance < userPair.amount_sats) {
-        console.warn(`${this.label}: insufficient balance for pending pair ${userPair.pair_id}`);
+        console.warn(
+          `${this.label}: insufficient balance for pending pair ${userPair.pair_id}`,
+        );
         continue;
       }
 
@@ -259,7 +286,9 @@ export class Nip60UserBot {
       });
       const submitText = await submitRes.text();
       if (submitRes.status !== 200) {
-        console.warn(`${this.label}: pending /submit-token failed ${submitRes.status}: ${submitText}`);
+        console.warn(
+          `${this.label}: pending /submit-token failed ${submitRes.status}: ${submitText}`,
+        );
         continue;
       }
       submittedCount++;
@@ -280,7 +309,10 @@ export class Nip60UserBot {
   async snapshot(): Promise<{ balance: number; eventCount: number }> {
     const entries = await loadNip60Proofs(this.nip60);
     return {
-      balance: entries.flatMap((e) => e.proofs).reduce((s, p) => s + p.amount, 0),
+      balance: entries.flatMap((e) => e.proofs).reduce(
+        (s, p) => s + p.amount,
+        0,
+      ),
       eventCount: entries.length,
     };
   }
@@ -298,7 +330,9 @@ export class Nip60UserBot {
   }
 
   private supersedeEventIds(relayVisibleEventIds: string[]): string[] {
-    return Array.from(new Set([...relayVisibleEventIds, ...this.latestTokenEventIds]));
+    return Array.from(
+      new Set([...relayVisibleEventIds, ...this.latestTokenEventIds]),
+    );
   }
 }
 

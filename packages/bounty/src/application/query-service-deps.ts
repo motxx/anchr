@@ -1,7 +1,14 @@
 import type { QueryStore } from "../domain/query-store.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
-import type { EscrowProvider, FrostSignaturePort, ProofDelivery } from "./ports.ts";
-import type { OracleResolver, MultiOracleResolver } from "./query-verification.ts";
+import type {
+  EscrowProvider,
+  FrostSignaturePort,
+  ProofDelivery,
+} from "./ports.ts";
+import type {
+  MultiOracleResolver,
+  OracleResolver,
+} from "./query-verification.ts";
 import type { QueryResult } from "../domain/types.ts";
 import type { CreateQueryOptions } from "./query-service.ts";
 

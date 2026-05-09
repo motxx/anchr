@@ -1,7 +1,7 @@
 import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
-import { ANCHR_QUERY_REQUEST, ANCHR_QUERY_FEEDBACK } from "./events.ts";
+import { ANCHR_QUERY_FEEDBACK, ANCHR_QUERY_REQUEST } from "./events.ts";
 import { useSettingsStore } from "../store/settings.ts";
 
 let _pool: SimplePool | null = null;
@@ -20,7 +20,9 @@ export async function publishEvent(
   relayUrls?: string[],
 ): Promise<{ successes: string[]; failures: string[] }> {
   const urls = relayUrls ?? getRelayUrls();
-  if (urls.length === 0) return { successes: [], failures: ["No relays configured"] };
+  if (urls.length === 0) {
+    return { successes: [], failures: ["No relays configured"] };
+  }
 
   const pool = getPool();
   const successes: string[] = [];

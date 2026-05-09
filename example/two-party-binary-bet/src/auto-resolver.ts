@@ -85,7 +85,9 @@ const defaultFetcher = async (url: string): Promise<string> => {
   });
   if (res.status >= 300 && res.status < 400) {
     await res.body?.cancel();
-    throw new Error(`HTTP redirect ${res.status} not followed (truth source must be a direct response)`);
+    throw new Error(
+      `HTTP redirect ${res.status} not followed (truth source must be a direct response)`,
+    );
   }
   if (!res.ok) {
     await res.body?.cancel();
@@ -104,7 +106,9 @@ const defaultFetcher = async (url: string): Promise<string> => {
       total += value.byteLength;
       if (total > MAX_TRUTH_BODY_BYTES) {
         await reader.cancel();
-        throw new Error(`truth-source body exceeded ${MAX_TRUTH_BODY_BYTES} bytes`);
+        throw new Error(
+          `truth-source body exceeded ${MAX_TRUTH_BODY_BYTES} bytes`,
+        );
       }
       chunks.push(value);
     }
@@ -144,7 +148,10 @@ export function startAutoResolver(
     const nowSecs = Math.floor(now() / 1000);
     if (market.resolution_deadline > nowSecs) return;
 
-    log("info", `market ${marketId} past deadline; fetching ${market.resolution_url}`);
+    log(
+      "info",
+      `market ${marketId} past deadline; fetching ${market.resolution_url}`,
+    );
 
     let body: string;
     try {
@@ -152,21 +159,27 @@ export function startAutoResolver(
     } catch (err) {
       log(
         "warn",
-        `market ${marketId} fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+        `market ${marketId} fetch failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
       );
       return;
     }
 
     let outcome: "yes" | "no";
     try {
-      outcome = evaluateCondition(market.resolution_condition, body) ? "yes" : "no";
+      outcome = evaluateCondition(market.resolution_condition, body)
+        ? "yes"
+        : "no";
     } catch (err) {
       const reason = err instanceof OracleError ? err.message : String(err);
       log("warn", `market ${marketId} condition evaluation failed: ${reason}`);
       return;
     }
 
-    const result = await settleMarket(state, marketId, outcome, { verifiedBody: body });
+    const result = await settleMarket(state, marketId, outcome, {
+      verifiedBody: body,
+    });
     if (!result.ok) {
       log("warn", `market ${marketId} settlement failed: ${result.error}`);
       return;
@@ -195,7 +208,9 @@ export function startAutoResolver(
         } catch (err) {
           log(
             "error",
-            `unexpected error resolving ${id}: ${err instanceof Error ? err.stack ?? err.message : String(err)}`,
+            `unexpected error resolving ${id}: ${
+              err instanceof Error ? err.stack ?? err.message : String(err)
+            }`,
           );
         }
       }),

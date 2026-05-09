@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import { DSCard, DSText, DSSatsAmount } from "../ds/index.ts";
+import { DSCard, DSSatsAmount, DSText } from "../ds/index.ts";
 
 interface BalanceCardProps {
   balance: number;

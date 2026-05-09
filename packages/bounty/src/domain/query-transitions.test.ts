@@ -19,15 +19,20 @@ describe("query-transitions", () => {
 
   describe("isValidTransition (HTLC)", () => {
     test("awaiting_quotes -> worker_selected is valid", () => {
-      expect(isValidTransition("awaiting_quotes", "worker_selected", true)).toBe(true);
+      expect(isValidTransition("awaiting_quotes", "worker_selected", true))
+        .toBe(true);
     });
 
     test("awaiting_quotes -> processing is no longer valid (must go through worker_selected)", () => {
-      expect(isValidTransition("awaiting_quotes", "processing", true)).toBe(false);
+      expect(isValidTransition("awaiting_quotes", "processing", true)).toBe(
+        false,
+      );
     });
 
     test("worker_selected -> processing is valid", () => {
-      expect(isValidTransition("worker_selected", "processing", true)).toBe(true);
+      expect(isValidTransition("worker_selected", "processing", true)).toBe(
+        true,
+      );
     });
 
     test("worker_selected -> expired is valid", () => {

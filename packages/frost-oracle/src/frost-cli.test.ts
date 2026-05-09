@@ -1,13 +1,13 @@
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import {
+  _setFrostSignerPathForTest,
+  dkgRound1,
   findFrostSigner,
   isFrostSignerAvailable,
   runFrostCommand,
-  _setFrostSignerPathForTest,
-  dkgRound1,
   verifySignature,
 } from "./frost-cli.ts";
 
@@ -52,7 +52,10 @@ describe("frost-cli wrapper", () => {
   test("runFrostCommand returns error when binary is not found", async () => {
     _setFrostSignerPathForTest(null);
     const result = await runFrostCommand("dkg-round1", ["--index", "1"]);
-    expect(result).toEqual({ ok: false, error: "frost-signer binary not available" });
+    expect(result).toEqual({
+      ok: false,
+      error: "frost-signer binary not available",
+    });
   });
 });
 
@@ -72,7 +75,11 @@ binaryDescribe("frost-cli with real binary", () => {
 
   test("verifySignature returns ok with valid field", async () => {
     _setFrostSignerPathForTest(realBinary!);
-    const result = await verifySignature("aa".repeat(32), "bb".repeat(32), "cc".repeat(16));
+    const result = await verifySignature(
+      "aa".repeat(32),
+      "bb".repeat(32),
+      "cc".repeat(16),
+    );
     expect(typeof result.ok).toBe("boolean");
     if (result.ok) {
       expect(result.data).toBeDefined();

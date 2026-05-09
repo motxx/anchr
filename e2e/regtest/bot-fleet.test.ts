@@ -18,26 +18,35 @@ import { expect } from "@std/expect";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import {
-  registerMarketRoutes,
   createMarketState,
   type MarketRouteContext,
   type MarketState,
+  registerMarketRoutes,
 } from "../../example/two-party-binary-bet/src/server-routes.ts";
 import { checkInfraReady, createWallet } from "../helpers/regtest.ts";
 import { MarketMakerBot } from "../../scripts/bot-fleet/bot.ts";
 import { POLYMARKET_SEED_MARKETS } from "../../scripts/bot-fleet/markets.ts";
-import { fundFleet, runOneRound, seedMarkets } from "../../scripts/bot-fleet/fleet.ts";
+import {
+  fundFleet,
+  runOneRound,
+  seedMarkets,
+} from "../../scripts/bot-fleet/fleet.ts";
 import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const INFRA_READY = await checkInfraReady(MINT_URL);
 
-const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
+const passthrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
 
 function buildMarketApp(state: MarketState) {
   // deno-lint-ignore no-explicit-any
   const app = new Hono<any>();
-  const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+  const ctx: MarketRouteContext = {
+    writeAuth: passthrough,
+    rateLimit: passthrough,
+  };
   registerMarketRoutes(app, ctx, state);
   return app;
 }
@@ -55,7 +64,10 @@ suite("e2e: market-maker bot fleet (regtest Cashu)", () => {
     // their fetch to the Hono app via a localhost server that proxies to it.
     const port = 3001 + Math.floor(Math.random() * 1000);
     const ac = new AbortController();
-    const server = Deno.serve({ port, signal: ac.signal, onListen: () => {} }, app.fetch);
+    const server = Deno.serve(
+      { port, signal: ac.signal, onListen: () => {} },
+      app.fetch,
+    );
 
     try {
       // === Seed one market ===
@@ -110,7 +122,9 @@ suite("e2e: market-maker bot fleet (regtest Cashu)", () => {
       const noResult = await noBot.placeBet(market.id, "no", BET);
       expect(noResult.matches.length).toBe(1);
       expect(noResult.matches[0].amount_sats).toBe(BET);
-      expect(noResult.matches[0].counterparty_pubkey).toBe(yesBot.identity.pubkey);
+      expect(noResult.matches[0].counterparty_pubkey).toBe(
+        yesBot.identity.pubkey,
+      );
       expect(noResult.submittedCount).toBe(1); // no-bot submitted its side
 
       // YES-bot's order matched but no /bet response was sent to it. Bot
@@ -119,7 +133,9 @@ suite("e2e: market-maker bot fleet (regtest Cashu)", () => {
       expect(yesSubmitted).toBe(1);
 
       // === Verify pair is locked ===
-      const detail = await fetch(`http://localhost:${port}/markets/${market.id}?pubkey=${yesBot.identity.pubkey}`)
+      const detail = await fetch(
+        `http://localhost:${port}/markets/${market.id}?pubkey=${yesBot.identity.pubkey}`,
+      )
         .then((r) => r.json()) as { user_pairs?: Array<{ status: string }> };
       expect(detail.user_pairs?.length).toBe(1);
       expect(detail.user_pairs?.[0]?.status).toBe("locked");
@@ -138,7 +154,10 @@ suite("e2e: market-maker bot fleet (regtest Cashu)", () => {
 
     const port = 4001 + Math.floor(Math.random() * 1000);
     const ac = new AbortController();
-    const server = Deno.serve({ port, signal: ac.signal, onListen: () => {} }, app.fetch);
+    const server = Deno.serve(
+      { port, signal: ac.signal, onListen: () => {} },
+      app.fetch,
+    );
 
     try {
       const SUBSET = POLYMARKET_SEED_MARKETS.slice(0, 3); // BTC $200k, ETH $5k, BTC ETF
@@ -169,7 +188,11 @@ suite("e2e: market-maker bot fleet (regtest Cashu)", () => {
       let marketsWithLockedPairs = 0;
       for (const m of seeded) {
         const detail = await fetch(`http://localhost:${port}/markets/${m.id}`)
-          .then((r) => r.json()) as { yes_pool_sats: number; no_pool_sats: number; matched_pairs: number };
+          .then((r) => r.json()) as {
+            yes_pool_sats: number;
+            no_pool_sats: number;
+            matched_pairs: number;
+          };
         if (detail.matched_pairs > 0) marketsWithLockedPairs++;
         // Either side can be empty on a small fleet, but the *total* pool
         // must be nonzero on every market the fleet touched.

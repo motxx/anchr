@@ -37,7 +37,9 @@ function isPrivateIp(hostname: string): boolean {
 
   // IPv6-mapped IPv4: browsers/runtimes may normalize ::ffff:A.B.C.D to ::ffff:XXYY:ZZWW (hex).
   // Check both dotted-decimal and hex forms.
-  const v4DottedMapped = lower.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  const v4DottedMapped = lower.match(
+    /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/,
+  );
   if (v4DottedMapped) {
     const ipv4 = v4DottedMapped[1]!;
     for (const pattern of PRIVATE_IPV4_PATTERNS) {
@@ -50,7 +52,9 @@ function isPrivateIp(hostname: string): boolean {
   if (v4HexMapped) {
     const hi = parseInt(v4HexMapped[1]!, 16);
     const lo = parseInt(v4HexMapped[2]!, 16);
-    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+    const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${
+      lo & 0xff
+    }`;
     for (const pattern of PRIVATE_IPV4_PATTERNS) {
       if (pattern.test(ipv4)) return true;
     }
@@ -82,8 +86,8 @@ export function validateAttachmentUri(uri: string): string | null {
     return "URLs with embedded credentials are not allowed";
   }
 
-  const isLocalhost =
-    parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  const isLocalhost = parsed.hostname === "localhost" ||
+    parsed.hostname === "127.0.0.1";
   const isProduction = Deno.env.get("NODE_ENV") === "production";
 
   // In production, reject localhost/loopback — prevents SSRF to co-hosted services

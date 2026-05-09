@@ -6,11 +6,15 @@ import { validateExif } from "@anchr/photo-verification/exif-validation";
 import { storeIntegrity } from "@anchr/photo-verification/integrity-store";
 import type { ProofModeIntegrity } from "@anchr/photo-verification/integrity-store";
 import { parseProofModeZip } from "@anchr/photo-verification/proofmode-validation";
-import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../domain/types.ts";
+import type {
+  AttachmentRef,
+  BlossomKeyMaterial,
+  GpsCoord,
+} from "../domain/types.ts";
 import {
   detectZip,
-  inferMimeType,
   extractProofModeIntegrity,
+  inferMimeType,
   logIntegrity,
 } from "./attachment-store-helpers.ts";
 
@@ -31,16 +35,27 @@ export interface UploadOptions {
  * Blossom is the only storage backend. BLOSSOM_SERVERS must be configured.
  * The encryption key is returned separately and never stored on the server (E2E).
  */
-export async function uploadAttachment(queryId: string, file: File, options?: UploadOptions): Promise<UploadResult> {
+export async function uploadAttachment(
+  queryId: string,
+  file: File,
+  options?: UploadOptions,
+): Promise<UploadResult> {
   if (!isBlossomEnabled()) {
-    throw new Error("Blossom is not configured. Set BLOSSOM_SERVERS to enable attachment uploads.");
+    throw new Error(
+      "Blossom is not configured. Set BLOSSOM_SERVERS to enable attachment uploads.",
+    );
   }
 
   const rawBuffer = Buffer.from(await file.arrayBuffer());
-  const { photoBuffer, photoFilename, proofmode } = await extractPhotoData(rawBuffer, file.name);
+  const { photoBuffer, photoFilename, proofmode } = await extractPhotoData(
+    rawBuffer,
+    file.name,
+  );
 
   const [exifResult, c2paResult] = await Promise.all([
-    Promise.resolve(validateExif(photoBuffer, { expectedGps: options?.expectedGps })),
+    Promise.resolve(
+      validateExif(photoBuffer, { expectedGps: options?.expectedGps }),
+    ),
     validateC2pa(photoBuffer, photoFilename),
   ]);
 
@@ -77,7 +92,9 @@ export async function uploadAttachment(queryId: string, file: File, options?: Up
 async function extractPhotoData(
   rawBuffer: Buffer,
   filename: string,
-): Promise<{ photoBuffer: Buffer; photoFilename: string; proofmode?: ProofModeIntegrity }> {
+): Promise<
+  { photoBuffer: Buffer; photoFilename: string; proofmode?: ProofModeIntegrity }
+> {
   if (!detectZip(rawBuffer, filename)) {
     return { photoBuffer: rawBuffer, photoFilename: filename };
   }
@@ -94,7 +111,9 @@ async function extractPhotoData(
   };
 }
 
-function buildAttachmentRef(result: NonNullable<Awaited<ReturnType<typeof workerUpload>>>): AttachmentRef {
+function buildAttachmentRef(
+  result: NonNullable<Awaited<ReturnType<typeof workerUpload>>>,
+): AttachmentRef {
   return {
     id: result.attachment.id,
     uri: result.attachment.uri,
@@ -103,6 +122,8 @@ function buildAttachmentRef(result: NonNullable<Awaited<ReturnType<typeof worker
     filename: result.attachment.filename,
     size_bytes: result.attachment.size_bytes,
     blossom_hash: result.blossom.hash,
-    blossom_servers: result.blossom.urls.map((u) => u.replace(`/${result.blossom.hash}`, "")),
+    blossom_servers: result.blossom.urls.map((u) =>
+      u.replace(`/${result.blossom.hash}`, "")
+    ),
   };
 }

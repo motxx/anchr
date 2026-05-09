@@ -1,8 +1,4 @@
-import {
-  type Proof,
-  getEncodedToken,
-  getDecodedToken,
-} from "@cashu/cashu-ts";
+import { getDecodedToken, getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { getCashuWallet, getMintUrl } from "./wallet.ts";
 
 export interface EscrowToken {
@@ -42,7 +38,10 @@ export async function createHtlcToken(
     const token = getEncodedToken({ mint: getMintUrl(), proofs: send });
     return { token, proofs: send, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to create hold token:", error instanceof Error ? error.message : error);
+    console.error(
+      "[cashu-htlc] Failed to create hold token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -79,7 +78,10 @@ export async function swapHtlcBindWorker(
     const token = getEncodedToken({ mint: getMintUrl(), proofs: send });
     return { token, proofs: send, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to swap HTLC:", error instanceof Error ? error.message : error);
+    console.error(
+      "[cashu-htlc] Failed to swap HTLC:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -114,7 +116,10 @@ export async function redeemHtlcToken(
     const token = getEncodedToken({ mint: getMintUrl(), proofs: send });
     return { token, proofs: send, amountSats };
   } catch (error) {
-    console.error("[cashu-htlc] Failed to redeem:", error instanceof Error ? error.message : error);
+    console.error(
+      "[cashu-htlc] Failed to redeem:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -126,8 +131,15 @@ export function inspectEscrowToken(token: string): {
 } | null {
   try {
     const decoded = getDecodedToken(token);
-    const amountSats = decoded.proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
-    return { amountSats, proofCount: decoded.proofs.length, mintUrl: decoded.mint };
+    const amountSats = decoded.proofs.reduce(
+      (sum: number, p: Proof) => sum + p.amount,
+      0,
+    );
+    return {
+      amountSats,
+      proofCount: decoded.proofs.length,
+      mintUrl: decoded.mint,
+    };
   } catch {
     return null;
   }

@@ -27,10 +27,10 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  Wallet,
-  type Proof,
   getDecodedToken,
   P2PKBuilder,
+  type Proof,
+  Wallet,
 } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
@@ -38,14 +38,18 @@ import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-prei
 import { createInMemoryMatchingQueue } from "../../example/two-party-binary-bet/src/matching-queue.ts";
 import { resolveMarket } from "../../example/two-party-binary-bet/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
-import type { PendingBet, MatchProposal, MatchedBetPair } from "../../example/two-party-binary-bet/src/market-types.ts";
+import type {
+  MatchedBetPair,
+  MatchProposal,
+  PendingBet,
+} from "../../example/two-party-binary-bet/src/market-types.ts";
 import {
   checkInfraReady,
   createWallet,
+  generateKeypair,
+  retryOnRateLimit,
   throttledMintProofs,
   throttleMintOp,
-  retryOnRateLimit,
-  generateKeypair,
 } from "../helpers/regtest.ts";
 import process from "node:process";
 
@@ -86,7 +90,9 @@ async function createCrossHtlcProofs(
 
   const fee = wallet.getFeesForProofs(sourceProofs);
   const sendAmount = amountSats - fee;
-  if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  if (sendAmount <= 0) {
+    throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  }
 
   await throttleMintOp();
   const { send } = await retryOnRateLimit(() =>
@@ -157,282 +163,291 @@ async function executeMatchDirect(
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-suite("e2e: the conditional-swap spec — Conditional Swap full two-party binary bet lifecycle", () => {
-  const wallet = sharedWallet!;
+suite(
+  "e2e: the conditional-swap spec — Conditional Swap full two-party binary bet lifecycle",
+  () => {
+    const wallet = sharedWallet!;
 
-  // Shared state across the lifecycle tests
-  const marketId = "market_btc_100k_2026";
-  const dualStore = createDualPreimageStore();
-  const matchingQueue = createInMemoryMatchingQueue();
+    // Shared state across the lifecycle tests
+    const marketId = "market_btc_100k_2026";
+    const dualStore = createDualPreimageStore();
+    const matchingQueue = createInMemoryMatchingQueue();
 
-  let yesBettor: { secretKey: string; publicKey: string };
-  let noBettor: { secretKey: string; publicKey: string };
-  let yesProofs: Proof[];
-  let noProofs: Proof[];
-  let swap: ConditionalSwapDef;
-  let matchProposals: MatchProposal[];
-  let matchedPair: MatchedBetPair & { _yesToNoProofs: Proof[]; _noToYesProofs: Proof[] };
-  let revealedPreimage: string;
-
-  // -------------------------------------------------------------------------
-  // Step 1: Create dual preimage store
-  // -------------------------------------------------------------------------
-
-  test("1. create dual preimage store with hash_a (YES) and hash_b (NO)", () => {
-    const hashes = dualStore.create(marketId);
-
-    expect(hashes.hash_a).toBeDefined();
-    expect(hashes.hash_b).toBeDefined();
-    expect(hashes.hash_a).not.toBe(hashes.hash_b);
-    // Hashes should be 64-char hex (SHA-256)
-    expect(hashes.hash_a).toMatch(/^[0-9a-f]{64}$/);
-    expect(hashes.hash_b).toMatch(/^[0-9a-f]{64}$/);
-
-    // Build ConditionalSwapDef for later steps
-    swap = {
-      swap_id: marketId,
-      hash_a: hashes.hash_a,
-      hash_b: hashes.hash_b,
-      locktime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+    let yesBettor: { secretKey: string; publicKey: string };
+    let noBettor: { secretKey: string; publicKey: string };
+    let yesProofs: Proof[];
+    let noProofs: Proof[];
+    let swap: ConditionalSwapDef;
+    let matchProposals: MatchProposal[];
+    let matchedPair: MatchedBetPair & {
+      _yesToNoProofs: Proof[];
+      _noToYesProofs: Proof[];
     };
+    let revealedPreimage: string;
 
-    // Verify store has the swap
-    expect(dualStore.has(marketId)).toBe(true);
-    const retrieved = dualStore.getHashes(marketId);
-    expect(retrieved).toEqual(hashes);
-  });
+    // -------------------------------------------------------------------------
+    // Step 1: Create dual preimage store
+    // -------------------------------------------------------------------------
 
-  // -------------------------------------------------------------------------
-  // Step 2: Two bettors mint Cashu tokens via regtest Lightning
-  // -------------------------------------------------------------------------
+    test("1. create dual preimage store with hash_a (YES) and hash_b (NO)", () => {
+      const hashes = dualStore.create(marketId);
 
-  test("2. two bettors mint Cashu tokens via regtest Lightning", async () => {
-    yesBettor = generateKeypair();
-    noBettor = generateKeypair();
+      expect(hashes.hash_a).toBeDefined();
+      expect(hashes.hash_b).toBeDefined();
+      expect(hashes.hash_a).not.toBe(hashes.hash_b);
+      // Hashes should be 64-char hex (SHA-256)
+      expect(hashes.hash_a).toMatch(/^[0-9a-f]{64}$/);
+      expect(hashes.hash_b).toMatch(/^[0-9a-f]{64}$/);
 
-    // Mint proofs for both bettors
-    yesProofs = await throttledMintProofs(wallet, BET_SATS);
-    noProofs = await throttledMintProofs(wallet, BET_SATS);
+      // Build ConditionalSwapDef for later steps
+      swap = {
+        swap_id: marketId,
+        hash_a: hashes.hash_a,
+        hash_b: hashes.hash_b,
+        locktime: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+      };
 
-    // Verify both got correct amounts
-    const yesTotal = yesProofs.reduce((s, p) => s + p.amount, 0);
-    const noTotal = noProofs.reduce((s, p) => s + p.amount, 0);
-    expect(yesTotal).toBe(BET_SATS);
-    expect(noTotal).toBe(BET_SATS);
-    expect(yesProofs.length).toBeGreaterThan(0);
-    expect(noProofs.length).toBeGreaterThan(0);
-  });
+      // Verify store has the swap
+      expect(dualStore.has(marketId)).toBe(true);
+      const retrieved = dualStore.getHashes(marketId);
+      expect(retrieved).toEqual(hashes);
+    });
 
-  // -------------------------------------------------------------------------
-  // Step 3: Both place orders in the order book
-  // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Step 2: Two bettors mint Cashu tokens via regtest Lightning
+    // -------------------------------------------------------------------------
 
-  test("3. both bettors place orders in the order book (YES and NO)", async () => {
-    const yesOrder: PendingBet = {
-      id: "order_yes_1",
-      market_id: marketId,
-      bettor_pubkey: yesBettor.publicKey,
-      side: "yes",
-      amount_sats: BET_SATS,
-      remaining_sats: BET_SATS,
-      timestamp: Date.now(),
-    };
+    test("2. two bettors mint Cashu tokens via regtest Lightning", async () => {
+      yesBettor = generateKeypair();
+      noBettor = generateKeypair();
 
-    const noOrder: PendingBet = {
-      id: "order_no_1",
-      market_id: marketId,
-      bettor_pubkey: noBettor.publicKey,
-      side: "no",
-      amount_sats: BET_SATS,
-      remaining_sats: BET_SATS,
-      timestamp: Date.now() + 1, // slightly after YES order
-    };
+      // Mint proofs for both bettors
+      yesProofs = await throttledMintProofs(wallet, BET_SATS);
+      noProofs = await throttledMintProofs(wallet, BET_SATS);
 
-    const addedYes = await matchingQueue.enqueue(yesOrder);
-    const addedNo = await matchingQueue.enqueue(noOrder);
+      // Verify both got correct amounts
+      const yesTotal = yesProofs.reduce((s, p) => s + p.amount, 0);
+      const noTotal = noProofs.reduce((s, p) => s + p.amount, 0);
+      expect(yesTotal).toBe(BET_SATS);
+      expect(noTotal).toBe(BET_SATS);
+      expect(yesProofs.length).toBeGreaterThan(0);
+      expect(noProofs.length).toBeGreaterThan(0);
+    });
 
-    expect(addedYes.remaining_sats).toBe(BET_SATS);
-    expect(addedNo.remaining_sats).toBe(BET_SATS);
+    // -------------------------------------------------------------------------
+    // Step 3: Both place orders in the order book
+    // -------------------------------------------------------------------------
 
-    // Verify orders appear in the book
-    const yesBets = await matchingQueue.listPending(marketId, "yes");
-    const noBets = await matchingQueue.listPending(marketId, "no");
-    expect(yesBets).toHaveLength(1);
-    expect(noBets).toHaveLength(1);
-  });
+    test("3. both bettors place orders in the order book (YES and NO)", async () => {
+      const yesOrder: PendingBet = {
+        id: "order_yes_1",
+        market_id: marketId,
+        bettor_pubkey: yesBettor.publicKey,
+        side: "yes",
+        amount_sats: BET_SATS,
+        remaining_sats: BET_SATS,
+        timestamp: Date.now(),
+      };
 
-  // -------------------------------------------------------------------------
-  // Step 4: Order book matches them -> MatchProposal
-  // -------------------------------------------------------------------------
+      const noOrder: PendingBet = {
+        id: "order_no_1",
+        market_id: marketId,
+        bettor_pubkey: noBettor.publicKey,
+        side: "no",
+        amount_sats: BET_SATS,
+        remaining_sats: BET_SATS,
+        timestamp: Date.now() + 1, // slightly after YES order
+      };
 
-  test("4. order book matches YES and NO orders into MatchProposal", async () => {
-    matchProposals = await matchingQueue.findMatches(marketId);
+      const addedYes = await matchingQueue.enqueue(yesOrder);
+      const addedNo = await matchingQueue.enqueue(noOrder);
 
-    expect(matchProposals).toHaveLength(1);
-    expect(matchProposals[0]!.yes_bet_id).toBe("order_yes_1");
-    expect(matchProposals[0]!.no_bet_id).toBe("order_no_1");
-    expect(matchProposals[0]!.amount_sats).toBe(BET_SATS);
+      expect(addedYes.remaining_sats).toBe(BET_SATS);
+      expect(addedNo.remaining_sats).toBe(BET_SATS);
 
-    // After matching, remaining_sats should be 0
-    const yesBets = await matchingQueue.listPending(marketId, "yes");
-    const noBets = await matchingQueue.listPending(marketId, "no");
-    // Orders with 0 remaining are excluded from listPending
-    expect(yesBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
-    expect(noBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
-  });
+      // Verify orders appear in the book
+      const yesBets = await matchingQueue.listPending(marketId, "yes");
+      const noBets = await matchingQueue.listPending(marketId, "no");
+      expect(yesBets).toHaveLength(1);
+      expect(noBets).toHaveLength(1);
+    });
 
-  // -------------------------------------------------------------------------
-  // Step 5: Execute match -> creates cross-HTLC locked SwapPair tokens
-  // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Step 4: Order book matches them -> MatchProposal
+    // -------------------------------------------------------------------------
 
-  test("5. execute match creates cross-HTLC locked escrow tokens", async () => {
-    const proposal = matchProposals[0]!;
+    test("4. order book matches YES and NO orders into MatchProposal", async () => {
+      matchProposals = await matchingQueue.findMatches(marketId);
 
-    matchedPair = await executeMatchDirect(
-      wallet,
-      proposal,
-      yesProofs,
-      noProofs,
-      swap,
-      yesBettor.publicKey,
-      noBettor.publicKey,
-      marketId,
-    ) as MatchedBetPair & { _yesToNoProofs: Proof[]; _noToYesProofs: Proof[] };
+      expect(matchProposals).toHaveLength(1);
+      expect(matchProposals[0]!.yes_bet_id).toBe("order_yes_1");
+      expect(matchProposals[0]!.no_bet_id).toBe("order_no_1");
+      expect(matchProposals[0]!.amount_sats).toBe(BET_SATS);
 
-    expect(matchedPair.status).toBe("locked");
-    expect(matchedPair.market_id).toBe(marketId);
-    expect(matchedPair.yes_pubkey).toBe(yesBettor.publicKey);
-    expect(matchedPair.no_pubkey).toBe(noBettor.publicKey);
-    expect(matchedPair.amount_sats).toBe(BET_SATS);
+      // After matching, remaining_sats should be 0
+      const yesBets = await matchingQueue.listPending(marketId, "yes");
+      const noBets = await matchingQueue.listPending(marketId, "no");
+      // Orders with 0 remaining are excluded from listPending
+      expect(yesBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
+      expect(noBets.filter((o) => o.remaining_sats > 0)).toHaveLength(0);
+    });
 
-    // Verify cross-HTLC proofs were created in both directions
-    expect(matchedPair._yesToNoProofs.length).toBeGreaterThan(0);
-    expect(matchedPair._noToYesProofs.length).toBeGreaterThan(0);
+    // -------------------------------------------------------------------------
+    // Step 5: Execute match -> creates cross-HTLC locked SwapPair tokens
+    // -------------------------------------------------------------------------
 
-    // Verify the HTLC secrets contain the correct hashes
-    for (const proof of matchedPair._yesToNoProofs) {
-      const secret = JSON.parse(proof.secret);
-      expect(secret[0]).toBe("HTLC");
-      // YES->NO proofs locked with hash_b
-      expect(secret[1].data).toBe(swap.hash_b);
-    }
-    for (const proof of matchedPair._noToYesProofs) {
-      const secret = JSON.parse(proof.secret);
-      expect(secret[0]).toBe("HTLC");
-      // NO->YES proofs locked with hash_a
-      expect(secret[1].data).toBe(swap.hash_a);
-    }
-  });
+    test("5. execute match creates cross-HTLC locked escrow tokens", async () => {
+      const proposal = matchProposals[0]!;
 
-  // -------------------------------------------------------------------------
-  // Step 6: Oracle resolves (YES wins) -> reveals preimage_a
-  // -------------------------------------------------------------------------
+      matchedPair = await executeMatchDirect(
+        wallet,
+        proposal,
+        yesProofs,
+        noProofs,
+        swap,
+        yesBettor.publicKey,
+        noBettor.publicKey,
+        marketId,
+      ) as MatchedBetPair & {
+        _yesToNoProofs: Proof[];
+        _noToYesProofs: Proof[];
+      };
 
-  test("6. oracle resolves market: YES wins, preimage_a revealed, preimage_b deleted", () => {
-    const resolution = resolveMarket(marketId, "yes", dualStore);
+      expect(matchedPair.status).toBe("locked");
+      expect(matchedPair.market_id).toBe(marketId);
+      expect(matchedPair.yes_pubkey).toBe(yesBettor.publicKey);
+      expect(matchedPair.no_pubkey).toBe(noBettor.publicKey);
+      expect(matchedPair.amount_sats).toBe(BET_SATS);
 
-    expect(resolution).not.toBeNull();
-    expect(resolution!.outcome).toBe("yes");
-    expect(resolution!.preimage).toBeDefined();
-    expect(resolution!.preimage).toMatch(/^[0-9a-f]{64}$/);
+      // Verify cross-HTLC proofs were created in both directions
+      expect(matchedPair._yesToNoProofs.length).toBeGreaterThan(0);
+      expect(matchedPair._noToYesProofs.length).toBeGreaterThan(0);
 
-    revealedPreimage = resolution!.preimage;
+      // Verify the HTLC secrets contain the correct hashes
+      for (const proof of matchedPair._yesToNoProofs) {
+        const secret = JSON.parse(proof.secret);
+        expect(secret[0]).toBe("HTLC");
+        // YES->NO proofs locked with hash_b
+        expect(secret[1].data).toBe(swap.hash_b);
+      }
+      for (const proof of matchedPair._noToYesProofs) {
+        const secret = JSON.parse(proof.secret);
+        expect(secret[0]).toBe("HTLC");
+        // NO->YES proofs locked with hash_a
+        expect(secret[1].data).toBe(swap.hash_a);
+      }
+    });
 
-    // After resolution, trying to reveal again should return null (already revealed)
-    const secondReveal = resolveMarket(marketId, "yes", dualStore);
-    expect(secondReveal).toBeNull();
-  });
+    // -------------------------------------------------------------------------
+    // Step 6: Oracle resolves (YES wins) -> reveals preimage_a
+    // -------------------------------------------------------------------------
 
-  // -------------------------------------------------------------------------
-  // Step 7: Winner (YES bettor) redeems loser's (NO bettor's) tokens
-  // -------------------------------------------------------------------------
+    test("6. oracle resolves market: YES wins, preimage_a revealed, preimage_b deleted", () => {
+      const resolution = resolveMarket(marketId, "yes", dualStore);
 
-  test("7. YES bettor redeems NO bettor's tokens using revealed preimage_a", async () => {
-    // NO->YES proofs are locked with hash_a + P2PK(YES bettor)
-    // YES bettor needs: preimage_a (from oracle) + YES bettor's private key
-    const noToYesProofs = matchedPair._noToYesProofs;
+      expect(resolution).not.toBeNull();
+      expect(resolution!.outcome).toBe("yes");
+      expect(resolution!.preimage).toBeDefined();
+      expect(resolution!.preimage).toMatch(/^[0-9a-f]{64}$/);
 
-    // Attach preimage as HTLC witness
-    const proofsWithPreimage = noToYesProofs.map((p) => ({
-      ...p,
-      witness: JSON.stringify({ preimage: revealedPreimage, signatures: [] }),
-    }));
+      revealedPreimage = resolution!.preimage;
 
-    const totalSats = proofsWithPreimage.reduce((s, p) => s + p.amount, 0);
-    const fee = wallet.getFeesForProofs(proofsWithPreimage);
-    expect(totalSats - fee).toBeGreaterThan(0);
+      // After resolution, trying to reveal again should return null (already revealed)
+      const secondReveal = resolveMarket(marketId, "yes", dualStore);
+      expect(secondReveal).toBeNull();
+    });
 
-    // Redeem via cashu-ts (handles SIG_ALL signing + Mint swap)
-    await throttleMintOp();
-    const { send: redeemed } = await retryOnRateLimit(() =>
-      wallet.ops
-        .send(totalSats - fee, proofsWithPreimage)
-        .privkey(yesBettor.secretKey)
-        .run()
-    );
+    // -------------------------------------------------------------------------
+    // Step 7: Winner (YES bettor) redeems loser's (NO bettor's) tokens
+    // -------------------------------------------------------------------------
 
-    expect(redeemed).not.toBeNull();
-    expect(redeemed.length).toBeGreaterThan(0);
+    test("7. YES bettor redeems NO bettor's tokens using revealed preimage_a", async () => {
+      // NO->YES proofs are locked with hash_a + P2PK(YES bettor)
+      // YES bettor needs: preimage_a (from oracle) + YES bettor's private key
+      const noToYesProofs = matchedPair._noToYesProofs;
 
-    // Verify redeemed amount
-    const redeemedTotal = redeemed.reduce((s, p) => s + p.amount, 0);
-    expect(redeemedTotal).toBe(totalSats - fee);
-  });
+      // Attach preimage as HTLC witness
+      const proofsWithPreimage = noToYesProofs.map((p) => ({
+        ...p,
+        witness: JSON.stringify({ preimage: revealedPreimage, signatures: [] }),
+      }));
 
-  // -------------------------------------------------------------------------
-  // Step 8: Verify loser's preimage is permanently deleted
-  // -------------------------------------------------------------------------
+      const totalSats = proofsWithPreimage.reduce((s, p) => s + p.amount, 0);
+      const fee = wallet.getFeesForProofs(proofsWithPreimage);
+      expect(totalSats - fee).toBeGreaterThan(0);
 
-  test("8. loser's preimage (preimage_b) is permanently deleted and cannot be revealed", () => {
-    // After YES resolution, preimage_b (the NO preimage) was permanently deleted.
-    // Even if the oracle tries to reveal outcome "b" now, it should fail.
+      // Redeem via cashu-ts (handles SIG_ALL signing + Mint swap)
+      await throttleMintOp();
+      const { send: redeemed } = await retryOnRateLimit(() =>
+        wallet.ops
+          .send(totalSats - fee, proofsWithPreimage)
+          .privkey(yesBettor.secretKey)
+          .run()
+      );
 
-    // The dual store should still have the hashes for lookup
-    const hashes = dualStore.getHashes(marketId);
-    expect(hashes).not.toBeNull();
+      expect(redeemed).not.toBeNull();
+      expect(redeemed.length).toBeGreaterThan(0);
 
-    // But revealing again should fail (already revealed once)
-    const attemptRevealB = dualStore.reveal(marketId, "b");
-    expect(attemptRevealB).toBeNull();
+      // Verify redeemed amount
+      const redeemedTotal = redeemed.reduce((s, p) => s + p.amount, 0);
+      expect(redeemedTotal).toBe(totalSats - fee);
+    });
 
-    // Also, trying to reveal "a" again fails
-    const attemptRevealA = dualStore.reveal(marketId, "a");
-    expect(attemptRevealA).toBeNull();
-  });
+    // -------------------------------------------------------------------------
+    // Step 8: Verify loser's preimage is permanently deleted
+    // -------------------------------------------------------------------------
 
-  // -------------------------------------------------------------------------
-  // Bonus: NO bettor CANNOT obtain preimage_b (protocol-level guarantee)
-  // -------------------------------------------------------------------------
+    test("8. loser's preimage (preimage_b) is permanently deleted and cannot be revealed", () => {
+      // After YES resolution, preimage_b (the NO preimage) was permanently deleted.
+      // Even if the oracle tries to reveal outcome "b" now, it should fail.
 
-  test("bonus: NO bettor cannot obtain preimage_b — protocol-level trustless guarantee", () => {
-    // YES->NO proofs are locked with hash_b + P2PK(NO bettor).
-    // NO bettor would need preimage_b to redeem, but it was permanently
-    // deleted by the DualPreimageStore when the oracle resolved YES.
-    //
-    // This is the CORE trustless property of conditional swaps:
-    // the losing preimage is destroyed at resolution time, so even a
-    // compromised oracle cannot retroactively give it to the loser.
+      // The dual store should still have the hashes for lookup
+      const hashes = dualStore.getHashes(marketId);
+      expect(hashes).not.toBeNull();
 
-    // 1. The dual preimage store refuses to reveal the losing outcome
-    const attemptRevealB = dualStore.reveal(marketId, "b");
-    expect(attemptRevealB).toBeNull();
+      // But revealing again should fail (already revealed once)
+      const attemptRevealB = dualStore.reveal(marketId, "b");
+      expect(attemptRevealB).toBeNull();
 
-    // 2. Verify the proofs are indeed locked with hash_b (the NO hash)
-    //    — confirming they require preimage_b which no longer exists
-    const yesToNoProofs = matchedPair._yesToNoProofs;
-    for (const proof of yesToNoProofs) {
-      const secret = JSON.parse(proof.secret);
-      expect(secret[0]).toBe("HTLC");
-      expect(secret[1].data).toBe(swap.hash_b);
-    }
+      // Also, trying to reveal "a" again fails
+      const attemptRevealA = dualStore.reveal(marketId, "a");
+      expect(attemptRevealA).toBeNull();
+    });
 
-    // 3. The only preimage that was revealed is preimage_a (YES outcome)
-    //    — it does NOT match hash_b, so it cannot unlock these proofs
-    //    (verified structurally: revealedPreimage hashes to hash_a, not hash_b)
-    expect(revealedPreimage).toBeDefined();
-    expect(swap.hash_a).not.toBe(swap.hash_b);
-  });
-});
+    // -------------------------------------------------------------------------
+    // Bonus: NO bettor CANNOT obtain preimage_b (protocol-level guarantee)
+    // -------------------------------------------------------------------------
+
+    test("bonus: NO bettor cannot obtain preimage_b — protocol-level trustless guarantee", () => {
+      // YES->NO proofs are locked with hash_b + P2PK(NO bettor).
+      // NO bettor would need preimage_b to redeem, but it was permanently
+      // deleted by the DualPreimageStore when the oracle resolved YES.
+      //
+      // This is the CORE trustless property of conditional swaps:
+      // the losing preimage is destroyed at resolution time, so even a
+      // compromised oracle cannot retroactively give it to the loser.
+
+      // 1. The dual preimage store refuses to reveal the losing outcome
+      const attemptRevealB = dualStore.reveal(marketId, "b");
+      expect(attemptRevealB).toBeNull();
+
+      // 2. Verify the proofs are indeed locked with hash_b (the NO hash)
+      //    — confirming they require preimage_b which no longer exists
+      const yesToNoProofs = matchedPair._yesToNoProofs;
+      for (const proof of yesToNoProofs) {
+        const secret = JSON.parse(proof.secret);
+        expect(secret[0]).toBe("HTLC");
+        expect(secret[1].data).toBe(swap.hash_b);
+      }
+
+      // 3. The only preimage that was revealed is preimage_a (YES outcome)
+      //    — it does NOT match hash_b, so it cannot unlock these proofs
+      //    (verified structurally: revealedPreimage hashes to hash_a, not hash_b)
+      expect(revealedPreimage).toBeDefined();
+      expect(swap.hash_a).not.toBe(swap.hash_b);
+    });
+  },
+);
 
 // =============================================================================
 // Partial matching test (separate describe to avoid shared state conflicts)

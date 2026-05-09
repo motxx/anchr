@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { secureStoreProvider } from "../platform/secure-store.ts";
-import { generateIdentity, restoreIdentity, type NostrIdentity } from "../nostr/identity.ts";
+import {
+  generateIdentity,
+  type NostrIdentity,
+  restoreIdentity,
+} from "../nostr/identity.ts";
 import { npubEncode } from "../nostr/nip19.ts";
 
 interface AuthState {

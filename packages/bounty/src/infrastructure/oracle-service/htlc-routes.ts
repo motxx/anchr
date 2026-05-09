@@ -20,7 +20,13 @@ export interface HtlcRouteDeps {
  *   POST /preimage        — release preimage iff /verify recorded a pass
  */
 export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
-  const { authMiddleware, preimageStore, queryHashMap, verifiedQueries, oracleId } = deps;
+  const {
+    authMiddleware,
+    preimageStore,
+    queryHashMap,
+    verifiedQueries,
+    oracleId,
+  } = deps;
 
   app.post("/hash", authMiddleware, async (c) => {
     const body = await c.req.json<{ query_id: string }>().catch(() => null);
@@ -46,7 +52,9 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
   });
 
   app.post("/verify", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query: Query; result: QueryResult; worker_pubkey?: string }>();
+    const body = await c.req.json<
+      { query: Query; result: QueryResult; worker_pubkey?: string }
+    >();
     if (!body.query || !body.result) {
       return c.json({ error: "Missing query or result in request body" }, 400);
     }
@@ -62,7 +70,8 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
     };
 
     if (detail.passed) {
-      const workerPubkey = body.worker_pubkey ?? body.query.escrow?.worker_pubkey ?? "";
+      const workerPubkey = body.worker_pubkey ??
+        body.query.escrow?.worker_pubkey ?? "";
       verifiedQueries.set(body.query.id, workerPubkey);
     }
 
@@ -70,7 +79,9 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
   });
 
   app.post("/preimage", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query_id: string; worker_pubkey?: string }>().catch(() => null);
+    const body = await c.req.json<
+      { query_id: string; worker_pubkey?: string }
+    >().catch(() => null);
     if (!body?.query_id) {
       return c.json({ error: "Missing query_id" }, 400);
     }
@@ -80,12 +91,18 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
     // strict equality for the binding check so a missing body pubkey can't
     // sneak past when a worker WAS bound.
     if (!verifiedQueries.has(body.query_id)) {
-      return c.json({ error: "Verification has not passed for this query" }, 403);
+      return c.json(
+        { error: "Verification has not passed for this query" },
+        403,
+      );
     }
     const verifiedWorker = verifiedQueries.get(body.query_id)!;
 
     if (verifiedWorker !== "" && body.worker_pubkey !== verifiedWorker) {
-      return c.json({ error: "Worker pubkey does not match selected worker" }, 403);
+      return c.json(
+        { error: "Worker pubkey does not match selected worker" },
+        403,
+      );
     }
 
     const hash = queryHashMap.get(body.query_id);

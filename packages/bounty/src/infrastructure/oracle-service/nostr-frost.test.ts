@@ -1,9 +1,9 @@
 import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  createOracleNostrService,
   _setPublishEventForTest,
   _setVerifyForTest,
+  createOracleNostrService,
 } from "./nostr-service.ts";
 import type { OracleNostrServiceConfig } from "./nostr-service.ts";
 import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
@@ -91,7 +91,12 @@ describe("verifyAndDeliverFrost", () => {
       failures: [],
     }));
 
-    const passed = await service.verifyAndDeliverFrost("q1", makeQuery("q1"), makeResult(), workerPubkey);
+    const passed = await service.verifyAndDeliverFrost(
+      "q1",
+      makeQuery("q1"),
+      makeResult(),
+      workerPubkey,
+    );
     expect(passed).toBe(true);
     expect(published.length).toBe(1); // Preimage DM (HTLC fallback)
   });
@@ -115,7 +120,12 @@ describe("verifyAndDeliverFrost", () => {
       failures: ["C2PA invalid"],
     }));
 
-    const passed = await service.verifyAndDeliverFrost("q-rej", makeQuery("q-rej"), makeResult(), workerPubkey);
+    const passed = await service.verifyAndDeliverFrost(
+      "q-rej",
+      makeQuery("q-rej"),
+      makeResult(),
+      workerPubkey,
+    );
     expect(passed).toBe(false);
     expect(published.length).toBe(1); // Rejection DM
   });
@@ -140,7 +150,12 @@ describe("verifyAndDeliverFrost", () => {
     }));
 
     // Verification passes but coordinateSigning will fail (no real key material, no peers running)
-    const passed = await service.verifyAndDeliverFrost("q-nopeer", makeQuery("q-nopeer"), makeResult(), workerPubkey);
+    const passed = await service.verifyAndDeliverFrost(
+      "q-nopeer",
+      makeQuery("q-nopeer"),
+      makeResult(),
+      workerPubkey,
+    );
     // Should return false because signing fails (peers unreachable, threshold not met)
     expect(passed).toBe(false);
     // Rejection DM about threshold not met

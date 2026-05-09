@@ -45,7 +45,9 @@ const LEFT_W = Math.floor(SCREEN_W * 0.5);
 const RIGHT_W = SCREEN_W - LEFT_W;
 
 // Demo UI — left
-const demoHtml = await Deno.readTextFile(new URL("./demo-payment-proof.html", import.meta.url).pathname);
+const demoHtml = await Deno.readTextFile(
+  new URL("./demo-payment-proof.html", import.meta.url).pathname,
+);
 const demoBrowser = await pw.chromium.launch({
   headless: false,
   args: [`--window-size=${LEFT_W},${SCREEN_H}`, `--window-position=0,0`],
@@ -53,8 +55,13 @@ const demoBrowser = await pw.chromium.launch({
 const demoPage = await demoBrowser.newPage();
 await demoPage.setViewportSize({ width: LEFT_W - 16, height: SCREEN_H - 80 });
 await demoPage.setContent(demoHtml);
-await demoPage.waitForFunction(() => typeof (window as any).flowActivate === "function");
-await demoPage.evaluate((ts: number) => (window as any).flowSetStart(ts), startTime);
+await demoPage.waitForFunction(() =>
+  typeof (window as any).flowActivate === "function"
+);
+await demoPage.evaluate(
+  (ts: number) => (window as any).flowSetStart(ts),
+  startTime,
+);
 
 const activate = (step: number, desc?: string) =>
   demoPage.evaluate(
@@ -66,16 +73,23 @@ const complete = (step: number, desc?: string) =>
     ([s, d]: [number, string]) => (window as any).flowComplete(s, d),
     [step, desc ?? ""] as [number, string],
   );
-const showResult = (data: { fields: Record<string, string>; footer?: string }) =>
-  demoPage.evaluate((d: any) => (window as any).flowResult(d), data);
+const showResult = (
+  data: { fields: Record<string, string>; footer?: string },
+) => demoPage.evaluate((d: any) => (window as any).flowResult(d), data);
 
 // Square browser — right (blank until payment)
 const squareBrowser = await pw.chromium.launch({
   headless: false,
-  args: [`--window-size=${RIGHT_W},${SCREEN_H}`, `--window-position=${LEFT_W},0`],
+  args: [
+    `--window-size=${RIGHT_W},${SCREEN_H}`,
+    `--window-position=${LEFT_W},0`,
+  ],
 });
 const squarePage = await squareBrowser.newPage();
-await squarePage.setViewportSize({ width: RIGHT_W - 16, height: SCREEN_H - 80 });
+await squarePage.setViewportSize({
+  width: RIGHT_W - 16,
+  height: SCREEN_H - 80,
+});
 await squarePage.setContent(
   '<html><body style="background:#08080d;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">' +
     '<p style="color:#333;font-family:system-ui;font-size:15px">Waiting...</p></body></html>',
@@ -89,9 +103,12 @@ console.log(`[${elapsed()}] Demo ready\n`);
 await activate(0, "Creating payment link...");
 console.log(`[${elapsed()}] Creating Square Payment Link...`);
 
-const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
-  headers: { Authorization: `Bearer ${SQUARE_ACCESS_TOKEN}` },
-});
+const locResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/locations",
+  {
+    headers: { Authorization: `Bearer ${SQUARE_ACCESS_TOKEN}` },
+  },
+);
 const LOCATION_ID = ((await locResp.json()) as any).locations?.[0]?.id;
 
 const linkResp = await fetch(
@@ -228,7 +245,8 @@ await activate(2, "Submitting proof...");
 console.log(`[${elapsed()}] Submitting to Anchr...`);
 
 // Create query + submit result (infrastructure hidden from UI)
-const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
+const WORKER_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000003";
 
 const queryResp = await fetch(`${ANCHR_URL}/queries`, {
   method: "POST",
@@ -238,7 +256,8 @@ const queryResp = await fetch(`${ANCHR_URL}/queries`, {
     verification_requirements: ["tlsn"],
     ttl_seconds: 600,
     tlsn_requirements: {
-      target_url: `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
+      target_url:
+        `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
       domain_hint: "connect.squareupsandbox.com",
       conditions: [
         {

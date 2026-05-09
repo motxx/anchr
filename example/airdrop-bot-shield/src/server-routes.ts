@@ -1,11 +1,19 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { isTlsnVerifierAvailable } from "@anchr/tlsn-toolkit/tlsn-validation";
-import { ProofGateError, type ProofGateService } from "@anchr/bounty/claim-gate";
+import {
+  ProofGateError,
+  type ProofGateService,
+} from "@anchr/bounty/claim-gate";
 import type { ProofCondition } from "./airdrop-criteria.ts";
 
 const ConditionSchema = z.object({
-  type: z.enum(["github_account_age", "twitter_followers", "github_repos", "github_contributions"]),
+  type: z.enum([
+    "github_account_age",
+    "twitter_followers",
+    "github_repos",
+    "github_contributions",
+  ]),
   target_url: z.string().min(1),
   min_value: z.number().int().positive().optional(),
   jsonpath: z.string().min(1),
@@ -39,7 +47,9 @@ export interface AirdropBotShieldRouteOptions {
   productionReady?: boolean;
 }
 
-export function buildAirdropBotShieldApp(opts: AirdropBotShieldRouteOptions): Hono {
+export function buildAirdropBotShieldApp(
+  opts: AirdropBotShieldRouteOptions,
+): Hono {
   const app = new Hono();
 
   app.get("/health", (c) =>
@@ -47,15 +57,13 @@ export function buildAirdropBotShieldApp(opts: AirdropBotShieldRouteOptions): Ho
       ok: true,
       service: "airdrop-bot-shield",
       tlsn_verifier_available: isTlsnVerifierAvailable(),
-    })
-  );
+    }));
 
   app.get("/ready", (c) =>
     c.json({
       ok: opts.productionReady ?? false,
       tlsn_verifier_available: isTlsnVerifierAvailable(),
-    }, opts.productionReady ? 200 : 503)
-  );
+    }, opts.productionReady ? 200 : 503));
 
   app.get("/airdrop/:id/status", async (c) => {
     try {
@@ -80,8 +88,13 @@ export function buildAirdropBotShieldApp(opts: AirdropBotShieldRouteOptions): Ho
 
   app.post("/airdrop/:id/reserve", async (c) => {
     try {
-      const body = z.object({ claimant_pubkey: z.string().min(64) }).parse(await c.req.json());
-      const claim = await opts.service.reserveClaim(c.req.param("id"), body.claimant_pubkey);
+      const body = z.object({ claimant_pubkey: z.string().min(64) }).parse(
+        await c.req.json(),
+      );
+      const claim = await opts.service.reserveClaim(
+        c.req.param("id"),
+        body.claimant_pubkey,
+      );
       return c.json({
         claim_id: claim.id,
         htlc_hash: claim.htlc_hash,
@@ -106,17 +119,26 @@ export function buildAirdropBotShieldApp(opts: AirdropBotShieldRouteOptions): Ho
   return app;
 }
 
-function authorized(header: string | undefined, token: string | undefined): boolean {
+function authorized(
+  header: string | undefined,
+  token: string | undefined,
+): boolean {
   if (!token) return false;
   return header === `Bearer ${token}`;
 }
 
-function errorResponse(c: { json: (body: unknown, status?: number) => Response }, err: unknown): Response {
+function errorResponse(
+  c: { json: (body: unknown, status?: number) => Response },
+  err: unknown,
+): Response {
   if (err instanceof ProofGateError) {
     return c.json({ error: err.code, message: err.message }, err.status);
   }
   if (err instanceof z.ZodError) {
     return c.json({ error: "invalid_request", issues: err.issues }, 400);
   }
-  return c.json({ error: "internal_error", message: err instanceof Error ? err.message : String(err) }, 500);
+  return c.json({
+    error: "internal_error",
+    message: err instanceof Error ? err.message : String(err),
+  }, 500);
 }

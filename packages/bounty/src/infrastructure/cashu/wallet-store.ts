@@ -1,28 +1,36 @@
 import type { Proof } from "@cashu/cashu-ts";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import {
-  type WalletRole,
-  type WalletData,
-  type WalletBalance,
-  makeKey,
-  selectProofs,
   computeBalance,
+  makeKey,
   pruneSpentProofs,
+  selectProofs,
+  type WalletBalance,
+  type WalletData,
+  type WalletRole,
 } from "./wallet-store-helpers.ts";
 
-export type { WalletRole, WalletBalance };
+export type { WalletBalance, WalletRole };
 
 export interface WalletStore {
   /** Add proofs to the wallet's confirmed balance. */
   addProofs(role: WalletRole, pubkey: string, proofs: Proof[]): void;
 
   /** Select proofs from confirmed and lock them for a query. Returns locked proofs, or null if insufficient. */
-  lockForQuery(role: WalletRole, pubkey: string, queryId: string, amountSats: number): Proof[] | null;
+  lockForQuery(
+    role: WalletRole,
+    pubkey: string,
+    queryId: string,
+    amountSats: number,
+  ): Proof[] | null;
 
   /** Transfer locked proofs from one wallet to another's confirmed balance (on approval). */
   transferLocked(
-    fromRole: WalletRole, fromPubkey: string, queryId: string,
-    toRole: WalletRole, toPubkey: string,
+    fromRole: WalletRole,
+    fromPubkey: string,
+    queryId: string,
+    toRole: WalletRole,
+    toPubkey: string,
   ): void;
 
   /** Return locked proofs to the owner's confirmed balance (on rejection/cancel). */
@@ -38,7 +46,11 @@ export interface WalletStore {
   getLockedProofs(role: WalletRole, pubkey: string, queryId: string): Proof[];
 
   /** Serialize concurrent mutations on a per-wallet basis. */
-  withLock<T>(role: WalletRole, pubkey: string, fn: () => T | Promise<T>): Promise<T>;
+  withLock<T>(
+    role: WalletRole,
+    pubkey: string,
+    fn: () => T | Promise<T>,
+  ): Promise<T>;
 }
 
 export function createWalletStore(): WalletStore {
@@ -57,11 +69,17 @@ export function createWalletStore(): WalletStore {
     return data;
   }
 
-  async function withLock<T>(role: WalletRole, pubkey: string, fn: () => T | Promise<T>): Promise<T> {
+  async function withLock<T>(
+    role: WalletRole,
+    pubkey: string,
+    fn: () => T | Promise<T>,
+  ): Promise<T> {
     const key = makeKey(role, pubkey);
     const prev = locks.get(key) ?? Promise.resolve();
     let resolve: () => void;
-    const next = new Promise<void>((r) => { resolve = r; });
+    const next = new Promise<void>((r) => {
+      resolve = r;
+    });
     locks.set(key, next);
     try {
       await prev;

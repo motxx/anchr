@@ -58,7 +58,9 @@ export interface CreateWalletInput {
   pool?: SimplePool;
 }
 
-export async function createNip60Wallet(input: CreateWalletInput): Promise<Nip60Wallet> {
+export async function createNip60Wallet(
+  input: CreateWalletInput,
+): Promise<Nip60Wallet> {
   const wallet: Nip60Wallet = {
     secretKey: input.secretKey,
     pubkey: getPublicKey(input.secretKey),
@@ -71,7 +73,9 @@ export async function createNip60Wallet(input: CreateWalletInput): Promise<Nip60
 }
 
 /** Publish (or replace) the kind:17375 wallet config event. */
-export async function publishWalletConfig(wallet: Nip60Wallet): Promise<string> {
+export async function publishWalletConfig(
+  wallet: Nip60Wallet,
+): Promise<string> {
   const tags: Array<[string, string]> = [
     ["mint", wallet.mintUrl],
   ];
@@ -137,13 +141,20 @@ export async function loadProofs(wallet: Nip60Wallet): Promise<TokenEntry[]> {
       const decrypted = decryptToSelf(wallet, ev.content);
       payload = JSON.parse(decrypted) as DecryptedTokenContent;
     } catch (err) {
-      console.warn(`[nip60] skipping undecryptable token event ${ev.id.slice(0, 8)}:`, err instanceof Error ? err.message : err);
+      console.warn(
+        `[nip60] skipping undecryptable token event ${ev.id.slice(0, 8)}:`,
+        err instanceof Error ? err.message : err,
+      );
       continue;
     }
     if (payload.del) {
       for (const id of payload.del) tombstoned.add(id);
     }
-    entries.push({ eventId: ev.id, mint: payload.mint, proofs: payload.proofs });
+    entries.push({
+      eventId: ev.id,
+      mint: payload.mint,
+      proofs: payload.proofs,
+    });
   }
   return entries.filter((entry) => !tombstoned.has(entry.eventId));
 }
@@ -161,16 +172,25 @@ export async function getBalance(wallet: Nip60Wallet): Promise<number> {
 
 // NIP-44 v2, self → self conversation key.
 function encryptToSelf(wallet: Nip60Wallet, plaintext: string): string {
-  const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
+  const key = nip44.v2.utils.getConversationKey(
+    wallet.secretKey,
+    wallet.pubkey,
+  );
   return nip44.v2.encrypt(plaintext, key);
 }
 
 function decryptToSelf(wallet: Nip60Wallet, ciphertext: string): string {
-  const key = nip44.v2.utils.getConversationKey(wallet.secretKey, wallet.pubkey);
+  const key = nip44.v2.utils.getConversationKey(
+    wallet.secretKey,
+    wallet.pubkey,
+  );
   return nip44.v2.decrypt(ciphertext, key);
 }
 
-async function publishToRelays(wallet: Nip60Wallet, event: Event): Promise<void> {
+async function publishToRelays(
+  wallet: Nip60Wallet,
+  event: Event,
+): Promise<void> {
   // Promise.allSettled so a single failed relay doesn't drop the publish.
   const promises = wallet.pool.publish(wallet.relays, event);
   await Promise.allSettled(promises);

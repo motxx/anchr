@@ -12,8 +12,14 @@
 
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queue.ts";
-import { createDualPreimageStore, type DualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
+import {
+  createInMemoryMatchingQueue,
+  type MatchingQueue,
+} from "./matching-queue.ts";
+import {
+  createDualPreimageStore,
+  type DualPreimageStore,
+} from "@anchr/cashu-conditional-swap/dual-preimage-store";
 import type { DualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
   createAdaptiveDualKeyStore,
@@ -22,15 +28,15 @@ import {
 import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
 import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
 import {
-  evaluateCondition,
-  calculatePayouts,
   calculateOracleFee,
+  calculatePayouts,
+  evaluateCondition,
 } from "./market-oracle.ts";
 import { resolveMarket as resolveMarketDual } from "./resolution.ts";
 import type {
-  TwoPartyBinaryBet,
   Bet,
   MarketResolution,
+  TwoPartyBinaryBet,
 } from "./market-types.ts";
 
 export interface MarketApiConfig {
@@ -59,18 +65,31 @@ export interface MarketApiState {
   frostConfig?: DualOutcomeFrostNodeConfig;
 }
 
-export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono; state: MarketApiState } {
+export function buildMarketApiRoutes(
+  config: MarketApiConfig = {},
+): { app: Hono; state: MarketApiState } {
   const oracleFeePpm = config.oracleFeePpm ?? 5_000;
 
-  const { store: dualKeyStore, mode, config: frostConfig } = createAdaptiveDualKeyStore(
-    config.marketFrostConfig,
-  );
+  const { store: dualKeyStore, mode, config: frostConfig } =
+    createAdaptiveDualKeyStore(
+      config.marketFrostConfig,
+    );
 
   console.log(`[market-api] Resolution mode: ${mode}`);
   if (mode === "frost" && frostConfig) {
-    console.log(`[market-api] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`);
-    console.log(`[market-api] YES group pubkey: ${frostConfig.group_pubkey.slice(0, 16)}...`);
-    console.log(`[market-api] NO  group pubkey: ${frostConfig.group_pubkey_b.slice(0, 16)}...`);
+    console.log(
+      `[market-api] FROST ${frostConfig.threshold}-of-${frostConfig.total_signers}`,
+    );
+    console.log(
+      `[market-api] YES group pubkey: ${
+        frostConfig.group_pubkey.slice(0, 16)
+      }...`,
+    );
+    console.log(
+      `[market-api] NO  group pubkey: ${
+        frostConfig.group_pubkey_b.slice(0, 16)
+      }...`,
+    );
   } else {
     console.log("[market-api] Using single-key Schnorr signing (demo mode)");
   }
@@ -89,7 +108,8 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
 
   const authMiddleware: MiddlewareHandler = async (c, next) => {
     if (!config.apiKey) return next();
-    const key = c.req.header("x-api-key") ?? c.req.header("authorization")?.slice(7);
+    const key = c.req.header("x-api-key") ??
+      c.req.header("authorization")?.slice(7);
     if (!key || key !== config.apiKey) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -98,19 +118,24 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
 
   app.get("/health", (c) => c.json({ ok: true, mode: state.mode }));
 
-  app.get("/info", (c) => c.json({
-    mode: state.mode,
-    frost: state.frostConfig ? {
-      threshold: state.frostConfig.threshold,
-      total_signers: state.frostConfig.total_signers,
-      group_pubkey_yes: state.frostConfig.group_pubkey,
-      group_pubkey_no: state.frostConfig.group_pubkey_b,
-    } : null,
-    oracle_fee_ppm: oracleFeePpm,
-  }));
+  app.get("/info", (c) =>
+    c.json({
+      mode: state.mode,
+      frost: state.frostConfig
+        ? {
+          threshold: state.frostConfig.threshold,
+          total_signers: state.frostConfig.total_signers,
+          group_pubkey_yes: state.frostConfig.group_pubkey,
+          group_pubkey_no: state.frostConfig.group_pubkey_b,
+        }
+        : null,
+      oracle_fee_ppm: oracleFeePpm,
+    }));
 
   app.post("/markets", authMiddleware, async (c) => {
-    const body = await c.req.json<Partial<TwoPartyBinaryBet>>().catch(() => null);
+    const body = await c.req.json<Partial<TwoPartyBinaryBet>>().catch(() =>
+      null
+    );
     if (!body?.id || !body?.title) {
       return c.json({ error: "Missing required fields (id, title)" }, 400);
     }
@@ -131,7 +156,8 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
         expected_text: "",
         description: "",
       },
-      resolution_deadline: body.resolution_deadline ?? Math.floor(Date.now() / 1000) + 86400,
+      resolution_deadline: body.resolution_deadline ??
+        Math.floor(Date.now() / 1000) + 86400,
       yes_pool_sats: 0,
       no_pool_sats: 0,
       min_bet_sats: body.min_bet_sats ?? 1,
@@ -178,7 +204,10 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     const market = state.markets.get(marketId);
     if (!market) return c.json({ error: "Market not found" }, 404);
     if (market.status !== "open" && market.status !== "closed") {
-      return c.json({ error: `Market is ${market.status}, cannot resolve` }, 409);
+      return c.json(
+        { error: `Market is ${market.status}, cannot resolve` },
+        409,
+      );
     }
 
     const body = await c.req.json<{
@@ -192,7 +221,10 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       return c.json({ error: "Missing verified_body" }, 400);
     }
 
-    const conditionMet = evaluateCondition(market.resolution_condition, body.verified_body);
+    const conditionMet = evaluateCondition(
+      market.resolution_condition,
+      body.verified_body,
+    );
     const outcome: "yes" | "no" = conditionMet ? "yes" : "no";
     const swapOutcome: "a" | "b" = outcome === "yes" ? "a" : "b";
 
@@ -230,7 +262,11 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
 
     // Also resolve the HTLC preimage side so callers that settle through the
     // HTLC redemption flow (rather than the FROST signature) receive the secret.
-    const htlcResult = resolveMarketDual(marketId, outcome, state.dualPreimageStore);
+    const htlcResult = resolveMarketDual(
+      marketId,
+      outcome,
+      state.dualPreimageStore,
+    );
     if (htlcResult) {
       preimage = htlcResult.preimage;
     }
@@ -242,7 +278,8 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       outcome,
       tlsn_proof: body.tlsn_proof ?? "",
       verified_data: {
-        server_name: body.server_name ?? new URL(market.resolution_url).hostname,
+        server_name: body.server_name ??
+          new URL(market.resolution_url).hostname,
         revealed_body: body.verified_body,
         timestamp: body.timestamp ?? Math.floor(Date.now() / 1000),
       },
@@ -250,7 +287,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       oracle_signature: oracleSignature ?? undefined,
     };
 
-    const allBets = (state.bets.get(marketId) ?? []).map(b => ({
+    const allBets = (state.bets.get(marketId) ?? []).map((b) => ({
       side: b.side,
       amount_sats: b.amount_sats,
       bettor_pubkey: b.bettor_pubkey,
@@ -284,8 +321,13 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       };
     }>().catch(() => null);
 
-    if (!body?.message || !body?.market_id || !body?.outcome || !body?.condition_data) {
-      return c.json({ error: "Missing message, market_id, outcome, or condition_data" }, 400);
+    if (
+      !body?.message || !body?.market_id || !body?.outcome ||
+      !body?.condition_data
+    ) {
+      return c.json({
+        error: "Missing message, market_id, outcome, or condition_data",
+      }, 400);
     }
     if (!state.frostConfig) {
       return c.json({ error: "FROST not configured on this node" }, 503);
@@ -310,7 +352,6 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_b;
 
-    
     const keyPackageJson = JSON.stringify(keyPackage);
     const result = await signRound1(keyPackageJson);
     if (!result.ok) {
@@ -334,7 +375,10 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     }>().catch(() => null);
 
     if (!body?.commitments || !body?.message || !body?.nonce_id) {
-      return c.json({ error: "Missing commitments, message, or nonce_id" }, 400);
+      return c.json(
+        { error: "Missing commitments, message, or nonce_id" },
+        400,
+      );
     }
     if (!state.frostConfig) {
       return c.json({ error: "FROST not configured on this node" }, 503);
@@ -350,9 +394,13 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       ? state.frostConfig.key_package
       : state.frostConfig.key_package_b;
 
-    
     const keyPackageJson = JSON.stringify(keyPackage);
-    const result = await signRound2(keyPackageJson, nonceEntry.nonces, body.commitments, body.message);
+    const result = await signRound2(
+      keyPackageJson,
+      nonceEntry.nonces,
+      body.commitments,
+      body.message,
+    );
 
     if (!result.ok) {
       return c.json({ error: result.error }, 500);
@@ -373,7 +421,9 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
       return c.json({ error: "Missing message or FROST not configured" }, 400);
     }
 
-    const msgBytes = new Uint8Array(body.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+    const msgBytes = new Uint8Array(
+      body.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)),
+    );
     const msgText = new TextDecoder().decode(msgBytes);
     const [marketId, outcome] = msgText.split(":");
 
@@ -384,37 +434,60 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
     if (body.result?.verified_body) {
       const market = state.markets.get(marketId);
       if (market) {
-        const conditionMet = evaluateCondition(market.resolution_condition, body.result.verified_body);
+        const conditionMet = evaluateCondition(
+          market.resolution_condition,
+          body.result.verified_body,
+        );
         const localOutcome = conditionMet ? "yes" : "no";
         if (localOutcome !== outcome) {
-          return c.json({ error: "Condition evaluation disagrees", local_outcome: localOutcome }, 403);
+          return c.json({
+            error: "Condition evaluation disagrees",
+            local_outcome: localOutcome,
+          }, 403);
         }
       }
     }
 
     const outcomeKey = outcome === "yes" ? "a" : "b";
-    const keyPackage = outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_b;
-    
+    const keyPackage = outcomeKey === "a"
+      ? state.frostConfig.key_package
+      : state.frostConfig.key_package_b;
+
     const result = await signRound1(JSON.stringify(keyPackage));
     if (!result.ok) return c.json({ error: result.error }, 500);
 
     const nonceId = crypto.randomUUID();
-    pendingMarketNonces.set(nonceId, { nonces: JSON.stringify(result.data!.nonces), outcomeKey });
+    pendingMarketNonces.set(nonceId, {
+      nonces: JSON.stringify(result.data!.nonces),
+      outcomeKey,
+    });
     return c.json({ commitments: result.data!.commitments, nonce_id: nonceId });
   });
 
   app.post("/frost/signer/round2", authMiddleware, async (c) => {
-    const body = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
-    if (!body?.commitments || !body?.message || !body?.nonce_id || !state.frostConfig) {
+    const body = await c.req.json<
+      { commitments: string; message: string; nonce_id: string }
+    >().catch(() => null);
+    if (
+      !body?.commitments || !body?.message || !body?.nonce_id ||
+      !state.frostConfig
+    ) {
       return c.json({ error: "Missing fields or FROST not configured" }, 400);
     }
     const stored = pendingMarketNonces.get(body.nonce_id);
     if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
     pendingMarketNonces.delete(body.nonce_id);
 
-    const keyPackage = stored.outcomeKey === "a" ? state.frostConfig.key_package : state.frostConfig.key_package_b;
-    
-    const result = await signRound2(JSON.stringify(keyPackage), stored.nonces, body.commitments, body.message);
+    const keyPackage = stored.outcomeKey === "a"
+      ? state.frostConfig.key_package
+      : state.frostConfig.key_package_b;
+
+    const result = await signRound2(
+      JSON.stringify(keyPackage),
+      stored.nonces,
+      body.commitments,
+      body.message,
+    );
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });
   });
@@ -422,4 +495,7 @@ export function buildMarketApiRoutes(config: MarketApiConfig = {}): { app: Hono;
   return { app, state };
 }
 
-const pendingMarketNonces = new Map<string, { nonces: string; outcomeKey: "a" | "b" }>();
+const pendingMarketNonces = new Map<
+  string,
+  { nonces: string; outcomeKey: "a" | "b" }
+>();

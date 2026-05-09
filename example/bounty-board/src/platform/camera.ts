@@ -28,7 +28,9 @@ function createWebProvider(): CameraProvider {
     async requestPermission() {
       if (typeof navigator !== "undefined" && navigator.mediaDevices) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
           stream.getTracks().forEach((t) => t.stop());
           return true;
         } catch {

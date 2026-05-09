@@ -9,9 +9,12 @@ if (!SQUARE_ACCESS_TOKEN) {
 
 // Get latest Payment ID (or create a test payment)
 console.log("Creating test payment in Square sandbox...");
-const locationResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
-  headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
-});
+const locationResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/locations",
+  {
+    headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
+  },
+);
 const locationData = await locationResp.json();
 const locationId = locationData.locations?.[0]?.id;
 if (!locationId) {
@@ -42,28 +45,34 @@ console.log(`Payment ID: ${PAYMENT_ID} (status: ${payData.payment.status})`);
 
 // Launch Chrome with TLSNotary Extension
 console.log("Launching Chrome with TLSNotary Extension...");
-const context = await chromium.launchPersistentContext("/tmp/chrome-tlsn-profile", {
-  headless: false,
-  args: [
-    "--disable-extensions-except=/private/tmp/tlsn-extension",
-    "--load-extension=/private/tmp/tlsn-extension",
-    "--no-first-run",
-    "--no-default-browser-check",
-  ],
-});
+const context = await chromium.launchPersistentContext(
+  "/tmp/chrome-tlsn-profile",
+  {
+    headless: false,
+    args: [
+      "--disable-extensions-except=/private/tmp/tlsn-extension",
+      "--load-extension=/private/tmp/tlsn-extension",
+      "--no-first-run",
+      "--no-default-browser-check",
+    ],
+  },
+);
 
 // Wait for Extension service worker
 let extId = "unknown";
 for (let i = 0; i < 30; i++) {
-  const sw = context.serviceWorkers().find(s => s.url().includes("background.bundle.js"));
+  const sw = context.serviceWorkers().find((s) =>
+    s.url().includes("background.bundle.js")
+  );
   if (sw) {
     extId = new URL(sw.url()).hostname;
     break;
   }
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 }
 if (extId === "unknown") {
-  const sw = await context.waitForEvent("serviceworker", { timeout: 10000 }).catch(() => null);
+  const sw = await context.waitForEvent("serviceworker", { timeout: 10000 })
+    .catch(() => null);
   if (sw?.url().includes("background.bundle.js")) {
     extId = new URL(sw.url()).hostname;
   }
@@ -146,22 +155,24 @@ await page.keyboard.press("Meta+a");
 await page.waitForTimeout(200);
 await page.keyboard.press("Backspace");
 await page.waitForTimeout(200);
-await page.evaluate((code) => { navigator.clipboard.writeText(code); }, pluginCode);
+await page.evaluate((code) => {
+  navigator.clipboard.writeText(code);
+}, pluginCode);
 await page.keyboard.press("Meta+v");
 await page.waitForTimeout(1000);
 console.log("Code injected.");
 
 // Monitor console
-page.on('console', msg => {
+page.on("console", (msg) => {
   console.log(`[devconsole] ${msg.text()}`);
 });
 
 // Listen for Allow popup
-context.on('page', async (newPage) => {
+context.on("page", async (newPage) => {
   console.log(`[new page] ${newPage.url()}`);
   await newPage.waitForLoadState("domcontentloaded").catch(() => {});
   try {
-    const allowBtn = newPage.locator('button', { hasText: /allow/i }).first();
+    const allowBtn = newPage.locator("button", { hasText: /allow/i }).first();
     if (await allowBtn.count() > 0) {
       await allowBtn.click({ timeout: 5000 });
       console.log("[new page] Clicked Allow!");
@@ -171,7 +182,7 @@ context.on('page', async (newPage) => {
 
 // Click Run Code
 console.log("Clicking Run Code...");
-const runButton = page.locator('button', { hasText: /run/i }).first();
+const runButton = page.locator("button", { hasText: /run/i }).first();
 await runButton.click();
 console.log("Run Code clicked! Waiting for proof...");
 
@@ -183,7 +194,10 @@ for (let i = 0; i < 30; i++) {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
 
   // Check if proof completed by looking at console
-  const consoleText = await page.locator('.console, [class*="console"]').textContent().catch(() => "") ?? "";
+  const consoleText =
+    await page.locator('.console, [class*="console"]').textContent().catch(() =>
+      ""
+    ) ?? "";
   if (consoleText.includes("Proof copied") || consoleText.includes("Proof:")) {
     console.log(`\n=== PROOF COMPLETED in ${elapsed}s ===`);
     await page.screenshot({ path: "/tmp/square-proof-done.png" });

@@ -12,7 +12,13 @@
  */
 
 import type { Buffer } from "node:buffer";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { spawn } from "@anchr/core-runtime";
@@ -79,9 +85,11 @@ function parseProofJson(raw: string): ProofModeMetadata | null {
   }
 }
 
-function findPhotoEntry(entries: Record<string, Buffer>): [string, Buffer] | null {
+function findPhotoEntry(
+  entries: Record<string, Buffer>,
+): [string, Buffer] | null {
   const found = Object.entries(entries).find(([name]) =>
-    /\.(jpg|jpeg|png|heic|webp)$/i.test(name) && !name.startsWith("__MACOSX"),
+    /\.(jpg|jpeg|png|heic|webp)$/i.test(name) && !name.startsWith("__MACOSX")
   );
   return found ?? null;
 }
@@ -93,7 +101,7 @@ function validateProofJson(
   failures: string[],
 ): { proof: ProofModeMetadata | null; hashValid: boolean } {
   const proofJsonEntry = Object.entries(entries).find(([name]) =>
-    name.endsWith(".proof.json"),
+    name.endsWith(".proof.json")
   );
 
   if (!proofJsonEntry) {
@@ -104,19 +112,30 @@ function validateProofJson(
   const proof = parseProofJson(proofJsonEntry[1].toString("utf-8"));
   if (!proof) return { proof: null, hashValid: false };
 
-  checks.push(`ProofMode: proof.json parsed (${proof.manufacturer} ${proof.hardware})`);
+  checks.push(
+    `ProofMode: proof.json parsed (${proof.manufacturer} ${proof.hardware})`,
+  );
 
   const actualHash = bytesToHex(sha256(new Uint8Array(photoBuffer)));
   const hashValid = actualHash === proof.fileHashSha256;
   if (hashValid) {
     checks.push("ProofMode: SHA256 hash matches");
   } else {
-    failures.push(`ProofMode: SHA256 mismatch (expected ${proof.fileHashSha256.slice(0, 16)}..., got ${actualHash.slice(0, 16)}...)`);
+    failures.push(
+      `ProofMode: SHA256 mismatch (expected ${
+        proof.fileHashSha256.slice(0, 16)
+      }..., got ${actualHash.slice(0, 16)}...)`,
+    );
   }
 
   if (proof.locationProvider && proof.locationLatitude !== 0) {
-    const accuracy = proof.locationAccuracy.split(",")[0] || proof.locationAccuracy;
-    checks.push(`ProofMode: GPS via ${proof.locationProvider} (accuracy: ${parseFloat(accuracy).toFixed(1)}m)`);
+    const accuracy = proof.locationAccuracy.split(",")[0] ||
+      proof.locationAccuracy;
+    checks.push(
+      `ProofMode: GPS via ${proof.locationProvider} (accuracy: ${
+        parseFloat(accuracy).toFixed(1)
+      }m)`,
+    );
   }
 
   return { proof, hashValid };
@@ -130,33 +149,50 @@ async function validatePgp(
   failures: string[],
 ): Promise<boolean | null> {
   const hasAsc = Object.keys(entries).some((name) =>
-    name.endsWith(".asc") && !name.includes("proof") && !name.includes("pubkey"),
+    name.endsWith(".asc") && !name.includes("proof") && !name.includes("pubkey")
   );
   const hasPubkey = Object.keys(entries).some((name) => name === "pubkey.asc");
   if (!hasAsc || !hasPubkey) return null;
 
-  const pgpValid = await verifyPgpSignature(entries, photoFilename, photoBuffer);
+  const pgpValid = await verifyPgpSignature(
+    entries,
+    photoFilename,
+    photoBuffer,
+  );
   if (pgpValid === true) {
     checks.push("ProofMode: PGP signature valid");
   } else if (pgpValid === false) {
     failures.push("ProofMode: PGP signature invalid");
   } else {
-    checks.push("ProofMode: PGP signature present (gpg not available for verification)");
+    checks.push(
+      "ProofMode: PGP signature present (gpg not available for verification)",
+    );
   }
   return pgpValid;
 }
 
-function checkAncillaryProofs(entries: Record<string, Buffer>, checks: string[]): { hasOts: boolean; hasDeviceCheck: boolean } {
+function checkAncillaryProofs(
+  entries: Record<string, Buffer>,
+  checks: string[],
+): { hasOts: boolean; hasDeviceCheck: boolean } {
   const hasOts = Object.keys(entries).some((name) => name.endsWith(".ots"));
-  if (hasOts) checks.push("ProofMode: OpenTimestamps proof present (Bitcoin anchored)");
+  if (hasOts) {
+    checks.push("ProofMode: OpenTimestamps proof present (Bitcoin anchored)");
+  }
 
-  const hasDeviceCheck = Object.keys(entries).some((name) => name.endsWith(".devicecheck"));
-  if (hasDeviceCheck) checks.push("ProofMode: Apple DeviceCheck attestation present");
+  const hasDeviceCheck = Object.keys(entries).some((name) =>
+    name.endsWith(".devicecheck")
+  );
+  if (hasDeviceCheck) {
+    checks.push("ProofMode: Apple DeviceCheck attestation present");
+  }
 
   return { hasOts, hasDeviceCheck };
 }
 
-export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeData | null> {
+export async function parseProofModeZip(
+  zipBuffer: Buffer,
+): Promise<ProofModeData | null> {
   const entries = await extractZipEntries(zipBuffer);
   if (!entries) return null;
 
@@ -169,8 +205,19 @@ export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeDat
   const [photoFilename, photoBuffer] = photoEntry;
   checks.push(`ProofMode: photo found (${photoFilename})`);
 
-  const { proof, hashValid } = validateProofJson(entries, photoBuffer, checks, failures);
-  const pgpValid = await validatePgp(entries, photoFilename, photoBuffer, checks, failures);
+  const { proof, hashValid } = validateProofJson(
+    entries,
+    photoBuffer,
+    checks,
+    failures,
+  );
+  const pgpValid = await validatePgp(
+    entries,
+    photoFilename,
+    photoBuffer,
+    checks,
+    failures,
+  );
   const { hasOts, hasDeviceCheck } = checkAncillaryProofs(entries, checks);
 
   return {
@@ -189,10 +236,14 @@ export async function parseProofModeZip(zipBuffer: Buffer): Promise<ProofModeDat
 /**
  * Extract all entries from a zip buffer using Bun's DeflateDecoder / raw zip parsing.
  */
-async function extractZipEntries(zipBuffer: Buffer): Promise<Record<string, Buffer> | null> {
+async function extractZipEntries(
+  zipBuffer: Buffer,
+): Promise<Record<string, Buffer> | null> {
   try {
     // Use unzip via spawn for reliability
-    const tmpDir = `/tmp/proofmode-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const tmpDir = `/tmp/proofmode-${Date.now()}-${
+      Math.random().toString(36).slice(2, 8)
+    }`;
     mkdirSync(tmpDir, { recursive: true });
 
     const zipPath = `${tmpDir}/input.zip`;
@@ -239,7 +290,7 @@ async function verifyPgpSignature(
     // Find the signature file for the photo
     const photoHash = bytesToHex(sha256(new Uint8Array(photoBuffer)));
     const sigFilename = Object.keys(entries).find((name) =>
-      name === `${photoHash}.asc`,
+      name === `${photoHash}.asc`
     );
     if (!sigFilename) return null;
 
@@ -256,7 +307,13 @@ async function verifyPgpSignature(
     mkdirSync(gpgHome, { mode: 0o700 });
 
     const importProc = spawn([
-      "gpg", "--homedir", gpgHome, "--batch", "--yes", "--import", `${tmpDir}/pubkey.asc`,
+      "gpg",
+      "--homedir",
+      gpgHome,
+      "--batch",
+      "--yes",
+      "--import",
+      `${tmpDir}/pubkey.asc`,
     ], { stdout: "pipe", stderr: "pipe" });
     await importProc.exited;
     if (importProc.exitCode !== 0) {
@@ -265,8 +322,13 @@ async function verifyPgpSignature(
     }
 
     const verifyProc = spawn([
-      "gpg", "--homedir", gpgHome, "--batch", "--verify",
-      `${tmpDir}/photo.sig.asc`, `${tmpDir}/photo.jpg`,
+      "gpg",
+      "--homedir",
+      gpgHome,
+      "--batch",
+      "--verify",
+      `${tmpDir}/photo.sig.asc`,
+      `${tmpDir}/photo.jpg`,
     ], { stdout: "pipe", stderr: "pipe" });
     await verifyProc.exited;
 

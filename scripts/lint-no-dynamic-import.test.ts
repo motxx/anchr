@@ -63,7 +63,8 @@ test("does NOT exempt lines after the import.meta.main block closes", () => {
 });
 
 test("honours per-line `allow-dynamic-import:` opt-out", () => {
-  const text = `const m = await import("./mod.ts"); // allow-dynamic-import: cycle-break for X`;
+  const text =
+    `const m = await import("./mod.ts"); // allow-dynamic-import: cycle-break for X`;
   const hits = scanText(text, "src/a.ts");
   expect(hits.length).toBe(0);
 });

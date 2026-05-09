@@ -4,7 +4,10 @@ import { createQueryService } from "./query-service.ts";
 import type { QueryService } from "./query-service.ts";
 import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
 import { normalizeQueryResult } from "../infrastructure/attachments.ts";
-import { storeIntegrity, clearIntegrityStore } from "@anchr/photo-verification/integrity-store";
+import {
+  clearIntegrityStore,
+  storeIntegrity,
+} from "@anchr/photo-verification/integrity-store";
 
 let svc: QueryService;
 
@@ -21,8 +24,25 @@ function injectValidC2pa(attachmentId: string, queryId: string) {
     attachmentId,
     queryId,
     capturedAt: Date.now(),
-    exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] },
-    c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "test.jpg" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] },
+    exif: {
+      hasExif: false,
+      hasCameraModel: false,
+      hasGps: false,
+      hasTimestamp: false,
+      timestampRecent: false,
+      gpsNearHint: null,
+      metadata: {},
+      checks: [],
+      failures: [],
+    },
+    c2pa: {
+      available: true,
+      hasManifest: true,
+      signatureValid: true,
+      manifest: { title: "test.jpg" },
+      checks: ["C2PA manifest found", "C2PA signature valid"],
+      failures: [],
+    },
   });
 }
 

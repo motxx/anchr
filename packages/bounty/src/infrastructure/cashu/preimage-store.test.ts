@@ -1,6 +1,9 @@
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore, createPersistentPreimageStore } from "@anchr/core-cashu/preimage-store";
+import {
+  createPersistentPreimageStore,
+  createPreimageStore,
+} from "@anchr/core-cashu/preimage-store";
 
 describe("PreimageStore", () => {
   test("create generates hash/preimage pair", () => {
@@ -33,7 +36,12 @@ describe("PreimageStore", () => {
     const entry = store.create();
 
     expect(store.verify(entry.hash, entry.preimage)).toBe(true);
-    expect(store.verify(entry.hash, "0000000000000000000000000000000000000000000000000000000000000000")).toBe(false);
+    expect(
+      store.verify(
+        entry.hash,
+        "0000000000000000000000000000000000000000000000000000000000000000",
+      ),
+    ).toBe(false);
     expect(store.verify("unknown", entry.preimage)).toBe(false);
   });
 
@@ -117,7 +125,12 @@ describe("PersistentPreimageStore", () => {
     const entry = store.create();
 
     expect(store.verify(entry.hash, entry.preimage)).toBe(true);
-    expect(store.verify(entry.hash, "0000000000000000000000000000000000000000000000000000000000000000")).toBe(false);
+    expect(
+      store.verify(
+        entry.hash,
+        "0000000000000000000000000000000000000000000000000000000000000000",
+      ),
+    ).toBe(false);
     expect(store.verify("unknown", entry.preimage)).toBe(false);
   });
 

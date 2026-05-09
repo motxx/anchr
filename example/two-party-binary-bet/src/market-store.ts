@@ -21,8 +21,8 @@ import { Database } from "@db/sqlite";
 import { getLogger } from "@anchr/core-runtime/logger";
 import type { MatchingQueue } from "./matching-queue.ts";
 import type {
-  MatchProposal,
   MatchedBetPair,
+  MatchProposal,
   PendingBet,
   TwoPartyBinaryBet,
 } from "./market-types.ts";
@@ -117,10 +117,18 @@ export interface MarketPersist {
   preimage(marketId: string, preimage: string): Promise<void>;
   signature(marketId: string, signature: string): Promise<void>;
   proofSignatures(marketId: string, sigs: Map<string, string>): Promise<void>;
-  pendingExchangeToken(pairId: string, side: "yes" | "no", token: string): Promise<void>;
+  pendingExchangeToken(
+    pairId: string,
+    side: "yes" | "no",
+    token: string,
+  ): Promise<void>;
   deletePendingExchangeToken(pairId: string, side: "yes" | "no"): Promise<void>;
   faucetToken(token: FaucetTokenRecord): Promise<void>;
-  claimFaucetToken(id: string, claimedAt: number, claimedBy: string): Promise<boolean>;
+  claimFaucetToken(
+    id: string,
+    claimedAt: number,
+    claimedBy: string,
+  ): Promise<boolean>;
 }
 
 export interface MarketStore {
@@ -164,20 +172,28 @@ export function openMarketStore(opts: OpenMarketStoreOpts): MarketStore {
 
 function hydrateAll(db: Database): HydratedState {
   const markets = new Map<string, TwoPartyBinaryBet>();
-  for (const row of db.prepare("SELECT json FROM markets").all<{ json: string }>()) {
+  for (
+    const row of db.prepare("SELECT json FROM markets").all<{ json: string }>()
+  ) {
     const m = JSON.parse(row.json) as TwoPartyBinaryBet;
     markets.set(m.id, m);
   }
 
   const matchedPairs = new Map<string, MatchedBetPair>();
-  for (const row of db.prepare("SELECT json FROM matched_pairs").all<{ json: string }>()) {
+  for (
+    const row of db.prepare("SELECT json FROM matched_pairs").all<
+      { json: string }
+    >()
+  ) {
     const p = JSON.parse(row.json) as MatchedBetPair;
     matchedPairs.set(p.pair_id, p);
   }
 
   const resolvedPreimages = new Map<string, string>();
   for (
-    const row of db.prepare("SELECT market_id, preimage FROM resolved_preimages")
+    const row of db.prepare(
+      "SELECT market_id, preimage FROM resolved_preimages",
+    )
       .all<{ market_id: string; preimage: string }>()
   ) {
     resolvedPreimages.set(row.market_id, row.preimage);
@@ -185,7 +201,9 @@ function hydrateAll(db: Database): HydratedState {
 
   const resolvedSignatures = new Map<string, string>();
   for (
-    const row of db.prepare("SELECT market_id, signature FROM resolved_signatures")
+    const row of db.prepare(
+      "SELECT market_id, signature FROM resolved_signatures",
+    )
       .all<{ market_id: string; signature: string }>()
   ) {
     resolvedSignatures.set(row.market_id, row.signature);
@@ -193,7 +211,9 @@ function hydrateAll(db: Database): HydratedState {
 
   const resolvedProofSignatures = new Map<string, Map<string, string>>();
   for (
-    const row of db.prepare("SELECT market_id, proof_secret, signature FROM resolved_proof_signatures")
+    const row of db.prepare(
+      "SELECT market_id, proof_secret, signature FROM resolved_proof_signatures",
+    )
       .all<{ market_id: string; proof_secret: string; signature: string }>()
   ) {
     let inner = resolvedProofSignatures.get(row.market_id);
@@ -206,7 +226,9 @@ function hydrateAll(db: Database): HydratedState {
 
   const pendingExchangeTokens = new Map<string, string>();
   for (
-    const row of db.prepare("SELECT pair_id, side, token FROM pending_exchange_tokens")
+    const row of db.prepare(
+      "SELECT pair_id, side, token FROM pending_exchange_tokens",
+    )
       .all<{ pair_id: string; side: "yes" | "no"; token: string }>()
   ) {
     pendingExchangeTokens.set(`${row.pair_id}_${row.side}`, row.token);
@@ -214,7 +236,9 @@ function hydrateAll(db: Database): HydratedState {
 
   const faucetTokens = new Map<string, FaucetTokenRecord>();
   for (
-    const row of db.prepare("SELECT id, token, amount_sats, claimed_at, claimed_by FROM faucet_tokens")
+    const row of db.prepare(
+      "SELECT id, token, amount_sats, claimed_at, claimed_by FROM faucet_tokens",
+    )
       .all<{
         id: string;
         token: string;
@@ -423,8 +447,10 @@ function createSqliteMatchingQueue(db: Database): MatchingQueue {
       // app runs single-process, so contention is not real today, but the
       // transaction also makes the partial-update step atomic.
       const proposals = db.transaction((): MatchProposal[] => {
-        const yesBets = selectPendingSide.all<PendingBetRow>(market_id, "yes").map(rowToBet);
-        const noBets = selectPendingSide.all<PendingBetRow>(market_id, "no").map(rowToBet);
+        const yesBets = selectPendingSide.all<PendingBetRow>(market_id, "yes")
+          .map(rowToBet);
+        const noBets = selectPendingSide.all<PendingBetRow>(market_id, "no")
+          .map(rowToBet);
 
         const result: MatchProposal[] = [];
         const changed = new Set<string>();

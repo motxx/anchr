@@ -109,7 +109,14 @@ export interface QuerySummary {
   tlsn_requirements?: {
     target_url: string;
     domain_hint?: string;
-    conditions?: Array<{ type: string; expression: string; expected?: string; description?: string }>;
+    conditions?: Array<
+      {
+        type: string;
+        expression: string;
+        expected?: string;
+        description?: string;
+      }
+    >;
     max_attestation_age_seconds?: number;
   };
   [key: string]: unknown;

@@ -42,7 +42,12 @@ async function writeSignerConfig(index: 1 | 2 | 3): Promise<string | null> {
     await Deno.chmod(path, 0o600);
     return path;
   } catch (err) {
-    logTag("entrypoint", `failed to decode FROST_SIGNER_${index}_CONFIG_B64: ${err instanceof Error ? err.message : err}`);
+    logTag(
+      "entrypoint",
+      `failed to decode FROST_SIGNER_${index}_CONFIG_B64: ${
+        err instanceof Error ? err.message : err
+      }`,
+    );
     return null;
   }
 }
@@ -55,7 +60,9 @@ interface ChildSpec {
 
 function spawnChild(spec: ChildSpec): Deno.ChildProcess {
   const baseEnv = Object.fromEntries(
-    Object.entries(Deno.env.toObject()).filter(([k]) => !k.startsWith("FROST_SIGNER_")),
+    Object.entries(Deno.env.toObject()).filter(([k]) =>
+      !k.startsWith("FROST_SIGNER_")
+    ),
   );
   const child = new Deno.Command(spec.cmd[0]!, {
     args: spec.cmd.slice(1),
@@ -86,15 +93,24 @@ async function main() {
   const children: Deno.ChildProcess[] = [];
 
   // 2. If we have all three configs and a passphrase, boot the FROST cluster.
-  if (haveAllConfigs && (Deno.env.get("FROST_KEY_PASSPHRASE") ?? "").length > 0) {
-    logTag("entrypoint", "FROST configs detected; starting 2-of-3 signer cluster");
+  if (
+    haveAllConfigs && (Deno.env.get("FROST_KEY_PASSPHRASE") ?? "").length > 0
+  ) {
+    logTag(
+      "entrypoint",
+      "FROST configs detected; starting 2-of-3 signer cluster",
+    );
     for (let i = 0; i < 3; i++) {
       const port = SIGNER_PORTS[i]!;
       const path = configPaths[i]!;
       children.push(spawnChild({
         tag: `frost-signer-${i + 1}`,
         cmd: [
-          "deno", "run", "--allow-all", "--config", "deno.json",
+          "deno",
+          "run",
+          "--allow-all",
+          "--config",
+          "deno.json",
           "example/two-party-binary-bet/scripts/frost-oracle-node.ts",
         ],
         env: {
@@ -128,7 +144,11 @@ async function main() {
   children.push(spawnChild({
     tag: "market-server",
     cmd: [
-      "deno", "run", "--allow-all", "--config", "deno.json",
+      "deno",
+      "run",
+      "--allow-all",
+      "--config",
+      "deno.json",
       "example/two-party-binary-bet/server.ts",
     ],
     env: marketEnv,
@@ -138,7 +158,9 @@ async function main() {
   const shutdown = () => {
     logTag("entrypoint", "shutting down children");
     for (const c of children) {
-      try { c.kill("SIGTERM"); } catch { /* already gone */ }
+      try {
+        c.kill("SIGTERM");
+      } catch { /* already gone */ }
     }
   };
   Deno.addSignalListener("SIGINT", shutdown);
@@ -146,10 +168,15 @@ async function main() {
 
   // 5. If any child exits non-zero, exit with that code so Fly restarts the VM.
   const statuses = children.map((c) => c.status);
-  const first = await Promise.race(statuses.map((p, i) =>
-    p.then((s) => ({ index: i, status: s }))
-  ));
-  logTag("entrypoint", `child #${first.index + 1} exited (code=${first.status.code}) — terminating VM`);
+  const first = await Promise.race(
+    statuses.map((p, i) => p.then((s) => ({ index: i, status: s }))),
+  );
+  logTag(
+    "entrypoint",
+    `child #${
+      first.index + 1
+    } exited (code=${first.status.code}) — terminating VM`,
+  );
   shutdown();
   Deno.exit(first.status.code ?? 1);
 }

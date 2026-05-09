@@ -2,10 +2,10 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
 import {
+  ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,
-  ANCHR_ORACLE_ATTESTATION,
 } from "./oracle-attestation.ts";
 import type { OracleAttestation } from "../../../domain/oracle-types.ts";
 
@@ -55,7 +55,10 @@ test("parseOracleAttestationPayload round-trips", () => {
   const parsed = parseOracleAttestationPayload(event.content);
   expect(parsed.oracle_id).toBe("test-oracle");
   expect(parsed.passed).toBe(true);
-  expect(parsed.checks).toEqual(["photo attachment present", "EXIF: camera identified"]);
+  expect(parsed.checks).toEqual([
+    "photo attachment present",
+    "EXIF: camera identified",
+  ]);
   expect(parsed.failures).toEqual([]);
 });
 

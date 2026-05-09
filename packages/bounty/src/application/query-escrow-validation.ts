@@ -29,7 +29,10 @@ export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
   verifying: ["approved", "rejected"],
 };
 
-export function validateEscrowTransition(from: QueryStatus, to: QueryStatus): boolean {
+export function validateEscrowTransition(
+  from: QueryStatus,
+  to: QueryStatus,
+): boolean {
   return ESCROW_TRANSITIONS[from]?.includes(to) ?? false;
 }
 

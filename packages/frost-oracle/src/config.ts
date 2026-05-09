@@ -40,16 +40,21 @@ export function loadFrostNodeConfig(filePath: string): FrostNodeConfig {
 }
 
 /** Save a FROST node config to a JSON file. */
-export function saveFrostNodeConfig(filePath: string, config: FrostNodeConfig): void {
+export function saveFrostNodeConfig(
+  filePath: string,
+  config: FrostNodeConfig,
+): void {
   Deno.writeTextFileSync(filePath, JSON.stringify(config, null, 2));
 }
 
 /** Build a ThresholdOracleConfig from a FrostNodeConfig. */
-export function toThresholdOracleConfig(config: FrostNodeConfig): ThresholdOracleConfig {
+export function toThresholdOracleConfig(
+  config: FrostNodeConfig,
+): ThresholdOracleConfig {
   return {
     threshold: config.threshold,
     total_signers: config.total_signers,
-    signer_pubkeys: config.peers.map(p => String(p.signer_index)),
+    signer_pubkeys: config.peers.map((p) => String(p.signer_index)),
     group_pubkey: config.group_pubkey,
   };
 }

@@ -35,7 +35,13 @@ afterEach(() => clearIntegrityStore());
 
 describe("integrity store", () => {
   test("stores and retrieves by attachment ID", () => {
-    storeIntegrity({ attachmentId: "photo1.jpg", queryId: "q1", capturedAt: Date.now(), exif: dummyExif, c2pa: dummyC2pa });
+    storeIntegrity({
+      attachmentId: "photo1.jpg",
+      queryId: "q1",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
 
     const result = getIntegrity("photo1.jpg");
     expect(result).not.toBeNull();
@@ -48,9 +54,27 @@ describe("integrity store", () => {
   });
 
   test("retrieves by query ID", () => {
-    storeIntegrity({ attachmentId: "a.jpg", queryId: "q2", capturedAt: Date.now(), exif: dummyExif, c2pa: dummyC2pa });
-    storeIntegrity({ attachmentId: "b.jpg", queryId: "q2", capturedAt: Date.now(), exif: dummyExif, c2pa: dummyC2pa });
-    storeIntegrity({ attachmentId: "c.jpg", queryId: "q3", capturedAt: Date.now(), exif: dummyExif, c2pa: dummyC2pa });
+    storeIntegrity({
+      attachmentId: "a.jpg",
+      queryId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "b.jpg",
+      queryId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "c.jpg",
+      queryId: "q3",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
 
     expect(getIntegrityForQuery("q2")).toHaveLength(2);
     expect(getIntegrityForQuery("q3")).toHaveLength(1);
@@ -58,8 +82,20 @@ describe("integrity store", () => {
   });
 
   test("purges stale entries", () => {
-    storeIntegrity({ attachmentId: "old.jpg", queryId: "q1", capturedAt: Date.now() - 10_000_000, exif: dummyExif, c2pa: dummyC2pa });
-    storeIntegrity({ attachmentId: "new.jpg", queryId: "q2", capturedAt: Date.now(), exif: dummyExif, c2pa: dummyC2pa });
+    storeIntegrity({
+      attachmentId: "old.jpg",
+      queryId: "q1",
+      capturedAt: Date.now() - 10_000_000,
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "new.jpg",
+      queryId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
 
     const purged = purgeStaleIntegrity(7_200_000);
     expect(purged).toBe(1);

@@ -1,7 +1,10 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
-import { createPaymentMiddleware, _clearSeenTokensForTest } from "./xcashu-middleware.ts";
+import {
+  _clearSeenTokensForTest,
+  createPaymentMiddleware,
+} from "./xcashu-middleware.ts";
 import type { DataListing, MarketplaceEnv } from "./types.ts";
 
 function makeListing(overrides?: Partial<DataListing>): DataListing {
@@ -25,7 +28,11 @@ function makeApp(listing: DataListing | null) {
 
   app.post("/data/:id", middleware, (c) => {
     const paymentInfo = c.get("paymentInfo");
-    return c.json({ ok: true, mode: paymentInfo.mode, amount: paymentInfo.amount_sats });
+    return c.json({
+      ok: true,
+      mode: paymentInfo.mode,
+      amount: paymentInfo.amount_sats,
+    });
   });
 
   return app;
@@ -40,26 +47,34 @@ describe("X-Cashu Payment Middleware", () => {
   test("no payment header returns 402 with pricing info", async () => {
     const listing = makeListing();
     const app = makeApp(listing);
-    const res = await app.request("http://localhost/data/listing_test1", { method: "POST" });
+    const res = await app.request("http://localhost/data/listing_test1", {
+      method: "POST",
+    });
     expect(res.status).toBe(402);
     const json = await res.json() as Record<string, unknown>;
     expect(json.error).toBe("Payment Required");
     expect(json.price_sats).toBe(10);
     expect(json.htlc_price_sats).toBe(15);
     expect(res.headers.get("x-price")).toBe("10");
-    expect(res.headers.get("x-payment-methods")).toBe("cashu-direct, cashu-htlc");
+    expect(res.headers.get("x-payment-methods")).toBe(
+      "cashu-direct, cashu-htlc",
+    );
   });
 
   test("listing not found returns 404", async () => {
     const app = makeApp(null);
-    const res = await app.request("http://localhost/data/nonexistent", { method: "POST" });
+    const res = await app.request("http://localhost/data/nonexistent", {
+      method: "POST",
+    });
     expect(res.status).toBe(404);
   });
 
   test("inactive listing returns 410", async () => {
     const listing = makeListing({ active: false });
     const app = makeApp(listing);
-    const res = await app.request("http://localhost/data/listing_test1", { method: "POST" });
+    const res = await app.request("http://localhost/data/listing_test1", {
+      method: "POST",
+    });
     expect(res.status).toBe(410);
   });
 

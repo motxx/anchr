@@ -19,7 +19,9 @@ function createPreimage(): { preimage: string; hash: string } {
 }
 
 function verifyPreimageHash(preimage: string, hash: string): boolean {
-  const raw = new Uint8Array(preimage.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+  const raw = new Uint8Array(
+    preimage.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  );
   const computed = bytesToHex(sha256(raw));
   return computed === hash;
 }

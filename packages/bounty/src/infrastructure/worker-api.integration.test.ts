@@ -15,7 +15,11 @@ import type { Query, QueryResult } from "../domain/types.ts";
 const TEST_ORACLE_ID = "worker-api-integration-oracle";
 const testRegistry = createOracleRegistry({ skipBuiltIn: true });
 testRegistry.register({
-  info: { id: TEST_ORACLE_ID, name: "Worker API integration oracle", fee_ppm: 0 },
+  info: {
+    id: TEST_ORACLE_ID,
+    name: "Worker API integration oracle",
+    fee_ppm: 0,
+  },
   verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
     return Promise.resolve({
       oracle_id: TEST_ORACLE_ID,
@@ -27,7 +31,10 @@ testRegistry.register({
     });
   },
 });
-const testService = createQueryService({ hooks: {}, oracleRegistry: testRegistry });
+const testService = createQueryService({
+  hooks: {},
+  oracleRegistry: testRegistry,
+});
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",

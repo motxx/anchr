@@ -9,9 +9,14 @@ import {
 
 const ORACLE_PUBKEY = "1234567890abcdef".repeat(4);
 
-function mockFetch(impl: (url: string, init?: RequestInit) => Promise<Response>): typeof globalThis.fetch {
+function mockFetch(
+  impl: (url: string, init?: RequestInit) => Promise<Response>,
+): typeof globalThis.fetch {
   return ((url: string | URL | Request, init?: RequestInit) =>
-    impl(typeof url === "string" ? url : url.toString(), init)) as typeof globalThis.fetch;
+    impl(
+      typeof url === "string" ? url : url.toString(),
+      init,
+    )) as typeof globalThis.fetch;
 }
 
 test("createHttpOracleClient returns the hash and oracle pubkey on a 200 response", async () => {
@@ -85,7 +90,9 @@ test("createHttpOracleClient throws OracleHttpError on a non-2xx response", asyn
 });
 
 test("OracleHttpError carries the status and body for debugging", async () => {
-  const fetchImpl = mockFetch(async () => new Response("rate limited", { status: 429 }));
+  const fetchImpl = mockFetch(async () =>
+    new Response("rate limited", { status: 429 })
+  );
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",

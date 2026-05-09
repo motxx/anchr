@@ -13,7 +13,7 @@
  * Each file contains the FrostNodeConfig for that signer.
  */
 
-import { mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   dkgRound1,
@@ -56,7 +56,9 @@ async function main() {
   console.log(`Output: ${OUTPUT_DIR}/signer-{1..${TOTAL}}.json`);
 
   if (!isFrostSignerAvailable()) {
-    console.error("ERROR: frost-signer binary not found. Run: cd crates/frost-signer && cargo build --release");
+    console.error(
+      "ERROR: frost-signer binary not found. Run: cd crates/frost-signer && cargo build --release",
+    );
     Deno.exit(1);
   }
 
@@ -65,21 +67,29 @@ async function main() {
 
   // === DKG Round 1 ===
   console.log("\n=== DKG Round 1 ===");
-  const round1: Array<{ secretPackage: string; package: string; identifier: string }> = [];
+  const round1: Array<
+    { secretPackage: string; package: string; identifier: string }
+  > = [];
 
   for (let i = 1; i <= TOTAL; i++) {
     const r = await dkgRound1(i, TOTAL, THRESHOLD);
-    if (!r.ok) { console.error(`Round 1 failed for signer ${i}:`, r.error); Deno.exit(1); }
+    if (!r.ok) {
+      console.error(`Round 1 failed for signer ${i}:`, r.error);
+      Deno.exit(1);
+    }
     const sp = JSON.stringify(r.data!.secret_package);
     const pkg = JSON.stringify(r.data!.package);
-    const id = (r.data!.secret_package as Record<string, unknown>).identifier as string;
+    const id = (r.data!.secret_package as Record<string, unknown>)
+      .identifier as string;
     round1.push({ secretPackage: sp, package: pkg, identifier: id });
     console.log(`  Signer ${i}: OK (id=${id.slice(0, 8)}...)`);
   }
 
   // === DKG Round 2 ===
   console.log("\n=== DKG Round 2 ===");
-  const round2: Array<{ secretPackage: string; packages: Record<string, unknown> }> = [];
+  const round2: Array<
+    { secretPackage: string; packages: Record<string, unknown> }
+  > = [];
 
   for (let i = 0; i < TOTAL; i++) {
     const othersMap: Record<string, unknown> = {};
@@ -87,8 +97,14 @@ async function main() {
       if (j === i) continue;
       othersMap[round1[j]!.identifier] = JSON.parse(round1[j]!.package);
     }
-    const r = await dkgRound2(round1[i]!.secretPackage, JSON.stringify(othersMap));
-    if (!r.ok) { console.error(`Round 2 failed for signer ${i + 1}:`, r.error); Deno.exit(1); }
+    const r = await dkgRound2(
+      round1[i]!.secretPackage,
+      JSON.stringify(othersMap),
+    );
+    if (!r.ok) {
+      console.error(`Round 2 failed for signer ${i + 1}:`, r.error);
+      Deno.exit(1);
+    }
     round2.push({
       secretPackage: JSON.stringify(r.data!.secret_package),
       packages: r.data!.packages as Record<string, unknown>,
@@ -116,8 +132,15 @@ async function main() {
       r2ForMe[round1[j]!.identifier] = pkgsFromJ[round1[i]!.identifier];
     }
 
-    const r = await dkgRound3(round2[i]!.secretPackage, JSON.stringify(othersR1), JSON.stringify(r2ForMe));
-    if (!r.ok) { console.error(`Round 3 failed for signer ${i + 1}:`, r.error); Deno.exit(1); }
+    const r = await dkgRound3(
+      round2[i]!.secretPackage,
+      JSON.stringify(othersR1),
+      JSON.stringify(r2ForMe),
+    );
+    if (!r.ok) {
+      console.error(`Round 3 failed for signer ${i + 1}:`, r.error);
+      Deno.exit(1);
+    }
 
     // Build peer list
     const peers: PeerConfig[] = [];
@@ -139,11 +162,15 @@ async function main() {
       peers,
     });
 
-    console.log(`  Signer ${i + 1}: OK (group_pubkey=${(r.data!.group_pubkey as string).slice(0, 16)}...)`);
+    console.log(
+      `  Signer ${i + 1}: OK (group_pubkey=${
+        (r.data!.group_pubkey as string).slice(0, 16)
+      }...)`,
+    );
   }
 
   // Verify all group pubkeys match
-  const gps = nodeConfigs.map(c => c.group_pubkey);
+  const gps = nodeConfigs.map((c) => c.group_pubkey);
   if (new Set(gps).size !== 1) {
     console.error("ERROR: Group pubkeys don't match!");
     Deno.exit(1);
@@ -155,7 +182,9 @@ async function main() {
     const path = join(OUTPUT_DIR, `signer-${config.signer_index}.json`);
     Deno.writeTextFileSync(path, JSON.stringify(config, null, 2));
     // Set 0600 — only owner can read/write. key_package contains FROST secret shares.
-    try { Deno.chmodSync(path, 0o600); } catch { /* Windows or restricted fs */ }
+    try {
+      Deno.chmodSync(path, 0o600);
+    } catch { /* Windows or restricted fs */ }
     console.log(`  ${path} (mode 0600)`);
   }
 
@@ -164,4 +193,7 @@ async function main() {
   console.log(`  deno run --allow-all scripts/frost-oracle-cluster.ts`);
 }
 
-main().catch((e) => { console.error(e); Deno.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  Deno.exit(1);
+});

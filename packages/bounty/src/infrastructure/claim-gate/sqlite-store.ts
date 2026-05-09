@@ -1,5 +1,10 @@
 import { Database } from "@db/sqlite";
-import type { ProofGateCampaign, ProofGateClaim, ProofGateCondition, ProofGateStore } from "./types.ts";
+import type {
+  ProofGateCampaign,
+  ProofGateClaim,
+  ProofGateCondition,
+  ProofGateStore,
+} from "./types.ts";
 
 const SCHEMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -38,7 +43,9 @@ CREATE TABLE IF NOT EXISTS proof_gate_presentation_hashes (
 );
 `;
 
-export function openSqliteProofGateStore<C extends ProofGateCondition = ProofGateCondition>(
+export function openSqliteProofGateStore<
+  C extends ProofGateCondition = ProofGateCondition,
+>(
   path: string,
 ): ProofGateStore<C> {
   const db = new Database(path);
@@ -50,16 +57,30 @@ export function openSqliteProofGateStore<C extends ProofGateCondition = ProofGat
       db.prepare(
         "INSERT INTO proof_gate_campaigns (id, json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?) " +
           "ON CONFLICT(id) DO UPDATE SET json=excluded.json, status=excluded.status, updated_at=excluded.updated_at",
-      ).run(campaign.id, row, campaign.status, campaign.created_at, campaign.updated_at);
+      ).run(
+        campaign.id,
+        row,
+        campaign.status,
+        campaign.created_at,
+        campaign.updated_at,
+      );
       return Promise.resolve();
     },
     getCampaign(id) {
-      const row = db.prepare("SELECT json FROM proof_gate_campaigns WHERE id = ?").get<{ json: string }>(id);
-      return Promise.resolve(row ? JSON.parse(row.json) as ProofGateCampaign<C> : undefined);
+      const row = db.prepare(
+        "SELECT json FROM proof_gate_campaigns WHERE id = ?",
+      ).get<{ json: string }>(id);
+      return Promise.resolve(
+        row ? JSON.parse(row.json) as ProofGateCampaign<C> : undefined,
+      );
     },
     listCampaigns() {
-      const rows = db.prepare("SELECT json FROM proof_gate_campaigns ORDER BY created_at DESC").all<{ json: string }>();
-      return Promise.resolve(rows.map((r) => JSON.parse(r.json) as ProofGateCampaign<C>));
+      const rows = db.prepare(
+        "SELECT json FROM proof_gate_campaigns ORDER BY created_at DESC",
+      ).all<{ json: string }>();
+      return Promise.resolve(
+        rows.map((r) => JSON.parse(r.json) as ProofGateCampaign<C>),
+      );
     },
     createClaim(claim) {
       db.prepare(
@@ -80,13 +101,22 @@ export function openSqliteProofGateStore<C extends ProofGateCondition = ProofGat
       return Promise.resolve();
     },
     getClaim(id) {
-      const row = db.prepare("SELECT json FROM proof_gate_claims WHERE id = ?").get<{ json: string }>(id);
-      return Promise.resolve(row ? JSON.parse(row.json) as ProofGateClaim<C> : undefined);
+      const row = db.prepare("SELECT json FROM proof_gate_claims WHERE id = ?")
+        .get<{ json: string }>(id);
+      return Promise.resolve(
+        row ? JSON.parse(row.json) as ProofGateClaim<C> : undefined,
+      );
     },
     updateClaim(claim) {
       db.prepare(
         "UPDATE proof_gate_claims SET status = ?, nullifier_hash = ?, json = ?, updated_at = ? WHERE id = ?",
-      ).run(claim.status, claim.nullifier_hash ?? null, JSON.stringify(claim), claim.updated_at, claim.id);
+      ).run(
+        claim.status,
+        claim.nullifier_hash ?? null,
+        JSON.stringify(claim),
+        claim.updated_at,
+        claim.id,
+      );
       return Promise.resolve();
     },
     approvedClaimCount(campaignId) {
@@ -99,7 +129,9 @@ export function openSqliteProofGateStore<C extends ProofGateCondition = ProofGat
       const row = db.prepare(
         "SELECT json FROM proof_gate_claims WHERE campaign_id = ? AND nullifier_hash = ? AND status = 'approved'",
       ).get<{ json: string }>(campaignId, nullifierHash);
-      return Promise.resolve(row ? JSON.parse(row.json) as ProofGateClaim<C> : undefined);
+      return Promise.resolve(
+        row ? JSON.parse(row.json) as ProofGateClaim<C> : undefined,
+      );
     },
     reservePresentationHashes(campaignId, claimId, hashes) {
       try {
@@ -122,4 +154,3 @@ export function openSqliteProofGateStore<C extends ProofGateCondition = ProofGat
     },
   };
 }
-

@@ -150,7 +150,9 @@ export function buildGitHubAgeCondition(minDaysOld: number): ProofCondition {
  *     }
  *   }
  */
-export function buildTwitterFollowerCondition(minFollowers: number): ProofCondition {
+export function buildTwitterFollowerCondition(
+  minFollowers: number,
+): ProofCondition {
   if (minFollowers <= 0) {
     throw new Error(`minFollowers must be positive, got ${minFollowers}`);
   }
@@ -192,16 +194,21 @@ export function buildGitHubReposCondition(minRepos: number): ProofCondition {
  * Verifies against: GET https://api.github.com/users/{username}
  * Extracts: `public_gists` field (integer, proxy for contribution activity)
  */
-export function buildGitHubContributionCondition(minContributions: number): ProofCondition {
+export function buildGitHubContributionCondition(
+  minContributions: number,
+): ProofCondition {
   if (minContributions <= 0) {
-    throw new Error(`minContributions must be positive, got ${minContributions}`);
+    throw new Error(
+      `minContributions must be positive, got ${minContributions}`,
+    );
   }
   return {
     type: "github_contributions",
     target_url: "https://api.github.com/users/{username}",
     min_value: minContributions,
     jsonpath: "public_gists",
-    description: `At least ${minContributions} GitHub contributions (public gists as proxy)`,
+    description:
+      `At least ${minContributions} GitHub contributions (public gists as proxy)`,
   };
 }
 
@@ -234,7 +241,10 @@ export function validateCriteria(criteria: AirdropCriteria): ValidationError[] {
   }
 
   if (!criteria.conditions || criteria.conditions.length === 0) {
-    errors.push({ field: "conditions", message: "At least one proof condition is required" });
+    errors.push({
+      field: "conditions",
+      message: "At least one proof condition is required",
+    });
   } else {
     const validTypes: ProofConditionType[] = [
       "github_account_age",
@@ -249,7 +259,9 @@ export function validateCriteria(criteria: AirdropCriteria): ValidationError[] {
       if (!validTypes.includes(cond.type)) {
         errors.push({
           field: `conditions[${i}].type`,
-          message: `Invalid condition type: "${cond.type}". Must be one of: ${validTypes.join(", ")}`,
+          message: `Invalid condition type: "${cond.type}". Must be one of: ${
+            validTypes.join(", ")
+          }`,
         });
       }
 
@@ -315,7 +327,8 @@ export function validateCriteria(criteria: AirdropCriteria): ValidationError[] {
   ) {
     errors.push({
       field: "total_budget_sats",
-      message: `Budget (${criteria.total_budget_sats} sats) is less than a single claim (${criteria.token_amount_per_claim} sats)`,
+      message:
+        `Budget (${criteria.total_budget_sats} sats) is less than a single claim (${criteria.token_amount_per_claim} sats)`,
     });
   }
 
@@ -327,7 +340,9 @@ export function validateCriteria(criteria: AirdropCriteria): ValidationError[] {
  */
 export function maxClaims(criteria: AirdropCriteria): number {
   if (criteria.token_amount_per_claim <= 0) return 0;
-  return Math.floor(criteria.total_budget_sats / criteria.token_amount_per_claim);
+  return Math.floor(
+    criteria.total_budget_sats / criteria.token_amount_per_claim,
+  );
 }
 
 /**
@@ -350,7 +365,8 @@ export function toTlsnRequirements(conditions: ProofCondition[]): Array<{
   }>;
 }> {
   return conditions.map((cond) => {
-    const hostname = new URL(cond.target_url.replace(/\{[^}]+\}/g, "placeholder")).hostname;
+    const hostname =
+      new URL(cond.target_url.replace(/\{[^}]+\}/g, "placeholder")).hostname;
     return {
       target_url: cond.target_url,
       method: "GET" as const,

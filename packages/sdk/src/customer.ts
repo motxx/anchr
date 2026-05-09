@@ -6,21 +6,18 @@
  * returns the verified data + proof.
  */
 
-import { createCashuClient, type CashuToken } from "./cashu.ts";
+import { type CashuToken, createCashuClient } from "./cashu.ts";
 import type {
   CustomerOptions,
   Quote,
   RequestOptions,
   RequestResult,
 } from "./types.ts";
-import {
-  isSchemaUri,
-  InvalidSchemaUriError,
-} from "./schema.ts";
+import { InvalidSchemaUriError, isSchemaUri } from "./schema.ts";
 import {
   createRelayClient,
-  generateKeypair,
   type Event as NostrEvent,
+  generateKeypair,
   type Keypair,
   type PublishResult,
   type RelayClient,
@@ -74,7 +71,10 @@ export class CustomerConfigError extends Error {
 
 /** Thrown when the oracle returns a pubkey that doesn't match the customer's whitelist. */
 export class OracleWhitelistMismatchError extends Error {
-  constructor(public readonly expected: string, public readonly received: string) {
+  constructor(
+    public readonly expected: string,
+    public readonly received: string,
+  ) {
     super(`Oracle pubkey mismatch: expected ${expected}, got ${received}`);
     this.name = "OracleWhitelistMismatchError";
   }
@@ -93,7 +93,10 @@ export class RelayPublishError extends Error {
 
 /** Thrown when no provider sent a (selectable) quote within the configured window. */
 export class NoQuotesReceivedError extends Error {
-  constructor(public readonly quoteWindowMs: number, public readonly receivedCount: number) {
+  constructor(
+    public readonly quoteWindowMs: number,
+    public readonly receivedCount: number,
+  ) {
     super(
       `No selectable quote received within ${quoteWindowMs}ms ` +
         `(received ${receivedCount} candidate quote(s) total).`,
@@ -104,9 +107,14 @@ export class NoQuotesReceivedError extends Error {
 
 /** Thrown when the selected provider did not deliver a result before the timeout elapsed. */
 export class ResultTimeoutError extends Error {
-  constructor(public readonly timeoutMs: number, public readonly providerPubkey: string) {
+  constructor(
+    public readonly timeoutMs: number,
+    public readonly providerPubkey: string,
+  ) {
     super(
-      `Provider ${providerPubkey.slice(0, 16)}… did not deliver a kind 6300 result ` +
+      `Provider ${
+        providerPubkey.slice(0, 16)
+      }… did not deliver a kind 6300 result ` +
         `within ${timeoutMs}ms.`,
     );
     this.name = "ResultTimeoutError";
@@ -141,7 +149,9 @@ export function pickOracleForRequest(oracles: readonly string[]): string {
  * Accepts `unknown` and narrows to `CustomerOptions` on success so
  * runtime negative tests can pass arbitrary shapes without `as` casts.
  */
-export function validateCustomerOptions(options: unknown): asserts options is CustomerOptions {
+export function validateCustomerOptions(
+  options: unknown,
+): asserts options is CustomerOptions {
   if (typeof options !== "object" || options === null) {
     throw new CustomerConfigError("options must be an object");
   }
@@ -151,7 +161,9 @@ export function validateCustomerOptions(options: unknown): asserts options is Cu
   }
   for (const entry of o.oracles) {
     if (typeof entry !== "string" || entry.length === 0) {
-      throw new CustomerConfigError("oracles entries must be non-empty strings");
+      throw new CustomerConfigError(
+        "oracles entries must be non-empty strings",
+      );
     }
   }
   if (!Array.isArray(o.relays) || o.relays.length === 0) {
@@ -184,7 +196,8 @@ export function createCustomer(options: CustomerOptions): Customer {
   const relays = [...options.relays];
   const mint = options.mint;
   const oracleClient = options.oracleClient;
-  const cashuClient = options.cashuClient ?? createCashuClient({ mintUrl: mint });
+  const cashuClient = options.cashuClient ??
+    createCashuClient({ mintUrl: mint });
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
@@ -199,11 +212,17 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (!isSchemaUri(req.spec.schema)) {
         throw new InvalidSchemaUriError(req.spec.schema);
       }
-      if (typeof req.payment.maxAmount !== "number" || req.payment.maxAmount <= 0) {
-        throw new CustomerConfigError("payment.maxAmount must be a positive number");
+      if (
+        typeof req.payment.maxAmount !== "number" || req.payment.maxAmount <= 0
+      ) {
+        throw new CustomerConfigError(
+          "payment.maxAmount must be a positive number",
+        );
       }
       if (!Array.isArray(req.sourceProofs)) {
-        throw new CustomerConfigError("sourceProofs must be an array of Cashu proofs");
+        throw new CustomerConfigError(
+          "sourceProofs must be an array of Cashu proofs",
+        );
       }
 
       const expectedOracle = pickOracleForRequest(oracles);
@@ -227,7 +246,8 @@ export function createCustomer(options: CustomerOptions): Customer {
       });
 
       const ownsRelayClient = options.relayClient === undefined;
-      const relayClient: RelayClient = options.relayClient ?? createRelayClient(relays);
+      const relayClient: RelayClient = options.relayClient ??
+        createRelayClient(relays);
 
       try {
         const requestPayload: QueryRequestPayload = {
@@ -262,7 +282,10 @@ export function createCustomer(options: CustomerOptions): Customer {
             if (parsed === null) return;
             totalReceived++;
             if (parsed.amount_sats > req.payment.maxAmount) return;
-            if (req.provider !== undefined && parsed.provider_pubkey !== req.provider) return;
+            if (
+              req.provider !== undefined &&
+              parsed.provider_pubkey !== req.provider
+            ) return;
             quotes.push({
               providerPubkey: parsed.provider_pubkey,
               amountSats: parsed.amount_sats,
@@ -273,7 +296,9 @@ export function createCustomer(options: CustomerOptions): Customer {
         );
 
         try {
-          await new Promise<void>((resolve) => setTimeout(resolve, quoteWindowMs));
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, quoteWindowMs)
+          );
         } finally {
           sub.close();
         }
@@ -322,13 +347,17 @@ export function createCustomer(options: CustomerOptions): Customer {
             },
             (event) => {
               handles.sub?.close();
-              if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
+              if (handles.timeoutId !== undefined) {
+                clearTimeout(handles.timeoutId);
+              }
               resolve(event);
             },
           );
           handles.timeoutId = setTimeout(() => {
             handles.sub?.close();
-            reject(new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey));
+            reject(
+              new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey),
+            );
           }, resultTimeoutMs);
         });
 
@@ -338,7 +367,10 @@ export function createCustomer(options: CustomerOptions): Customer {
           selected.providerPubkey,
         );
         if (response === null) {
-          throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
+          throw new ResultTimeoutError(
+            resultTimeoutMs,
+            selected.providerPubkey,
+          );
         }
 
         const verifier = verifiers[req.spec.schema];

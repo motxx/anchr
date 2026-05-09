@@ -1,10 +1,16 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "../../../../packages/bounty/src/infrastructure/worker-api.ts";
 import { createListingStore } from "./listing-store.ts";
 import { createOracleRegistry } from "../../../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { createQueryService, createQueryStore } from "../../../../packages/bounty/src/application/query-service.ts";
-import type { Oracle, OracleAttestation } from "../../../../packages/bounty/src/domain/oracle-types.ts";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../../../../packages/bounty/src/application/query-service.ts";
+import type {
+  Oracle,
+  OracleAttestation,
+} from "../../../../packages/bounty/src/domain/oracle-types.ts";
 import type { Query, QueryResult } from "@anchr/bounty/domain-types";
 import { _clearSeenTokensForTest } from "./xcashu-middleware.ts";
 import { _clearPurchaseLogForTest } from "./marketplace-routes.ts";
@@ -14,7 +20,10 @@ import { registerMarketplaceRoutes } from "./marketplace-routes.ts";
 function makeMockOracle(id: string): Oracle {
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      query: Query,
+      _result: QueryResult,
+    ): Promise<OracleAttestation> {
       return {
         oracle_id: id,
         query_id: query.id,
@@ -32,7 +41,10 @@ function makeTestApp() {
   const listingStore = createListingStore();
   const registry = createOracleRegistry({ skipBuiltIn: true });
   registry.register(makeMockOracle("test-oracle"));
-  const queryService = createQueryService({ store: queryStore, oracleRegistry: registry });
+  const queryService = createQueryService({
+    store: queryStore,
+    oracleRegistry: registry,
+  });
   const app = buildWorkerApiApp({
     queryService,
     oracleRegistry: registry,
@@ -80,78 +92,100 @@ describe("Marketplace Routes", () => {
     expect(json).toHaveLength(0);
   });
 
-  test("POST /marketplace/listings creates a listing", withOpenAuth(async () => {
-    const { app } = makeTestApp();
-    const res = await app.request("http://localhost/marketplace/listings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "BTC Price",
-        source_url: "https://api.example.com/btc",
-        price_sats: 10,
-        htlc_price_sats: 15,
-        tlsn_requirement: { target_url: "https://api.example.com/btc" },
-      }),
-    });
-    expect(res.status).toBe(201);
-    const json = await res.json() as { id: string; name: string; active: boolean };
-    expect(json.name).toBe("BTC Price");
-    expect(json.active).toBe(true);
-    expect(json.id).toMatch(/^listing_/);
-  }));
+  test(
+    "POST /marketplace/listings creates a listing",
+    withOpenAuth(async () => {
+      const { app } = makeTestApp();
+      const res = await app.request("http://localhost/marketplace/listings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "BTC Price",
+          source_url: "https://api.example.com/btc",
+          price_sats: 10,
+          htlc_price_sats: 15,
+          tlsn_requirement: { target_url: "https://api.example.com/btc" },
+        }),
+      });
+      expect(res.status).toBe(201);
+      const json = await res.json() as {
+        id: string;
+        name: string;
+        active: boolean;
+      };
+      expect(json.name).toBe("BTC Price");
+      expect(json.active).toBe(true);
+      expect(json.id).toMatch(/^listing_/);
+    }),
+  );
 
-  test("created listing appears in GET /marketplace/listings", withOpenAuth(async () => {
-    const { app } = makeTestApp();
-    await app.request("http://localhost/marketplace/listings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name: "ETH Price",
-        source_url: "https://api.example.com/eth",
-        price_sats: 5,
-        htlc_price_sats: 8,
-        tlsn_requirement: { target_url: "https://api.example.com/eth" },
-      }),
-    });
-    const listRes = await app.request("http://localhost/marketplace/listings");
-    expect(listRes.status).toBe(200);
-    const listings = await listRes.json() as Array<{ name: string }>;
-    expect(listings).toHaveLength(1);
-    expect(listings[0]!.name).toBe("ETH Price");
-  }));
+  test(
+    "created listing appears in GET /marketplace/listings",
+    withOpenAuth(async () => {
+      const { app } = makeTestApp();
+      await app.request("http://localhost/marketplace/listings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "ETH Price",
+          source_url: "https://api.example.com/eth",
+          price_sats: 5,
+          htlc_price_sats: 8,
+          tlsn_requirement: { target_url: "https://api.example.com/eth" },
+        }),
+      });
+      const listRes = await app.request(
+        "http://localhost/marketplace/listings",
+      );
+      expect(listRes.status).toBe(200);
+      const listings = await listRes.json() as Array<{ name: string }>;
+      expect(listings).toHaveLength(1);
+      expect(listings[0]!.name).toBe("ETH Price");
+    }),
+  );
 
   test("GET /marketplace/listings/:id returns 404 for unknown", async () => {
     const { app } = makeTestApp();
-    const res = await app.request("http://localhost/marketplace/listings/nonexistent");
+    const res = await app.request(
+      "http://localhost/marketplace/listings/nonexistent",
+    );
     expect(res.status).toBe(404);
   });
 
-  test("DELETE /marketplace/listings/:id deactivates listing", withOpenAuth(async () => {
-    const { app, listingStore } = makeTestApp();
-    listingStore.set("listing_del", {
-      id: "listing_del",
-      name: "To Delete",
-      source_url: "https://example.com",
-      price_sats: 10,
-      htlc_price_sats: 15,
-      tlsn_requirement: { target_url: "https://example.com" },
-      max_age_seconds: 300,
-      active: true,
-      created_at: Date.now(),
-    });
+  test(
+    "DELETE /marketplace/listings/:id deactivates listing",
+    withOpenAuth(async () => {
+      const { app, listingStore } = makeTestApp();
+      listingStore.set("listing_del", {
+        id: "listing_del",
+        name: "To Delete",
+        source_url: "https://example.com",
+        price_sats: 10,
+        htlc_price_sats: 15,
+        tlsn_requirement: { target_url: "https://example.com" },
+        max_age_seconds: 300,
+        active: true,
+        created_at: Date.now(),
+      });
 
-    const res = await app.request("http://localhost/marketplace/listings/listing_del", {
-      method: "DELETE",
-    });
-    expect(res.status).toBe(200);
-    const json = await res.json() as { ok: boolean; active: boolean };
-    expect(json.ok).toBe(true);
-    expect(json.active).toBe(false);
+      const res = await app.request(
+        "http://localhost/marketplace/listings/listing_del",
+        {
+          method: "DELETE",
+        },
+      );
+      expect(res.status).toBe(200);
+      const json = await res.json() as { ok: boolean; active: boolean };
+      expect(json.ok).toBe(true);
+      expect(json.active).toBe(false);
 
-    const listRes = await app.request("http://localhost/marketplace/listings");
-    const listings = await listRes.json() as unknown[];
-    expect(listings).toHaveLength(0);
-  }));
+      const listRes = await app.request(
+        "http://localhost/marketplace/listings",
+      );
+      const listings = await listRes.json() as unknown[];
+      expect(listings).toHaveLength(0);
+    }),
+  );
 
   test("GET /marketplace/data/:id returns 402", async () => {
     const { app, listingStore } = makeTestApp();
@@ -167,7 +201,9 @@ describe("Marketplace Routes", () => {
       created_at: Date.now(),
     });
 
-    const res = await app.request("http://localhost/marketplace/data/listing_402");
+    const res = await app.request(
+      "http://localhost/marketplace/data/listing_402",
+    );
     expect(res.status).toBe(402);
     const json = await res.json() as { listing_id: string; price_sats: number };
     expect(json.listing_id).toBe("listing_402");
@@ -176,7 +212,9 @@ describe("Marketplace Routes", () => {
 
   test("GET /marketplace/data/:id returns 404 for unknown", async () => {
     const { app } = makeTestApp();
-    const res = await app.request("http://localhost/marketplace/data/nonexistent");
+    const res = await app.request(
+      "http://localhost/marketplace/data/nonexistent",
+    );
     expect(res.status).toBe(404);
   });
 
@@ -194,21 +232,27 @@ describe("Marketplace Routes", () => {
       created_at: Date.now(),
     });
 
-    const res = await app.request("http://localhost/marketplace/data/listing_nopay", {
-      method: "POST",
-    });
+    const res = await app.request(
+      "http://localhost/marketplace/data/listing_nopay",
+      {
+        method: "POST",
+      },
+    );
     expect(res.status).toBe(402);
   });
 
-  test("POST /marketplace/listings with invalid payload returns 400", withOpenAuth(async () => {
-    const { app } = makeTestApp();
-    const res = await app.request("http://localhost/marketplace/listings", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "" }), // name too short, missing required fields
-    });
-    expect(res.status).toBe(400);
-  }));
+  test(
+    "POST /marketplace/listings with invalid payload returns 400",
+    withOpenAuth(async () => {
+      const { app } = makeTestApp();
+      const res = await app.request("http://localhost/marketplace/listings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "" }), // name too short, missing required fields
+      });
+      expect(res.status).toBe(400);
+    }),
+  );
 
   test("existing /queries routes still work", async () => {
     const { app } = makeTestApp();

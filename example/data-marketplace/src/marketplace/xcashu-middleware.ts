@@ -61,7 +61,10 @@ export function createPaymentMiddleware(
     if (escrowToken) {
       const htlcHash = c.req.header("x-htlc-hash");
       if (!htlcHash) {
-        return c.json({ error: "X-Htlc-Hash header required for HTLC mode" }, 400);
+        return c.json(
+          { error: "X-Htlc-Hash header required for HTLC mode" },
+          400,
+        );
       }
 
       const tokenHash = sha256Hex(escrowToken);
@@ -72,7 +75,10 @@ export function createPaymentMiddleware(
       const result = await verifyToken(escrowToken, listing.htlc_price_sats);
       if (!result.valid) {
         return new Response(
-          JSON.stringify({ error: "Payment verification failed", detail: result.error }),
+          JSON.stringify({
+            error: "Payment verification failed",
+            detail: result.error,
+          }),
           {
             status: 402,
             headers: {
@@ -107,7 +113,10 @@ export function createPaymentMiddleware(
       const result = await verifyToken(directToken, listing.price_sats);
       if (!result.valid) {
         return new Response(
-          JSON.stringify({ error: "Payment verification failed", detail: result.error }),
+          JSON.stringify({
+            error: "Payment verification failed",
+            detail: result.error,
+          }),
           {
             status: 402,
             headers: {

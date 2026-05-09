@@ -8,10 +8,10 @@ import type { OracleRegistry } from "./oracle-client/registry.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { QueryService } from "../application/query-service.ts";
 import {
-  registerQueryRoutes,
   registerAttachmentRoutes,
   registerHtlcRoutes,
   registerLogRoutes,
+  registerQueryRoutes,
 } from "./worker-api-routes.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
@@ -68,15 +68,23 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
     if (Deno.env.get("NODE_ENV") === "production") {
       return c.json({ error: "Server misconfigured: no API keys set" }, 503);
     }
-    log.error("WARNING: No API keys configured — write endpoints are unauthenticated");
+    log.error(
+      "WARNING: No API keys configured — write endpoints are unauthenticated",
+    );
     return next();
   }
 
   const supplied = extractApiKey(c);
-  if (supplied && httpApiKeys.some((key) => safeCompare(supplied, key))) return next();
+  if (supplied && httpApiKeys.some((key) => safeCompare(supplied, key))) {
+    return next();
+  }
 
   return c.json(
-    { error: "Unauthorized", hint: "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints." },
+    {
+      error: "Unauthorized",
+      hint:
+        "Set Authorization: Bearer <key> or X-API-Key: <key> to access write endpoints.",
+    },
     401,
     { "www-authenticate": "Bearer" },
   );
@@ -87,17 +95,25 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
 export function buildWorkerApiApp(deps: WorkerApiDeps) {
   const svc = deps.queryService;
   const pStore = deps.preimageStore;
-  const doListOracles = deps.oracleRegistry ? () => deps.oracleRegistry!.list() : listOracles;
+  const doListOracles = deps.oracleRegistry
+    ? () => deps.oracleRegistry!.list()
+    : listOracles;
 
   const app = new Hono();
 
   const corsOrigin = Deno.env.get("CORS_ORIGIN");
   if (!corsOrigin && Deno.env.get("NODE_ENV") === "production") {
-    log.error("WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only");
+    log.error(
+      "WARNING: CORS_ORIGIN not set in production — defaulting to same-origin only",
+    );
   }
-  app.use("*", cors({
-    origin: corsOrigin || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
-  }));
+  app.use(
+    "*",
+    cors({
+      origin: corsOrigin ||
+        (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
+    }),
+  );
 
   // --- Rate limiting for write endpoints ---
   const RATE_WINDOW_MS = 60_000;
@@ -108,10 +124,10 @@ export function buildWorkerApiApp(deps: WorkerApiDeps) {
   // X-Forwarded-For is NOT used because it is attacker-controlled without a trusted proxy.
   // https://developers.cloudflare.com/workers/examples/protect-against-timing-attacks/
   const rateLimit: MiddlewareHandler = async (c, next) => {
-    const ip = c.req.header("fly-client-ip")
-      ?? c.req.header("x-real-ip")
-      ?? (c.env?.remoteAddr as { hostname?: string })?.hostname
-      ?? "unknown";
+    const ip = c.req.header("fly-client-ip") ??
+      c.req.header("x-real-ip") ??
+      (c.env?.remoteAddr as { hostname?: string })?.hostname ??
+      "unknown";
     const now = Date.now();
     let bucket = rateBuckets.get(ip);
     if (!bucket || now > bucket.resetAt) {

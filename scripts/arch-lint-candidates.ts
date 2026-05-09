@@ -39,10 +39,18 @@ interface Candidate {
   lines: number;
 }
 
-async function listLayer(absDir: string, layerLabel: string): Promise<Candidate[]> {
+async function listLayer(
+  absDir: string,
+  layerLabel: string,
+): Promise<Candidate[]> {
   const out: Candidate[] = [];
   try {
-    for await (const entry of walk(absDir, { exts: [".ts", ".tsx"], skip: [/\.test\.tsx?$/, /node_modules/] })) {
+    for await (
+      const entry of walk(absDir, {
+        exts: [".ts", ".tsx"],
+        skip: [/\.test\.tsx?$/, /node_modules/],
+      })
+    ) {
       const text = await Deno.readTextFile(entry.path);
       const rel = relative(ROOT, entry.path);
       out.push({ rel, lines: text.split("\n").length });
@@ -60,8 +68,14 @@ async function main() {
   const layerArg = args.find((a, i, all) => all[i - 1] === "--layer");
 
   const groups: { label: string; absDir: string }[] = [
-    ...SRC_LAYERS.map((l) => ({ label: `src/${l}/`, absDir: `${ROOT}src/${l}` })),
-    ...PKG_NAMES.map((p) => ({ label: `packages/${p}/src/`, absDir: `${ROOT}packages/${p}/src` })),
+    ...SRC_LAYERS.map((l) => ({
+      label: `src/${l}/`,
+      absDir: `${ROOT}src/${l}`,
+    })),
+    ...PKG_NAMES.map((p) => ({
+      label: `packages/${p}/src/`,
+      absDir: `${ROOT}packages/${p}/src`,
+    })),
   ];
 
   const filtered = layerArg

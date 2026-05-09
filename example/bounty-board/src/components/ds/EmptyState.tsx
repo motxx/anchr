@@ -17,7 +17,9 @@ export function DSEmptyState({ icon, title, subtitle }: DSEmptyStateProps) {
       </View>
       <DSText variant="body" weight="medium" muted>{title}</DSText>
       {subtitle && (
-        <DSText variant="caption" muted className="mt-1 text-center">{subtitle}</DSText>
+        <DSText variant="caption" muted className="mt-1 text-center">
+          {subtitle}
+        </DSText>
       )}
     </View>
   );

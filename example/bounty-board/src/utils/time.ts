@@ -2,7 +2,9 @@ export function timeLeft(expiresAt: number): string {
   const s = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
   if (s === 0) return "expired";
   if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+  if (s < 3600) {
+    return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+  }
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return `${h}h${String(m).padStart(2, "0")}m`;

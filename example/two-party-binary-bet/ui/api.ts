@@ -31,7 +31,13 @@ export interface BetResult {
   error?: string;
 }
 
-export type ConditionType = "jsonpath_gt" | "jsonpath_lt" | "jsonpath_equals" | "contains_text" | "price_above" | "price_below";
+export type ConditionType =
+  | "jsonpath_gt"
+  | "jsonpath_lt"
+  | "jsonpath_equals"
+  | "contains_text"
+  | "price_above"
+  | "price_below";
 
 export interface ResolutionCondition {
   type: ConditionType;
@@ -239,7 +245,10 @@ export interface RedeemResult {
   redeem_instructions?: string;
 }
 
-export async function redeemWinnings(marketId: string, pubkey: string): Promise<RedeemResult> {
+export async function redeemWinnings(
+  marketId: string,
+  pubkey: string,
+): Promise<RedeemResult> {
   const res = await apiFetch(`${API_BASE}/${marketId}/redeem`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

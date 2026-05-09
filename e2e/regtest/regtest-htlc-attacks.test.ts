@@ -21,21 +21,21 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  Wallet,
-  type Proof,
-  getEncodedToken,
   getDecodedToken,
+  getEncodedToken,
   P2PKBuilder,
+  type Proof,
+  Wallet,
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   checkInfraReady,
   createWallet as createRegtestWallet,
+  generateKeypair,
+  retryOnRateLimit,
   throttledMintProofs,
   throttleMintOp,
-  retryOnRateLimit,
-  generateKeypair,
 } from "../helpers/regtest.ts";
 import process from "node:process";
 
@@ -66,7 +66,9 @@ async function createHtlcProofs(
 
   const fee = wallet.getFeesForProofs(sourceProofs);
   const sendAmount = amountSats - fee;
-  if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  if (sendAmount <= 0) {
+    throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  }
 
   await throttleMintOp();
   const { send } = await retryOnRateLimit(() =>
@@ -79,7 +81,10 @@ async function createHtlcProofs(
 /**
  * Build blinded outputs for a swap request.
  */
-function buildOutputs(amountSats: number, keysetId: string): Array<{ amount: number; id: string; B_: string }> {
+function buildOutputs(
+  amountSats: number,
+  keysetId: string,
+): Array<{ amount: number; id: string; B_: string }> {
   const outputs: Array<{ amount: number; id: string; B_: string }> = [];
   let remaining = amountSats;
   for (const denom of [64, 32, 16, 8, 4, 2, 1]) {
@@ -111,8 +116,8 @@ async function attemptRedeem(
       witness: preimage
         ? JSON.stringify({ preimage, signatures: [] })
         : privateKey
-          ? JSON.stringify({ signatures: [] })
-          : undefined,
+        ? JSON.stringify({ signatures: [] })
+        : undefined,
     }));
 
     const totalSats = proofsWithWitness.reduce((sum, p) => sum + p.amount, 0);
@@ -131,7 +136,11 @@ async function attemptRedeem(
           id: p.id,
           secret: p.secret,
           C: p.C,
-          witness: typeof p.witness === "string" ? p.witness : p.witness ? JSON.stringify(p.witness) : undefined,
+          witness: typeof p.witness === "string"
+            ? p.witness
+            : p.witness
+            ? JSON.stringify(p.witness)
+            : undefined,
         })),
         outputs,
       }),
@@ -143,10 +152,17 @@ async function attemptRedeem(
       return null;
     }
 
-    const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
+    const { signatures } = (await res.json()) as {
+      signatures: Array<{ amount: number; id: string; C_: string }>;
+    };
     // See redeem-attempt note in regtest-htlc-trustless: blinded signatures are
     // mapped to a Proof-shaped record purely as a structural carrier for tests.
-    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
+    return signatures.map((s) => ({
+      amount: s.amount,
+      id: s.id,
+      secret: "",
+      C: s.C_,
+    }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-attempt] Error: ${msg}`);
@@ -197,9 +213,16 @@ async function attemptRedeemWithCustomWitness(
       return null;
     }
 
-    const { signatures } = (await res.json()) as { signatures: Array<{ amount: number; id: string; C_: string }> };
+    const { signatures } = (await res.json()) as {
+      signatures: Array<{ amount: number; id: string; C_: string }>;
+    };
     // See redeem-attempt note above.
-    return signatures.map((s) => ({ amount: s.amount, id: s.id, secret: "", C: s.C_ }));
+    return signatures.map((s) => ({
+      amount: s.amount,
+      id: s.id,
+      secret: "",
+      C: s.C_,
+    }));
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[redeem-custom] Error: ${msg}`);
@@ -216,7 +239,9 @@ const suite = INFRA_READY ? describe : describe.ignore;
 // Create wallet at module level before describes register.
 // This ensures loadMint() fetch responses are fully consumed
 // before any test scope begins (avoids Deno sanitizer false positives).
-const sharedWallet = INFRA_READY ? await createRegtestWallet(MINT_URL) : undefined;
+const sharedWallet = INFRA_READY
+  ? await createRegtestWallet(MINT_URL)
+  : undefined;
 
 // =============================================================================
 // E2E Attack Category 1: Proof Manipulation
@@ -233,8 +258,13 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Tamper: change proof amount from actual to 128
@@ -243,7 +273,12 @@ suite("e2e: Proof Manipulation Attacks", () => {
       amount: 128,
     }));
 
-    const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
+    const result = await attemptRedeem(
+      wallet,
+      tamperedProofs,
+      preimage,
+      worker.secretKey,
+    );
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for modified amount
   });
 
@@ -256,15 +291,25 @@ suite("e2e: Proof Manipulation Attacks", () => {
     const { hash: hash1, preimage: preimage1 } = createHTLCHash();
     const source1 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs1 = await createHtlcProofs(
-      wallet, source1, AMOUNT_SATS,
-      hash1, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      source1,
+      AMOUNT_SATS,
+      hash1,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     const { hash: hash2, preimage: preimage2 } = createHTLCHash();
     const source2 = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs2 = await createHtlcProofs(
-      wallet, source2, AMOUNT_SATS,
-      hash2, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      source2,
+      AMOUNT_SATS,
+      hash2,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Swap secrets between proof sets (take secrets from set 2, put into set 1)
@@ -274,7 +319,12 @@ suite("e2e: Proof Manipulation Attacks", () => {
     }));
 
     // Try to redeem with preimage1 (matching hash1, but secrets from set 2)
-    const result = await attemptRedeem(wallet, swappedProofs, preimage1, worker.secretKey);
+    const result = await attemptRedeem(
+      wallet,
+      swappedProofs,
+      preimage1,
+      worker.secretKey,
+    );
     expect(result).toBeNull(); // Mint MUST reject — secret/C mismatch
   });
 
@@ -286,8 +336,13 @@ suite("e2e: Proof Manipulation Attacks", () => {
 
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Tamper: empty secret
@@ -296,7 +351,12 @@ suite("e2e: Proof Manipulation Attacks", () => {
       secret: "",
     }));
 
-    const result = await attemptRedeem(wallet, tamperedProofs, preimage, worker.secretKey);
+    const result = await attemptRedeem(
+      wallet,
+      tamperedProofs,
+      preimage,
+      worker.secretKey,
+    );
     expect(result).toBeNull(); // Mint MUST reject — empty secret is invalid
   });
 });
@@ -316,8 +376,13 @@ suite("e2e: Redemption Timing Attacks", () => {
 
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Send witness with BOTH preimage and signatures for the worker key
@@ -344,8 +409,13 @@ suite("e2e: Redemption Timing Attacks", () => {
 
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Worker redeems with preimage + correct key after locktime expired
@@ -359,7 +429,9 @@ suite("e2e: Redemption Timing Attacks", () => {
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
     await throttleMintOp();
     const { send: result } = await retryOnRateLimit(() =>
-      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker.secretKey).run()
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
+        worker.secretKey,
+      ).run()
     );
 
     // Worker SHOULD succeed — preimage path is independent of locktime
@@ -385,8 +457,13 @@ suite("e2e: Multi-Party Attacks", () => {
     // Lock proofs to worker1's key
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker1.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker1.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Worker 1 redeems successfully
@@ -398,14 +475,21 @@ suite("e2e: Multi-Party Attacks", () => {
     const fee = wallet.getFeesForProofs(proofsWithPreimage);
     await throttleMintOp();
     const { send: first } = await retryOnRateLimit(() =>
-      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(worker1.secretKey).run()
+      wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
+        worker1.secretKey,
+      ).run()
     );
     expect(first).not.toBeNull();
     expect(first.length).toBeGreaterThan(0);
 
     // Worker 2 tries to redeem the same proofs with preimage (different key)
     // Even if Worker 2 had the preimage, proofs are already spent
-    const second = await attemptRedeem(wallet, htlcProofs, preimage, worker2.secretKey);
+    const second = await attemptRedeem(
+      wallet,
+      htlcProofs,
+      preimage,
+      worker2.secretKey,
+    );
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
   });
 
@@ -419,14 +503,24 @@ suite("e2e: Multi-Party Attacks", () => {
 
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
-      wallet, sourceProofs, AMOUNT_SATS,
-      hash, worker.publicKey, requester.publicKey, locktime,
+      wallet,
+      sourceProofs,
+      AMOUNT_SATS,
+      hash,
+      worker.publicKey,
+      requester.publicKey,
+      locktime,
     );
 
     // Requester has the refund key AND the preimage.
     // Tries to redeem with requester key + preimage (NOT the worker key).
     // The hashlock path requires the WORKER's key, not the requester's.
-    const result = await attemptRedeem(wallet, htlcProofs, preimage, requester.secretKey);
+    const result = await attemptRedeem(
+      wallet,
+      htlcProofs,
+      preimage,
+      requester.secretKey,
+    );
     expect(result).toBeNull(); // Mint MUST reject — requester key is not the lock key
   });
 });

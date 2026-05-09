@@ -15,7 +15,10 @@ export interface FlightClaim {
   raw: QuerySummary;
 }
 
-const ROUTE_MAP: Record<string, { origin: string; destination: string; departure: string }> = {
+const ROUTE_MAP: Record<
+  string,
+  { origin: string; destination: string; departure: string }
+> = {
   NH123: { origin: "NRT", destination: "SFO", departure: "10:00" },
   JL456: { origin: "HND", destination: "LAX", departure: "14:00" },
   NH789: { origin: "NRT", destination: "CDG", departure: "11:30" },
@@ -31,12 +34,17 @@ function parseFlightNumber(description: string): string | null {
 
 function mapStatus(queryStatus: string): FlightClaim["status"] {
   switch (queryStatus) {
-    case "approved": return "claimed";
-    case "rejected": return "rejected";
-    case "expired": return "expired";
+    case "approved":
+      return "claimed";
+    case "rejected":
+      return "rejected";
+    case "expired":
+      return "expired";
     case "submitted":
-    case "verifying": return "verifying";
-    default: return "monitoring";
+    case "verifying":
+      return "verifying";
+    default:
+      return "monitoring";
   }
 }
 
@@ -44,7 +52,8 @@ function toFlightClaim(q: QuerySummary): FlightClaim | null {
   if (!q.description.toLowerCase().includes("auto-claim")) return null;
 
   const flightNumber = parseFlightNumber(q.description) ?? "---";
-  const route = ROUTE_MAP[flightNumber] ?? { origin: "???", destination: "???", departure: "--:--" };
+  const route = ROUTE_MAP[flightNumber] ??
+    { origin: "???", destination: "???", departure: "--:--" };
 
   return {
     id: q.id,
@@ -81,14 +90,21 @@ export function useAutoClaims() {
     }
     const unique = [...byFlight.values()];
 
-    const monitoring = unique.filter((c) => c.status === "monitoring" || c.status === "verifying");
+    const monitoring = unique.filter((c) =>
+      c.status === "monitoring" || c.status === "verifying"
+    );
     const claimed = unique.filter((c) => c.status === "claimed");
-    const finished = unique.filter((c) => c.status === "expired" || c.status === "rejected");
+    const finished = unique.filter((c) =>
+      c.status === "expired" || c.status === "rejected"
+    );
 
     monitoring.sort((a, b) => a.expiresAt - b.expiresAt);
     claimed.sort((a, b) => b.expiresAt - a.expiresAt);
 
-    const totalRecoveredSats = claimed.reduce((sum, c) => sum + c.payoutSats, 0);
+    const totalRecoveredSats = claimed.reduce(
+      (sum, c) => sum + c.payoutSats,
+      0,
+    );
     const totalRecoveredJpy = Math.round(totalRecoveredSats * SAT_TO_JPY);
 
     return {

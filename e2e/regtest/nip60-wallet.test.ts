@@ -34,7 +34,8 @@ import process from "node:process";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const RELAY_URL = process.env.NOSTR_RELAY_URL ?? "ws://localhost:7777";
 
-const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable(RELAY_URL);
+const INFRA_READY = await checkInfraReady(MINT_URL) &&
+  await isRelayReachable(RELAY_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
@@ -103,8 +104,8 @@ suite("e2e: NIP-60 wallet (Nostr relay + regtest Cashu)", () => {
 
     const entries = await loadProofs(wallet);
     const liveIds = entries.map((e) => e.eventId);
-    expect(liveIds).not.toContain(idA);   // tombstoned
-    expect(liveIds).toContain(idB);       // survives
+    expect(liveIds).not.toContain(idA); // tombstoned
+    expect(liveIds).toContain(idB); // survives
     expect(await getBalance(wallet)).toBe(50);
 
     await closeNip60Wallet(wallet);

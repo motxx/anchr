@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { mkdtemp, rm, readdir, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createQueryService } from "./query-service.ts";

@@ -1,6 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { emitLog, subscribeLog, getRecentLogs, type LogEntry } from "./log-stream.ts";
+import {
+  emitLog,
+  getRecentLogs,
+  type LogEntry,
+  subscribeLog,
+} from "./log-stream.ts";
 
 describe("log-stream", () => {
   test("emitLog delivers to subscribers", () => {
@@ -68,7 +73,9 @@ describe("log-stream", () => {
 
   test("subscriber error does not break other subscribers", () => {
     const received: LogEntry[] = [];
-    const u1 = subscribeLog(() => { throw new Error("oops"); });
+    const u1 = subscribeLog(() => {
+      throw new Error("oops");
+    });
     const u2 = subscribeLog((e) => received.push(e));
 
     emitLog("err-test", "still works");

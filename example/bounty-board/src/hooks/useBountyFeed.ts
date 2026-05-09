@@ -1,24 +1,35 @@
 import { useMemo } from "react";
 import { useQueries } from "./useQueries.ts";
 import { useUserLocation } from "./useUserLocation.ts";
-import { useFeedStore, type FeedFilter } from "../store/feed.ts";
+import { type FeedFilter, useFeedStore } from "../store/feed.ts";
 import { haversineKm } from "../utils/distance.ts";
 import { isExpired } from "../utils/time.ts";
-import type { QuerySummary, GpsCoord } from "../api/types.ts";
+import type { GpsCoord, QuerySummary } from "../api/types.ts";
 
 const NEARBY_RADIUS_KM = 50;
 
-function sortByFilter(queries: QuerySummary[], filter: FeedFilter, userLocation: GpsCoord | null): QuerySummary[] {
+function sortByFilter(
+  queries: QuerySummary[],
+  filter: FeedFilter,
+  userLocation: GpsCoord | null,
+): QuerySummary[] {
   const active = queries.filter((q) => !isExpired(q.expires_at));
 
   switch (filter) {
     case "nearby":
       if (!userLocation) return active;
       return active
-        .filter((q) => q.expected_gps && haversineKm(userLocation, q.expected_gps) <= NEARBY_RADIUS_KM)
+        .filter((q) =>
+          q.expected_gps &&
+          haversineKm(userLocation, q.expected_gps) <= NEARBY_RADIUS_KM
+        )
         .sort((a, b) => {
-          const distA = a.expected_gps ? haversineKm(userLocation, a.expected_gps) : Infinity;
-          const distB = b.expected_gps ? haversineKm(userLocation, b.expected_gps) : Infinity;
+          const distA = a.expected_gps
+            ? haversineKm(userLocation, a.expected_gps)
+            : Infinity;
+          const distB = b.expected_gps
+            ? haversineKm(userLocation, b.expected_gps)
+            : Infinity;
           return distA - distB;
         });
 

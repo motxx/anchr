@@ -6,11 +6,17 @@ export async function readFile(path: string): Promise<Uint8Array> {
   return await Deno.readFile(path);
 }
 
-export async function writeFile(path: string, data: Uint8Array | BufferSource | string): Promise<void> {
+export async function writeFile(
+  path: string,
+  data: Uint8Array | BufferSource | string,
+): Promise<void> {
   if (typeof data === "string") {
     await Deno.writeTextFile(path, data);
   } else {
-    await Deno.writeFile(path, data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer));
+    await Deno.writeFile(
+      path,
+      data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer),
+    );
   }
 }
 
@@ -28,7 +34,9 @@ export async function fileLastModified(path: string): Promise<number> {
   return stat.mtime?.getTime() ?? 0;
 }
 
-export async function readFileAsArrayBuffer(path: string): Promise<ArrayBuffer> {
+export async function readFileAsArrayBuffer(
+  path: string,
+): Promise<ArrayBuffer> {
   const data = await Deno.readFile(path);
   return data.buffer as ArrayBuffer;
 }

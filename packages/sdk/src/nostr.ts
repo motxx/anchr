@@ -8,14 +8,18 @@
 
 import { SimplePool } from "nostr-tools/pool";
 import {
+  type Event,
+  type EventTemplate,
   finalizeEvent,
   generateSecretKey,
   getPublicKey,
-  type Event,
-  type EventTemplate,
   type UnsignedEvent,
 } from "nostr-tools/pure";
-import { decrypt as nip44Decrypt, encrypt as nip44Encrypt, getConversationKey } from "nostr-tools/nip44";
+import {
+  decrypt as nip44Decrypt,
+  encrypt as nip44Encrypt,
+  getConversationKey,
+} from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
@@ -140,7 +144,10 @@ export async function publishOnce(
       if (r.status === "fulfilled") {
         successes.push(relays[i]);
       } else {
-        failures.push({ relay: relays[i], reason: String(r.reason ?? "unknown") });
+        failures.push({
+          relay: relays[i],
+          reason: String(r.reason ?? "unknown"),
+        });
       }
     });
     return { successes, failures };
@@ -192,7 +199,10 @@ export function createRelayClient(relays: readonly string[]): RelayClient {
         if (r.status === "fulfilled") {
           successes.push(relayList[i]);
         } else {
-          failures.push({ relay: relayList[i], reason: String(r.reason ?? "unknown") });
+          failures.push({
+            relay: relayList[i],
+            reason: String(r.reason ?? "unknown"),
+          });
         }
       });
       return { successes, failures };

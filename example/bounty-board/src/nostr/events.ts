@@ -1,7 +1,15 @@
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
 import type { VerificationFactor } from "../api/types.ts";
 import type { NostrIdentity } from "./identity.ts";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.ts";
+import {
+  decryptNip44,
+  deriveConversationKey,
+  encryptNip44,
+} from "./encryption.ts";
 
 export const ANCHR_QUERY_REQUEST = 5300;
 export const ANCHR_QUERY_RESPONSE = 6300;
@@ -71,10 +79,16 @@ export function buildQueryRequestEvent(
 
   if (payload.nonce) tags.push(["param", "nonce", payload.nonce]);
   if (payload.verification_requirements?.length) {
-    tags.push(["param", "verification", payload.verification_requirements.join(",")]);
+    tags.push([
+      "param",
+      "verification",
+      payload.verification_requirements.join(","),
+    ]);
   }
   if (payload.bounty?.token) tags.push(["bid", payload.bounty.token]);
-  if (payload.oracle_pubkey) tags.push(["p", payload.oracle_pubkey, "", "oracle"]);
+  if (payload.oracle_pubkey) {
+    tags.push(["p", payload.oracle_pubkey, "", "oracle"]);
+  }
   if (regionCode) tags.push(["region", regionCode.toUpperCase()]);
 
   const template: EventTemplate = {
@@ -93,7 +107,10 @@ export function buildQuoteFeedbackEvent(
   requesterPubKey: string,
   payload: QuoteFeedbackPayload,
 ): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, requesterPubKey);
+  const conversationKey = deriveConversationKey(
+    identity.secretKey,
+    requesterPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
@@ -116,7 +133,10 @@ export function buildSelectionFeedbackEvent(
   workerPubKey: string,
   payload: SelectionFeedbackPayload,
 ): VerifiedEvent {
-  const conversationKey = deriveConversationKey(identity.secretKey, workerPubKey);
+  const conversationKey = deriveConversationKey(
+    identity.secretKey,
+    workerPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {

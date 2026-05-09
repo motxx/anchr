@@ -1,5 +1,5 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { View, Text, Pressable } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface Props {
@@ -49,7 +49,9 @@ export class ErrorBoundary extends Component<Props, State> {
             onPress={this.handleRetry}
             className="bg-surface border border-border rounded-lg px-4 py-2"
           >
-            <Text className="text-sm font-medium text-foreground">Try Again</Text>
+            <Text className="text-sm font-medium text-foreground">
+              Try Again
+            </Text>
           </Pressable>
         </View>
       );

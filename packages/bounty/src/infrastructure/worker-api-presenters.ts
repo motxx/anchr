@@ -27,10 +27,12 @@ export function getPublicRequestUrl(c: Context): string {
   }
 
   const url = new URL(c.req.url);
-  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim()?.toLowerCase();
+  const forwardedHost = c.req.header("x-forwarded-host")?.split(",")[0]?.trim()
+    ?.toLowerCase();
   if (forwardedHost && TRUSTED_HOSTS.has(forwardedHost)) {
     url.host = forwardedHost;
-    const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]?.trim();
+    const forwardedProto = c.req.header("x-forwarded-proto")?.split(",")[0]
+      ?.trim();
     if (forwardedProto === "https" || forwardedProto === "http") {
       url.protocol = `${forwardedProto}:`;
     }
@@ -51,16 +53,24 @@ export function querySummary(query: Query) {
     verification_requirements: query.verification_requirements,
     oracle_ids: query.oracle_ids ?? null,
     expires_at: query.expires_at,
-    expires_in_seconds: Math.max(0, Math.floor((query.expires_at - Date.now()) / 1000)),
-    escrow: query.escrow ? {
-      ...(query.escrow.type === "htlc"
-        ? { type: "htlc" as const, hash: query.escrow.hash }
-        : { type: "p2pk_frost" as const, group_pubkey: query.escrow.group_pubkey }),
-      oracle_pubkeys: query.escrow.oracle_pubkeys,
-      worker_pubkey: query.escrow.worker_pubkey ?? null,
-      locktime: query.escrow.locktime,
-      verified_escrow_sats: query.escrow.verified_escrow_sats ?? null,
-    } : null,
+    expires_in_seconds: Math.max(
+      0,
+      Math.floor((query.expires_at - Date.now()) / 1000),
+    ),
+    escrow: query.escrow
+      ? {
+        ...(query.escrow.type === "htlc"
+          ? { type: "htlc" as const, hash: query.escrow.hash }
+          : {
+            type: "p2pk_frost" as const,
+            group_pubkey: query.escrow.group_pubkey,
+          }),
+        oracle_pubkeys: query.escrow.oracle_pubkeys,
+        worker_pubkey: query.escrow.worker_pubkey ?? null,
+        locktime: query.escrow.locktime,
+        verified_escrow_sats: query.escrow.verified_escrow_sats ?? null,
+      }
+      : null,
     quotes_count: query.quotes?.length ?? 0,
     expected_gps: query.expected_gps ?? null,
     max_gps_distance_km: query.max_gps_distance_km ?? null,
@@ -86,8 +96,16 @@ export function buildCreatedQueryPayload(query: Query, requestUrl: string) {
     payment_status: query.payment_status,
     escrow: query.escrow
       ? (query.escrow.type === "htlc"
-        ? { type: "htlc" as const, hash: query.escrow.hash, oracle_pubkeys: query.escrow.oracle_pubkeys }
-        : { type: "p2pk_frost" as const, group_pubkey: query.escrow.group_pubkey, oracle_pubkeys: query.escrow.oracle_pubkeys })
+        ? {
+          type: "htlc" as const,
+          hash: query.escrow.hash,
+          oracle_pubkeys: query.escrow.oracle_pubkeys,
+        }
+        : {
+          type: "p2pk_frost" as const,
+          group_pubkey: query.escrow.group_pubkey,
+          oracle_pubkeys: query.escrow.oracle_pubkeys,
+        })
       : null,
   };
 }
@@ -100,7 +118,9 @@ export function queryDetail(query: Query, requestUrl: string) {
     created_at: query.created_at,
     submitted_at: query.submitted_at,
     assigned_oracle_id: query.assigned_oracle_id ?? null,
-    result: query.result ? materializeQueryResult(query.result, requestUrl) : undefined,
+    result: query.result
+      ? materializeQueryResult(query.result, requestUrl)
+      : undefined,
     verification: query.verification,
     submission_meta: query.submission_meta,
     payment_status: query.payment_status,
@@ -119,7 +139,12 @@ export function getAttachmentRefs(query: Query): AttachmentRef[] | null {
   return query.result.attachments;
 }
 
-export async function buildAttachmentPayload(query: Query, attachment: AttachmentRef, index: number, requestUrl: string) {
+export async function buildAttachmentPayload(
+  query: Query,
+  attachment: AttachmentRef,
+  index: number,
+  requestUrl: string,
+) {
   const stat = await statStoredAttachment(attachment, requestUrl);
   const handle = buildAttachmentHandle(query.id, index, attachment, requestUrl);
   return {
@@ -132,9 +157,12 @@ export async function buildAttachmentPayload(query: Query, attachment: Attachmen
     },
     attachment_view_url: handle.access.view_url,
     attachment_meta_url: handle.access.meta_url,
-    absolute_url: stat?.absoluteUrl ?? buildAttachmentAbsoluteUrl(attachment, requestUrl),
+    absolute_url: stat?.absoluteUrl ??
+      buildAttachmentAbsoluteUrl(attachment, requestUrl),
     storage_kind: stat?.storageKind ?? handle.attachment.storage_kind,
-    mime_type: handle.attachment.storage_kind === "blossom" ? handle.attachment.mime_type : (stat?.mimeType ?? handle.attachment.mime_type),
+    mime_type: handle.attachment.storage_kind === "blossom"
+      ? handle.attachment.mime_type
+      : (stat?.mimeType ?? handle.attachment.mime_type),
     size_bytes: stat?.size ?? handle.attachment.size_bytes ?? null,
   };
 }

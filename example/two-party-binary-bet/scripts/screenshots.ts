@@ -17,9 +17,9 @@
  * a market through the UI manually, then re-run with `--full`.
  */
 
-import { chromium, type Browser, type Page } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
 import { existsSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
 const SCREENSHOT_DIR = join(PROJECT_ROOT, "screenshots");
@@ -103,7 +103,8 @@ try {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       title: "Will BTC/JPY exceed 15M by end of 2026?",
-      description: "Resolves YES if bitFlyer best_bid > 15,000,000 JPY at deadline.",
+      description:
+        "Resolves YES if bitFlyer best_bid > 15,000,000 JPY at deadline.",
       category: "crypto",
       resolution_url: "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY",
       resolution_deadline: Math.floor(Date.now() / 1000) + 86400 * 7,
@@ -117,7 +118,10 @@ try {
     }),
   });
   if (!created.ok) {
-    console.warn("[screenshots] could not seed market for screenshots:", created.status);
+    console.warn(
+      "[screenshots] could not seed market for screenshots:",
+      created.status,
+    );
   } else {
     await page.click("text=Cancel");
     await page.waitForTimeout(500);
@@ -146,6 +150,8 @@ try {
 } finally {
   if (page) await page.close().catch(() => {});
   if (browser) await browser.close().catch(() => {});
-  try { serverProc.kill("SIGINT"); } catch { /* already gone */ }
+  try {
+    serverProc.kill("SIGINT");
+  } catch { /* already gone */ }
   await serverProc.status.catch(() => {});
 }

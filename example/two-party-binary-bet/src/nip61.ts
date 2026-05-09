@@ -15,11 +15,11 @@
  */
 
 import {
+  getDecodedToken,
+  getEncodedToken,
   P2PKBuilder,
   type Proof,
   type Wallet,
-  getDecodedToken,
-  getEncodedToken,
 } from "@cashu/cashu-ts";
 import { finalizeEvent, getPublicKey } from "nostr-tools/pure";
 import type { Filter } from "nostr-tools/filter";
@@ -28,7 +28,9 @@ import { SimplePool } from "nostr-tools/pool";
 /** Local hex encoder — avoids pulling @noble/hashes into the browser bundle. */
 function bytesToHex(bytes: Uint8Array): string {
   let s = "";
-  for (let i = 0; i < bytes.length; i++) s += bytes[i]!.toString(16).padStart(2, "0");
+  for (let i = 0; i < bytes.length; i++) {
+    s += bytes[i]!.toString(16).padStart(2, "0");
+  }
   return s;
 }
 
@@ -66,7 +68,9 @@ export interface NutzapSendResult {
  * Send a nutzap. Locks `amountSats` to the recipient's pubkey, publishes
  * the locked token as a kind:9321 event tagged with the recipient.
  */
-export async function sendNutzap(input: NutzapInput): Promise<NutzapSendResult> {
+export async function sendNutzap(
+  input: NutzapInput,
+): Promise<NutzapSendResult> {
   const senderPubkey = getPublicKey(input.senderSecret);
   const pool = input.pool ?? new SimplePool();
 
@@ -92,7 +96,9 @@ export async function sendNutzap(input: NutzapInput): Promise<NutzapSendResult> 
     ["amount", String(input.amountSats)],
     ["u", input.mintUrl],
   ];
-  const content = input.comment ? `${lockedToken}\n${input.comment}` : lockedToken;
+  const content = input.comment
+    ? `${lockedToken}\n${input.comment}`
+    : lockedToken;
   const event = finalizeEvent(
     {
       kind: NIP61_NUTZAP_KIND,
@@ -138,7 +144,9 @@ export async function fetchIncomingNutzaps(
     ...(since ? { since: since + 1 } : {}),
   };
   const events = await pool.querySync(relays, filter);
-  return events.map(parseNutzapEvent).filter((n): n is IncomingNutzap => n !== null);
+  return events.map(parseNutzapEvent).filter((n): n is IncomingNutzap =>
+    n !== null
+  );
 }
 
 function parseNutzapEvent(event: {
@@ -156,9 +164,15 @@ function parseNutzapEvent(event: {
   // Content is `cashuB...` optionally followed by `\n<comment>`. Split
   // on the first newline so the comment can contain whitespace freely.
   const newlineIdx = event.content.indexOf("\n");
-  const lockedToken = newlineIdx >= 0 ? event.content.slice(0, newlineIdx) : event.content;
-  const comment = newlineIdx >= 0 ? event.content.slice(newlineIdx + 1) : undefined;
-  if (!lockedToken.startsWith("cashuB") && !lockedToken.startsWith("cashuA")) return null;
+  const lockedToken = newlineIdx >= 0
+    ? event.content.slice(0, newlineIdx)
+    : event.content;
+  const comment = newlineIdx >= 0
+    ? event.content.slice(newlineIdx + 1)
+    : undefined;
+  if (!lockedToken.startsWith("cashuB") && !lockedToken.startsWith("cashuA")) {
+    return null;
+  }
 
   return {
     eventId: event.id,
@@ -183,7 +197,8 @@ export interface RedeemNutzapInput {
  */
 export async function redeemNutzap(input: RedeemNutzapInput): Promise<Proof[]> {
   await input.recipientWallet.loadMint(true);
-  const knownKeysetIds = input.recipientWallet.keyChain?.getAllKeysetIds?.() ?? [];
+  const knownKeysetIds = input.recipientWallet.keyChain?.getAllKeysetIds?.() ??
+    [];
   const decoded = getDecodedToken(input.nutzap.lockedToken, knownKeysetIds);
   if (decoded.proofs.length === 0) {
     throw new Error("Nutzap token has no proofs");

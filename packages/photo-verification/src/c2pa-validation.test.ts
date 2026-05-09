@@ -1,11 +1,16 @@
 import { Buffer } from "node:buffer";
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { validateC2pa, isC2paAvailable } from "./c2pa-validation.ts";
+import { isC2paAvailable, validateC2pa } from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, writeFile, type fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
+import {
+  type fileExists,
+  readFileAsArrayBuffer,
+  spawn,
+  writeFile,
+} from "@anchr/core-runtime";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).
@@ -18,7 +23,10 @@ function buildMinimalJpeg(): Buffer {
   parts.push(Buffer.from([0xff, 0xd8]));
 
   // APP0 JFIF
-  const jfif = Buffer.from("JFIF\0\x01\x01\x00\x00\x01\x00\x01\x00\x00", "binary");
+  const jfif = Buffer.from(
+    "JFIF\0\x01\x01\x00\x00\x01\x00\x01\x00\x00",
+    "binary",
+  );
   const app0Len = Buffer.alloc(2);
   app0Len.writeUInt16BE(jfif.length + 2);
   parts.push(Buffer.from([0xff, 0xe0]), app0Len, jfif);
@@ -30,16 +38,51 @@ function buildMinimalJpeg(): Buffer {
   parts.push(Buffer.from([0xff, 0xdb]), dqtLen, Buffer.from([0x00]), qt);
 
   // SOF0: 1x1, 1 component, 8-bit
-  parts.push(Buffer.from([0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00]));
+  parts.push(
+    Buffer.from([
+      0xff,
+      0xc0,
+      0x00,
+      0x0b,
+      0x08,
+      0x00,
+      0x01,
+      0x00,
+      0x01,
+      0x01,
+      0x01,
+      0x11,
+      0x00,
+    ]),
+  );
 
   // DHT (minimal DC Huffman table)
-  const ht = Buffer.concat([Buffer.from([0x00]), Buffer.alloc(16), Buffer.from([0x00])]);
+  const ht = Buffer.concat([
+    Buffer.from([0x00]),
+    Buffer.alloc(16),
+    Buffer.from([0x00]),
+  ]);
   const dhtLen = Buffer.alloc(2);
   dhtLen.writeUInt16BE(ht.length + 2);
   parts.push(Buffer.from([0xff, 0xc4]), dhtLen, ht);
 
   // SOS + scan data
-  parts.push(Buffer.from([0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00, 0x7f, 0x50]));
+  parts.push(
+    Buffer.from([
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0x01,
+      0x01,
+      0x00,
+      0x00,
+      0x3f,
+      0x00,
+      0x7f,
+      0x50,
+    ]),
+  );
 
   // EOI
   parts.push(Buffer.from([0xff, 0xd9]));
@@ -56,18 +99,35 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
     const manifestPath = join(tmpDir, "manifest.json");
 
     await writeFile(inputPath, jpegBuf);
-    await writeFile(manifestPath, JSON.stringify({
-      claim_generator: "anchr-test/1.0",
-      assertions: [
-        { label: "c2pa.actions", data: { actions: [{ action: "c2pa.created" }] } },
-        {
-          label: "stds.schema-org.CreativeWork",
-          data: { "@type": "CreativeWork", "author": [{ "@type": "Person", "name": "Anchr Test Worker" }] },
-        },
-      ],
-    }));
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        claim_generator: "anchr-test/1.0",
+        assertions: [
+          {
+            label: "c2pa.actions",
+            data: { actions: [{ action: "c2pa.created" }] },
+          },
+          {
+            label: "stds.schema-org.CreativeWork",
+            data: {
+              "@type": "CreativeWork",
+              "author": [{ "@type": "Person", "name": "Anchr Test Worker" }],
+            },
+          },
+        ],
+      }),
+    );
 
-    const proc = spawn(["c2patool", inputPath, "-m", manifestPath, "-o", outputPath, "-f"], {
+    const proc = spawn([
+      "c2patool",
+      inputPath,
+      "-m",
+      manifestPath,
+      "-o",
+      outputPath,
+      "-f",
+    ], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -139,6 +199,8 @@ suite("c2pa-validation", () => {
 
     expect(result.available).toBe(true);
     expect(result.hasManifest).toBe(false);
-    expect(result.checks).toEqual(expect.arrayContaining([expect.stringContaining("unsupported format")]));
+    expect(result.checks).toEqual(
+      expect.arrayContaining([expect.stringContaining("unsupported format")]),
+    );
   });
 });

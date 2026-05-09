@@ -14,14 +14,19 @@ import {
 } from "./events.ts";
 import {
   decryptNip44,
-  generateKeypair,
   type Event,
   type Filter,
+  generateKeypair,
   type PublishResult,
   type RelayClient,
   type Subscription,
 } from "./nostr.ts";
-import type { CashuClient, CashuToken, RedeemHtlcParams, RedeemResult } from "./cashu.ts";
+import type {
+  CashuClient,
+  CashuToken,
+  RedeemHtlcParams,
+  RedeemResult,
+} from "./cashu.ts";
 import { bytesToHex } from "./test-helpers.ts";
 import type { ProviderOptions } from "./types.ts";
 
@@ -36,16 +41,36 @@ const oracleKey = generateKeypair();
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
     mintUrl: overrides?.mintUrl ?? "https://mint.example.org",
-    buildHtlcLock: overrides?.buildHtlcLock ?? (async (p) => ({ token: "x", amountSats: p.amountSats, proofs: [] } satisfies CashuToken)),
-    bindProvider: overrides?.bindProvider ?? (async () => ({ token: "y", amountSats: 0, proofs: [] } satisfies CashuToken)),
-    redeemHtlc: overrides?.redeemHtlc ?? (async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({ proofs: [], amountSats: 0 })),
+    buildHtlcLock: overrides?.buildHtlcLock ??
+      (async (
+        p,
+      ) => ({
+        token: "x",
+        amountSats: p.amountSats,
+        proofs: [],
+      } satisfies CashuToken)),
+    bindProvider: overrides?.bindProvider ??
+      (async () => ({
+        token: "y",
+        amountSats: 0,
+        proofs: [],
+      } satisfies CashuToken)),
+    redeemHtlc: overrides?.redeemHtlc ??
+      (async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
+        proofs: [],
+        amountSats: 0,
+      })),
   };
 }
 
 function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
   return {
-    publish: overrides?.publish ?? (async () => ({ successes: ["wss://relay.example.org"], failures: [] })),
-    subscribe: overrides?.subscribe ?? ((_filter: Filter, _onEvent: (e: Event) => void): Subscription => ({ close: () => {} })),
+    publish: overrides?.publish ??
+      (async () => ({ successes: ["wss://relay.example.org"], failures: [] })),
+    subscribe: overrides?.subscribe ??
+      ((_filter: Filter, _onEvent: (e: Event) => void): Subscription => ({
+        close: () => {},
+      })),
     close: overrides?.close ?? (() => {}),
   };
 }
@@ -67,7 +92,10 @@ test("validateProviderOptions accepts a well-formed options object", () => {
 
 test("validateProviderOptions accepts an optional notary URL", () => {
   expect(() =>
-    validateProviderOptions({ ...validOptions(), notary: "wss://notary.example.org" })
+    validateProviderOptions({
+      ...validOptions(),
+      notary: "wss://notary.example.org",
+    })
   ).not.toThrow();
 });
 
@@ -105,7 +133,10 @@ test("validateProviderOptions rejects a non-object input", () => {
 // --- Constructor ---
 
 test("createProvider exposes oracles / relays / mint / notary / pubkey as readonly", () => {
-  const provider = createProvider({ ...validOptions(), notary: "wss://notary.example.org" });
+  const provider = createProvider({
+    ...validOptions(),
+    notary: "wss://notary.example.org",
+  });
   expect([...provider.oracles]).toEqual([ORACLE_A]);
   expect([...provider.relays]).toEqual(["wss://relay.example.org"]);
   expect(provider.mint).toEqual("https://mint.example.org");
@@ -342,7 +373,9 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   }));
 
   await new Promise((r) => setTimeout(r, 5));
-  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  if (onRequestEvent === null) {
+    throw new Error("request subscribe was not called");
+  }
   const fireRequest = onRequestEvent as (e: Event) => void;
 
   // Customer sends a request.
@@ -363,15 +396,21 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   // Wait for the provider to publish its quote and open the selection
   // subscription before we deliver the selection event.
   await new Promise((r) => setTimeout(r, 30));
-  if (onSelectionEvent === null) throw new Error("selection subscribe was not called");
+  if (onSelectionEvent === null) {
+    throw new Error("selection subscribe was not called");
+  }
   const fireSelection = onSelectionEvent as (e: Event) => void;
 
   // Customer announces selecting this provider, with a bound token.
-  const selectionEvent = buildSelectionFeedbackEvent(customerKey, requestEvent.id, {
-    status: "processing",
-    selected_provider_pubkey: providerKey.publicKey,
-    bound_token: "cashuBbound",
-  });
+  const selectionEvent = buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      bound_token: "cashuBbound",
+    },
+  );
   fireSelection(selectionEvent);
 
   // Wait for produce + result publish + preimage timeout (30ms) to drain
@@ -431,7 +470,9 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   }));
 
   await new Promise((r) => setTimeout(r, 5));
-  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  if (onRequestEvent === null) {
+    throw new Error("request subscribe was not called");
+  }
   (onRequestEvent as (e: Event) => void)(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "io.anchr.tlsn-https.v1",
@@ -498,7 +539,9 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   }));
 
   await new Promise((r) => setTimeout(r, 5));
-  if (onRequestEvent === null) throw new Error("request subscribe was not called");
+  if (onRequestEvent === null) {
+    throw new Error("request subscribe was not called");
+  }
   const fireRequest = onRequestEvent as (e: Event) => void;
 
   // Customer sends a request bound to our (real) oracle.
@@ -517,7 +560,9 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   fireRequest(requestEvent);
 
   await new Promise((r) => setTimeout(r, 30));
-  if (onSelectionEvent === null) throw new Error("selection subscribe was not called");
+  if (onSelectionEvent === null) {
+    throw new Error("selection subscribe was not called");
+  }
   (onSelectionEvent as (e: Event) => void)(buildSelectionFeedbackEvent(
     customerKey,
     requestEvent.id,
@@ -529,7 +574,9 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   ));
 
   await new Promise((r) => setTimeout(r, 30));
-  if (onPreimageEvent === null) throw new Error("preimage subscribe was not called");
+  if (onPreimageEvent === null) {
+    throw new Error("preimage subscribe was not called");
+  }
   (onPreimageEvent as (e: Event) => void)(buildPreimageDeliveryEvent(
     oracleKey,
     providerKey.publicKey,
@@ -548,7 +595,9 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   if (redeemRecorder.params === null) throw new Error("unreachable");
   expect(redeemRecorder.params.token).toBe("cashuBbound");
   expect(redeemRecorder.params.preimageHex).toBe("ff".repeat(32));
-  expect(redeemRecorder.params.providerSecretKey).toEqual(providerKey.secretKey);
+  expect(redeemRecorder.params.providerSecretKey).toEqual(
+    providerKey.secretKey,
+  );
 });
 
 test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {

@@ -1,7 +1,10 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildWorkerApiApp } from "./worker-api.ts";
-import { createQueryService, createQueryStore } from "../application/query-service.ts";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../application/query-service.ts";
 import { createOracleRegistry } from "./oracle-client/registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
@@ -9,8 +12,18 @@ import type { Query, QueryResult } from "../domain/types.ts";
 function makeMockOracle(id: string): Oracle {
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    async verify(query: Query, _result: QueryResult): Promise<OracleAttestation> {
-      return { oracle_id: id, query_id: query.id, passed: true, checks: ["ok"], failures: [], attested_at: Date.now() };
+    async verify(
+      query: Query,
+      _result: QueryResult,
+    ): Promise<OracleAttestation> {
+      return {
+        oracle_id: id,
+        query_id: query.id,
+        passed: true,
+        checks: ["ok"],
+        failures: [],
+        attested_at: Date.now(),
+      };
     },
   };
 }
@@ -39,7 +52,10 @@ function makeTestApp() {
   const registry = createOracleRegistry({ skipBuiltIn: true });
   registry.register(makeMockOracle("test-oracle"));
   const svc = createQueryService({ store, oracleRegistry: registry });
-  const app = buildWorkerApiApp({ queryService: svc, oracleRegistry: registry });
+  const app = buildWorkerApiApp({
+    queryService: svc,
+    oracleRegistry: registry,
+  });
   return { app, svc };
 }
 

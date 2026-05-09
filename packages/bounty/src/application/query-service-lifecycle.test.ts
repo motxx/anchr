@@ -3,8 +3,17 @@ import { expect } from "@std/expect";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { QueryService, QueryStore } from "./query-service.ts";
 import { createOracleRegistry } from "../infrastructure/oracle-client/index.ts";
-import type { OracleRegistry, Oracle, OracleAttestation } from "../infrastructure/oracle-client/index.ts";
-import type { Query, QueryResult, BlossomKeyMap, VerificationDetail } from "../domain/types.ts";
+import type {
+  Oracle,
+  OracleAttestation,
+  OracleRegistry,
+} from "../infrastructure/oracle-client/index.ts";
+import type {
+  BlossomKeyMap,
+  Query,
+  QueryResult,
+  VerificationDetail,
+} from "../domain/types.ts";
 
 function makeMockOracle(opts?: {
   id?: string;
@@ -16,7 +25,11 @@ function makeMockOracle(opts?: {
   const pass = opts?.pass ?? true;
   return {
     info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    verify: async (_query: Query, _result: QueryResult, _keys?: BlossomKeyMap): Promise<OracleAttestation> => ({
+    verify: async (
+      _query: Query,
+      _result: QueryResult,
+      _keys?: BlossomKeyMap,
+    ): Promise<OracleAttestation> => ({
       oracle_id: id,
       query_id: _query.id,
       passed: pass,
@@ -40,7 +53,10 @@ function setup(oracleOpts?: { pass?: boolean; oracles?: Oracle[] }) {
 
 const defaultInput = { description: "Take a photo of Tokyo Tower" };
 const defaultResult: QueryResult = { attachments: [], notes: "Here it is" };
-const defaultMeta = { executor_type: "human" as const, channel: "worker_api" as const };
+const defaultMeta = {
+  executor_type: "human" as const,
+  channel: "worker_api" as const,
+};
 
 describe("Application Service — Simple lifecycle", () => {
   test("create → submit → approved", async () => {
@@ -48,7 +64,11 @@ describe("Application Service — Simple lifecycle", () => {
     const query = svc.createQuery(defaultInput);
     expect(query.status).toBe("pending");
 
-    const outcome = await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
+    const outcome = await svc.submitQueryResult(
+      query.id,
+      defaultResult,
+      defaultMeta,
+    );
     expect(outcome.ok).toBe(true);
     expect(outcome.query?.status).toBe("approved");
     expect(outcome.query?.payment_status).toBe("released");
@@ -59,7 +79,11 @@ describe("Application Service — Simple lifecycle", () => {
     const { svc } = setup({ pass: false });
     const query = svc.createQuery(defaultInput);
 
-    const outcome = await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
+    const outcome = await svc.submitQueryResult(
+      query.id,
+      defaultResult,
+      defaultMeta,
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.status).toBe("rejected");
     expect(outcome.query?.payment_status).toBe("cancelled");
@@ -87,7 +111,11 @@ describe("Application Service — Simple lifecycle", () => {
 
   test("submit to non-existent query", async () => {
     const { svc } = setup();
-    const outcome = await svc.submitQueryResult("no-such-id", defaultResult, defaultMeta);
+    const outcome = await svc.submitQueryResult(
+      "no-such-id",
+      defaultResult,
+      defaultMeta,
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not found");
   });
@@ -97,7 +125,11 @@ describe("Application Service — Simple lifecycle", () => {
     const query = svc.createQuery(defaultInput);
     await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
 
-    const second = await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
+    const second = await svc.submitQueryResult(
+      query.id,
+      defaultResult,
+      defaultMeta,
+    );
     expect(second.ok).toBe(false);
   });
 
@@ -218,7 +250,11 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: recordResult + completeVerification separately", async () => {
     const { svc } = setup({ pass: true });
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    svc.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
 
@@ -234,7 +270,11 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: completeVerification rejected", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    svc.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
     svc.recordResult(query.id, defaultResult, "w1");
@@ -255,7 +295,11 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: expire at processing", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, { ...htlcOptions(), ttlMs: 1 });
-    svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    svc.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
 
@@ -276,11 +320,19 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: worker pubkey mismatch", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    svc.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await svc.selectWorker(query.id, "w1");
     svc.beginWork(query.id);
 
-    const outcome = await svc.submitEscrowResult(query.id, defaultResult, "wrong_worker");
+    const outcome = await svc.submitEscrowResult(
+      query.id,
+      defaultResult,
+      "wrong_worker",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
   });
@@ -299,7 +351,11 @@ describe("Application Service — Quorum verification", () => {
       quorum: { min_approvals: 2 },
     });
 
-    const outcome = await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
+    const outcome = await svc.submitQueryResult(
+      query.id,
+      defaultResult,
+      defaultMeta,
+    );
     expect(outcome.ok).toBe(true);
     expect(outcome.query?.status).toBe("approved");
     expect(outcome.query?.attestations?.length).toBe(3);
@@ -317,7 +373,11 @@ describe("Application Service — Quorum verification", () => {
       quorum: { min_approvals: 2 },
     });
 
-    const outcome = await svc.submitQueryResult(query.id, defaultResult, defaultMeta);
+    const outcome = await svc.submitQueryResult(
+      query.id,
+      defaultResult,
+      defaultMeta,
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.status).toBe("rejected");
   });
@@ -326,20 +386,24 @@ describe("Application Service — Quorum verification", () => {
 describe("Application Service — Aggregate error propagation", () => {
   test("rejects empty description (delegates validation to aggregate)", () => {
     const { svc } = setup();
-    expect(() => svc.createQuery({ description: "" })).toThrow("description must not be empty");
+    expect(() => svc.createQuery({ description: "" })).toThrow(
+      "description must not be empty",
+    );
   });
 
   test("rejects HTLC locktime too short at service level", () => {
     const { svc } = setup();
     const nowSecs = Math.floor(Date.now() / 1000);
-    expect(() => svc.createQuery(defaultInput, {
-      escrow: {
-        type: "htlc",
-        hash: "h",
-        oracle_pubkeys: ["o"],
-        requester_pubkey: "r",
-        locktime: nowSecs + 100,
-      },
-    })).toThrow("600s");
+    expect(() =>
+      svc.createQuery(defaultInput, {
+        escrow: {
+          type: "htlc",
+          hash: "h",
+          oracle_pubkeys: ["o"],
+          requester_pubkey: "r",
+          locktime: nowSecs + 100,
+        },
+      })
+    ).toThrow("600s");
   });
 });

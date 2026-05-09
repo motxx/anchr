@@ -28,11 +28,11 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  Wallet,
-  type Proof,
-  type P2PKOptions,
   P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
   signP2PKProofs,
+  Wallet,
 } from "@cashu/cashu-ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
@@ -45,9 +45,9 @@ import {
 import {
   checkInfraReady,
   createWallet,
+  retryOnRateLimit,
   throttledMintProofs,
   throttleMintOp,
-  retryOnRateLimit,
 } from "../helpers/regtest.ts";
 
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
@@ -90,7 +90,9 @@ async function createP2PKLockedProofs(
 ): Promise<Proof[]> {
   const fee = wallet.getFeesForProofs(sourceProofs);
   const sendAmount = amountSats - fee;
-  if (sendAmount <= 0) throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  if (sendAmount <= 0) {
+    throw new Error(`Fee (${fee}) exceeds amount (${amountSats})`);
+  }
 
   await throttleMintOp();
   const { send } = await retryOnRateLimit(() =>
@@ -106,284 +108,310 @@ async function createP2PKLockedProofs(
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
-suite("e2e: FROST P2PK + real Cashu mint — trustless two-party binary bet flow", () => {
-  const wallet = sharedWallet!;
+suite(
+  "e2e: FROST P2PK + real Cashu mint — trustless two-party binary bet flow",
+  () => {
+    const wallet = sharedWallet!;
 
-  // Oracle keypairs (simulating FROST DKG output)
-  let oracleYes: { secretKey: string; publicKey: string };
-  let oracleNo: { secretKey: string; publicKey: string };
+    // Oracle keypairs (simulating FROST DKG output)
+    let oracleYes: { secretKey: string; publicKey: string };
+    let oracleNo: { secretKey: string; publicKey: string };
 
-  // User keypairs
-  let alice: { secretKey: string; publicKey: string };
-  let bob: { secretKey: string; publicKey: string };
+    // User keypairs
+    let alice: { secretKey: string; publicKey: string };
+    let bob: { secretKey: string; publicKey: string };
 
-  // Minted proofs
-  let aliceProofs: Proof[];
-  let bobProofs: Proof[];
+    // Minted proofs
+    let aliceProofs: Proof[];
+    let bobProofs: Proof[];
 
-  // P2PK-locked proofs
-  let aliceLockedProofs: Proof[]; // Alice's proofs locked for Bob (if NO wins)
-  let bobLockedProofs: Proof[];   // Bob's proofs locked for Alice (if YES wins)
+    // P2PK-locked proofs
+    let aliceLockedProofs: Proof[]; // Alice's proofs locked for Bob (if NO wins)
+    let bobLockedProofs: Proof[]; // Bob's proofs locked for Alice (if YES wins)
 
-  const locktime = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+    const locktime = Math.floor(Date.now() / 1000) + 3600; // 1 hour
 
-  // -------------------------------------------------------------------------
-  // Step 1: Generate keypairs
-  // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Step 1: Generate keypairs
+    // -------------------------------------------------------------------------
 
-  test("1. generate Oracle group keypairs (YES/NO) and user keypairs (Alice/Bob)", () => {
-    oracleYes = genKeypair();
-    oracleNo = genKeypair();
-    alice = genKeypair();
-    bob = genKeypair();
+    test("1. generate Oracle group keypairs (YES/NO) and user keypairs (Alice/Bob)", () => {
+      oracleYes = genKeypair();
+      oracleNo = genKeypair();
+      alice = genKeypair();
+      bob = genKeypair();
 
-    // All keys should be 64 hex chars (x-only BIP-340)
-    expect(oracleYes.publicKey).toHaveLength(64);
-    expect(oracleNo.publicKey).toHaveLength(64);
-    expect(alice.publicKey).toHaveLength(64);
-    expect(bob.publicKey).toHaveLength(64);
+      // All keys should be 64 hex chars (x-only BIP-340)
+      expect(oracleYes.publicKey).toHaveLength(64);
+      expect(oracleNo.publicKey).toHaveLength(64);
+      expect(alice.publicKey).toHaveLength(64);
+      expect(bob.publicKey).toHaveLength(64);
 
-    // All distinct
-    const allPks = [oracleYes.publicKey, oracleNo.publicKey, alice.publicKey, bob.publicKey];
-    expect(new Set(allPks).size).toBe(4);
-  });
-
-  // -------------------------------------------------------------------------
-  // Step 2: Mint Cashu proofs via regtest Lightning
-  // -------------------------------------------------------------------------
-
-  test("2. Alice and Bob mint Cashu proofs via regtest Lightning", async () => {
-    aliceProofs = await throttledMintProofs(wallet, BET_SATS);
-    bobProofs = await throttledMintProofs(wallet, BET_SATS);
-
-    const aliceTotal = aliceProofs.reduce((s, p) => s + p.amount, 0);
-    const bobTotal = bobProofs.reduce((s, p) => s + p.amount, 0);
-
-    expect(aliceTotal).toBe(BET_SATS);
-    expect(bobTotal).toBe(BET_SATS);
-    expect(aliceProofs.length).toBeGreaterThan(0);
-    expect(bobProofs.length).toBeGreaterThan(0);
-  });
-
-  // -------------------------------------------------------------------------
-  // Step 3: Lock Alice's proofs — she's betting YES
-  //   P2PK([group_pubkey_no, bob_pubkey], n_sigs=2) + refund(alice)
-  //   -> Bob redeems if NO wins (oracle signs with sk_no)
-  // -------------------------------------------------------------------------
-
-  test("3. lock Alice's proofs with P2PK([group_pubkey_no, bob], n=2) — she bets YES", async () => {
-    const options = buildFrostSwapForPartyA({
-      group_pubkey_b: oracleNo.publicKey,
-      counterpartyPubkey: bob.publicKey,
-      refundPubkey: alice.publicKey,
-      locktime,
+      // All distinct
+      const allPks = [
+        oracleYes.publicKey,
+        oracleNo.publicKey,
+        alice.publicKey,
+        bob.publicKey,
+      ];
+      expect(new Set(allPks).size).toBe(4);
     });
 
-    aliceLockedProofs = await createP2PKLockedProofs(wallet, aliceProofs, BET_SATS, options);
+    // -------------------------------------------------------------------------
+    // Step 2: Mint Cashu proofs via regtest Lightning
+    // -------------------------------------------------------------------------
 
-    expect(aliceLockedProofs.length).toBeGreaterThan(0);
+    test("2. Alice and Bob mint Cashu proofs via regtest Lightning", async () => {
+      aliceProofs = await throttledMintProofs(wallet, BET_SATS);
+      bobProofs = await throttledMintProofs(wallet, BET_SATS);
 
-    // Verify P2PK lock structure.
-    // NUT-11 secret format: ["P2PK", { data: <primary_pubkey>, tags: [["pubkeys", ...extra]] }]
-    // The first pubkey goes into `data`, remaining go into the `pubkeys` tag.
-    for (const proof of aliceLockedProofs) {
-      const secret = JSON.parse(proof.secret);
-      expect(secret[0]).toBe("P2PK");
+      const aliceTotal = aliceProofs.reduce((s, p) => s + p.amount, 0);
+      const bobTotal = bobProofs.reduce((s, p) => s + p.amount, 0);
 
-      // Collect ALL lock pubkeys: `data` field + `pubkeys` tag
-      const dataPk = secret[1]?.data as string;
-      const tags: string[][] = secret[1]?.tags ?? [];
-      const pubkeysTag = tags.find((t: string[]) => t[0] === "pubkeys");
-      const allLockKeys = [dataPk, ...(pubkeysTag?.slice(1) ?? [])];
-
-      const matchKey = (target: string, key: string) =>
-        key === target || key === `02${target}` || key === `03${target}`;
-
-      const hasBob = allLockKeys.some((k) => matchKey(bob.publicKey, k));
-      const hasOracleNo = allLockKeys.some((k) => matchKey(oracleNo.publicKey, k));
-      expect(hasBob).toBe(true);
-      expect(hasOracleNo).toBe(true);
-
-      // n_sigs should be 2
-      const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
-      expect(nSigs).toBeDefined();
-      expect(nSigs![1]).toBe("2");
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Step 4: Lock Bob's proofs — he's betting NO
-  //   P2PK([group_pubkey_yes, alice_pubkey], n_sigs=2) + refund(bob)
-  //   -> Alice redeems if YES wins (oracle signs with sk_yes)
-  // -------------------------------------------------------------------------
-
-  test("4. lock Bob's proofs with P2PK([group_pubkey_yes, alice], n=2) — he bets NO", async () => {
-    const options = buildFrostSwapForPartyB({
-      group_pubkey_a: oracleYes.publicKey,
-      counterpartyPubkey: alice.publicKey,
-      refundPubkey: bob.publicKey,
-      locktime,
+      expect(aliceTotal).toBe(BET_SATS);
+      expect(bobTotal).toBe(BET_SATS);
+      expect(aliceProofs.length).toBeGreaterThan(0);
+      expect(bobProofs.length).toBeGreaterThan(0);
     });
 
-    bobLockedProofs = await createP2PKLockedProofs(wallet, bobProofs, BET_SATS, options);
+    // -------------------------------------------------------------------------
+    // Step 3: Lock Alice's proofs — she's betting YES
+    //   P2PK([group_pubkey_no, bob_pubkey], n_sigs=2) + refund(alice)
+    //   -> Bob redeems if NO wins (oracle signs with sk_no)
+    // -------------------------------------------------------------------------
 
-    expect(bobLockedProofs.length).toBeGreaterThan(0);
+    test("3. lock Alice's proofs with P2PK([group_pubkey_no, bob], n=2) — she bets YES", async () => {
+      const options = buildFrostSwapForPartyA({
+        group_pubkey_b: oracleNo.publicKey,
+        counterpartyPubkey: bob.publicKey,
+        refundPubkey: alice.publicKey,
+        locktime,
+      });
 
-    // Verify P2PK lock structure (same pattern as step 3)
-    for (const proof of bobLockedProofs) {
-      const secret = JSON.parse(proof.secret);
-      expect(secret[0]).toBe("P2PK");
+      aliceLockedProofs = await createP2PKLockedProofs(
+        wallet,
+        aliceProofs,
+        BET_SATS,
+        options,
+      );
 
-      const dataPk = secret[1]?.data as string;
-      const tags: string[][] = secret[1]?.tags ?? [];
-      const pubkeysTag = tags.find((t: string[]) => t[0] === "pubkeys");
-      const allLockKeys = [dataPk, ...(pubkeysTag?.slice(1) ?? [])];
+      expect(aliceLockedProofs.length).toBeGreaterThan(0);
 
-      const matchKey = (target: string, key: string) =>
-        key === target || key === `02${target}` || key === `03${target}`;
+      // Verify P2PK lock structure.
+      // NUT-11 secret format: ["P2PK", { data: <primary_pubkey>, tags: [["pubkeys", ...extra]] }]
+      // The first pubkey goes into `data`, remaining go into the `pubkeys` tag.
+      for (const proof of aliceLockedProofs) {
+        const secret = JSON.parse(proof.secret);
+        expect(secret[0]).toBe("P2PK");
 
-      const hasAlice = allLockKeys.some((k) => matchKey(alice.publicKey, k));
-      const hasOracleYes = allLockKeys.some((k) => matchKey(oracleYes.publicKey, k));
-      expect(hasAlice).toBe(true);
-      expect(hasOracleYes).toBe(true);
+        // Collect ALL lock pubkeys: `data` field + `pubkeys` tag
+        const dataPk = secret[1]?.data as string;
+        const tags: string[][] = secret[1]?.tags ?? [];
+        const pubkeysTag = tags.find((t: string[]) => t[0] === "pubkeys");
+        const allLockKeys = [dataPk, ...(pubkeysTag?.slice(1) ?? [])];
 
-      const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
-      expect(nSigs).toBeDefined();
-      expect(nSigs![1]).toBe("2");
-    }
-  });
+        const matchKey = (target: string, key: string) =>
+          key === target || key === `02${target}` || key === `03${target}`;
 
-  // -------------------------------------------------------------------------
-  // Step 5: YES wins — Oracle produces Schnorr signature with sk_yes
-  // -------------------------------------------------------------------------
+        const hasBob = allLockKeys.some((k) => matchKey(bob.publicKey, k));
+        const hasOracleNo = allLockKeys.some((k) =>
+          matchKey(oracleNo.publicKey, k)
+        );
+        expect(hasBob).toBe(true);
+        expect(hasOracleNo).toBe(true);
 
-  test("5. YES wins: Oracle signs with sk_yes (simulating FROST threshold signing)", () => {
-    // In production: FROST threshold signers cooperate to produce group signature.
-    // In demo mode: single Schnorr sign with the YES outcome's secret key.
+        // n_sigs should be 2
+        const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
+        expect(nSigs).toBeDefined();
+        expect(nSigs![1]).toBe("2");
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Step 4: Lock Bob's proofs — he's betting NO
+    //   P2PK([group_pubkey_yes, alice_pubkey], n_sigs=2) + refund(bob)
+    //   -> Alice redeems if YES wins (oracle signs with sk_yes)
+    // -------------------------------------------------------------------------
+
+    test("4. lock Bob's proofs with P2PK([group_pubkey_yes, alice], n=2) — he bets NO", async () => {
+      const options = buildFrostSwapForPartyB({
+        group_pubkey_a: oracleYes.publicKey,
+        counterpartyPubkey: alice.publicKey,
+        refundPubkey: bob.publicKey,
+        locktime,
+      });
+
+      bobLockedProofs = await createP2PKLockedProofs(
+        wallet,
+        bobProofs,
+        BET_SATS,
+        options,
+      );
+
+      expect(bobLockedProofs.length).toBeGreaterThan(0);
+
+      // Verify P2PK lock structure (same pattern as step 3)
+      for (const proof of bobLockedProofs) {
+        const secret = JSON.parse(proof.secret);
+        expect(secret[0]).toBe("P2PK");
+
+        const dataPk = secret[1]?.data as string;
+        const tags: string[][] = secret[1]?.tags ?? [];
+        const pubkeysTag = tags.find((t: string[]) => t[0] === "pubkeys");
+        const allLockKeys = [dataPk, ...(pubkeysTag?.slice(1) ?? [])];
+
+        const matchKey = (target: string, key: string) =>
+          key === target || key === `02${target}` || key === `03${target}`;
+
+        const hasAlice = allLockKeys.some((k) => matchKey(alice.publicKey, k));
+        const hasOracleYes = allLockKeys.some((k) =>
+          matchKey(oracleYes.publicKey, k)
+        );
+        expect(hasAlice).toBe(true);
+        expect(hasOracleYes).toBe(true);
+
+        const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
+        expect(nSigs).toBeDefined();
+        expect(nSigs![1]).toBe("2");
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // Step 5: YES wins — Oracle produces Schnorr signature with sk_yes
+    // -------------------------------------------------------------------------
+
+    test("5. YES wins: Oracle signs with sk_yes (simulating FROST threshold signing)", () => {
+      // In production: FROST threshold signers cooperate to produce group signature.
+      // In demo mode: single Schnorr sign with the YES outcome's secret key.
+      //
+      // The signature is over the proof secret (SIG_ALL mode). This is verified
+      // by the Cashu mint as part of the P2PK NUT-11 protocol.
+
+      // Verify the Oracle YES key is valid for Schnorr signing
+      const testMessage = new Uint8Array(32);
+      crypto.getRandomValues(testMessage);
+      const sig = schnorr.sign(testMessage, hexToBytes(oracleYes.secretKey));
+      const valid = schnorr.verify(
+        sig,
+        testMessage,
+        hexToBytes(oracleYes.publicKey),
+      );
+      expect(valid).toBe(true);
+    });
+
+    // -------------------------------------------------------------------------
+    // Step 6: Alice redeems Bob's locked proofs
+    //   Bob's proofs are locked with P2PK([group_pubkey_yes, alice], n=2)
+    //   Alice provides: oracle_sig (sk_yes) + alice_sig (sk_alice)
+    // -------------------------------------------------------------------------
+
+    test("6. Alice redeems Bob's locked proofs using [oracle_yes_key, alice_key]", async () => {
+      // Bob's proofs are locked to [group_pubkey_yes, alice_pubkey] with n_sigs=2.
+      // Alice needs both keys to sign: oracle's YES key + her own key.
+      // wallet.ops.send().privkey([oracle_yes_sk, alice_sk]) handles multi-sig signing.
+
+      const totalSats = bobLockedProofs.reduce((s, p) => s + p.amount, 0);
+      const fee = wallet.getFeesForProofs(bobLockedProofs);
+      expect(totalSats - fee).toBeGreaterThan(0);
+
+      await throttleMintOp();
+      const { send: redeemed } = await retryOnRateLimit(() =>
+        wallet.ops
+          .send(totalSats - fee, bobLockedProofs)
+          .privkey([oracleYes.secretKey, alice.secretKey])
+          .run()
+      );
+
+      expect(redeemed).not.toBeNull();
+      expect(redeemed.length).toBeGreaterThan(0);
+
+      // Verify redeemed amount
+      const redeemedTotal = redeemed.reduce((s, p) => s + p.amount, 0);
+      expect(redeemedTotal).toBe(totalSats - fee);
+    });
+
+    // -------------------------------------------------------------------------
+    // Step 7: Verify Bob CANNOT produce valid P2PK signatures for Alice's proofs
+    //   Alice's proofs are locked with P2PK([group_pubkey_no, bob], n=2)
+    //   Bob has his own key, but needs oracle NO key — which was never signed.
     //
-    // The signature is over the proof secret (SIG_ALL mode). This is verified
-    // by the Cashu mint as part of the P2PK NUT-11 protocol.
+    //   NOTE: Nutshell 0.19.2 DOES enforce NUT-11 P2PK spending conditions
+    //   on /v1/swap (returns 400 without valid witness). We additionally verify
+    //   at the client/protocol level using signP2PKProofs for defense-in-depth.
+    // -------------------------------------------------------------------------
 
-    // Verify the Oracle YES key is valid for Schnorr signing
-    const testMessage = new Uint8Array(32);
-    crypto.getRandomValues(testMessage);
-    const sig = schnorr.sign(testMessage, hexToBytes(oracleYes.secretKey));
-    const valid = schnorr.verify(sig, testMessage, hexToBytes(oracleYes.publicKey));
-    expect(valid).toBe(true);
-  });
+    test("7. Bob cannot produce valid 2-of-2 signature without oracle NO key", () => {
+      // Alice's proofs are locked to [group_pubkey_no, bob_pubkey] with n_sigs=2.
+      // Bob has bob_sk, but the Oracle never signed with sk_no (YES won).
+      // signP2PKProofs with only Bob's key produces only 1 of 2 required signatures.
 
-  // -------------------------------------------------------------------------
-  // Step 6: Alice redeems Bob's locked proofs
-  //   Bob's proofs are locked with P2PK([group_pubkey_yes, alice], n=2)
-  //   Alice provides: oracle_sig (sk_yes) + alice_sig (sk_alice)
-  // -------------------------------------------------------------------------
+      const signed = signP2PKProofs(aliceLockedProofs, bob.secretKey);
 
-  test("6. Alice redeems Bob's locked proofs using [oracle_yes_key, alice_key]", async () => {
-    // Bob's proofs are locked to [group_pubkey_yes, alice_pubkey] with n_sigs=2.
-    // Alice needs both keys to sign: oracle's YES key + her own key.
-    // wallet.ops.send().privkey([oracle_yes_sk, alice_sk]) handles multi-sig signing.
+      for (const proof of signed) {
+        const witness = typeof proof.witness === "string"
+          ? JSON.parse(proof.witness)
+          : proof.witness;
 
-    const totalSats = bobLockedProofs.reduce((s, p) => s + p.amount, 0);
-    const fee = wallet.getFeesForProofs(bobLockedProofs);
-    expect(totalSats - fee).toBeGreaterThan(0);
+        // Only 1 signature (Bob's) — need 2 for n_sigs=2
+        expect(witness.signatures.length).toBe(1);
 
-    await throttleMintOp();
-    const { send: redeemed } = await retryOnRateLimit(() =>
-      wallet.ops
-        .send(totalSats - fee, bobLockedProofs)
-        .privkey([oracleYes.secretKey, alice.secretKey])
-        .run()
-    );
+        // Verify the lock requires 2 signatures
+        const secret = JSON.parse(proof.secret);
+        const tags: string[][] = secret[1]?.tags ?? [];
+        const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
+        expect(nSigs![1]).toBe("2");
+      }
+    });
 
-    expect(redeemed).not.toBeNull();
-    expect(redeemed.length).toBeGreaterThan(0);
+    // -------------------------------------------------------------------------
+    // Step 8: Verify wrong oracle key produces invalid P2PK signatures
+    //   Alice's proofs need [oracle_no, bob] — oracle YES key is wrong group.
+    // -------------------------------------------------------------------------
 
-    // Verify redeemed amount
-    const redeemedTotal = redeemed.reduce((s, p) => s + p.amount, 0);
-    expect(redeemedTotal).toBe(totalSats - fee);
-  });
+    test("8. wrong oracle key (YES instead of NO) cannot sign Alice's proofs", () => {
+      // Alice's proofs are locked to [group_pubkey_no, bob_pubkey].
+      // Oracle YES key is NOT in the lock — signP2PKProofs skips it.
 
-  // -------------------------------------------------------------------------
-  // Step 7: Verify Bob CANNOT produce valid P2PK signatures for Alice's proofs
-  //   Alice's proofs are locked with P2PK([group_pubkey_no, bob], n=2)
-  //   Bob has his own key, but needs oracle NO key — which was never signed.
-  //
-  //   NOTE: Nutshell 0.19.2 DOES enforce NUT-11 P2PK spending conditions
-  //   on /v1/swap (returns 400 without valid witness). We additionally verify
-  //   at the client/protocol level using signP2PKProofs for defense-in-depth.
-  // -------------------------------------------------------------------------
+      // Sign with Bob (produces 1 valid sig)
+      const bobSigned = signP2PKProofs(aliceLockedProofs, bob.secretKey);
 
-  test("7. Bob cannot produce valid 2-of-2 signature without oracle NO key", () => {
-    // Alice's proofs are locked to [group_pubkey_no, bob_pubkey] with n_sigs=2.
-    // Bob has bob_sk, but the Oracle never signed with sk_no (YES won).
-    // signP2PKProofs with only Bob's key produces only 1 of 2 required signatures.
+      // Try to add oracle YES signature — wrong key, not in pubkeys list.
+      // signP2PKProofs will skip (or warn) because oracleYes is not in the lock.
+      const doubleSigned = signP2PKProofs(bobSigned, oracleYes.secretKey);
 
-    const signed = signP2PKProofs(aliceLockedProofs, bob.secretKey);
+      for (const proof of doubleSigned) {
+        const witness = typeof proof.witness === "string"
+          ? JSON.parse(proof.witness)
+          : proof.witness;
 
-    for (const proof of signed) {
-      const witness = typeof proof.witness === "string"
-        ? JSON.parse(proof.witness)
-        : proof.witness;
+        // Still only 1 valid signature (Bob's) — oracleYes key is not in the lock
+        // so signP2PKProofs should not have added a second signature.
+        expect(witness.signatures.length).toBe(1);
+      }
+    });
 
-      // Only 1 signature (Bob's) — need 2 for n_sigs=2
-      expect(witness.signatures.length).toBe(1);
+    // -------------------------------------------------------------------------
+    // Step 9: Verify a random third party cannot sign any locked proofs
+    // -------------------------------------------------------------------------
 
-      // Verify the lock requires 2 signatures
-      const secret = JSON.parse(proof.secret);
-      const tags: string[][] = secret[1]?.tags ?? [];
-      const nSigs = tags.find((t: string[]) => t[0] === "n_sigs");
-      expect(nSigs![1]).toBe("2");
-    }
-  });
+    test("9. random third party key cannot produce valid signatures", () => {
+      const eve = genKeypair();
 
-  // -------------------------------------------------------------------------
-  // Step 8: Verify wrong oracle key produces invalid P2PK signatures
-  //   Alice's proofs need [oracle_no, bob] — oracle YES key is wrong group.
-  // -------------------------------------------------------------------------
+      // Eve's key is not in any lock — signP2PKProofs should skip
+      const eveSigned = signP2PKProofs(aliceLockedProofs, eve.secretKey);
 
-  test("8. wrong oracle key (YES instead of NO) cannot sign Alice's proofs", () => {
-    // Alice's proofs are locked to [group_pubkey_no, bob_pubkey].
-    // Oracle YES key is NOT in the lock — signP2PKProofs skips it.
+      for (const proof of eveSigned) {
+        const witness = typeof proof.witness === "string"
+          ? JSON.parse(proof.witness)
+          : proof.witness;
 
-    // Sign with Bob (produces 1 valid sig)
-    const bobSigned = signP2PKProofs(aliceLockedProofs, bob.secretKey);
-
-    // Try to add oracle YES signature — wrong key, not in pubkeys list.
-    // signP2PKProofs will skip (or warn) because oracleYes is not in the lock.
-    const doubleSigned = signP2PKProofs(bobSigned, oracleYes.secretKey);
-
-    for (const proof of doubleSigned) {
-      const witness = typeof proof.witness === "string"
-        ? JSON.parse(proof.witness)
-        : proof.witness;
-
-      // Still only 1 valid signature (Bob's) — oracleYes key is not in the lock
-      // so signP2PKProofs should not have added a second signature.
-      expect(witness.signatures.length).toBe(1);
-    }
-  });
-
-  // -------------------------------------------------------------------------
-  // Step 9: Verify a random third party cannot sign any locked proofs
-  // -------------------------------------------------------------------------
-
-  test("9. random third party key cannot produce valid signatures", () => {
-    const eve = genKeypair();
-
-    // Eve's key is not in any lock — signP2PKProofs should skip
-    const eveSigned = signP2PKProofs(aliceLockedProofs, eve.secretKey);
-
-    for (const proof of eveSigned) {
-      const witness = typeof proof.witness === "string"
-        ? JSON.parse(proof.witness)
-        : proof.witness;
-
-      // Eve's key not in the lock, no signature should be produced
-      // (signP2PKProofs skips keys not in the pubkeys list)
-      expect(witness?.signatures?.length ?? 0).toBe(0);
-    }
-  });
-});
+        // Eve's key not in the lock, no signature should be produced
+        // (signP2PKProofs skips keys not in the pubkeys list)
+        expect(witness?.signatures?.length ?? 0).toBe(0);
+      }
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Separate suite: FROST P2PK structural tests (no Docker needed)
@@ -449,7 +477,9 @@ describe("FROST P2PK structural tests (no mint required)", () => {
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys.length).toBe(2);
 
-    const refundKeys = Array.isArray(opts.refundKeys) ? opts.refundKeys : [opts.refundKeys];
+    const refundKeys = Array.isArray(opts.refundKeys)
+      ? opts.refundKeys
+      : [opts.refundKeys];
     expect(refundKeys.length).toBe(1);
   });
 

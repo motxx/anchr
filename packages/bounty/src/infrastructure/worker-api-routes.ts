@@ -18,10 +18,20 @@ import {
   querySummary,
   renderStoredAttachmentPreview,
 } from "./worker-api-presenters.ts";
-import type { QueryService, QueryInput, QueryResult } from "../application/query-service.ts";
+import type {
+  QueryInput,
+  QueryResult,
+  QueryService,
+} from "../application/query-service.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";
 import type { OracleInfo } from "./oracle-client/index.ts";
-import type { AttachmentRef, BlossomKeyMap, EscrowInfo, QuorumConfig, QuoteInfo } from "../domain/types.ts";
+import type {
+  AttachmentRef,
+  BlossomKeyMap,
+  EscrowInfo,
+  QuorumConfig,
+  QuoteInfo,
+} from "../domain/types.ts";
 
 export interface RouteContext {
   svc: QueryService;
@@ -46,13 +56,21 @@ function handleListQueries(c: Context, svc: QueryService) {
     }
     const maxDist = maxDistParam ? parseFloat(maxDistParam) : 50;
     if (!Number.isFinite(maxDist) || maxDist <= 0) {
-      return c.json({ error: "max_distance_km must be a positive number" }, 400);
+      return c.json(
+        { error: "max_distance_km must be a positive number" },
+        400,
+      );
     }
 
     queries = queries.filter((q) => {
       if (!q.expected_gps) return true;
       const queryMaxDist = q.max_gps_distance_km ?? maxDist;
-      return haversineKm(workerLat, workerLon, q.expected_gps.lat, q.expected_gps.lon) <= queryMaxDist;
+      return haversineKm(
+        workerLat,
+        workerLon,
+        q.expected_gps.lat,
+        q.expected_gps.lon,
+      ) <= queryMaxDist;
     });
   }
 
@@ -96,14 +114,20 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
   const { svc, writeAuth, rateLimit } = ctx;
 
   app.get("/queries", (c) => handleListQueries(c, svc));
-  app.get("/queries/all", writeAuth, (c) => c.json(svc.listAllQueries().map(querySummary)));
+  app.get(
+    "/queries/all",
+    writeAuth,
+    (c) => c.json(svc.listAllQueries().map(querySummary)),
+  );
 
   app.get("/queries/:id", (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     const query = svc.getQuery(id);
     const requestUrl = getPublicRequestUrl(c);
-    return query ? c.json(queryDetail(query, requestUrl)) : c.json({ error: "Query not found" }, 404);
+    return query
+      ? c.json(queryDetail(query, requestUrl))
+      : c.json({ error: "Query not found" }, 404);
   });
 
   app.post(
@@ -112,15 +136,27 @@ export function registerQueryRoutes(app: Hono, ctx: RouteContext) {
     writeAuth,
     async (c) => {
       let raw: unknown;
-      try { raw = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+      try {
+        raw = await c.req.json();
+      } catch {
+        return c.json({ error: "Invalid JSON" }, 400);
+      }
       const parsed = createQuerySchema.safeParse(raw);
       if (!parsed.success) {
         return c.json({
           error: "Invalid query payload",
-          issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
         }, 400);
       }
-      return handleCreateQuery(c, svc, parsed.data, () => getPublicRequestUrl(c));
+      return handleCreateQuery(
+        c,
+        svc,
+        parsed.data,
+        () => getPublicRequestUrl(c),
+      );
     },
   );
 
@@ -136,34 +172,75 @@ function resolveIndexedAttachment(
   svc: QueryService,
   id: string | undefined,
   indexRaw: number,
-): { error: string; status: number } | { query: ReturnType<QueryService["getQuery"]> & object; attachment: AttachmentRef; attachments: AttachmentRef[] } {
+): { error: string; status: number } | {
+  query: ReturnType<QueryService["getQuery"]> & object;
+  attachment: AttachmentRef;
+  attachments: AttachmentRef[];
+} {
   if (!id) return { error: "Query id is required", status: 400 };
-  if (!Number.isInteger(indexRaw) || indexRaw < 0) return { error: "Attachment index must be a non-negative integer", status: 400 };
+  if (!Number.isInteger(indexRaw) || indexRaw < 0) {
+    return {
+      error: "Attachment index must be a non-negative integer",
+      status: 400,
+    };
+  }
   const query = svc.getQuery(id);
   if (!query) return { error: "Query not found", status: 404 };
   const attachments = getAttachmentRefs(query);
-  if (!attachments) return { error: "Query does not have attachments", status: 404 };
+  if (!attachments) {
+    return { error: "Query does not have attachments", status: 404 };
+  }
   const attachment = attachments[indexRaw];
   if (!attachment) return { error: "Attachment not found", status: 404 };
   return { query, attachment, attachments };
 }
 
 async function handleAttachmentPreview(c: Context, svc: QueryService) {
-  const resolved = resolveIndexedAttachment(svc, c.req.param("id"), Number(c.req.param("index")));
-  if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status as 400);
+  const resolved = resolveIndexedAttachment(
+    svc,
+    c.req.param("id"),
+    Number(c.req.param("index")),
+  );
+  if ("error" in resolved) {
+    return c.json({ error: resolved.error }, resolved.status as 400);
+  }
   const { attachment } = resolved;
   const maxDimensionParam = c.req.query("max_dimension");
-  const maxDimension = maxDimensionParam ? Number(maxDimensionParam) : getRuntimeConfig().previewMaxDimension;
-  if (!Number.isFinite(maxDimension) || maxDimension <= 0) return c.json({ error: "max_dimension must be a positive number" }, 400);
-  const preview = await renderStoredAttachmentPreview(attachment, getPublicRequestUrl(c), { maxDimension: Math.floor(maxDimension) });
+  const maxDimension = maxDimensionParam
+    ? Number(maxDimensionParam)
+    : getRuntimeConfig().previewMaxDimension;
+  if (!Number.isFinite(maxDimension) || maxDimension <= 0) {
+    return c.json({ error: "max_dimension must be a positive number" }, 400);
+  }
+  const preview = await renderStoredAttachmentPreview(
+    attachment,
+    getPublicRequestUrl(c),
+    { maxDimension: Math.floor(maxDimension) },
+  );
   if (!preview) return c.json({ error: "Preview could not be generated" }, 422);
   return new Response(Buffer.from(preview.data, "base64"), {
-    headers: { "content-type": preview.mimeType, "content-length": String(preview.size), "cache-control": "public, max-age=3600" },
+    headers: {
+      "content-type": preview.mimeType,
+      "content-length": String(preview.size),
+      "cache-control": "public, max-age=3600",
+    },
   });
 }
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const ALLOWED_UPLOAD_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif", ".mp4", ".mov", ".webm", ".zip"];
+const ALLOWED_UPLOAD_EXTENSIONS = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".mp4",
+  ".mov",
+  ".webm",
+  ".zip",
+];
 
 async function handleUpload(c: Context, svc: QueryService) {
   const id = c.req.param("id");
@@ -171,25 +248,42 @@ async function handleUpload(c: Context, svc: QueryService) {
 
   const contentLength = Number(c.req.header("content-length") ?? 0);
   if (contentLength > MAX_UPLOAD_BYTES) {
-    return c.json({ error: `Upload too large: ${contentLength} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+    return c.json({
+      error:
+        `Upload too large: ${contentLength} bytes (max ${MAX_UPLOAD_BYTES})`,
+    }, 413);
   }
 
   const query = svc.getQuery(id);
   if (!query) return c.json({ error: "Query not found" }, 404);
-  if (query.status !== "pending") return c.json({ error: "Query not pending" }, 409);
+  if (query.status !== "pending") {
+    return c.json({ error: "Query not pending" }, 409);
+  }
   let formData: FormData;
-  try { formData = await c.req.formData(); } catch { return c.json({ error: "Expected multipart/form-data" }, 400); }
+  try {
+    formData = await c.req.formData();
+  } catch {
+    return c.json({ error: "Expected multipart/form-data" }, 400);
+  }
   const fileEntry = formData.get("photo");
-  if (!(fileEntry instanceof File)) return c.json({ error: "Missing photo field" }, 400);
+  if (!(fileEntry instanceof File)) {
+    return c.json({ error: "Missing photo field" }, 400);
+  }
   const file = fileEntry;
 
   if (file.size > MAX_UPLOAD_BYTES) {
-    return c.json({ error: `File too large: ${file.size} bytes (max ${MAX_UPLOAD_BYTES})` }, 413);
+    return c.json({
+      error: `File too large: ${file.size} bytes (max ${MAX_UPLOAD_BYTES})`,
+    }, 413);
   }
 
   const ext = file.name.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? ".jpg";
-  if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) return c.json({ error: `Unsupported file type: ${ext}` }, 400);
-  const result = await uploadAttachment(id, file, { expectedGps: query.expected_gps });
+  if (!ALLOWED_UPLOAD_EXTENSIONS.includes(ext)) {
+    return c.json({ error: `Unsupported file type: ${ext}` }, 400);
+  }
+  const result = await uploadAttachment(id, file, {
+    expectedGps: query.expected_gps,
+  });
   return c.json({
     ok: true,
     attachment: materializeAttachmentRef(result.attachment, c.req.url),
@@ -206,43 +300,90 @@ export function registerAttachmentRoutes(app: Hono, ctx: RouteContext) {
     const query = svc.getQuery(id);
     if (!query) return c.json({ error: "Query not found" }, 404);
     const attachments = getAttachmentRefs(query);
-    if (!attachments) return c.json({ error: "Query does not have attachments" }, 404);
+    if (!attachments) {
+      return c.json({ error: "Query does not have attachments" }, 404);
+    }
     const payloads = await Promise.all(
-      attachments.map((att, i) => buildAttachmentPayload(query, att, i, getPublicRequestUrl(c))),
+      attachments.map((att, i) =>
+        buildAttachmentPayload(query, att, i, getPublicRequestUrl(c))
+      ),
     );
     return c.json(payloads);
   });
 
   app.get("/queries/:id/attachments/:index/meta", async (c) => {
-    const resolved = resolveIndexedAttachment(svc, c.req.param("id"), Number(c.req.param("index")));
-    if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status as 400);
-    return c.json(await buildAttachmentPayload(resolved.query, resolved.attachment, Number(c.req.param("index")), getPublicRequestUrl(c)));
+    const resolved = resolveIndexedAttachment(
+      svc,
+      c.req.param("id"),
+      Number(c.req.param("index")),
+    );
+    if ("error" in resolved) {
+      return c.json({ error: resolved.error }, resolved.status as 400);
+    }
+    return c.json(
+      await buildAttachmentPayload(
+        resolved.query,
+        resolved.attachment,
+        Number(c.req.param("index")),
+        getPublicRequestUrl(c),
+      ),
+    );
   });
 
   app.get("/queries/:id/attachments/:index", async (c) => {
-    const resolved = resolveIndexedAttachment(svc, c.req.param("id"), Number(c.req.param("index")));
-    if ("error" in resolved) return c.json({ error: resolved.error }, resolved.status as 400);
+    const resolved = resolveIndexedAttachment(
+      svc,
+      c.req.param("id"),
+      Number(c.req.param("index")),
+    );
+    if ("error" in resolved) {
+      return c.json({ error: resolved.error }, resolved.status as 400);
+    }
     const uriError = validateAttachmentUri(resolved.attachment.uri);
-    if (uriError) return c.json({ error: `Invalid attachment URI: ${uriError}` }, 400);
+    if (uriError) {
+      return c.json({ error: `Invalid attachment URI: ${uriError}` }, 400);
+    }
     return c.redirect(resolved.attachment.uri, 302);
   });
 
-  app.get("/queries/:id/attachments/:index/preview", (c) => handleAttachmentPreview(c, svc));
-  app.post("/queries/:id/upload", rateLimit, writeAuth, (c) => handleUpload(c, svc));
+  app.get(
+    "/queries/:id/attachments/:index/preview",
+    (c) => handleAttachmentPreview(c, svc),
+  );
+  app.post(
+    "/queries/:id/upload",
+    rateLimit,
+    writeAuth,
+    (c) => handleUpload(c, svc),
+  );
 }
 
-function parseResultBody(rawBody: unknown): { error: string; issues?: Array<{ path: string; message: string }> } | z.infer<typeof resultBodySchema> {
+function parseResultBody(
+  rawBody: unknown,
+):
+  | { error: string; issues?: Array<{ path: string; message: string }> }
+  | z.infer<typeof resultBodySchema> {
   const parsed = resultBodySchema.safeParse(rawBody);
   if (!parsed.success) {
     return {
       error: "Invalid result payload",
-      issues: parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message })),
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
     };
   }
   return parsed.data;
 }
 
-function buildQueryResult(body: z.infer<typeof resultBodySchema>): { result: QueryResult; workerPubkey: string; blossomKeys: BlossomKeyMap | undefined; oracleId: string | undefined } {
+function buildQueryResult(
+  body: z.infer<typeof resultBodySchema>,
+): {
+  result: QueryResult;
+  workerPubkey: string;
+  blossomKeys: BlossomKeyMap | undefined;
+  oracleId: string | undefined;
+} {
   return {
     result: {
       attachments: body.attachments as AttachmentRef[],
@@ -263,16 +404,28 @@ async function handleSubmitResult(c: Context, svc: QueryService) {
   const id = c.req.param("id");
   if (!id) return c.json({ error: "Query id is required" }, 400);
   let rawBody: unknown;
-  try { rawBody = await c.req.json(); } catch { return c.json({ error: "Invalid JSON" }, 400); }
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON" }, 400);
+  }
 
   const parsed = parseResultBody(rawBody);
   if ("error" in parsed) return c.json(parsed, 400);
 
-  const { result, workerPubkey, blossomKeys, oracleId } = buildQueryResult(parsed);
+  const { result, workerPubkey, blossomKeys, oracleId } = buildQueryResult(
+    parsed,
+  );
 
   const query = svc.getQuery(id);
   if (query?.escrow) {
-    const escrowOutcome = await svc.submitEscrowResult(id, result, workerPubkey, oracleId, blossomKeys);
+    const escrowOutcome = await svc.submitEscrowResult(
+      id,
+      result,
+      workerPubkey,
+      oracleId,
+      blossomKeys,
+    );
     const status = !escrowOutcome.query ? 404 : !escrowOutcome.ok ? 422 : 200;
     return c.json({
       ok: escrowOutcome.ok,
@@ -285,7 +438,13 @@ async function handleSubmitResult(c: Context, svc: QueryService) {
     }, status);
   }
 
-  const outcome = await svc.submitQueryResult(id, result, { executor_type: "human", channel: "worker_api" }, oracleId, blossomKeys);
+  const outcome = await svc.submitQueryResult(
+    id,
+    result,
+    { executor_type: "human", channel: "worker_api" },
+    oracleId,
+    blossomKeys,
+  );
   return c.json({
     ok: outcome.ok,
     message: outcome.message,
@@ -316,15 +475,27 @@ export function registerHtlcRoutes(app: Hono, ctx: RouteContext) {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: Record<string, unknown>;
-    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+    try {
+      body = await c.req.json() as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
 
-    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
-    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
+    const workerPubkey = typeof body.worker_pubkey === "string"
+      ? body.worker_pubkey
+      : undefined;
+    if (!workerPubkey) {
+      return c.json({ error: "worker_pubkey is required" }, 400);
+    }
 
     const quote: QuoteInfo = {
       worker_pubkey: workerPubkey,
-      amount_sats: typeof body.amount_sats === "number" ? body.amount_sats : undefined,
-      quote_event_id: typeof body.quote_event_id === "string" ? body.quote_event_id : "",
+      amount_sats: typeof body.amount_sats === "number"
+        ? body.amount_sats
+        : undefined,
+      quote_event_id: typeof body.quote_event_id === "string"
+        ? body.quote_event_id
+        : "",
       received_at: Date.now(),
     };
 
@@ -336,11 +507,21 @@ export function registerHtlcRoutes(app: Hono, ctx: RouteContext) {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Query id is required" }, 400);
     let body: Record<string, unknown>;
-    try { body = await c.req.json() as Record<string, unknown>; } catch { return c.json({ error: "Invalid JSON" }, 400); }
+    try {
+      body = await c.req.json() as Record<string, unknown>;
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
 
-    const workerPubkey = typeof body.worker_pubkey === "string" ? body.worker_pubkey : undefined;
-    if (!workerPubkey) return c.json({ error: "worker_pubkey is required" }, 400);
-    const escrowToken = typeof body.htlc_token === "string" ? body.htlc_token : undefined;
+    const workerPubkey = typeof body.worker_pubkey === "string"
+      ? body.worker_pubkey
+      : undefined;
+    if (!workerPubkey) {
+      return c.json({ error: "worker_pubkey is required" }, 400);
+    }
+    const escrowToken = typeof body.htlc_token === "string"
+      ? body.htlc_token
+      : undefined;
 
     const outcome = await svc.selectWorker(id, workerPubkey, escrowToken);
     return c.json(outcome, outcome.ok ? 200 : 400);
@@ -353,10 +534,17 @@ export function registerHtlcRoutes(app: Hono, ctx: RouteContext) {
     return c.json(outcome, outcome.ok ? 200 : 400);
   });
 
-  app.post("/queries/:id/result", rateLimit, writeAuth, (c) => handleSubmitResult(c, svc));
+  app.post(
+    "/queries/:id/result",
+    rateLimit,
+    writeAuth,
+    (c) => handleSubmitResult(c, svc),
+  );
 }
 
-function parseDockerLogLine(line: string): { service: string; message: string } {
+function parseDockerLogLine(
+  line: string,
+): { service: string; message: string } {
   const match = line.match(/^(\S+)\s+\|\s+(.*)/);
   const service = match?.[1]
     ? match[1].replace(/^anchr-/, "").replace(/-\d+$/, "")
@@ -401,9 +589,13 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
 
     const stream = new ReadableStream({
       async start(controller) {
-        const send = (entry: { service: string; message: string; ts: number }) => {
+        const send = (
+          entry: { service: string; message: string; ts: number },
+        ) => {
           try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(entry)}\n\n`));
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(entry)}\n\n`),
+            );
           } catch { /* client gone */ }
         };
 
@@ -413,7 +605,11 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
         try {
           dockerProc = await streamDockerLogs(send);
         } catch (err) {
-          send({ service: "system", message: `Docker logs unavailable: ${err}`, ts: Date.now() });
+          send({
+            service: "system",
+            message: `Docker logs unavailable: ${err}`,
+            ts: Date.now(),
+          });
         }
 
         controller.close();
@@ -428,7 +624,8 @@ export function registerLogRoutes(app: Hono, writeAuth: MiddlewareHandler) {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
-        "Access-Control-Allow-Origin": Deno.env.get("CORS_ORIGIN") || (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
+        "Access-Control-Allow-Origin": Deno.env.get("CORS_ORIGIN") ||
+          (Deno.env.get("NODE_ENV") === "production" ? "" : "*"),
       },
     });
   });

@@ -57,7 +57,9 @@ async function main() {
   });
   await check("shows filter tabs (All, Active, Verified, Failed)", async () => {
     for (const tab of ["All", "Active", "Verified", "Failed"]) {
-      await page.waitForSelector(`button:has-text("${tab}")`, { timeout: 3000 });
+      await page.waitForSelector(`button:has-text("${tab}")`, {
+        timeout: 3000,
+      });
     }
   });
 
@@ -70,7 +72,10 @@ async function main() {
   await check("fills description and URL", async () => {
     await page.fill("textarea", "Browser E2E: verify BTC price");
     // Target URL field has a placeholder but no value — must fill it explicitly
-    await page.fill("input[type='url']", "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd");
+    await page.fill(
+      "input[type='url']",
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    );
     const desc = await page.inputValue("textarea");
     if (!desc.includes("Browser E2E")) throw new Error(`desc is "${desc}"`);
     const url = await page.inputValue("input[type='url']");
@@ -79,7 +84,9 @@ async function main() {
   await check("clicks Create and query appears", async () => {
     await page.click("button:has-text('Create')");
     // Wait for modal to close and query to appear in list
-    await page.waitForSelector("text=Browser E2E: verify BTC price", { timeout: 8000 });
+    await page.waitForSelector("text=Browser E2E: verify BTC price", {
+      timeout: 8000,
+    });
   });
   await check("ACTIVE count incremented", async () => {
     // Find the ACTIVE stat card
@@ -94,19 +101,25 @@ async function main() {
     await page.click("button:has-text('Active')");
     await page.waitForTimeout(500);
     const text = await page.textContent("body");
-    if (text?.includes("却下")) throw new Error("rejected query visible in Active filter");
+    if (text?.includes("却下")) {
+      throw new Error("rejected query visible in Active filter");
+    }
   });
   await check("Failed filter shows only failed queries", async () => {
     await page.click("button:has-text('Failed')");
     await page.waitForTimeout(500);
     const text = await page.textContent("body");
-    if (!text?.includes("却下")) throw new Error("no rejected queries in Failed filter");
+    if (!text?.includes("却下")) {
+      throw new Error("no rejected queries in Failed filter");
+    }
   });
   await check("All filter shows everything", async () => {
     await page.click("button:has-text('All')");
     await page.waitForTimeout(500);
     const text = await page.textContent("body");
-    if (!text?.includes("Browser E2E")) throw new Error("active query missing from All");
+    if (!text?.includes("Browser E2E")) {
+      throw new Error("active query missing from All");
+    }
   });
 
   // --- Dashboard UI ---
@@ -129,7 +142,9 @@ async function main() {
     await page.waitForSelector("text=Two-party binary bets", { timeout: 5000 });
   });
   await check("displays market listings", async () => {
-    const cards = await page.$$("[class*='card'], [class*='Card'], [class*='rounded']");
+    const cards = await page.$$(
+      "[class*='card'], [class*='Card'], [class*='rounded']",
+    );
     if (cards.length < 2) throw new Error(`only ${cards.length} cards found`);
   });
 
@@ -149,8 +164,12 @@ async function main() {
   // --- Cleanup: cancel the test query ---
   console.log("\n=== Cleanup ===");
   await check("cancel test query via API", async () => {
-    const queriesRes = await (await fetch(`${BASE}/queries`)).json() as Array<{ id: string; description: string }>;
-    const testQuery = queriesRes.find((q) => q.description.includes("Browser E2E"));
+    const queriesRes = await (await fetch(`${BASE}/queries`)).json() as Array<
+      { id: string; description: string }
+    >;
+    const testQuery = queriesRes.find((q) =>
+      q.description.includes("Browser E2E")
+    );
     if (testQuery) {
       await fetch(`${BASE}/queries/${testQuery.id}/cancel`, { method: "POST" });
     }

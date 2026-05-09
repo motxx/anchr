@@ -11,16 +11,16 @@
  */
 
 import {
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
   type getEncodedToken,
+  P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
 } from "@cashu/cashu-ts";
 import type { EscrowToken } from "@anchr/core-cashu/escrow";
 import type { FrostConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
-  getWalletAndConfig,
   encodeProofs,
+  getWalletAndConfig,
   loadAndSend,
 } from "@anchr/core-cashu/escrow-helpers";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
@@ -164,7 +164,11 @@ export function createDualKeyStore(): DualKeyStore {
       return entry;
     },
 
-    sign(swap_id: string, outcome: "a" | "b", message: Uint8Array): string | null {
+    sign(
+      swap_id: string,
+      outcome: "a" | "b",
+      message: Uint8Array,
+    ): string | null {
       const entry = entries.get(swap_id);
       if (!entry || entry.signed) return null;
 
@@ -262,8 +266,18 @@ export async function createFrostSwapPairTokens(
   });
 
   try {
-    const sendA = await loadAndSend(ctx.wallet, amount, partyAProofs, optionsAtoB);
-    const sendB = await loadAndSend(ctx.wallet, amount, partyBProofs, optionsBtoA);
+    const sendA = await loadAndSend(
+      ctx.wallet,
+      amount,
+      partyAProofs,
+      optionsAtoB,
+    );
+    const sendB = await loadAndSend(
+      ctx.wallet,
+      amount,
+      partyBProofs,
+      optionsBtoA,
+    );
 
     const tokenAtoB: EscrowToken = {
       token: encodeProofs(ctx.config.mintUrl, sendA),
@@ -281,7 +295,8 @@ export async function createFrostSwapPairTokens(
 
     return { tokenAtoB, tokenBtoA };
   } catch (error) {
-    log.error("Failed to create swap pair tokens:",
+    log.error(
+      "Failed to create swap pair tokens:",
       error instanceof Error ? error.message : error,
     );
     return null;

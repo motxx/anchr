@@ -16,26 +16,29 @@
  */
 
 import {
-  type Proof,
-  type Wallet,
   getDecodedToken,
   getEncodedToken,
+  type Proof,
   signP2PKProofs,
+  type Wallet,
 } from "@cashu/cashu-ts";
-import { createLockedToken, type ExchangeConfig } from "../src/exchange-protocol.ts";
+import {
+  createLockedToken,
+  type ExchangeConfig,
+} from "../src/exchange-protocol.ts";
 import { getOrCreateKeypair } from "./keypair.ts";
 import {
   createNip60Wallet,
   loadProofs as loadNip60Proofs,
-  publishProofs as publishNip60Proofs,
   type Nip60Wallet,
+  publishProofs as publishNip60Proofs,
   type TokenEntry,
 } from "../src/nip60.ts";
 import {
   fetchIncomingNutzaps,
+  type IncomingNutzap,
   redeemNutzap,
   sendNutzap as sendNutzapPrimitive,
-  type IncomingNutzap,
 } from "../src/nip61.ts";
 import { signProofs } from "./api.ts";
 
@@ -61,7 +64,9 @@ export async function initWallet(
   mintUrl: string,
   relays: string[] = [],
 ): Promise<Wallet> {
-  if (_wallet && _mintUrl === mintUrl && relays.join(",") === _relays.join(",")) {
+  if (
+    _wallet && _mintUrl === mintUrl && relays.join(",") === _relays.join(",")
+  ) {
     return _wallet;
   }
   const { Wallet: CashuWallet } = await import("@cashu/cashu-ts"); // allow-dynamic-import: keeps the cashu-ts bundle lazy — viewers who never open the wallet panel skip the download
@@ -292,7 +297,10 @@ export async function redeemMarketWinnings(
       const decoded = getDecodedToken(tok.cashu_token, knownKeysetIds);
       const proofs = decoded.proofs;
       if (proofs.length === 0) {
-        failures.push({ pair_id: tok.pair_id, error: "Held token has no proofs" });
+        failures.push({
+          pair_id: tok.pair_id,
+          error: "Held token has no proofs",
+        });
         continue;
       }
 
@@ -302,7 +310,8 @@ export async function redeemMarketWinnings(
       if (signResult.signed_count < secrets.length) {
         failures.push({
           pair_id: tok.pair_id,
-          error: `Oracle signed only ${signResult.signed_count}/${secrets.length} proofs`,
+          error:
+            `Oracle signed only ${signResult.signed_count}/${secrets.length} proofs`,
         });
         continue;
       }
@@ -337,7 +346,12 @@ export async function redeemMarketWinnings(
     }
   }
 
-  return { redeemed_pairs: redemptions.length, total_sats: totalSats, redemptions, failures };
+  return {
+    redeemed_pairs: redemptions.length,
+    total_sats: totalSats,
+    redemptions,
+    failures,
+  };
 }
 
 // Local hex helper — keypair.ts has its own; duplicated here to avoid a
@@ -358,7 +372,14 @@ export interface NutzapReceiveResult {
   /** Total sats added across the redeemed nutzaps (after mint swap fee). */
   total_sats: number;
   /** Per-nutzap detail for the UI to show "+1,000 sats from <pubkey>". */
-  redemptions: Array<{ event_id: string; sender_pubkey: string; amount_sats: number; comment?: string }>;
+  redemptions: Array<
+    {
+      event_id: string;
+      sender_pubkey: string;
+      amount_sats: number;
+      comment?: string;
+    }
+  >;
   /** Nutzaps that failed to redeem (already-spent, wrong mint, etc.). */
   failures: Array<{ event_id: string; error: string }>;
 }
@@ -394,7 +415,10 @@ export async function receiveIncomingNutzaps(
 
   for (const nz of nutzaps) {
     if (nz.mintUrl !== mintUrl) {
-      failures.push({ event_id: nz.eventId, error: `Wrong mint: ${nz.mintUrl}` });
+      failures.push({
+        event_id: nz.eventId,
+        error: `Wrong mint: ${nz.mintUrl}`,
+      });
       continue;
     }
     try {
@@ -420,7 +444,12 @@ export async function receiveIncomingNutzaps(
     }
   }
 
-  return { redeemed: redemptions.length, total_sats: totalSats, redemptions, failures };
+  return {
+    redeemed: redemptions.length,
+    total_sats: totalSats,
+    redemptions,
+    failures,
+  };
 }
 
 /**
@@ -437,7 +466,9 @@ export async function sendNutzap(input: {
   const wallet = await initWallet(input.mintUrl, _relays);
   const { secretKey } = getOrCreateKeypair();
   if (_relays.length === 0 || _nip60 === null) {
-    throw new Error("Nutzap requires NOSTR_RELAYS to be configured on the server");
+    throw new Error(
+      "Nutzap requires NOSTR_RELAYS to be configured on the server",
+    );
   }
 
   const senderProofs = await loadProofs();

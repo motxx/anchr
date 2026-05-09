@@ -1,14 +1,22 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
-import { getOracle, listOracles, registerOracle, resolveOracle } from "./registry.ts";
+import {
+  getOracle,
+  listOracles,
+  registerOracle,
+  resolveOracle,
+} from "./registry.ts";
 import type { Oracle, OracleAttestation } from "../../domain/oracle-types.ts";
 import type { Query, QueryResult } from "../../domain/types.ts";
 
 function makeFakeOracle(id: string, feePpm = 50_000): Oracle {
   return {
     info: { id, name: `Oracle ${id}`, fee_ppm: feePpm },
-    async verify(_query: Query, _result: QueryResult): Promise<OracleAttestation> {
+    async verify(
+      _query: Query,
+      _result: QueryResult,
+    ): Promise<OracleAttestation> {
       return {
         oracle_id: id,
         query_id: _query.id,
@@ -84,7 +92,8 @@ test("resolveOracle with explicit id checks acceptable set", () => {
   registerOracle(fake);
 
   // Oracle is in acceptable set → ok
-  expect(resolveOracle("test-oracle-2", ["test-oracle-2", BUILT_IN_ORACLE_ID])).toBe(fake);
+  expect(resolveOracle("test-oracle-2", ["test-oracle-2", BUILT_IN_ORACLE_ID]))
+    .toBe(fake);
 
   // Oracle is NOT in acceptable set → rejected
   expect(resolveOracle("test-oracle-2", [BUILT_IN_ORACLE_ID])).toBe(null);

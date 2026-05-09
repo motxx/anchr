@@ -17,16 +17,16 @@ import { expect } from "@std/expect";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import {
+  buildEscrowP2PKOptions,
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
-  buildEscrowP2PKOptions,
 } from "@anchr/core-cashu/escrow";
 import {
+  driveToProcessing,
+  makeEscrowInfo,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-  makeEscrowInfo,
-  driveToProcessing,
 } from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
 // =============================================================================
@@ -70,7 +70,10 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
 
   test("preimage is NOT returned to Oracle — only to Worker via submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
     // Oracle's verification returns preimage to the caller (Worker endpoint)
     const outcome = await service.submitEscrowResult(
@@ -99,7 +102,11 @@ describe("NUT-14: Worker cannot redeem without valid proof", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+      { oracleIds: ["strict-oracle"] },
+    );
 
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -214,7 +221,9 @@ describe("NUT-11: Timeout refund", () => {
     });
 
     expect(opts.locktime).toBe(locktimeSeconds);
-    const refundKeys = Array.isArray(opts.refundKeys) ? opts.refundKeys : [opts.refundKeys];
+    const refundKeys = Array.isArray(opts.refundKeys)
+      ? opts.refundKeys
+      : [opts.refundKeys];
     expect(refundKeys.length).toBe(1);
     expect(refundKeys[0]).toContain("r" + "0".repeat(63));
   });
@@ -247,7 +256,11 @@ describe("NUT-11: Timeout refund", () => {
 
     const query = service.createQuery(
       { description: "Reject refund test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
+      {
+        escrow: escrowInfo,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["strict-oracle"],
+      },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -277,7 +290,10 @@ describe("NUT-11: Timeout refund", () => {
 describe("Worker impersonation prevention", () => {
   test("wrong Worker cannot submit result for selected Worker", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -313,7 +329,9 @@ describe("Worker impersonation prevention", () => {
     expect(outcome.ok).toBe(true);
     // But HTLC token is now locked to other_worker ��� legit_worker can't redeem
     expect(service.getQuery(query.id)?.status).toBe("worker_selected");
-    expect(service.getQuery(query.id)?.escrow?.worker_pubkey).toBe("other_worker");
+    expect(service.getQuery(query.id)?.escrow?.worker_pubkey).toBe(
+      "other_worker",
+    );
   });
 });
 
@@ -325,7 +343,10 @@ describe("Oracle + Requester collusion limits", () => {
   test("Oracle withholding preimage: Worker loses but Oracle cannot profit", async () => {
     // Simulate: Oracle verifies valid proof but preimage store has been cleared
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
     // Oracle "withholds" by deleting preimage before result submission
     preimageStore.delete(entry.hash);
@@ -352,7 +373,11 @@ describe("Oracle + Requester collusion limits", () => {
 
     const query = service.createQuery(
       { description: "Settlement test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfo,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -384,7 +409,11 @@ describe("Oracle + Requester collusion limits", () => {
 
     const query = service.createQuery(
       { description: "Reject test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["strict-oracle"] },
+      {
+        escrow: escrowInfo,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["strict-oracle"],
+      },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -430,7 +459,9 @@ describe("Preimage reveal conditions", () => {
     const fail = makeServiceWithPreimage({
       mockOracle: makeMockOracle("fail-oracle", () => false),
     });
-    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, { oracleIds: ["fail-oracle"] });
+    const failCtx = await driveToProcessing(fail.service, fail.preimageStore, {
+      oracleIds: ["fail-oracle"],
+    });
     const failOutcome = await fail.service.submitEscrowResult(
       failCtx.query.id,
       { attachments: [] },
@@ -509,7 +540,10 @@ describe("HTLC state machine — invalid transitions blocked", () => {
 
   test("cannot submit result twice", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
     const first = await service.submitEscrowResult(
       query.id,
@@ -588,7 +622,9 @@ describe("Two-phase HTLC: Phase 1 (plain) vs Phase 2 (locked)", () => {
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys).toContain(`02${WORKER}`);
 
-    const refundKeys = Array.isArray(opts.refundKeys) ? opts.refundKeys : [opts.refundKeys];
+    const refundKeys = Array.isArray(opts.refundKeys)
+      ? opts.refundKeys
+      : [opts.refundKeys];
     expect(refundKeys).toContain(`02${REQUESTER}`);
   });
 

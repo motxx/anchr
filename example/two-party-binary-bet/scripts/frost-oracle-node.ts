@@ -21,19 +21,38 @@ const API_KEY = Deno.env.get("ORACLE_API_KEY")?.trim();
 const FROST_CONFIG_PATH = Deno.env.get("FROST_MARKET_CONFIG_PATH")?.trim();
 
 if (!FROST_CONFIG_PATH) {
-  console.error("ERROR: FROST_MARKET_CONFIG_PATH environment variable is required");
-  console.error("Run: deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts");
+  console.error(
+    "ERROR: FROST_MARKET_CONFIG_PATH environment variable is required",
+  );
+  console.error(
+    "Run: deno run --allow-all example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts",
+  );
   Deno.exit(1);
 }
 
 try {
-  const marketFrostConfig = await loadDualOutcomeFrostNodeConfigAsync(FROST_CONFIG_PATH, {
-    passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
-  });
-  console.log(`[${ORACLE_ID}] Loaded FROST market config from ${FROST_CONFIG_PATH}`);
-  console.log(`[${ORACLE_ID}] Signer ${marketFrostConfig.signer_index} of ${marketFrostConfig.total_signers} (threshold: ${marketFrostConfig.threshold})`);
-  console.log(`[${ORACLE_ID}] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
-  console.log(`[${ORACLE_ID}] NO  group: ${marketFrostConfig.group_pubkey_b.slice(0, 16)}...`);
+  const marketFrostConfig = await loadDualOutcomeFrostNodeConfigAsync(
+    FROST_CONFIG_PATH,
+    {
+      passphrase: Deno.env.get("FROST_KEY_PASSPHRASE"),
+    },
+  );
+  console.log(
+    `[${ORACLE_ID}] Loaded FROST market config from ${FROST_CONFIG_PATH}`,
+  );
+  console.log(
+    `[${ORACLE_ID}] Signer ${marketFrostConfig.signer_index} of ${marketFrostConfig.total_signers} (threshold: ${marketFrostConfig.threshold})`,
+  );
+  console.log(
+    `[${ORACLE_ID}] YES group: ${
+      marketFrostConfig.group_pubkey.slice(0, 16)
+    }...`,
+  );
+  console.log(
+    `[${ORACLE_ID}] NO  group: ${
+      marketFrostConfig.group_pubkey_b.slice(0, 16)
+    }...`,
+  );
 
   const { app } = buildMarketApiRoutes({
     apiKey: API_KEY,
@@ -44,6 +63,9 @@ try {
   console.log(`[${ORACLE_ID}] Starting on port ${ORACLE_PORT}`);
   Deno.serve({ port: ORACLE_PORT }, app.fetch);
 } catch (e) {
-  console.error(`[${ORACLE_ID}] Failed to start:`, e instanceof Error ? e.message : e);
+  console.error(
+    `[${ORACLE_ID}] Failed to start:`,
+    e instanceof Error ? e.message : e,
+  );
   Deno.exit(1);
 }

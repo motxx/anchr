@@ -25,7 +25,9 @@ export type MultiOracleResolver = (
   count: number,
 ) => Oracle[];
 
-export function toAttestationRecord(a: OracleAttestation): OracleAttestationRecord {
+export function toAttestationRecord(
+  a: OracleAttestation,
+): OracleAttestationRecord {
   return {
     oracle_id: a.oracle_id,
     passed: a.passed,
@@ -49,7 +51,13 @@ export async function verifyWithQuorum(
   const effectiveOracleId = query.oracle_ids?.length ? oracleId : undefined;
 
   if (!query.quorum) {
-    return verifySingleOracle(query, result, resolveOracle, effectiveOracleId, blossomKeys);
+    return verifySingleOracle(
+      query,
+      result,
+      resolveOracle,
+      effectiveOracleId,
+      blossomKeys,
+    );
   }
 
   return verifyQuorum(query, result, resolveMultiple, blossomKeys);
@@ -70,9 +78,11 @@ async function verifySingleOracle(
       verification: {
         passed: false,
         checks: [],
-        failures: [effectiveOracleId
-          ? `Oracle "${effectiveOracleId}" is not available or not accepted for this query`
-          : "No oracle available for this query"],
+        failures: [
+          effectiveOracleId
+            ? `Oracle "${effectiveOracleId}" is not available or not accepted for this query`
+            : "No oracle available for this query",
+        ],
       },
     };
   }
@@ -100,7 +110,11 @@ async function verifyQuorum(
     return {
       passed: false,
       attestations: [],
-      verification: { passed: false, checks: [], failures: ["No oracle registry with resolveMultiple support"] },
+      verification: {
+        passed: false,
+        checks: [],
+        failures: ["No oracle registry with resolveMultiple support"],
+      },
     };
   }
   const needed = query.quorum!.min_approvals + 2;
@@ -109,11 +123,21 @@ async function verifyQuorum(
     return {
       passed: false,
       attestations: [],
-      verification: { passed: false, checks: [], failures: [`Need ${query.quorum!.min_approvals} oracles but only ${oracles.length} available`] },
+      verification: {
+        passed: false,
+        checks: [],
+        failures: [
+          `Need ${
+            query.quorum!.min_approvals
+          } oracles but only ${oracles.length} available`,
+        ],
+      },
     };
   }
 
-  const rawAtts = await Promise.all(oracles.map((o) => o.verify(query, result, blossomKeys)));
+  const rawAtts = await Promise.all(
+    oracles.map((o) => o.verify(query, result, blossomKeys)),
+  );
   const records: OracleAttestationRecord[] = rawAtts.map(toAttestationRecord);
 
   const passCount = records.filter((a) => a.passed).length;

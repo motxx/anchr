@@ -134,8 +134,13 @@ describe("TLSNotary E2E", () => {
       );
     }
 
-    if (REQUIRE_CORE_INFRA && (!verifierReachable || !proverAvailable || !verifierBinAvailable)) {
-      throw new Error("TLSNotary core e2e infrastructure is required but not ready");
+    if (
+      REQUIRE_CORE_INFRA &&
+      (!verifierReachable || !proverAvailable || !verifierBinAvailable)
+    ) {
+      throw new Error(
+        "TLSNotary core e2e infrastructure is required but not ready",
+      );
     }
   });
 

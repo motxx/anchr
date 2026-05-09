@@ -1,6 +1,6 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getEncodedToken, getDecodedToken, type Proof } from "@cashu/cashu-ts";
+import { getDecodedToken, getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import {
   buildFrostP2PKOptions,
   createFrostEscrowProvider,
@@ -8,10 +8,14 @@ import {
 } from "./frost-p2pk.ts";
 import type { EscrowProvider } from "../../application/ports.ts";
 
-const WORKER_PUB = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const GROUP_PUB  = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const REFUND_PUB = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const OTHER_PUB  = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const WORKER_PUB =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const GROUP_PUB =
+  "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const REFUND_PUB =
+  "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const OTHER_PUB =
+  "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
 function makeP2PKToken(pubkeys: string[], amount = 100): string {
   const secret = JSON.stringify([
@@ -56,81 +60,110 @@ function createTestableProvider(groupPubkey: string) {
 
   const config: FrostEscrowConfig = { groupPubkey };
 
-  const provider: EscrowProvider & { _seed(ref: string, token: string): void } = {
-    async createHold() { return null; },
-    async bindWorker() { return null; },
+  const provider: EscrowProvider & { _seed(ref: string, token: string): void } =
+    {
+      async createHold() {
+        return null;
+      },
+      async bindWorker() {
+        return null;
+      },
 
-    async verify(escrow_ref, expected_sats) {
-      const entry = tokenMap.get(escrow_ref);
-      if (!entry) return { valid: false, error: "Unknown escrow reference" };
+      async verify(escrow_ref, expected_sats) {
+        const entry = tokenMap.get(escrow_ref);
+        if (!entry) return { valid: false, error: "Unknown escrow reference" };
 
-      try {
-        const decoded = getDecodedToken(entry.token);
-        const totalAmount = decoded.proofs.reduce((sum: number, p) => sum + p.amount, 0);
-        if (expected_sats && totalAmount < expected_sats) {
-          return { valid: false, amount_sats: totalAmount, error: `Insufficient amount: ${totalAmount} < ${expected_sats}` };
-        }
-        return { valid: true, amount_sats: totalAmount };
-      } catch {
-        return { valid: false, error: "Invalid token" };
-      }
-    },
-
-    async verifyLock(escrow_ref, _payment_hash, worker_pubkey) {
-      const entry = tokenMap.get(escrow_ref);
-      if (!entry) return { ok: false, message: "Unknown escrow reference" };
-
-      try {
-        const decoded = getDecodedToken(entry.token);
-        for (const proof of decoded.proofs) {
-          const secret = JSON.parse(proof.secret);
-          if (!Array.isArray(secret) || secret[0] !== "P2PK") {
-            return { ok: false, message: "Not a P2PK proof" };
-          }
-          const tags: string[][] = secret[1]?.tags ?? [];
-          const pubkeys = tags.find((t: string[]) => t[0] === "pubkeys");
-          if (!pubkeys) {
-            return { ok: false, message: "No pubkeys tag in P2PK proof" };
-          }
-          const hasWorker = pubkeys.slice(1).some((pk: string) =>
-            pk === worker_pubkey || pk === `02${worker_pubkey}` || pk === `03${worker_pubkey}`
+        try {
+          const decoded = getDecodedToken(entry.token);
+          const totalAmount = decoded.proofs.reduce(
+            (sum: number, p) => sum + p.amount,
+            0,
           );
-          const hasGroup = pubkeys.slice(1).some((pk: string) =>
-            pk === groupPubkey || pk === `02${groupPubkey}` || pk === `03${groupPubkey}`
-          );
-          if (!hasWorker) return { ok: false, message: "Worker pubkey not in P2PK lock" };
-          if (!hasGroup) return { ok: false, message: "Group pubkey not in P2PK lock" };
+          if (expected_sats && totalAmount < expected_sats) {
+            return {
+              valid: false,
+              amount_sats: totalAmount,
+              error: `Insufficient amount: ${totalAmount} < ${expected_sats}`,
+            };
+          }
+          return { valid: true, amount_sats: totalAmount };
+        } catch {
+          return { valid: false, error: "Invalid token" };
         }
-        return { ok: true };
-      } catch (error) {
-        return { ok: false, message: `P2PK verification failed: ${error instanceof Error ? error.message : error}` };
-      }
-    },
+      },
 
-    async settle() {
-      return {
-        settled: false,
-        error: "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
-      };
-    },
+      async verifyLock(escrow_ref, _payment_hash, worker_pubkey) {
+        const entry = tokenMap.get(escrow_ref);
+        if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
-    async cancel(escrow_ref) {
-      const deleted = tokenMap.delete(escrow_ref);
-      return { cancelled: deleted };
-    },
+        try {
+          const decoded = getDecodedToken(entry.token);
+          for (const proof of decoded.proofs) {
+            const secret = JSON.parse(proof.secret);
+            if (!Array.isArray(secret) || secret[0] !== "P2PK") {
+              return { ok: false, message: "Not a P2PK proof" };
+            }
+            const tags: string[][] = secret[1]?.tags ?? [];
+            const pubkeys = tags.find((t: string[]) => t[0] === "pubkeys");
+            if (!pubkeys) {
+              return { ok: false, message: "No pubkeys tag in P2PK proof" };
+            }
+            const hasWorker = pubkeys.slice(1).some((pk: string) =>
+              pk === worker_pubkey || pk === `02${worker_pubkey}` ||
+              pk === `03${worker_pubkey}`
+            );
+            const hasGroup = pubkeys.slice(1).some((pk: string) =>
+              pk === groupPubkey || pk === `02${groupPubkey}` ||
+              pk === `03${groupPubkey}`
+            );
+            if (!hasWorker) {
+              return { ok: false, message: "Worker pubkey not in P2PK lock" };
+            }
+            if (!hasGroup) {
+              return { ok: false, message: "Group pubkey not in P2PK lock" };
+            }
+          }
+          return { ok: true };
+        } catch (error) {
+          return {
+            ok: false,
+            message: `P2PK verification failed: ${
+              error instanceof Error ? error.message : error
+            }`,
+          };
+        }
+      },
 
-    _seed(ref: string, token: string) {
-      const decoded = getDecodedToken(token);
-      tokenMap.set(ref, { token, proofs: decoded.proofs });
-    },
-  };
+      async settle() {
+        return {
+          settled: false,
+          error:
+            "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+        };
+      },
+
+      async cancel(escrow_ref) {
+        const deleted = tokenMap.delete(escrow_ref);
+        return { cancelled: deleted };
+      },
+
+      _seed(ref: string, token: string) {
+        const decoded = getDecodedToken(token);
+        tokenMap.set(ref, { token, proofs: decoded.proofs });
+      },
+    };
 
   return provider;
 }
 
 describe("buildFrostP2PKOptions", () => {
   test("creates 2-of-2 P2PK lock with worker + group pubkey", () => {
-    const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, 1700000000);
+    const opts = buildFrostP2PKOptions(
+      WORKER_PUB,
+      GROUP_PUB,
+      REFUND_PUB,
+      1700000000,
+    );
 
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys).toContain(`02${WORKER_PUB}`);
@@ -139,24 +172,46 @@ describe("buildFrostP2PKOptions", () => {
   });
 
   test("sets n_sigs = 2 (both worker and group must sign)", () => {
-    const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, 1700000000);
+    const opts = buildFrostP2PKOptions(
+      WORKER_PUB,
+      GROUP_PUB,
+      REFUND_PUB,
+      1700000000,
+    );
     expect(opts.requiredSignatures).toBe(2);
   });
 
   test("sets locktime from parameter", () => {
     const locktime = 1800000000;
-    const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, locktime);
+    const opts = buildFrostP2PKOptions(
+      WORKER_PUB,
+      GROUP_PUB,
+      REFUND_PUB,
+      locktime,
+    );
     expect(opts.locktime).toBe(locktime);
   });
 
   test("sets requester refund key", () => {
-    const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, 1700000000);
-    const refundKeys = Array.isArray(opts.refundKeys) ? opts.refundKeys : [opts.refundKeys];
+    const opts = buildFrostP2PKOptions(
+      WORKER_PUB,
+      GROUP_PUB,
+      REFUND_PUB,
+      1700000000,
+    );
+    const refundKeys = Array.isArray(opts.refundKeys)
+      ? opts.refundKeys
+      : [opts.refundKeys];
     expect(refundKeys).toContain(`02${REFUND_PUB}`);
   });
 
   test("sets SIG_ALL flag", () => {
-    const opts = buildFrostP2PKOptions(WORKER_PUB, GROUP_PUB, REFUND_PUB, 1700000000);
+    const opts = buildFrostP2PKOptions(
+      WORKER_PUB,
+      GROUP_PUB,
+      REFUND_PUB,
+      1700000000,
+    );
     expect(opts.sigFlag).toBe("SIG_ALL");
   });
 });
@@ -205,7 +260,11 @@ describe("FROST EscrowProvider", () => {
 
   describe("verifyLock()", () => {
     test("returns failed for unknown escrow reference", async () => {
-      const result = await provider.verifyLock("nonexistent_ref", "", WORKER_PUB);
+      const result = await provider.verifyLock(
+        "nonexistent_ref",
+        "",
+        WORKER_PUB,
+      );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("Unknown escrow reference");
     });
@@ -275,7 +334,11 @@ describe("FROST EscrowProvider", () => {
       });
       provider._seed("ref_no_pubkeys", token);
 
-      const result = await provider.verifyLock("ref_no_pubkeys", "", WORKER_PUB);
+      const result = await provider.verifyLock(
+        "ref_no_pubkeys",
+        "",
+        WORKER_PUB,
+      );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("No pubkeys tag in P2PK proof");
     });
@@ -300,8 +363,18 @@ describe("FROST EscrowProvider", () => {
       const token = getEncodedToken({
         mint: "https://mint.example.com",
         proofs: [
-          { amount: 50, id: "test-keyset", secret: validSecret, C: "02" + "aa".repeat(32) },
-          { amount: 50, id: "test-keyset", secret: invalidSecret, C: "02" + "bb".repeat(32) },
+          {
+            amount: 50,
+            id: "test-keyset",
+            secret: validSecret,
+            C: "02" + "aa".repeat(32),
+          },
+          {
+            amount: 50,
+            id: "test-keyset",
+            secret: invalidSecret,
+            C: "02" + "bb".repeat(32),
+          },
         ],
       });
       provider._seed("ref_multi", token);
@@ -344,7 +417,9 @@ describe("FROST EscrowProvider", () => {
 
   describe("createHold()", () => {
     test("returns null when no sourceProofsResolver configured", async () => {
-      const realProvider = createFrostEscrowProvider({ groupPubkey: GROUP_PUB });
+      const realProvider = createFrostEscrowProvider({
+        groupPubkey: GROUP_PUB,
+      });
       const result = await realProvider.createHold({
         amount_sats: 100,
         payment_hash: "testhash",

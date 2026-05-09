@@ -23,7 +23,7 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
-import { type Proof, getEncodedToken } from "@cashu/cashu-ts";
+import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
@@ -31,9 +31,9 @@ import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
 import { normalizeQueryResult } from "../../packages/bounty/src/infrastructure/attachments.ts";
 import {
   checkInfraReady,
+  createWallet,
   payInvoiceViaLndUser,
   throttledMintProofs,
-  createWallet,
 } from "../helpers/regtest.ts";
 import process from "node:process";
 
@@ -47,7 +47,9 @@ const INFRA_READY = await checkInfraReady(MINT_URL);
 // before any test scope begins (avoids Deno sanitizer false positives).
 const sharedWallet = INFRA_READY ? await createWallet(MINT_URL) : undefined;
 
-async function mintCashuToken(amountSats: number): Promise<{ token: string; proofs: Proof[] }> {
+async function mintCashuToken(
+  amountSats: number,
+): Promise<{ token: string; proofs: Proof[] }> {
   const proofs = await throttledMintProofs(sharedWallet!, amountSats);
   const token = getEncodedToken({ mint: MINT_URL, proofs });
   return { token, proofs };
@@ -86,8 +88,16 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
 
   test("lnd-user has channel balance", async () => {
     const proc = spawn([
-      "docker", "compose", "exec", "-T", "lnd-user",
-      "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
+      "docker",
+      "compose",
+      "exec",
+      "-T",
+      "lnd-user",
+      "lncli",
+      "--network",
+      "regtest",
+      "--rpcserver",
+      "lnd-user:10009",
       "channelbalance",
     ], { stdout: "pipe", stderr: "pipe" });
     const stdout = await new Response(proc.stdout).text();
@@ -226,7 +236,9 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
 
     // Verify query bounty via detail endpoint
     const detailRes = await app.request(`http://localhost/queries/${query_id}`);
-    const detail = (await detailRes.json()) as { bounty: { amount_sats: number } };
+    const detail = (await detailRes.json()) as {
+      bounty: { amount_sats: number };
+    };
     expect(detail.bounty.amount_sats).toBe(BOUNTY_SATS);
   });
 });

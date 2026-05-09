@@ -9,7 +9,9 @@ export interface DSChipProps {
   onPress?: () => void;
 }
 
-export function DSChip({ label, icon, selected = false, onPress }: DSChipProps) {
+export function DSChip(
+  { label, icon, selected = false, onPress }: DSChipProps,
+) {
   return (
     <Pressable
       onPress={onPress}

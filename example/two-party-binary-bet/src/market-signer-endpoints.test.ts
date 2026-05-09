@@ -13,20 +13,20 @@
  *   - Unknown nonce_id → 409
  */
 
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import {
-  registerMarketRoutes,
   createMarketState,
-  type MarketState,
   type MarketRouteContext,
+  type MarketState,
+  registerMarketRoutes,
 } from "./server-routes.ts";
 import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
 import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -57,7 +57,9 @@ esac
 
 function teardownMockBinary() {
   _setFrostSignerPathForTest(undefined);
-  try { rmSync(mockDir, { recursive: true, force: true }); } catch { /* ok */ }
+  try {
+    rmSync(mockDir, { recursive: true, force: true });
+  } catch { /* ok */ }
 }
 
 /** Encode a string as hex for the "message" field. */
@@ -84,7 +86,9 @@ function makeFrostConfig(): DualOutcomeFrostNodeConfig {
 }
 
 /** No-op auth middleware for testing. */
-const noopAuth: MiddlewareHandler = async (_c, next) => { await next(); };
+const noopAuth: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
 
 /** Build a Hono app with market routes + FROST signer endpoints enabled. */
 function buildTestApp(stateOverrides?: Partial<MarketState>): Hono {
@@ -109,7 +113,9 @@ function buildTestApp(stateOverrides?: Partial<MarketState>): Hono {
 }
 
 /** Build a test app and pre-populate a market in the state. */
-function buildTestAppWithMarket(market: TwoPartyBinaryBet): { app: Hono; state: MarketState } {
+function buildTestAppWithMarket(
+  market: TwoPartyBinaryBet,
+): { app: Hono; state: MarketState } {
   const frostConfig = makeFrostConfig();
   const state = createMarketState({ frostConfig });
   state.markets.set(market.id, market);
@@ -511,7 +517,9 @@ describe("market FROST signer — frost-cli unavailable", () => {
 
     const failDir = mkdtempSync(join(tmpdir(), "anchr-market-signer-fail-"));
     const failPath = join(failDir, "frost-signer");
-    writeFileSync(failPath, `#!/bin/sh\necho "error" >&2\nexit 1\n`, { mode: 0o755 });
+    writeFileSync(failPath, `#!/bin/sh\necho "error" >&2\nexit 1\n`, {
+      mode: 0o755,
+    });
     _setFrostSignerPathForTest(failPath);
 
     const r2Res = await app.request("/frost/signer/round2", {
@@ -526,7 +534,9 @@ describe("market FROST signer — frost-cli unavailable", () => {
 
     expect(r2Res.status).toBe(500);
 
-    try { rmSync(failDir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(failDir, { recursive: true, force: true });
+    } catch { /* ok */ }
   });
 });
 
@@ -564,7 +574,11 @@ describe("market FROST signer — endpoints not registered without FROST config"
     const res = await app.request("/frost/signer/round2", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ commitments: "{}", message: "aabb", nonce_id: "x" }),
+      body: JSON.stringify({
+        commitments: "{}",
+        message: "aabb",
+        nonce_id: "x",
+      }),
     });
 
     expect(res.status).toBe(404);

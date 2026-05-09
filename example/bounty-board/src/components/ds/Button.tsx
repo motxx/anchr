@@ -1,11 +1,19 @@
 import React from "react";
-import { Pressable, Text, ActivityIndicator, type PressableProps } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  type PressableProps,
+  Text,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
-const VARIANT_CLASSES: Record<Variant, { container: string; text: string; active: string }> = {
+const VARIANT_CLASSES: Record<
+  Variant,
+  { container: string; text: string; active: string }
+> = {
   primary: {
     container: "bg-primary",
     text: "text-primary-foreground font-semibold",
@@ -28,7 +36,10 @@ const VARIANT_CLASSES: Record<Variant, { container: string; text: string; active
   },
 };
 
-const SIZE_CLASSES: Record<Size, { container: string; text: string; icon: number }> = {
+const SIZE_CLASSES: Record<
+  Size,
+  { container: string; text: string; icon: number }
+> = {
   sm: { container: "py-2 px-3 rounded-lg", text: "text-xs", icon: 14 },
   md: { container: "py-3 px-4 rounded-xl", text: "text-sm", icon: 16 },
   lg: { container: "py-4 px-5 rounded-xl", text: "text-base", icon: 20 },
@@ -66,11 +77,22 @@ export function DSButton({
       } ${fullWidth ? "w-full" : ""} ${className}`}
       {...props}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color={variant === "primary" ? "#fff" : "#a1a1aa"} />
-      ) : icon ? (
-        <Ionicons name={icon} size={s.icon} color={variant === "primary" ? "#fff" : "#a1a1aa"} />
-      ) : null}
+      {loading
+        ? (
+          <ActivityIndicator
+            size="small"
+            color={variant === "primary" ? "#fff" : "#a1a1aa"}
+          />
+        )
+        : icon
+        ? (
+          <Ionicons
+            name={icon}
+            size={s.icon}
+            color={variant === "primary" ? "#fff" : "#a1a1aa"}
+          />
+        )
+        : null}
       <Text className={`${v.text} ${s.text}`}>{label}</Text>
     </Pressable>
   );

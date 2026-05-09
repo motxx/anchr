@@ -1,4 +1,4 @@
-import { test, describe } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { verifyReceivedToken } from "./exchange-protocol.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
@@ -286,10 +286,10 @@ describe("verifyReceivedToken", () => {
     // aggregate pubkeys. verifyReceivedToken must normalize both sides before
     // comparing, otherwise the same key is rejected over a representation
     // difference.
-    const xOnlyGroup = makeKeypair().pubkey;       // 64 hex chars
-    const xOnlyMine = makeKeypair().pubkey;        // 64 hex chars
-    const compressedGroup = "02" + xOnlyGroup;     // 66 hex chars
-    const compressedMine = "02" + xOnlyMine;       // 66 hex chars
+    const xOnlyGroup = makeKeypair().pubkey; // 64 hex chars
+    const xOnlyMine = makeKeypair().pubkey; // 64 hex chars
+    const compressedGroup = "02" + xOnlyGroup; // 66 hex chars
+    const compressedMine = "02" + xOnlyMine; // 66 hex chars
 
     const proof = mockP2PKProof({
       amount: 64,

@@ -71,7 +71,11 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
 test("buildOracleAnnouncementEvent includes relay tags when provided", () => {
   const identity = generateEphemeralIdentity();
   const relayUrls = ["wss://relay1.example.com", "wss://relay2.example.com"];
-  const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO, relayUrls);
+  const event = buildOracleAnnouncementEvent(
+    identity,
+    FULL_ORACLE_INFO,
+    relayUrls,
+  );
 
   const relayTags = event.tags.filter((t) => t[0] === "relay").map((t) => t[1]);
   expect(relayTags).toEqual(relayUrls);
@@ -206,7 +210,9 @@ test("round-trip: build then parse preserves all fields", () => {
   expect(parsed!.endpoint).toBe(FULL_ORACLE_INFO.endpoint);
   expect(parsed!.fee_ppm).toBe(FULL_ORACLE_INFO.fee_ppm);
   expect(parsed!.supported_factors).toEqual(FULL_ORACLE_INFO.supported_factors);
-  expect(parsed!.supported_escrow_types).toEqual(FULL_ORACLE_INFO.supported_escrow_types);
+  expect(parsed!.supported_escrow_types).toEqual(
+    FULL_ORACLE_INFO.supported_escrow_types,
+  );
   expect(parsed!.min_bounty_sats).toBe(FULL_ORACLE_INFO.min_bounty_sats);
   expect(parsed!.max_bounty_sats).toBe(FULL_ORACLE_INFO.max_bounty_sats);
   expect(parsed!.description).toBe(FULL_ORACLE_INFO.description);

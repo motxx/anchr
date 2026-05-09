@@ -3,11 +3,11 @@ import { expect } from "@std/expect";
 
 import {
   DEFINED_SCHEMAS,
+  InvalidSchemaUriError,
   isSchemaUri,
   resolveProducer,
   resolveVerifier,
   UnknownSchemaError,
-  InvalidSchemaUriError,
 } from "./schema.ts";
 import type { SchemaProducer, SchemaVerifier } from "./types.ts";
 

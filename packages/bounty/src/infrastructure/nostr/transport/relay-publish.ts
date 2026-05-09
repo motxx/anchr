@@ -28,7 +28,10 @@ export function publishQueryToRelay(query: Query): void {
     oracle_ids: query.oracle_ids,
     verification_requirements: query.verification_requirements,
     bounty: query.bounty?.escrow_token
-      ? { mint: Deno.env.get("CASHU_MINT_URL") ?? "", token: query.bounty.escrow_token }
+      ? {
+        mint: Deno.env.get("CASHU_MINT_URL") ?? "",
+        token: query.bounty.escrow_token,
+      }
       : undefined,
   }, query.location_hint);
 
@@ -37,16 +40,22 @@ export function publishQueryToRelay(query: Query): void {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       const result = await publishEvent(event);
       if (result.successes.length > 0) {
-        log.error(`Query ${query.id} published to ${result.successes.length} relay(s)`);
+        log.error(
+          `Query ${query.id} published to ${result.successes.length} relay(s)`,
+        );
         return;
       }
       if (attempt < MAX_RETRIES) {
         const delaySec = attempt * 2;
-        log.error(`Query ${query.id} publish failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`);
+        log.error(
+          `Query ${query.id} publish failed (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`,
+        );
         await new Promise((r) => setTimeout(r, delaySec * 1000));
       }
     }
-    log.error(`Query ${query.id} failed to publish after ${MAX_RETRIES} attempts`);
+    log.error(
+      `Query ${query.id} failed to publish after ${MAX_RETRIES} attempts`,
+    );
   })().catch((err) => {
     log.error("Failed to publish query:", err);
   });

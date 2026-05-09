@@ -63,14 +63,20 @@ export class OracleResponseError extends Error {
  * Default OracleClient that talks to an HTTP oracle exposing
  * `POST /hash` and returning `{ hash: "<hex>" }`.
  */
-export function createHttpOracleClient(options: HttpOracleOptions): OracleClient {
+export function createHttpOracleClient(
+  options: HttpOracleOptions,
+): OracleClient {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const endpoint = options.endpoint.replace(/\/$/, "");
   const oraclePubkey = options.oraclePubkey;
 
   return {
-    async requestHash(queryId: string): Promise<{ hash: string; oraclePubkey: string }> {
-      const headers: Record<string, string> = { "content-type": "application/json" };
+    async requestHash(
+      queryId: string,
+    ): Promise<{ hash: string; oraclePubkey: string }> {
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+      };
       if (options.apiKey) headers["authorization"] = `Bearer ${options.apiKey}`;
 
       const res = await fetchImpl(`${endpoint}/hash`, {

@@ -2,13 +2,16 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
 import {
+  createQueryService,
+  createQueryStore,
+} from "../../packages/bounty/src/application/query-service.ts";
+import {
+  driveToProcessing,
+  makeEscrowInfo,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-  makeEscrowInfo,
-  driveToProcessing,
 } from "../../packages/bounty/src/testing/protocol-helpers.ts";
 
 describe("Attack: Preimage Isolation", () => {
@@ -26,13 +29,26 @@ describe("Attack: Preimage Isolation", () => {
 
     const q1 = service.createQuery(
       { description: "Query 1" },
-      { escrow: escrowInfo1, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfo1,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
-    service.recordQuote(q1.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(q1.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
-    const outcome1 = await service.submitEscrowResult(q1.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome1 = await service.submitEscrowResult(
+      q1.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
+    );
     expect(outcome1.ok).toBe(true);
     expect(outcome1.preimage).toBe(entry1.preimage);
 
@@ -48,13 +64,26 @@ describe("Attack: Preimage Isolation", () => {
 
     const q2 = service.createQuery(
       { description: "Query 2 reuse" },
-      { escrow: escrowInfo2, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfo2,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
-    service.recordQuote(q2.id, { worker_pubkey: "w2", quote_event_id: "e2", received_at: Date.now() });
+    service.recordQuote(q2.id, {
+      worker_pubkey: "w2",
+      quote_event_id: "e2",
+      received_at: Date.now(),
+    });
     await service.selectWorker(q2.id, "w2", makeFakeToken(100));
     service.beginWork(q2.id);
 
-    const outcome2 = await service.submitEscrowResult(q2.id, { attachments: [] }, "w2", "test-oracle");
+    const outcome2 = await service.submitEscrowResult(
+      q2.id,
+      { attachments: [] },
+      "w2",
+      "test-oracle",
+    );
     expect(outcome2.ok).toBe(true);
     // Preimage was deleted on the first query's reveal — cannot be re-revealed even with same hash
     expect(outcome2.preimage).toBeUndefined();
@@ -64,7 +93,11 @@ describe("Attack: Preimage Isolation", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["strict-oracle"] });
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+      { oracleIds: ["strict-oracle"] },
+    );
 
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -81,14 +114,27 @@ describe("Attack: Preimage Isolation", () => {
 
   test("deleted preimage cannot be re-requested via second submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
-    const first = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const first = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(first.ok).toBe(true);
     expect(first.preimage).toBe(entry.preimage);
     expect(preimageStore.getPreimage(entry.hash)).toBeNull();
 
-    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(second.ok).toBe(false);
     expect(second.preimage).toBeUndefined();
   });
@@ -103,7 +149,11 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Cancel attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
@@ -128,12 +178,16 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expiry attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     // Wait past the 1ms ttl so the expiry sweep observes it as expired
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
 
     const expired = service.expireQueries();
     expect(expired).toBeGreaterThanOrEqual(1);
@@ -157,40 +211,65 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expired submit" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     service.expireQueries();
 
-    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
   });
 
   test("double-submit by worker — second attempt fails, first preimage valid", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
-    const first = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const first = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(first.ok).toBe(true);
     expect(first.preimage).toBe(entry.preimage);
 
-    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not processing");
     expect(second.preimage).toBeUndefined();
   });
 });
 
-
 describe("Attack: Oracle Manipulation", () => {
   test("dishonest oracle approves garbage — preimage still revealed (oracle judgment is final)", async () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("rubber-stamp", () => true),
     });
-    const { query, entry, workerPub } = await driveToProcessing(service, preimageStore, { oracleIds: ["rubber-stamp"] });
+    const { query, entry, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+      { oracleIds: ["rubber-stamp"] },
+    );
 
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -212,13 +291,26 @@ describe("Attack: Oracle Manipulation", () => {
     const { escrowInfo: escrowInfo1 } = makeEscrowInfo(preimageStore);
     const q1 = service.createQuery(
       { description: "Flip-flop Q1" },
-      { escrow: escrowInfo1, bounty: { amount_sats: 100 }, oracleIds: ["flip-oracle"] },
+      {
+        escrow: escrowInfo1,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["flip-oracle"],
+      },
     );
-    service.recordQuote(q1.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(q1.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
-    const outcome1 = await service.submitEscrowResult(q1.id, { attachments: [] }, "w1", "flip-oracle");
+    const outcome1 = await service.submitEscrowResult(
+      q1.id,
+      { attachments: [] },
+      "w1",
+      "flip-oracle",
+    );
     expect(outcome1.ok).toBe(false);
     expect(outcome1.preimage).toBeUndefined();
 
@@ -227,13 +319,26 @@ describe("Attack: Oracle Manipulation", () => {
     const { escrowInfo: escrowInfo2, entry: entry2 } = makeEscrowInfo(ps2);
     const q2 = service2.createQuery(
       { description: "Flip-flop Q2" },
-      { escrow: escrowInfo2, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfo2,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
-    service2.recordQuote(q2.id, { worker_pubkey: "w2", quote_event_id: "e2", received_at: Date.now() });
+    service2.recordQuote(q2.id, {
+      worker_pubkey: "w2",
+      quote_event_id: "e2",
+      received_at: Date.now(),
+    });
     await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
     service2.beginWork(q2.id);
 
-    const outcome2 = await service2.submitEscrowResult(q2.id, { attachments: [] }, "w2", "test-oracle");
+    const outcome2 = await service2.submitEscrowResult(
+      q2.id,
+      { attachments: [] },
+      "w2",
+      "test-oracle",
+    );
     expect(outcome2.ok).toBe(true);
     expect(outcome2.preimage).toBe(entry2.preimage);
   });
@@ -259,11 +364,20 @@ describe("Attack: Oracle Manipulation", () => {
         quorum: { min_approvals: 2 },
       },
     );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
-    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "oracle-pass");
+    const outcome = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "oracle-pass",
+    );
     // 1 pass out of 3 with min_approvals=2 — quorum not met, must reject
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -273,7 +387,11 @@ describe("Attack: Oracle Manipulation", () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      preimageStore,
+    });
 
     const entry = preimageStore.create();
     const escrowInfo = {
@@ -288,11 +406,20 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "No oracle" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() });
+    service.recordQuote(query.id, {
+      worker_pubkey: "w1",
+      quote_event_id: "e1",
+      received_at: Date.now(),
+    });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
-    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "nonexistent-oracle");
+    const outcome = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "nonexistent-oracle",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
   });
@@ -308,7 +435,12 @@ describe("Attack: State Machine — illegal transitions", () => {
       { escrow: escrowInfo },
     );
 
-    const outcome = await service.submitEscrowResult(query.id, { attachments: [] }, "w1", "test-oracle");
+    const outcome = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      "w1",
+      "test-oracle",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
     expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
@@ -316,13 +448,26 @@ describe("Attack: State Machine — illegal transitions", () => {
 
   test("revert approved to processing: submit another result after approval", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(service, preimageStore);
+    const { query, workerPub } = await driveToProcessing(
+      service,
+      preimageStore,
+    );
 
-    const approval = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const approval = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(approval.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("approved");
 
-    const second = await service.submitEscrowResult(query.id, { attachments: [] }, workerPub, "test-oracle");
+    const second = await service.submitEscrowResult(
+      query.id,
+      { attachments: [] },
+      workerPub,
+      "test-oracle",
+    );
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not processing");
     expect(service.getQuery(query.id)?.status).toBe("approved");
@@ -356,30 +501,54 @@ describe("Attack: Cross-Query", () => {
   test("worker accepted on query A tries to submit on query B — fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
-    const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(preimageStore);
+    const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(
+      preimageStore,
+    );
     const qA = service.createQuery(
       { description: "Query A" },
-      { escrow: escrowInfoA, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfoA,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
-    service.recordQuote(qA.id, { worker_pubkey: "worker_a", quote_event_id: "eA", received_at: Date.now() });
+    service.recordQuote(qA.id, {
+      worker_pubkey: "worker_a",
+      quote_event_id: "eA",
+      received_at: Date.now(),
+    });
     await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
-    const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(preimageStore);
+    const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(
+      preimageStore,
+    );
     const qB = service.createQuery(
       { description: "Query B" },
-      { escrow: escrowInfoB, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfoB,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
-    service.recordQuote(qB.id, { worker_pubkey: "worker_b", quote_event_id: "eB", received_at: Date.now() });
+    service.recordQuote(qB.id, {
+      worker_pubkey: "worker_b",
+      quote_event_id: "eB",
+      received_at: Date.now(),
+    });
     await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));
     service.beginWork(qB.id);
 
-    const outcome = await service.submitEscrowResult(qB.id, { attachments: [] }, "worker_a", "test-oracle");
+    const outcome = await service.submitEscrowResult(
+      qB.id,
+      { attachments: [] },
+      "worker_a",
+      "test-oracle",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
 
     // Query B's state must remain unaffected by the cross-query attempt
     expect(service.getQuery(qB.id)?.status).toBe("processing");
   });
-
 });

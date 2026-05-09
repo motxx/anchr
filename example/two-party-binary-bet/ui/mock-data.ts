@@ -1,5 +1,16 @@
-export type MarketCategory = "crypto" | "sports" | "politics" | "economics" | "custom";
-export type MarketStatus = "open" | "closed" | "resolving" | "resolved_yes" | "resolved_no" | "expired";
+export type MarketCategory =
+  | "crypto"
+  | "sports"
+  | "politics"
+  | "economics"
+  | "custom";
+export type MarketStatus =
+  | "open"
+  | "closed"
+  | "resolving"
+  | "resolved_yes"
+  | "resolved_no"
+  | "expired";
 
 export interface ResolutionCondition {
   type: string;
@@ -40,7 +51,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "a1b2c3d4e5f6",
     title: "Will BTC/JPY exceed ¥15,000,000 by end of April 2026?",
-    description: "Resolves YES if the best bid price on bitFlyer BTC/JPY market is above 15,000,000 JPY at the resolution deadline. Verified via TLSNotary proof from api.bitflyer.com.",
+    description:
+      "Resolves YES if the best bid price on bitFlyer BTC/JPY market is above 15,000,000 JPY at the resolution deadline. Verified via TLSNotary proof from api.bitflyer.com.",
     category: "crypto",
     resolution_url: "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY",
     resolution_deadline: now + 24 * DAY,
@@ -60,7 +72,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "b2c3d4e5f6a1",
     title: "Will Nostr reach 10M monthly active users by July 2026?",
-    description: "Resolves YES if nostr.band analytics API reports ≥10,000,000 unique pubkeys with at least one event in the 30 days prior to the resolution deadline.",
+    description:
+      "Resolves YES if nostr.band analytics API reports ≥10,000,000 unique pubkeys with at least one event in the 30 days prior to the resolution deadline.",
     category: "custom",
     resolution_url: "https://api.nostr.band/v0/stats",
     resolution_deadline: now + 90 * DAY,
@@ -80,9 +93,11 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "c3d4e5f6a1b2",
     title: "Will the Fed cut rates at the June 2026 FOMC meeting?",
-    description: "Resolves YES if the Federal Reserve announces a reduction in the federal funds target rate at or after the June 2026 FOMC meeting. Verified via TLSNotary proof from the Fed's official press release.",
+    description:
+      "Resolves YES if the Federal Reserve announces a reduction in the federal funds target rate at or after the June 2026 FOMC meeting. Verified via TLSNotary proof from the Fed's official press release.",
     category: "economics",
-    resolution_url: "https://www.federalreserve.gov/newsevents/pressreleases.htm",
+    resolution_url:
+      "https://www.federalreserve.gov/newsevents/pressreleases.htm",
     resolution_deadline: now + 60 * DAY,
     yes_pool_sats: 670_000,
     no_pool_sats: 530_000,
@@ -100,7 +115,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "d4e5f6a1b2c3",
     title: "Will ETH/BTC ratio go below 0.01 in 2026?",
-    description: "Resolves YES if the ETH/BTC trading pair drops below 0.01 at any point before the resolution deadline, as verified by TLSNotary proof from a major exchange API.",
+    description:
+      "Resolves YES if the ETH/BTC trading pair drops below 0.01 at any point before the resolution deadline, as verified by TLSNotary proof from a major exchange API.",
     category: "crypto",
     resolution_url: "https://api.binance.com/api/v3/ticker/price?symbol=ETHBTC",
     resolution_deadline: now + 180 * DAY,
@@ -120,7 +136,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "e5f6a1b2c3d4",
     title: "Will Japan legalize Bitcoin as legal tender by 2027?",
-    description: "Resolves YES if Japan officially recognizes Bitcoin as legal tender (not just a legal payment method) before January 1, 2027.",
+    description:
+      "Resolves YES if Japan officially recognizes Bitcoin as legal tender (not just a legal payment method) before January 1, 2027.",
     category: "politics",
     resolution_url: "https://www.japantimes.co.jp/tag/bitcoin/",
     resolution_deadline: now + 270 * DAY,
@@ -140,9 +157,11 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "f6a1b2c3d4e5",
     title: "Did BTC/USD close above $100K on March 31, 2026?",
-    description: "Resolved via TLSNotary proof from CoinGecko API. BTC closed at $103,450 — condition met.",
+    description:
+      "Resolved via TLSNotary proof from CoinGecko API. BTC closed at $103,450 — condition met.",
     category: "crypto",
-    resolution_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    resolution_url:
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
     resolution_deadline: now - 6 * DAY,
     yes_pool_sats: 890_000,
     no_pool_sats: 340_000,
@@ -160,7 +179,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "g7b2c3d4e5f6",
     title: "Will Lightning Network capacity exceed 10,000 BTC by June 2026?",
-    description: "Resolves YES if total Lightning Network capacity exceeds 10,000 BTC as reported by mempool.space API.",
+    description:
+      "Resolves YES if total Lightning Network capacity exceeds 10,000 BTC as reported by mempool.space API.",
     category: "crypto",
     resolution_url: "https://mempool.space/api/v1/lightning/statistics/latest",
     resolution_deadline: now + 75 * DAY,
@@ -180,7 +200,8 @@ export const MOCK_MARKETS: Market[] = [
   {
     id: "h8c3d4e5f6a1",
     title: "Will the 2026 FIFA World Cup final have over 3.5 goals?",
-    description: "Resolves YES if the total number of goals scored in the 2026 FIFA World Cup final match (including extra time) exceeds 3.",
+    description:
+      "Resolves YES if the total number of goals scored in the 2026 FIFA World Cup final match (including extra time) exceeds 3.",
     category: "sports",
     resolution_url: "https://api.football-data.org/v4/competitions/WC/matches",
     resolution_deadline: now + 100 * DAY,

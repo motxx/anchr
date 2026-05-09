@@ -41,7 +41,8 @@ import process from "node:process";
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const RELAY_URL = process.env.NOSTR_RELAY_URL ?? "ws://localhost:7777";
 
-const INFRA_READY = await checkInfraReady(MINT_URL) && await isRelayReachable(RELAY_URL);
+const INFRA_READY = await checkInfraReady(MINT_URL) &&
+  await isRelayReachable(RELAY_URL);
 
 const suite = INFRA_READY ? describe : describe.ignore;
 
@@ -74,7 +75,10 @@ suite("e2e: NIP-61 nutzap (regtest Cashu + Nostr relay)", () => {
         pool,
       });
       expect(sendResult.eventId).toMatch(/^[0-9a-f]{64}$/);
-      const senderChange = sendResult.keepProofs.reduce((s, p) => s + p.amount, 0);
+      const senderChange = sendResult.keepProofs.reduce(
+        (s, p) => s + p.amount,
+        0,
+      );
       // Sender keeps `FUND - ZAP - fee`. Nutshell input_fee_ppk=100 ≈ 1 sat.
       expect(senderChange).toBeLessThanOrEqual(FUND - ZAP);
       expect(senderChange).toBeGreaterThanOrEqual(FUND - ZAP - 5);
@@ -82,7 +86,11 @@ suite("e2e: NIP-61 nutzap (regtest Cashu + Nostr relay)", () => {
       // Recipient queries the relay for nutzaps targeting them.
       // Allow a beat for the relay to flush the event.
       await new Promise((r) => setTimeout(r, 200));
-      const incoming = await fetchIncomingNutzaps(pool, [RELAY_URL], recipientPk);
+      const incoming = await fetchIncomingNutzaps(
+        pool,
+        [RELAY_URL],
+        recipientPk,
+      );
       expect(incoming.length).toBeGreaterThanOrEqual(1);
       const nz = incoming.find((n) => n.eventId === sendResult.eventId);
       expect(nz).toBeTruthy();
@@ -135,7 +143,11 @@ suite("e2e: NIP-61 nutzap (regtest Cashu + Nostr relay)", () => {
       void evePk;
 
       await new Promise((r) => setTimeout(r, 200));
-      const incoming = await fetchIncomingNutzaps(pool, [RELAY_URL], aliceXOnly);
+      const incoming = await fetchIncomingNutzaps(
+        pool,
+        [RELAY_URL],
+        aliceXOnly,
+      );
       expect(incoming.length).toBeGreaterThanOrEqual(1);
 
       // Eve gets her hands on alice's nutzap event somehow (the relay is

@@ -50,12 +50,16 @@ Deno.serve({ port: PORT }, (req) => {
   const match = url.pathname.match(/^\/api\/flights\/(\w+)$/);
 
   if (!match) {
-    return Response.json({ error: "Not found. Try /api/flights/NH123" }, { status: 404 });
+    return Response.json({ error: "Not found. Try /api/flights/NH123" }, {
+      status: 404,
+    });
   }
 
   const base = flights[match[1]];
   if (!base) {
-    return Response.json({ error: `Flight ${match[1]} not found` }, { status: 404 });
+    return Response.json({ error: `Flight ${match[1]} not found` }, {
+      status: 404,
+    });
   }
 
   const elapsed = (Date.now() - startTime) / 1000;
@@ -70,7 +74,8 @@ Deno.serve({ port: PORT }, (req) => {
       status: "delayed",
       delay_minutes: 185,
       actual_departure: "2026-04-05T13:05:00Z",
-      message: "Delayed due to mechanical issues. We apologize for the inconvenience.",
+      message:
+        "Delayed due to mechanical issues. We apologize for the inconvenience.",
     });
   }
 

@@ -1,13 +1,25 @@
 import React from "react";
-import { View, ScrollView, ActivityIndicator, Pressable } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSCard, DSSection, DSBadge, DSSatsAmount, DSDivider, DSButton } from "../../../src/components/ds/index.ts";
+import {
+  DSBadge,
+  DSButton,
+  DSCard,
+  DSDivider,
+  DSSatsAmount,
+  DSSection,
+  DSText,
+} from "../../../src/components/ds/index.ts";
 import { StatusTimeline } from "../../../src/components/bounty/StatusTimeline.tsx";
 import { VerificationResults } from "../../../src/components/bounty/VerificationResults.tsx";
 import { useQueryDetail } from "../../../src/hooks/useQueries.ts";
 import { useAuthStore } from "../../../src/store/auth.ts";
-import { timeLeft, isExpired, formatShortTime } from "../../../src/utils/time.ts";
+import {
+  formatShortTime,
+  isExpired,
+  timeLeft,
+} from "../../../src/utils/time.ts";
 import { formatStatus } from "../../../src/utils/format.ts";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -51,14 +63,25 @@ export default function BountyDetailScreen() {
       <View className="px-4 gap-3">
         <DSCard>
           <View className="flex-row items-center justify-between mb-2">
-            <DSBadge label={formatStatus(bounty.status)} variant={
-              bounty.status === "approved" ? "success" :
-              bounty.status === "rejected" ? "error" :
-              expired ? "muted" : "default"
-            } />
+            <DSBadge
+              label={formatStatus(bounty.status)}
+              variant={bounty.status === "approved"
+                ? "success"
+                : bounty.status === "rejected"
+                ? "error"
+                : expired
+                ? "muted"
+                : "default"}
+            />
             <View className="flex-row items-center gap-1">
-              <Ionicons name={isPhoto ? "camera" : "globe"} size={14} color="#a1a1aa" />
-              <DSText variant="caption" muted>{isPhoto ? "Photo" : "Web Proof"}</DSText>
+              <Ionicons
+                name={isPhoto ? "camera" : "globe"}
+                size={14}
+                color="#a1a1aa"
+              />
+              <DSText variant="caption" muted>
+                {isPhoto ? "Photo" : "Web Proof"}
+              </DSText>
             </View>
           </View>
 
@@ -74,7 +97,11 @@ export default function BountyDetailScreen() {
 
             <View className="flex-row items-center justify-between">
               <DSText variant="body" muted>Time Left</DSText>
-              <DSText variant="body" weight="medium" color={expired ? "text-destructive" : undefined}>
+              <DSText
+                variant="body"
+                weight="medium"
+                color={expired ? "text-destructive" : undefined}
+              >
                 {expired ? "Expired" : timeLeft(bounty.expires_at)}
               </DSText>
             </View>
@@ -88,7 +115,9 @@ export default function BountyDetailScreen() {
 
             <View className="flex-row items-center justify-between">
               <DSText variant="body" muted>Created</DSText>
-              <DSText variant="body">{formatShortTime(bounty.created_at)}</DSText>
+              <DSText variant="body">
+                {formatShortTime(bounty.created_at)}
+              </DSText>
             </View>
 
             <View className="flex-row items-center justify-between">
@@ -107,7 +136,9 @@ export default function BountyDetailScreen() {
               {bounty.tlsn_requirements.conditions?.map((c, i) => (
                 <View key={i} className="flex-row items-center gap-2 mt-1">
                   <Ionicons name="code-slash" size={12} color="#a1a1aa" />
-                  <DSText variant="caption" muted>{c.type}: {c.expression}</DSText>
+                  <DSText variant="caption" muted>
+                    {c.type}: {c.expression}
+                  </DSText>
                 </View>
               ))}
             </DSCard>
@@ -131,7 +162,8 @@ export default function BountyDetailScreen() {
             />
           )}
 
-          {(bounty.status === "worker_selected" || bounty.status === "processing") && (
+          {(bounty.status === "worker_selected" ||
+            bounty.status === "processing") && (
             <DSButton
               label="Submit Proof"
               icon="cloud-upload"
@@ -140,7 +172,8 @@ export default function BountyDetailScreen() {
             />
           )}
 
-          {(bounty.status === "pending" || bounty.status === "awaiting_quotes") && (
+          {(bounty.status === "pending" ||
+            bounty.status === "awaiting_quotes") && (
             <DSButton
               label="Submit Quote"
               icon="hand-right"

@@ -7,10 +7,16 @@
  */
 
 import { Buffer } from "node:buffer";
-import { stripJpegExif, stripExifWithTool } from "./exif-strip-helpers.ts";
+import { stripExifWithTool, stripJpegExif } from "./exif-strip-helpers.ts";
 
 const IMAGE_EXTENSIONS = new Set([
-  ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".heic",
+  ".heif",
 ]);
 
 /**
@@ -19,7 +25,10 @@ const IMAGE_EXTENSIONS = new Set([
  * Other formats: Uses ImageMagick/sips if available.
  * Non-image files are returned unchanged.
  */
-export async function stripExif(data: Buffer, filename: string): Promise<Buffer> {
+export async function stripExif(
+  data: Buffer,
+  filename: string,
+): Promise<Buffer> {
   const ext = filename.match(/\.[^.]+$/)?.[0]?.toLowerCase() ?? "";
 
   if (!IMAGE_EXTENSIONS.has(ext)) {

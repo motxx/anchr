@@ -2,27 +2,30 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { makeQuery } from "../testing/factories.ts";
 import {
-  createQueryAggregate,
-  submitResult,
-  expireQuery,
-  cancelQuery,
   addQuote,
-  selectWorker,
   beginWork,
-  recordResult,
+  cancelQuery,
   completeVerification,
+  createQueryAggregate,
+  expireQuery,
   MIN_ESCROW_LOCKTIME_SECS,
+  recordResult,
+  selectWorker,
+  submitResult,
 } from "./query-aggregate.ts";
 import type {
+  EscrowInfo,
   Query,
   QueryInput,
   QueryResult,
-  VerificationDetail,
-  SubmissionMeta,
   QuoteInfo,
-  EscrowInfo,
+  SubmissionMeta,
+  VerificationDetail,
 } from "./types.ts";
-import type { CreateQueryAggregateOptions, TransitionResult } from "./query-aggregate.ts";
+import type {
+  CreateQueryAggregateOptions,
+  TransitionResult,
+} from "./query-aggregate.ts";
 
 // --- Helpers ---
 
@@ -46,7 +49,9 @@ const defaultOptions: CreateQueryAggregateOptions = {
   ttlMs: 600_000, // 10 min
 };
 
-function makeHtlcOptions(overrides?: Partial<Omit<EscrowInfo, "type">>): CreateQueryAggregateOptions {
+function makeHtlcOptions(
+  overrides?: Partial<Omit<EscrowInfo, "type">>,
+): CreateQueryAggregateOptions {
   const nowSecs = Math.floor(Date.now() / 1000);
   return {
     ttlMs: 600_000,
@@ -60,7 +65,6 @@ function makeHtlcOptions(overrides?: Partial<Omit<EscrowInfo, "type">>): CreateQ
     },
   };
 }
-
 
 function makeHtlcQuery(overrides?: Partial<Query>): Query {
   return makeQuery({
@@ -202,7 +206,9 @@ describe("createQueryAggregate", () => {
 
   // --- Validation errors ---
   test("rejects empty description", () => {
-    const err = expectErr(createQueryAggregate({ description: "" }, defaultOptions));
+    const err = expectErr(
+      createQueryAggregate({ description: "" }, defaultOptions),
+    );
     expect(err).toContain("description");
   });
 
@@ -250,7 +256,9 @@ describe("createQueryAggregate", () => {
 describe("submitResult", () => {
   test("pending → approved on passed verification", () => {
     const query = makeQuery();
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta));
+    const q = expectOk(
+      submitResult(query, defaultResult, passedVerification, defaultMeta),
+    );
     expect(q.status).toBe("approved");
     expect(q.payment_status).toBe("released");
     expect(q.verification?.passed).toBe(true);
@@ -260,63 +268,127 @@ describe("submitResult", () => {
 
   test("pending → rejected on failed verification", () => {
     const query = makeQuery();
-    const q = expectOk(submitResult(query, defaultResult, failedVerification, defaultMeta));
+    const q = expectOk(
+      submitResult(query, defaultResult, failedVerification, defaultMeta),
+    );
     expect(q.status).toBe("rejected");
     expect(q.payment_status).toBe("cancelled");
   });
 
   test("sets assigned_oracle_id from attestations", () => {
     const query = makeQuery();
-    const atts = [{ oracle_id: "oracle1", passed: true, checks: [], failures: [], attested_at: Date.now() }];
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta, undefined, atts));
+    const atts = [{
+      oracle_id: "oracle1",
+      passed: true,
+      checks: [],
+      failures: [],
+      attested_at: Date.now(),
+    }];
+    const q = expectOk(
+      submitResult(
+        query,
+        defaultResult,
+        passedVerification,
+        defaultMeta,
+        undefined,
+        atts,
+      ),
+    );
     expect(q.assigned_oracle_id).toBe("oracle1");
   });
 
   test("sets assigned_oracle_id from oracleId parameter", () => {
     const query = makeQuery();
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta, "my_oracle"));
+    const q = expectOk(
+      submitResult(
+        query,
+        defaultResult,
+        passedVerification,
+        defaultMeta,
+        "my_oracle",
+      ),
+    );
     expect(q.assigned_oracle_id).toBe("my_oracle");
   });
 
   test("sets blossom_keys", () => {
     const query = makeQuery();
     const keys = { att1: { encrypt_key: "k", encrypt_iv: "iv" } };
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta, undefined, undefined, keys));
+    const q = expectOk(
+      submitResult(
+        query,
+        defaultResult,
+        passedVerification,
+        defaultMeta,
+        undefined,
+        undefined,
+        keys,
+      ),
+    );
     expect(q.blossom_keys).toEqual(keys);
   });
 
   test("stores attestations when quorum is set", () => {
     const query = makeQuery({ quorum: { min_approvals: 2 } });
     const atts = [
-      { oracle_id: "o1", passed: true, checks: [], failures: [], attested_at: Date.now() },
-      { oracle_id: "o2", passed: true, checks: [], failures: [], attested_at: Date.now() },
+      {
+        oracle_id: "o1",
+        passed: true,
+        checks: [],
+        failures: [],
+        attested_at: Date.now(),
+      },
+      {
+        oracle_id: "o2",
+        passed: true,
+        checks: [],
+        failures: [],
+        attested_at: Date.now(),
+      },
     ];
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta, undefined, atts));
+    const q = expectOk(
+      submitResult(
+        query,
+        defaultResult,
+        passedVerification,
+        defaultMeta,
+        undefined,
+        atts,
+      ),
+    );
     expect(q.attestations?.length).toBe(2);
   });
 
   test("does not store attestations when no quorum", () => {
     const query = makeQuery();
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta));
+    const q = expectOk(
+      submitResult(query, defaultResult, passedVerification, defaultMeta),
+    );
     expect(q.attestations).toBeUndefined();
   });
 
   test("rejects when query is not pending", () => {
     const query = makeQuery({ status: "approved" });
-    const err = expectErr(submitResult(query, defaultResult, passedVerification, defaultMeta));
+    const err = expectErr(
+      submitResult(query, defaultResult, passedVerification, defaultMeta),
+    );
     expect(err).toContain("approved");
   });
 
   test("expires query instead of submitting if past deadline", () => {
     const query = makeQuery({ expires_at: Date.now() - 1000 });
-    const q = expectOk(submitResult(query, defaultResult, passedVerification, defaultMeta));
+    const q = expectOk(
+      submitResult(query, defaultResult, passedVerification, defaultMeta),
+    );
     expect(q.status).toBe("expired");
     expect(q.payment_status).toBe("cancelled");
   });
 
   test("rejects HTLC query", () => {
     const query = makeHtlcQuery({ status: "pending" });
-    const err = expectErr(submitResult(query, defaultResult, passedVerification, defaultMeta));
+    const err = expectErr(
+      submitResult(query, defaultResult, passedVerification, defaultMeta),
+    );
     expect(err).toContain("escrow");
   });
 });
@@ -457,28 +529,44 @@ describe("addQuote", () => {
 
   test("rejects non-HTLC query", () => {
     const query = makeQuery();
-    const quote: QuoteInfo = { worker_pubkey: "w", quote_event_id: "e", received_at: Date.now() };
+    const quote: QuoteInfo = {
+      worker_pubkey: "w",
+      quote_event_id: "e",
+      received_at: Date.now(),
+    };
     const err = expectErr(addQuote(query, quote));
     expect(err).toContain("escrow");
   });
 
   test("rejects when not awaiting_quotes", () => {
     const query = makeHtlcQuery({ status: "processing" });
-    const quote: QuoteInfo = { worker_pubkey: "w", quote_event_id: "e", received_at: Date.now() };
+    const quote: QuoteInfo = {
+      worker_pubkey: "w",
+      quote_event_id: "e",
+      received_at: Date.now(),
+    };
     const err = expectErr(addQuote(query, quote));
     expect(err).toContain("processing");
   });
 
   test("rejects quote with empty worker_pubkey", () => {
     const query = makeHtlcQuery();
-    const quote: QuoteInfo = { worker_pubkey: "", quote_event_id: "e", received_at: Date.now() };
+    const quote: QuoteInfo = {
+      worker_pubkey: "",
+      quote_event_id: "e",
+      received_at: Date.now(),
+    };
     const err = expectErr(addQuote(query, quote));
     expect(err).toContain("worker_pubkey");
   });
 
   test("rejects quote with empty quote_event_id", () => {
     const query = makeHtlcQuery();
-    const quote: QuoteInfo = { worker_pubkey: "w", quote_event_id: "", received_at: Date.now() };
+    const quote: QuoteInfo = {
+      worker_pubkey: "w",
+      quote_event_id: "",
+      received_at: Date.now(),
+    };
     const err = expectErr(addQuote(query, quote));
     expect(err).toContain("quote_event_id");
   });
@@ -496,7 +584,9 @@ describe("selectWorker", () => {
 
   test("sets escrow_token and payment_status on swap", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectWorker(query, "worker_pub", { escrow_token: "tok123" }));
+    const q = expectOk(
+      selectWorker(query, "worker_pub", { escrow_token: "tok123" }),
+    );
     expect(q.escrow?.escrow_token).toBe("tok123");
     expect(q.payment_status).toBe("escrow_swapped");
   });
@@ -509,7 +599,9 @@ describe("selectWorker", () => {
 
   test("sets verified_escrow_sats", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectWorker(query, "worker_pub", { verified_escrow_sats: 100 }));
+    const q = expectOk(
+      selectWorker(query, "worker_pub", { verified_escrow_sats: 100 }),
+    );
     expect(q.escrow?.verified_escrow_sats).toBe(100);
   });
 
@@ -601,7 +693,9 @@ describe("recordResult", () => {
 describe("completeVerification", () => {
   test("verifying → approved when passed", () => {
     const query = makeHtlcQuery({ status: "verifying" });
-    const q = expectOk(completeVerification(query, true, passedVerification, "oracle1"));
+    const q = expectOk(
+      completeVerification(query, true, passedVerification, "oracle1"),
+    );
     expect(q.status).toBe("approved");
     expect(q.payment_status).toBe("released");
     expect(q.assigned_oracle_id).toBe("oracle1");
@@ -621,41 +715,74 @@ describe("completeVerification", () => {
   });
 
   test("stores attestations when quorum is set", () => {
-    const query = makeHtlcQuery({ status: "verifying", quorum: { min_approvals: 2 } });
+    const query = makeHtlcQuery({
+      status: "verifying",
+      quorum: { min_approvals: 2 },
+    });
     const atts = [
-      { oracle_id: "o1", passed: true, checks: [], failures: [], attested_at: Date.now() },
-      { oracle_id: "o2", passed: true, checks: [], failures: [], attested_at: Date.now() },
+      {
+        oracle_id: "o1",
+        passed: true,
+        checks: [],
+        failures: [],
+        attested_at: Date.now(),
+      },
+      {
+        oracle_id: "o2",
+        passed: true,
+        checks: [],
+        failures: [],
+        attested_at: Date.now(),
+      },
     ];
-    const q = expectOk(completeVerification(query, true, passedVerification, undefined, atts));
+    const q = expectOk(
+      completeVerification(query, true, passedVerification, undefined, atts),
+    );
     expect(q.attestations?.length).toBe(2);
   });
 
   test("derives oracle_id from attestations", () => {
     const query = makeHtlcQuery({ status: "verifying" });
-    const atts = [{ oracle_id: "orc1", passed: true, checks: [], failures: [], attested_at: Date.now() }];
-    const q = expectOk(completeVerification(query, true, passedVerification, undefined, atts));
+    const atts = [{
+      oracle_id: "orc1",
+      passed: true,
+      checks: [],
+      failures: [],
+      attested_at: Date.now(),
+    }];
+    const q = expectOk(
+      completeVerification(query, true, passedVerification, undefined, atts),
+    );
     expect(q.assigned_oracle_id).toBe("orc1");
   });
 
   test("rejects non-HTLC query", () => {
     const query = makeQuery({ status: "verifying" });
-    const err = expectErr(completeVerification(query, true, passedVerification));
+    const err = expectErr(
+      completeVerification(query, true, passedVerification),
+    );
     expect(err).toContain("escrow");
   });
 
   test("rejects wrong state (processing)", () => {
     const query = makeHtlcQuery({ status: "processing" });
-    expect(completeVerification(query, true, passedVerification).ok).toBe(false);
+    expect(completeVerification(query, true, passedVerification).ok).toBe(
+      false,
+    );
   });
 
   test("rejects wrong state (awaiting_quotes)", () => {
     const query = makeHtlcQuery();
-    expect(completeVerification(query, true, passedVerification).ok).toBe(false);
+    expect(completeVerification(query, true, passedVerification).ok).toBe(
+      false,
+    );
   });
 
   test("rejects already approved query", () => {
     const query = makeHtlcQuery({ status: "approved" });
-    expect(completeVerification(query, true, passedVerification).ok).toBe(false);
+    expect(completeVerification(query, true, passedVerification).ok).toBe(
+      false,
+    );
   });
 });
 
@@ -681,14 +808,22 @@ describe("HTLC full lifecycle", () => {
     const q3 = expectOk(recordResult(q2b, defaultResult, "w1"));
     expect(q3.status).toBe("verifying");
 
-    const q4 = expectOk(completeVerification(q3, true, passedVerification, "oracle1"));
+    const q4 = expectOk(
+      completeVerification(q3, true, passedVerification, "oracle1"),
+    );
     expect(q4.status).toBe("approved");
     expect(q4.payment_status).toBe("released");
   });
 
   test("awaiting_quotes → worker_selected → processing → verifying → rejected", () => {
     const q0 = makeHtlcQuery();
-    const q1 = expectOk(addQuote(q0, { worker_pubkey: "w1", quote_event_id: "e1", received_at: Date.now() }));
+    const q1 = expectOk(
+      addQuote(q0, {
+        worker_pubkey: "w1",
+        quote_event_id: "e1",
+        received_at: Date.now(),
+      }),
+    );
     const q2 = expectOk(selectWorker(q1, "w1", {}));
     const q2b = expectOk(beginWork(q2));
     const q3 = expectOk(recordResult(q2b, defaultResult, "w1"));

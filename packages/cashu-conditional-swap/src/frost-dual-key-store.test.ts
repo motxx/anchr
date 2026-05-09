@@ -1,8 +1,8 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  createFrostDualKeyStore,
   createAdaptiveDualKeyStore,
+  createFrostDualKeyStore,
 } from "./frost-dual-key-store.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
 import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";

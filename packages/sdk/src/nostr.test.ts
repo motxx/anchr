@@ -37,7 +37,8 @@ test("generateKeypair produces unique keys", () => {
 });
 
 test("normalizePubkey accepts hex and lowercases it", () => {
-  const hex = "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
+  const hex =
+    "ABCDEF0123456789abcdef0123456789ABCDEF0123456789abcdef0123456789";
   expect(normalizePubkey(hex)).toBe(hex.toLowerCase());
 });
 
@@ -47,7 +48,8 @@ test("normalizePubkey rejects malformed input", () => {
 });
 
 test("normalizeSecretKey accepts hex and returns 32 bytes", () => {
-  const hex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  const hex =
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
   const bytes = normalizeSecretKey(hex);
   expect(bytes).toBeInstanceOf(Uint8Array);
   expect(bytes.length).toBe(32);
@@ -60,7 +62,8 @@ test("normalizeSecretKey rejects malformed input", () => {
 test("NIP-44 encrypt / decrypt round-trips between two keypairs", () => {
   const alice = generateKeypair();
   const bob = generateKeypair();
-  const message = "hello, anchr-sdk — this is a test message with non-ASCII: 日本語 + 🔐";
+  const message =
+    "hello, anchr-sdk — this is a test message with non-ASCII: 日本語 + 🔐";
 
   const ciphertext = encryptNip44(message, alice.secretKey, bob.publicKey);
   expect(ciphertext).toMatch(/^[A-Za-z0-9+/=]+$/);
@@ -83,7 +86,8 @@ test("NIP-44 decrypt fails when the wrong recipient key is used", () => {
   const bob = generateKeypair();
   const eve = generateKeypair();
   const ciphertext = encryptNip44("secret", alice.secretKey, bob.publicKey);
-  expect(() => decryptNip44(ciphertext, eve.secretKey, alice.publicKey)).toThrow();
+  expect(() => decryptNip44(ciphertext, eve.secretKey, alice.publicKey))
+    .toThrow();
 });
 
 test("signEvent produces a signed Event with id and sig", () => {

@@ -7,26 +7,42 @@
  */
 
 import { Buffer } from "node:buffer";
-import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  test,
+} from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { evaluateCondition, validateTlsn, _setVerifierPathForTest, _clearSeenPresentationsForTest } from "./tlsn-validation.ts";
+import {
+  _clearSeenPresentationsForTest,
+  _setVerifierPathForTest,
+  evaluateCondition,
+  validateTlsn,
+} from "./tlsn-validation.ts";
 import type { TlsnAttestation, TlsnRequirement } from "./tlsn-types.ts";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 // --- Helpers ---
 
-function makeAttestation(overrides?: Partial<TlsnAttestation>): TlsnAttestation {
+function makeAttestation(
+  overrides?: Partial<TlsnAttestation>,
+): TlsnAttestation {
   return {
     presentation: Buffer.from("fake-presentation").toString("base64"),
     ...overrides,
   };
 }
 
-function makeRequirement(overrides?: Partial<TlsnRequirement>): TlsnRequirement {
+function makeRequirement(
+  overrides?: Partial<TlsnRequirement>,
+): TlsnRequirement {
   return {
-    target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    target_url:
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
     ...overrides,
   };
 }
@@ -54,37 +70,58 @@ afterAll(() => {
 // --- Condition evaluation (pure functions, no binary needed) ---
 
 describe("evaluateCondition", () => {
-  const body = JSON.stringify({ bitcoin: { usd: 42000 }, ethereum: { usd: 3000 } });
+  const body = JSON.stringify({
+    bitcoin: { usd: 42000 },
+    ethereum: { usd: 3000 },
+  });
 
   test("contains — match", () => {
-    const result = evaluateCondition({ type: "contains", expression: "bitcoin" }, body);
+    const result = evaluateCondition({
+      type: "contains",
+      expression: "bitcoin",
+    }, body);
     expect(result.passed).toBe(true);
   });
 
   test("contains — no match", () => {
-    const result = evaluateCondition({ type: "contains", expression: "dogecoin" }, body);
+    const result = evaluateCondition({
+      type: "contains",
+      expression: "dogecoin",
+    }, body);
     expect(result.passed).toBe(false);
   });
 
   test("regex — match", () => {
-    const result = evaluateCondition({ type: "regex", expression: '"usd":\\s*\\d+' }, body);
+    const result = evaluateCondition({
+      type: "regex",
+      expression: '"usd":\\s*\\d+',
+    }, body);
     expect(result.passed).toBe(true);
     expect(result.actual_value).toBeTruthy();
   });
 
   test("regex — no match", () => {
-    const result = evaluateCondition({ type: "regex", expression: '"eur":\\s*\\d+' }, body);
+    const result = evaluateCondition({
+      type: "regex",
+      expression: '"eur":\\s*\\d+',
+    }, body);
     expect(result.passed).toBe(false);
   });
 
   test("jsonpath — exists", () => {
-    const result = evaluateCondition({ type: "jsonpath", expression: "bitcoin.usd" }, body);
+    const result = evaluateCondition({
+      type: "jsonpath",
+      expression: "bitcoin.usd",
+    }, body);
     expect(result.passed).toBe(true);
     expect(result.actual_value).toBe("42000");
   });
 
   test("jsonpath — not found", () => {
-    const result = evaluateCondition({ type: "jsonpath", expression: "bitcoin.eur" }, body);
+    const result = evaluateCondition({
+      type: "jsonpath",
+      expression: "bitcoin.eur",
+    }, body);
     expect(result.passed).toBe(false);
   });
 
@@ -106,7 +143,10 @@ describe("evaluateCondition", () => {
   });
 
   test("jsonpath — invalid JSON body", () => {
-    const result = evaluateCondition({ type: "jsonpath", expression: "foo" }, "not json");
+    const result = evaluateCondition(
+      { type: "jsonpath", expression: "foo" },
+      "not json",
+    );
     expect(result.passed).toBe(false);
     expect(result.actual_value).toBe("invalid JSON");
   });
@@ -119,7 +159,8 @@ describe("validateTlsn without binary", () => {
     _setVerifierPathForTest(null);
     const result = await validateTlsn(makeAttestation(), makeRequirement());
     expect(result.available).toBe(false);
-    expect(result.failures.some((f) => f.includes("binary not available"))).toBe(true);
+    expect(result.failures.some((f) => f.includes("binary not available")))
+      .toBe(true);
   });
 });
 
@@ -140,7 +181,11 @@ describe("validateTlsn with mock binary", () => {
     const result = await validateTlsn(
       makeAttestation(),
       makeRequirement({
-        conditions: [{ type: "jsonpath", expression: "bitcoin.usd", description: "BTC price" }],
+        conditions: [{
+          type: "jsonpath",
+          expression: "bitcoin.usd",
+          description: "BTC price",
+        }],
       }),
     );
 
@@ -150,7 +195,9 @@ describe("validateTlsn with mock binary", () => {
     expect(result.conditionResults[0]!.passed).toBe(true);
     expect(result.failures).toHaveLength(0);
     expect(result.verifiedData?.server_name).toBe("api.coingecko.com");
-    expect(result.verifiedData?.revealed_body).toBe('{"bitcoin":{"usd":42000}}');
+    expect(result.verifiedData?.revealed_body).toBe(
+      '{"bitcoin":{"usd":42000}}',
+    );
   });
 
   test("invalid signature fails", async () => {
@@ -159,7 +206,9 @@ describe("validateTlsn with mock binary", () => {
 
     const result = await validateTlsn(makeAttestation(), makeRequirement());
     expect(result.signatureValid).toBe(false);
-    expect(result.failures.some((f) => f.includes("signature invalid"))).toBe(true);
+    expect(result.failures.some((f) => f.includes("signature invalid"))).toBe(
+      true,
+    );
   });
 
   test("domain mismatch fails", async () => {
@@ -173,7 +222,8 @@ describe("validateTlsn with mock binary", () => {
 
     const result = await validateTlsn(makeAttestation(), makeRequirement());
     expect(result.serverIdentityValid).toBe(false);
-    expect(result.failures.some((f) => f.includes("does not match target"))).toBe(true);
+    expect(result.failures.some((f) => f.includes("does not match target")))
+      .toBe(true);
   });
 
   test("stale attestation fails freshness", async () => {
@@ -206,8 +256,16 @@ describe("validateTlsn with mock binary", () => {
       makeAttestation(),
       makeRequirement({
         conditions: [
-          { type: "jsonpath", expression: "bitcoin.usd", description: "BTC price" },
-          { type: "contains", expression: "dogecoin", description: "DOGE present" },
+          {
+            type: "jsonpath",
+            expression: "bitcoin.usd",
+            description: "BTC price",
+          },
+          {
+            type: "contains",
+            expression: "dogecoin",
+            description: "DOGE present",
+          },
         ],
       }),
     );

@@ -5,14 +5,14 @@
  * createMarketWallet factory.
  */
 
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import type { Proof, Wallet } from "@cashu/cashu-ts";
 import {
-  getUserBalance,
+  createMarketWallet,
   creditUser,
   debitUser,
-  createMarketWallet,
+  getUserBalance,
 } from "./market-wallet.ts";
 
 /** Create a minimal Cashu Proof stub with given amount. */
@@ -53,7 +53,11 @@ function makeMockWallet(opts?: {
   const opsStub = new Proxy({} as Wallet["ops"], {
     get(_target, prop) {
       if (prop === "send") return mockSend;
-      throw new Error(`market-wallet test stub: unimplemented WalletOps method "${String(prop)}"`);
+      throw new Error(
+        `market-wallet test stub: unimplemented WalletOps method "${
+          String(prop)
+        }"`,
+      );
     },
   });
   const stub: Pick<Wallet, "loadMint" | "ops" | "getFeesForProofs"> = {

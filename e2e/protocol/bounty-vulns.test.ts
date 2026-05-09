@@ -3,7 +3,10 @@ import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createQueryService, createQueryStore } from "../../packages/bounty/src/application/query-service.ts";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../../packages/bounty/src/application/query-service.ts";
 import { MIN_ESCROW_LOCKTIME_SECS } from "../../packages/bounty/src/application/query-escrow-validation.ts";
 import {
   makeFakeToken,
@@ -25,7 +28,11 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
 
     const query = service.createQuery(
       { description: "Preimage reveal test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, oracleIds: ["test-oracle"] },
+      {
+        escrow: escrowInfo,
+        bounty: { amount_sats: 100 },
+        oracleIds: ["test-oracle"],
+      },
     );
     service.recordQuote(query.id, {
       worker_pubkey: "w1",
@@ -97,7 +104,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     const evilOracle = makeMockOracle("evil-oracle", () => true);
     registry.register(evilOracle);
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      preimageStore,
+    });
 
     const entry = preimageStore.create();
 
@@ -142,7 +153,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     registry.register(oracle1);
     registry.register(oracle2);
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      preimageStore,
+    });
 
     const entry = preimageStore.create();
 
@@ -185,7 +200,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("legit-oracle"));
     const preimageStore = createPreimageStore();
-    const service = createQueryService({ store, oracleRegistry: registry, preimageStore });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      preimageStore,
+    });
 
     const entry = preimageStore.create();
 
@@ -224,7 +243,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
 });
 
 describe("CTF-2: Requester submits self-locked HTLC token", () => {
-  function makeHtlcToken(amountSats: number, hash: string, lockedPubkey: string): string {
+  function makeHtlcToken(
+    amountSats: number,
+    hash: string,
+    lockedPubkey: string,
+  ): string {
     const htlcSecret = JSON.stringify([
       "HTLC",
       {
@@ -235,7 +258,12 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
     ]);
     return getEncodedToken({
       mint: "https://mint.example.com",
-      proofs: [{ amount: amountSats, id: "test", secret: htlcSecret, C: "C_htlc" }],
+      proofs: [{
+        amount: amountSats,
+        id: "test",
+        secret: htlcSecret,
+        C: "C_htlc",
+      }],
     });
   }
 
@@ -263,9 +291,17 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
     });
 
     // Self-locked HTLC: token locked to requester pubkey, not the selected worker
-    const selfLockedToken = makeHtlcToken(100, entry.hash, "02requester_hex_pubkey");
+    const selfLockedToken = makeHtlcToken(
+      100,
+      entry.hash,
+      "02requester_hex_pubkey",
+    );
 
-    const result = await service.selectWorker(query.id, "02worker_hex_pubkey", selfLockedToken);
+    const result = await service.selectWorker(
+      query.id,
+      "02worker_hex_pubkey",
+      selfLockedToken,
+    );
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not locked to selected worker");
   });
@@ -293,9 +329,17 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       received_at: Date.now(),
     });
 
-    const workerLockedToken = makeHtlcToken(100, entry.hash, "02worker_hex_pubkey");
+    const workerLockedToken = makeHtlcToken(
+      100,
+      entry.hash,
+      "02worker_hex_pubkey",
+    );
 
-    const result = await service.selectWorker(query.id, "02worker_hex_pubkey", workerLockedToken);
+    const result = await service.selectWorker(
+      query.id,
+      "02worker_hex_pubkey",
+      workerLockedToken,
+    );
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Worker selected");
   });
@@ -323,9 +367,17 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       received_at: Date.now(),
     });
 
-    const wrongHashToken = makeHtlcToken(100, "deadbeef_wrong_hash", "02worker_hex_pubkey");
+    const wrongHashToken = makeHtlcToken(
+      100,
+      "deadbeef_wrong_hash",
+      "02worker_hex_pubkey",
+    );
 
-    const result = await service.selectWorker(query.id, "02worker_hex_pubkey", wrongHashToken);
+    const result = await service.selectWorker(
+      query.id,
+      "02worker_hex_pubkey",
+      wrongHashToken,
+    );
     expect(result.ok).toBe(false);
     expect(result.message).toContain("HTLC hash mismatch");
   });
@@ -377,7 +429,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             locktime: now + 1, // Only 1 second!
           },
         },
-      ),
+      )
     ).toThrow(`escrow locktime must be at least ${MIN_ESCROW_LOCKTIME_SECS}s`);
   });
 
@@ -397,7 +449,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             locktime: now - 100, // In the past
           },
         },
-      ),
+      )
     ).toThrow(`escrow locktime must be at least ${MIN_ESCROW_LOCKTIME_SECS}s`);
   });
 
@@ -418,7 +470,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             locktime: now + MIN_ESCROW_LOCKTIME_SECS - 1,
           },
         },
-      ),
+      )
     ).toThrow(`escrow locktime must be at least ${MIN_ESCROW_LOCKTIME_SECS}s`);
   });
 

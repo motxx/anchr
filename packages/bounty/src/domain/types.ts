@@ -24,7 +24,6 @@ export type AttachmentStorageKind = "blossom" | "external";
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
 export type ProofVisibility = "public" | "requester_only";
 
-
 export interface GpsCoord {
   lat: number;
   lon: number;
@@ -34,10 +33,20 @@ export interface GpsCoord {
  * Verification factors that a Requester can request.
  * When omitted, defaults to ["gps", "ai_check"].
  */
-export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check", "tlsn"] as const;
+export const VERIFICATION_FACTORS = [
+  "nonce",
+  "gps",
+  "timestamp",
+  "oracle",
+  "ai_check",
+  "tlsn",
+] as const;
 export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
-export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
+export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
+  "gps",
+  "ai_check",
+] as const;
 
 // TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
 // domain re-exports them so existing call sites keep the single import surface.
@@ -48,7 +57,13 @@ import type {
   TlsnRequirement,
   TlsnVerifiedData,
 } from "@anchr/tlsn-toolkit/tlsn-types";
-export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
+export type {
+  TlsnAttestation,
+  TlsnCondition,
+  TlsnEncryptedContext,
+  TlsnRequirement,
+  TlsnVerifiedData,
+};
 
 export interface QueryInput {
   description: string;
@@ -78,7 +93,7 @@ export interface AttachmentRef {
 /** Ephemeral key material for Blossom E2E encryption. Never persisted on the server. */
 export interface BlossomKeyMaterial {
   encrypt_key: string; // hex-encoded AES-256-GCM key
-  encrypt_iv: string;  // hex-encoded AES-256-GCM IV
+  encrypt_iv: string; // hex-encoded AES-256-GCM IV
 }
 
 /** Map of attachment ID → key material, used for one-time oracle verification. */

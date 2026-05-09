@@ -29,8 +29,8 @@ import type {
   BlossomKeyMap,
   BountyInfo,
   EscrowInfo,
-  ExecutorType,
   EscrowSubmitOutcome,
+  ExecutorType,
   Query,
   QueryInput,
   QueryResult,
@@ -49,9 +49,9 @@ export type {
   QueryInput,
   QueryResult,
   QueryStatus,
-  VerificationFactor,
   RequesterMeta,
   RequesterType,
+  VerificationFactor,
 } from "../domain/types.ts";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;
@@ -125,10 +125,23 @@ export interface QueryService {
   clearQueryStore(): void;
 
   recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
-  selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<HtlcOutcome>;
+  selectWorker(
+    queryId: string,
+    workerPubkey: string,
+    escrowToken?: string,
+  ): Promise<HtlcOutcome>;
   beginWork(queryId: string): HtlcOutcome;
-  recordResult(queryId: string, result: QueryResult, workerPubkey: string, blossomKeys?: BlossomKeyMap): HtlcOutcome;
-  completeVerification(queryId: string, passed: boolean, oracleId?: string): HtlcOutcome;
+  recordResult(
+    queryId: string,
+    result: QueryResult,
+    workerPubkey: string,
+    blossomKeys?: BlossomKeyMap,
+  ): HtlcOutcome;
+  completeVerification(
+    queryId: string,
+    passed: boolean,
+    oracleId?: string,
+  ): HtlcOutcome;
   /** Returns preimage on success. */
   submitEscrowResult(
     queryId: string,
@@ -148,22 +161,38 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const hooks = deps?.hooks;
   const proofDelivery = deps?.proofDelivery;
 
-  const oracleResolver = (oracleId: string | undefined, acceptableIds: string[] | undefined) =>
-    registry ? registry.resolve(oracleId, acceptableIds) : null;
+  const oracleResolver = (
+    oracleId: string | undefined,
+    acceptableIds: string[] | undefined,
+  ) => registry ? registry.resolve(oracleId, acceptableIds) : null;
   const multiOracleResolver = registry?.resolveMultiple?.bind(registry);
 
   const normalizeResult = deps?.normalizeResult;
-  const svcDeps: ServiceDeps = { store, oracleResolver, multiOracleResolver, preimageStore, escrowProvider, frostSignature, proofDelivery, normalizeResult };
+  const svcDeps: ServiceDeps = {
+    store,
+    oracleResolver,
+    multiOracleResolver,
+    preimageStore,
+    escrowProvider,
+    frostSignature,
+    proofDelivery,
+    normalizeResult,
+  };
 
   return {
-    createQuery: (input, options) => doCreateQuery(svcDeps, input, options, hooks),
+    createQuery: (input, options) =>
+      doCreateQuery(svcDeps, input, options, hooks),
     getQuery: (id) => store.get(id),
     listOpenQueries: () => {
       const now = Date.now();
-      return store.values().filter((q) => isOpenStatus(q.status) && q.expires_at > now);
+      return store.values().filter((q) =>
+        isOpenStatus(q.status) && q.expires_at > now
+      );
     },
-    listAllQueries: () => store.values().sort((a, b) => b.created_at - a.created_at),
-    submitQueryResult: (id, result, meta, oId, bk) => doSubmitQueryResult(svcDeps, id, result, meta, oId, bk),
+    listAllQueries: () =>
+      store.values().sort((a, b) => b.created_at - a.created_at),
+    submitQueryResult: (id, result, meta, oId, bk) =>
+      doSubmitQueryResult(svcDeps, id, result, meta, oId, bk),
     cancelQuery: (id) => doCancelQuery(store, id),
     expireQueries: () => doExpireQueries(store),
     purgeExpiredFromStore: () => doPurgeExpired(store),
@@ -171,9 +200,11 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     recordQuote: (queryId, quote) => doRecordQuote(store, queryId, quote),
     selectWorker: (queryId, wp, ht) => doSelectWorker(svcDeps, queryId, wp, ht),
     beginWork: (queryId) => doBeginWork(store, queryId),
-    recordResult: (queryId, result, wp, bk) => doRecordResult(svcDeps, queryId, result, wp, bk),
-    completeVerification: (queryId, passed, oId) => doCompleteVerification(store, queryId, passed, oId),
-    submitEscrowResult: (queryId, result, wp, oId, bk) => doSubmitEscrowResult(svcDeps, queryId, result, wp, oId, bk),
+    recordResult: (queryId, result, wp, bk) =>
+      doRecordResult(svcDeps, queryId, result, wp, bk),
+    completeVerification: (queryId, passed, oId) =>
+      doCompleteVerification(store, queryId, passed, oId),
+    submitEscrowResult: (queryId, result, wp, oId, bk) =>
+      doSubmitEscrowResult(svcDeps, queryId, result, wp, oId, bk),
   };
 }
-

@@ -4,11 +4,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  getEncodedToken,
   getDecodedToken,
+  getEncodedToken,
+  isHTLCSpendAuthorised,
   P2PKBuilder,
   signP2PKProofs,
-  isHTLCSpendAuthorised,
   verifyHTLCHash,
 } from "@cashu/cashu-ts";
 import type { Proof } from "@cashu/cashu-ts";
@@ -28,7 +28,9 @@ function genKeypair() {
 }
 
 function sha256Hex(hexPreimage: string): string {
-  const bytes = new Uint8Array(hexPreimage.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+  const bytes = new Uint8Array(
+    hexPreimage.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+  );
   return bytesToHex(sha256(bytes));
 }
 
@@ -69,7 +71,11 @@ function makeHtlcProof(params: {
   };
 }
 
-function prepareHtlcWitness(proofs: Proof[], preimage: string, workerPrivateKey: string): Proof[] {
+function prepareHtlcWitness(
+  proofs: Proof[],
+  preimage: string,
+  workerPrivateKey: string,
+): Proof[] {
   const proofsWithPreimage = proofs.map((p) => ({
     ...p,
     witness: JSON.stringify({ preimage, signatures: [] }),
@@ -139,15 +145,29 @@ describe("redeemHtlcToken — witness preparation", () => {
 
   test("prepareHtlcWitness handles multiple proofs", () => {
     const proofs = [
-      makeHtlcProof({ hash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime, amount: 32 }),
-      makeHtlcProof({ hash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime, amount: 32 }),
+      makeHtlcProof({
+        hash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+        amount: 32,
+      }),
+      makeHtlcProof({
+        hash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+        amount: 32,
+      }),
     ];
 
     const signed = prepareHtlcWitness(proofs, preimage, worker.secretKey);
 
     expect(signed).toHaveLength(2);
     for (const s of signed) {
-      const witness = typeof s.witness === "string" ? JSON.parse(s.witness) : s.witness;
+      const witness = typeof s.witness === "string"
+        ? JSON.parse(s.witness)
+        : s.witness;
       expect(witness.preimage).toBe(preimage);
       expect(witness.signatures.length).toBeGreaterThan(0);
     }
@@ -340,8 +360,20 @@ describe("verifyHtlcProofs — public verification function", () => {
 
   test("multi-proof: all valid returns null", () => {
     const proofs = [
-      makeHtlcProof({ hash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime, amount: 32 }),
-      makeHtlcProof({ hash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime, amount: 32 }),
+      makeHtlcProof({
+        hash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+        amount: 32,
+      }),
+      makeHtlcProof({
+        hash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+        amount: 32,
+      }),
     ];
 
     const result = verifyHtlcProofs(proofs, hash, preimage);
@@ -351,8 +383,18 @@ describe("verifyHtlcProofs — public verification function", () => {
   test("multi-proof: one with wrong hash returns error", () => {
     const otherHash = sha256Hex(randomPreimage());
     const proofs = [
-      makeHtlcProof({ hash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime }),
-      makeHtlcProof({ hash: otherHash, workerPubkey: worker.publicKey, refundPubkey: requester.publicKey, locktime }),
+      makeHtlcProof({
+        hash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+      }),
+      makeHtlcProof({
+        hash: otherHash,
+        workerPubkey: worker.publicKey,
+        refundPubkey: requester.publicKey,
+        locktime,
+      }),
     ];
 
     const result = verifyHtlcProofs(proofs, hash, preimage);
@@ -410,7 +452,9 @@ describe("buildHtlcFinalOptions — P2PK options for HTLC", () => {
       locktimeSeconds: locktime,
     });
 
-    const refundKeys = Array.isArray(opts.refundKeys) ? opts.refundKeys : [opts.refundKeys];
+    const refundKeys = Array.isArray(opts.refundKeys)
+      ? opts.refundKeys
+      : [opts.refundKeys];
     expect(refundKeys).toContain(`02${requester.publicKey}`);
   });
 });
