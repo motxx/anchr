@@ -99,14 +99,71 @@ Related (not INV-03 but same surface, kept for context):
 `LEGIT: Requester refund key after locktime → Mint ACCEPTS` demonstrates the
 refund path works once locktime elapses.
 
+### INV-04: Stolen preimage alone cannot redeem bound escrow
+
+**Status:** `cross-referenced`
+
+**Claim:** A Provider-bound Cashu HTLC proof cannot be redeemed with the Oracle
+preimage alone. The redeeming party must also satisfy the bound Provider P2PK
+lock with the selected Provider's signature.
+
+**Attack:** Learn or steal the Oracle preimage for an active Provider-bound
+escrow, then attempt to redeem the token with a different private key or with no
+Provider signature.
+
+**Expected:** The Cashu Mint rejects the swap. Funds stay locked for the
+selected Provider until they present both the matching preimage and the bound
+Provider signature, or for the Customer refund path after locktime.
+
+**Tests:** Cross-referenced from existing attack-class tests, annotated with
+`// INV-04` comments:
+
+- `e2e/regtest/regtest-htlc-attacks.test.ts` —
+  `ATTACK: Requester redeems own HTLC proofs before locktime — fails`
+
+## Settlement Decision Rules
+
+Provider-side settlement separates three decisions:
+
+- **Mint-level redeem:** a hard gate that checks token spendability only. The
+  Provider can redeem when the bound token's hashlock matches the released
+  preimage, the token is locked to the Provider pubkey, the Provider can sign,
+  and the mint accepts the swap.
+- **Clean settlement:** a protocol-quality decision. The release material must
+  come from the expected Oracle pubkey or FROST group key and its signature must
+  bind the payment hash, Provider pubkey, `query_id`, and `request_event_id`.
+- **Audit / reputation:** anomaly recording for release source mismatch,
+  signature mismatch, `query_id` mismatch, `request_event_id` mismatch, stale
+  reply threads, short locktime, or implementation drift.
+
+The Provider redeem gate MUST NOT re-run mutable Provider policy after a
+preflight ticket has accepted an escrow. Redeem is governed by token
+spendability plus the immutable preflight ticket fields: token fingerprint,
+payment hash, Provider pubkey lock, accepted amount, mint URL, locktime, and
+expected authority. Policy changes after `produce()` starts can affect future
+quotes, clean-settlement reporting, or reputation, but they must not block
+recovery of funds from an already spendable token.
+
+Unexpected release material is not a clean valid release. However, if the
+material unlocks the currently held bound token and the Provider can satisfy the
+Provider signature requirement, the Provider SDK should attempt the economic
+redeem and record the mismatch as audit evidence instead of treating it as a
+redeem failure.
+
+Oracle release depends on proof validity and expected authority, not on a host,
+coordinator, or Customer cancel flag observed after the proof has verified. A
+cancel race after valid proof submission can affect Customer UX and audit state,
+but it must not suppress release of material needed for a Provider to redeem
+valid completed work.
+
 ## Future invariants (declared, not yet specified)
 
-- **INV-04:** FROST t-of-n threshold safety — no subset of size < t can produce
+- **INV-05:** FROST t-of-n threshold safety — no subset of size < t can produce
   a valid aggregate signature. Likely cross-referenced to
-  `e2e/frost-threshold.test.ts::ATTACK: 1-of-3 (below threshold) →
+  `e2e/frost-threshold.test.ts::ATTACK: 1-of-3 (below threshold) ->
   aggregation fails`
   once declared.
-- **INV-05:** C2PA manifest signature + GPS binding. Scoped after `crates/` gets
+- **INV-06:** C2PA manifest signature + GPS binding. Scoped after `crates/` gets
   a C2PA verifier.
 
 ---

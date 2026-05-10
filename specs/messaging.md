@@ -110,6 +110,28 @@ Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly. The public query may include a `domain_hint` for display
 purposes.
 
+## Provider Preflight
+
+Before irreversible work, the Provider verifies the selected escrow and records
+an immutable preflight ticket. The preflight report is structured:
+
+| Field      | Description                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| `ok`       | Whether the Provider may start work                                |
+| `errors`   | Hard failures that prevent `produce()`                             |
+| `warnings` | Non-fatal risks to record before proceeding                        |
+| `details`  | Parsed escrow facts used to build the ticket and explain decisions |
+
+The ticket binds the work decision to concrete escrow facts: `query_id`,
+original request event id, expected Oracle pubkey or FROST group key, Provider
+pubkey, mint URL, payment hash, token fingerprint, accepted amount, quote
+amount, locktime, and Provider policy version. If the ticket cannot be created,
+the Provider declines selection and does not call `produce()`.
+
+Provider policy is closed at preflight. After the Provider starts work, later
+policy changes can affect future quotes and audit outcomes, but they must not
+block redeem of the accepted token.
+
 ## Proof Submission (kind 6300)
 
 The Provider submits the result:
@@ -157,6 +179,39 @@ After Oracle verification:
 All sensitive payloads are encrypted using NIP-44 (versioned encryption).
 Point-to-point messages (e.g., preimage delivery, FROST shares) use NIP-44
 direct messages between specific pubkeys.
+
+## Release Material and Redeem Gate
+
+Oracle release material is not just a bare preimage. A release message binds:
+
+| Field                 | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `query_id`            | Query identifier from the Customer request                   |
+| `request_event_id`    | Original kind 5300 event id                                  |
+| `payment_hash`        | Hash committed in the selected bound token                   |
+| `provider_pubkey`     | Provider pubkey the token is bound to                        |
+| `oracle_pubkey`       | Releasing Oracle pubkey, for single-Oracle releases          |
+| `oracle_group_pubkey` | Expected FROST group key, for threshold releases             |
+| `preimage`            | HTLC preimage, when the payment profile uses NUT-14 hashlock |
+| `signature`           | Oracle or FROST signature over the release fields            |
+
+Provider-side settlement has three separate decisions:
+
+- Mint-level redeem checks token spendability: matching preimage, Provider
+  pubkey lock, Provider signature, and mint acceptance.
+- Clean settlement checks expected authority and release signature binding.
+- Audit / reputation records mismatched source, signature, `query_id`,
+  `request_event_id`, reply thread, or other correlation anomalies.
+
+Correlation mismatches are not redeem hard failures by themselves. If release
+material is not a clean valid release but still unlocks the Provider's current
+bound token, the Provider should attempt economic redeem and record the anomaly.
+If the preimage does not match the token hashlock, the token is not locked to
+the Provider, or the Provider cannot sign, redeem fails.
+
+Oracle release is driven by proof validity and the expected release authority. A
+host, coordinator, or Customer cancel observed after proof verification must not
+suppress release material for valid completed work.
 
 ## Preimage Delivery Reliability
 

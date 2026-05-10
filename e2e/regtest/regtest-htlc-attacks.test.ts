@@ -494,6 +494,7 @@ suite("e2e: Multi-Party Attacks", () => {
   });
 
   // INV-03: Requester can't unlock escrow before timeout
+  // INV-04: Stolen preimage alone cannot redeem bound escrow
   test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
     const worker = generateKeypair();
     const requester = generateKeypair();

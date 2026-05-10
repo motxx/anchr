@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-10
 
 ## Priority
 
@@ -86,3 +87,25 @@ Failure handling:
 - protocol docs で Oracle cancel-race behavior を仕様化する。
 - Provider preflight checks を Provider SDK API に昇格させる。
 - 既存の HTLC attack tests に注記するか拡張し、上記 candidate invariants をカバーする。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/threat-model.md`
+- `docs/threat-model.lock.json`
+- `specs/messaging.md`
+- `packages/sdk/README.md`
+- `e2e/regtest/regtest-htlc-attacks.test.ts`
+
+Verified with:
+
+- `deno fmt --check docs/threat-model.md specs/messaging.md packages/sdk/README.md e2e/regtest/regtest-htlc-attacks.test.ts docs/threat-model.lock.json`
+- `deno task lint:invariants`
+- `deno task test:unit --filter provider`
+- `deno task lint:strict`
+- `deno task test:all`
+
+Follow-up:
+
+- None

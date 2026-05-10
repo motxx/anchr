@@ -10,5 +10,9 @@
   "INV-03": {
     "hash": "sha256:6c3e2a0b6598f865a8a07882a1cfce1bf2d2d6e30b540e764ff8bbcfb421a72a",
     "justification": "markdown formatter normalized line wrapping without changing the invariant"
+  },
+  "INV-04": {
+    "hash": "sha256:88937d759dda709ac5af561e5a99d266e0d5b872a0513ebc12210eb6bd5492d8",
+    "justification": "document the two-condition Provider-bound escrow invariant before SDK and transport refactors"
   }
 }
