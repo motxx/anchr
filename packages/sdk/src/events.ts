@@ -23,7 +23,7 @@ import {
 export interface QueryRequestPayload {
   /** Caller-chosen unique query id (SHOULD match the `d` tag). */
   query_id: string;
-  /** Schema URI identifying the proof format. */
+  /** Schema URL identifying the proof format. */
   schema: string;
   /** Schema-specific predicate. */
   predicate: unknown;
@@ -52,7 +52,7 @@ export interface QueryRequestPayload {
  *   - d:        query_id (NIP-33 addressable)
  *   - t:        "anchr" (discovery tag)
  *   - p:        oracle pubkey (NIP-90 marker "oracle")
- *   - schema:   schema URI (custom tag, indexable as #schema)
+ *   - s:        proof schema URL (custom tag, indexable as #s)
  *
  * The content carries the JSON payload above.
  */
@@ -64,7 +64,7 @@ export function buildQueryRequestEvent(
     ["d", payload.query_id],
     ["t", "anchr"],
     ["p", payload.oracle_pubkey, "", "oracle"],
-    ["schema", payload.schema],
+    ["s", payload.schema],
   ];
 
   return signEvent(
@@ -248,7 +248,7 @@ import { decryptNip44, encryptNip44 } from "./nostr.ts";
 
 /** Plaintext payload that travels NIP-44-encrypted in the NIP-90 kind 6300 result content. */
 export interface QueryResponsePayload {
-  /** Schema URI under which the proof was produced. */
+  /** Schema URL under which the proof was produced. */
   schema: string;
   /** Verified response payload (shape defined by the schema). */
   data: unknown;

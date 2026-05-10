@@ -166,7 +166,7 @@ test("createCustomer copies arrays so mutating the original does not affect the 
   expect(customer.oracles).toHaveLength(2);
 });
 
-test("Customer.request rejects an invalid schema URI synchronously", async () => {
+test("Customer.request rejects an invalid schema URL synchronously", async () => {
   const customer = createCustomer(validOptions());
   await expect(
     customer.request({
@@ -181,7 +181,10 @@ test("Customer.request rejects non-positive maxAmount", async () => {
   const customer = createCustomer(validOptions());
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 0 },
       sourceProofs: [],
     }),
@@ -204,7 +207,10 @@ test("Customer.request calls oracleClient.requestHash", async () => {
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -223,7 +229,10 @@ test("Customer.request rejects when oracleClient returns a pubkey not matching t
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -250,7 +259,10 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1234 },
       sourceProofs: [{ id: "proof1" }],
     }),
@@ -276,7 +288,10 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -287,7 +302,10 @@ test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the
   const customer = createCustomer({ ...validOptions(), quoteWindowMs: 10 });
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: { foo: "bar" },
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -310,7 +328,10 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: { foo: "bar" },
+      },
       payment: { maxAmount: 500 },
       sourceProofs: [],
     }),
@@ -351,7 +372,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
           const id = requestEventId.id ?? "unknown";
           const customerPub = customerEphemeralPubkey.value ?? "00".repeat(32);
           const result = buildQueryResponseEvent(provider, id, customerPub, {
-            schema: "io.anchr.tlsn-https.v1",
+            schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
             data: { hello: "world" },
             proof: "base64proofbytes==",
           });
@@ -370,18 +391,21 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   });
 
   const result = await customer.request({
-    spec: { schema: "io.anchr.tlsn-https.v1", predicate: { foo: "bar" } },
+    spec: {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      predicate: { foo: "bar" },
+    },
     payment: { maxAmount: 1000 },
     sourceProofs: [],
   });
 
   expect(result.providerPubkey).toBe(provider.publicKey);
-  expect(result.schema).toBe("io.anchr.tlsn-https.v1");
+  expect(result.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(result.data).toEqual({ hello: "world" });
   expect(result.proof).toBe("base64proofbytes==");
 });
 
-test("Customer.request runs schemaVerifiers when provided", async () => {
+test("Customer.request runs verifierAdapters when provided", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
@@ -420,7 +444,7 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
             requestEventId.id ?? "x",
             customerEphemeralPubkey.value ?? "00".repeat(32),
             {
-              schema: "io.anchr.tlsn-https.v1",
+              schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
               data: { ok: true },
               proof: "p1",
             },
@@ -436,16 +460,23 @@ test("Customer.request runs schemaVerifiers when provided", async () => {
     relayClient,
     quoteWindowMs: 30,
     resultTimeoutMs: 1000,
-    schemaVerifiers: {
-      "io.anchr.tlsn-https.v1": (proof, predicate, data) => {
-        verifierCalls.push({ proof, predicate, data });
-        return true;
+    verifierAdapters: [
+      {
+        canHandle: (schema) =>
+          schema === "https://anchr-spec.org/spec/proof/tlsn/v1",
+        verify: (proof, predicate, data) => {
+          verifierCalls.push({ proof, predicate, data });
+          return true;
+        },
       },
-    },
+    ],
   });
 
   await customer.request({
-    spec: { schema: "io.anchr.tlsn-https.v1", predicate: { x: 1 } },
+    spec: {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      predicate: { x: 1 },
+    },
     payment: { maxAmount: 1000 },
     sourceProofs: [],
   });
@@ -492,7 +523,11 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
             provider,
             requestEventId.id ?? "x",
             customerPub.value ?? "00".repeat(32),
-            { schema: "io.anchr.tlsn-https.v1", data: { x: 1 }, proof: "fake" },
+            {
+              schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+              data: { x: 1 },
+              proof: "fake",
+            },
           ));
         });
       }
@@ -505,12 +540,19 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
     relayClient,
     quoteWindowMs: 30,
     resultTimeoutMs: 1000,
-    schemaVerifiers: { "io.anchr.tlsn-https.v1": () => false },
+    verifierAdapters: [{
+      canHandle: (schema) =>
+        schema === "https://anchr-spec.org/spec/proof/tlsn/v1",
+      verify: () => false,
+    }],
   });
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -556,7 +598,10 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -624,7 +669,10 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -676,7 +724,10 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
@@ -728,7 +779,10 @@ test("Customer.request honors `provider` pinning when set", async () => {
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
       provider: wantedProvider.publicKey,
@@ -751,7 +805,10 @@ test("Customer.request throws RelayPublishError when no relay accepts the event"
 
   await expect(
     customer.request({
-      spec: { schema: "io.anchr.tlsn-https.v1", predicate: {} },
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),

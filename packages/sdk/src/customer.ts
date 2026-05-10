@@ -13,7 +13,11 @@ import type {
   RequestOptions,
   RequestResult,
 } from "./types.ts";
-import { InvalidSchemaUriError, isSchemaUri } from "./schema.ts";
+import {
+  InvalidSchemaUriError,
+  isSchemaUri,
+  resolveVerifierAdapter,
+} from "./schema.ts";
 import {
   createRelayClient,
   type Event as NostrEvent,
@@ -201,7 +205,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
-  const verifiers = options.schemaVerifiers ?? {};
+  const verifierAdapters = options.verifierAdapters ?? [];
 
   return {
     oracles,
@@ -373,10 +377,13 @@ export function createCustomer(options: CustomerOptions): Customer {
           );
         }
 
-        const verifier = verifiers[req.spec.schema];
-        if (verifier !== undefined) {
+        const verifier = resolveVerifierAdapter(
+          verifierAdapters,
+          req.spec.schema,
+        );
+        if (verifier !== null) {
           const ok = await Promise.resolve(
-            verifier(response.proof, req.spec.predicate, response.data),
+            verifier.verify(response.proof, req.spec.predicate, response.data),
           );
           if (!ok) {
             throw new SchemaVerificationError(req.spec.schema);

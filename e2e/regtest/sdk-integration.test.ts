@@ -164,7 +164,7 @@ suite(
       try {
         const result = await customer.request({
           spec: {
-            schema: "io.anchr.tlsn-https.v1",
+            schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
             predicate: { target: "https://api.example.org" },
           },
           payment: { maxAmount: BOUNTY_SATS },
@@ -172,9 +172,11 @@ suite(
         });
 
         expect(result.providerPubkey).toBe(providerKey.publicKey);
-        expect(result.schema).toBe("io.anchr.tlsn-https.v1");
+        expect(result.schema).toBe(
+          "https://anchr-spec.org/spec/proof/tlsn/v1",
+        );
         expect(result.data).toEqual({
-          schema: "io.anchr.tlsn-https.v1",
+          schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
           ok: true,
         });
         expect(result.proof).toBe("regtest-proof-bytes");

@@ -29,7 +29,7 @@ const customer = createCustomer({
 
 const result = await customer.request({
   spec: {
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: { target: "https://api.github.com/users/alice" },
   },
   payment: { maxAmount: 1000 },
@@ -64,20 +64,20 @@ await provider.serve(async (request) => {
 });
 ```
 
-## Schema URIs
+## Proof Schema URLs
 
-The SDK is verification-format-agnostic. Each request carries a `schema` URI;
-the provider's handler interprets it. URIs the SDK ships as constants:
+The SDK is verification-format-agnostic. Each request carries a `schema` URL;
+the provider's handler interprets it. URLs the SDK ships as constants:
 
-| URI | Meaning |
+| URL | Meaning |
 |---|---|
-| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
-| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video |
+| `https://anchr-spec.org/spec/proof/tlsn/v1` | TLSNotary attestation of an HTTPS response |
+| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo / video |
 
 The SDK does not bundle producers or verifiers. Wire your own
 `produce(): Promise<{ data, proof }>` in the provider handler, and pass an
-optional `schemaVerifiers` registry on the customer if you want local
-verification of returned proofs.
+optional `verifierAdapters` list on the customer if you want local verification
+of returned proofs.
 
 ## Testing
 

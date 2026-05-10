@@ -6,6 +6,11 @@ Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending
 Machine (DVM) pattern. This spec defines the event kinds, payloads, and
 lifecycle for Customer, Provider, and Oracle actors.
 
+Proof format dispatch uses HTTPS schema URLs defined in
+[`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
+schema URL in an `s` tag for discovery, and encrypted payloads carry the same
+URL in their `schema` field for execution.
+
 ## Actors
 
 - **Customer** posts a query, selects a Provider, and locks payment.
@@ -36,6 +41,7 @@ The Customer broadcasts a DVM Job Request:
   "content": "<encrypted payload>",
   "tags": [
     ["i", "<target_url_or_description>", "text"],
+    ["s", "https://anchr-spec.org/spec/proof/tlsn/v1"],
     ["param", "oracle_ids", "<comma-separated>"],
     ["param", "quorum", "<min_approvals>"],
     ["bid", "<amount_sats>"]
@@ -48,6 +54,7 @@ The Customer broadcasts a DVM Job Request:
 | Field                       | Description                         |
 | --------------------------- | ----------------------------------- |
 | `description`               | Human-readable query description    |
+| `schema`                    | Proof schema URL                    |
 | `verification_requirements` | Array of verification factors       |
 | `tlsn_requirements`         | Target URL, method, conditions      |
 | `expected_gps`              | GPS coordinates (for photo queries) |
@@ -123,6 +130,7 @@ The Provider submits the result:
 
 | Field              | Description                                                                 |
 | ------------------ | --------------------------------------------------------------------------- |
+| `schema`           | Proof schema URL used to dispatch Oracle and Customer verification          |
 | `attachments`      | Blossom blob references                                                     |
 | `notes`            | Optional Provider notes                                                     |
 | `gps`              | GPS coordinates at submission time                                          |

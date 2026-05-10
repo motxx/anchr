@@ -15,6 +15,7 @@ All specs in this directory are released under [CC0 1.0 Universal](LICENSE)
 | [Nostr DVM Messaging](messaging.md)     | NIP-90 event kinds (5300/6300/7000) used by every Anchr Customer / Provider / Oracle to discover each other and exchange queries, quotes, and proofs.                                                |
 | [Conditional Swap](conditional-swap.md) | Cross-locked Cashu-token primitive (HTLC dual-preimage, FROST P2PK dual-key). Required reading for any two-party-binary-bet / N:M client that wants to interop with `@anchr/cashu-conditional-swap`. |
 | [Oracle Registry](oracle-registry.md)   | Nostr kind-30088 announcement + discovery format. Required for any Oracle that wants to be discovered by the network.                                                                                |
+| [Proof Schema URLs](proof-schemas.md)   | HTTPS URL identifiers and matching rules for proof generator and verifier dispatch.                                                                                                                  |
 
 ## Where everything else lives
 

@@ -83,7 +83,7 @@ const customer = createCustomer({
 
 const { data, proof, providerPubkey } = await customer.request({
   spec: {
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: {
       target: "https://api.github.com/users/alice",
       conditions: [{ path: "$.public_repos", op: ">", value: 10 }],
@@ -102,13 +102,13 @@ commands.
 
 ## Verification Schemas
 
-The SDK does not bake in a proof format. Each request carries a schema URI, and
+The SDK does not bake in a proof format. Each request carries a schema URL, and
 the Provider and Oracle interpret it.
 
 | Schema                   | Use case                                   |
 | ------------------------ | ------------------------------------------ |
-| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
-| `io.anchr.c2pa-image.v1` | C2PA-signed photo/video provenance and GPS |
+| `https://anchr-spec.org/spec/proof/tlsn/v1` | TLSNotary attestation of an HTTPS response |
+| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo/video provenance and GPS |
 
 ## Reference Implementations
 
