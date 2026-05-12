@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-12
 
 ## Priority
 
@@ -29,3 +30,19 @@ Blocks:
 - 現在の gating command、semantic skill、docs lock、e2e bucket を一覧化する。
 - レビュー観点ごとに `automated`、`semantic skill`、`human universal decision`、`not yet covered` の分類を付ける。
 - `not yet covered` の観点を、追加テスト、lint、skill、仕様追記のいずれに変換するか決める。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/review-harness.md`
+- `CLAUDE.md`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Follow-up:
+
+- #0017 should standardize the loop for turning repeated review findings into harness updates.
+- #0018 should define the residual human-review checklist after the harness passes.

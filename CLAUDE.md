@@ -41,6 +41,9 @@ history (`added for X` / `previously did Y`) — caught by
 - `deno task test:all:docker` — Docker-backed e2e
   (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
 
+Use `docs/review-harness.md` to route recurring review findings to automated
+checks, semantic skills, universal docs, or follow-up issues.
+
 Failed test → fix the implementation. Never skip, weaken, or
 `--no-check`.
 
