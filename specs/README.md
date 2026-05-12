@@ -37,6 +37,10 @@ The cryptographic + protocol-state invariants that anchor security claims are
 tracked in [`docs/threat-model.md`](../docs/threat-model.md) and CI-enforced via
 `deno task lint:invariants`.
 
+For the broader placement rule that separates universal protocol contracts from
+architecture, package, adapter, example, and agent harness decisions, see
+[`docs/universality-boundaries.md`](../docs/universality-boundaries.md).
+
 ## License
 
 All specifications in this directory are released under

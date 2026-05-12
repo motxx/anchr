@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-12
 
 ## Priority
 
@@ -29,3 +30,28 @@ Blocks:
 - 普遍性、実装選択、example 固有判断、agent runtime integration の分類基準を文書化する。
 - 新しい設計判断を `specs/`、`docs/threat-model.md`、各 `SPEC.md`、`docs/architecture.md`、`example/` のどこへ置くべきかのルールを定義する。
 - 既存の pending issue がこの分類に従っているか確認し、必要なら追記対象を明確にする。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/universality-boundaries.md`
+- `docs/architecture.md`
+- `specs/README.md`
+
+The new boundary guide classifies universal protocol contracts, security
+invariants, architecture boundaries, package contracts, adapter/runtime
+integrations, example policy, and agent harness rules. It also records where
+pending SDK, component, adapter, and harness issues should place their follow-up
+decisions.
+
+Verified with:
+
+- `deno fmt docs/universality-boundaries.md docs/architecture.md specs/README.md`
+- `deno task lint:strict`
+- `deno task test:all`
+- `deno task test:all:docker`
+
+Follow-up:
+
+- None

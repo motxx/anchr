@@ -146,6 +146,9 @@ encrypted-store primitive ships in `packages/blossom/`.
 - Per-package implementation guides are each package's `SPEC.md`.
 - Threat-model invariants and the attack tests pinning them are in
   [`docs/threat-model.md`](threat-model.md).
+- Cross-document placement rules for universal protocol contracts, security
+  invariants, package contracts, adapters, examples, and agent harness rules are
+  in [`docs/universality-boundaries.md`](universality-boundaries.md).
 
 ## Relation to NIP-90
 
