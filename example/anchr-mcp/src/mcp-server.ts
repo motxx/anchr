@@ -1,11 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import type { QueryService } from "../application/query-service.ts";
+import type { QueryService } from "@anchr/bounty";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
-import type { TlsnCondition, VerificationFactor } from "../domain/types.ts";
-import { VERIFICATION_FACTORS } from "../domain/types.ts";
+import type {
+  TlsnCondition,
+  VerificationFactor,
+} from "@anchr/bounty/domain-types";
+import { VERIFICATION_FACTORS } from "@anchr/bounty/domain-types";
 import {
   handleCancelQuery,
   handleCreateQuery,

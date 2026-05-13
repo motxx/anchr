@@ -2,7 +2,7 @@
  * MCP tool handlers for the Verified Data Marketplace.
  */
 
-import type { McpQueryBackend } from "@anchr/bounty/mcp-query-backend";
+import type { McpQueryBackend } from "@anchr/anchr-mcp/mcp-query-backend";
 
 type McpTextResult = { content: Array<{ type: "text"; text: string }> };
 

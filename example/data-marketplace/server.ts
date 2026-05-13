@@ -11,7 +11,7 @@
  */
 
 import { composeHost } from "@anchr/bounty";
-import { startMcpServer } from "@anchr/bounty/mcp-server";
+import { startMcpServer } from "@anchr/anchr-mcp/mcp-server";
 import { createListingStore } from "./src/marketplace/listing-store.ts";
 import { registerMarketplaceRoutes } from "./src/marketplace/marketplace-routes.ts";
 import {

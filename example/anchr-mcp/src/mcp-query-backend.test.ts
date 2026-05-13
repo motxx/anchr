@@ -1,11 +1,11 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  createOracleRegistry,
   createQueryService,
   type QueryService,
-} from "../application/query-service.ts";
-import { createOracleRegistry } from "./oracle-client/registry.ts";
-import { normalizeQueryResult } from "./attachments.ts";
+} from "@anchr/bounty";
+import { normalizeQueryResult } from "@anchr/bounty/attachment-access";
 import { clearIntegrityStore } from "@anchr/photo-verification/integrity-store";
 import { getMcpQueryBackend } from "./mcp-query-backend.ts";
 

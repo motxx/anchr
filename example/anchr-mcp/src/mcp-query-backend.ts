@@ -5,20 +5,19 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "./attachments.ts";
-import { getRuntimeConfig } from "./config.ts";
-import type { QueryService } from "../application/query-service.ts";
+} from "@anchr/bounty/attachment-access";
+import type { QueryInput, QueryResult, QueryService } from "@anchr/bounty";
 import type {
   AttachmentHandle,
   AttachmentRef,
   Query,
-  QueryInput,
-  QueryResult,
   RequesterMeta,
-} from "../domain/types.ts";
+} from "@anchr/bounty/domain-types";
 
-const runtimeConfig = getRuntimeConfig();
-const localBaseUrl = `http://localhost:${runtimeConfig.httpApiPort}`;
+const httpApiPort = Number(Deno.env.get("HTTP_API_PORT")) || 3000;
+const previewMaxDimension = Number(Deno.env.get("PREVIEW_MAX_DIMENSION")) ||
+  512;
+const localBaseUrl = `http://localhost:${httpApiPort}`;
 
 // --- Shared types for MCP tool responses ---
 
@@ -149,7 +148,7 @@ async function buildPreviewPayload(
   }
 
   const preview = await renderStoredAttachmentPreview(ref, baseUrl, {
-    maxDimension: maxDimension ?? runtimeConfig.previewMaxDimension,
+    maxDimension: maxDimension ?? previewMaxDimension,
   });
 
   if (!preview) {
@@ -233,7 +232,7 @@ function createDefaultBackend(service: QueryService): McpQueryBackend {
     async submitQueryResult(queryId, result, oracleId) {
       const outcome = await service.submitQueryResult(queryId, result, {
         executor_type: "agent",
-        channel: "mcp",
+        channel: "adapter",
       }, oracleId);
       return {
         ok: outcome.ok,
@@ -342,7 +341,7 @@ async function fetchRemotePreview(
       original_size_bytes: metaData.size_bytes ?? null,
       preview_size_bytes: bytes.length,
       preview_mime_type: mimeType,
-      max_dimension: maxDimension ?? runtimeConfig.previewMaxDimension,
+      max_dimension: maxDimension ?? previewMaxDimension,
     },
     image: { data: bytes.toString("base64"), mimeType },
   };

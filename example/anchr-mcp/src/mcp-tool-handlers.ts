@@ -2,13 +2,13 @@
  * Individual MCP tool handler functions.
  */
 
-import type { QueryInput, QueryResult } from "../application/query-service.ts";
+import type { QueryInput, QueryResult } from "@anchr/bounty";
 import type {
   AttachmentRef,
   RequesterMeta,
   TlsnCondition,
   VerificationFactor,
-} from "../domain/types.ts";
+} from "@anchr/bounty/domain-types";
 import type { McpQueryBackend } from "./mcp-query-backend.ts";
 
 function normalizeMcpQueryResult(raw: Record<string, unknown>): QueryResult {
