@@ -35,9 +35,10 @@
  *   [E016] cashu-conditional-swap may only depend on
  *          core-runtime, core-cashu, frost-oracle
  *   [E019] blossom may only depend on core-runtime
- *   [E024] bounty may depend on every primitive package except sdk
- *   [E017] sdk must not depend on any host-side @anchr/* package (other
- *          than core-runtime)
+ *   [E025] protocol may not depend on other @anchr/* packages
+ *   [E026] actor SDKs may depend on protocol and their explicit peer SDKs
+ *   [E024] bounty may depend on every primitive package except actor SDKs
+ *   [E017] sdk may only aggregate protocol and actor SDK packages
  *
  * Rules (example/):
  *   [E023] example/<app>/ must reach Anchr only through `@anchr/*`
@@ -95,6 +96,10 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
     "frost-oracle",
   ]),
   "blossom": new Set<string>(["core-runtime"]),
+  "protocol": new Set<string>(),
+  "oracle-sdk": new Set<string>(["protocol"]),
+  "customer-sdk": new Set<string>(["protocol", "oracle-sdk"]),
+  "provider-sdk": new Set<string>(["protocol"]),
   "bounty": new Set<string>([
     "core-runtime",
     "core-cashu",
@@ -104,7 +109,13 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
     "cashu-conditional-swap",
     "blossom",
   ]),
-  "sdk": new Set<string>(["core-runtime"]),
+  "sdk": new Set<string>([
+    "core-runtime",
+    "protocol",
+    "oracle-sdk",
+    "customer-sdk",
+    "provider-sdk",
+  ]),
 };
 
 const BANNED_PACKAGES = new Set(["express", "dotenv", "ws"]);
@@ -514,6 +525,10 @@ function checkPackageFile(
         ? "E016"
         : pkg === "sdk"
         ? "E017"
+        : pkg === "protocol"
+        ? "E025"
+        : pkg.endsWith("-sdk")
+        ? "E026"
         : "E010";
       violations.push({
         file: fileRel,

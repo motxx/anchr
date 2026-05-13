@@ -19,18 +19,17 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import { createCustomer } from "./customer.ts";
-import { createProvider } from "./provider.ts";
+import { createProvider } from "@anchr/provider-sdk/provider";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
-} from "./events.ts";
-import {
-  type Event,
-  type Filter,
-  generateKeypair,
-  type PublishResult,
-  type RelayClient,
-  type Subscription,
+} from "@anchr/protocol/events";
+import { type Event, generateKeypair } from "@anchr/protocol/nostr";
+import type {
+  Filter,
+  PublishResult,
+  RelayClient,
+  Subscription,
 } from "./nostr.ts";
 import type {
   CashuClient,
@@ -38,7 +37,7 @@ import type {
   RedeemHtlcParams,
   RedeemResult,
 } from "./cashu.ts";
-import type { OracleClient } from "./oracle.ts";
+import type { OracleClient } from "@anchr/oracle-sdk/oracle";
 import { bytesToHex } from "./test-helpers.ts";
 
 // --- Mock relay ---

@@ -48,9 +48,14 @@ packages/
 ├── frost-oracle/              FROST t-of-n threshold-signing primitives (BIP-340 Schnorr)
 ├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
 ├── blossom/                   Encrypted attachment store (BUD-01–06 client)
+├── protocol/                  Pure protocol helpers: wire event builders/parsers,
+│                              schema identifiers, and role-neutral types.
+├── oracle-sdk/                Oracle client port and simple HTTP hash-client adapter.
+├── customer-sdk/              Customer local state, request flow, HTLC lock/bind, and ports.
+├── provider-sdk/              Provider request handling, quote/result flow, redeem gate, and ports.
 ├── bounty/                    Current host-shaped implementation: Query lifecycle, escrow,
 │                              oracle-client/service, worker-api (HTTP), MCP (stdio).
-└── sdk/                       Current Customer / Provider SDK facade for downstream consumers
+└── sdk/                       Aggregate convenience package plus host REST client facade.
 
 example/                       Runnable apps; each owns its design system + deno.json
   ├── anchr-reference-host/    Temporary bundled runtime example, not a protocol actor

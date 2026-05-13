@@ -1,0 +1,39 @@
+{
+  "name": "@anchr/protocol",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./events": "./src/events.ts",
+    "./nostr": "./src/nostr.ts",
+    "./schema": "./src/schema.ts",
+    "./types": "./src/types.ts"
+  },
+  "imports": {
+    "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
+    "nostr-tools/nip44": "npm:nostr-tools@^2/nip44",
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
+    "@std/expect": "jsr:@std/expect@^1",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd"
+  },
+  "publish": {
+    "include": [
+      "src/mod.ts",
+      "src/events.ts",
+      "src/nostr.ts",
+      "src/schema.ts",
+      "src/types.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/*.test.ts"
+    ]
+  },
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test src/"
+  }
+}

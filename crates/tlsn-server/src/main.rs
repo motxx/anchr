@@ -111,7 +111,6 @@ async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
         let state = state.clone();
 
         tokio::spawn(async move {
-            use async_tungstenite::tokio::TokioAdapter;
             use async_tungstenite::tungstenite::handshake::server::{Request, Response, ErrorResponse};
 
             let mut path = String::new();

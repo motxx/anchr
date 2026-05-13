@@ -12,15 +12,14 @@ import {
   parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseSelectionFeedbackEvent,
-} from "./events.ts";
+} from "@anchr/protocol/events";
+import { createRelayClient, type RelayClient } from "./nostr.ts";
 import {
-  createRelayClient,
   type Event as NostrEvent,
   findTagValue,
   type Keypair,
   normalizeSecretKey,
-  type RelayClient,
-} from "./nostr.ts";
+} from "@anchr/protocol/nostr";
 import { getPublicKey } from "nostr-tools/pure";
 import type {
   ProofGenerator,
@@ -29,7 +28,7 @@ import type {
   ProviderQuote,
   ProviderRequestEvent,
 } from "./types.ts";
-import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
+import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
 import { type CashuClient, createCashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */

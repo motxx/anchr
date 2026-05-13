@@ -26,18 +26,16 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { createCustomer } from "../../packages/sdk/src/customer.ts";
-import { createProvider } from "../../packages/sdk/src/provider.ts";
-import { createCashuClient } from "../../packages/sdk/src/cashu.ts";
-import {
-  createRelayClient,
-  generateKeypair,
-} from "../../packages/sdk/src/nostr.ts";
+import { createCustomer } from "@anchr/customer-sdk/customer";
+import { createProvider } from "@anchr/provider-sdk/provider";
+import { createCashuClient } from "@anchr/customer-sdk/cashu";
+import { createRelayClient } from "@anchr/customer-sdk/nostr";
+import { generateKeypair } from "@anchr/protocol/nostr";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
-} from "../../packages/sdk/src/events.ts";
-import type { OracleClient } from "../../packages/sdk/src/oracle.ts";
+} from "@anchr/protocol/events";
+import type { OracleClient } from "@anchr/oracle-sdk/oracle";
 import { getDecodedToken, Wallet } from "@cashu/cashu-ts";
 
 import {
