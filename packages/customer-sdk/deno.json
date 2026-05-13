@@ -12,6 +12,7 @@
     "@anchr/oracle-sdk": "../oracle-sdk/src/mod.ts",
     "@anchr/oracle-sdk/oracle": "../oracle-sdk/src/oracle.ts",
     "@anchr/protocol": "../protocol/src/mod.ts",
+    "@anchr/protocol/capabilities": "../protocol/src/capabilities.ts",
     "@anchr/protocol/events": "../protocol/src/events.ts",
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",

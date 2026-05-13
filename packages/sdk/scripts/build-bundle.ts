@@ -7,6 +7,7 @@ const packageDir = resolve(scriptDir, "..");
 
 const aliases = new Map<string, string>([
   ["@anchr/protocol", "../protocol/src/mod.ts"],
+  ["@anchr/protocol/capabilities", "../protocol/src/capabilities.ts"],
   ["@anchr/protocol/events", "../protocol/src/events.ts"],
   ["@anchr/protocol/nostr", "../protocol/src/nostr.ts"],
   ["@anchr/protocol/schema", "../protocol/src/schema.ts"],

@@ -13,7 +13,7 @@ import {
   parseQueryRequestEvent,
   parseSelectionFeedbackEvent,
 } from "@anchr/protocol/events";
-import { createRelayClient, type RelayClient } from "./nostr.ts";
+import type { RelayClient } from "./nostr.ts";
 import {
   type Event as NostrEvent,
   findTagValue,
@@ -29,7 +29,7 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
-import { type CashuClient, createCashuClient } from "./cashu.ts";
+import type { CashuClient } from "./cashu.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -98,6 +98,12 @@ export function validateProviderOptions(
   if (typeof o.privKey !== "string" || o.privKey.length === 0) {
     throw new ProviderConfigError("privKey must be a non-empty string");
   }
+  if (o.cashuClient === undefined || o.cashuClient === null) {
+    throw new ProviderConfigError("cashuClient adapter is required");
+  }
+  if (o.relayClient === undefined || o.relayClient === null) {
+    throw new ProviderConfigError("relayClient adapter is required");
+  }
   if (o.notary !== undefined) {
     if (typeof o.notary !== "string" || o.notary.length === 0) {
       throw new ProviderConfigError(
@@ -154,8 +160,7 @@ export function createProvider(options: ProviderOptions): Provider {
   const relays = [...options.relays];
   const mint = options.mint;
   const notary = options.notary;
-  const cashuClient = options.cashuClient ??
-    createCashuClient({ mintUrl: mint });
+  const cashuClient = options.cashuClient;
   const selectionTimeoutMs = options.selectionTimeoutMs ??
     DEFAULT_SELECTION_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ??
@@ -176,9 +181,7 @@ export function createProvider(options: ProviderOptions): Provider {
     pubkey,
 
     async serve(handler: ProviderHandler): Promise<void> {
-      const ownsRelayClient = options.relayClient === undefined;
-      const relayClient: RelayClient = options.relayClient ??
-        createRelayClient(relays);
+      const relayClient: RelayClient = options.relayClient;
 
       return new Promise<void>((resolveServe) => {
         const sub = relayClient.subscribe(
@@ -202,7 +205,6 @@ export function createProvider(options: ProviderOptions): Provider {
 
         state.stop = () => {
           sub.close();
-          if (ownsRelayClient) relayClient.close();
           state.stop = undefined;
           resolveServe();
         };

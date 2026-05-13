@@ -15,8 +15,10 @@
 
 import {
   type CashuProof,
+  createCashuClient,
   createCustomer,
   createHttpOracleClient,
+  createRelayClient,
   DEFINED_SCHEMAS,
 } from "anchr-sdk";
 
@@ -41,6 +43,8 @@ const customer = createCustomer({
     oraclePubkey,
     apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
   }),
+  cashuClient: createCashuClient({ mintUrl: mint }),
+  relayClient: createRelayClient(relays),
   quoteWindowMs: Number(Deno.env.get("QUOTE_WINDOW_MS") ?? "30000"),
   resultTimeoutMs: Number(Deno.env.get("RESULT_TIMEOUT_MS") ?? "600000"),
 });

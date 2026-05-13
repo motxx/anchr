@@ -34,6 +34,7 @@ import {
   verifyHTLCHash,
   Wallet,
 } from "@cashu/cashu-ts";
+import type { AdapterManifest } from "@anchr/protocol/capabilities";
 
 /**
  * A Cashu proof — typed as `unknown` so downstream cashu-ts types do not
@@ -114,6 +115,8 @@ export interface CashuToken {
  * Provider-side method:  `redeemHtlc`.
  */
 export interface CashuClient {
+  /** Adapter metadata for capability/conformance checks. */
+  readonly manifest?: AdapterManifest;
   /** Phase 1: build the initial HTLC lock with no provider bound yet. */
   buildHtlcLock(params: BuildHtlcLockParams): Promise<CashuToken>;
   /** Phase 2: swap to add the selected provider's pubkey to the lock. */
@@ -317,6 +320,13 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
   }
 
   return {
+    manifest: {
+      id: "cashu-htlc",
+      technology: "cashu",
+      capabilities: ["payment"],
+      runtimes: ["browser", "deno", "node"],
+      experimental: true,
+    },
     mintUrl,
 
     async buildHtlcLock(p: BuildHtlcLockParams): Promise<CashuToken> {

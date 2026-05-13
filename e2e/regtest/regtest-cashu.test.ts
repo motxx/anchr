@@ -142,12 +142,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     const submitOutcome = await testService.submitQueryResult(
       created.id,
       {
-        attachments: [{
-          id: "e2e_test_hash_deadbeef",
-          uri: "http://localhost:3333/e2e-test.jpg",
-          mime_type: "image/jpeg",
-          storage_kind: "blossom",
-        }],
+        attachments: [],
         gps: { lat: 35.6595, lon: 139.7004 },
       },
       { executor_type: "human", channel: "adapter" },

@@ -120,6 +120,17 @@ test("createCashuClient stores the mint URL on the returned client", () => {
   expect(client.mintUrl).toBe("https://mint.example.org");
 });
 
+test("createCashuClient exposes payment adapter capability metadata", () => {
+  const client = createCashuClient({ mintUrl: "https://mint.example.org" });
+  expect(client.manifest).toEqual({
+    id: "cashu-htlc",
+    technology: "cashu",
+    capabilities: ["payment"],
+    runtimes: ["browser", "deno", "node"],
+    experimental: true,
+  });
+});
+
 test("createCashuClient rejects an empty mint URL", () => {
   expect(() => createCashuClient({ mintUrl: "" })).toThrow(CashuClientError);
 });

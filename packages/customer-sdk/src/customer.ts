@@ -6,7 +6,7 @@
  * returns the verified data + proof.
  */
 
-import { type CashuToken, createCashuClient } from "./cashu.ts";
+import type { CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
   Quote,
@@ -18,11 +18,7 @@ import {
   isSchemaUri,
   resolveVerifierAdapter,
 } from "@anchr/protocol/schema";
-import {
-  createRelayClient,
-  type PublishResult,
-  type RelayClient,
-} from "./nostr.ts";
+import type { PublishResult, RelayClient } from "./nostr.ts";
 import {
   type Event as NostrEvent,
   generateKeypair,
@@ -181,6 +177,12 @@ export function validateCustomerOptions(
   if (o.oracleClient === undefined || o.oracleClient === null) {
     throw new CustomerConfigError("oracleClient is required");
   }
+  if (o.cashuClient === undefined || o.cashuClient === null) {
+    throw new CustomerConfigError("cashuClient adapter is required");
+  }
+  if (o.relayClient === undefined || o.relayClient === null) {
+    throw new CustomerConfigError("relayClient adapter is required");
+  }
 }
 
 /** Generate a unique query identifier for a single request. */
@@ -202,8 +204,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const relays = [...options.relays];
   const mint = options.mint;
   const oracleClient = options.oracleClient;
-  const cashuClient = options.cashuClient ??
-    createCashuClient({ mintUrl: mint });
+  const cashuClient = options.cashuClient;
   const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
@@ -251,158 +252,150 @@ export function createCustomer(options: CustomerOptions): Customer {
         sourceProofs: req.sourceProofs,
       });
 
-      const ownsRelayClient = options.relayClient === undefined;
-      const relayClient: RelayClient = options.relayClient ??
-        createRelayClient(relays);
+      const relayClient: RelayClient = options.relayClient;
+
+      const requestPayload: QueryRequestPayload = {
+        query_id: queryId,
+        schema: req.spec.schema,
+        predicate: req.spec.predicate,
+        description: req.spec.description,
+        customer_pubkey: identity.publicKey,
+        oracle_pubkey: oraclePubkey,
+        mint_url: mint,
+        bounty_token: initialLock.token,
+        max_amount_sats: req.payment.maxAmount,
+        locktime_seconds: locktimeSeconds,
+        expires_at: Date.now() + quoteWindowMs,
+      };
+      const requestEvent = buildQueryRequestEvent(identity, requestPayload);
+      const publishResult = await relayClient.publish(requestEvent);
+
+      if (publishResult.successes.length === 0) {
+        throw new RelayPublishError(publishResult);
+      }
+
+      const quotes: Quote[] = [];
+      let totalReceived = 0;
+      const sub = relayClient.subscribe(
+        {
+          kinds: [7000],
+          "#e": [requestEvent.id],
+        },
+        (event) => {
+          const parsed = parseQuoteFeedbackEvent(event);
+          if (parsed === null) return;
+          totalReceived++;
+          if (parsed.amount_sats > req.payment.maxAmount) return;
+          if (
+            req.provider !== undefined &&
+            parsed.provider_pubkey !== req.provider
+          ) return;
+          quotes.push({
+            providerPubkey: parsed.provider_pubkey,
+            amountSats: parsed.amount_sats,
+            quoteEventId: event.id,
+            receivedAt: Date.now(),
+          });
+        },
+      );
 
       try {
-        const requestPayload: QueryRequestPayload = {
-          query_id: queryId,
-          schema: req.spec.schema,
-          predicate: req.spec.predicate,
-          description: req.spec.description,
-          customer_pubkey: identity.publicKey,
-          oracle_pubkey: oraclePubkey,
-          mint_url: mint,
-          bounty_token: initialLock.token,
-          max_amount_sats: req.payment.maxAmount,
-          locktime_seconds: locktimeSeconds,
-          expires_at: Date.now() + quoteWindowMs,
-        };
-        const requestEvent = buildQueryRequestEvent(identity, requestPayload);
-        const publishResult = await relayClient.publish(requestEvent);
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, quoteWindowMs)
+        );
+      } finally {
+        sub.close();
+      }
 
-        if (publishResult.successes.length === 0) {
-          throw new RelayPublishError(publishResult);
-        }
+      const selected = selector(quotes);
+      if (selected === null) {
+        throw new NoQuotesReceivedError(quoteWindowMs, totalReceived);
+      }
 
-        const quotes: Quote[] = [];
-        let totalReceived = 0;
-        const sub = relayClient.subscribe(
+      // Pass proofs directly rather than re-decoding the broadcast token:
+      // the encoded V4 form truncates keyset IDs and would require wallet
+      // keychain access to map them back.
+      const boundLock: CashuToken = await cashuClient.bindProvider({
+        initialProofs: initialLock.proofs,
+        providerPubkey: selected.providerPubkey,
+        hashHex: hash,
+        locktimeSeconds,
+        customerPubkey: identity.publicKey,
+        customerSecretKey: identity.secretKey,
+      });
+
+      const selectionPayload: SelectionFeedbackPayload = {
+        status: "processing",
+        selected_provider_pubkey: selected.providerPubkey,
+        bound_token: boundLock.token,
+      };
+      const selectionEvent = buildSelectionFeedbackEvent(
+        identity,
+        requestEvent.id,
+        selectionPayload,
+      );
+      await relayClient.publish(selectionEvent);
+
+      const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
+        // Mutable holder so the subscribe callback can reach the
+        // eventually-set timeout id (and vice versa).
+        const handles: {
+          sub?: { close(): void };
+          timeoutId?: ReturnType<typeof setTimeout>;
+        } = {};
+        handles.sub = relayClient.subscribe(
           {
-            kinds: [7000],
+            kinds: [6300],
             "#e": [requestEvent.id],
+            authors: [selected.providerPubkey],
           },
           (event) => {
-            const parsed = parseQuoteFeedbackEvent(event);
-            if (parsed === null) return;
-            totalReceived++;
-            if (parsed.amount_sats > req.payment.maxAmount) return;
-            if (
-              req.provider !== undefined &&
-              parsed.provider_pubkey !== req.provider
-            ) return;
-            quotes.push({
-              providerPubkey: parsed.provider_pubkey,
-              amountSats: parsed.amount_sats,
-              quoteEventId: event.id,
-              receivedAt: Date.now(),
-            });
+            handles.sub?.close();
+            if (handles.timeoutId !== undefined) {
+              clearTimeout(handles.timeoutId);
+            }
+            resolve(event);
           },
         );
-
-        try {
-          await new Promise<void>((resolve) =>
-            setTimeout(resolve, quoteWindowMs)
+        handles.timeoutId = setTimeout(() => {
+          handles.sub?.close();
+          reject(
+            new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey),
           );
-        } finally {
-          sub.close();
-        }
+        }, resultTimeoutMs);
+      });
 
-        const selected = selector(quotes);
-        if (selected === null) {
-          throw new NoQuotesReceivedError(quoteWindowMs, totalReceived);
-        }
-
-        // Pass proofs directly rather than re-decoding the broadcast token:
-        // the encoded V4 form truncates keyset IDs and would require wallet
-        // keychain access to map them back.
-        const boundLock: CashuToken = await cashuClient.bindProvider({
-          initialProofs: initialLock.proofs,
-          providerPubkey: selected.providerPubkey,
-          hashHex: hash,
-          locktimeSeconds,
-          customerPubkey: identity.publicKey,
-          customerSecretKey: identity.secretKey,
-        });
-
-        const selectionPayload: SelectionFeedbackPayload = {
-          status: "processing",
-          selected_provider_pubkey: selected.providerPubkey,
-          bound_token: boundLock.token,
-        };
-        const selectionEvent = buildSelectionFeedbackEvent(
-          identity,
-          requestEvent.id,
-          selectionPayload,
-        );
-        await relayClient.publish(selectionEvent);
-
-        const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
-          // Mutable holder so the subscribe callback can reach the
-          // eventually-set timeout id (and vice versa).
-          const handles: {
-            sub?: { close(): void };
-            timeoutId?: ReturnType<typeof setTimeout>;
-          } = {};
-          handles.sub = relayClient.subscribe(
-            {
-              kinds: [6300],
-              "#e": [requestEvent.id],
-              authors: [selected.providerPubkey],
-            },
-            (event) => {
-              handles.sub?.close();
-              if (handles.timeoutId !== undefined) {
-                clearTimeout(handles.timeoutId);
-              }
-              resolve(event);
-            },
-          );
-          handles.timeoutId = setTimeout(() => {
-            handles.sub?.close();
-            reject(
-              new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey),
-            );
-          }, resultTimeoutMs);
-        });
-
-        const response = parseQueryResponseEvent(
-          resultEvent,
-          identity.secretKey,
+      const response = parseQueryResponseEvent(
+        resultEvent,
+        identity.secretKey,
+        selected.providerPubkey,
+      );
+      if (response === null) {
+        throw new ResultTimeoutError(
+          resultTimeoutMs,
           selected.providerPubkey,
         );
-        if (response === null) {
-          throw new ResultTimeoutError(
-            resultTimeoutMs,
-            selected.providerPubkey,
-          );
-        }
+      }
 
-        const verifier = resolveVerifierAdapter(
-          verifierAdapters,
-          req.spec.schema,
+      const verifier = resolveVerifierAdapter(
+        verifierAdapters,
+        req.spec.schema,
+      );
+      if (verifier !== null) {
+        const ok = await Promise.resolve(
+          verifier.verify(response.proof, req.spec.predicate, response.data),
         );
-        if (verifier !== null) {
-          const ok = await Promise.resolve(
-            verifier.verify(response.proof, req.spec.predicate, response.data),
-          );
-          if (!ok) {
-            throw new SchemaVerificationError(req.spec.schema);
-          }
-        }
-
-        return {
-          data: response.data,
-          proof: response.proof,
-          providerPubkey: selected.providerPubkey,
-          schema: response.schema,
-        };
-      } finally {
-        if (ownsRelayClient) {
-          relayClient.close();
+        if (!ok) {
+          throw new SchemaVerificationError(req.spec.schema);
         }
       }
+
+      return {
+        data: response.data,
+        proof: response.proof,
+        providerPubkey: selected.providerPubkey,
+        schema: response.schema,
+      };
     },
   };
 }

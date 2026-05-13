@@ -17,7 +17,9 @@
  */
 
 import {
+  createCashuClient,
   createProvider,
+  createRelayClient,
   DEFINED_SCHEMAS,
   type ProviderRequestEvent,
 } from "anchr-sdk";
@@ -53,6 +55,8 @@ const provider = createProvider({
   relays,
   mint,
   privKey,
+  cashuClient: createCashuClient({ mintUrl: mint }),
+  relayClient: createRelayClient(relays),
   notary: Deno.env.get("TLSN_NOTARY_URL") ?? undefined,
   selectionTimeoutMs: Number(Deno.env.get("SELECTION_TIMEOUT_MS") ?? "120000"),
   preimageTimeoutMs: Number(Deno.env.get("PREIMAGE_TIMEOUT_MS") ?? "300000"),

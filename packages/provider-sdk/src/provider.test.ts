@@ -122,10 +122,16 @@ test("validateProviderOptions rejects empty-string notary when provided", () => 
     .toThrow(ProviderConfigError);
 });
 
-test("validateProviderOptions accepts missing cashuClient (SDK builds one from mint)", () => {
+test("validateProviderOptions rejects missing cashuClient adapter", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.cashuClient;
-  expect(() => validateProviderOptions(opts)).not.toThrow();
+  expect(() => validateProviderOptions(opts)).toThrow(ProviderConfigError);
+});
+
+test("validateProviderOptions rejects missing relayClient adapter", () => {
+  const opts: Record<string, unknown> = { ...validOptions() };
+  delete opts.relayClient;
+  expect(() => validateProviderOptions(opts)).toThrow(ProviderConfigError);
 });
 
 test("validateProviderOptions accepts proof generator adapters", () => {

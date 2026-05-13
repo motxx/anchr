@@ -142,10 +142,16 @@ test("validateCustomerOptions rejects missing oracleClient", () => {
   expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
 });
 
-test("validateCustomerOptions accepts missing cashuClient (SDK builds one from mint)", () => {
+test("validateCustomerOptions rejects missing cashuClient adapter", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.cashuClient;
-  expect(() => validateCustomerOptions(opts)).not.toThrow();
+  expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
+});
+
+test("validateCustomerOptions rejects missing relayClient adapter", () => {
+  const opts: Record<string, unknown> = { ...validOptions() };
+  delete opts.relayClient;
+  expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
 });
 
 test("validateCustomerOptions rejects a non-object input", () => {

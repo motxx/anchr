@@ -21,6 +21,7 @@ import {
   getConversationKey,
 } from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
+import type { AdapterManifest } from "@anchr/protocol/capabilities";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;
@@ -158,6 +159,8 @@ export async function publishOnce(
 
 /** A long-lived relay client for repeated publish + subscribe. */
 export interface RelayClient {
+  /** Adapter metadata for capability/conformance checks. */
+  readonly manifest?: AdapterManifest;
   publish(event: Event): Promise<PublishResult>;
   subscribe(
     filter: Filter,
@@ -190,6 +193,13 @@ export function createRelayClient(relays: readonly string[]): RelayClient {
   const relayList = [...relays];
 
   return {
+    manifest: {
+      id: "nostr-relay",
+      technology: "nostr",
+      capabilities: ["transport", "signer"],
+      runtimes: ["browser", "deno", "node"],
+      experimental: true,
+    },
     async publish(event: Event): Promise<PublishResult> {
       const promises = pool.publish(relayList, event);
       const results = await Promise.allSettled(promises);

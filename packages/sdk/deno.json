@@ -9,6 +9,7 @@
     "@std/expect": "jsr:@std/expect@^1",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "@anchr/protocol": "../protocol/src/mod.ts",
+    "@anchr/protocol/capabilities": "../protocol/src/capabilities.ts",
     "@anchr/protocol/events": "../protocol/src/events.ts",
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",

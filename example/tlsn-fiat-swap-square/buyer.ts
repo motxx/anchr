@@ -6,7 +6,11 @@
  * and redeem the HTLC when the Oracle releases the preimage.
  */
 
-import { createProvider } from "anchr-sdk";
+import {
+  createCashuClient,
+  createProvider,
+  createRelayClient,
+} from "anchr-sdk";
 import {
   buildFiatSwapResultData,
   FIAT_SWAP_SCHEMA,
@@ -25,6 +29,8 @@ try {
     relays: config.relays,
     mint: config.mintUrl,
     privKey: config.providerPrivKey,
+    cashuClient: createCashuClient({ mintUrl: config.mintUrl }),
+    relayClient: createRelayClient(config.relays),
     notary: config.notaryUrl,
     selectionTimeoutMs: config.selectionTimeoutMs,
     preimageTimeoutMs: config.preimageTimeoutMs,

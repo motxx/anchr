@@ -46,6 +46,16 @@ export {
 } from "@anchr/customer-sdk/customer";
 
 export {
+  type AdapterCapability,
+  type AdapterManifest,
+  type CapabilityAdapter,
+  type CapabilityCheckResult,
+  checkCapabilities,
+  missingCapabilities,
+  type RuntimeTarget,
+} from "@anchr/protocol/capabilities";
+
+export {
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,

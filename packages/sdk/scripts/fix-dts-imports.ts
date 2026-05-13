@@ -7,6 +7,7 @@ const distDir = join(scriptDir, "..", "dist");
 
 const aliases = new Map<string, string>([
   ["@anchr/protocol", "protocol/src/mod.js"],
+  ["@anchr/protocol/capabilities", "protocol/src/capabilities.js"],
   ["@anchr/protocol/events", "protocol/src/events.js"],
   ["@anchr/protocol/nostr", "protocol/src/nostr.js"],
   ["@anchr/protocol/schema", "protocol/src/schema.js"],

@@ -28,8 +28,10 @@ export interface ProviderOptions {
   mint: string;
   /** Provider's secret key (nsec or hex). */
   privKey: string;
-  cashuClient?: CashuClient;
-  relayClient?: RelayClient;
+  /** Payment adapter. The bundled Cashu HTLC adapter is one implementation. */
+  cashuClient: CashuClient;
+  /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
+  relayClient: RelayClient;
   /** Optional: TLSN notary URL. */
   notary?: string;
   selectionTimeoutMs?: number;

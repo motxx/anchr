@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "exports": {
     ".": "./src/mod.ts",
+    "./capabilities": "./src/capabilities.ts",
     "./events": "./src/events.ts",
     "./nostr": "./src/nostr.ts",
     "./schema": "./src/schema.ts",
@@ -18,6 +19,7 @@
   "publish": {
     "include": [
       "src/mod.ts",
+      "src/capabilities.ts",
       "src/events.ts",
       "src/nostr.ts",
       "src/schema.ts",

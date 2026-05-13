@@ -5,7 +5,12 @@
  * a Provider quote, and wait for the Provider's Square Sandbox TLSN result.
  */
 
-import { createCustomer, createHttpOracleClient } from "anchr-sdk";
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createRelayClient,
+} from "anchr-sdk";
 import {
   buildFiatSwapSpec,
   FiatSwapConfigError,
@@ -42,6 +47,8 @@ try {
     relays: config.relays,
     mint: config.mintUrl,
     oracleClient,
+    cashuClient: createCashuClient({ mintUrl: config.mintUrl }),
+    relayClient: createRelayClient(config.relays),
     quoteWindowMs: config.quoteWindowMs,
     resultTimeoutMs: config.resultTimeoutMs,
   });

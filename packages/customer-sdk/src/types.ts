@@ -24,8 +24,10 @@ export interface CustomerOptions {
   mint: string;
   /** Adapter for talking to the oracle. */
   oracleClient: OracleClient;
-  cashuClient?: CashuClient;
-  relayClient?: RelayClient;
+  /** Payment adapter. The bundled Cashu HTLC adapter is one implementation. */
+  cashuClient: CashuClient;
+  /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
+  relayClient: RelayClient;
   quoteSelector?: QuoteSelector;
   quoteWindowMs?: number;
   resultTimeoutMs?: number;

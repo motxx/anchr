@@ -91,6 +91,28 @@ Customer/Provider/Oracle actor names follow
 | Local actor state     | Track one actor's private progress without making local implementation state part of the network contract.                                                      | Actor configuration, observed messages, wallet state, verifier state, retry state, persisted tickets.        | Local projections, preflight tickets, idempotency records, retry schedule, audit records. | Corrupt store, conflicting events, missing idempotency record, stale local policy, failed persistence.                       | Actor SDK storage ports; current `@anchr/bounty` Query lifecycle scaffolding.         |
 | Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, app-owned HTTP route, MCP tool, mobile or web bridge.                        | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | `example/anchr-mcp`, `example/data-marketplace`, example apps.                         |
 
+### Adapter Capability Contracts
+
+Nostr, Cashu, TLSNotary, Blossom, and similar concrete technologies are adapter
+or primitive-package choices. Actor SDK core code must depend on injected ports
+for transport, payment, proof production, proof verification, attachments,
+local state, and signing. Concrete adapters may expose
+`AdapterManifest` metadata from `@anchr/protocol/capabilities` so apps and
+tests can check whether an adapter satisfies the capabilities a flow needs.
+
+Current reference adapters:
+
+- `@anchr/customer-sdk/nostr` and `@anchr/provider-sdk/nostr`: Nostr transport
+  over relay clients.
+- `@anchr/customer-sdk/cashu` and `@anchr/provider-sdk/cashu`: Cashu HTLC
+  payment and redeem.
+- `ProofGenerator` and `VerifierAdapter`: schema-selected proof engine ports.
+- `@anchr/blossom` and bounty attachment helpers: encrypted attachment
+  transport primitives.
+
+Customer and Provider constructors require the runtime adapters explicitly.
+They do not create relay or wallet clients behind the caller's back.
+
 ## Naming migration
 
 Public protocol, docs, SDKs, and examples should use **Customer**, **Provider**,

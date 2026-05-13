@@ -44,6 +44,7 @@
     "@noble/curves/secp256k1": "npm:@noble/curves@^2/secp256k1.js",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
     "@anchr/protocol": "./packages/protocol/src/mod.ts",
+    "@anchr/protocol/capabilities": "./packages/protocol/src/capabilities.ts",
     "@anchr/protocol/events": "./packages/protocol/src/events.ts",
     "@anchr/protocol/nostr": "./packages/protocol/src/nostr.ts",
     "@anchr/protocol/schema": "./packages/protocol/src/schema.ts",
