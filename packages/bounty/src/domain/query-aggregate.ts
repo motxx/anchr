@@ -290,7 +290,7 @@ export function recordResult(
       status: "verifying",
       result,
       submitted_at: clock.now(),
-      submission_meta: { executor_type: "human", channel: "worker_api" },
+      submission_meta: { executor_type: "human", channel: "adapter" },
       blossom_keys: blossomKeys,
     },
   };

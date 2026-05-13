@@ -88,14 +88,11 @@
   },
   "unstable": ["sloppy-imports", "detect-cjs"],
   "tasks": {
-    "start": "deno run --allow-net --allow-env --allow-read --allow-write --allow-run --allow-sys --env example/anchr-reference-host/server.ts",
-    "dev": "deno run --watch --allow-all --env example/anchr-reference-host/server.ts",
-
     "check": "deno check packages/ e2e/ scripts/",
     "test": "deno task test:unit && deno task test:integration && deno task test:e2e:protocol && deno task test:scripts && deno task test:examples",
     "publish:dry-run": "deno publish --dry-run --allow-dirty --config packages/core-runtime/deno.json && deno publish --dry-run --allow-dirty --config packages/core-cashu/deno.json && deno publish --dry-run --allow-dirty --config packages/tlsn-toolkit/deno.json && deno publish --dry-run --allow-dirty --config packages/photo-verification/deno.json && deno publish --dry-run --allow-dirty --config packages/frost-oracle/deno.json && deno publish --dry-run --allow-dirty --config packages/cashu-conditional-swap/deno.json && deno publish --dry-run --allow-dirty --config packages/blossom/deno.json && deno publish --dry-run --allow-dirty --config packages/protocol/deno.json && deno publish --dry-run --allow-dirty --config packages/oracle-sdk/deno.json && deno publish --dry-run --allow-dirty --config packages/customer-sdk/deno.json && deno publish --dry-run --allow-dirty --config packages/provider-sdk/deno.json && deno publish --dry-run --allow-dirty --config packages/bounty/deno.json && deno publish --dry-run --allow-dirty --config packages/sdk/deno.json",
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
-    "test:integration": "bash -c 'deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $(find packages -name \"*.integration.test.ts\" -type f)'",
+    "test:integration": "bash -c 'files=$(find packages -name \"*.integration.test.ts\" -type f); if [ -z \"$files\" ]; then echo \"No package integration tests\"; exit 0; fi; deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $files'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:examples": "deno test --allow-all example/ --ignore=example/expo-worker-app",
 
@@ -104,8 +101,6 @@
     "test:e2e:regtest": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/regtest/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys --allow-ffi",
     "test:e2e:frost": "FROST_E2E_REQUIRE_CORE=1 deno test e2e/frost/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:tlsn": "TLSN_E2E_REQUIRE_CORE=1 deno test e2e/tlsn/ --allow-all",
-    "test:e2e:pentest": "deno test e2e/pentest/ --allow-env --allow-read --allow-net --allow-run --allow-sys",
-    "test:e2e:web": "deno test e2e/web/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
 
     "test:all": "./scripts/test-all.sh --local",
     "test:all:docker": "./scripts/test-all.sh --docker",

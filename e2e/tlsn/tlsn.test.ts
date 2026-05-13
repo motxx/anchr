@@ -4,8 +4,6 @@
  * Prerequisites:
  *   - Docker Verifier Server: docker compose up tlsn-verifier -d
  *   - Rust binaries built: cd crates/tlsn-prover && cargo build
- *   - Anchr server running: deno task dev
- *
  * Run:
  *   deno task test:e2e:tlsn
  */
@@ -13,7 +11,6 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
-import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
 import {
   createQueryService,
   createQueryStore,
@@ -228,7 +225,7 @@ describe("TLSNotary E2E", () => {
     const outcome = await svc.submitQueryResult(
       query.id,
       result,
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
 
     expect(outcome.ok).toBe(true);
@@ -267,7 +264,7 @@ describe("TLSNotary E2E", () => {
     const outcome = await svc.submitQueryResult(
       query.id,
       { attachments: [] },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
 
     expect(outcome.ok).toBe(false);
@@ -290,13 +287,8 @@ describe("TLSNotary E2E", () => {
         hooks: {},
         oracleRegistry: createOracleRegistry(),
       });
-      const app = buildWorkerApiApp({ queryService: testService });
-
-      // Create query
-      const createRes = await app.request("/queries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const query = testService.createQuery(
+        {
           description: "E2E: extension result test",
           verification_requirements: ["tlsn"],
           visibility: "requester_only",
@@ -308,40 +300,32 @@ describe("TLSNotary E2E", () => {
               description: "Product code exists",
             }],
           },
-          ttl_seconds: 600,
-        }),
-      });
-      expect(createRes.status).toBe(201);
-      const { query_id } = await createRes.json() as { query_id: string };
+        },
+        { ttlSeconds: 600 },
+      );
 
       // Generate real presentation via CLI prover
       const presentationB64 = await generatePresentation(TARGET_URL);
 
-      // Submit as extension result — exercises the extension path in verifier.ts
-      const submitRes = await app.request(`/queries/${query_id}/result`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_tlsn_worker",
+      const submitOutcome = await testService.submitQueryResult(
+        query.id,
+        {
+          attachments: [],
           tlsn_extension_result: { presentation: presentationB64 },
-        }),
-      });
-
-      const submitData = await submitRes.json() as Record<string, unknown>;
-      expect(submitData.ok).toBe(true);
-      expect((submitData.verification as Record<string, unknown>)?.passed).toBe(
-        true,
+        },
+        { executor_type: "human", channel: "adapter" },
       );
+      expect(submitOutcome.ok).toBe(true);
+      expect(submitOutcome.query?.verification?.passed).toBe(true);
 
       // Verify that tlsn_verified data is populated
-      const verified = (submitData.verification as Record<string, unknown>)
-        ?.tlsn_verified as Record<string, unknown>;
+      const verified = submitOutcome.query?.verification?.tlsn_verified;
       expect(verified?.server_name).toBe(TARGET_SERVER);
       expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
     },
   );
 
-  test("HTTP API accepts tlsn_presentation field", async () => {
+  test("service accepts TLSNotary presentation result", async () => {
     if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
       console.error("[e2e] SKIPPED — infrastructure not ready");
       return;
@@ -351,13 +335,8 @@ describe("TLSNotary E2E", () => {
       hooks: {},
       oracleRegistry: createOracleRegistry(),
     });
-    const app = buildWorkerApiApp({ queryService: testService });
-
-    // Create query
-    const createRes = await app.request("/queries", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const query = testService.createQuery(
+      {
         description: "E2E: HTTP API test",
         verification_requirements: ["tlsn"],
         visibility: "requester_only",
@@ -369,28 +348,22 @@ describe("TLSNotary E2E", () => {
             description: "BTC/JPY price",
           }],
         },
-        ttl_seconds: 600,
-      }),
-    });
-    expect(createRes.status).toBe(201);
-    const { query_id } = await createRes.json() as { query_id: string };
+      },
+      { ttlSeconds: 600 },
+    );
 
     // Generate and submit real presentation
     const presentationB64 = await generatePresentation(TARGET_URL);
 
-    const submitRes = await app.request(`/queries/${query_id}/result`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        worker_pubkey: "e2e_tlsn_worker",
-        tlsn_presentation: presentationB64,
-      }),
-    });
-
-    const submitData = await submitRes.json() as Record<string, unknown>;
-    expect(submitData.ok).toBe(true);
-    expect((submitData.verification as Record<string, unknown>)?.passed).toBe(
-      true,
+    const submitOutcome = await testService.submitQueryResult(
+      query.id,
+      {
+        attachments: [],
+        tlsn_attestation: { presentation: presentationB64 },
+      },
+      { executor_type: "human", channel: "adapter" },
     );
+    expect(submitOutcome.ok).toBe(true);
+    expect(submitOutcome.query?.verification?.passed).toBe(true);
   });
 });

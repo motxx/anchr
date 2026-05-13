@@ -14,11 +14,10 @@ mint state, and encrypted Blossom attachments. A deployment may bundle multiple
 roles into one process for development, but that process is not a fourth
 protocol actor and must not be required for interoperability.
 
-The current repository is mid-refactor. It still contains a host-shaped
-`@anchr/bounty` package and `example/anchr-reference-host/`, but those are
-implementation scaffolding around the three actor model. Concrete deployments
-live in `example/`. No package depends on `example/` code: packages flow into
-examples, never the other way.
+The repository still contains `@anchr/bounty` as migration scaffolding around
+the three actor model, but the bundled Reference Host and shared worker HTTP
+gateway have been removed. Concrete deployments live in `example/`. No package
+depends on `example/` code: packages flow into examples, never the other way.
 
 ## Target layer stack
 
@@ -31,7 +30,7 @@ The refactor target is five layers, from most reusable to most concrete:
 3. Actor SDKs: `@anchr/customer-sdk`, `@anchr/provider-sdk`, and
    `@anchr/oracle-sdk`. Each SDK owns local state and injects ports for relays,
    wallets, signers, proof generation, verification, and storage.
-4. Adapters: CLI, HTTP gateway, MCP, Discord bot, mobile bridge, web UI bridge,
+4. Adapters: CLI, app-owned HTTP routes, MCP, Discord bot, mobile bridge, web UI bridge,
    or any other runtime integration. Adapters call SDKs; SDKs do not depend on
    adapters.
 5. Examples and apps: runnable compositions that choose relays, mints, oracles,
@@ -53,14 +52,13 @@ packages/
 ├── oracle-sdk/                Oracle client port and simple HTTP hash-client adapter.
 ├── customer-sdk/              Customer local state, request flow, HTLC lock/bind, and ports.
 ├── provider-sdk/              Provider request handling, quote/result flow, redeem gate, and ports.
-├── bounty/                    Current host-shaped implementation: Query lifecycle, escrow,
-│                              oracle-client/service, worker-api (HTTP).
+├── bounty/                    Migration scaffolding: Query lifecycle, escrow,
+│                              oracle-client/service, verification adapters.
 └── sdk/                       Aggregate convenience package plus host REST client facade.
 
 example/                       Runnable apps; each owns its design system + deno.json
-  ├── anchr-reference-host/    Temporary bundled runtime example, not a protocol actor
   ├── anchr-mcp/               MCP stdio adapter for agent runtime integration
-  ├── data-marketplace/        Bounty pattern with extra `/marketplace/*` routes via composeHost(extras)
+  ├── data-marketplace/        App-owned `/marketplace/*` routes plus MCP tools
   ├── two-party-binary-bet/    Market pattern (no host needed)
   └── …                        SDK consumers + standalone primitives demos
 crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
@@ -91,7 +89,7 @@ Customer/Provider/Oracle actor names follow
 | Release authority     | Produce the material that unlocks settlement only after verification succeeds, and bind that material to the selected work.                                     | Verification verdict, query id, request event id, payment hash, Provider key, authority key or quorum state. | Signed release message, preimage, threshold signature, or equivalent unlock material.     | Verification failure, wrong authority, quorum not met, signature mismatch, release fields not bound to the accepted work.    | Single Oracle preimage release, FROST threshold signatures.                           |
 | Attachment transport  | Store and retrieve large or sensitive proof material without making the storage service a protocol actor.                                                       | Plaintext bytes, encryption key material, retention policy, recipient set.                                   | Encrypted attachment reference, content address, delivery key material.                   | Encryption failure, content-address mismatch, unavailable storage server, missing key material, retention expiry.            | Encrypted Blossom blobs; see [Attachment registry](#attachment-registry-blossom).     |
 | Local actor state     | Track one actor's private progress without making local implementation state part of the network contract.                                                      | Actor configuration, observed messages, wallet state, verifier state, retry state, persisted tickets.        | Local projections, preflight tickets, idempotency records, retry schedule, audit records. | Corrupt store, conflicting events, missing idempotency record, stale local policy, failed persistence.                       | Actor SDK storage ports; current `@anchr/bounty` Query lifecycle scaffolding.         |
-| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, HTTP route, MCP tool, mobile or web bridge.                                  | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | Reference host scaffolding, worker-api HTTP routes, `example/anchr-mcp`, example apps. |
+| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, app-owned HTTP route, MCP tool, mobile or web bridge.                        | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | `example/anchr-mcp`, `example/data-marketplace`, example apps.                         |
 
 ## Naming migration
 
@@ -113,18 +111,18 @@ Migration rules:
 - After versioned replacements exist, requester/worker vocabulary should be
   removed from wire and domain contracts instead of retained as aliases.
 - Adapter names should describe the integration surface, not a protocol role:
-  `anchr-mcp`, HTTP gateway, CLI, mobile app, and web UI are adapters.
+  `anchr-mcp`, CLI, mobile app, web UI, and app-owned HTTP surfaces are
+  adapters.
 
-## Reference host status
+## Reference host removal
 
-`example/anchr-reference-host/` is a temporary bundled deployment for local
-testing. It wires QueryService, worker-api HTTP routes, scheduler, and log
-capture into one process. MCP stdio is split into `example/anchr-mcp/` so agent
-runtime integration stays adapter-owned. The reference host is not the
-network's default endpoint, not a hosted reference URL, and not part of the
-protocol contract.
+`example/anchr-reference-host/` and the shared `worker-api` HTTP gateway have
+been removed. MCP stdio remains in `example/anchr-mcp/`, while HTTP routes now
+belong to concrete apps such as `example/data-marketplace/`. The network has no
+default Anchr server, hosted reference URL, or mandatory REST compatibility
+surface.
 
-This tradeoff removes a convenient central demo target. In return:
+This removes a convenient central demo target. In return:
 
 - Customers, Providers, and Oracles must choose explicit relays, mints, oracle
   pubkeys/endpoints, and notaries.

@@ -96,7 +96,7 @@ const failedVerification: VerificationDetail = {
 
 const defaultMeta: SubmissionMeta = {
   executor_type: "human",
-  channel: "worker_api",
+  channel: "adapter",
 };
 
 const defaultResult: QueryResult = {

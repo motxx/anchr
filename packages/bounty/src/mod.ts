@@ -129,15 +129,6 @@ export type {
 export { buildOracleApp } from "./infrastructure/oracle-service/index.ts";
 
 export {
-  composeHost,
-  startReferenceRuntime,
-} from "./infrastructure/runtime.ts";
-export type {
-  ComposeHostOptions,
-  HostComposition,
-  RuntimeCapabilities,
-} from "./infrastructure/runtime.ts";
-export {
   queryResultToInput,
   queryToRequirement,
   verify as verifyQueryResult,
@@ -161,7 +152,3 @@ export type {
   OracleNostrService,
   OracleNostrServiceConfig,
 } from "./infrastructure/oracle-service/nostr-service.ts";
-
-if (import.meta.main) {
-  await import("./infrastructure/server.ts");
-}

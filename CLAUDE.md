@@ -37,7 +37,7 @@ history (`added for X` / `previously did Y`) — caught by
 "Done" = full local pass:
 - `deno task test:all` — lint:strict + test:unit + test:integration +
   test:e2e:protocol + test:scripts + test:examples + test:e2e:frost +
-  test:e2e:pentest
+  local static checks
 - `deno task test:all:docker` — Docker-backed e2e
   (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
 
@@ -56,7 +56,7 @@ Three tiers, one suffix per tier, directory = task:
   by `deno task test:integration`.
 - **E2E:** `e2e/<bucket>/*.test.ts`. Bucket directory = infra profile
   = deno task name. Buckets: `protocol` (no infra), `relay`, `regtest`,
-  `frost`, `tlsn`, `pentest`, `web`. Run via `deno task test:e2e:<bucket>`.
+  `frost`, `tlsn`. Run via `deno task test:e2e:<bucket>`.
 
 Adding a new test means dropping the file in the right place — no
 `deno.json` edit. The `.unit.` / `.domain.` / `.application.` suffixes
@@ -72,13 +72,12 @@ pre-commit hook.
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
   `frost-oracle`, `cashu-conditional-swap`, `blossom`, `bounty`,
-  `sdk`). The host implementation (Query lifecycle, escrow,
-  oracle-client/service, worker-api, MCP) lives in
+  `sdk`). Migration scaffolding (Query lifecycle, escrow,
+  oracle-client/service, verification adapters) lives in
   `packages/bounty/src/{domain,application,infrastructure}/`.
 - `example/<app>/` — concrete apps; their own deno.json + design
   system. **Must reach Anchr through `@anchr/*` only** — relative
-  paths into `packages/<pkg>/src/...` are an E023 violation. The
-  reference deployment is `example/anchr-reference-host/`.
+  paths into `packages/<pkg>/src/...` are an E023 violation.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants

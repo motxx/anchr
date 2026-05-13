@@ -86,37 +86,6 @@ run_local() {
   fi
 }
 
-# --- Phase 1.5: Pentest (needs app server running) ---
-
-run_pentest() {
-  step "Phase 1.5: Penetration Tests"
-
-  # Start the server for pentest. RATE_LIMIT_MAX is bumped because the
-  # DOS + SSRF + fuzz tests issue ~150 requests from the same socket IP;
-  # the default 60/min would starve every downstream test. The rate-limit
-  # test isolates itself with a distinct x-real-ip bucket and fires past
-  # this ceiling to verify the limiter actually trips.
-  local port=8091
-  HTTP_API_KEYS=pentest-key-001 PORT=$port RATE_LIMIT_MAX=500 \
-    deno run --allow-all example/anchr-reference-host/server.ts &
-  local server_pid=$!
-
-  # Poll /health for up to 30s — CI cold-start (tailwind CSS build + Deno cache)
-  # can exceed 3s on a fresh runner.
-  if ! wait_for_service "pentest server" "http://localhost:$port/health" 15; then
-    kill $server_pid 2>/dev/null || true
-    fail "pentest server start"
-    return
-  fi
-
-  PENTEST_APP_URL="http://localhost:$port" \
-  HTTP_API_KEYS=pentest-key-001 \
-  run_test "pentest e2e" deno task test:e2e:pentest
-
-  kill $server_pid 2>/dev/null || true
-  wait $server_pid 2>/dev/null || true
-}
-
 # --- Phase 2: Docker-dependent tests ---
 
 wait_for_service() {
@@ -203,10 +172,6 @@ run_docker_tests() {
   BLOSSOM_SERVERS="$BLOSSOM_URL" \
   run_test "relay e2e" deno task test:e2e:relay
 
-  ANCHR_E2E_REQUIRE_INFRA=1 \
-  BLOSSOM_SERVERS="$BLOSSOM_URL" \
-  run_test "blossom integration" deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
-
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
   CASHU_MINT_URL="$CASHU_MINT_URL" \
@@ -248,7 +213,6 @@ run_docker_tests() {
 case "$MODE" in
   --local)
     run_local
-    run_pentest
     ;;
   --docker)
     trap cleanup EXIT
@@ -259,7 +223,6 @@ case "$MODE" in
   --ci|full|*)
     trap cleanup EXIT
     run_local
-    run_pentest
 
     if [ "$FAILED" = "1" ] && [ "$MODE" != "--ci" ]; then
       echo -e "\n${RED}Local tests failed. Skipping Docker tests.${NC}"

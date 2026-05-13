@@ -168,7 +168,7 @@ export function doRecordResult(
     status: "verifying",
     result: normalizedResult,
     submitted_at: Date.now(),
-    submission_meta: { executor_type: "human", channel: "worker_api" },
+    submission_meta: { executor_type: "human", channel: "adapter" },
     blossom_keys: blossomKeys,
   });
   return { ok: true, message: "Result recorded, verification in progress" };
@@ -241,7 +241,7 @@ export async function doSubmitEscrowResult(
     status: "verifying",
     result: normalizedResult,
     submitted_at: Date.now(),
-    submission_meta: { executor_type: "human", channel: "worker_api" },
+    submission_meta: { executor_type: "human", channel: "adapter" },
     blossom_keys: blossomKeys,
   };
   store.set(queryId, verifyingQuery);

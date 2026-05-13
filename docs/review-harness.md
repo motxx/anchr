@@ -36,7 +36,6 @@ from ad hoc review into one of these homes.
 | `deno task test:e2e:regtest` | `automated` | Cashu, Lightning regtest, Blossom, and full bounty lifecycle flows. |
 | `deno task test:e2e:frost` | `automated` | FROST threshold behavior. |
 | `deno task test:e2e:tlsn` | `automated` | TLSNotary proof generation and verification. |
-| `deno task test:e2e:pentest` | `automated` | API attack classes such as auth bypass, injection, SSRF, rate limits, DoS, and Oracle attacks. |
 | `deno task test:all` | `automated` | Local verification bar from `CLAUDE.md`. |
 | `deno task test:all:docker` | `automated` | Docker-backed verification bar from `CLAUDE.md`. |
 | `skills/arch-lint-llm/SKILL.md` | `semantic skill` | God modules, hidden service locators, duplicated state machines, inappropriate intimacy, oversized functions, and domain leakage that deterministic architecture lint cannot prove. |
@@ -60,7 +59,7 @@ from ad hoc review into one of these homes.
 | Silent bypass of verification, validation, settlement, redemption, auth, signing, or quorum logic | `semantic skill` | `skills/check-silent-bypass/SKILL.md` | Add a concrete pattern to the skill rubric, then add a deterministic test if the shape repeats. |
 | Missing behavior coverage in package code | `automated` | `deno task test:unit` or `deno task test:integration` | Add the narrowest test at the owning package boundary. |
 | Cross-actor protocol regression | `automated` | `deno task test:e2e:protocol` | Add an e2e test with a protocol-level name. |
-| Infrastructure-specific regression | `automated` | Relay, regtest, FROST, TLSN, pentest, or web e2e bucket | Add coverage to the bucket matching the infrastructure profile. |
+| Infrastructure-specific regression | `automated` | Relay, regtest, FROST, or TLSN e2e bucket | Add coverage to the bucket matching the infrastructure profile. |
 | Concrete technology leaking into a universal contract | `human universal decision` | `docs/universality-boundaries.md`, `docs/architecture.md`, `specs/` | Decide whether the rule is universal or adapter-specific before coding. |
 | Example or product policy leaking into packages | `automated` and `human universal decision` | `deno task lint:arch`, `docs/universality-boundaries.md` | Add vocabulary or dependency lint only when the leak can be detected mechanically. |
 | Public vocabulary change | `human universal decision` | `docs/architecture.md`, `specs/`, owning package docs | Record the vocabulary decision before broad renames. |

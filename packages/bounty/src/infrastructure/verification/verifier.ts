@@ -256,7 +256,7 @@ export function queryResultToInput(result: QueryResult): VerificationInput {
 /**
  * Query-aware verification — adapter over `verifyProof`.
  *
- * Used by the NIP-90 reference host. Standalone callers should construct a
+ * NIP-90 adapters can use this shape. Standalone callers should construct a
  * `VerificationRequirement` directly and call `verifyProof`.
  */
 export function verify(

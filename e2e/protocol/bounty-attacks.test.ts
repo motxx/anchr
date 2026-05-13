@@ -90,6 +90,7 @@ describe("Attack: Preimage Isolation", () => {
   });
 
   test("preimage not leaked on rejected verification", async () => {
+    // INV-02
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });

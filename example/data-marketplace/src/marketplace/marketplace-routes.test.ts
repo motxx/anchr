@@ -1,61 +1,23 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildWorkerApiApp } from "../../../../packages/bounty/src/infrastructure/worker-api.ts";
+import { Hono } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { createListingStore } from "./listing-store.ts";
-import { createOracleRegistry } from "../../../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import {
-  createQueryService,
-  createQueryStore,
-} from "../../../../packages/bounty/src/application/query-service.ts";
-import type {
-  Oracle,
-  OracleAttestation,
-} from "../../../../packages/bounty/src/domain/oracle-types.ts";
-import type { Query, QueryResult } from "@anchr/bounty/domain-types";
 import { _clearSeenTokensForTest } from "./xcashu-middleware.ts";
 import { _clearPurchaseLogForTest } from "./marketplace-routes.ts";
 import { _clearCacheForTest } from "./data-fetcher.ts";
 import { registerMarketplaceRoutes } from "./marketplace-routes.ts";
 
-function makeMockOracle(id: string): Oracle {
-  return {
-    info: { id, name: `Mock ${id}`, fee_ppm: 0 },
-    async verify(
-      query: Query,
-      _result: QueryResult,
-    ): Promise<OracleAttestation> {
-      return {
-        oracle_id: id,
-        query_id: query.id,
-        passed: true,
-        checks: ["mock passed"],
-        failures: [],
-        attested_at: Date.now(),
-      };
-    },
-  };
-}
-
 function makeTestApp() {
-  const queryStore = createQueryStore();
   const listingStore = createListingStore();
-  const registry = createOracleRegistry({ skipBuiltIn: true });
-  registry.register(makeMockOracle("test-oracle"));
-  const queryService = createQueryService({
-    store: queryStore,
-    oracleRegistry: registry,
-  });
-  const app = buildWorkerApiApp({
-    queryService,
-    oracleRegistry: registry,
-    extraRoutes: (app, ctx) => {
-      registerMarketplaceRoutes(app, {
-        listingStore,
-        preimageStore: ctx.preimageStore,
-        writeAuth: ctx.writeAuth,
-        rateLimit: ctx.rateLimit,
-      });
-    },
+  const app = new Hono();
+  const open: MiddlewareHandler = async (_c, next) => {
+    await next();
+  };
+  registerMarketplaceRoutes(app, {
+    listingStore,
+    writeAuth: open,
+    rateLimit: open,
   });
   return { app, listingStore };
 }
@@ -254,17 +216,9 @@ describe("Marketplace Routes", () => {
     }),
   );
 
-  test("existing /queries routes still work", async () => {
+  test("unowned /queries routes are not installed", async () => {
     const { app } = makeTestApp();
     const res = await app.request("http://localhost/queries");
-    expect(res.status).toBe(200);
-    const json = await res.json() as unknown[];
-    expect(json).toHaveLength(0);
-  });
-
-  test("existing /health route still works", async () => {
-    const { app } = makeTestApp();
-    const res = await app.request("http://localhost/health");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(404);
   });
 });

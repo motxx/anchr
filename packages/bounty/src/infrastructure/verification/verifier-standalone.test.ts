@@ -1,9 +1,9 @@
 /**
  * Standalone-API tests: verifyProof() called directly without a Query envelope.
  *
- * Asserts that fixed-stakeholder use cases can drive the same verification
- * pipeline as the NIP-90 reference host, just by constructing a
- * VerificationRequirement instead of going through Query/QueryResult.
+ * Asserts that fixed-stakeholder use cases can drive verification by
+ * constructing a VerificationRequirement instead of going through
+ * Query/QueryResult.
  */
 
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";

@@ -10,7 +10,7 @@ export async function handleMarketplaceListData(
   backend: McpQueryBackend,
   activeOnly: boolean,
 ): Promise<McpTextResult> {
-  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ??
+  const baseUrl = Deno.env.get("MARKETPLACE_API_BASE_URL") ??
     "http://localhost:3000";
   const url = `${baseUrl}/marketplace/listings`;
 
@@ -45,7 +45,7 @@ export async function handleMarketplaceBuyData(
   listingId: string,
   cashuToken: string,
 ): Promise<McpTextResult> {
-  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ??
+  const baseUrl = Deno.env.get("MARKETPLACE_API_BASE_URL") ??
     "http://localhost:3000";
   const url = `${baseUrl}/marketplace/data/${listingId}`;
 
@@ -79,7 +79,7 @@ export async function handleMarketplaceSearchListings(
   backend: McpQueryBackend,
   query: string,
 ): Promise<McpTextResult> {
-  const baseUrl = Deno.env.get("REMOTE_QUERY_API_BASE_URL") ??
+  const baseUrl = Deno.env.get("MARKETPLACE_API_BASE_URL") ??
     "http://localhost:3000";
   const url = `${baseUrl}/marketplace/listings`;
 

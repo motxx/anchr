@@ -213,7 +213,7 @@ describe("createQueryService", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
     expect(outcome.ok).toBe(true);
@@ -232,7 +232,7 @@ describe("createQueryService", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "strict-oracle",
     );
     expect(outcome.ok).toBe(false);
@@ -245,7 +245,7 @@ describe("createQueryService", () => {
     const outcome = await service.submitQueryResult(
       "nonexistent",
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.query).toBeNull();
@@ -261,7 +261,7 @@ describe("createQueryService", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toBe("Query has expired");
@@ -275,13 +275,13 @@ describe("createQueryService", () => {
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);
@@ -297,7 +297,7 @@ describe("createQueryService", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);
@@ -327,7 +327,7 @@ describe("createQueryService", () => {
     await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "open" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
     const outcome = service.cancelQuery(query.id);
@@ -978,7 +978,7 @@ describe("verifyWithQuorum", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "test" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.query?.status).toBe("approved");
@@ -1004,7 +1004,7 @@ describe("verifyWithQuorum", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "test" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.query?.status).toBe("rejected");
@@ -1023,7 +1023,7 @@ describe("verifyWithQuorum", () => {
     const outcome = await service.submitQueryResult(
       query.id,
       { attachments: [], notes: "test" },
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "oracle-a",
     );
     expect(outcome.ok).toBe(true);

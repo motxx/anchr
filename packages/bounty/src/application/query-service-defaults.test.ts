@@ -58,14 +58,14 @@ test("query service approves valid submissions", async () => {
     notes: "Observed storefront, looked open",
   }, {
     executor_type: "human",
-    channel: "worker_api",
+    channel: "adapter",
   });
 
   expect(outcome.ok).toBe(true);
   expect(outcome.query?.status).toBe("approved");
   expect(outcome.query?.submission_meta).toEqual({
     executor_type: "human",
-    channel: "worker_api",
+    channel: "adapter",
   });
 });
 
@@ -119,7 +119,7 @@ test("query service records assigned_oracle_id on submission", async () => {
   const outcome = await svc.submitQueryResult(
     query.id,
     { attachments: [], notes: "open" },
-    { executor_type: "human", channel: "worker_api" },
+    { executor_type: "human", channel: "adapter" },
   );
 
   expect(outcome.ok).toBe(true);
@@ -135,7 +135,7 @@ test("query service rejects submission with unacceptable oracle", async () => {
   const outcome = await svc.submitQueryResult(
     query.id,
     { attachments: [], notes: "open" },
-    { executor_type: "human", channel: "worker_api" },
+    { executor_type: "human", channel: "adapter" },
     "built-in",
   );
 
@@ -161,7 +161,7 @@ test("query service normalizes blossom attachment refs before approval", async (
     notes: "ok",
   }, {
     executor_type: "human",
-    channel: "worker_api",
+    channel: "adapter",
   });
 
   expect(outcome.ok).toBe(true);

@@ -89,7 +89,7 @@ describe("proof-delivery integration", () => {
     const outcome = await svc.submitQueryResult(
       query.id,
       result,
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
 
@@ -125,7 +125,7 @@ describe("proof-delivery integration", () => {
     const outcome = await svc.submitQueryResult(
       query.id,
       result,
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
       "test-oracle",
     );
 
@@ -165,7 +165,7 @@ describe("proof-delivery integration", () => {
     const outcome = await svc.submitQueryResult(
       query.id,
       result,
-      { executor_type: "human", channel: "worker_api" },
+      { executor_type: "human", channel: "adapter" },
     );
 
     expect(outcome.ok).toBe(true);

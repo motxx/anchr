@@ -4,8 +4,8 @@
     "justification": "INV-01 is now backed by a TLSN mutation e2e test instead of a pending-test exception"
   },
   "INV-02": {
-    "hash": "sha256:a33d1a9f8317324aaf2a76d21777675a961d38cc132daf0cf9303781594de05d",
-    "justification": "clarify INV-02 as an honest-oracle wrapper invariant, not a Byzantine guarantee against a malicious or colluding oracle set"
+    "hash": "sha256:c203e198c8d4d9238abc93fa5a5316d8ca963e38a14c3b0d22e4e6e155169ed4",
+    "justification": "update INV-02 from the removed HTTP gateway wording to the query-service result path while preserving the no-preimage-on-failure invariant"
   },
   "INV-03": {
     "hash": "sha256:6c3e2a0b6598f865a8a07882a1cfce1bf2d2d6e30b540e764ff8bbcfb421a72a",

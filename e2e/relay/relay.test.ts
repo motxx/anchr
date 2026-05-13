@@ -13,7 +13,6 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { publishQueryToRelay } from "../../packages/bounty/src/infrastructure/nostr/transport/relay-publish.ts";
@@ -104,30 +103,17 @@ suite("e2e: full query lifecycle with Nostr relay", () => {
     expect(RELAY_REACHABLE).toBe(true);
   });
 
-  test("create query via HTTP and verify relay publication", async () => {
-    const app = buildWorkerApiApp({ queryService: relayService });
-
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+  test("create query and verify relay publication", async () => {
+    const query = relayService.createQuery(
+      {
         description: "E2E Ramen Shop の営業状況",
         location_hint: "Shibuya",
-        ttl_seconds: 120,
-      }),
-    });
-    expect(createRes.status).toBe(201);
-
-    const createJson = await createRes.json() as {
-      query_id: string;
-      description: string;
-      status: string;
-      challenge_nonce: string | null;
-      reference_app_url: string;
-    };
-    expect(createJson.query_id).toMatch(/^query_/);
-    expect(createJson.description).toBe("E2E Ramen Shop の営業状況");
-    expect(createJson.status).toBe("pending");
+      },
+      { ttlSeconds: 120 },
+    );
+    expect(query.id).toMatch(/^query_/);
+    expect(query.description).toBe("E2E Ramen Shop の営業状況");
+    expect(query.status).toBe("pending");
 
     // Wait for fire-and-forget relay publish to complete
     await new Promise((r) => setTimeout(r, 1500));
@@ -160,109 +146,60 @@ suite("e2e: full query lifecycle with Nostr relay", () => {
   });
 
   test("full lifecycle: create → list → submit → verify status", async () => {
-    const app = buildWorkerApiApp({ queryService: relayService });
-
-    // 1. Create query
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const query = relayService.createQuery(
+      {
         description: "E2E Lifecycle Store の営業状況",
         location_hint: "Akihabara",
-        ttl_seconds: 300,
         verification_requirements: [],
-      }),
-    });
-    expect(createRes.status).toBe(201);
-    const { query_id, challenge_nonce } = await createRes.json() as {
-      query_id: string;
-      challenge_nonce: string | null;
-    };
+      },
+      { ttlSeconds: 300 },
+    );
 
     // 2. List queries – should include our query
-    const listRes = await app.request("http://localhost/queries");
-    expect(listRes.status).toBe(200);
-    const listed = await listRes.json() as Array<{ id: string }>;
-    expect(listed.some((q) => q.id === query_id)).toBe(true);
+    const listed = relayService.listOpenQueries();
+    expect(listed.some((q) => q.id === query.id)).toBe(true);
 
     // 3. Get query detail
-    const detailRes = await app.request(`http://localhost/queries/${query_id}`);
-    expect(detailRes.status).toBe(200);
-    const detail = await detailRes.json() as {
-      id: string;
-      status: string;
-      challenge_nonce: string | null;
-    };
+    const detail = relayService.getQuery(query.id)!;
     expect(detail.status).toBe("pending");
-    expect(detail.challenge_nonce).toBe(challenge_nonce);
+    expect(detail.challenge_nonce).toBe(query.challenge_nonce);
 
     // 4. Submit result
-    const submitRes = await app.request(
-      `http://localhost/queries/${query_id}/result`,
+    const submitOutcome = await relayService.submitQueryResult(
+      query.id,
       {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e-test-worker",
-          attachments: [],
-          notes: `E2E test observation${
-            challenge_nonce ? ` ${challenge_nonce}` : ""
-          }`,
-        }),
+        attachments: [],
+        notes: `E2E test observation${
+          query.challenge_nonce ? ` ${query.challenge_nonce}` : ""
+        }`,
       },
+      { executor_type: "human", channel: "adapter" },
     );
-    expect(submitRes.status).toBe(200);
-    const submitJson = await submitRes.json() as {
-      ok: boolean;
-      payment_status: string;
-      verification: { passed: boolean };
-    };
-    expect(submitJson.ok).toBe(true);
-    expect(submitJson.payment_status).toBe("released");
-    expect(submitJson.verification.passed).toBe(true);
+    expect(submitOutcome.ok).toBe(true);
+    expect(submitOutcome.query?.payment_status).toBe("released");
+    expect(submitOutcome.query?.verification?.passed).toBe(true);
 
     // 5. Verify status is approved
-    const statusRes = await app.request(`http://localhost/queries/${query_id}`);
-    expect(statusRes.status).toBe(200);
-    const statusJson = await statusRes.json() as {
-      status: string;
-      payment_status: string;
-    };
-    expect(statusJson.status).toBe("approved");
-    expect(statusJson.payment_status).toBe("released");
+    const statusQuery = relayService.getQuery(query.id)!;
+    expect(statusQuery.status).toBe("approved");
+    expect(statusQuery.payment_status).toBe("released");
   });
 
   test("cancel query flow", async () => {
-    const app = buildWorkerApiApp({ queryService: relayService });
-
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        description: "E2E Cancel Store",
-        ttl_seconds: 120,
-      }),
-    });
-    const { query_id } = await createRes.json() as { query_id: string };
-
-    const cancelRes = await app.request(
-      `http://localhost/queries/${query_id}/cancel`,
-      {
-        method: "POST",
-      },
+    const query = relayService.createQuery(
+      { description: "E2E Cancel Store" },
+      { ttlSeconds: 120 },
     );
-    expect(cancelRes.status).toBe(200);
-    const cancelJson = await cancelRes.json() as { ok: boolean };
-    expect(cancelJson.ok).toBe(true);
+
+    const cancelOutcome = relayService.cancelQuery(query.id);
+    expect(cancelOutcome.ok).toBe(true);
 
     // Verify no longer in open list
-    const listRes = await app.request("http://localhost/queries");
-    const listed = await listRes.json() as Array<{ id: string }>;
-    expect(listed.some((q) => q.id === query_id)).toBe(false);
+    const listed = relayService.listOpenQueries();
+    expect(listed.some((q) => q.id === query.id)).toBe(false);
   });
 
   test("multiple queries appear on relay", async () => {
-    const app = buildWorkerApiApp({ queryService: relayService });
     const since = Math.floor(Date.now() / 1000) - 5;
 
     // Create 3 queries in parallel
@@ -271,15 +208,9 @@ suite("e2e: full query lifecycle with Nostr relay", () => {
       "E2E Bravo の確認",
       "E2E Charlie の確認",
     ];
-    await Promise.all(
-      descriptions.map((desc) =>
-        app.request("http://localhost/queries", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ description: desc, ttl_seconds: 120 }),
-        })
-      ),
-    );
+    for (const desc of descriptions) {
+      relayService.createQuery({ description: desc }, { ttlSeconds: 120 });
+    }
 
     // Wait for relay publish
     await new Promise((r) => setTimeout(r, 2000));

@@ -24,7 +24,6 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "@anchr/core-runtime";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
@@ -70,12 +69,6 @@ const testService = createQueryService({
 });
 
 suite("e2e: regtest Cashu bounty lifecycle", () => {
-  const app = buildWorkerApiApp({
-    queryService: testService,
-    oracleRegistry: testOracleRegistry,
-    preimageStore: testPreimageStore,
-  });
-
   beforeAll(() => {
     testService.clearQueryStore();
   });
@@ -120,81 +113,53 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     const { token } = await mintCashuToken(BOUNTY_SATS);
     expect(token).toMatch(/^cashuB/);
 
-    // 2. Create query with bounty
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const created = testService.createQuery(
+      {
         description: "E2E 渋谷交差点の撮影テスト",
         location_hint: "Shibuya",
         expected_gps: { lat: 35.6595, lon: 139.7004 },
-        ttl_seconds: 300,
         verification_requirements: [],
+      },
+      {
+        ttlSeconds: 300,
         bounty: {
           amount_sats: BOUNTY_SATS,
-          cashu_token: token,
+          escrow_token: token,
         },
-      }),
-    });
-    expect(createRes.status).toBe(201);
-
-    const created = (await createRes.json()) as {
-      query_id: string;
-      status: string;
-      payment_status: string;
-    };
-    expect(created.query_id).toMatch(/^query_/);
+      },
+    );
+    expect(created.id).toMatch(/^query_/);
     expect(created.status).toBe("pending");
     expect(created.payment_status).toBe("locked");
 
     // 3. Verify query appears in list with bounty
-    const listRes = await app.request("http://localhost/queries");
-    const queries = (await listRes.json()) as Array<{
-      id: string;
-      bounty: { amount_sats: number };
-    }>;
-    const ourQuery = queries.find((q) => q.id === created.query_id);
+    const queries = testService.listOpenQueries();
+    const ourQuery = queries.find((q) => q.id === created.id);
     expect(ourQuery).toBeDefined();
-    expect(ourQuery!.bounty.amount_sats).toBe(BOUNTY_SATS);
+    expect(ourQuery!.bounty?.amount_sats).toBe(BOUNTY_SATS);
 
     // 4. Submit result with GPS
-    const submitRes = await app.request(
-      `http://localhost/queries/${created.query_id}/result`,
+    const submitOutcome = await testService.submitQueryResult(
+      created.id,
       {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_test_worker",
-          blob_hash: "e2e_test_hash_deadbeef",
-          blob_url: "http://localhost:3333/e2e-test.jpg",
-          gps: { lat: 35.6595, lon: 139.7004 },
-          timestamp_ms: Date.now(),
-        }),
+        attachments: [{
+          id: "e2e_test_hash_deadbeef",
+          uri: "http://localhost:3333/e2e-test.jpg",
+          mime_type: "image/jpeg",
+          storage_kind: "blossom",
+        }],
+        gps: { lat: 35.6595, lon: 139.7004 },
       },
+      { executor_type: "human", channel: "adapter" },
     );
-    expect(submitRes.status).toBe(200);
-
-    const submitJson = (await submitRes.json()) as {
-      ok: boolean;
-      message: string;
-      verification: { passed: boolean };
-      payment_status: string;
-    };
 
     // 5. Verify results
-    expect(submitJson.ok).toBe(true);
-    expect(submitJson.verification.passed).toBe(true);
-    expect(submitJson.payment_status).toBe("released");
+    expect(submitOutcome.ok).toBe(true);
+    expect(submitOutcome.query?.verification?.passed).toBe(true);
+    expect(submitOutcome.query?.payment_status).toBe("released");
 
     // 6. Verify query is now approved
-    const detailRes = await app.request(
-      `http://localhost/queries/${created.query_id}`,
-    );
-    expect(detailRes.status).toBe(200);
-    const detail = (await detailRes.json()) as {
-      status: string;
-      payment_status: string;
-    };
+    const detail = testService.getQuery(created.id)!;
     expect(detail.status).toBe("approved");
     expect(detail.payment_status).toBe("released");
   });
@@ -202,43 +167,27 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
   test("bounty token is redeemable at cashu mint", async () => {
     // Create bounty query and submit to get token back
     const { token } = await mintCashuToken(BOUNTY_SATS);
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const query = testService.createQuery(
+      {
         description: "E2E Token redemption test",
         location_hint: "Tokyo",
-        ttl_seconds: 300,
         verification_requirements: [],
-        bounty: { amount_sats: BOUNTY_SATS, cashu_token: token },
-      }),
-    });
-    const { query_id } = (await createRes.json()) as { query_id: string };
-
-    const submitRes = await app.request(
-      `http://localhost/queries/${query_id}/result`,
+      },
       {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_redeem_worker",
-          gps: { lat: 35.68, lon: 139.76 },
-          timestamp_ms: Date.now(),
-        }),
+        ttlSeconds: 300,
+        bounty: { amount_sats: BOUNTY_SATS, escrow_token: token },
       },
     );
-    const submitJson = (await submitRes.json()) as {
-      ok: boolean;
-      payment_status: string;
-    };
-    expect(submitJson.ok).toBe(true);
-    expect(submitJson.payment_status).toBe("released");
+    const submitOutcome = await testService.submitQueryResult(
+      query.id,
+      { attachments: [], gps: { lat: 35.68, lon: 139.76 } },
+      { executor_type: "human", channel: "adapter" },
+    );
+    expect(submitOutcome.ok).toBe(true);
+    expect(submitOutcome.query?.payment_status).toBe("released");
 
     // Verify query bounty via detail endpoint
-    const detailRes = await app.request(`http://localhost/queries/${query_id}`);
-    const detail = (await detailRes.json()) as {
-      bounty: { amount_sats: number };
-    };
-    expect(detail.bounty.amount_sats).toBe(BOUNTY_SATS);
+    const detail = testService.getQuery(query.id)!;
+    expect(detail.bounty?.amount_sats).toBe(BOUNTY_SATS);
   });
 });

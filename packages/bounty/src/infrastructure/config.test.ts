@@ -15,8 +15,6 @@ describe("getRuntimeConfig", () => {
     "HTTP_API_KEY",
     "ANTHROPIC_API_KEY",
     "AI_CONTENT_CHECK",
-    "REMOTE_QUERY_API_BASE_URL",
-    "REMOTE_QUERY_API_KEY",
     "TRUSTED_ORACLE_PUBKEYS",
     "TLSN_VERIFIER_URL",
     "TLSN_PROXY_URL",

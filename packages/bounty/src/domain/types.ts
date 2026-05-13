@@ -18,7 +18,7 @@ export type PaymentStatus =
   | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
-export type SubmissionChannel = "worker_api" | "adapter";
+export type SubmissionChannel = "adapter";
 export type AttachmentStorageKind = "blossom" | "external";
 
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
@@ -124,10 +124,8 @@ export interface QueryResult {
 
 /**
  * Query-independent verification policy. The transport-neutral input to the
- * core verifier — anyone can construct one without going through the NIP-90
- * Query type. The reference host derives this from a signed Query event; a
- * standalone caller (e.g. an HTTP service with fixed stakeholders) builds it
- * directly from authenticated requests.
+ * core verifier. NIP-90 adapters derive this from a signed Query event; a
+ * standalone caller builds it directly from authenticated requests.
  */
 export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */

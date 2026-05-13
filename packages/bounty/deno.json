@@ -8,8 +8,6 @@
     "./nostr-events": "./src/infrastructure/nostr/events/events.ts",
     "./nostr-transport": "./src/infrastructure/nostr/transport/client.ts",
     "./url-validation": "./src/infrastructure/url-validation.ts",
-    "./worker-api": "./src/infrastructure/worker-api.ts",
-    "./worker-api-schemas": "./src/infrastructure/worker-api-schemas.ts",
     "./claim-gate": "./src/infrastructure/claim-gate/index.ts"
   },
   "imports": {

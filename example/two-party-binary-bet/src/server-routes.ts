@@ -1,9 +1,9 @@
 /**
  * Two-party binary bet HTTP route registration.
  *
- * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
- * pattern from worker-api-routes.ts. In-memory market store + matching queue +
- * dual preimage store, wired into Hono.
+ * All routes are under /markets/* and use an app-owned Hono route registrar.
+ * In-memory market store + matching queue + dual preimage store, wired into
+ * Hono.
  *
  * State is injectable via `MarketState` for testing. When no state is
  * provided, a lazily-constructed module-level state is reused.

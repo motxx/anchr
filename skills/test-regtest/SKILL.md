@@ -240,13 +240,13 @@ Use MCP tools to automate verification:
 
 ---
 
-## Phase 5: Submit via API (`submit`)
+## Phase 5: Submit via app adapter or SDK
 
-Since file selection in the simulator is limited, use the API to test the full submit + bounty release flow.
+Since file selection in the simulator is limited, use the app adapter or SDK
+test harness to test the full submit + bounty release flow.
 
-> **Endpoint note:** the `/queries/:id/submit` endpoint returns `410 Deprecated`.
-> All submissions go through `POST /queries/:id/result` and require a non-empty
-> `worker_pubkey` (the schema is in `src/infrastructure/worker-api-schemas.ts`).
+> The shared Reference Host and worker HTTP gateway were removed. Do not assume
+> `/queries/*` exists unless the concrete app under test owns those routes.
 
 ### 5a. Verify GPS-required query rejects empty submission
 
@@ -396,7 +396,7 @@ These are non-obvious facts discovered through actual testing. The agent WILL ge
 | `createwallet` error -4 "Database already exists" | Script auto-falls back to `loadwallet`. If still failing, `docker compose down -v` to wipe volumes |
 | `lnd-mint` keeps restarting | Wait longer before init-regtest.sh (increase sleep to 30-40s) |
 | Invoice payment fails | Verify channel is active: `docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009 listchannels` |
-| Deno sanitizer leak errors | Ensure wallet is created at module level, not in `beforeAll`. Ensure `buildWorkerApiApp` uses `createQueryService({ hooks: {} })` |
+| Deno sanitizer leak errors | Ensure wallet is created at module level, not in `beforeAll`, and test services use `createQueryService({ hooks: {} })` when relay publishing is not under test |
 | iOS build fails with "duplicate symbol" | Remove `react-native-worklets` from mobile/package.json (conflicts with reanimated 3.17+) |
 | iOS build fails with "undefined_arch" | Use `npx expo run:ios` instead of raw `xcodebuild` |
 | Mobile app can't reach server | Use Mac's IP instead of localhost (e.g., `http://192.168.x.x:3000`) |

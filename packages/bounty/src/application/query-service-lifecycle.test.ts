@@ -55,7 +55,7 @@ const defaultInput = { description: "Take a photo of Tokyo Tower" };
 const defaultResult: QueryResult = { attachments: [], notes: "Here it is" };
 const defaultMeta = {
   executor_type: "human" as const,
-  channel: "worker_api" as const,
+  channel: "adapter" as const,
 };
 
 describe("Application Service — Simple lifecycle", () => {

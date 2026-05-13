@@ -121,14 +121,12 @@ async function createMcpClient(
   bootstrapPreamble = "",
 ) {
   // Construct one QueryService at startup and surface it via
-  // globalThis.__queryService so the test bootstrapPreamble can pass it
-  // into both `startMcpServer({ queryService })` and any
-  // `buildWorkerApiApp({ queryService })` wired by the preamble.
+  // globalThis.__queryService so the test bootstrapPreamble can seed the
+  // same in-memory backend that the MCP server reads.
   const setupImports = [
     `import { createQueryService, createOracleRegistry } from "@anchr/bounty";`,
     `import { normalizeQueryResult } from "@anchr/bounty/attachment-access";`,
     `import { startMcpServer } from "@anchr/anchr-mcp/mcp-server";`,
-    `import { buildWorkerApiApp } from "@anchr/bounty/worker-api";`,
     `import { storeIntegrity } from "@anchr/photo-verification/integrity-store";`,
   ].join("\n");
   const setupQueryService = [
@@ -186,7 +184,7 @@ Deno.test({
       `storeIntegrity({ attachmentId: ${
         JSON.stringify(attachmentId)
       }, queryId: query.id, capturedAt: Date.now(), exif: { hasExif: false, hasCameraModel: false, hasGps: false, hasTimestamp: false, timestampRecent: false, gpsNearHint: null, metadata: {}, checks: [], failures: [] }, c2pa: { available: true, hasManifest: true, signatureValid: true, manifest: { title: "${attachmentId}.png" }, checks: ["C2PA manifest found", "C2PA signature valid"], failures: [] } });`,
-      `await globalThis.__queryService.submitQueryResult(query.id, { attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "worker_api" });`,
+      `await globalThis.__queryService.submitQueryResult(query.id, { attachments: [attachment], notes: "mcp integration" }, { executor_type: "human", channel: "adapter" });`,
     ].join(" ");
 
     const mcp = await createMcpClient({}, setupPreamble);
@@ -308,92 +306,6 @@ Deno.test({
         status as { content: Array<{ type: string; text?: string }> },
       );
       expect(statusJson.status).toBe("pending");
-    } finally {
-      await mcp.close();
-    }
-  },
-});
-
-Deno.test({
-  name: "mcp can use a remote HTTP query backend",
-  fn: async () => {
-    const baseUrl = "http://remote.test";
-    const bootstrapPreamble = [
-      `Deno.env.set("HTTP_API_KEY", "remote-test-key");`,
-      `const app = buildWorkerApiApp({ queryService: globalThis.__queryService });`,
-      `const originalFetch = globalThis.fetch.bind(globalThis);`,
-      `globalThis.fetch = async (input, init) => {`,
-      `  const url = typeof input === "string" || input instanceof URL ? new URL(input.toString()) : new URL(input.url);`,
-      `  if (url.origin === ${JSON.stringify(baseUrl)}) {`,
-      `    const method = init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET");`,
-      `    const headers = new Headers(init?.headers ?? (typeof input === "object" && "headers" in input ? input.headers : undefined));`,
-      `    const body = init?.body ?? (typeof input === "object" && "body" in input ? input.body : undefined);`,
-      `    const request = new Request(url, { method, headers, body, duplex: "half" });`,
-      `    return app.fetch(request);`,
-      `  }`,
-      `  return originalFetch(input, init);`,
-      `};`,
-    ].join(" ");
-    const mcp = await createMcpClient({
-      REMOTE_QUERY_API_BASE_URL: baseUrl,
-      REMOTE_QUERY_API_KEY: "remote-test-key",
-      HTTP_API_PORT: "3000",
-    }, bootstrapPreamble);
-    const { client } = mcp;
-
-    try {
-      const created = await client.callTool({
-        name: "create_query",
-        arguments: {
-          description: "Remote MCP Smoke Store の営業状況",
-          location_hint: "Tokyo",
-          ttl_seconds: 180,
-          verification_requirements: [],
-        },
-      });
-      const createdJson = parseTextPayload(
-        created as { content: Array<{ type: string; text?: string }> },
-      );
-      expect(createdJson.query_id).toMatch(/^query_/);
-      expect(createdJson.reference_app_url).toContain(baseUrl);
-      expect(createdJson.requester_meta?.client_name).toBe("mcp-remote");
-
-      const listed = await client.callTool({
-        name: "list_available_queries",
-        arguments: {},
-      });
-      const listedJson = parseTextPayload(
-        listed as { content: Array<{ type: string; text?: string }> },
-      ) as Array<{ query_id: string }>;
-      expect(
-        listedJson.some((query) => query.query_id === createdJson.query_id),
-      ).toBe(true);
-
-      const submit = await client.callTool({
-        name: "submit_query_result",
-        arguments: {
-          query_id: createdJson.query_id,
-          result: {
-            attachments: [],
-            notes: "Observed storefront, looked open",
-          },
-        },
-      });
-      const submitJson = parseTextPayload(
-        submit as { content: Array<{ type: string; text?: string }> },
-      );
-      expect(submitJson.ok).toBe(true);
-      expect(submitJson.payment_status).toBe("released");
-
-      const status = await client.callTool({
-        name: "get_query_status",
-        arguments: { query_id: createdJson.query_id },
-      });
-      const statusJson = parseTextPayload(
-        status as { content: Array<{ type: string; text?: string }> },
-      );
-      expect(statusJson.status).toBe("approved");
-      expect(statusJson.requester_meta?.client_name).toBe("mcp-remote");
     } finally {
       await mcp.close();
     }

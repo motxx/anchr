@@ -50,26 +50,25 @@ preimage. Oracle does NOT emit a FROST signature share.
 
 **Status:** `enforced`
 
-**Claim:** The honest Oracle HTTP wrapper never returns the Cashu HTLC preimage
-in response to a `POST /queries/:id/result` unless verification passes.
-Protocol-layer outcome: regardless of which cryptographic check fails (missing
-presentation, malformed JSON, wrong signature, expired presentation, empty
-worker_pubkey), the response body does not contain `preimage`. This is an
-implementation invariant, not a Byzantine-oracle guarantee: a malicious solo
-Oracle or a colluding FROST threshold can still reveal an unlock secret or sign
-the wrong outcome outside this wrapper.
+**Claim:** The honest Oracle/query-service wrapper never returns the Cashu HTLC
+preimage unless verification passes. Protocol-layer outcome: regardless of
+which cryptographic check fails (missing presentation, malformed payload, wrong
+signature, expired presentation, empty Provider key), the result does not
+contain `preimage`. This is an implementation invariant, not a Byzantine-oracle
+guarantee: a malicious solo Oracle or a colluding FROST threshold can still
+reveal an unlock secret or sign the wrong outcome outside this wrapper.
 
-**Attack:** Submit adversarial payloads to `POST /queries/:id/result`: missing
-presentation, malformed JSON, invalid worker_pubkey, oracle not yet registered.
+**Attack:** Submit adversarial payloads to the query result path: missing
+presentation, malformed payload, invalid Provider key, oracle not yet
+registered.
 
-**Expected:** HTTP response body has no `preimage` field. HTTP status rejects
-(4xx) or returns `ok: false`. Oracle's preimage store is not decremented.
+**Expected:** Result outcome has no `preimage` field, returns `ok: false`, and
+the Oracle's preimage store is not decremented.
 
 **Tests:**
 
-- `e2e/pentest/oracle-attacks.test.ts` — `ORACLE-ATTACK: Preimage
-  protection`
-  suite (both tests).
+- `e2e/protocol/bounty-attacks.test.ts` — `preimage not leaked on rejected
+  verification`.
 
 ### INV-03: Requester can't unlock escrow before timeout
 

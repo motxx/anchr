@@ -40,8 +40,6 @@ deno task test:e2e:relay        # Nostr relay + Blossom (Docker)
 deno task test:e2e:regtest      # full Cashu + Lightning (Docker)
 deno task test:e2e:frost        # FROST threshold signing (needs frost-signer binary)
 deno task test:e2e:tlsn         # TLSNotary (needs verifier Docker + Rust prover binary)
-deno task test:e2e:pentest      # pentest (needs anchr server)
-deno task test:e2e:web          # browser flow (needs anchr server + expo web)
 
 ./scripts/test-all.sh --local   # everything that does not need Docker (= what CI Phase 1 runs)
 ./scripts/test-all.sh --docker  # Docker-backed e2e buckets (relay + regtest + tlsn)

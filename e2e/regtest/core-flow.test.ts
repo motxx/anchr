@@ -29,7 +29,6 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { buildWorkerApiApp } from "../../packages/bounty/src/infrastructure/worker-api.ts";
 import {
   createQueryService,
   createQueryStore,
@@ -93,7 +92,6 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     preimageStore,
     hooks: {}, // No relay hooks — avoid WebSocket leaks
   });
-  const app = buildWorkerApiApp({ queryService: service });
 
   beforeAll(() => {
     store.clear();
@@ -129,113 +127,75 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
 
     // === Phase 2: Query Lifecycle ===
 
-    // 2a. Create HTLC query via HTTP API
-    const createRes = await app.request("http://localhost/queries", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
+    const query = service.createQuery(
+      {
         description: "E2E Core Flow: BTC price verification",
         verification_requirements: [],
-        oracle_ids: ["e2e-oracle"],
-        ttl_seconds: 600,
+      },
+      {
+        oracleIds: ["e2e-oracle"],
+        ttlSeconds: 600,
         escrow: escrowInfo,
         bounty: { amount_sats: BOUNTY_SATS, escrow_token: escrowToken },
-      }),
-    });
-    expect(createRes.status).toBe(201);
-    const { query_id } = await createRes.json() as { query_id: string };
-    expect(query_id).toMatch(/^query_/);
+      },
+    );
+    const queryId = query.id;
+    expect(queryId).toMatch(/^query_/);
 
     // Verify initial state
-    const q0 = service.getQuery(query_id)!;
+    const q0 = service.getQuery(queryId)!;
     expect(q0.status).toBe("awaiting_quotes");
     expect(q0.payment_status).toBe("escrow_locked");
 
     // 2b. Worker submits quote
-    const quoteRes = await app.request(
-      `http://localhost/queries/${query_id}/quotes`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_worker_pub",
-          amount_sats: BOUNTY_SATS,
-          quote_event_id: "e2e_quote_1",
-        }),
-      },
-    );
-    expect((await quoteRes.json() as { ok: boolean }).ok).toBe(true);
+    const quoteOutcome = service.recordQuote(queryId, {
+      worker_pubkey: "e2e_worker_pub",
+      amount_sats: BOUNTY_SATS,
+      quote_event_id: "e2e_quote_1",
+      received_at: Date.now(),
+    });
+    expect(quoteOutcome.ok).toBe(true);
 
     // 2c. Requester selects Worker
-    const selectRes = await app.request(
-      `http://localhost/queries/${query_id}/select`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_worker_pub",
-        }),
-      },
-    );
-    expect((await selectRes.json() as { ok: boolean }).ok).toBe(true);
-    expect(service.getQuery(query_id)!.status).toBe("worker_selected");
+    const selectOutcome = await service.selectWorker(queryId, "e2e_worker_pub");
+    expect(selectOutcome.ok).toBe(true);
+    expect(service.getQuery(queryId)!.status).toBe("worker_selected");
 
     // 2d. Worker acknowledges selection (worker_selected → processing)
-    const beginRes = await app.request(
-      `http://localhost/queries/${query_id}/begin`,
-      {
-        method: "POST",
-      },
-    );
-    expect((await beginRes.json() as { ok: boolean }).ok).toBe(true);
-    expect(service.getQuery(query_id)!.status).toBe("processing");
+    const beginOutcome = service.beginWork(queryId);
+    expect(beginOutcome.ok).toBe(true);
+    expect(service.getQuery(queryId)!.status).toBe("processing");
 
     // === Phase 3: Verification + Settlement ===
 
     // 3a. Worker submits result (inline verification)
-    const resultRes = await app.request(
-      `http://localhost/queries/${query_id}/result`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          worker_pubkey: "e2e_worker_pub",
-          attachments: [],
-          notes: "E2E core flow result",
-          oracle_id: "e2e-oracle",
-        }),
-      },
+    const resultOutcome = await service.submitEscrowResult(
+      queryId,
+      { attachments: [], notes: "E2E core flow result" },
+      "e2e_worker_pub",
+      "e2e-oracle",
     );
-    expect(resultRes.status).toBe(200);
-
-    const resultJson = await resultRes.json() as {
-      ok: boolean;
-      verification: { passed: boolean; checks: string[]; failures: string[] };
-      oracle_id: string;
-      payment_status: string;
-      preimage: string | null;
-    };
 
     // 3b. Verify oracle passed
-    expect(resultJson.ok).toBe(true);
-    expect(resultJson.verification.passed).toBe(true);
-    expect(resultJson.oracle_id).toBe("e2e-oracle");
-    expect(resultJson.payment_status).toBe("released");
+    expect(resultOutcome.ok).toBe(true);
+    expect(resultOutcome.query?.verification?.passed).toBe(true);
+    expect(resultOutcome.query?.assigned_oracle_id).toBe("e2e-oracle");
+    expect(resultOutcome.query?.payment_status).toBe("released");
 
     // 3c. Preimage is revealed to Worker
-    expect(resultJson.preimage).toBe(preimage);
+    expect(resultOutcome.preimage).toBe(preimage);
 
     // 3d. Verify preimage → hash relationship
     //     Preimage is hex-encoded random bytes; hash = SHA-256(raw_bytes)
     const preimageBytes = new Uint8Array(
-      resultJson.preimage!.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+      resultOutcome.preimage!.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
     );
     const computedHash = bytesToHex(sha256(preimageBytes));
     expect(computedHash).toBe(hash);
 
     // === Phase 4: Final State ===
 
-    const finalQuery = service.getQuery(query_id)!;
+    const finalQuery = service.getQuery(queryId)!;
     expect(finalQuery.status).toBe("approved");
     expect(finalQuery.payment_status).toBe("released");
     expect(finalQuery.assigned_oracle_id).toBe("e2e-oracle");
