@@ -7,7 +7,6 @@ import type { Hono } from "hono";
 import { dirname } from "node:path";
 import { getRuntimeConfig } from "./config.ts";
 import { purgeExpiredQueries } from "../application/data-purge.ts";
-import { type McpServerCapabilities, startMcpServer } from "./mcp-server.ts";
 import {
   createQueryService,
   type QueryService,
@@ -24,12 +23,17 @@ import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "scheduler"]);
 const apiLog = getLogger(["anchr", "http-api"]);
 
+export interface RuntimeCapabilities {
+  cashu: boolean;
+  nostr: boolean;
+}
+
 export interface HostComposition {
   queryService: QueryService;
   preimageStore: PreimageStore;
   oracleRegistry: OracleRegistry;
   app: Hono;
-  capabilities: McpServerCapabilities;
+  capabilities: RuntimeCapabilities;
 }
 
 export interface ComposeHostOptions {
@@ -78,7 +82,7 @@ export interface ReferenceRuntime {
 
 export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
   const config = getRuntimeConfig();
-  const { queryService, app, capabilities } = composeHost();
+  const { queryService, app } = composeHost();
 
   const scheduler = setInterval(async () => {
     const expired = queryService.expireQueries();
@@ -94,8 +98,6 @@ export async function startReferenceRuntime(): Promise<ReferenceRuntime> {
   setupServerLogCapture();
   Deno.serve({ port: config.httpApiPort }, app.fetch);
   apiLog.error(`HTTP API → http://localhost:${config.httpApiPort}`);
-
-  await startMcpServer({ queryService, capabilities });
 
   return {
     stopScheduler() {

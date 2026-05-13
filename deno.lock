@@ -2731,7 +2731,6 @@
           "jsr:@std/testing@1",
           "jsr:@zod/zod@4",
           "npm:@cashu/cashu-ts@3",
-          "npm:@modelcontextprotocol/sdk@1",
           "npm:nostr-tools@2"
         ]
       },

@@ -9,7 +9,6 @@ import {
   JSONRPCMessage,
   JSONRPCMessageSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { moduleDir } from "@anchr/core-runtime/mod";
 
 const PNG_BYTES = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVQImWP8//8/AxJgYGBgAAQYAAHcAQObmQ4AAAAASUVORK5CYII=",
@@ -53,7 +52,7 @@ class DenoStdioTransport implements Transport {
         "--allow-all",
         "--unstable-sloppy-imports",
         "--unstable-detect-cjs",
-        `--config=${join(moduleDir(import.meta), "../../deno.json")}`,
+        `--config=${join(Deno.cwd(), "deno.json")}`,
         this.scriptPath,
       ],
       stdin: "piped",
@@ -125,27 +124,21 @@ async function createMcpClient(
   // globalThis.__queryService so the test bootstrapPreamble can pass it
   // into both `startMcpServer({ queryService })` and any
   // `buildWorkerApiApp({ queryService })` wired by the preamble.
+  const setupImports = [
+    `import { createQueryService, createOracleRegistry } from "@anchr/bounty";`,
+    `import { normalizeQueryResult } from "@anchr/bounty/attachment-access";`,
+    `import { startMcpServer } from "@anchr/anchr-mcp/mcp-server";`,
+    `import { buildWorkerApiApp } from "@anchr/bounty/worker-api";`,
+    `import { storeIntegrity } from "@anchr/photo-verification/integrity-store";`,
+  ].join("\n");
   const setupQueryService = [
-    `const { createQueryService } = await import(${
-      JSON.stringify(
-        join(moduleDir(import.meta), "../application/query-service.ts"),
-      )
-    });`,
-    `const { createOracleRegistry } = await import(${
-      JSON.stringify(join(moduleDir(import.meta), "oracle-client/registry.ts"))
-    });`,
-    `const { normalizeQueryResult } = await import(${
-      JSON.stringify(join(moduleDir(import.meta), "attachments.ts"))
-    });`,
     `globalThis.__queryService = createQueryService({ oracleRegistry: createOracleRegistry(), normalizeResult: normalizeQueryResult });`,
   ].join("\n");
 
   const bootstrap = [
+    setupImports,
     setupQueryService,
     bootstrapPreamble,
-    `const { startMcpServer } = await import(${
-      JSON.stringify(join(moduleDir(import.meta), "mcp-server.ts"))
-    });`,
     "await startMcpServer({ queryService: globalThis.__queryService });",
     "await new Promise(() => {});",
   ].join("\n");
@@ -182,14 +175,6 @@ Deno.test({
     // Bootstrap: create query + submit result inside the MCP subprocess so
     // the in-memory store has the data when MCP tools read it.
     const setupPreamble = [
-      `const { storeIntegrity } = await import(${
-        JSON.stringify(
-          join(
-            moduleDir(import.meta),
-            "../../../photo-verification/src/integrity-store.ts",
-          ),
-        )
-      });`,
       `const query = globalThis.__queryService.createQuery({ description: "MCP integration test" }, { ttlSeconds: 300 });`,
       `globalThis.__testQueryId = query.id;`,
       `globalThis.__testNonce = query.challenge_nonce;`,
@@ -335,9 +320,6 @@ Deno.test({
     const baseUrl = "http://remote.test";
     const bootstrapPreamble = [
       `Deno.env.set("HTTP_API_KEY", "remote-test-key");`,
-      `const { buildWorkerApiApp } = await import(${
-        JSON.stringify(join(moduleDir(import.meta), "worker-api.ts"))
-      });`,
       `const app = buildWorkerApiApp({ queryService: globalThis.__queryService });`,
       `const originalFetch = globalThis.fetch.bind(globalThis);`,
       `globalThis.fetch = async (input, init) => {`,

@@ -54,11 +54,12 @@ packages/
 ├── customer-sdk/              Customer local state, request flow, HTLC lock/bind, and ports.
 ├── provider-sdk/              Provider request handling, quote/result flow, redeem gate, and ports.
 ├── bounty/                    Current host-shaped implementation: Query lifecycle, escrow,
-│                              oracle-client/service, worker-api (HTTP), MCP (stdio).
+│                              oracle-client/service, worker-api (HTTP).
 └── sdk/                       Aggregate convenience package plus host REST client facade.
 
 example/                       Runnable apps; each owns its design system + deno.json
   ├── anchr-reference-host/    Temporary bundled runtime example, not a protocol actor
+  ├── anchr-mcp/               MCP stdio adapter for agent runtime integration
   ├── data-marketplace/        Bounty pattern with extra `/marketplace/*` routes via composeHost(extras)
   ├── two-party-binary-bet/    Market pattern (no host needed)
   └── …                        SDK consumers + standalone primitives demos
@@ -90,7 +91,7 @@ Customer/Provider/Oracle actor names follow
 | Release authority     | Produce the material that unlocks settlement only after verification succeeds, and bind that material to the selected work.                                     | Verification verdict, query id, request event id, payment hash, Provider key, authority key or quorum state. | Signed release message, preimage, threshold signature, or equivalent unlock material.     | Verification failure, wrong authority, quorum not met, signature mismatch, release fields not bound to the accepted work.    | Single Oracle preimage release, FROST threshold signatures.                           |
 | Attachment transport  | Store and retrieve large or sensitive proof material without making the storage service a protocol actor.                                                       | Plaintext bytes, encryption key material, retention policy, recipient set.                                   | Encrypted attachment reference, content address, delivery key material.                   | Encryption failure, content-address mismatch, unavailable storage server, missing key material, retention expiry.            | Encrypted Blossom blobs; see [Attachment registry](#attachment-registry-blossom).     |
 | Local actor state     | Track one actor's private progress without making local implementation state part of the network contract.                                                      | Actor configuration, observed messages, wallet state, verifier state, retry state, persisted tickets.        | Local projections, preflight tickets, idempotency records, retry schedule, audit records. | Corrupt store, conflicting events, missing idempotency record, stale local policy, failed persistence.                       | Actor SDK storage ports; current `@anchr/bounty` Query lifecycle scaffolding.         |
-| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, HTTP route, MCP tool, mobile or web bridge.                                  | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | Reference host scaffolding, worker-api HTTP routes, MCP stdio, example apps.          |
+| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, HTTP route, MCP tool, mobile or web bridge.                                  | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | Reference host scaffolding, worker-api HTTP routes, `example/anchr-mcp`, example apps. |
 
 ## Naming migration
 
@@ -117,9 +118,11 @@ Migration rules:
 ## Reference host status
 
 `example/anchr-reference-host/` is a temporary bundled deployment for local
-testing. It wires QueryService, worker-api HTTP routes, MCP stdio, scheduler,
-and log capture into one process. It is not the network's default endpoint, not
-a hosted reference URL, and not part of the protocol contract.
+testing. It wires QueryService, worker-api HTTP routes, scheduler, and log
+capture into one process. MCP stdio is split into `example/anchr-mcp/` so agent
+runtime integration stays adapter-owned. The reference host is not the
+network's default endpoint, not a hosted reference URL, and not part of the
+protocol contract.
 
 This tradeoff removes a convenient central demo target. In return:
 

@@ -18,7 +18,7 @@ export type PaymentStatus =
   | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
-export type SubmissionChannel = "worker_api" | "mcp";
+export type SubmissionChannel = "worker_api" | "adapter";
 export type AttachmentStorageKind = "blossom" | "external";
 
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */

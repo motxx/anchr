@@ -128,7 +128,6 @@ export type {
 } from "./infrastructure/oracle-client/index.ts";
 export { buildOracleApp } from "./infrastructure/oracle-service/index.ts";
 
-export { startMcpServer as startMcpAdapter } from "./infrastructure/mcp-server.ts";
 export {
   composeHost,
   startReferenceRuntime,
@@ -136,6 +135,7 @@ export {
 export type {
   ComposeHostOptions,
   HostComposition,
+  RuntimeCapabilities,
 } from "./infrastructure/runtime.ts";
 export {
   queryResultToInput,
