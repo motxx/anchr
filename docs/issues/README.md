@@ -71,7 +71,25 @@ Completed: YYYY-MM-DD
 
 ## Resolution
 
-What changed, including important PRs, commits, files, or follow-up notes.
+Implemented by updating:
+
+- `path/to/file`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- <which test, lint, skill, threat-model entry, universality-boundary entry, or
+  spec edit absorbs this class of finding>; or
+- None — <one-line rationale for why no harness update was needed, for example
+  the finding is a one-time design decision now locked in docs, or it is a
+  `human universal decision` that belongs to a maintainer call>.
+
+Follow-up:
+
+- None
 ```
 
 Do not renumber files when moving them. If the work reveals a separate task,
@@ -81,6 +99,11 @@ If the issue has unresolved `Depends on` entries, do not close it unless the
 maintainer explicitly accepts the remaining dependency risk. When closing an
 issue, update other pending issues whose `Depends on` or `Blocks` lists should
 change as a result.
+
+The harness-update field follows the maintenance loop in
+[`docs/review-harness.md`](../review-harness.md#maintenance-loop). "Out of
+scope" alone is not a rationale; pair it with the pending issue number that
+will absorb the class of finding.
 
 ## Security
 
