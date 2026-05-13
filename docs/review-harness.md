@@ -47,7 +47,7 @@ from ad hoc review into one of these homes.
 | `skills/test-tlsn/SKILL.md` | `semantic skill` | Manual and automated TLSNotary verification runbook selection. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
-| `docs/issues/README.md` | `automated` process input | Issue structure, dependency recording, closure format, and security-sensitive issue limits. |
+| `docs/issues/README.md` | `automated` process input | Issue structure, dependency recording, closure format, review residual recording, and security-sensitive issue limits. |
 
 ## Review Concern Map
 
@@ -67,6 +67,7 @@ from ad hoc review into one of these homes.
 | Pre-1.0 replaced path kept as a compatibility shim | `automated` | `deno task lint:deprecation` plus tests for new behavior | Delete the path and lock the replacement behavior. |
 | Developer-local path, secret-shaped data, or private operational detail in docs or issue text | `automated` for local paths; `human universal decision` for sensitive disclosure | `deno task lint:paths`, `docs/issues/README.md` | Add a redaction rule or a pending issue when the leak pattern is not local-path-shaped. |
 | Human disagreement about risk acceptance | `human universal decision` | `docs/threat-model.md`, `docs/universality-boundaries.md`, pending issue resolution notes | Record the accepted risk and the harness follow-up, or leave the issue pending. |
+| Review residuals after all required checks pass | `human universal decision` | This document, `docs/issues/README.md`, and pending issue resolution notes | Record only the residual decision, its owning document, or the pending issue that will resolve it. |
 
 ## Not Yet Covered
 
@@ -75,7 +76,6 @@ These review concerns are not fully owned by the current harness:
 | Concern | Current handling | Convert to |
 | --- | --- | --- |
 | Repeated natural-language ambiguity in issue plans or resolution notes | Human review during `resolve-issues` | Issue-template guidance in `docs/issues/README.md` or a repository skill rubric update. |
-| Review residuals after all required checks pass | Human reviewer judgment | #0018 should define the residual checklist and where it is recorded. |
 | Coverage quality inside manual runbooks | Human review plus runbook skills | Add focused script tests when a runbook command can be parsed or simulated. |
 
 ## Updating This Map
@@ -89,7 +89,44 @@ When a review finding repeats:
    small set of files.
 4. Prefer docs or specs when the finding is really a universal decision.
 5. If the right home is unclear, create a pending issue and mark the concern as
-   `not yet covered` until #0018 resolves the residual-checklist gap.
+   `not yet covered` until the harness owner is chosen.
+
+## Residual Review
+
+After the required verification commands and semantic skills pass, human review
+should be limited to residual decisions that cannot be reduced to the current
+harness. The reviewer should check only whether the change leaves one of these
+decisions:
+
+- a protocol, security, architecture, or public-vocabulary decision whose
+  owning home is unclear;
+- an explicit risk acceptance, including a security, funds-flow, privacy,
+  replay, or availability tradeoff;
+- a specification or threat-model change that needs maintainer agreement before
+  it becomes normative;
+- an infrastructure, runbook, or external dependency gap that prevented the full
+  verification bar from running;
+- a repeated review concern that should become a test, lint, semantic skill,
+  docs lock, spec entry, or pending issue.
+
+Routine style, naming consistency, local readability, formatting, type safety,
+package boundaries, and behavior regressions are not residual review topics
+once the relevant harness owner exists. If a human reviewer still has to catch
+one of those, route it through the maintenance loop below.
+
+### Recording residuals
+
+Use the `Review residuals:` field in issue resolution notes:
+
+- `None` when no human decision remains after verification.
+- A concise bullet naming the residual decision and its owning document when the
+  maintainer accepted it in the same change.
+- A pending issue number when the residual cannot be closed in the current
+  change.
+
+Do not close an issue with an unresolved residual unless the maintainer
+explicitly accepts the risk. If the same residual appears again, treat it as a
+new review finding and route it through the maintenance loop.
 
 ## Maintenance Loop
 
