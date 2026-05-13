@@ -67,6 +67,9 @@ docs/                          Architecture + threat model
 Component names describe protocol responsibilities, not today's bindings. A
 boundary is stable when replacing its current binding changes only adapter
 code, primitive-package implementation, or package `SPEC.md` guidance.
+Normative cross-implementation capability requirements live in
+[`specs/protocol-contract.md`](../specs/protocol-contract.md). This table records
+architecture placement, failure surfaces, and current repository bindings.
 Placement of any rule derived from this table — universal contract, security
 invariant, package contract, or adapter detail — follows
 [`docs/universality-boundaries.md`](universality-boundaries.md); the

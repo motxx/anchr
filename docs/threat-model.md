@@ -123,38 +123,22 @@ Provider signature, or for the Customer refund path after locktime.
 
 ## Settlement Decision Rules
 
-Provider-side settlement separates three decisions:
+The normative Provider preflight and redeem contract lives in
+[`specs/protocol-contract.md#provider-preflight`](../specs/protocol-contract.md#provider-preflight)
+and
+[`specs/protocol-contract.md#release-and-redeem`](../specs/protocol-contract.md#release-and-redeem).
+This threat model treats that separation as security-sensitive because
+collapsing mint-level spendability, clean settlement, and audit decisions can
+strand Provider funds or hide release anomalies.
 
-- **Mint-level redeem:** a hard gate that checks token spendability only. The
-  Provider can redeem when the bound token's hashlock matches the released
-  preimage, the token is locked to the Provider pubkey, the Provider can sign,
-  and the mint accepts the swap.
-- **Clean settlement:** a protocol-quality decision. The release material must
-  come from the expected Oracle pubkey or FROST group key and its signature must
-  bind the payment hash, Provider pubkey, `query_id`, and `request_event_id`.
-- **Audit / reputation:** anomaly recording for release source mismatch,
-  signature mismatch, `query_id` mismatch, `request_event_id` mismatch, stale
-  reply threads, short locktime, or implementation drift.
-
-The Provider redeem gate MUST NOT re-run mutable Provider policy after a
-preflight ticket has accepted an escrow. Redeem is governed by token
-spendability plus the immutable preflight ticket fields: token fingerprint,
-payment hash, Provider pubkey lock, accepted amount, mint URL, locktime, and
-expected authority. Policy changes after `produce()` starts can affect future
-quotes, clean-settlement reporting, or reputation, but they must not block
-recovery of funds from an already spendable token.
-
-Unexpected release material is not a clean valid release. However, if the
-material unlocks the currently held bound token and the Provider can satisfy the
-Provider signature requirement, the Provider SDK should attempt the economic
-redeem and record the mismatch as audit evidence instead of treating it as a
-redeem failure.
-
-Oracle release depends on proof validity and expected authority, not on a host,
-coordinator, or Customer cancel flag observed after the proof has verified. A
-cancel race after valid proof submission can affect Customer UX and audit state,
-but it must not suppress release of material needed for a Provider to redeem
-valid completed work.
+The security claim is that mutable Provider policy, release-source mismatch,
+signature mismatch, `query_id` mismatch, `request_event_id` mismatch, stale
+reply threads, and Customer cancel races are not standalone reasons to suppress
+economic redeem when the currently held Provider-bound token is spendable.
+Those facts belong to clean-settlement reporting and audit. Conversely, a token
+that does not match the release material, is not bound to the Provider, cannot
+be signed by the Provider, or is rejected by the settlement backend is not
+spendable and must not redeem.
 
 ## Future invariants (declared, not yet specified)
 

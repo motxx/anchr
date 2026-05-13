@@ -110,17 +110,19 @@ proof, release, and redeem vocabulary.
 
 The protocol depends on capabilities, not fixed implementations:
 
-| Capability | Universal contract | Current reference profile |
-| --- | --- | --- |
-| Actor coordination | Authenticated messages preserve role identity, causal parent links, replay context, and encrypted payload boundaries. | Nostr DVM events, NIP-44 direct messages. |
-| Proof dispatch | Requests and proofs carry an exact proof schema URL that selects a verifier without embedding verifier implementation details in the protocol. | [`proof-schemas.md`](proof-schemas.md), TLSNotary and C2PA adapters. |
-| Settlement lock | A selected Provider can redeem only with the bound unlock material and Provider authorization; the Customer can refund only after locktime. | Cashu HTLC / P2PK locks. |
-| Release authority | Unlock material is produced only after verification succeeds and is bound to the selected work and settlement lock. | Single Oracle preimage release or FROST threshold signature. |
-| Attachment transport | Large or sensitive proof material is content-addressed or integrity-checked, encrypted for authorized readers, and referenced from the proof submission. | Encrypted Blossom blobs. |
-| Local actor state | Each actor persists enough state for idempotency, retries, preflight tickets, and audit records without making local storage a network actor. | Actor SDK storage ports. |
+| Capability | Universal contract |
+| --- | --- |
+| Actor coordination | Authenticated messages preserve role identity, causal parent links, replay context, and encrypted payload boundaries. |
+| Proof dispatch | Requests and proofs carry an exact proof schema URL that selects a verifier without embedding verifier implementation details in the protocol. |
+| Settlement lock | A selected Provider can redeem only with the bound unlock material and Provider authorization; the Customer can refund only after locktime. |
+| Release authority | Unlock material is produced only after verification succeeds and is bound to the selected work and settlement lock. |
+| Attachment transport | Large or sensitive proof material is content-addressed or integrity-checked, encrypted for authorized readers, and referenced from the proof submission. |
+| Local actor state | Each actor persists enough state for idempotency, retries, preflight tickets, and audit records without making local storage a network actor. |
 
 An implementation may replace a reference profile when it satisfies the same
 capability contract and any profile-specific spec it claims to implement.
+Current repository bindings and package placement live in
+[`docs/architecture.md`](../docs/architecture.md).
 
 ## Provider Preflight
 

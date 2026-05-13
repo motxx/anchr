@@ -42,6 +42,7 @@ Implemented by updating:
 - `specs/README.md`
 - `specs/messaging.md`
 - `docs/architecture.md`
+- `docs/threat-model.md`
 
 Verified with:
 
@@ -51,7 +52,7 @@ Verified with:
 
 Harness update:
 
-- Universal protocol placement is now locked in `specs/protocol-contract.md` and referenced from `specs/README.md`; no deterministic lint was added because this is a one-time `human universal decision` about where future normative text belongs.
+- Universal protocol placement is now locked in `specs/protocol-contract.md` and referenced from `specs/README.md`; `docs/threat-model.md`, `docs/architecture.md`, and `specs/messaging.md` link to that source instead of duplicating the normative preflight, redeem, capability, and actor rules. No deterministic lint was added because this is a one-time `human universal decision` about where future normative text belongs.
 
 Follow-up:
 

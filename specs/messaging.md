@@ -16,17 +16,15 @@ Proof format dispatch uses HTTPS schema URLs defined in
 schema URL in an `s` tag for discovery, and encrypted payloads carry the same
 URL in their `schema` field for execution.
 
-## Actors
+## Actor Naming
 
-- **Customer** posts a query, selects a Provider, and locks payment.
-- **Provider** quotes work, submits proof, and redeems after Oracle approval.
-- **Oracle** verifies proof material and releases the unlock material.
-
-Some current field names still use `requester_*` or `worker_*`. Those names are
-compatibility identifiers for existing events and host-shaped code; new prose
-and SDK APIs use Customer and Provider. Once versioned replacements are
-available, requester/worker names should be removed rather than retained as
-aliases.
+The protocol actors are defined in
+[`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr
+profile maps them to event authors and `p` tags. Some current field names still
+use `requester_*` or `worker_*`; those are compatibility identifiers for
+existing events and host-shaped code. New prose and SDK APIs use Customer and
+Provider. Once versioned replacements are available, requester/worker names
+should be removed rather than retained as aliases.
 
 ## Event Kinds
 
@@ -191,18 +189,16 @@ For this Nostr profile, a release message binds:
 | `signature`           | Oracle or FROST signature over the release fields            |
 
 Correlation mismatches are audit inputs, not redeem hard failures by
-themselves. If release material is not clean but still unlocks the Provider's
-current bound token, the Provider should attempt economic redeem and record the
-anomaly. If the preimage does not match the token hashlock, the token is not
-locked to the Provider, or the Provider cannot sign, redeem fails.
+themselves; the redeem decision remains the universal rule in
+[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
 
 ## Preimage Delivery Reliability
 
-The preimage is the most critical message in the protocol. If the Provider
+The preimage is the most critical message in the Nostr profile. If the Provider
 completed valid work but never receives the preimage, they cannot redeem escrow.
-The following delivery strategy MUST be implemented:
+The Nostr delivery strategy is:
 
-### Three-Tier Delivery
+### NIP-44 Delivery
 
 1. **Primary**: Oracle sends preimage via NIP-44 DM to the Provider, published
    to multiple relays. The message MUST succeed on at least one relay before the
@@ -212,19 +208,15 @@ The following delivery strategy MUST be implemented:
    attempts: 2s, 4s, 8s). The Oracle MUST NOT delete the preimage until at least
    one delivery is confirmed.
 
-3. **Fallback (HTTP)**: The Oracle MAY expose an HTTP endpoint
-   (`GET /oracle/preimage/:queryId`) where the Provider can poll for the
-   preimage. The endpoint MUST authenticate the request by verifying the caller
-   is the selected Provider (e.g., Nostr signature). The preimage is served only
-   if the query is approved. This fallback is an Oracle-operated adapter
-   endpoint, not a hosted Anchr reference endpoint.
+An Oracle-operated pull endpoint may exist as an adapter-specific recovery
+profile, but it is not part of the Nostr protocol requirement and must not be a
+hosted Anchr reference endpoint.
 
 ### Provider-Side Behavior
 
 The Provider subscribes to NIP-44 DMs from the Oracle. If no preimage arrives
 within a configurable timeout (e.g., 30 seconds after proof submission), the
-Provider SHOULD poll the Oracle's HTTP fallback endpoint when that endpoint is
-announced.
+Provider may use an announced adapter-specific recovery profile.
 
 ### Deletion Policy
 
@@ -232,7 +224,8 @@ The Oracle MUST retain the preimage until at least one of the following is
 confirmed:
 
 - Relay delivery success (at least 1 relay acknowledged)
-- HTTP fetch by the Provider
+- Authenticated fetch by the Provider through an adapter-specific recovery
+  profile
 - Escrow redemption observed on the Cashu mint
 
 ## Transport Agnosticism

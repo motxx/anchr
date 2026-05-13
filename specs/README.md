@@ -10,7 +10,7 @@ All specs in this directory are released under [CC0 1.0 Universal](LICENSE)
 
 ## Specs
 
-| Title                                   | Why it's wire-format                                                                                                                                                                                 |
+| Title                                   | Why it belongs in `specs/`                                                                                                                                                                           |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Universal Protocol Contract](protocol-contract.md) | Role-neutral lifecycle, message classes, capability requirements, state transitions, Provider preflight, and redeem rules shared by independent Anchr implementations. |
 | [Nostr DVM Messaging](messaging.md)     | NIP-90 event kinds (5300/6300/7000) used by every Anchr Customer / Provider / Oracle to discover each other and exchange queries, quotes, and proofs.                                                |
