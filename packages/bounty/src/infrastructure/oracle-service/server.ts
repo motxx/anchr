@@ -78,7 +78,6 @@ export function buildOracleApp(
   // Per-app session state. Lives only as long as the app instance — the
   // route registrars hold references but never mutate the binding.
   const queryHashMap = new Map<string, string>();
-  const verifiedQueries = new Map<string, string>();
   const pendingNonces = new Map<string, string>();
 
   registerHtlcRoutes(app, {
@@ -86,7 +85,6 @@ export function buildOracleApp(
     authMiddleware,
     preimageStore,
     queryHashMap,
-    verifiedQueries,
   });
 
   registerFrostSignerRoutes(app, {

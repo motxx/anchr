@@ -7,9 +7,8 @@ Machine (DVM) pattern. This spec defines the event kinds, payloads, and
 lifecycle for Customer, Provider, and Oracle actors.
 
 The role-neutral lifecycle, state transitions, preflight ticket, and redeem
-rules are defined in
-[`protocol-contract.md`](protocol-contract.md). This document specifies their
-Nostr event encoding.
+rules are defined in [`protocol-contract.md`](protocol-contract.md). This
+document specifies their Nostr event encoding.
 
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
@@ -19,12 +18,12 @@ URL in their `schema` field for execution.
 ## Actor Naming
 
 The protocol actors are defined in
-[`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr
-profile maps them to event authors and `p` tags. Some current field names still
-use `requester_*` or `worker_*`; those are compatibility identifiers for
-existing events and host-shaped code. New prose and SDK APIs use Customer and
-Provider. Once versioned replacements are available, requester/worker names
-should be removed rather than retained as aliases.
+[`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr profile
+maps them to event authors and `p` tags. Some current field names still use
+`requester_*` or `worker_*`; those are compatibility identifiers for existing
+events and host-shaped code. New prose and SDK APIs use Customer and Provider.
+Once versioned replacements are available, requester/worker names should be
+removed rather than retained as aliases.
 
 ## Event Kinds
 
@@ -188,44 +187,49 @@ For this Nostr profile, a release message binds:
 | `preimage`            | HTLC preimage, when the payment profile uses NUT-14 hashlock |
 | `signature`           | Oracle or FROST signature over the release fields            |
 
-Correlation mismatches are audit inputs, not redeem hard failures by
-themselves; the redeem decision remains the universal rule in
+Correlation mismatches are audit inputs, not redeem hard failures by themselves;
+the redeem decision remains the universal rule in
 [`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
 
-## Preimage Delivery Reliability
+## Release Delivery Reliability
 
-The preimage is the most critical message in the Nostr profile. If the Provider
-completed valid work but never receives the preimage, they cannot redeem escrow.
-The Nostr delivery strategy is:
+The release material is the most critical message in the Nostr profile. If the
+Provider completed valid work but never receives the preimage or FROST
+signature, they cannot redeem escrow. The Nostr delivery strategy is:
 
 ### NIP-44 Delivery
 
-1. **Primary**: Oracle sends preimage via NIP-44 DM to the Provider, published
-   to multiple relays. The message MUST succeed on at least one relay before the
-   preimage is deleted from the Oracle's store.
+1. **Primary**: Oracle sends release material via NIP-44 DM to the Provider,
+   published to multiple relays. The message MUST succeed on at least one relay
+   before the release material is deleted from the Oracle's retry store.
 
 2. **Retry**: If zero relays confirm, retry with exponential backoff (3
-   attempts: 2s, 4s, 8s). The Oracle MUST NOT delete the preimage until at least
-   one delivery is confirmed.
+   attempts: 2s, 4s, 8s). The Oracle MUST NOT delete release material until at
+   least one relay delivery is confirmed or a later redeem observation proves
+   the Provider received spendable material.
 
-An Oracle-operated pull endpoint may exist as an adapter-specific recovery
-profile, but it is not part of the Nostr protocol requirement and must not be a
-hosted Anchr reference endpoint.
+3. **Recovery**: If direct relay delivery keeps failing, the Provider may send
+   an authenticated Nostr retry request that references the original kind 5300
+   request, selected offer, and proof submission. The Oracle answers with a new
+   NIP-44 DM to the selected Provider pubkey. Implementations may choose their
+   own retry event kind or tag set until a dedicated profile is standardized,
+   but the recovery path remains Nostr-native and is not a hosted Anchr HTTP
+   endpoint.
 
 ### Provider-Side Behavior
 
-The Provider subscribes to NIP-44 DMs from the Oracle. If no preimage arrives
-within a configurable timeout (e.g., 30 seconds after proof submission), the
-Provider may use an announced adapter-specific recovery profile.
+The Provider subscribes to NIP-44 DMs from the Oracle. If no release material
+arrives within a configurable timeout (e.g., 30 seconds after proof submission),
+the Provider may publish an authenticated retry request on the configured
+relays.
 
 ### Deletion Policy
 
-The Oracle MUST retain the preimage until at least one of the following is
+The Oracle MUST retain release material until at least one of the following is
 confirmed:
 
 - Relay delivery success (at least 1 relay acknowledged)
-- Authenticated fetch by the Provider through an adapter-specific recovery
-  profile
+- Authenticated Nostr retry delivery to the selected Provider
 - Escrow redemption observed on the Cashu mint
 
 ## Transport Agnosticism

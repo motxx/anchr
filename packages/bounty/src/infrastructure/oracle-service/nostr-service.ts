@@ -90,6 +90,8 @@ export interface OracleNostrServiceConfig {
     passed: boolean,
     workerPubkey: string,
   ) => void;
+  /** Delivery retry delays in milliseconds. Defaults to 2s, 4s, then final attempt. */
+  deliveryRetryDelaysMs?: number[];
 }
 
 export interface OracleNostrService {
@@ -178,10 +180,10 @@ export function createOracleNostrService(
         preimage,
       );
 
-      // Retry delivery with exponential backoff — do NOT delete preimage until confirmed
-      const MAX_RETRIES = 3;
+      const retryDelaysMs = config.deliveryRetryDelaysMs ?? [2000, 4000];
+      const maxAttempts = retryDelaysMs.length + 1;
       let delivered = false;
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const publishResult = await _publishEventFn(dm, config.relayUrls);
         if (publishResult.successes.length > 0) {
           log.error(
@@ -190,12 +192,12 @@ export function createOracleNostrService(
           delivered = true;
           break;
         }
-        if (attempt < MAX_RETRIES) {
-          const delaySec = attempt * 2;
+        const delayMs = retryDelaysMs[attempt - 1];
+        if (delayMs !== undefined) {
           log.error(
-            `Preimage delivery failed for ${queryId} (attempt ${attempt}/${MAX_RETRIES}), retrying in ${delaySec}s...`,
+            `Preimage delivery failed for ${queryId} (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`,
           );
-          await new Promise((r) => setTimeout(r, delaySec * 1000));
+          await new Promise((r) => setTimeout(r, delayMs));
         }
       }
 
@@ -204,8 +206,9 @@ export function createOracleNostrService(
         queryHashMap.delete(queryId);
       } else {
         log.error(
-          `Preimage delivery failed for ${queryId} after ${MAX_RETRIES} attempts — preimage retained for HTTP fallback`,
+          `Preimage delivery failed for ${queryId} after ${maxAttempts} attempts — preimage retained for Nostr retry`,
         );
+        return false;
       }
       return true;
     } else {
