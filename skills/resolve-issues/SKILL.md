@@ -44,7 +44,8 @@ only after the work is implemented and verified.
     after implementation and verification.
 11. Add `Completed: YYYY-MM-DD` and a `## Resolution` section that records what
     changed, important files, verification commands, the harness update or
-    rationale chosen in step 9, and any follow-up issue numbers.
+    rationale chosen in step 9, review residuals, and any follow-up issue
+    numbers.
 12. Update other pending issues if their `Depends on` or `Blocks` entries should
     change after this issue is closed.
 13. Report the closed issue path, changed files, and verification outcome.
@@ -95,6 +96,12 @@ Harness update:
 - None — finding is a one-time design decision locked in
   `docs/architecture.md`.
 
+Review residuals:
+
+- None; or
+- Maintainer must decide whether X is a universal protocol rule before #NNNN
+  can close.
+
 Follow-up:
 
 - None
@@ -104,4 +111,6 @@ Use concise bullets. If verification was blocked, record the blocker and leave
 the issue pending unless the user explicitly accepts the residual risk. The
 `Harness update` bullet is required; "Out of scope" alone is not a rationale and
 must be paired with the pending issue number that will absorb the class of
-finding.
+finding. The `Review residuals` bullet records the human decisions that remain
+after verification; use `None` when the issue leaves no maintainer-only
+decision.

@@ -87,6 +87,12 @@ Harness update:
   the finding is a one-time design decision now locked in docs, or it is a
   `human universal decision` that belongs to a maintainer call>.
 
+Review residuals:
+
+- None; or
+- <human decision left after verification, with the owning doc/spec or pending
+  issue number>.
+
 Follow-up:
 
 - None
@@ -103,7 +109,13 @@ change as a result.
 The harness-update field follows the maintenance loop in
 [`docs/review-harness.md`](../review-harness.md#maintenance-loop). "Out of
 scope" alone is not a rationale; pair it with the pending issue number that
-will absorb the class of finding.
+will close the gap.
+
+The review-residuals field follows
+[`docs/review-harness.md`](../review-harness.md#residual-review). Use `None`
+when no human decision remains after verification. If a residual remains, name
+the decision and its owning document, or leave the issue pending unless the
+maintainer explicitly accepts the risk.
 
 ## Security
 

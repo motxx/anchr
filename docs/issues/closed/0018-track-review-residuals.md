@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-13
 
 ## Priority
 
@@ -29,3 +30,31 @@ AI が実装し、ハーネスが検査した後に、それでも人間が見�
 - 人間レビューに残す判断と、ハーネスへ委譲すべき判断を分けた短いチェックリストを作る。
 - pending issue または resolution note に、未自動化のレビュー残差を記録する形式を決める。
 - 残差が繰り返し出た場合に `0017` のハーネス保守ループへ戻す導線を定義する。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/review-harness.md`
+- `docs/issues/README.md`
+- `skills/resolve-issues/SKILL.md`
+
+Verified with:
+
+- `deno task test:all`
+- `deno task test:all:docker`
+- `deno task lint:strict`
+
+Harness update:
+
+- `docs/review-harness.md` now owns the residual-review checklist, and
+  `docs/issues/README.md` plus `skills/resolve-issues/SKILL.md` require
+  `Review residuals:` in issue resolution notes.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
