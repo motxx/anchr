@@ -61,6 +61,16 @@ export interface AttachmentPreview {
   maxDimension: number;
 }
 
+export interface QueryAttachmentUrls {
+  viewUrl: string;
+  metaUrl: string;
+  previewUrl: string;
+}
+
+export interface StoredAttachmentStats extends StoredAttachment {
+  size: number;
+}
+
 function resolvePreviewCommand():
   | {
     command: string;
@@ -202,7 +212,7 @@ export function buildQueryAttachmentUrls(
   queryId: string,
   attachmentIndex: number,
   requestUrl?: string,
-) {
+): QueryAttachmentUrls {
   const baseUrl = attachmentPublicBaseUrl(requestUrl);
   return {
     viewUrl: new URL(
@@ -381,7 +391,7 @@ export async function renderStoredAttachmentPreview(
 export async function statStoredAttachment(
   ref: AttachmentLike,
   requestUrl?: string,
-) {
+): Promise<StoredAttachmentStats | null> {
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 

@@ -92,7 +92,7 @@ const writeAuth: MiddlewareHandler = async (c, next) => {
 
 // --- App ---
 
-export function buildWorkerApiApp(deps: WorkerApiDeps) {
+export function buildWorkerApiApp(deps: WorkerApiDeps): Hono {
   const svc = deps.queryService;
   const pStore = deps.preimageStore;
   const doListOracles = deps.oracleRegistry
