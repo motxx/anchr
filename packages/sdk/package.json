@@ -4,17 +4,17 @@
   "type": "module",
   "description": "SDK for Anchr — verified-data purchase between pseudonymous parties over Nostr",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "dist/sdk/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/sdk/src/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
   "files": ["dist"],
   "scripts": {
-    "build": "bun run clean && bun build src/index.ts --outdir dist --target node && bunx tsc -p tsconfig.json && bun run scripts/fix-dts-imports.ts",
+    "build": "bun run clean && bun run scripts/build-bundle.ts && bunx tsc -p tsconfig.json && bun run scripts/fix-dts-imports.ts",
     "clean": "rm -rf dist",
     "test": "bun test"
   },
