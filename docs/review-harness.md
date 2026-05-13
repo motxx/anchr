@@ -76,7 +76,6 @@ These review concerns are not fully owned by the current harness:
 | --- | --- | --- |
 | Repeated natural-language ambiguity in issue plans or resolution notes | Human review during `resolve-issues` | Issue-template guidance in `docs/issues/README.md` or a repository skill rubric update. |
 | Review residuals after all required checks pass | Human reviewer judgment | #0018 should define the residual checklist and where it is recorded. |
-| Deciding whether a newly found drift deserves lint, a semantic skill, a spec update, or only an issue | Human reviewer judgment | #0017 should define the maintenance loop and require a short rationale when no harness update is made. |
 | Coverage quality inside manual runbooks | Human review plus runbook skills | Add focused script tests when a runbook command can be parsed or simulated. |
 
 ## Updating This Map
@@ -90,4 +89,64 @@ When a review finding repeats:
    small set of files.
 4. Prefer docs or specs when the finding is really a universal decision.
 5. If the right home is unclear, create a pending issue and mark the concern as
-   `not yet covered` until #0017 or #0018 resolves the process gap.
+   `not yet covered` until #0018 resolves the residual-checklist gap.
+
+## Maintenance Loop
+
+Every human review finding on AI output should either go away the next time the
+same shape appears, or be recorded as a deliberate residual. This loop defines
+how to route a finding so the harness, not a human reviewer, catches the next
+occurrence.
+
+### Drift classes
+
+Classify the finding into exactly one of these before deciding where it lives.
+Pick the most specific class that fits; if more than one applies, prefer the
+class higher in the table.
+
+| Class | Definition | Default home |
+| --- | --- | --- |
+| `bug regression` | A previously-working behavior or contract no longer holds. The fix is a concrete code change with an observable failure mode. | Add the narrowest failing test next to the code (unit, integration, or e2e bucket matching the infrastructure profile), then fix the code. |
+| `boundary drift` | A layer, package, vocabulary, dependency-direction, or runtime-placement rule is violated. The shape of the violation is structural, not semantic. | Extend `scripts/arch-lint.ts` (or another `scripts/lint-*.ts`) plus its test fixture. Use `skills/arch-lint-llm/SKILL.md` only when the rule cannot be expressed deterministically. |
+| `semantic bypass` | A plausible-looking branch skips a verification, validation, settlement, redemption, auth, signing, or quorum check. The pattern requires reading intent across files. | Add the concrete shape to `skills/check-silent-bypass/SKILL.md`. Add a deterministic lint or test if the pattern can be reduced to a syntactic check. |
+| `missing invariant` | A security, fund-flow, oracle-release, privacy, or replay property is implicit and not locked. Weakening it would invalidate a `README.md` or threat-model claim. | Add or update an invariant in `docs/threat-model.md`, record it in `docs/threat-model.lock.json` via `deno task lint:invariants`, and reference the pinning test or attack class. |
+| `unclear universal decision` | A rule is presented as protocol-universal but might really be reference-implementation or adapter policy, or vice versa. The disagreement is about which class in `docs/universality-boundaries.md` owns the rule. | Decide the class in `docs/universality-boundaries.md`, move the normative statement to the owning home (`specs/`, `docs/threat-model.md`, `docs/architecture.md`, package `SPEC.md`, or `example/<app>/`), and link from any lower-level document. |
+
+### Routing rules
+
+- A drift class always maps to one of: a new or extended test, a new or
+  extended deterministic lint, a new or extended semantic skill, a normative
+  edit to `docs/threat-model.md` plus its lock, an edit to
+  `docs/universality-boundaries.md` or another universal doc, or a pending
+  issue that names which of these will be added.
+- Prefer deterministic automation over semantic skills when the pattern is
+  syntactic or can be reduced to one. Prefer skills over docs when the pattern
+  needs cross-file reading but follows a stable rubric. Prefer docs and specs
+  only when the rule is really a universal decision.
+- A pending issue is the correct home only when the right harness update is
+  known but cannot be made in the current change, or when the right harness
+  update is itself a design question. Naming the harness update is part of the
+  issue.
+- A skill or lint update belongs in the same change as the fix when the change
+  is small enough to verify locally. When that is not practical, create a
+  pending issue that points at the specific file to extend.
+
+### Closing an issue
+
+When resolving any issue under `docs/issues/pending/`, the resolution note
+must record one of:
+
+- the harness update that was made (test, lint, skill, threat-model entry,
+  universality-boundary entry, or spec edit), with file paths; or
+- a one-line rationale stating why no harness update was needed for this
+  finding.
+
+Acceptable rationales include: the finding is a one-time design decision now
+locked in docs; the harness already catches the underlying class and only the
+output had to be reworded; the residual is a `human universal decision` that
+belongs to a maintainer call. "Out of scope" alone is not a rationale and must
+be paired with a pointer to the pending issue that will close the gap.
+
+This rule is enforced socially by `skills/resolve-issues/SKILL.md` and the
+issue-close format in `docs/issues/README.md`. It is not enforced by a
+deterministic lint because the rationale is free text.

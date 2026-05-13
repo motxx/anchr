@@ -35,14 +35,19 @@ only after the work is implemented and verified.
 8. Run focused checks during iteration, then run the repository verification
    expected for the affected scope. Do not call the issue fully resolved if
    required checks are failing or skipped without a clear blocker.
-9. Move the issue file from `docs/issues/pending/` to `docs/issues/closed/` only
-   after implementation and verification.
-10. Add `Completed: YYYY-MM-DD` and a `## Resolution` section that records what
-    changed, important files, verification commands, and any follow-up issue
-    numbers.
-11. Update other pending issues if their `Depends on` or `Blocks` entries should
+9. Classify the finding using the maintenance loop in
+   [`docs/review-harness.md`](../docs/review-harness.md#maintenance-loop) and
+   decide whether the change adds a test, lint, skill, threat-model entry,
+   universality-boundary entry, spec edit, or none of those. If no harness
+   update is needed, prepare a short rationale for the resolution note.
+10. Move the issue file from `docs/issues/pending/` to `docs/issues/closed/` only
+    after implementation and verification.
+11. Add `Completed: YYYY-MM-DD` and a `## Resolution` section that records what
+    changed, important files, verification commands, the harness update or
+    rationale chosen in step 9, and any follow-up issue numbers.
+12. Update other pending issues if their `Depends on` or `Blocks` entries should
     change after this issue is closed.
-12. Report the closed issue path, changed files, and verification outcome.
+13. Report the closed issue path, changed files, and verification outcome.
 
 ## Implementation Rules
 
@@ -84,10 +89,19 @@ Verified with:
 
 - `deno task test:unit`
 
+Harness update:
+
+- `scripts/lint-foo.ts` extended to catch class X; or
+- None — finding is a one-time design decision locked in
+  `docs/architecture.md`.
+
 Follow-up:
 
 - None
 ```
 
 Use concise bullets. If verification was blocked, record the blocker and leave
-the issue pending unless the user explicitly accepts the residual risk.
+the issue pending unless the user explicitly accepts the residual risk. The
+`Harness update` bullet is required; "Out of scope" alone is not a rationale and
+must be paired with the pending issue number that will absorb the class of
+finding.

@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-13
 
 ## Priority
 
@@ -28,3 +29,36 @@ AI の出力を見て人間が発見したズレを、都度どのハーネス�
 - AI 出力のズレを `bug regression`、`boundary drift`、`semantic bypass`、`missing invariant`、`unclear universal decision` に分類する手順を書く。
 - 各分類を追加すべき場所、例えば unit/e2e test、`scripts/*lint*.ts`、repository skill、`docs/threat-model.md`、pending issue に対応付ける。
 - issue を閉じる前に「ハーネス更新が不要なら理由を書く」ルールを追加するか決める。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/review-harness.md` — added a "Maintenance Loop" section that lists the
+  five drift classes (`bug regression`, `boundary drift`, `semantic bypass`,
+  `missing invariant`, `unclear universal decision`), routes each to its
+  default harness home, and defines the "harness update or one-line rationale"
+  requirement for issue resolution notes. Removed the obsolete "Not Yet
+  Covered" row that pointed at #0017.
+- `docs/issues/README.md` — the closing template now requires a `Harness
+  update:` field that names the harness change or records the rationale, and
+  points at the maintenance loop.
+- `skills/resolve-issues/SKILL.md` — added a classification step before
+  closing and a required `Harness update:` bullet in the resolution template.
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- The maintenance loop itself is the harness for this class of finding. The
+  required `Harness update:` bullet in the closing template is the
+  enforcement; rationale text is free-form by design, so no deterministic
+  lint is added. The rule is socially enforced by `skills/resolve-issues`.
+
+Follow-up:
+
+- #0018 should define the residual human-review checklist after the harness
+  passes, including which `human universal decision` calls remain for
+  maintainers.
