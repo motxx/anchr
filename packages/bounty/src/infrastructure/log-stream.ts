@@ -21,13 +21,17 @@ export function emitLog(service: string, message: string): void {
   buffer.push(entry);
   if (buffer.length > MAX_BUFFER) buffer.splice(0, buffer.length - MAX_BUFFER);
   for (const fn of listeners) {
-    try { fn(entry); } catch {}
+    try {
+      fn(entry);
+    } catch {}
   }
 }
 
 export function subscribeLog(fn: LogListener): () => void {
   listeners.add(fn);
-  return () => { listeners.delete(fn); };
+  return () => {
+    listeners.delete(fn);
+  };
 }
 
 export function getRecentLogs(n = 50): LogEntry[] {
@@ -45,7 +49,8 @@ export function setupServerLogCapture(): void {
   const origLog = console.log;
 
   function format(args: unknown[]): string {
-    return args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" ");
+    return args.map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+      .join(" ");
   }
 
   console.error = (...args: unknown[]) => {

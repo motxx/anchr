@@ -14,14 +14,18 @@
  * 10. Verify final status
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
+const CASHU_MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
+const TLSN_VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
 if (!STRIPE_SECRET_KEY) {
-  console.error("STRIPE_SECRET_KEY required (test mode key starting with sk_test_)");
+  console.error(
+    "STRIPE_SECRET_KEY required (test mode key starting with sk_test_)",
+  );
   process.exit(1);
 }
 
@@ -60,7 +64,10 @@ const requesterBrowser = await pw.chromium.launch({
   args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,0`],
 });
 const requesterPage = await requesterBrowser.newPage();
-await requesterPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+await requesterPage.setViewportSize({
+  width: HALF_W - 16,
+  height: HALF_H - 80,
+});
 await requesterPage.goto(`${ANCHR_URL}/requester`);
 
 // Worker UI — top right
@@ -79,36 +86,54 @@ const browser = await chromium.launch({
 });
 const blankPage = await browser.newPage();
 await blankPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
-await blankPage.setContent('<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Stripe Payment — waiting for Worker to accept job...</p></body></html>');
+await blankPage.setContent(
+  '<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Stripe Payment — waiting for Worker to accept job...</p></body></html>',
+);
 
 // Flow visualization UI — bottom right
-const flowHtml = await Deno.readTextFile(new URL("./e2e-flow-ui.html", import.meta.url).pathname);
+const flowHtml = await Deno.readTextFile(
+  new URL("./e2e-flow-ui.html", import.meta.url).pathname,
+);
 const flowBrowser = await pw.chromium.launch({
   headless: false,
-  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=${HALF_W},${HALF_H}`],
+  args: [
+    `--window-size=${HALF_W},${HALF_H}`,
+    `--window-position=${HALF_W},${HALF_H}`,
+  ],
 });
 const flowPage = await flowBrowser.newPage();
 await flowPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
 await flowPage.goto("about:blank");
 await flowPage.setContent(flowHtml);
 for (let i = 0; i < 30; i++) {
-  const ready = await flowPage.evaluate(() => typeof (window as any).flowUpdate === 'function');
+  const ready = await flowPage.evaluate(() =>
+    typeof (window as any).flowUpdate === "function"
+  );
   if (ready) break;
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 200));
 }
 await flowPage.evaluate((ts) => (window as any).flowSetStart(ts), startTime);
 
-console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Stripe: bottom-left | Flow: bottom-right`);
+console.log(
+  `[${elapsed()}] Requester: top-left | Worker: top-right | Stripe: bottom-left | Flow: bottom-right`,
+);
 
 const flow = (step: number, status: string, detail?: string) =>
-  flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [step, status, detail ?? ""]);
+  flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [
+    step,
+    status,
+    detail ?? "",
+  ]);
 
 const BOUNTY_SATS = 100;
 
 // Use fixed pubkeys (in production, these would be real Nostr pubkeys)
-const ORACLE_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000001";
-const REQUESTER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000002";
-const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
+const ORACLE_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000001";
+const REQUESTER_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000002";
+const WORKER_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000003";
 
 // ============================================================
 // Step 1: Oracle generates preimage hash (POST /hash)
@@ -126,7 +151,9 @@ await flow(0, "complete", `Hash: ${HTLC_HASH.slice(0, 8)}`);
 // Step 2: Seller creates Stripe Payment Link (Product → Price → Link)
 // ============================================================
 await flow(1, "active", "Creating link...");
-console.log(`\n[${elapsed()}] === Step 2: Seller creates Stripe Payment Link ===`);
+console.log(
+  `\n[${elapsed()}] === Step 2: Seller creates Stripe Payment Link ===`,
+);
 
 // Create a one-time Product
 const productResp = await fetch(`${STRIPE_API}/v1/products`, {
@@ -171,20 +198,36 @@ if (!PAYMENT_LINK_URL) {
 await flow(2, "active", `Minting ${BOUNTY_SATS} sats...`);
 console.log(`\n[${elapsed()}] === Step 3: Seller mints Cashu bounty ===`);
 
-const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts"); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
-const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
+const { Wallet: CashuWallet, getEncodedToken } = await import(
+  "@cashu/cashu-ts"
+); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
+const cashuWallet = new CashuWallet(CASHU_MINT_URL, { unit: "sat" });
 await cashuWallet.loadMint();
 
 const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-const payProc = spawn(["bash", "-c",
-  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
+const payProc = spawn([
+  "docker",
+  "compose",
+  "exec",
+  "-T",
+  "lnd-user",
+  "lncli",
+  "--network=regtest",
+  "--rpcserver=lnd-user:10009",
+  "payinvoice",
+  "--force",
+  mintQuote.request,
 ], { stdout: "pipe", stderr: "pipe" });
 await payProc.exited;
 const payOut = await new Response(payProc.stdout).text();
-console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
+console.log(
+  `[${elapsed()}] Lightning: ${
+    payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"
+  }`,
+);
 
 const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
-const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+const cashuToken = getEncodedToken({ mint: CASHU_MINT_URL, proofs });
 await flow(2, "complete", `${BOUNTY_SATS} sats minted`);
 console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
 
@@ -229,7 +272,11 @@ const queryData = await queryResp.json();
 const QUERY_ID = queryData.query_id;
 await flow(3, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
 console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
-console.log(`[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${HTLC_HASH.slice(0, 8)}...)`);
+console.log(
+  `[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${
+    HTLC_HASH.slice(0, 8)
+  }...)`,
+);
 
 if (!QUERY_ID) {
   console.error("Failed to create query:", JSON.stringify(queryData));
@@ -238,7 +285,7 @@ if (!QUERY_ID) {
 
 // Wait for Worker UI to show the query
 console.log(`[${elapsed()}] Waiting for Worker UI to display the query...`);
-await new Promise(r => setTimeout(r, 5000));
+await new Promise((r) => setTimeout(r, 5000));
 
 // ============================================================
 // Step 5: Worker accepts job (quote + select)
@@ -257,7 +304,9 @@ const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
   }),
 });
 const quoteData = await quoteResp.json();
-console.log(`[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`);
+console.log(
+  `[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`,
+);
 
 // Seller selects worker + provides HTLC token
 const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
@@ -269,7 +318,11 @@ const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
   }),
 });
 const selectData = await selectResp.json();
-console.log(`[${elapsed()}] Select: ${selectData.ok ? "worker selected" : selectData.message}`);
+console.log(
+  `[${elapsed()}] Select: ${
+    selectData.ok ? "worker selected" : selectData.message
+  }`,
+);
 
 if (!selectData.ok) {
   console.error("Failed to select worker:", JSON.stringify(selectData));
@@ -278,19 +331,24 @@ if (!selectData.ok) {
 await flow(4, "complete", "Job accepted");
 
 // Wait for UI to reflect worker_selected state
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 // ============================================================
 // Step 6: Buyer pays via Stripe Payment Link (test card)
 // ============================================================
 await flow(5, "active", "Buyer paying...");
-console.log(`\n[${elapsed()}] === Step 6: Buyer pays via Stripe Payment Link ===`);
+console.log(
+  `\n[${elapsed()}] === Step 6: Buyer pays via Stripe Payment Link ===`,
+);
 
 // Close blank page, open payment page in the same browser
 await blankPage.close();
 const stripePage = await browser.newPage();
 await stripePage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
-await stripePage.goto(PAYMENT_LINK_URL, { waitUntil: "domcontentloaded", timeout: 60000 });
+await stripePage.goto(PAYMENT_LINK_URL, {
+  waitUntil: "domcontentloaded",
+  timeout: 60000,
+});
 const page = stripePage;
 await page.waitForTimeout(5000);
 await page.screenshot({ path: "/tmp/stripe-step1.png" });
@@ -300,26 +358,28 @@ console.log(`[${elapsed()}] Filling test card details...`);
 
 // Fill card fields FIRST (before email, to avoid Stripe Link overlay)
 // Card number
-await page.locator('input#cardNumber').click({ force: true });
-await page.locator('input#cardNumber').pressSequentially("4242424242424242", { delay: 30 });
+await page.locator("input#cardNumber").click({ force: true });
+await page.locator("input#cardNumber").pressSequentially("4242424242424242", {
+  delay: 30,
+});
 console.log(`[${elapsed()}] Card number typed`);
 
 // Expiry
-await page.locator('input#cardExpiry').click({ force: true });
-await page.locator('input#cardExpiry').pressSequentially("1230", { delay: 30 });
+await page.locator("input#cardExpiry").click({ force: true });
+await page.locator("input#cardExpiry").pressSequentially("1230", { delay: 30 });
 console.log(`[${elapsed()}] Expiry typed`);
 
 // CVC
-await page.locator('input#cardCvc').click({ force: true });
-await page.locator('input#cardCvc').pressSequentially("123", { delay: 30 });
+await page.locator("input#cardCvc").click({ force: true });
+await page.locator("input#cardCvc").pressSequentially("123", { delay: 30 });
 console.log(`[${elapsed()}] CVC typed`);
 
 // Cardholder name
-await page.locator('input#billingName').fill("Test User", { force: true });
+await page.locator("input#billingName").fill("Test User", { force: true });
 console.log(`[${elapsed()}] Name filled`);
 
 // Email (fill last to avoid Stripe Link overlay)
-await page.locator('input#email').fill("test@example.com", { force: true });
+await page.locator("input#email").fill("test@example.com", { force: true });
 console.log(`[${elapsed()}] Email filled`);
 
 // Stripe Link overlay appears — click "決済をキャンセルする" to dismiss
@@ -335,7 +395,9 @@ if (await linkCancelBtn.count() > 0) {
 await page.screenshot({ path: "/tmp/stripe-step2c.png" });
 
 // Click Pay / Submit button
-const payButton = page.locator('button[type="submit"][data-testid="hosted-payment-submit-button"]').first();
+const payButton = page.locator(
+  'button[type="submit"][data-testid="hosted-payment-submit-button"]',
+).first();
 const btnText = await payButton.textContent();
 console.log(`[${elapsed()}] Clicking "${btnText?.trim()}"...`);
 await payButton.click();
@@ -343,8 +405,11 @@ await payButton.click();
 // Wait for payment success page (up to 10s)
 for (let i = 0; i < 10; i++) {
   await page.waitForTimeout(1000);
-  const bodyText = await page.locator('body').innerText().catch(() => "");
-  if (bodyText.includes("ありがとう") || bodyText.includes("thank") || bodyText.includes("success")) {
+  const bodyText = await page.locator("body").innerText().catch(() => "");
+  if (
+    bodyText.includes("ありがとう") || bodyText.includes("thank") ||
+    bodyText.includes("success")
+  ) {
     console.log(`[${elapsed()}] Payment success page detected`);
     break;
   }
@@ -371,14 +436,24 @@ for (let attempt = 0; attempt < 10; attempt++) {
   if (pi?.status === "succeeded") {
     PAYMENT_INTENT_ID = pi.id;
     paymentStatus = pi.status;
-    console.log(`[${elapsed()}] Found: ${pi.id} (created ${new Date(pi.created * 1000).toISOString()})`);
+    console.log(
+      `[${elapsed()}] Found: ${pi.id} (created ${
+        new Date(pi.created * 1000).toISOString()
+      })`,
+    );
     break;
   }
-  console.log(`[${elapsed()}] Waiting for PaymentIntent... (attempt ${attempt + 1}, status: ${pi?.status ?? "none"})`);
-  await new Promise(r => setTimeout(r, 1000));
+  console.log(
+    `[${elapsed()}] Waiting for PaymentIntent... (attempt ${
+      attempt + 1
+    }, status: ${pi?.status ?? "none"})`,
+  );
+  await new Promise((r) => setTimeout(r, 1000));
 }
 await flow(6, "complete", `ID: ${PAYMENT_INTENT_ID.slice(0, 12)}`);
-console.log(`[${elapsed()}] PaymentIntent: ${PAYMENT_INTENT_ID} (status: ${paymentStatus})`);
+console.log(
+  `[${elapsed()}] PaymentIntent: ${PAYMENT_INTENT_ID} (status: ${paymentStatus})`,
+);
 
 if (!PAYMENT_INTENT_ID || paymentStatus !== "succeeded") {
   console.error("Payment not succeeded!");
@@ -389,7 +464,9 @@ if (!PAYMENT_INTENT_ID || paymentStatus !== "succeeded") {
 // Step 8: Worker generates TLSNotary proof
 // ============================================================
 await flow(7, "active", "MPC-TLS...");
-console.log(`\n[${elapsed()}] === Step 8: Worker generates TLSNotary proof ===`);
+console.log(
+  `\n[${elapsed()}] === Step 8: Worker generates TLSNotary proof ===`,
+);
 
 const proofFile = `/tmp/e2e-stripe-${Date.now()}.presentation.tlsn`;
 const proveStart = Date.now();
@@ -399,13 +476,19 @@ const proveStart = Date.now();
 // ~2.9KB response needs 4096 recv buffer. Proof takes ~60-120s.
 const proc = spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
-  "--verifier", "localhost:7046",
-  "--max-recv-data", "4096",
-  "--max-sent-data", "4096",
-  "-H", `Authorization: Bearer ${STRIPE_SECRET_KEY}`,
-  "-H", "Connection: close",
+  "--verifier",
+  TLSN_VERIFIER_HOST,
+  "--max-recv-data",
+  "4096",
+  "--max-sent-data",
+  "4096",
+  "-H",
+  `Authorization: Bearer ${STRIPE_SECRET_KEY}`,
+  "-H",
+  "Connection: close",
   `https://api.stripe.com/v1/payment_intents/${PAYMENT_INTENT_ID}`,
-  "-o", proofFile,
+  "-o",
+  proofFile,
 ], { stdout: "pipe", stderr: "pipe" });
 
 await proc.exited;
@@ -419,8 +502,12 @@ if (proc.exitCode !== 0) {
 }
 
 await flow(7, "complete", `${proveTime}s`);
-console.log(`[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`);
-for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
+console.log(
+  `[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`,
+);
+for (
+  const line of stderr.split("\n").filter((l) => l.includes("[tlsn-prove]"))
+) {
   console.log(`  ${line}`);
 }
 
@@ -440,7 +527,9 @@ const resultResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/result`, {
 });
 
 const resultData = await resultResp.json();
-console.log(`[${elapsed()}] Verification: ${resultData.ok ? "PASSED" : "FAILED"}`);
+console.log(
+  `[${elapsed()}] Verification: ${resultData.ok ? "PASSED" : "FAILED"}`,
+);
 if (resultData.verification?.checks) {
   for (const c of resultData.verification.checks) console.log(`  ✓ ${c}`);
 }
@@ -453,11 +542,13 @@ if (resultData.preimage) {
   console.log(`  Preimage: ${resultData.preimage.slice(0, 16)}...`);
   console.log(`  → Worker can now redeem HTLC token on Cashu mint`);
 } else {
-  console.log(`[${elapsed()}] preimage: null (verification failed or no preimage store)`);
+  console.log(
+    `[${elapsed()}] preimage: null (verification failed or no preimage store)`,
+  );
 }
 
 // Wait for UIs to show results
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 // ============================================================
 // Step 10: Verify query status

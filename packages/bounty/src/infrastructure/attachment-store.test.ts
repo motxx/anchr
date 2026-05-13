@@ -8,8 +8,12 @@ describe("uploadAttachment", () => {
     Deno.env.delete("BLOSSOM_SERVERS");
 
     try {
-      const file = new File([new Uint8Array([0xFF, 0xD8])], "photo.jpg", { type: "image/jpeg" });
-      await expect(uploadAttachment("q1", file)).rejects.toThrow("Blossom is not configured");
+      const file = new File([new Uint8Array([0xFF, 0xD8])], "photo.jpg", {
+        type: "image/jpeg",
+      });
+      await expect(uploadAttachment("q1", file)).rejects.toThrow(
+        "Blossom is not configured",
+      );
     } finally {
       if (saved !== undefined) Deno.env.set("BLOSSOM_SERVERS", saved);
     }
@@ -21,8 +25,19 @@ describe("uploadAttachment", () => {
 
     try {
       // PK magic bytes → detected as zip, but contains no photo
-      const fakeZip = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
-      const file = new File([fakeZip], "bundle.zip", { type: "application/zip" });
+      const fakeZip = new Uint8Array([
+        0x50,
+        0x4B,
+        0x03,
+        0x04,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
+      const file = new File([fakeZip], "bundle.zip", {
+        type: "application/zip",
+      });
       await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");
     } finally {
       if (saved !== undefined) Deno.env.set("BLOSSOM_SERVERS", saved);
@@ -36,7 +51,16 @@ describe("uploadAttachment", () => {
 
     try {
       // PK header but named .jpg — should still be treated as zip
-      const fakeZip = new Uint8Array([0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]);
+      const fakeZip = new Uint8Array([
+        0x50,
+        0x4B,
+        0x03,
+        0x04,
+        0x00,
+        0x00,
+        0x00,
+        0x00,
+      ]);
       const file = new File([fakeZip], "disguised.jpg", { type: "image/jpeg" });
       // Will be detected as zip due to PK magic bytes → "Invalid zip: no photo found"
       await expect(uploadAttachment("q1", file)).rejects.toThrow("Invalid zip");

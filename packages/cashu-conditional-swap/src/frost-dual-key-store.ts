@@ -13,10 +13,13 @@
  * whether signing is local or distributed.
  */
 
-import type { DualKeyStore, DualKeyEntry } from "./frost-conditional-swap.ts";
+import type { DualKeyEntry, DualKeyStore } from "./frost-conditional-swap.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
 import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
-import { coordinateSigning, type SigningCoordinatorConfig } from "@anchr/frost-oracle/signing-coordinator";
+import {
+  coordinateSigning,
+  type SigningCoordinatorConfig,
+} from "@anchr/frost-oracle/signing-coordinator";
 import { isFrostSignerAvailable } from "@anchr/frost-oracle/frost-cli";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
@@ -49,7 +52,9 @@ export interface FrostDualKeyStoreConfig {
  * Falls back to single-key `createDualKeyStore()` when the frost-signer
  * binary is not available.
  */
-export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKeyStore {
+export function createFrostDualKeyStore(
+  config: FrostDualKeyStoreConfig,
+): DualKeyStore {
   if (!isFrostSignerAvailable()) {
     log.warn("frost-signer not available, falling back to single-key mode");
     return createDualKeyStore();
@@ -76,7 +81,11 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       return entry;
     },
 
-    sign(swap_id: string, outcome: "a" | "b", message: Uint8Array): string | null {
+    sign(
+      swap_id: string,
+      outcome: "a" | "b",
+      message: Uint8Array,
+    ): string | null {
       const entry = entries.get(swap_id);
       if (!entry || entry.signed || signedSwaps.has(swap_id)) return null;
 
@@ -87,8 +96,9 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       // FROST signing is async but DualKeyStore.sign() is sync.
       // Return a placeholder -- the actual signing happens via signAsync().
       // Consumers that need FROST should use signAsync() instead.
-      log.warn("sign() called synchronously -- " +
-        "use signAsync() for real FROST threshold signing"
+      log.warn(
+        "sign() called synchronously -- " +
+          "use signAsync() for real FROST threshold signing",
       );
       return null;
     },
@@ -102,8 +112,9 @@ export function createFrostDualKeyStore(config: FrostDualKeyStoreConfig): DualKe
       if (!entry || entry.signed || signedSwaps.has(swap_id)) return null;
 
       // FROST per-proof signing is async -- use frostSignProofSecretsAsync() instead.
-      log.warn("signProofSecrets() called synchronously -- " +
-        "use frostSignProofSecretsAsync() for real FROST threshold signing"
+      log.warn(
+        "signProofSecrets() called synchronously -- " +
+          "use frostSignProofSecretsAsync() for real FROST threshold signing",
       );
       return null;
     },
@@ -140,7 +151,11 @@ export async function frostDualKeySignAsync(
   config: DualOutcomeFrostNodeConfig,
   outcome: "a" | "b",
   message: Uint8Array,
-  conditionData?: { condition_id: string; resolution_url: string; verified_body: string },
+  conditionData?: {
+    condition_id: string;
+    resolution_url: string;
+    verified_body: string;
+  },
 ): Promise<string | null> {
   const messageHex = bytesToHex(message);
 
@@ -148,39 +163,43 @@ export async function frostDualKeySignAsync(
   const signingConfig: SigningCoordinatorConfig = {
     nodeConfig: outcome === "a"
       ? {
-          signer_index: config.signer_index,
-          total_signers: config.total_signers,
-          threshold: config.threshold,
-          key_package: config.key_package,
-          pubkey_package: config.pubkey_package,
-          group_pubkey: config.group_pubkey,
-          peers: config.peers,
-        }
+        signer_index: config.signer_index,
+        total_signers: config.total_signers,
+        threshold: config.threshold,
+        key_package: config.key_package,
+        pubkey_package: config.pubkey_package,
+        group_pubkey: config.group_pubkey,
+        peers: config.peers,
+      }
       : {
-          signer_index: config.signer_index,
-          total_signers: config.total_signers,
-          threshold: config.threshold,
-          key_package: config.key_package_b,
-          pubkey_package: config.pubkey_package_b,
-          group_pubkey: config.group_pubkey_b,
-          peers: config.peers,
-        },
+        signer_index: config.signer_index,
+        total_signers: config.total_signers,
+        threshold: config.threshold,
+        key_package: config.key_package_b,
+        pubkey_package: config.pubkey_package_b,
+        group_pubkey: config.group_pubkey_b,
+        peers: config.peers,
+      },
     peerTimeoutMs: 15_000,
     // Forward condition context to peers for independent verification.
     // The shape is the host-side `VerificationRequirement` / `VerificationInput`
     // pair the FROST signer route in `oracle-frost-signer-routes.ts` consumes.
-    requirement: conditionData ? {
-      id: conditionData.condition_id,
-      factors: ["tlsn"],
-      tlsn_requirements: {
-        target_url: conditionData.resolution_url,
-        conditions: [],
-      },
-    } : undefined,
-    input: conditionData ? {
-      attachments: [],
-      tlsn_attestation: { presentation: conditionData.verified_body },
-    } : undefined,
+    requirement: conditionData
+      ? {
+        id: conditionData.condition_id,
+        factors: ["tlsn"],
+        tlsn_requirements: {
+          target_url: conditionData.resolution_url,
+          conditions: [],
+        },
+      }
+      : undefined,
+    input: conditionData
+      ? {
+        attachments: [],
+        tlsn_attestation: { presentation: conditionData.verified_body },
+      }
+      : undefined,
   };
 
   const result = await coordinateSigning(signingConfig, messageHex);
@@ -189,7 +208,8 @@ export async function frostDualKeySignAsync(
     return null;
   }
 
-  log.info(`FROST signing succeeded: ${result.signers_participated.length} signers participated`
+  log.info(
+    `FROST signing succeeded: ${result.signers_participated.length} signers participated`,
   );
   return result.signature;
 }
@@ -212,14 +232,23 @@ export async function frostSignProofSecretsAsync(
   config: DualOutcomeFrostNodeConfig,
   outcome: "a" | "b",
   proofSecrets: string[],
-  conditionData?: { condition_id: string; resolution_url: string; verified_body: string },
+  conditionData?: {
+    condition_id: string;
+    resolution_url: string;
+    verified_body: string;
+  },
 ): Promise<Map<string, string> | null> {
   const result = new Map<string, string>();
 
   for (const proofSecret of proofSecrets) {
     // NUT-11 P2PK: signing message = SHA256(proof.secret)
     const msgHash = sha256(new TextEncoder().encode(proofSecret));
-    const sig = await frostDualKeySignAsync(config, outcome, msgHash, conditionData);
+    const sig = await frostDualKeySignAsync(
+      config,
+      outcome,
+      msgHash,
+      conditionData,
+    );
     if (!sig) {
       log.error(`FROST per-proof signing failed for secret`);
       return null;
@@ -227,7 +256,8 @@ export async function frostSignProofSecretsAsync(
     result.set(proofSecret, sig);
   }
 
-  log.info(`FROST per-proof signing succeeded: ${proofSecrets.length} proofs signed`
+  log.info(
+    `FROST per-proof signing succeeded: ${proofSecrets.length} proofs signed`,
   );
   return result;
 }
@@ -247,7 +277,11 @@ export async function frostSignProofSecretsAsync(
  */
 export function createAdaptiveDualKeyStore(
   dualOutcomeFrostConfig?: DualOutcomeFrostNodeConfig,
-): { store: DualKeyStore; mode: "frost" | "single-key"; config?: DualOutcomeFrostNodeConfig } {
+): {
+  store: DualKeyStore;
+  mode: "frost" | "single-key";
+  config?: DualOutcomeFrostNodeConfig;
+} {
   if (dualOutcomeFrostConfig && isFrostSignerAvailable()) {
     return {
       store: createFrostDualKeyStore({ yesConfig: dualOutcomeFrostConfig }),

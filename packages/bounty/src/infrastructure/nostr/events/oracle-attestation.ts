@@ -6,7 +6,11 @@
  * reproduce the deterministic verification checks.
  */
 
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
 import type { NostrIdentity } from "../crypto/identity.ts";
 import type { OracleAttestation } from "../../../domain/oracle-types.ts";
 import type { TlsnVerifiedData } from "../../../domain/types.ts";
@@ -65,14 +69,18 @@ export function buildOracleAttestationEvent(
 /**
  * Parse an OracleAttestation event.
  */
-export function parseOracleAttestationPayload(content: string): OracleAttestationPayload {
+export function parseOracleAttestationPayload(
+  content: string,
+): OracleAttestationPayload {
   return JSON.parse(content) as OracleAttestationPayload;
 }
 
 /**
  * Convert an OracleAttestationPayload to an OracleAttestation.
  */
-export function toOracleAttestation(payload: OracleAttestationPayload): OracleAttestation {
+export function toOracleAttestation(
+  payload: OracleAttestationPayload,
+): OracleAttestation {
   return {
     oracle_id: payload.oracle_id,
     query_id: payload.query_id,

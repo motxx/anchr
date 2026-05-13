@@ -6,10 +6,10 @@ import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../nostr/crypto/identity.ts";
 import {
-  parseOracleResponsePayload,
-  parseFeedbackPayload,
-  type QuoteFeedbackPayload,
   type OracleResponsePayload,
+  parseFeedbackPayload,
+  parseOracleResponsePayload,
+  type QuoteFeedbackPayload,
 } from "../nostr/events/events.ts";
 import type { Query, QueryResult } from "../../domain/types.ts";
 
@@ -22,7 +22,10 @@ export interface WatchedQuery {
   subs: SubCloser[];
 }
 
-export function buildQueryFromPayload(queryId: string, oraclePayload: OracleResponsePayload): Query {
+export function buildQueryFromPayload(
+  queryId: string,
+  oraclePayload: OracleResponsePayload,
+): Query {
   return {
     id: queryId,
     status: "processing",
@@ -36,7 +39,9 @@ export function buildQueryFromPayload(queryId: string, oraclePayload: OracleResp
   };
 }
 
-export function buildResultFromPayload(oraclePayload: OracleResponsePayload): QueryResult {
+export function buildResultFromPayload(
+  oraclePayload: OracleResponsePayload,
+): QueryResult {
   return {
     attachments: (oraclePayload.attachments ?? []).map((a) => ({
       id: a.blossom_hash,
@@ -55,7 +60,11 @@ export function handleFeedbackEvent(
   watched: Map<string, WatchedQuery>,
   queryId: string,
   event: Event,
-  onQuote?: (queryId: string, workerPubkey: string, amountSats?: number) => void,
+  onQuote?: (
+    queryId: string,
+    workerPubkey: string,
+    amountSats?: number,
+  ) => void,
 ): void {
   const entry = watched.get(queryId);
   if (!entry) return;

@@ -9,18 +9,21 @@ export interface HtlcRouteDeps {
   authMiddleware: MiddlewareHandler;
   preimageStore: PreimageStore;
   queryHashMap: Map<string, string>;
-  verifiedQueries: Map<string, string>;
 }
 
 /**
  * Register the HTLC proof-gated flow on the given Hono app:
  *   POST /hash            — generate preimage, return hash
  *   GET  /hash/:queryId   — read hash for a known query
- *   POST /verify          — run verification, gate preimage release
- *   POST /preimage        — release preimage iff /verify recorded a pass
+ *   POST /verify          — run verification and return attestation
  */
 export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
-  const { authMiddleware, preimageStore, queryHashMap, verifiedQueries, oracleId } = deps;
+  const {
+    authMiddleware,
+    preimageStore,
+    queryHashMap,
+    oracleId,
+  } = deps;
 
   app.post("/hash", authMiddleware, async (c) => {
     const body = await c.req.json<{ query_id: string }>().catch(() => null);
@@ -46,7 +49,9 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
   });
 
   app.post("/verify", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query: Query; result: QueryResult; worker_pubkey?: string }>();
+    const body = await c.req.json<
+      { query: Query; result: QueryResult }
+    >();
     if (!body.query || !body.result) {
       return c.json({ error: "Missing query or result in request body" }, 400);
     }
@@ -61,48 +66,6 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
       attested_at: Date.now(),
     };
 
-    if (detail.passed) {
-      const workerPubkey = body.worker_pubkey ?? body.query.escrow?.worker_pubkey ?? "";
-      verifiedQueries.set(body.query.id, workerPubkey);
-    }
-
     return c.json(attestation);
-  });
-
-  app.post("/preimage", authMiddleware, async (c) => {
-    const body = await c.req.json<{ query_id: string; worker_pubkey?: string }>().catch(() => null);
-    if (!body?.query_id) {
-      return c.json({ error: "Missing query_id" }, 400);
-    }
-
-    // verifiedQueries holds the worker_pubkey (or "" when none was bound at
-    // verify time, e.g. non-escrow flows). Use `.has()` for the gate and
-    // strict equality for the binding check so a missing body pubkey can't
-    // sneak past when a worker WAS bound.
-    if (!verifiedQueries.has(body.query_id)) {
-      return c.json({ error: "Verification has not passed for this query" }, 403);
-    }
-    const verifiedWorker = verifiedQueries.get(body.query_id)!;
-
-    if (verifiedWorker !== "" && body.worker_pubkey !== verifiedWorker) {
-      return c.json({ error: "Worker pubkey does not match selected worker" }, 403);
-    }
-
-    const hash = queryHashMap.get(body.query_id);
-    if (!hash) {
-      return c.json({ error: "No preimage found for this query" }, 404);
-    }
-
-    const preimage = preimageStore.getPreimage(hash);
-    if (!preimage) {
-      return c.json({ error: "No preimage found for this query" }, 404);
-    }
-
-    // Replay protection (R-004): delete from every store before responding.
-    preimageStore.delete(hash);
-    queryHashMap.delete(body.query_id);
-    verifiedQueries.delete(body.query_id);
-
-    return c.json({ query_id: body.query_id, preimage });
   });
 }

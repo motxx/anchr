@@ -18,7 +18,7 @@
  * to take the opposite side will match against it.
  */
 
-import { Wallet, type Proof } from "@cashu/cashu-ts";
+import { type Proof, Wallet } from "@cashu/cashu-ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import {
@@ -33,7 +33,10 @@ import { createLockedToken } from "../../example/two-party-binary-bet/src/exchan
  * any real Lightning payment. Production-friendly because regtest LND is
  * not available outside the local docker stack.
  */
-async function mintProofsFakeWallet(wallet: Wallet, amountSats: number): Promise<Proof[]> {
+async function mintProofsFakeWallet(
+  wallet: Wallet,
+  amountSats: number,
+): Promise<Proof[]> {
   await wallet.loadMint(true);
   const quote = await wallet.createMintQuote(amountSats);
   // Brief delay so the mint can register the quote internally; testnut
@@ -313,4 +316,3 @@ export function generateBotIdentity(): BotIdentity {
   const sk = generateSecretKey();
   return { secretHex: bytesToHex(sk), pubkey: getPublicKey(sk) };
 }
-

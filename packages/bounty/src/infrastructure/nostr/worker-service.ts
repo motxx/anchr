@@ -20,24 +20,27 @@ import type { TlsnEncryptedContext } from "../../domain/types.ts";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
-  buildQuoteFeedbackEvent,
   buildQueryResponseEvent,
-  parseQueryRequestPayload,
+  buildQuoteFeedbackEvent,
   parseFeedbackPayload,
+  parseQueryRequestPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events/events.ts";
-import { parseOracleDM, type OracleDMPayload } from "./events/dm.ts";
+import { type OracleDMPayload, parseOracleDM } from "./events/dm.ts";
 import {
   publishEvent,
-  subscribeToQueries,
-  subscribeToFeedback,
   subscribeToDMs,
+  subscribeToFeedback,
+  subscribeToQueries,
 } from "./transport/client.ts";
-import { encryptNip44, deriveConversationKey } from "./crypto/encryption.ts";
-import { workerUpload, type WorkerUploadResult } from "../blossom/worker-upload.ts";
+import { deriveConversationKey, encryptNip44 } from "./crypto/encryption.ts";
+import {
+  workerUpload,
+  type WorkerUploadResult,
+} from "../blossom/worker-upload.ts";
 import type { BlossomUploadResult } from "@anchr/blossom";
 
 export interface WorkerConfig {
@@ -79,11 +82,16 @@ export function discoverQueries(
         const payload = parseQueryRequestPayload(event.content);
 
         // Verify Oracle pubkey against whitelist
-        if (payload.oracle_pubkey && !config.trustedOraclePubkeys.includes(payload.oracle_pubkey)) {
+        if (
+          payload.oracle_pubkey &&
+          !config.trustedOraclePubkeys.includes(payload.oracle_pubkey)
+        ) {
           return; // Unknown Oracle, skip
         }
 
-        const oracleTag = event.tags.find((t) => t[0] === "p" && t[3] === "oracle");
+        const oracleTag = event.tags.find((t) =>
+          t[0] === "p" && t[3] === "oracle"
+        );
 
         onQuery({
           eventId: event.id,
@@ -132,7 +140,10 @@ export async function submitQuote(
 export function waitForSelection(
   identity: NostrIdentity,
   query: DiscoveredQuery,
-  onSelected: (escrowToken?: string, encryptedContext?: TlsnEncryptedContext) => void,
+  onSelected: (
+    escrowToken?: string,
+    encryptedContext?: TlsnEncryptedContext,
+  ) => void,
   onRejected: () => void,
   relayUrls?: string[],
 ): SubCloser {
@@ -178,11 +189,13 @@ export async function encryptAndUpload(
   requesterPubkey: string,
   oraclePubkey: string,
   blossomServerUrls?: string[],
-): Promise<{
-  upload: WorkerUploadResult;
-  kR: string; // K encrypted to Requester (NIP-44)
-  kO: string; // K encrypted to Oracle (NIP-44)
-} | null> {
+): Promise<
+  {
+    upload: WorkerUploadResult;
+    kR: string; // K encrypted to Requester (NIP-44)
+    kO: string; // K encrypted to Oracle (NIP-44)
+  } | null
+> {
   // Upload to Blossom (EXIF strip + AES-256-GCM encrypt)
   const upload = await workerUpload(data, filename, mimeType, {
     serverUrls: blossomServerUrls,
@@ -195,7 +208,10 @@ export async function encryptAndUpload(
     iv: upload.blossom.encryptIv,
   });
 
-  const requesterConvKey = deriveConversationKey(identity.secretKey, requesterPubkey);
+  const requesterConvKey = deriveConversationKey(
+    identity.secretKey,
+    requesterPubkey,
+  );
   const kR = encryptNip44(keyMaterial, requesterConvKey);
 
   const oracleConvKey = deriveConversationKey(identity.secretKey, oraclePubkey);

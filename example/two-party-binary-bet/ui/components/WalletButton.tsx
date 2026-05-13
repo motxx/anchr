@@ -1,12 +1,9 @@
 import React, { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchWalletConfig, requestFaucet } from "../api.ts";
 import {
-  fetchWalletConfig,
-  requestFaucet,
-} from "../api.ts";
-import {
-  initWallet,
   getBalance,
+  initWallet,
   isNostrBacked,
   receiveToken,
 } from "../wallet.ts";
@@ -38,6 +35,8 @@ export function WalletButton() {
   });
   const mintUrl = walletConfig.data?.mint_url ?? null;
   const relays = walletConfig.data?.nostr_relays ?? [];
+  const faucet = walletConfig.data?.faucet;
+  const faucetAmount = faucet?.amount_sats ?? 1000;
 
   // Balance is owned by the wallet module (NIP-60 events or localStorage).
   // useQuery handles the async fetch and re-renders when invalidated.
@@ -65,7 +64,7 @@ export function WalletButton() {
   const faucetMutation = useMutation({
     mutationFn: async () => {
       if (!mintUrl) throw new Error("Mint not configured");
-      const result = await requestFaucet(1000);
+      const result = await requestFaucet(faucetAmount);
       const wallet = await initWallet(mintUrl, relays);
       await receiveToken(wallet, result.cashu_token);
       return result.amount_sats;
@@ -95,7 +94,17 @@ export function WalletButton() {
         className="h-9 px-3.5 rounded-full bg-card border border-border hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center gap-2"
         title="Wallet"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-muted-foreground"
+        >
           <path d="M21 8H3a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2Z" />
           <path d="M16 14h.01" />
           <path d="M2 8V6a2 2 0 0 1 2-2h16" />
@@ -131,12 +140,16 @@ export function WalletButton() {
               </div>
               <div className="font-mono text-2xl font-bold text-foreground">
                 {balance.toLocaleString()}
-                <span className="text-sm text-muted-foreground ml-1.5">sats</span>
+                <span className="text-sm text-muted-foreground ml-1.5">
+                  sats
+                </span>
               </div>
             </div>
 
             {!mintUrl && (
-              <p className="text-xs text-muted-foreground">Mint not configured.</p>
+              <p className="text-xs text-muted-foreground">
+                Mint not configured.
+              </p>
             )}
 
             {mintUrl && !walletReady && (
@@ -146,11 +159,15 @@ export function WalletButton() {
                   disabled={connectMutation.isPending}
                   className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
                 >
-                  {connectMutation.isPending ? "Connecting…" : "Connect to mint"}
+                  {connectMutation.isPending
+                    ? "Connecting…"
+                    : "Connect to mint"}
                 </button>
                 {connectMutation.isError && (
                   <p className="text-xs text-destructive mt-2">
-                    {connectMutation.error instanceof Error ? connectMutation.error.message : "Failed to connect"}
+                    {connectMutation.error instanceof Error
+                      ? connectMutation.error.message
+                      : "Failed to connect"}
                   </p>
                 )}
               </div>
@@ -158,19 +175,39 @@ export function WalletButton() {
 
             {walletReady && (
               <div className="space-y-3">
-                <button
-                  onClick={() => faucetMutation.mutate()}
-                  disabled={faucetMutation.isPending}
-                  className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
-                >
-                  {faucetMutation.isPending ? "Minting…" : "Faucet · +1,000 sats"}
-                </button>
+                {faucet?.mode === "external" && faucet.external_url
+                  ? (
+                    <a
+                      href={faucet.external_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center justify-center"
+                    >
+                      Open faucet
+                    </a>
+                  )
+                  : (
+                    <button
+                      onClick={() => faucetMutation.mutate()}
+                      disabled={faucetMutation.isPending ||
+                        faucet?.enabled === false}
+                      className="w-full h-10 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
+                    >
+                      {faucetMutation.isPending
+                        ? "Minting…"
+                        : `Faucet · +${faucetAmount.toLocaleString()} sats`}
+                    </button>
+                  )}
                 {faucetMutation.isSuccess && (
-                  <p className="text-xs text-yes">+{faucetMutation.data?.toLocaleString()} sats</p>
+                  <p className="text-xs text-yes">
+                    +{faucetMutation.data?.toLocaleString()} sats
+                  </p>
                 )}
                 {faucetMutation.isError && (
                   <p className="text-xs text-destructive">
-                    {faucetMutation.error instanceof Error ? faucetMutation.error.message : "Faucet failed"}
+                    {faucetMutation.error instanceof Error
+                      ? faucetMutation.error.message
+                      : "Faucet failed"}
                   </p>
                 )}
 
@@ -195,11 +232,15 @@ export function WalletButton() {
                     </button>
                   </div>
                   {receiveMutation.isSuccess && (
-                    <p className="text-xs text-yes mt-1.5">+{receiveMutation.data?.toLocaleString()} sats</p>
+                    <p className="text-xs text-yes mt-1.5">
+                      +{receiveMutation.data?.toLocaleString()} sats
+                    </p>
                   )}
                   {receiveMutation.isError && (
                     <p className="text-xs text-destructive mt-1.5">
-                      {receiveMutation.error instanceof Error ? receiveMutation.error.message : "Receive failed"}
+                      {receiveMutation.error instanceof Error
+                        ? receiveMutation.error.message
+                        : "Receive failed"}
                     </p>
                   )}
                 </div>

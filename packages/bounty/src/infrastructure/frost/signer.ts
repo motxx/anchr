@@ -14,8 +14,18 @@
  */
 
 import { verifyProof } from "../verification/verifier.ts";
-import type { BlossomKeyMap, VerificationInput, VerificationRequirement } from "../../domain/types.ts";
-import { signRound1, signRound2, dkgRound1, dkgRound2, dkgRound3 } from "@anchr/frost-oracle/frost-cli";
+import type {
+  BlossomKeyMap,
+  VerificationInput,
+  VerificationRequirement,
+} from "../../domain/types.ts";
+import {
+  dkgRound1,
+  dkgRound2,
+  dkgRound3,
+  signRound1,
+  signRound2,
+} from "@anchr/frost-oracle/frost-cli";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "frost-signer"]);
@@ -29,7 +39,10 @@ export interface FrostSignerConfig {
 
 export interface FrostSigner {
   /** Execute a DKG round. */
-  dkgRound(round: 1 | 2 | 3, input: DkgRoundInput): Promise<DkgRoundOutput | null>;
+  dkgRound(
+    round: 1 | 2 | 3,
+    input: DkgRoundInput,
+  ): Promise<DkgRoundOutput | null>;
 
   /**
    * Independently verify the requirement / evidence pair and produce
@@ -71,6 +84,17 @@ export interface SignerOutput {
   signature_share?: string;
 }
 
+function asJsonString(value: unknown): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function asJsonStringMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, asJsonString(item)]),
+  );
+}
+
 export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
   // Nonces are generated in round 1 and consumed in round 2
   let pendingNonces: string | undefined;
@@ -85,23 +109,29 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         );
         if (!result.ok || !result.data) return null;
         return {
-          secretPackage: result.data.secret_package as string,
-          package: result.data.package as string,
+          secretPackage: asJsonString(result.data.secret_package),
+          package: asJsonString(result.data.package),
         };
       }
 
       if (round === 2) {
         if (!input.secretPackage || !input.round1Packages) return null;
-        const result = await dkgRound2(input.secretPackage, input.round1Packages);
+        const result = await dkgRound2(
+          input.secretPackage,
+          input.round1Packages,
+        );
         if (!result.ok || !result.data) return null;
         return {
-          secretPackage: result.data.secret_package as string,
-          packages: result.data.packages as Record<string, string>,
+          secretPackage: asJsonString(result.data.secret_package),
+          packages: asJsonStringMap(result.data.packages),
         };
       }
 
       if (round === 3) {
-        if (!input.round2SecretPackage || !input.round1Packages || !input.round2Packages) return null;
+        if (
+          !input.round2SecretPackage || !input.round1Packages ||
+          !input.round2Packages
+        ) return null;
         const result = await dkgRound3(
           input.round2SecretPackage,
           input.round1Packages,
@@ -109,19 +139,29 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         );
         if (!result.ok || !result.data) return null;
         return {
-          keyPackage: result.data.key_package as string,
-          pubkeyPackage: result.data.pubkey_package as string,
-          groupPubkey: result.data.group_pubkey as string,
+          keyPackage: asJsonString(result.data.key_package),
+          pubkeyPackage: asJsonString(result.data.pubkey_package),
+          groupPubkey: String(result.data.group_pubkey),
         };
       }
 
       return null;
     },
 
-    async verifyAndSign(requirement, input, message, commitmentsJson, blossomKeys) {
+    async verifyAndSign(
+      requirement,
+      input,
+      message,
+      commitmentsJson,
+      blossomKeys,
+    ) {
       const detail = await verifyProof(requirement, input, { blossomKeys });
       if (!detail.passed) {
-        log.error(`Verification failed for ${requirement.id}: ${detail.failures.join(", ")}`);
+        log.error(
+          `Verification failed for ${requirement.id}: ${
+            detail.failures.join(", ")
+          }`,
+        );
         return null;
       }
 
@@ -129,9 +169,9 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       if (!commitmentsJson) {
         const r1 = await signRound1(config.keyPackage);
         if (!r1.ok || !r1.data) return null;
-        pendingNonces = r1.data.nonces as string;
+        pendingNonces = asJsonString(r1.data.nonces);
         return {
-          nonce_commitment: r1.data.commitments as string,
+          nonce_commitment: asJsonString(r1.data.commitments),
           nonces: pendingNonces,
         };
       }
@@ -143,12 +183,17 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         return null;
       }
 
-      const r2 = await signRound2(config.keyPackage, nonces, commitmentsJson, message);
+      const r2 = await signRound2(
+        config.keyPackage,
+        nonces,
+        commitmentsJson,
+        message,
+      );
       pendingNonces = undefined; // Consume nonces
       if (!r2.ok || !r2.data) return null;
 
       return {
-        signature_share: r2.data.signature_share as string,
+        signature_share: asJsonString(r2.data.signature_share),
       };
     },
   };

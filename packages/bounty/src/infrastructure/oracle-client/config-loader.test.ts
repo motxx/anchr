@@ -1,4 +1,4 @@
-import { test, describe } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { parseOracleRegistry } from "./config-loader.ts";
 import { createOracleRegistry } from "./registry.ts";
@@ -6,7 +6,9 @@ import { loadOraclesFromEnv } from "./config-loader.ts";
 
 describe("parseOracleRegistry", () => {
   test("parses single entry without API key", () => {
-    const entries = parseOracleRegistry("ext1:https://oracle1.example.com:50000");
+    const entries = parseOracleRegistry(
+      "ext1:https://oracle1.example.com:50000",
+    );
     expect(entries.length).toBe(1);
     expect(entries[0]!.id).toBe("ext1");
     expect(entries[0]!.endpoint).toBe("https://oracle1.example.com");
@@ -15,7 +17,9 @@ describe("parseOracleRegistry", () => {
   });
 
   test("parses single entry with API key", () => {
-    const entries = parseOracleRegistry("ext1:https://oracle1.example.com:50000:sk-xxx");
+    const entries = parseOracleRegistry(
+      "ext1:https://oracle1.example.com:50000:sk-xxx",
+    );
     expect(entries.length).toBe(1);
     expect(entries[0]!.id).toBe("ext1");
     expect(entries[0]!.endpoint).toBe("https://oracle1.example.com");
@@ -35,14 +39,18 @@ describe("parseOracleRegistry", () => {
   });
 
   test("handles URL with port", () => {
-    const entries = parseOracleRegistry("ext1:https://oracle1.example.com:8080:50000");
+    const entries = parseOracleRegistry(
+      "ext1:https://oracle1.example.com:8080:50000",
+    );
     expect(entries.length).toBe(1);
     expect(entries[0]!.endpoint).toBe("https://oracle1.example.com:8080");
     expect(entries[0]!.fee_ppm).toBe(50000);
   });
 
   test("handles API key containing colons", () => {
-    const entries = parseOracleRegistry("ext1:https://oracle1.example.com:8080:50000:sk:key:with:colons");
+    const entries = parseOracleRegistry(
+      "ext1:https://oracle1.example.com:8080:50000:sk:key:with:colons",
+    );
     expect(entries.length).toBe(1);
     expect(entries[0]!.endpoint).toBe("https://oracle1.example.com:8080");
     expect(entries[0]!.fee_ppm).toBe(50000);
@@ -50,7 +58,9 @@ describe("parseOracleRegistry", () => {
   });
 
   test("skips empty entries", () => {
-    const entries = parseOracleRegistry("ext1:https://oracle1.example.com:50000,,");
+    const entries = parseOracleRegistry(
+      "ext1:https://oracle1.example.com:50000,,",
+    );
     expect(entries.length).toBe(1);
   });
 });

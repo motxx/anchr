@@ -34,7 +34,10 @@ test("eventVerification has undefined location_hint when location omitted", () =
 });
 
 test("eventVerification uses explicit location when provided", () => {
-  const input = queryTemplates.eventVerification("Concert at Budokan", "Chiyoda");
+  const input = queryTemplates.eventVerification(
+    "Concert at Budokan",
+    "Chiyoda",
+  );
   expect(input.description).toBe("Event verification: Concert at Budokan");
   expect(input.location_hint).toBe("Chiyoda");
 });

@@ -23,21 +23,21 @@
  */
 
 import {
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
   getDecodedToken,
-  verifyHTLCSpendingConditions,
   isHTLCSpendAuthorised,
+  P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
   signP2PKProofs,
   verifyHTLCHash,
+  verifyHTLCSpendingConditions,
 } from "@cashu/cashu-ts";
 import {
-  getWalletAndConfig,
-  sumProofAmounts,
-  encodeProofs,
-  loadAndSend,
   computeNetAmount,
+  encodeProofs,
+  getWalletAndConfig,
+  loadAndSend,
+  sumProofAmounts,
 } from "./escrow-helpers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
@@ -107,7 +107,12 @@ export async function createEscrowToken(
   const p2pkOptions = buildEscrowP2PKOptions(params);
 
   try {
-    const send = await loadAndSend(ctx.wallet, amountSats, sourceProofs, p2pkOptions);
+    const send = await loadAndSend(
+      ctx.wallet,
+      amountSats,
+      sourceProofs,
+      p2pkOptions,
+    );
     return {
       token: encodeProofs(ctx.config.mintUrl, send),
       proofs: send,
@@ -115,7 +120,10 @@ export async function createEscrowToken(
       amountSats,
     };
   } catch (error) {
-    log.error("Failed to create escrow token:", error instanceof Error ? error.message : error);
+    log.error(
+      "Failed to create escrow token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -141,10 +149,17 @@ export async function executeEscrowSwap(
   }
 
   try {
-    const workerP2PK = new P2PKBuilder().addLockPubkey(workerPubkey).toOptions();
-    const oracleP2PK = new P2PKBuilder().addLockPubkey(oraclePubkey).toOptions();
+    const workerP2PK = new P2PKBuilder().addLockPubkey(workerPubkey)
+      .toOptions();
+    const oracleP2PK = new P2PKBuilder().addLockPubkey(oraclePubkey)
+      .toOptions();
 
-    const workerProofs = await loadAndSend(ctx.wallet, workerSats, signedProofs, workerP2PK);
+    const workerProofs = await loadAndSend(
+      ctx.wallet,
+      workerSats,
+      signedProofs,
+      workerP2PK,
+    );
 
     const remainingProofs = signedProofs.filter(
       (p) => !workerProofs.some((wp) => wp.C === p.C),
@@ -152,7 +167,12 @@ export async function executeEscrowSwap(
 
     let oracleProofs: Proof[];
     if (remainingProofs.length > 0) {
-      oracleProofs = await loadAndSend(ctx.wallet, feeSats, remainingProofs, oracleP2PK);
+      oracleProofs = await loadAndSend(
+        ctx.wallet,
+        feeSats,
+        remainingProofs,
+        oracleP2PK,
+      );
     } else {
       oracleProofs = [];
     }
@@ -218,7 +238,9 @@ export function buildHtlcInitialOptions(params: HtlcInitialLockParams): null {
  * hashlock(hash) + P2PK(Worker) + locktime + refund(Requester).
  * Worker redeems with preimage + Worker signature.
  */
-export function buildHtlcFinalOptions(params: HtlcWorkerBindParams): P2PKOptions {
+export function buildHtlcFinalOptions(
+  params: HtlcWorkerBindParams,
+): P2PKOptions {
   return new P2PKBuilder()
     .addHashlock(params.hash)
     .addLockPubkey(params.workerPubkey)
@@ -247,9 +269,17 @@ export async function createHtlcToken(
 
   try {
     const send = await loadAndSend(ctx.wallet, amountSats, sourceProofs);
-    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions: null, amountSats };
+    return {
+      token: encodeProofs(ctx.config.mintUrl, send),
+      proofs: send,
+      p2pkOptions: null,
+      amountSats,
+    };
   } catch (error) {
-    log.error("Failed to create initial hold token:", error instanceof Error ? error.message : error);
+    log.error(
+      "Failed to create initial hold token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -276,10 +306,23 @@ export async function swapHtlcBindWorker(
       return null;
     }
 
-    const send = await loadAndSend(ctx.wallet, amountSats, initialProofs, p2pkOptions);
-    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, p2pkOptions, amountSats };
+    const send = await loadAndSend(
+      ctx.wallet,
+      amountSats,
+      initialProofs,
+      p2pkOptions,
+    );
+    return {
+      token: encodeProofs(ctx.config.mintUrl, send),
+      proofs: send,
+      p2pkOptions,
+      amountSats,
+    };
   } catch (error) {
-    log.error("Failed to swap HTLC for worker binding:", error instanceof Error ? error.message : error);
+    log.error(
+      "Failed to swap HTLC for worker binding:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -310,7 +353,11 @@ export async function redeemHtlcToken(
   if (!ctx) return null;
 
   try {
-    const signedProofs = prepareHtlcWitness(htlcProofs, preimage, workerPrivateKey);
+    const signedProofs = prepareHtlcWitness(
+      htlcProofs,
+      preimage,
+      workerPrivateKey,
+    );
     const verifyError = verifyHtlcSpendAuth(signedProofs);
     if (verifyError) return null;
 
@@ -320,15 +367,32 @@ export async function redeemHtlcToken(
       return null;
     }
 
-    const send = await loadAndSend(ctx.wallet, amountSats, signedProofs, undefined, workerPrivateKey);
-    return { token: encodeProofs(ctx.config.mintUrl, send), proofs: send, amountSats };
+    const send = await loadAndSend(
+      ctx.wallet,
+      amountSats,
+      signedProofs,
+      undefined,
+      workerPrivateKey,
+    );
+    return {
+      token: encodeProofs(ctx.config.mintUrl, send),
+      proofs: send,
+      amountSats,
+    };
   } catch (error) {
-    log.error("Failed to redeem HTLC token:", error instanceof Error ? error.message : error);
+    log.error(
+      "Failed to redeem HTLC token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
 
-function prepareHtlcWitness(proofs: Proof[], preimage: string, workerPrivateKey: string): Proof[] {
+function prepareHtlcWitness(
+  proofs: Proof[],
+  preimage: string,
+  workerPrivateKey: string,
+): Proof[] {
   const proofsWithPreimage = proofs.map((p) => ({
     ...p,
     witness: JSON.stringify({ preimage, signatures: [] }),
@@ -379,7 +443,11 @@ export function verifyHtlcProofs(
   return null;
 }
 
-function validateHtlcSecret(proof: Proof, index: number, expectedHash: string): string | null {
+function validateHtlcSecret(
+  proof: Proof,
+  index: number,
+  expectedHash: string,
+): string | null {
   try {
     const secret = JSON.parse(proof.secret);
     if (!Array.isArray(secret) || secret[0] !== "HTLC") {

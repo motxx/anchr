@@ -8,25 +8,39 @@
  */
 
 import { Buffer } from "node:buffer";
-import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  test,
+} from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { _setVerifierPathForTest, _clearSeenPresentationsForTest } from "@anchr/tlsn-toolkit/tlsn-validation";
+import {
+  _clearSeenPresentationsForTest,
+  _setVerifierPathForTest,
+} from "@anchr/tlsn-toolkit/tlsn-validation";
 import { verify } from "./verifier.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../../domain/types.ts";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-function makeAttestation(overrides?: Partial<TlsnAttestation>): TlsnAttestation {
+function makeAttestation(
+  overrides?: Partial<TlsnAttestation>,
+): TlsnAttestation {
   return {
     presentation: Buffer.from("fake-presentation").toString("base64"),
     ...overrides,
   };
 }
 
-function makeRequirement(overrides?: Partial<TlsnRequirement>): TlsnRequirement {
+function makeRequirement(
+  overrides?: Partial<TlsnRequirement>,
+): TlsnRequirement {
   return {
-    target_url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+    target_url:
+      "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
     ...overrides,
   };
 }
@@ -68,7 +82,9 @@ describe("verify() integration with tlsn", () => {
 
     const verification = await verify(query, result);
     expect(verification.passed).toBe(false);
-    expect(verification.failures.some((f) => f.includes("no attestation provided"))).toBe(true);
+    expect(
+      verification.failures.some((f) => f.includes("no attestation provided")),
+    ).toBe(true);
   });
 
   test("tlsn query without tlsn_requirements fails", async () => {
@@ -86,7 +102,11 @@ describe("verify() integration with tlsn", () => {
 
     const verification = await verify(query, result);
     expect(verification.passed).toBe(false);
-    expect(verification.failures.some((f) => f.includes("missing tlsn_requirements"))).toBe(true);
+    expect(
+      verification.failures.some((f) =>
+        f.includes("missing tlsn_requirements")
+      ),
+    ).toBe(true);
   });
 
   test("tlsn query does not require photo attachments", async () => {
@@ -111,7 +131,8 @@ describe("verify() integration with tlsn", () => {
     const result = { attachments: [], tlsn_attestation: makeAttestation() };
 
     const verification = await verify(query, result);
-    expect(verification.failures.filter((f) => f.includes("no media evidence"))).toHaveLength(0);
+    expect(verification.failures.filter((f) => f.includes("no media evidence")))
+      .toHaveLength(0);
     expect(verification.passed).toBe(true);
     expect(verification.tlsn_verified?.server_name).toBe("api.coingecko.com");
   });

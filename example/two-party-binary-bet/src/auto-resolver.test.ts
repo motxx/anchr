@@ -9,7 +9,9 @@ import { startAutoResolver } from "./auto-resolver.ts";
 import { createMarketState } from "./server-routes.ts";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
 
-function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
+function makeMarket(
+  overrides: Partial<TwoPartyBinaryBet> = {},
+): TwoPartyBinaryBet {
   return {
     id: "mkt_test",
     title: "Will it work?",
@@ -101,14 +103,20 @@ describe("auto-resolver", () => {
 
   test("does NOT settle markets still in their resolution window", async () => {
     const state = createMarketState();
-    state.markets.set("mkt_open", makeMarket({ id: "mkt_open", resolution_deadline: 9_999_999_999 }));
+    state.markets.set(
+      "mkt_open",
+      makeMarket({ id: "mkt_open", resolution_deadline: 9_999_999_999 }),
+    );
 
     let fetchedCount = 0;
     const handle = startAutoResolver(state, {
       pollIntervalMs: 60_000,
       runImmediately: false,
       now: () => 1_000_000, // before the deadline
-      fetchTruthSource: async () => { fetchedCount++; return "YES"; },
+      fetchTruthSource: async () => {
+        fetchedCount++;
+        return "YES";
+      },
       log: () => {},
     });
     await handle.tick();
@@ -130,7 +138,10 @@ describe("auto-resolver", () => {
       pollIntervalMs: 60_000,
       runImmediately: false,
       now: () => 2_000_000,
-      fetchTruthSource: async () => { fetchedCount++; return "YES"; },
+      fetchTruthSource: async () => {
+        fetchedCount++;
+        return "YES";
+      },
       log: () => {},
     });
     await handle.tick();
@@ -151,14 +162,18 @@ describe("auto-resolver", () => {
       pollIntervalMs: 60_000,
       runImmediately: false,
       now: () => 2_000_000,
-      fetchTruthSource: async () => { throw new Error("ENETUNREACH"); },
+      fetchTruthSource: async () => {
+        throw new Error("ENETUNREACH");
+      },
       log: (level, msg) => logged.push({ level, msg }),
     });
     await handle.tick();
     handle.stop();
 
     expect(state.markets.get("mkt_flaky")?.status).toBe("open");
-    expect(logged.some((l) => l.level === "warn" && l.msg.includes("fetch failed"))).toBe(true);
+    expect(
+      logged.some((l) => l.level === "warn" && l.msg.includes("fetch failed")),
+    ).toBe(true);
   });
 
   test("survives a condition-evaluation error and leaves the market open", async () => {
@@ -191,6 +206,10 @@ describe("auto-resolver", () => {
     handle.stop();
 
     expect(state.markets.get("mkt_badcond")?.status).toBe("open");
-    expect(logged.some((l) => l.level === "warn" && l.msg.includes("condition evaluation failed"))).toBe(true);
+    expect(
+      logged.some((l) =>
+        l.level === "warn" && l.msg.includes("condition evaluation failed")
+      ),
+    ).toBe(true);
   });
 });

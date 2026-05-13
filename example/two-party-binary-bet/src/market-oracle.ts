@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet Oracle (Resolution Logic)
+ * Two-party binary bet oracle (resolution logic)
  *
  * The oracle resolves markets by generating a TLSNotary proof from an
  * authoritative URL and evaluating the resolution condition against the
@@ -13,10 +13,10 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes, randomBytes } from "@noble/hashes/utils.js";
 import type {
-  TwoPartyBinaryBet,
   MarketResolution,
-  ResolutionCondition,
   OracleHtlcKeypair,
+  ResolutionCondition,
+  TwoPartyBinaryBet,
 } from "./market-types.ts";
 import { validateTlsn } from "@anchr/tlsn-toolkit/tlsn-validation";
 import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
@@ -37,7 +37,10 @@ export function createMarketHtlc(): OracleHtlcKeypair {
   };
 }
 
-export function verifyPreimage(preimage: string, expectedHash: string): boolean {
+export function verifyPreimage(
+  preimage: string,
+  expectedHash: string,
+): boolean {
   const hashBytes = sha256(hexToBytes(preimage));
   return bytesToHex(hashBytes) === expectedHash;
 }
@@ -46,7 +49,7 @@ export function verifyPreimage(preimage: string, expectedHash: string): boolean 
  * Resolve a two-party binary bet from already-verified TLSNotary data.
  *
  * The caller is responsible for cryptographic verification (see
- * `verifyMarketResolution` for the trustless path that does the crypto
+ * `verifyMarketResolution` for the path that verifies the TLSNotary proof
  * itself). This function trusts the caller's claim of `verifiedBody` /
  * `verifiedServerName` / `verifiedTimestamp` — useful for tests and
  * for callers that have already validated the presentation upstream.
@@ -79,7 +82,10 @@ export function resolveMarket(
     throw new OracleError("Preimage does not match market HTLC hash");
   }
 
-  const conditionMet = evaluateCondition(market.resolution_condition, verifiedBody);
+  const conditionMet = evaluateCondition(
+    market.resolution_condition,
+    verifiedBody,
+  );
   const outcome = conditionMet ? "yes" : "no";
 
   return {
@@ -126,24 +132,36 @@ export async function verifyMarketResolution(
     domain_hint: expectedHostname,
   };
 
-  const result = await validateTlsn({ presentation: tlsnPresentation }, requirement);
+  const result = await validateTlsn(
+    { presentation: tlsnPresentation },
+    requirement,
+  );
 
   if (!result.available) {
-    throw new OracleError("TLSNotary verifier binary not available; cannot verify proof");
+    throw new OracleError(
+      "TLSNotary verifier binary not available; cannot verify proof",
+    );
   }
   if (!result.signatureValid) {
     throw new OracleError(
-      `TLSNotary signature invalid: ${result.failures.join("; ") || "verification failed"}`,
+      `TLSNotary signature invalid: ${
+        result.failures.join("; ") || "verification failed"
+      }`,
     );
   }
   if (!result.serverIdentityValid) {
     throw new OracleError(
-      `TLSNotary server identity mismatch: ${result.failures.join("; ") || `expected ${expectedHostname}`}`,
+      `TLSNotary server identity mismatch: ${
+        result.failures.join("; ") || `expected ${expectedHostname}`
+      }`,
     );
   }
   if (!result.attestationFresh) {
     throw new OracleError(
-      `TLSNotary attestation too old: ${result.failures.join("; ") || `max age ${requirement.max_attestation_age_seconds}s`}`,
+      `TLSNotary attestation too old: ${
+        result.failures.join("; ") ||
+        `max age ${requirement.max_attestation_age_seconds}s`
+      }`,
     );
   }
 
@@ -151,7 +169,10 @@ export async function verifyMarketResolution(
   const verifiedServerName = result.verifiedData?.server_name ?? "";
   const verifiedTimestamp = result.verifiedData?.session_timestamp ?? 0;
 
-  const conditionMet = evaluateCondition(market.resolution_condition, verifiedBody);
+  const conditionMet = evaluateCondition(
+    market.resolution_condition,
+    verifiedBody,
+  );
 
   return {
     outcome: conditionMet ? "yes" : "no",
@@ -214,7 +235,9 @@ function evaluateJsonpathComparison(
       `Expected numeric value at path "${condition.jsonpath}", got ${typeof value}`,
     );
   }
-  return op === "gt" ? value > condition.threshold : value < condition.threshold;
+  return op === "gt"
+    ? value > condition.threshold
+    : value < condition.threshold;
 }
 
 function evaluateJsonpathEquals(
@@ -281,7 +304,10 @@ export function extractJsonValue(
  * @param totalPoolSats Combined YES + NO pool
  * @param feePpm Fee in parts per million (e.g. 5000 = 0.5%)
  */
-export function calculateOracleFee(totalPoolSats: number, feePpm: number): number {
+export function calculateOracleFee(
+  totalPoolSats: number,
+  feePpm: number,
+): number {
   return Math.ceil((totalPoolSats * feePpm) / 1_000_000);
 }
 
@@ -297,7 +323,9 @@ export function calculateOracleFee(totalPoolSats: number, feePpm: number): numbe
 export function calculatePayouts(
   market: TwoPartyBinaryBet,
   outcome: "yes" | "no",
-  bets: Array<{ side: "yes" | "no"; amount_sats: number; bettor_pubkey: string }>,
+  bets: Array<
+    { side: "yes" | "no"; amount_sats: number; bettor_pubkey: string }
+  >,
   oracleFeePpm: number,
 ): Array<{ bettor_pubkey: string; payout_sats: number }> {
   const totalPool = market.yes_pool_sats + market.no_pool_sats;
@@ -306,7 +334,9 @@ export function calculatePayouts(
   const payablePool = totalPool - oracleFee - creatorFee;
 
   const winningBets = bets.filter((b) => b.side === outcome);
-  const winningPool = outcome === "yes" ? market.yes_pool_sats : market.no_pool_sats;
+  const winningPool = outcome === "yes"
+    ? market.yes_pool_sats
+    : market.no_pool_sats;
 
   if (winningPool === 0) return [];
 

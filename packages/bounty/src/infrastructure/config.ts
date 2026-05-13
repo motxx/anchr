@@ -34,8 +34,6 @@ export interface RuntimeConfig {
   httpApiKeys: string[];
   anthropicApiKey?: string;
   aiContentCheckEnabled: boolean;
-  remoteQueryApiBaseUrl?: string;
-  remoteQueryApiKey?: string;
   /** Trusted Oracle pubkeys for Worker whitelist (from TRUSTED_ORACLE_PUBKEYS env). */
   trustedOraclePubkeys: string[];
   /** TLSNotary Verifier Server URL (served to workers). */
@@ -46,7 +44,8 @@ export interface RuntimeConfig {
   preimageStorePath: string;
 }
 
-export const DEFAULT_RUNTIME_DATA_DIR = Deno.env.get("RUNTIME_DATA_DIR") ?? join(moduleDir(import.meta), "..", ".local");
+export const DEFAULT_RUNTIME_DATA_DIR = Deno.env.get("RUNTIME_DATA_DIR") ??
+  join(moduleDir(import.meta), "..", ".local");
 export function getRuntimeConfig(): RuntimeConfig {
   return {
     httpApiPort: readNumberEnv("HTTP_API_PORT", readNumberEnv("PORT", 3000)),
@@ -55,9 +54,8 @@ export function getRuntimeConfig(): RuntimeConfig {
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
     anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY")?.trim() || undefined,
-    aiContentCheckEnabled: Deno.env.get("AI_CONTENT_CHECK") === "true" || Deno.env.get("AI_CONTENT_CHECK") === "1",
-    remoteQueryApiBaseUrl: Deno.env.get("REMOTE_QUERY_API_BASE_URL")?.trim() || undefined,
-    remoteQueryApiKey: Deno.env.get("REMOTE_QUERY_API_KEY")?.trim() || undefined,
+    aiContentCheckEnabled: Deno.env.get("AI_CONTENT_CHECK") === "true" ||
+      Deno.env.get("AI_CONTENT_CHECK") === "1",
     trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
     tlsnVerifierUrl: Deno.env.get("TLSN_VERIFIER_URL")?.trim() || undefined,
     tlsnProxyUrl: Deno.env.get("TLSN_PROXY_URL")?.trim() || undefined,

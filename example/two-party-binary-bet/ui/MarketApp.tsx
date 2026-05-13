@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CATEGORIES, type Market, type MarketCategory } from "./mock-data.ts";
-import { fetchMarkets, createMarket, type CreateMarketParams, type ConditionType } from "./api.ts";
+import {
+  type ConditionType,
+  createMarket,
+  type CreateMarketParams,
+  fetchMarkets,
+} from "./api.ts";
 import { Header } from "./components/Header.tsx";
 import { StatsBar } from "./components/StatsBar.tsx";
 import { MarketCard } from "./components/MarketCard.tsx";
@@ -33,12 +38,18 @@ function filterAndSort(
     .filter((m) => q === "" || m.title.toLowerCase().includes(q));
   return matched.sort((a, b) => {
     switch (sort) {
-      case "trending": return trendingScore(b) - trendingScore(a);
-      case "popular": return b.num_bettors - a.num_bettors;
-      case "newest": return b.created_at - a.created_at;
-      case "ending_soon": return a.resolution_deadline - b.resolution_deadline;
-      case "volume": return b.volume_sats - a.volume_sats;
-      default: return 0;
+      case "trending":
+        return trendingScore(b) - trendingScore(a);
+      case "popular":
+        return b.num_bettors - a.num_bettors;
+      case "newest":
+        return b.created_at - a.created_at;
+      case "ending_soon":
+        return a.resolution_deadline - b.resolution_deadline;
+      case "volume":
+        return b.volume_sats - a.volume_sats;
+      default:
+        return 0;
     }
   });
 }
@@ -124,37 +135,42 @@ export function MarketApp() {
         <SakuraBurst trigger={sakuraTrigger} />
         <Header onLogoClick={closeMarket} />
         <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-          {selectedMarket ? (
-            <MarketDetail
-              market={selectedMarket}
-              onBack={() => {
-                closeMarket();
-                invalidateMarkets();
-              }}
-              onBetPlaced={() => {
-                invalidateMarkets();
-                setSakuraTrigger((v) => v + 1);
-              }}
-            />
-          ) : marketsQuery.isPending ? (
-            <div className="text-center py-16">
-              <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-              <p className="text-muted-foreground text-sm">Loading…</p>
-            </div>
-          ) : (
-            <div className="text-center py-16">
-              <p className="text-lg text-foreground mb-2">Market not found</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                <span className="font-mono">{selectedMarketId}</span> doesn't match any open market.
-              </p>
-              <button
-                onClick={closeMarket}
-                className="h-9 px-4 rounded-md border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
-              >
-                ← All markets
-              </button>
-            </div>
-          )}
+          {selectedMarket
+            ? (
+              <MarketDetail
+                market={selectedMarket}
+                onBack={() => {
+                  closeMarket();
+                  invalidateMarkets();
+                }}
+                onBetPlaced={() => {
+                  invalidateMarkets();
+                  setSakuraTrigger((v) => v + 1);
+                }}
+              />
+            )
+            : marketsQuery.isPending
+            ? (
+              <div className="text-center py-16">
+                <div className="inline-block w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-muted-foreground text-sm">Loading…</p>
+              </div>
+            )
+            : (
+              <div className="text-center py-16">
+                <p className="text-lg text-foreground mb-2">Market not found</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  <span className="font-mono">{selectedMarketId}</span>{" "}
+                  doesn't match any open market.
+                </p>
+                <button
+                  onClick={closeMarket}
+                  className="h-9 px-4 rounded-md border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors"
+                >
+                  ← All markets
+                </button>
+              </div>
+            )}
         </main>
       </div>
     );
@@ -166,9 +182,10 @@ export function MarketApp() {
       <Header />
 
       <main className="max-w-6xl mx-auto px-4 sm:px-5 py-6 sm:py-8">
-        {/* Hero — Kannagi is the platform; the brand is established in the
-         * header, so the page lands directly on the create CTA. No
-         * redundant tagline or stats above the featured market. */}
+        {
+          /* Hero — the page lands directly on the create CTA. No redundant
+         * tagline or stats above the featured market. */
+        }
         <div className="flex items-center justify-end mb-5">
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
@@ -190,7 +207,10 @@ export function MarketApp() {
 
         {/* Featured */}
         {featured && !showCreateForm && (
-          <FeaturedMarket market={featured} onClick={() => openMarket(featured.id)} />
+          <FeaturedMarket
+            market={featured}
+            onClick={() => openMarket(featured.id)}
+          />
         )}
 
         {/* Sort tabs (Polymarket-style) */}
@@ -231,8 +251,19 @@ export function MarketApp() {
           </div>
 
           <div className="relative flex-1 sm:flex-initial sm:ml-auto w-full sm:w-auto">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
             </svg>
             <input
               type="text"
@@ -256,7 +287,9 @@ export function MarketApp() {
         {marketsQuery.isError && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 mb-6 text-center">
             <p className="text-sm text-destructive mb-3">
-              {marketsQuery.error instanceof Error ? marketsQuery.error.message : "Failed to load markets"}
+              {marketsQuery.error instanceof Error
+                ? marketsQuery.error.message
+                : "Failed to load markets"}
             </p>
             <button
               onClick={() => marketsQuery.refetch()}
@@ -301,8 +334,12 @@ export function MarketApp() {
         {/* Footer — neutral, no decorative chrome */}
         <footer className="mt-16 pt-6 border-t border-border text-center text-xs text-muted-foreground">
           <p>
-            <span className="font-shrine text-foreground/80">Kannagi</span>
-            <span className="text-muted-foreground/70 ml-2">かんなぎ</span>
+            <span className="font-shrine text-foreground/80">
+              Two-party binary bet
+            </span>
+            <span className="text-muted-foreground/70 ml-2">
+              testnet reference
+            </span>
           </p>
         </footer>
       </main>
@@ -325,26 +362,46 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
   const [categoryVal, setCategoryVal] = useState<MarketCategory>("crypto");
   const [resolutionUrl, setResolutionUrl] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
-  const [conditionType, setConditionType] = useState<ConditionType>("jsonpath_gt");
+  const [conditionType, setConditionType] = useState<ConditionType>(
+    "jsonpath_gt",
+  );
   const [jsonpath, setJsonpath] = useState("");
   const [threshold, setThreshold] = useState("");
   const [expectedText, setExpectedText] = useState("");
   const [minBetSats, setMinBetSats] = useState("100");
 
-  const needsJsonpath = ["jsonpath_gt", "jsonpath_lt", "jsonpath_equals", "price_above", "price_below"].includes(conditionType);
-  const needsThreshold = ["jsonpath_gt", "jsonpath_lt", "price_above", "price_below"].includes(conditionType);
-  const needsExpectedText = ["jsonpath_equals", "contains_text"].includes(conditionType);
+  const needsJsonpath = [
+    "jsonpath_gt",
+    "jsonpath_lt",
+    "jsonpath_equals",
+    "price_above",
+    "price_below",
+  ].includes(conditionType);
+  const needsThreshold = [
+    "jsonpath_gt",
+    "jsonpath_lt",
+    "price_above",
+    "price_below",
+  ].includes(conditionType);
+  const needsExpectedText = ["jsonpath_equals", "contains_text"].includes(
+    conditionType,
+  );
 
   const createMutation = useMutation({
     mutationFn: createMarket,
     onSuccess: () => onCreated(),
   });
   const submitting = createMutation.isPending;
-  const submitError = createMutation.error instanceof Error ? createMutation.error.message : null;
+  const submitError = createMutation.error instanceof Error
+    ? createMutation.error.message
+    : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !resolutionUrl.trim() || !deadlineDate) return;
+    if (
+      !title.trim() || !description.trim() || !resolutionUrl.trim() ||
+      !deadlineDate
+    ) return;
     const params: CreateMarketParams = {
       title: title.trim(),
       description: description.trim(),
@@ -352,9 +409,15 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
       resolution_url: resolutionUrl.trim(),
       resolution_condition: {
         type: conditionType,
-        ...(needsJsonpath && jsonpath.trim() ? { jsonpath: jsonpath.trim() } : {}),
-        ...(needsThreshold && threshold ? { threshold: parseFloat(threshold) } : {}),
-        ...(needsExpectedText && expectedText.trim() ? { expected_text: expectedText.trim() } : {}),
+        ...(needsJsonpath && jsonpath.trim()
+          ? { jsonpath: jsonpath.trim() }
+          : {}),
+        ...(needsThreshold && threshold
+          ? { threshold: parseFloat(threshold) }
+          : {}),
+        ...(needsExpectedText && expectedText.trim()
+          ? { expected_text: expectedText.trim() }
+          : {}),
         description: title.trim(),
       },
       resolution_deadline: Math.floor(new Date(deadlineDate).getTime() / 1000),
@@ -365,12 +428,16 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
   return (
     <div className="rounded-lg border border-border bg-card p-5 sm:p-6 mb-6">
-      <h2 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wider">Create New Market</h2>
+      <h2 className="text-sm font-medium text-foreground mb-4 uppercase tracking-wider">
+        Create New Market
+      </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Title */}
           <div className="sm:col-span-2">
-            <label className="text-xs text-muted-foreground block mb-1.5">Title</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Title
+            </label>
             <input
               type="text"
               value={title}
@@ -383,7 +450,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
           {/* Description */}
           <div className="sm:col-span-2">
-            <label className="text-xs text-muted-foreground block mb-1.5">Description</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Description
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -396,7 +465,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
           {/* Category */}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1.5">Category</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Category
+            </label>
             <select
               value={categoryVal}
               onChange={(e) => setCategoryVal(e.target.value as MarketCategory)}
@@ -412,7 +483,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
           {/* Resolution URL */}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1.5">Resolution URL</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Resolution URL
+            </label>
             <input
               type="url"
               value={resolutionUrl}
@@ -425,13 +498,18 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
           {/* Resolution Condition */}
           <div className="sm:col-span-2 rounded-lg border border-border bg-muted/50 p-4 space-y-3">
-            <label className="text-xs text-muted-foreground block font-medium uppercase tracking-wider">Resolution Condition (YES if...)</label>
+            <label className="text-xs text-muted-foreground block font-medium uppercase tracking-wider">
+              Resolution Condition (YES if...)
+            </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Type</label>
+                <label className="text-xs text-muted-foreground block mb-1">
+                  Type
+                </label>
                 <select
                   value={conditionType}
-                  onChange={(e) => setConditionType(e.target.value as ConditionType)}
+                  onChange={(e) =>
+                    setConditionType(e.target.value as ConditionType)}
                   className="w-full h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:border-primary appearance-none cursor-pointer"
                 >
                   <option value="jsonpath_gt">JSON value &gt; threshold</option>
@@ -444,7 +522,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
               </div>
               {needsJsonpath && (
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">JSON Path</label>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    JSON Path
+                  </label>
                   <input
                     type="text"
                     value={jsonpath}
@@ -456,7 +536,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
               )}
               {needsThreshold && (
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Threshold</label>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Threshold
+                  </label>
                   <input
                     type="number"
                     value={threshold}
@@ -469,7 +551,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
               )}
               {needsExpectedText && (
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1">Expected Text</label>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Expected Text
+                  </label>
                   <input
                     type="text"
                     value={expectedText}
@@ -481,13 +565,16 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Oracle fetches the Resolution URL via TLSNotary, then evaluates this condition against the response.
+              Oracle fetches the Resolution URL via TLSNotary, then evaluates
+              this condition against the response.
             </p>
           </div>
 
           {/* Deadline */}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1.5">Resolution Deadline</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Resolution Deadline
+            </label>
             <input
               type="datetime-local"
               value={deadlineDate}
@@ -499,7 +586,9 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
 
           {/* Min Bet */}
           <div>
-            <label className="text-xs text-muted-foreground block mb-1.5">Min Bet (sats)</label>
+            <label className="text-xs text-muted-foreground block mb-1.5">
+              Min Bet (sats)
+            </label>
             <input
               type="number"
               value={minBetSats}
@@ -518,7 +607,8 @@ function CreateMarketForm({ onCreated, onCancel }: CreateMarketFormProps) {
         <div className="flex items-center gap-3 pt-2">
           <button
             type="submit"
-            disabled={submitting || !title.trim() || !description.trim() || !resolutionUrl.trim() || !deadlineDate}
+            disabled={submitting || !title.trim() || !description.trim() ||
+              !resolutionUrl.trim() || !deadlineDate}
             className="h-9 px-5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {submitting ? "Creating..." : "Create Market"}

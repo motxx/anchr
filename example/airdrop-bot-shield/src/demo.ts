@@ -1,5 +1,5 @@
 /**
- * 形代(Katashiro) — Demo (Airdrop bot shield)
+ * Airdrop bot shield demo
  *
  * Simulates the full airdrop claim flow:
  *   1. Project creates an airdrop campaign with GitHub-based criteria
@@ -17,21 +17,21 @@
  */
 
 import {
+  type AirdropCriteria,
   buildGitHubAgeCondition,
-  buildGitHubReposCondition,
   buildGitHubContributionCondition,
+  buildGitHubReposCondition,
   buildTwitterFollowerCondition,
-  validateCriteria,
+  type GitHubUserResponse,
   maxClaims,
   toTlsnRequirements,
-  type AirdropCriteria,
-  type GitHubUserResponse,
+  validateCriteria,
 } from "./airdrop-criteria.ts";
 
 import {
-  verifyClaim,
   generateClaimHash,
   type VerifiedProofData,
+  verifyClaim,
 } from "./claim-verifier.ts";
 
 function separator(title: string): void {
@@ -65,7 +65,9 @@ const criteria: AirdropCriteria = {
 console.log(`Campaign: ${criteria.name}`);
 console.log(`ID:       ${criteria.id}`);
 console.log(`Budget:   ${criteria.total_budget_sats.toLocaleString()} sats`);
-console.log(`Per claim: ${criteria.token_amount_per_claim.toLocaleString()} sats`);
+console.log(
+  `Per claim: ${criteria.token_amount_per_claim.toLocaleString()} sats`,
+);
 console.log(`Max claims: ${maxClaims(criteria)}`);
 
 console.log("\nEligibility conditions:");
@@ -90,7 +92,9 @@ console.log("\nValidation: PASSED (all criteria valid)");
 separator("Step 2: TLSNotary Proof Requirements");
 
 console.log("The claimant must generate one TLSNotary proof per condition.");
-console.log("Each proof cryptographically verifies the HTTP response from the target URL.\n");
+console.log(
+  "Each proof cryptographically verifies the HTTP response from the target URL.\n",
+);
 
 const tlsnRequirements = toTlsnRequirements(criteria.conditions);
 for (const [i, req] of tlsnRequirements.entries()) {
@@ -101,7 +105,9 @@ for (const [i, req] of tlsnRequirements.entries()) {
   console.log(`  Max age:     ${req.max_attestation_age_seconds}s`);
   console.log(`  Conditions:`);
   for (const cond of req.conditions) {
-    console.log(`    - [${cond.type}] ${cond.expression} -- ${cond.description}`);
+    console.log(
+      `    - [${cond.type}] ${cond.expression} -- ${cond.description}`,
+    );
   }
   console.log();
 }
@@ -109,9 +115,15 @@ for (const [i, req] of tlsnRequirements.entries()) {
 console.log("In practice, the claimant would:");
 console.log("  1. Open the TLSNotary browser extension");
 console.log("  2. Navigate to https://api.github.com/users/<their-username>");
-console.log("  3. The extension runs an MPC-TLS session with a TLSNotary verifier");
-console.log("  4. The cryptographic presentation (.presentation.tlsn) is generated");
-console.log("  5. The presentation is submitted to the Anchr oracle for verification");
+console.log(
+  "  3. The extension runs an MPC-TLS session with a TLSNotary verifier",
+);
+console.log(
+  "  4. The cryptographic presentation (.presentation.tlsn) is generated",
+);
+console.log(
+  "  5. The presentation is submitted to the Anchr oracle for verification",
+);
 
 separator("Step 3: Simulate Claim Verification");
 
@@ -170,7 +182,9 @@ if (result.all_passed) {
 
 separator("Step 4: Cashu HTLC Escrow Flow");
 
-console.log("The token distribution uses Anchr's 2-phase HTLC pattern (NUT-14):\n");
+console.log(
+  "The token distribution uses Anchr's 2-phase HTLC pattern (NUT-14):\n",
+);
 
 console.log("Phase 1: Project locks tokens in escrow");
 console.log("  - Project creates Cashu proofs for the total budget");
@@ -178,7 +192,9 @@ console.log("  - Each claim gets a unique hash/preimage pair");
 console.log("  - Oracle holds the preimage");
 console.log("  - Proofs are held by the project (plain bearer instruments)");
 console.log();
-console.log("  In code (reference: packages/bounty/src/infrastructure/cashu/escrow.ts):");
+console.log(
+  "  In code (reference: packages/bounty/src/infrastructure/cashu/escrow.ts):",
+);
 console.log("  ```");
 console.log("  // Phase 1: Create hold token");
 console.log("  const holdToken = await createHtlcToken(");
@@ -198,7 +214,9 @@ console.log();
 console.log("  In code:");
 console.log("  ```");
 console.log("  // Phase 2: Bind to claimant after verification");
-console.log("  const escrowToken = await swapHtlcBindWorker(holdToken.proofs, {");
+console.log(
+  "  const escrowToken = await swapHtlcBindWorker(holdToken.proofs, {",
+);
 console.log("    hash,");
 console.log("    workerPubkey: claimantPubkey,");
 console.log("    requesterRefundPubkey: projectPubkey,");
@@ -265,7 +283,9 @@ for (const r of botResult.results) {
 
 console.log(`\nOverall: ${botResult.all_passed ? "APPROVED" : "REJECTED"}`);
 console.log("HTLC preimage: NOT released (conditions not met)");
-console.log("Escrowed tokens remain locked and will be refunded to the project after locktime.");
+console.log(
+  "Escrowed tokens remain locked and will be refunded to the project after locktime.",
+);
 
 separator("Step 6: Economic Analysis");
 
@@ -273,15 +293,23 @@ const claimValue = criteria.token_amount_per_claim;
 const btcPrice = 90_000;
 const claimValueUsd = (claimValue / 100_000_000) * btcPrice;
 
-console.log(`Claim value: ${claimValue.toLocaleString()} sats (~$${claimValueUsd.toFixed(2)} at $${btcPrice.toLocaleString()} BTC)\n`);
+console.log(
+  `Claim value: ${claimValue.toLocaleString()} sats (~$${
+    claimValueUsd.toFixed(2)
+  } at $${btcPrice.toLocaleString()} BTC)\n`,
+);
 
 console.log("Cost to farm a qualifying fake account:");
 console.log("  GitHub account > 365 days old:");
 console.log("    - Buy aged GitHub account:    $50-100");
-console.log("    - Risk of account suspension:  High (GitHub actively detects purchased accounts)");
+console.log(
+  "    - Risk of account suspension:  High (GitHub actively detects purchased accounts)",
+);
 console.log();
 console.log("  GitHub > 10 public repos:");
-console.log("    - Fork/create repos:           $5-10 (scripts exist, but easily detected)");
+console.log(
+  "    - Fork/create repos:           $5-10 (scripts exist, but easily detected)",
+);
 console.log("    - Organic repo creation:        Months of effort");
 console.log();
 console.log("  GitHub > 5 contributions (gists):");
@@ -289,35 +317,55 @@ console.log("    - Create public gists:          $2-5");
 console.log("    - Meaningful contributions:     Weeks of effort");
 console.log();
 console.log("  Combined farming cost:            $57-115+ per identity");
-console.log(`  Airdrop reward:                   $${claimValueUsd.toFixed(2)} per claim`);
+console.log(
+  `  Airdrop reward:                   $${claimValueUsd.toFixed(2)} per claim`,
+);
 console.log();
 
 if (claimValueUsd < 57) {
   console.log("  Result: UNPROFITABLE to farm at scale");
-  console.log("  The combined cost of faking all conditions exceeds the airdrop reward.");
+  console.log(
+    "  The combined cost of faking all conditions exceeds the airdrop reward.",
+  );
 } else {
   console.log("  Result: Marginal profitability");
-  console.log("  Consider adding more conditions (e.g., Twitter followers) to increase farming cost.");
+  console.log(
+    "  Consider adding more conditions (e.g., Twitter followers) to increase farming cost.",
+  );
 }
 
 console.log();
-console.log("Adding Twitter follower requirement (>100 followers) would increase farming cost");
-console.log("by an additional $50-150 per identity, making attacks even less economical.");
+console.log(
+  "Adding Twitter follower requirement (>100 followers) would increase farming cost",
+);
+console.log(
+  "by an additional $50-150 per identity, making attacks even less economical.",
+);
 
 separator("Summary");
 
-console.log("形代(Katashiro) uses Anchr's TLSNotary + Cashu HTLC stack to:");
+console.log("Airdrop Bot Shield uses Anchr's TLSNotary + Cashu HTLC stack to:");
 console.log();
-console.log("  1. PROVE real-world identity attributes without revealing identity");
-console.log("     (TLSNotary cryptographic proofs of GitHub/Twitter API responses)");
+console.log(
+  "  1. PROVE real-world identity attributes without revealing identity",
+);
+console.log(
+  "     (TLSNotary cryptographic proofs of GitHub/Twitter API responses)",
+);
 console.log();
-console.log("  2. DISTRIBUTE tokens trustlessly via Cashu HTLC escrow");
+console.log("  2. DISTRIBUTE tokens through oracle-gated Cashu HTLC escrow");
 console.log("     (NUT-14 hashlock + P2PK, non-custodial, atomic settlement)");
 console.log();
 console.log("  3. RESIST Sybil attacks through economic cost barriers");
 console.log("     (combined proof requirements make farming unprofitable)");
 console.log();
 console.log("For integration with the full Anchr server, see:");
-console.log("  - packages/bounty/src/domain/types.ts          (TlsnRequirement, EscrowInfo)");
-console.log("  - packages/bounty/src/infrastructure/verification/tlsn-validation.ts (proof verification)");
-console.log("  - packages/bounty/src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)");
+console.log(
+  "  - packages/bounty/src/domain/types.ts          (TlsnRequirement, EscrowInfo)",
+);
+console.log(
+  "  - packages/bounty/src/infrastructure/verification/tlsn-validation.ts (proof verification)",
+);
+console.log(
+  "  - packages/bounty/src/infrastructure/cashu/escrow.ts (HTLC token lifecycle)",
+);

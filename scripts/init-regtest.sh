@@ -13,6 +13,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/docker-compose-env.sh"
+
 BITCOIN_CLI="docker compose exec -T bitcoind bitcoin-cli -regtest -rpcuser=cashu -rpcpassword=cashu"
 LNCLI_MINT="docker compose exec -T lnd-mint lncli --network regtest --rpcserver lnd-mint:10009"
 LNCLI_USER="docker compose exec -T lnd-user lncli --network regtest --rpcserver lnd-user:10009"
@@ -106,8 +109,8 @@ USER_BAL=$($LNCLI_USER channelbalance 2>/dev/null | tr -d '\r' | python3 -c "imp
 echo "  lnd-mint channel balance: ${MINT_BAL:-0} sats"
 echo "  lnd-user channel balance: ${USER_BAL:-0} sats"
 echo ""
-echo "  Cashu mint: http://localhost:3338"
-echo "  LND user REST: https://localhost:8081"
+echo "  Cashu mint: http://localhost:${ANCHR_CASHU_MINT_PORT}"
+echo "  LND user REST: https://localhost:${ANCHR_LND_REST_PORT}"
 echo ""
 echo "  To pay a mint invoice from lnd-user:"
 echo "    docker compose exec lnd-user lncli --network regtest payinvoice --force <bolt11>"

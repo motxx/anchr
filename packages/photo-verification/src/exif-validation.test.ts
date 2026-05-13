@@ -12,7 +12,9 @@ function buildJpegWithExif(options: {
 }): Buffer {
   // Build a minimal TIFF/EXIF structure inside a JPEG APP1 segment
   const le = true; // little-endian
-  const entries: Array<{ tag: number; type: number; count: number; value: Buffer }> = [];
+  const entries: Array<
+    { tag: number; type: number; count: number; value: Buffer }
+  > = [];
 
   function makeAsciiEntry(tag: number, str: string): void {
     const buf = Buffer.from(str + "\0", "ascii");
@@ -117,8 +119,18 @@ describe("extractExifMetadata", () => {
 describe("validateExif", () => {
   test("passes for JPEG with camera model and recent timestamp", () => {
     const now = new Date();
-    const dt = `${now.getFullYear()}:${String(now.getMonth() + 1).padStart(2, "0")}:${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
-    const jpeg = buildJpegWithExif({ make: "Samsung", model: "Galaxy S24", dateTime: dt });
+    const dt = `${now.getFullYear()}:${
+      String(now.getMonth() + 1).padStart(2, "0")
+    }:${String(now.getDate()).padStart(2, "0")} ${
+      String(now.getHours()).padStart(2, "0")
+    }:${String(now.getMinutes()).padStart(2, "0")}:${
+      String(now.getSeconds()).padStart(2, "0")
+    }`;
+    const jpeg = buildJpegWithExif({
+      make: "Samsung",
+      model: "Galaxy S24",
+      dateTime: dt,
+    });
     const result = validateExif(jpeg);
 
     expect(result.hasExif).toBe(true);
@@ -133,11 +145,17 @@ describe("validateExif", () => {
     const result = validateExif(bare);
 
     expect(result.hasExif).toBe(false);
-    expect(result.failures).toContain("no EXIF metadata found (possible AI-generated image)");
+    expect(result.failures).toContain(
+      "no EXIF metadata found (possible AI-generated image)",
+    );
   });
 
   test("warns for old timestamp", () => {
-    const jpeg = buildJpegWithExif({ make: "Canon", model: "EOS R5", dateTime: "2020:01:01 00:00:00" });
+    const jpeg = buildJpegWithExif({
+      make: "Canon",
+      model: "EOS R5",
+      dateTime: "2020:01:01 00:00:00",
+    });
     const result = validateExif(jpeg);
 
     expect(result.hasExif).toBe(true);
@@ -152,6 +170,7 @@ describe("validateExif", () => {
 
     expect(result.hasExif).toBe(true);
     expect(result.hasCameraModel).toBe(false);
-    expect(result.failures.some((f) => f.includes("no camera make/model"))).toBe(true);
+    expect(result.failures.some((f) => f.includes("no camera make/model")))
+      .toBe(true);
   });
 });

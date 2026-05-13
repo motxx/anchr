@@ -5,7 +5,7 @@
 #   ./scripts/test-all.sh              # local + docker tests (full suite)
 #   ./scripts/test-all.sh --local      # local tests only (no Docker)
 #   ./scripts/test-all.sh --docker     # docker tests only (assumes services up or starts them)
-#   ./scripts/test-all.sh --ci         # CI mode: same as full but skips docker teardown on failure for logs
+#   ./scripts/test-all.sh --ci         # CI mode: same as full
 #
 # Exit codes:
 #   0 = all passed
@@ -18,9 +18,16 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
+export ANCHR_DOCKER_ISOLATION="${ANCHR_DOCKER_ISOLATION:-worktree}"
+source "$SCRIPT_DIR/docker-compose-env.sh"
+
 MODE="${1:-full}"
 FAILED=0
 DOCKER_STARTED=0
+RELAY_URL="ws://localhost:${ANCHR_RELAY_PORT}"
+BLOSSOM_URL="http://localhost:${ANCHR_BLOSSOM_PORT}"
+CASHU_MINT_URL="http://localhost:${ANCHR_CASHU_MINT_PORT}"
+TLSN_VERIFIER_HOST="localhost:${ANCHR_TLSN_TCP_PORT}"
 
 # Colors (disabled in CI if no tty)
 if [ -t 1 ]; then
@@ -46,8 +53,8 @@ run_test() {
 cleanup() {
   if [ "$DOCKER_STARTED" = "1" ]; then
     step "Teardown"
-    docker compose down --timeout 10 2>/dev/null || true
-    echo "  Docker services stopped."
+    docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
+    echo "  Docker services, networks, and volumes removed."
   fi
 }
 
@@ -59,55 +66,24 @@ run_local() {
   # Single chain of every lint that gates merges. Keeping this as
   # `lint:strict` (defined in deno.json) means CI and pre-commit share one
   # source of truth — adding a new lint to the chain auto-propagates here.
-  run_test "lint:strict"       deno task lint:strict
-  run_test "dep audit"         deno task lint:deps
-  run_test "unit tests"        deno task test:unit
-  run_test "protocol tests"    deno task test:protocol
+  run_test "lint:strict"        deno task lint:strict
+  run_test "dep audit"          deno task lint:deps
+  run_test "unit tests"         deno task test:unit
+  run_test "integration tests"  deno task test:integration
+  run_test "protocol e2e"       deno task test:e2e:protocol
+  run_test "scripts tests"      deno task test:scripts
+  run_test "example tests"      deno task test:examples
 
   # CI builds frost-signer in a dedicated step before tests run. Mirror that
-  # here so e2e/frost-threshold.test.ts actually exercises against the binary
-  # locally — without it the FROST tests silently skip and a green pre-push
-  # masks failures that would surface on CI.
+  # here so e2e/frost/frost-threshold.test.ts actually exercises against the
+  # binary locally — without it the FROST e2e silently skips and a green
+  # pre-push masks failures that would surface on CI.
   echo "  Building frost-signer..."
   if (cd crates/frost-signer && cargo build --release 2>&1); then
-    run_test "FROST tests"     deno task test:frost
+    FROST_E2E_REQUIRE_CORE=1 run_test "frost e2e" deno task test:e2e:frost
   else
     fail "frost-signer build"
   fi
-
-  run_test "integration tests" deno task test:integration
-  run_test "example tests"     deno task test:example
-}
-
-# --- Phase 1.5: Pentest (needs app server running) ---
-
-run_pentest() {
-  step "Phase 1.5: Penetration Tests"
-
-  # Start the server for pentest. RATE_LIMIT_MAX is bumped because the
-  # DOS + SSRF + fuzz tests issue ~150 requests from the same socket IP;
-  # the default 60/min would starve every downstream test. The rate-limit
-  # test isolates itself with a distinct x-real-ip bucket and fires past
-  # this ceiling to verify the limiter actually trips.
-  local port=8091
-  HTTP_API_KEYS=pentest-key-001 PORT=$port RATE_LIMIT_MAX=500 \
-    deno run --allow-all example/anchr-reference-host/server.ts &
-  local server_pid=$!
-
-  # Poll /health for up to 30s — CI cold-start (tailwind CSS build + Deno cache)
-  # can exceed 3s on a fresh runner.
-  if ! wait_for_service "pentest server" "http://localhost:$port/health" 15; then
-    kill $server_pid 2>/dev/null || true
-    fail "pentest server start"
-    return
-  fi
-
-  PENTEST_APP_URL="http://localhost:$port" \
-  HTTP_API_KEYS=pentest-key-001 \
-  run_test "pentest" deno task test:pentest
-
-  kill $server_pid 2>/dev/null || true
-  wait $server_pid 2>/dev/null || true
 }
 
 # --- Phase 2: Docker-dependent tests ---
@@ -116,6 +92,20 @@ wait_for_service() {
   local name="$1" url="$2" max_attempts="${3:-30}"
   for i in $(seq 1 "$max_attempts"); do
     if curl -sf "$url" > /dev/null 2>&1; then
+      echo "  $name ready."
+      return 0
+    fi
+    [ "$((i % 5))" = "0" ] && echo "  Waiting for $name... ($i/$max_attempts)"
+    sleep 2
+  done
+  echo "  ERROR: $name not ready after $((max_attempts * 2))s" >&2
+  return 1
+}
+
+wait_for_tcp_service() {
+  local name="$1" host="$2" port="$3" max_attempts="${4:-30}"
+  for i in $(seq 1 "$max_attempts"); do
+    if bash -c ":</dev/tcp/$host/$port" > /dev/null 2>&1; then
       echo "  $name ready."
       return 0
     fi
@@ -136,14 +126,16 @@ start_docker_services() {
   # classic flake. Volumes and orphan containers go too, so each run
   # starts deterministic.
   echo "  Resetting previous Docker state..."
+  echo "  Compose project: ${COMPOSE_PROJECT_NAME}"
+  echo "  Ports: relay=${ANCHR_RELAY_PORT} blossom=${ANCHR_BLOSSOM_PORT} cashu=${ANCHR_CASHU_MINT_PORT} tlsn=${ANCHR_TLSN_TCP_PORT}/${ANCHR_TLSN_WS_PORT}"
   docker compose down -v --remove-orphans --timeout 10 2>/dev/null || true
 
   echo "  Starting relay + blossom..."
-  docker compose up -d relay blossom
   DOCKER_STARTED=1
+  docker compose up -d relay blossom
 
-  wait_for_service "Nostr relay" "http://localhost:7777" 15 || return 2
-  wait_for_service "Blossom"     "http://localhost:3333" 15 || return 2
+  wait_for_service "Nostr relay" "http://localhost:${ANCHR_RELAY_PORT}" 15 || return 2
+  wait_for_service "Blossom"     "$BLOSSOM_URL" 15 || return 2
 
   pass "relay + blossom"
 }
@@ -168,23 +160,52 @@ start_regtest() {
   sleep 5
   docker compose restart cashu-mint 2>/dev/null || true
 
-  wait_for_service "Cashu mint" "http://localhost:3338/v1/info" 20 || return 2
+  wait_for_service "Cashu mint" "${CASHU_MINT_URL}/v1/info" 20 || return 2
   pass "cashu mint"
 }
 
 run_docker_tests() {
   step "Phase 2: E2E Tests (relay + blossom)"
 
-  NOSTR_RELAYS=ws://localhost:7777 \
-  BLOSSOM_SERVERS=http://localhost:3333 \
+  NOSTR_RELAYS="$RELAY_URL" \
+  NOSTR_RELAY_URL="$RELAY_URL" \
+  BLOSSOM_SERVERS="$BLOSSOM_URL" \
   run_test "relay e2e" deno task test:e2e:relay
 
   step "Phase 3: Regtest Tests (HTLC + Cashu)"
 
-  CASHU_MINT_URL=http://localhost:3338 \
-  NOSTR_RELAYS=ws://localhost:7777 \
-  BLOSSOM_SERVERS=http://localhost:3333 \
-  run_test "regtest e2e" deno task test:regtest
+  CASHU_MINT_URL="$CASHU_MINT_URL" \
+  NOSTR_RELAYS="$RELAY_URL" \
+  NOSTR_RELAY_URL="$RELAY_URL" \
+  BLOSSOM_SERVERS="$BLOSSOM_URL" \
+  run_test "regtest e2e" deno task test:e2e:regtest
+
+  # TLSN bucket — boots its own verifier service and builds the local
+  # prover/verifier binaries first so this path cannot pass by skipping all
+  # proof-producing tests.
+  step "Phase 4: TLSNotary E2E"
+  echo "  Building tlsn-prover..."
+  if ! (cd crates/tlsn-prover && cargo build 2>&1); then
+    fail "tlsn-prover build"
+    return
+  fi
+  echo "  Building tlsn-verifier..."
+  if ! (cd crates/tlsn-verifier && cargo build --release 2>&1); then
+    fail "tlsn-verifier build"
+    return
+  fi
+  echo "  Starting tlsn-verifier..."
+  if ! docker compose up -d tlsn-verifier 2>&1; then
+    fail "tlsn-verifier start"
+    return
+  fi
+  wait_for_tcp_service "TLSN verifier TCP" "localhost" "$ANCHR_TLSN_TCP_PORT" 30 || { fail "tlsn-verifier TCP readiness"; return; }
+  wait_for_tcp_service "TLSN verifier WS"  "localhost" "$ANCHR_TLSN_WS_PORT" 30 || { fail "tlsn-verifier WS readiness"; return; }
+
+  TLSN_E2E_REQUIRE_CORE=1 \
+  TLSN_VERIFIER_HOST="$TLSN_VERIFIER_HOST" \
+  TLSN_VERIFIER_WS_PORT="$ANCHR_TLSN_WS_PORT" \
+  run_test "tlsn e2e" deno task test:e2e:tlsn
 }
 
 # --- Main ---
@@ -192,7 +213,6 @@ run_docker_tests() {
 case "$MODE" in
   --local)
     run_local
-    run_pentest
     ;;
   --docker)
     trap cleanup EXIT
@@ -203,7 +223,6 @@ case "$MODE" in
   --ci|full|*)
     trap cleanup EXIT
     run_local
-    run_pentest
 
     if [ "$FAILED" = "1" ] && [ "$MODE" != "--ci" ]; then
       echo -e "\n${RED}Local tests failed. Skipping Docker tests.${NC}"

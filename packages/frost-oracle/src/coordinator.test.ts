@@ -3,7 +3,9 @@ import { expect } from "@std/expect";
 import { createFrostCoordinator } from "./coordinator.ts";
 import type { ThresholdOracleConfig } from "./types.ts";
 
-function makeConfig(overrides?: Partial<ThresholdOracleConfig>): ThresholdOracleConfig {
+function makeConfig(
+  overrides?: Partial<ThresholdOracleConfig>,
+): ThresholdOracleConfig {
   return {
     threshold: 2,
     total_signers: 3,
@@ -36,9 +38,27 @@ describe("FrostCoordinator", () => {
     const coord = createFrostCoordinator();
     const session = coord.initDkg({ threshold: 2, total: 3 });
 
-    await coord.submitDkgPackage(session.session_id, 1, 0, '{"pkg":"r1_0"}', '{"secret":"s0"}');
-    await coord.submitDkgPackage(session.session_id, 1, 1, '{"pkg":"r1_1"}', '{"secret":"s1"}');
-    const result = await coord.submitDkgPackage(session.session_id, 1, 2, '{"pkg":"r1_2"}', '{"secret":"s2"}');
+    await coord.submitDkgPackage(
+      session.session_id,
+      1,
+      0,
+      '{"pkg":"r1_0"}',
+      '{"secret":"s0"}',
+    );
+    await coord.submitDkgPackage(
+      session.session_id,
+      1,
+      1,
+      '{"pkg":"r1_1"}',
+      '{"secret":"s1"}',
+    );
+    const result = await coord.submitDkgPackage(
+      session.session_id,
+      1,
+      2,
+      '{"pkg":"r1_2"}',
+      '{"secret":"s2"}',
+    );
 
     expect(result).not.toBeNull();
     expect(result!.round).toBe(1);
@@ -49,7 +69,12 @@ describe("FrostCoordinator", () => {
     const coord = createFrostCoordinator();
     const session = coord.initDkg({ threshold: 2, total: 3 });
 
-    const result = await coord.submitDkgPackage(session.session_id, 1, 0, '{"pkg":"r1_0"}');
+    const result = await coord.submitDkgPackage(
+      session.session_id,
+      1,
+      0,
+      '{"pkg":"r1_0"}',
+    );
 
     expect(result).not.toBeNull();
     expect(result!.round).toBe(1);
@@ -58,7 +83,12 @@ describe("FrostCoordinator", () => {
 
   test("submitDkgPackage returns null for unknown session", async () => {
     const coord = createFrostCoordinator();
-    const result = await coord.submitDkgPackage("nonexistent_session", 1, 0, '{"pkg":"test"}');
+    const result = await coord.submitDkgPackage(
+      "nonexistent_session",
+      1,
+      0,
+      '{"pkg":"test"}',
+    );
     expect(result).toBeNull();
   });
 

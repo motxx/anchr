@@ -19,7 +19,10 @@ export interface DSIconProps {
   circleBg?: string;
 }
 
-export function DSIcon({ name, size = "sm", color = "#6b7280", circle, circleBg = "bg-gray-100" }: DSIconProps) {
+export function DSIcon(
+  { name, size = "sm", color = "#6b7280", circle, circleBg = "bg-gray-100" }:
+    DSIconProps,
+) {
   const s = SIZE_MAP[size];
   const icon = <Ionicons name={name} size={s.icon} color={color} />;
 

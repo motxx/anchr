@@ -145,7 +145,9 @@ async function inScopeChangedFiles(base: string): Promise<string[]> {
   const inScope: string[] = [];
   for (const f of files) {
     if (!IN_SCOPE_RE.test(f)) continue;
-    if (f.endsWith(".test.ts") || f.endsWith(".test.tsx") || f.endsWith(".d.ts")) {
+    if (
+      f.endsWith(".test.ts") || f.endsWith(".test.tsx") || f.endsWith(".d.ts")
+    ) {
       continue;
     }
     try {

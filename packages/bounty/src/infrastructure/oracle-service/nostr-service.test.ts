@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { withEnv } from "../../testing/helpers.ts";
 import {
-  createOracleNostrService,
-  createOracleNostrServiceFromEnv,
   _setPublishEventForTest,
   _setVerifyForTest,
+  createOracleNostrService,
+  createOracleNostrServiceFromEnv,
 } from "./nostr-service.ts";
 import type { OracleNostrServiceConfig } from "./nostr-service.ts";
 import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
@@ -17,7 +17,9 @@ import type { VerifiedEvent } from "nostr-tools";
 const workerIdentity = generateEphemeralIdentity();
 const workerPubkey = workerIdentity.publicKey;
 
-function makeConfig(overrides?: Partial<OracleNostrServiceConfig>): OracleNostrServiceConfig {
+function makeConfig(
+  overrides?: Partial<OracleNostrServiceConfig>,
+): OracleNostrServiceConfig {
   return {
     identity: generateEphemeralIdentity(),
     preimageStore: createPreimageStore(),
@@ -47,7 +49,9 @@ describe("generateHash", () => {
 
   test("stores preimage in preimage store", () => {
     const store = createPreimageStore();
-    const service = createOracleNostrService(makeConfig({ preimageStore: store }));
+    const service = createOracleNostrService(
+      makeConfig({ preimageStore: store }),
+    );
     const { hash } = service.generateHash("q1");
     expect(store.has(hash)).toBe(true);
     expect(store.getPreimage(hash)).not.toBeNull();
@@ -89,11 +93,52 @@ describe("verifyAndDeliver", () => {
       payment_status: "escrow_swapped" as const,
     };
 
-    const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
+    const passed = await service.verifyAndDeliver("q1", query, {
+      attachments: [],
+    }, workerPubkey);
     expect(passed).toBe(true);
     expect(published.length).toBe(1);
     // Preimage should be deleted from store after delivery
     expect(store.has(hash)).toBe(false);
+  });
+
+  test("returns false and retains preimage when delivery fails", async () => {
+    const store = createPreimageStore();
+    const config = makeConfig({
+      deliveryRetryDelaysMs: [0, 0],
+      preimageStore: store,
+    });
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateHash("q-delivery-fail");
+
+    _setPublishEventForTest(async () => ({
+      successes: [],
+      failures: ["relay1"],
+    }));
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    const query = {
+      id: "q-delivery-fail",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    const passed = await service.verifyAndDeliver(
+      "q-delivery-fail",
+      query,
+      { attachments: [] },
+      workerPubkey,
+    );
+    expect(passed).toBe(false);
+    expect(store.has(hash)).toBe(true);
   });
 
   test("publishes rejection DM on verification fail", async () => {
@@ -123,7 +168,9 @@ describe("verifyAndDeliver", () => {
       payment_status: "escrow_swapped" as const,
     };
 
-    const passed = await service.verifyAndDeliver("q1", query, { attachments: [] }, workerPubkey);
+    const passed = await service.verifyAndDeliver("q1", query, {
+      attachments: [],
+    }, workerPubkey);
     expect(passed).toBe(false);
     expect(published.length).toBe(1);
   });
@@ -151,7 +198,9 @@ describe("verifyAndDeliver", () => {
     };
 
     // Verify passes but no preimage exists, so rejection DM is sent
-    const passed = await service.verifyAndDeliver("q_unknown", query, { attachments: [] }, workerPubkey);
+    const passed = await service.verifyAndDeliver("q_unknown", query, {
+      attachments: [],
+    }, workerPubkey);
     expect(passed).toBe(false);
   });
 });

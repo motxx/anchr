@@ -27,7 +27,9 @@ export function inferAttachmentId(value: string): string {
   }
 }
 
-export function extractBlossomFields(ref: AttachmentLike): Record<string, unknown> {
+export function extractBlossomFields(
+  ref: AttachmentLike,
+): Record<string, unknown> {
   if (typeof ref === "string") return {};
   return {
     blossom_hash: ref.blossom_hash,
@@ -42,7 +44,8 @@ export function normalizeFromResolved(
 ): AttachmentRef {
   const baseRef = typeof ref === "string" ? null : ref;
   return {
-    id: baseRef?.id ?? resolved.filename ?? inferAttachmentId(attachmentRefSource(ref)),
+    id: baseRef?.id ?? resolved.filename ??
+      inferAttachmentId(attachmentRefSource(ref)),
     uri: resolved.absoluteUrl,
     mime_type: baseRef?.mime_type ?? resolved.mimeType,
     storage_kind: baseRef?.storage_kind ?? resolved.storageKind,
@@ -79,7 +82,15 @@ export function normalizeFromString(ref: string): AttachmentRef {
 export async function readBlossomAttachment(
   ref: AttachmentRef,
   blossomKeyMaterial: BlossomKeyMaterial,
-): Promise<{ filename: string; mimeType: string; absoluteUrl: string; storageKind: AttachmentStorageKind; data: Buffer } | null> {
+): Promise<
+  {
+    filename: string;
+    mimeType: string;
+    absoluteUrl: string;
+    storageKind: AttachmentStorageKind;
+    data: Buffer;
+  } | null
+> {
   const data = await downloadFromBlossom(
     ref.blossom_hash!,
     blossomKeyMaterial.encrypt_key,
@@ -98,7 +109,15 @@ export async function readBlossomAttachment(
 
 export async function readExternalAttachment(
   attachment: StoredAttachment,
-): Promise<{ filename: string; mimeType: string; absoluteUrl: string; storageKind: AttachmentStorageKind; data: Buffer } | null> {
+): Promise<
+  {
+    filename: string;
+    mimeType: string;
+    absoluteUrl: string;
+    storageKind: AttachmentStorageKind;
+    data: Buffer;
+  } | null
+> {
   const response = await fetch(attachment.absoluteUrl);
   if (!response.ok) return null;
   return {

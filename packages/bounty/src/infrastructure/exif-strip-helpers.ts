@@ -3,7 +3,13 @@
  */
 
 import { Buffer } from "node:buffer";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime/mod";
+import {
+  fileExists,
+  readFileAsArrayBuffer,
+  spawn,
+  which,
+  writeFile,
+} from "@anchr/core-runtime/mod";
 import process from "node:process";
 
 const JPEG_SOI = 0xffd8;
@@ -16,14 +22,16 @@ function isExifSegment(data: Buffer, payloadStart: number): boolean {
     data[payloadStart] === 0x45 && // E
     data[payloadStart + 1] === 0x78 && // x
     data[payloadStart + 2] === 0x69 && // i
-    data[payloadStart + 3] === 0x66    // f
+    data[payloadStart + 3] === 0x66 // f
   );
 }
 
 function isXmpSegment(data: Buffer, payloadStart: number): boolean {
   return (
     data.length > payloadStart + 28 &&
-    data.subarray(payloadStart, payloadStart + 28).toString("ascii").startsWith("http://ns.adobe.com/xap")
+    data.subarray(payloadStart, payloadStart + 28).toString("ascii").startsWith(
+      "http://ns.adobe.com/xap",
+    )
   );
 }
 
@@ -71,7 +79,9 @@ export function stripJpegExif(data: Buffer): Buffer {
 
     if (marker === JPEG_APP1) {
       const payloadStart = offset + 4;
-      if (isExifSegment(data, payloadStart) || isXmpSegment(data, payloadStart)) {
+      if (
+        isExifSegment(data, payloadStart) || isXmpSegment(data, payloadStart)
+      ) {
         offset = segmentEnd;
         continue;
       }
@@ -84,13 +94,22 @@ export function stripJpegExif(data: Buffer): Buffer {
   return Buffer.concat(chunks);
 }
 
-async function stripWithExiftool(inputPath: string, outputPath: string): Promise<boolean> {
+async function stripWithExiftool(
+  inputPath: string,
+  outputPath: string,
+): Promise<boolean> {
   const exiftool = which("exiftool");
   if (!exiftool) return false;
 
   const { copyFile } = await import("node:fs/promises");
   await copyFile(inputPath, outputPath);
-  const proc = spawn([exiftool, "-all=", "--jumbf:all", "-overwrite_original", outputPath], {
+  const proc = spawn([
+    exiftool,
+    "-all=",
+    "--jumbf:all",
+    "-overwrite_original",
+    outputPath,
+  ], {
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -98,7 +117,10 @@ async function stripWithExiftool(inputPath: string, outputPath: string): Promise
   return proc.exitCode === 0 && await fileExists(outputPath);
 }
 
-async function stripWithFallbackTool(inputPath: string, outputPath: string): Promise<boolean> {
+async function stripWithFallbackTool(
+  inputPath: string,
+  outputPath: string,
+): Promise<boolean> {
   const magick = which("magick");
   const sips = process.platform === "darwin" ? "/usr/bin/sips" : null;
 
@@ -127,7 +149,10 @@ async function stripWithFallbackTool(inputPath: string, outputPath: string): Pro
  * Strip EXIF using exiftool (preserves C2PA/JUMBF), falling back to
  * ImageMagick/sips (which destroy C2PA). Returns original data if no tool.
  */
-export async function stripExifWithTool(data: Buffer, ext: string): Promise<Buffer> {
+export async function stripExifWithTool(
+  data: Buffer,
+  ext: string,
+): Promise<Buffer> {
   const { mkdtemp, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const { join } = await import("node:path");

@@ -1,9 +1,9 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  buildAttachmentAbsoluteUrl,
   buildAttachmentAccess,
   buildAttachmentHandle,
-  buildAttachmentAbsoluteUrl,
   buildQueryAttachmentUrls,
   materializeQueryResult,
   normalizeQueryResult,
@@ -11,11 +11,15 @@ import {
 } from "./attachments.ts";
 
 test("resolveStoredAttachment accepts absolute URLs", () => {
-  const attachment = resolveStoredAttachment("https://cdn.example.com/query/image.png");
+  const attachment = resolveStoredAttachment(
+    "https://cdn.example.com/query/image.png",
+  );
 
   expect(attachment).not.toBeNull();
   expect(attachment?.storageKind).toBe("external");
-  expect(attachment?.absoluteUrl).toBe("https://cdn.example.com/query/image.png");
+  expect(attachment?.absoluteUrl).toBe(
+    "https://cdn.example.com/query/image.png",
+  );
 });
 
 test("resolveStoredAttachment returns null for relative paths", () => {
@@ -23,9 +27,10 @@ test("resolveStoredAttachment returns null for relative paths", () => {
 });
 
 test("buildAttachmentAbsoluteUrl keeps external URLs", () => {
-  expect(buildAttachmentAbsoluteUrl("https://cdn.example.com/query/image.png")).toBe(
-    "https://cdn.example.com/query/image.png",
-  );
+  expect(buildAttachmentAbsoluteUrl("https://cdn.example.com/query/image.png"))
+    .toBe(
+      "https://cdn.example.com/query/image.png",
+    );
 });
 
 test("normalizeQueryResult preserves blossom attachment refs", () => {
@@ -61,11 +66,21 @@ test("materializeQueryResult expands blossom attachment refs", () => {
 });
 
 test("buildQueryAttachmentUrls returns stable query attachment endpoints", () => {
-  const urls = buildQueryAttachmentUrls("query_1", 2, "http://localhost:3000/queries/query_1");
+  const urls = buildQueryAttachmentUrls(
+    "query_1",
+    2,
+    "http://localhost:3000/queries/query_1",
+  );
 
-  expect(urls.viewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2");
-  expect(urls.metaUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/meta");
-  expect(urls.previewUrl).toBe("http://localhost:3000/queries/query_1/attachments/2/preview");
+  expect(urls.viewUrl).toBe(
+    "http://localhost:3000/queries/query_1/attachments/2",
+  );
+  expect(urls.metaUrl).toBe(
+    "http://localhost:3000/queries/query_1/attachments/2/meta",
+  );
+  expect(urls.previewUrl).toBe(
+    "http://localhost:3000/queries/query_1/attachments/2/preview",
+  );
 });
 
 test("buildAttachmentAccess builds delivery URLs for blossom attachment", () => {
@@ -83,9 +98,15 @@ test("buildAttachmentAccess builds delivery URLs for blossom attachment", () => 
   );
 
   expect(access.original_url).toBe("https://blossom.example.com/abc123");
-  expect(access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
-  expect(access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
-  expect(access.meta_url).toBe("http://localhost:3000/queries/query_1/attachments/0/meta");
+  expect(access.preview_url).toBe(
+    "http://localhost:3000/queries/query_1/attachments/0/preview",
+  );
+  expect(access.view_url).toBe(
+    "http://localhost:3000/queries/query_1/attachments/0",
+  );
+  expect(access.meta_url).toBe(
+    "http://localhost:3000/queries/query_1/attachments/0/meta",
+  );
 });
 
 test("buildAttachmentHandle returns attachment plus derived access info", () => {
@@ -104,6 +125,10 @@ test("buildAttachmentHandle returns attachment plus derived access info", () => 
 
   expect(handle.attachment.uri).toBe("https://blossom.example.com/abc123");
   expect(handle.access.original_url).toBe("https://blossom.example.com/abc123");
-  expect(handle.access.preview_url).toBe("http://localhost:3000/queries/query_1/attachments/0/preview");
-  expect(handle.access.view_url).toBe("http://localhost:3000/queries/query_1/attachments/0");
+  expect(handle.access.preview_url).toBe(
+    "http://localhost:3000/queries/query_1/attachments/0/preview",
+  );
+  expect(handle.access.view_url).toBe(
+    "http://localhost:3000/queries/query_1/attachments/0",
+  );
 });

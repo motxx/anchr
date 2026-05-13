@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 type SatsSize = "sm" | "md" | "lg" | "xl";
@@ -18,7 +18,9 @@ export interface DSSatsAmountProps {
   showPlus?: boolean;
 }
 
-export function DSSatsAmount({ amount, size = "md", color, showPlus = false }: DSSatsAmountProps) {
+export function DSSatsAmount(
+  { amount, size = "md", color, showPlus = false }: DSSatsAmountProps,
+) {
   const s = SIZE_MAP[size];
   const textColor = color ?? "text-primary";
   const prefix = showPlus && amount > 0 ? "+" : "";
@@ -27,10 +29,13 @@ export function DSSatsAmount({ amount, size = "md", color, showPlus = false }: D
     <View className="flex-row items-center gap-0.5">
       <Ionicons name="flash" size={s.icon} color="#10b981" />
       <Text className={`${s.text} font-bold ${textColor}`}>
-        {prefix}{amount.toLocaleString()}
+        {prefix}
+        {amount.toLocaleString()}
       </Text>
       {size !== "sm" && (
-        <Text className={`text-xs font-medium ${textColor} opacity-70`}> sats</Text>
+        <Text className={`text-xs font-medium ${textColor} opacity-70`}>
+          sats
+        </Text>
       )}
     </View>
   );

@@ -6,7 +6,8 @@ describe("validateAttachmentUri", () => {
   // --- Valid URLs ---
   test("accepts HTTPS URLs", () => {
     expect(validateAttachmentUri("https://example.com/photo.jpg")).toBeNull();
-    expect(validateAttachmentUri("https://blossom.example.com/abc123")).toBeNull();
+    expect(validateAttachmentUri("https://blossom.example.com/abc123"))
+      .toBeNull();
   });
 
   test("accepts http://localhost for dev", () => {
@@ -32,8 +33,12 @@ describe("validateAttachmentUri", () => {
 
   // --- Embedded credentials ---
   test("rejects URLs with embedded credentials", () => {
-    expect(validateAttachmentUri("https://user:pass@example.com/")).toContain("credentials");
-    expect(validateAttachmentUri("https://admin@example.com/")).toContain("credentials");
+    expect(validateAttachmentUri("https://user:pass@example.com/")).toContain(
+      "credentials",
+    );
+    expect(validateAttachmentUri("https://admin@example.com/")).toContain(
+      "credentials",
+    );
   });
 
   // --- Private IPv4 ---
@@ -41,7 +46,9 @@ describe("validateAttachmentUri", () => {
     expect(validateAttachmentUri("https://10.0.0.1/")).toContain("private");
     expect(validateAttachmentUri("https://172.16.0.1/")).toContain("private");
     expect(validateAttachmentUri("https://192.168.1.1/")).toContain("private");
-    expect(validateAttachmentUri("https://169.254.169.254/")).toContain("private");
+    expect(validateAttachmentUri("https://169.254.169.254/")).toContain(
+      "private",
+    );
   });
 
   // --- IPv6 loopback ---
@@ -61,13 +68,20 @@ describe("validateAttachmentUri", () => {
 
   // --- IPv6-mapped IPv4 (S-9 SSRF bypass) ---
   test("rejects IPv6-mapped IPv4 loopback (::ffff:127.0.0.1)", () => {
-    expect(validateAttachmentUri("https://[::ffff:127.0.0.1]/")).toContain("private");
+    expect(validateAttachmentUri("https://[::ffff:127.0.0.1]/")).toContain(
+      "private",
+    );
   });
 
   test("rejects IPv6-mapped private IPv4 (::ffff:10.x.x.x)", () => {
-    expect(validateAttachmentUri("https://[::ffff:10.0.0.1]/")).toContain("private");
-    expect(validateAttachmentUri("https://[::ffff:192.168.1.1]/")).toContain("private");
-    expect(validateAttachmentUri("https://[::ffff:169.254.169.254]/")).toContain("private");
+    expect(validateAttachmentUri("https://[::ffff:10.0.0.1]/")).toContain(
+      "private",
+    );
+    expect(validateAttachmentUri("https://[::ffff:192.168.1.1]/")).toContain(
+      "private",
+    );
+    expect(validateAttachmentUri("https://[::ffff:169.254.169.254]/"))
+      .toContain("private");
   });
 
   test("allows IPv6-mapped public IPv4", () => {

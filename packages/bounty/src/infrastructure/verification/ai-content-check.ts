@@ -10,7 +10,10 @@
  * their own checker via `createAiContentChecker` from the package.
  */
 
-import { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
+import {
+  type AiContentChecker,
+  createAiContentChecker,
+} from "@anchr/photo-verification/ai-content-check";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
 import type { AttachmentRef } from "../../domain/types.ts";
@@ -18,10 +21,15 @@ import type { AttachmentRef } from "../../domain/types.ts";
 export type { ContentCheckResult } from "@anchr/photo-verification/ai-content-check";
 export { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
 
-const checker = createAiContentChecker<AttachmentRef>({
+const checker: AiContentChecker<AttachmentRef> = createAiContentChecker<
+  AttachmentRef
+>({
   getConfig: () => {
     const c = getRuntimeConfig();
-    return { enabled: c.aiContentCheckEnabled, anthropicApiKey: c.anthropicApiKey };
+    return {
+      enabled: c.aiContentCheckEnabled,
+      anthropicApiKey: c.anthropicApiKey,
+    };
   },
   readAttachment: (ref, key) => readStoredAttachmentBuffer(ref, undefined, key),
 });

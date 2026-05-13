@@ -1,7 +1,11 @@
 // NIP-33 parameterized replaceable event (kind 38421), Routstr-compatible.
 
 import { Buffer } from "node:buffer";
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools/pure";
 import { publishEvent } from "@anchr/bounty/nostr-transport";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
 import { ANCHR_MARKETPLACE_LISTING } from "@anchr/bounty/nostr-events";

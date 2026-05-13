@@ -1,5 +1,5 @@
 # Build tlsn-verifier binary
-FROM rust:1-bookworm@sha256:adab7941580c74513aa3347f2d2a1f975498280743d29ec62978ba12e3540d3a AS rust-builder
+FROM rust:1-bookworm@sha256:503651ea31e66ecb74623beabde781059a5978df1595a9e8ed03974d5fec1bf0 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY crates/tlsn-verifier/Cargo.toml ./crates/tlsn-verifier/
@@ -37,21 +37,21 @@ COPY packages/photo-verification/deno.json ./packages/photo-verification/
 COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 COPY packages/blossom/deno.json ./packages/blossom/
-COPY packages/runtime/deno.json ./packages/runtime/
+COPY packages/protocol/deno.json ./packages/protocol/
+COPY packages/oracle-sdk/deno.json ./packages/oracle-sdk/
+COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
+COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
+COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
+COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
+COPY example/tlsn-fiat-swap-square/deno.json ./example/tlsn-fiat-swap-square/
 RUN deno install
 
 COPY . .
 
 # Build frontend
 RUN deno task build:ui
-# Tailwind CSS v4: @import "tailwindcss" resolves from the input file's
-# directory. Symlink node_modules into /app so the CSS resolver finds it.
-RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null; \
-  ln -sf /tmp/node_modules /app/example/two-party-binary-bet/ui/node_modules \
-  && /tmp/node_modules/.bin/tailwindcss -i /app/example/two-party-binary-bet/ui/globals.css -o /app/example/two-party-binary-bet/ui/generated.css \
-  && rm -f /app/example/two-party-binary-bet/ui/node_modules \
-  && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
+RUN deno task build:css
 
 ENV NODE_ENV=production
 ENV HTTP_API_PORT=8080

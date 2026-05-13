@@ -50,7 +50,10 @@ export function generateHistory(market: Market, points = 48): HistoryPoint[] {
   const rand = rng(hashId(market.id));
 
   const start = market.created_at;
-  const end = Math.min(market.resolution_deadline, Math.floor(Date.now() / 1000));
+  const end = Math.min(
+    market.resolution_deadline,
+    Math.floor(Date.now() / 1000),
+  );
   const span = Math.max(end - start, 3600);
   const step = span / (points - 1);
 
@@ -87,7 +90,10 @@ export function generateActivity(market: Market, count = 12): ActivityEvent[] {
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesBias = total > 0 ? market.yes_pool_sats / total : 0.5;
   const avgBet = market.num_bettors > 0
-    ? Math.max(market.min_bet_sats, Math.floor(market.volume_sats / market.num_bettors))
+    ? Math.max(
+      market.min_bet_sats,
+      Math.floor(market.volume_sats / market.num_bettors),
+    )
     : Math.max(market.min_bet_sats, 1000);
 
   const now = Math.floor(Date.now() / 1000);
@@ -138,7 +144,10 @@ export function generateHolders(market: Market, count = 8): HolderRow[] {
   const rand = rng(hashId(market.id) ^ 0xC1A05);
   const total = market.yes_pool_sats + market.no_pool_sats;
   const yesBias = total > 0 ? market.yes_pool_sats / total : 0.5;
-  const totalDistributable = Math.max(market.volume_sats, market.min_bet_sats * 100);
+  const totalDistributable = Math.max(
+    market.volume_sats,
+    market.min_bet_sats * 100,
+  );
 
   const rows: HolderRow[] = [];
   let remaining = totalDistributable;

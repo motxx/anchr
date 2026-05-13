@@ -2,11 +2,12 @@
 
 End-to-end operator runbook for deploying the Anchr two-party binary bet on
 **regtest** (local development) or **testnet** (public preview). The
-production-style deploy uses encrypted FROST DKG keys (PR-D), the
-auto-resolver (PR-B), trustless TLSNotary verification (PR-C), and the
-browser-side Cashu bet flow (PR-E).
+hosted testnet path uses encrypted FROST DKG keys (PR-D), the
+auto-resolver (PR-B), TLSNotary-backed resolution proofs (PR-C), and the
+browser-side Cashu bet flow (PR-E). This is a reference deployment, not a
+mainnet production-readiness claim.
 
-> **Live testnet deploy:** <https://anchr-market.fly.dev> (Fly region `sin`,
+> **Hosted testnet demo:** <https://anchr-market.fly.dev> (Fly region `sin`,
 > testnut.cashu.space mint, anchr-relay Nostr relay, anchr-tlsn-verifier).
 
 ## Architecture at a glance
@@ -72,10 +73,11 @@ Click `+1,000 sats` in the wallet panel — that mints a fresh Cashu
 token via regtest Lightning, swaps it at the mint, and credits your
 browser-only balance.
 
-## 2. Adding a FROST cluster (production-style settlement)
+## 2. Adding a FROST cluster (threshold settlement)
 
-In production, you want a *t-of-n* threshold cluster instead of a single
-HTLC preimage. PR-D's encrypted DKG bootstrap covers this.
+For higher-stakes testnet deployments, use a *t-of-n* threshold cluster
+instead of a single HTLC preimage. PR-D's encrypted DKG bootstrap covers
+this.
 
 ```bash
 # 1. Run distributed key generation for both YES and NO outcome groups.
@@ -104,7 +106,7 @@ in a 2-of-3 deploy is not enough to settle dishonestly.
 Loss-of-passphrase is unrecoverable. Back up
 `.frost-market/signer-*.json` and the passphrase out-of-band.
 
-## 3. Trustless resolution: TLSNotary
+## 3. Publicly verifiable resolution: TLSNotary
 
 The auto-resolver in `auto-resolver.ts` polls every market past its
 deadline and:
@@ -115,13 +117,15 @@ deadline and:
 2. Evaluates the market's `resolution_condition` on the body.
 3. Settles via `settleMarket(...)`.
 
-For full trustlessness, anyone (not just the operator) can submit a
+To avoid trusting the operator's raw HTTP fetch, anyone can submit a
 TLSNotary proof of the truth-source response via
 `POST /markets/:id/submit-resolution` with `{ tlsn_presentation }`. The
 server cryptographically verifies the proof, then evaluates the
-condition. **No one needs to be trusted to read the URL** — the
-binding is `(server name, response body, session timestamp)`, all
-covered by the TLSNotary signature.
+condition. The URL read becomes externally checkable through the binding
+`(server name, response body, session timestamp)`, all covered by the
+TLSNotary signature. The operator or Oracle set is still trusted to apply
+the configured condition and release the corresponding settlement secret
+or signature.
 
 This requires the TLSNotary verifier binary on the host:
 
@@ -220,20 +224,51 @@ the HTLC fallback path for those legacy markets.
       *binary* locally to validate submitted presentations).
 - [x] FROST 2-of-3 with passphrase-encrypted shares (PR-D).
 - [x] TLS via Fly (`force_https = true` in `fly.market.toml`).
-- [ ] Add API key or NIP-98 auth middleware in `server.ts`
-      (`writeAuth`/`rateLimit`
-      currently no-op for the demo). Wire it to your KMS.
+- [x] Public write rate limit in `server.ts`
+      (`MARKET_RATE_LIMIT_WINDOW_MS`, `MARKET_RATE_LIMIT_MAX`).
+- [x] Manual `/markets/:id/resolve` disabled by default on the public server;
+      settlement should use auto-resolver or `/submit-resolution` with a
+      TLSNotary proof. Set `MARKET_ALLOW_MANUAL_RESOLVE=1` only for local
+      demos.
+- [x] FROST signer endpoints are split behind internal/API-key middleware
+      (`MARKET_SIGNER_API_KEY` or `ORACLE_API_KEY`).
+- [x] Public-testnet faucet mode that does not depend on regtest Docker/LND:
+      preload one-time cashuB tokens with `MARKET_FAUCET_TOKENS`.
+- [x] Readiness endpoint: `GET /ready` reports missing mint, relay, faucet,
+      and persistence requirements before advertising the app as playable.
 - [ ] Run the screenshot script as a smoke test in CI:
       `deno run --allow-all example/two-party-binary-bet/scripts/screenshots.ts`.
+
+### Public-testnet faucet
+
+The local regtest faucet pays mint invoices through the `lnd-user` Docker
+container. That cannot work on Fly or any public testnet host. For a public
+preview, seed a small one-time token bank instead:
+
+```bash
+flyctl secrets set \
+  --app anchr-market \
+  MARKET_FAUCET_TOKENS='1000:cashuB... 1000:cashuB... 1000:cashuB...'
+```
+
+Each entry is `amount_sats:cashuB_token`. Tokens are persisted in
+`MARKET_DB_PATH` and marked claimed on first payout, so a restart does not
+re-issue already claimed ecash. Refill by adding fresh tokens to the secret
+and redeploying. `/markets/wallet/config` exposes the current faucet mode to
+the browser UI.
+
+For deployments that use an external testnet faucet instead, set
+`MARKET_FAUCET_URL=https://...`; the UI opens that URL instead of calling the
+server faucet.
 
 ## 5. Useful smoke tests
 
 ```bash
 # In-process test of the full lifecycle (skips when mint isn't reachable):
-deno test --allow-all e2e/two-party-binary-bet-lifecycle.test.ts
+deno test --allow-all e2e/regtest/two-party-binary-bet-lifecycle.test.ts
 
 # Just the unit + route tests (no Docker needed):
-deno task test:example
+deno task test:examples
 
 # Full local run:
 deno task test:all

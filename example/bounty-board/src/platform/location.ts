@@ -29,7 +29,9 @@ function createWebProvider(): LocationProvider {
       if (!("geolocation" in navigator)) return false;
       if (navigator.permissions) {
         try {
-          const result = await navigator.permissions.query({ name: "geolocation" });
+          const result = await navigator.permissions.query({
+            name: "geolocation",
+          });
           return result.state !== "denied";
         } catch {
           return true;
@@ -40,7 +42,8 @@ function createWebProvider(): LocationProvider {
     async getCurrentPosition() {
       return new Promise<GpsCoord>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
-          (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+          (pos) =>
+            resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
           (err) => reject(new Error(`Geolocation error: ${err.message}`)),
           { enableHighAccuracy: true, timeout: 15000 },
         );

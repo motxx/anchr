@@ -7,12 +7,14 @@
  * 4. tlsn-prove で proof 生成
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 if (!STRIPE_SECRET_KEY) {
-  console.error("STRIPE_SECRET_KEY required (test mode key starting with sk_test_)");
+  console.error(
+    "STRIPE_SECRET_KEY required (test mode key starting with sk_test_)",
+  );
   process.exit(1);
 }
 
@@ -72,7 +74,9 @@ await page.screenshot({ path: "/tmp/stripe-e2e-1-loaded.png" });
 console.log("Screenshot: /tmp/stripe-e2e-1-loaded.png");
 
 // Fill email
-const emailField = page.locator('input[name="email"], input[type="email"], input[placeholder*="email" i]').first();
+const emailField = page.locator(
+  'input[name="email"], input[type="email"], input[placeholder*="email" i]',
+).first();
 if (await emailField.count() > 0) {
   await emailField.fill("test@example.com");
   console.log("Email filled");
@@ -80,22 +84,32 @@ if (await emailField.count() > 0) {
 
 // Fill card details in Stripe's iframe
 console.log("Filling test card details (4242 4242 4242 4242)...");
-const cardFrame = page.frameLocator('iframe[name*="__privateStripeFrame"], iframe[title*="card"]').first();
+const cardFrame = page.frameLocator(
+  'iframe[name*="__privateStripeFrame"], iframe[title*="card"]',
+).first();
 
-const cardInput = cardFrame.locator('input[name="cardnumber"], input[placeholder*="card" i]').first();
+const cardInput = cardFrame.locator(
+  'input[name="cardnumber"], input[placeholder*="card" i]',
+).first();
 if (await cardInput.count() > 0) await cardInput.fill("4242424242424242");
 
-const expiryInput = cardFrame.locator('input[name="exp-date"], input[placeholder*="MM" i]').first();
+const expiryInput = cardFrame.locator(
+  'input[name="exp-date"], input[placeholder*="MM" i]',
+).first();
 if (await expiryInput.count() > 0) await expiryInput.fill("1230");
 
-const cvcInput = cardFrame.locator('input[name="cvc"], input[placeholder*="CVC" i]').first();
+const cvcInput = cardFrame.locator(
+  'input[name="cvc"], input[placeholder*="CVC" i]',
+).first();
 if (await cvcInput.count() > 0) await cvcInput.fill("123");
 
 await page.screenshot({ path: "/tmp/stripe-e2e-2-filled.png" });
 console.log("Screenshot: /tmp/stripe-e2e-2-filled.png");
 
 // Submit payment
-const payButton = page.locator('button[type="submit"], button:has-text("Pay"), button:has-text("支払う")').first();
+const payButton = page.locator(
+  'button[type="submit"], button:has-text("Pay"), button:has-text("支払う")',
+).first();
 if (await payButton.count() > 0) {
   const btnText = await payButton.textContent();
   console.log(`Clicking "${btnText?.trim()}"...`);
@@ -109,7 +123,7 @@ await browser.close();
 
 // --- Step 4: Find PaymentIntent ID ---
 console.log("\n=== Step 4: Find PaymentIntent ID ===");
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 let PAYMENT_INTENT_ID = "";
 for (let attempt = 0; attempt < 10; attempt++) {
@@ -129,8 +143,12 @@ for (let attempt = 0; attempt < 10; attempt++) {
     });
     break;
   }
-  console.log(`Waiting for PaymentIntent... (attempt ${attempt + 1}, status: ${pi?.status ?? "none"})`);
-  await new Promise(r => setTimeout(r, 2000));
+  console.log(
+    `Waiting for PaymentIntent... (attempt ${attempt + 1}, status: ${
+      pi?.status ?? "none"
+    })`,
+  );
+  await new Promise((r) => setTimeout(r, 2000));
 }
 
 if (!PAYMENT_INTENT_ID) {
@@ -144,12 +162,17 @@ console.log(`Running tlsn-prove against PaymentIntent: ${PAYMENT_INTENT_ID}`);
 
 const proc = spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
-  "--verifier", "localhost:7046",
-  "--max-recv-data", "4096",
-  "--max-sent-data", "4096",
-  "-H", `Authorization: Bearer ${STRIPE_SECRET_KEY}`,
+  "--verifier",
+  "localhost:7046",
+  "--max-recv-data",
+  "4096",
+  "--max-sent-data",
+  "4096",
+  "-H",
+  `Authorization: Bearer ${STRIPE_SECRET_KEY}`,
   `https://api.stripe.com/v1/payment_intents/${PAYMENT_INTENT_ID}`,
-  "-o", "/tmp/stripe-e2e-proof.presentation.tlsn",
+  "-o",
+  "/tmp/stripe-e2e-proof.presentation.tlsn",
 ], { stdout: "pipe", stderr: "pipe" });
 
 const proveStart = Date.now();

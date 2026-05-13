@@ -2,20 +2,24 @@
  * Nostr event builder functions for Anchr NIP-90 DVM events.
  */
 
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
 import type { NostrIdentity } from "../crypto/identity.ts";
 import { deriveConversationKey, encryptNip44 } from "../crypto/encryption.ts";
 import {
+  ANCHR_ORACLE_ANNOUNCEMENT,
+  ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_ORACLE_ANNOUNCEMENT,
+  type OracleResponsePayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
+  type QuerySettlementPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-  type QuerySettlementPayload,
-  type OracleResponsePayload,
 } from "./events.ts";
 import type { OracleInfo } from "../../../domain/oracle-types.ts";
 
@@ -23,8 +27,15 @@ function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-function encryptPayload(identity: NostrIdentity, recipientPubKey: string, payload: unknown): string {
-  const conversationKey = deriveConversationKey(identity.secretKey, recipientPubKey);
+function encryptPayload(
+  identity: NostrIdentity,
+  recipientPubKey: string,
+  payload: unknown,
+): string {
+  const conversationKey = deriveConversationKey(
+    identity.secretKey,
+    recipientPubKey,
+  );
   return encryptNip44(JSON.stringify(payload), conversationKey);
 }
 
@@ -46,7 +57,11 @@ function buildRequestTags(
     tags.push(["param", "nonce", payload.nonce]);
   }
   if (payload.verification_requirements?.length) {
-    tags.push(["param", "verification", payload.verification_requirements.join(",")]);
+    tags.push([
+      "param",
+      "verification",
+      payload.verification_requirements.join(","),
+    ]);
   }
   if (payload.bounty?.token) {
     tags.push(["bid", payload.bounty.token]);
@@ -138,7 +153,13 @@ export function buildQueryResponseEvent(
   const template: EventTemplate = {
     kind: ANCHR_QUERY_RESPONSE,
     created_at: nowUnix(),
-    tags: buildResponseTags(identity, queryEventId, requesterPubKey, payload, oraclePubKey),
+    tags: buildResponseTags(
+      identity,
+      queryEventId,
+      requesterPubKey,
+      payload,
+      oraclePubKey,
+    ),
     content: encryptPayload(identity, requesterPubKey, payload),
   };
   return finalizeEvent(template, identity.secretKey);
@@ -238,9 +259,12 @@ export function buildOracleAnnouncementEvent(
     fee_ppm: oracleInfo.fee_ppm,
     supported_factors: oracleInfo.supported_factors ?? [],
     supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
-    ...(oracleInfo.min_bounty_sats !== undefined && { min_bounty_sats: oracleInfo.min_bounty_sats }),
-    ...(oracleInfo.max_bounty_sats !== undefined && { max_bounty_sats: oracleInfo.max_bounty_sats }),
-    ...(oracleInfo.description !== undefined && { description: oracleInfo.description }),
+    ...(oracleInfo.min_bounty_sats !== undefined &&
+      { min_bounty_sats: oracleInfo.min_bounty_sats }),
+    ...(oracleInfo.max_bounty_sats !== undefined &&
+      { max_bounty_sats: oracleInfo.max_bounty_sats }),
+    ...(oracleInfo.description !== undefined &&
+      { description: oracleInfo.description }),
   });
 
   const template: EventTemplate = {

@@ -23,7 +23,7 @@ const API_KEY = Deno.args.includes("--api-key")
 async function main() {
   // Discover signer configs
   const configs: string[] = [];
-  for (let i = 1; ; i++) {
+  for (let i = 1;; i++) {
     const path = join(CONFIG_DIR, `signer-${i}.json`);
     if (!existsSync(path)) break;
     configs.push(path);
@@ -50,7 +50,9 @@ async function main() {
 
     const child = new Deno.Command("deno", {
       args: [
-        "run", "--allow-all", "--env",
+        "run",
+        "--allow-all",
+        "--env",
         "packages/bounty/src/infrastructure/oracle-service/server.ts",
       ],
       env: {
@@ -67,19 +69,26 @@ async function main() {
     processes.push(child);
   }
 
-  console.log(`\n${configs.length} Oracle nodes started. Press Ctrl+C to stop.\n`);
+  console.log(
+    `\n${configs.length} Oracle nodes started. Press Ctrl+C to stop.\n`,
+  );
 
   // Wait for Ctrl+C
   Deno.addSignalListener("SIGINT", () => {
     console.log("\nShutting down...");
     for (const p of processes) {
-      try { p.kill(); } catch { /* already dead */ }
+      try {
+        p.kill();
+      } catch { /* already dead */ }
     }
     Deno.exit(0);
   });
 
   // Keep alive
-  await Promise.all(processes.map(p => p.status));
+  await Promise.all(processes.map((p) => p.status));
 }
 
-main().catch((e) => { console.error(e); Deno.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  Deno.exit(1);
+});

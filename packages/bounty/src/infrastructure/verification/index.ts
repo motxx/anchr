@@ -1,16 +1,37 @@
-export { verify, verifyProof, queryToRequirement, queryResultToInput } from "./verifier.ts";
-export { checkAttachmentContent, type ContentCheckResult } from "./ai-content-check.ts";
 export {
-  validateExif,
-  extractExifMetadata,
+  queryResultToInput,
+  queryToRequirement,
+  verify,
+  verifyProof,
+} from "./verifier.ts";
+export {
+  checkAttachmentContent,
+  type ContentCheckResult,
+} from "./ai-content-check.ts";
+export {
   type ExifMetadata,
   type ExifValidationResult,
+  extractExifMetadata,
+  validateExif,
 } from "@anchr/photo-verification/exif-validation";
 export {
-  validateC2pa,
-  isC2paAvailable,
-  type C2paValidationResult,
   type C2paManifest,
+  type C2paValidationResult,
+  isC2paAvailable,
+  validateC2pa,
 } from "@anchr/photo-verification/c2pa-validation";
-export { validateTlsn, isTlsnVerifierAvailable, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
-export { createIntegrityStore, getIntegrity, getIntegrityForQuery, storeIntegrity, purgeStaleIntegrity, clearIntegrityStore, type IntegrityMetadata, type IntegrityStore } from "@anchr/photo-verification/integrity-store";
+export {
+  isTlsnVerifierAvailable,
+  type TlsnValidationResult,
+  validateTlsn,
+} from "@anchr/tlsn-toolkit/tlsn-validation";
+export {
+  clearIntegrityStore,
+  createIntegrityStore,
+  getIntegrity,
+  getIntegrityForQuery,
+  type IntegrityMetadata,
+  type IntegrityStore,
+  purgeStaleIntegrity,
+  storeIntegrity,
+} from "@anchr/photo-verification/integrity-store";

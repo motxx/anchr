@@ -28,7 +28,9 @@ export function useNearbyNotifications(
       notificationProvider.scheduleImmediate({
         title: "Near you",
         subtitle: query.location_hint ?? undefined,
-        body: `${query.description}${query.bounty ? ` — ${query.bounty.amount_sats} sats` : ""}`,
+        body: `${query.description}${
+          query.bounty ? ` — ${query.bounty.amount_sats} sats` : ""
+        }`,
         data: { queryId: query.id },
       });
     }

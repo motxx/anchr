@@ -33,13 +33,16 @@
 import {
   fundFleet,
   runOneRound,
-  seedMarkets,
   type SeededMarket,
+  seedMarkets,
 } from "./fleet.ts";
 import { POLYMARKET_SEED_MARKETS } from "./markets.ts";
 
-const SERVER = (Deno.env.get("ANCHR_SERVER") ?? "http://localhost:3001").replace(/\/$/, "");
-const FUNDING_STRATEGY = (Deno.env.get("FUNDING") ?? "regtest") as "regtest" | "fakewallet";
+const SERVER = (Deno.env.get("ANCHR_SERVER") ?? "http://localhost:3001")
+  .replace(/\/$/, "");
+const FUNDING_STRATEGY = (Deno.env.get("FUNDING") ?? "regtest") as
+  | "regtest"
+  | "fakewallet";
 const INTERVAL_MS = Number(Deno.env.get("FLEET_INTERVAL_MS") ?? 15_000);
 const YES_BOTS = Number(Deno.env.get("YES_BOTS") ?? 4);
 const NO_BOTS = Number(Deno.env.get("NO_BOTS") ?? 4);
@@ -52,7 +55,9 @@ const BET_SIZE_FACTOR = Number(Deno.env.get("BET_SIZE_FACTOR") ?? 0.05);
 async function resolveMintUrl(): Promise<string> {
   const env = Deno.env.get("CASHU_MINT_URL");
   if (env) return env;
-  const config = await fetch(`${SERVER}/markets/wallet/config`).then((r) => r.json()) as {
+  const config = await fetch(`${SERVER}/markets/wallet/config`).then((r) =>
+    r.json()
+  ) as {
     mint_url: string | null;
   };
   if (!config.mint_url) {
@@ -62,12 +67,18 @@ async function resolveMintUrl(): Promise<string> {
 }
 const MINT = await resolveMintUrl();
 
-console.log(`[fleet-run] server=${SERVER} mint=${MINT} funding=${FUNDING_STRATEGY}`);
-console.log(`[fleet-run] interval=${INTERVAL_MS}ms bots=${YES_BOTS}+${NO_BOTS} funding=${FUNDING_SATS}sats factor=${BET_SIZE_FACTOR}`);
+console.log(
+  `[fleet-run] server=${SERVER} mint=${MINT} funding=${FUNDING_STRATEGY}`,
+);
+console.log(
+  `[fleet-run] interval=${INTERVAL_MS}ms bots=${YES_BOTS}+${NO_BOTS} funding=${FUNDING_SATS}sats factor=${BET_SIZE_FACTOR}`,
+);
 
 // --- Seed markets (idempotent: skip if server already has open markets) ---
 async function ensureSeed(): Promise<SeededMarket[]> {
-  const existing = await fetch(`${SERVER}/markets`).then((r) => r.json()) as Array<{
+  const existing = await fetch(`${SERVER}/markets`).then((r) =>
+    r.json()
+  ) as Array<{
     id: string;
     title: string;
     category: string;
@@ -82,7 +93,9 @@ async function ensureSeed(): Promise<SeededMarket[]> {
       return m ? [{ id: m.id, seed }] : [];
     });
   }
-  console.log(`[fleet-run] seeding ${POLYMARKET_SEED_MARKETS.length} Polymarket-aligned markets…`);
+  console.log(
+    `[fleet-run] seeding ${POLYMARKET_SEED_MARKETS.length} Polymarket-aligned markets…`,
+  );
   return seedMarkets(SERVER, POLYMARKET_SEED_MARKETS);
 }
 
@@ -90,7 +103,9 @@ const markets = await ensureSeed();
 console.log(`[fleet-run] active markets: ${markets.length}`);
 
 // --- Fund bots once ---
-console.log(`[fleet-run] funding ${YES_BOTS + NO_BOTS} bots via ${FUNDING_STRATEGY}…`);
+console.log(
+  `[fleet-run] funding ${YES_BOTS + NO_BOTS} bots via ${FUNDING_STRATEGY}…`,
+);
 const profiles = await fundFleet({
   serverUrl: SERVER,
   mintUrl: MINT,
@@ -121,11 +136,15 @@ while (!stop) {
     const totalBalance = profiles.reduce((s, p) => s + p.bot.balanceSats(), 0);
     console.log(
       `[fleet-run] round=${round} bets=${result.totalBets} ` +
-      `committed=${result.totalCommittedSats}sats locked=${result.pairsLocked} ` +
-      `elapsed=${elapsed}ms fleetBalance=${totalBalance}sats`,
+        `committed=${result.totalCommittedSats}sats locked=${result.pairsLocked} ` +
+        `elapsed=${elapsed}ms fleetBalance=${totalBalance}sats`,
     );
   } catch (err) {
-    console.warn(`[fleet-run] round=${round} threw: ${err instanceof Error ? err.message : err}`);
+    console.warn(
+      `[fleet-run] round=${round} threw: ${
+        err instanceof Error ? err.message : err
+      }`,
+    );
   }
   if (stop) break;
   await new Promise<void>((resolve) => setTimeout(resolve, INTERVAL_MS));

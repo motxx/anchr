@@ -2,19 +2,40 @@
 
 ## Abstract
 
-Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending Machine (DVM) pattern. This spec defines the event kinds, payloads, and lifecycle.
+Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending
+Machine (DVM) pattern. This spec defines the event kinds, payloads, and
+lifecycle for Customer, Provider, and Oracle actors.
+
+The role-neutral lifecycle, state transitions, preflight ticket, and redeem
+rules are defined in [`protocol-contract.md`](protocol-contract.md). This
+document specifies their Nostr event encoding.
+
+Proof format dispatch uses HTTPS schema URLs defined in
+[`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
+schema URL in an `s` tag for discovery, and encrypted payloads carry the same
+URL in their `schema` field for execution.
+
+## Actor Naming
+
+The protocol actors are defined in
+[`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr profile
+maps them to event authors and `p` tags. Some current field names still use
+`requester_*` or `worker_*`; those are compatibility identifiers for existing
+events and host-shaped code. New prose and SDK APIs use Customer and Provider.
+Once versioned replacements are available, requester/worker names should be
+removed rather than retained as aliases.
 
 ## Event Kinds
 
-| Kind | Name | Direction | Purpose |
-|------|------|-----------|---------|
-| 5300 | Job Request | Requester → Relay | Post a query |
-| 6300 | Job Result | Worker → Relay | Submit proof |
-| 7000 | Job Feedback | Various | Quotes, selection, completion |
+| Kind | Name         | Direction         | Purpose                       |
+| ---- | ------------ | ----------------- | ----------------------------- |
+| 5300 | Job Request  | Customer -> Relay | Post a query                  |
+| 6300 | Job Result   | Provider -> Relay | Submit proof                  |
+| 7000 | Job Feedback | Various           | Quotes, selection, completion |
 
 ## Query Posting (kind 5300)
 
-The Requester broadcasts a DVM Job Request:
+The Customer broadcasts a DVM Job Request:
 
 ```json
 {
@@ -22,6 +43,7 @@ The Requester broadcasts a DVM Job Request:
   "content": "<encrypted payload>",
   "tags": [
     ["i", "<target_url_or_description>", "text"],
+    ["s", "https://anchr-spec.org/spec/proof/tlsn/v1"],
     ["param", "oracle_ids", "<comma-separated>"],
     ["param", "quorum", "<min_approvals>"],
     ["bid", "<amount_sats>"]
@@ -31,21 +53,22 @@ The Requester broadcasts a DVM Job Request:
 
 ### QueryRequestPayload
 
-| Field | Description |
-|-------|-------------|
-| `description` | Human-readable query description |
-| `verification_requirements` | Array of verification factors |
-| `tlsn_requirements` | Target URL, method, conditions |
-| `expected_gps` | GPS coordinates (for photo queries) |
-| `max_gps_distance_km` | Max distance from expected GPS |
-| `bounty` | `{ amount_sats }` |
-| `oracle_ids` | Acceptable Oracle IDs |
-| `quorum` | `{ min_approvals }` |
-| `visibility` | `public` or `requester_only` |
+| Field                       | Description                         |
+| --------------------------- | ----------------------------------- |
+| `description`               | Human-readable query description    |
+| `schema`                    | Proof schema URL                    |
+| `verification_requirements` | Array of verification factors       |
+| `tlsn_requirements`         | Target URL, method, conditions      |
+| `expected_gps`              | GPS coordinates (for photo queries) |
+| `max_gps_distance_km`       | Max distance from expected GPS      |
+| `bounty`                    | `{ amount_sats }`                   |
+| `oracle_ids`                | Acceptable Oracle IDs               |
+| `quorum`                    | `{ min_approvals }`                 |
+| `visibility`                | `public` or `requester_only`        |
 
-## Worker Quote (kind 7000, status=payment-required)
+## Provider Quote (kind 7000, status=payment-required)
 
-A Worker discovers the query and submits a quote:
+A Provider discovers the query and submits a quote:
 
 ```json
 {
@@ -53,16 +76,16 @@ A Worker discovers the query and submits a quote:
   "content": "<optional message>",
   "tags": [
     ["e", "<job_request_event_id>"],
-    ["p", "<requester_pubkey>"],
+    ["p", "<customer_pubkey>"],
     ["status", "payment-required"],
     ["amount", "<requested_sats>", "sat"]
   ]
 }
 ```
 
-## Worker Selection (kind 7000, status=processing)
+## Provider Selection (kind 7000, status=processing)
 
-The Requester selects a Worker and announces:
+The Customer selects a Provider and announces:
 
 ```json
 {
@@ -70,7 +93,7 @@ The Requester selects a Worker and announces:
   "content": "<encrypted payload>",
   "tags": [
     ["e", "<job_request_event_id>"],
-    ["p", "<worker_pubkey>"],
+    ["p", "<provider_pubkey>"],
     ["status", "processing"]
   ]
 }
@@ -80,16 +103,28 @@ The Requester selects a Worker and announces:
 
 The encrypted content includes:
 
-| Field | Description |
-|-------|-------------|
-| `escrow_token` | Cashu token with spending conditions |
-| `encrypted_context` | TLSNotary target URL, headers, etc. (encrypted to Worker) |
+| Field               | Description                                                 |
+| ------------------- | ----------------------------------------------------------- |
+| `escrow_token`      | Cashu token with spending conditions                        |
+| `encrypted_context` | TLSNotary target URL, headers, etc. (encrypted to Provider) |
 
-Sensitive context (session IDs, auth headers) is encrypted to the Worker and never stored publicly. The public query may include a `domain_hint` for display purposes.
+Sensitive context (session IDs, auth headers) is encrypted to the Provider and
+never stored publicly. The public query may include a `domain_hint` for display
+purposes.
+
+## Provider Preflight
+
+Before irreversible work, the Provider verifies the selected escrow and records
+the immutable preflight ticket required by
+[`protocol-contract.md#provider-preflight`](protocol-contract.md#provider-preflight).
+For this Nostr profile, the original request reference is the kind 5300 event
+id, the expected authority is the Oracle pubkey or FROST group key referenced by
+the encrypted request and selection payloads, and the selected offer reference
+is the kind 7000 `status=payment-required` event id when available.
 
 ## Proof Submission (kind 6300)
 
-The Worker submits the result:
+The Provider submits the result:
 
 ```json
 {
@@ -97,7 +132,7 @@ The Worker submits the result:
   "content": "<encrypted payload>",
   "tags": [
     ["e", "<job_request_event_id>"],
-    ["p", "<requester_pubkey>"],
+    ["p", "<customer_pubkey>"],
     ["request", "<original_job_request_event>"]
   ]
 }
@@ -105,13 +140,14 @@ The Worker submits the result:
 
 ### QueryResponsePayload
 
-| Field | Description |
-|-------|-------------|
-| `attachments` | Blossom blob references |
-| `notes` | Optional Worker notes |
-| `gps` | GPS coordinates at submission time |
-| `tlsn_attestation` | Base64-encoded `.presentation.tlsn` |
-| `blossom_keys` | Map of attachment ID → AES-256-GCM key/IV (encrypted to Oracle + Requester) |
+| Field              | Description                                                                 |
+| ------------------ | --------------------------------------------------------------------------- |
+| `schema`           | Proof schema URL used to dispatch Oracle and Customer verification          |
+| `attachments`      | Blossom blob references                                                     |
+| `notes`            | Optional Provider notes                                                     |
+| `gps`              | GPS coordinates at submission time                                          |
+| `tlsn_attestation` | Base64-encoded `.presentation.tlsn`                                         |
+| `blossom_keys`     | Map of attachment ID -> AES-256-GCM key/IV (encrypted to Oracle + Customer) |
 
 ## Completion (kind 7000, status=success or error)
 
@@ -130,31 +166,75 @@ After Oracle verification:
 
 ## Encryption
 
-All sensitive payloads are encrypted using NIP-44 (versioned encryption). Point-to-point messages (e.g., preimage delivery, FROST shares) use NIP-44 direct messages between specific pubkeys.
+All sensitive payloads are encrypted using NIP-44 (versioned encryption).
+Point-to-point messages (e.g., preimage delivery, FROST shares) use NIP-44
+direct messages between specific pubkeys.
 
-## Preimage Delivery Reliability
+## Release Material and Redeem Gate
 
-The preimage is the most critical message in the protocol. If the Worker completed valid work but never receives the preimage, they cannot redeem escrow. The following delivery strategy MUST be implemented:
+Oracle release material follows
+[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
+For this Nostr profile, a release message binds:
 
-### Three-Tier Delivery
+| Field                 | Description                                                  |
+| --------------------- | ------------------------------------------------------------ |
+| `query_id`            | Query identifier from the Customer request                   |
+| `request_event_id`    | Original kind 5300 event id                                  |
+| `payment_hash`        | Hash committed in the selected bound token                   |
+| `provider_pubkey`     | Provider pubkey the token is bound to                        |
+| `oracle_pubkey`       | Releasing Oracle pubkey, for single-Oracle releases          |
+| `oracle_group_pubkey` | Expected FROST group key, for threshold releases             |
+| `preimage`            | HTLC preimage, when the payment profile uses NUT-14 hashlock |
+| `signature`           | Oracle or FROST signature over the release fields            |
 
-1. **Primary**: Oracle sends preimage via NIP-44 DM to the Worker, published to multiple relays. The message MUST succeed on at least one relay before the preimage is deleted from the Oracle's store.
+Correlation mismatches are audit inputs, not redeem hard failures by themselves;
+the redeem decision remains the universal rule in
+[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
 
-2. **Retry**: If zero relays confirm, retry with exponential backoff (3 attempts: 2s, 4s, 8s). The Oracle MUST NOT delete the preimage until at least one delivery is confirmed.
+## Release Delivery Reliability
 
-3. **Fallback (HTTP)**: The Oracle exposes an HTTP endpoint (`GET /oracle/preimage/:queryId`) where the Worker can poll for the preimage. The endpoint MUST authenticate the request by verifying the caller is the selected Worker (e.g., Nostr signature). The preimage is served only if the query is approved.
+The release material is the most critical message in the Nostr profile. If the
+Provider completed valid work but never receives the preimage or FROST
+signature, they cannot redeem escrow. The Nostr delivery strategy is:
 
-### Worker-Side Behavior
+### NIP-44 Delivery
 
-The Worker subscribes to NIP-44 DMs from the Oracle. If no preimage arrives within a configurable timeout (e.g., 30 seconds after proof submission), the Worker SHOULD poll the HTTP fallback endpoint.
+1. **Primary**: Oracle sends release material via NIP-44 DM to the Provider,
+   published to multiple relays. The message MUST succeed on at least one relay
+   before the release material is deleted from the Oracle's retry store.
+
+2. **Retry**: If zero relays confirm, retry with exponential backoff (3
+   attempts: 2s, 4s, 8s). The Oracle MUST NOT delete release material until at
+   least one relay delivery is confirmed or a later redeem observation proves
+   the Provider received spendable material.
+
+3. **Recovery**: If direct relay delivery keeps failing, the Provider may send
+   an authenticated Nostr retry request that references the original kind 5300
+   request, selected offer, and proof submission. The Oracle answers with a new
+   NIP-44 DM to the selected Provider pubkey. Implementations may choose their
+   own retry event kind or tag set until a dedicated profile is standardized,
+   but the recovery path remains Nostr-native and is not a hosted Anchr HTTP
+   endpoint.
+
+### Provider-Side Behavior
+
+The Provider subscribes to NIP-44 DMs from the Oracle. If no release material
+arrives within a configurable timeout (e.g., 30 seconds after proof submission),
+the Provider may publish an authenticated retry request on the configured
+relays.
 
 ### Deletion Policy
 
-The Oracle MUST retain the preimage until at least one of the following is confirmed:
+The Oracle MUST retain release material until at least one of the following is
+confirmed:
+
 - Relay delivery success (at least 1 relay acknowledged)
-- HTTP fetch by the Worker
+- Authenticated Nostr retry delivery to the selected Provider
 - Escrow redemption observed on the Cashu mint
 
 ## Transport Agnosticism
 
-Nostr is the current transport. The protocol design permits alternative transports (HTTP-only mode, libp2p) by implementing the same message lifecycle over a different medium.
+Nostr is the current protocol transport. The protocol design permits alternative
+transports by implementing the same message lifecycle over a different medium,
+but Anchr does not define a default hosted HTTP relay or reference-host
+endpoint.

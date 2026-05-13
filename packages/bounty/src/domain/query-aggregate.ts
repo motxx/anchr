@@ -1,24 +1,33 @@
 import type {
+  BlossomKeyMap,
+  BountyInfo,
   EscrowInfo,
+  OracleAttestationRecord,
   PaymentStatus,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
+  QuorumConfig,
   QuoteInfo,
+  RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
-  BlossomKeyMap,
-  BountyInfo,
-  QuorumConfig,
-  OracleAttestationRecord,
-  RequesterMeta,
 } from "./types.ts";
 import { DEFAULT_VERIFICATION_FACTORS } from "./types.ts";
 import type { Clock, DomainServices } from "./ports.ts";
 import { realDomainServices } from "./ports.ts";
-import { isValidTransition, isCancellable, isExpirable } from "./query-transitions.ts";
-import { MIN_ESCROW_LOCKTIME_SECS, validateQueryInput, validateEscrowLocktime, validateQuoteInfo } from "./value-objects.ts";
+import {
+  isCancellable,
+  isExpirable,
+  isValidTransition,
+} from "./query-transitions.ts";
+import {
+  MIN_ESCROW_LOCKTIME_SECS,
+  validateEscrowLocktime,
+  validateQueryInput,
+  validateQuoteInfo,
+} from "./value-objects.ts";
 
 export { MIN_ESCROW_LOCKTIME_SECS };
 import { buildChallengeRule } from "./challenge.ts";
@@ -49,13 +58,20 @@ export function createQueryAggregate(
 
   if (options.escrow?.locktime) {
     const nowSecs = Math.floor(now / 1000);
-    const locktimeError = validateEscrowLocktime(options.escrow.locktime, nowSecs, MIN_ESCROW_LOCKTIME_SECS);
+    const locktimeError = validateEscrowLocktime(
+      options.escrow.locktime,
+      nowSecs,
+      MIN_ESCROW_LOCKTIME_SECS,
+    );
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
-  const requirements = input.verification_requirements ?? DEFAULT_VERIFICATION_FACTORS;
+  const requirements = input.verification_requirements ??
+    DEFAULT_VERIFICATION_FACTORS;
   const needsNonce = requirements.includes("nonce");
-  const nonce = needsNonce ? services.nonceGenerator.newChallengeNonce() : undefined;
+  const nonce = needsNonce
+    ? services.nonceGenerator.newChallengeNonce()
+    : undefined;
   const isEscrow = options.escrow !== undefined;
 
   const query: Query = {
@@ -64,7 +80,9 @@ export function createQueryAggregate(
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
-    challenge_rule: nonce ? buildChallengeRule(nonce, input.description) : undefined,
+    challenge_rule: nonce
+      ? buildChallengeRule(nonce, input.description)
+      : undefined,
     verification_requirements: requirements,
     created_at: now,
     expires_at: now + options.ttlMs,
@@ -97,7 +115,10 @@ export function submitResult(
   clock: Clock = realDomainServices.clock,
 ): TransitionResult {
   if (query.escrow !== undefined) {
-    return { ok: false, error: "Use the escrow-mode functions for queries with an escrow" };
+    return {
+      ok: false,
+      error: "Use the escrow-mode functions for queries with an escrow",
+    };
   }
   if (query.status !== "pending") {
     return { ok: false, error: `Query is ${query.status}, not pending` };
@@ -111,7 +132,9 @@ export function submitResult(
   }
 
   const newStatus: QueryStatus = verification.passed ? "approved" : "rejected";
-  const paymentStatus: PaymentStatus = verification.passed ? "released" : "cancelled";
+  const paymentStatus: PaymentStatus = verification.passed
+    ? "released"
+    : "cancelled";
   const firstOracle = attestations?.[0]?.oracle_id ?? oracleId;
 
   return {
@@ -164,7 +187,10 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
     return { ok: false, error: "Not an escrow query" };
   }
   if (query.status !== "awaiting_quotes") {
-    return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
+    return {
+      ok: false,
+      error: `Query is ${query.status}, not awaiting_quotes`,
+    };
   }
   const quoteError = validateQuoteInfo(quote);
   if (quoteError) return { ok: false, error: quoteError };
@@ -179,7 +205,10 @@ export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
  * escrow type or hashlock mid-flight.
  */
 export type EscrowSelectionUpdates = Partial<
-  Pick<EscrowInfo, "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "worker_pubkey">
+  Pick<
+    EscrowInfo,
+    "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "worker_pubkey"
+  >
 >;
 
 /** Select a worker and transition awaiting_quotes → worker_selected. */
@@ -192,7 +221,10 @@ export function selectWorker(
     return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "worker_selected", true)) {
-    return { ok: false, error: `Query is ${query.status}, not awaiting_quotes` };
+    return {
+      ok: false,
+      error: `Query is ${query.status}, not awaiting_quotes`,
+    };
   }
 
   const escrow: EscrowInfo = {
@@ -207,7 +239,9 @@ export function selectWorker(
       ...query,
       status: "worker_selected",
       escrow,
-      payment_status: escrowUpdates.escrow_token ? "escrow_swapped" : query.payment_status,
+      payment_status: escrowUpdates.escrow_token
+        ? "escrow_swapped"
+        : query.payment_status,
     },
   };
 }
@@ -218,7 +252,10 @@ export function beginWork(query: Query): TransitionResult {
     return { ok: false, error: "Not an escrow query" };
   }
   if (!isValidTransition(query.status, "processing", true)) {
-    return { ok: false, error: `Query is ${query.status}, not worker_selected` };
+    return {
+      ok: false,
+      error: `Query is ${query.status}, not worker_selected`,
+    };
   }
   return {
     ok: true,
@@ -240,7 +277,9 @@ export function recordResult(
   if (!isValidTransition(query.status, "verifying", true)) {
     return { ok: false, error: `Query is ${query.status}, not processing` };
   }
-  if (query.escrow.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey) {
+  if (
+    query.escrow.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey
+  ) {
     return { ok: false, error: "Worker pubkey does not match selected worker" };
   }
 
@@ -251,7 +290,7 @@ export function recordResult(
       status: "verifying",
       result,
       submitted_at: clock.now(),
-      submission_meta: { executor_type: "human", channel: "worker_api" },
+      submission_meta: { executor_type: "human", channel: "adapter" },
       blossom_keys: blossomKeys,
     },
   };

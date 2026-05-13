@@ -39,7 +39,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   proofs: [],
 
   addTransaction: (tx) => {
-    if (tx.queryId && get().transactions.some((t) => t.queryId === tx.queryId && t.type === tx.type)) return;
+    if (
+      tx.queryId &&
+      get().transactions.some((t) =>
+        t.queryId === tx.queryId && t.type === tx.type
+      )
+    ) return;
 
     const entry: WalletTransaction = {
       ...tx,

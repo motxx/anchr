@@ -116,9 +116,24 @@ test("findMatches: FIFO — earliest matched first", async () => {
   const ob = createInMemoryMatchingQueue();
   const now = Math.floor(Date.now() / 1000);
 
-  const yes1 = makeBet({ side: "yes", amount_sats: 50, remaining_sats: 50, timestamp: now });
-  const yes2 = makeBet({ side: "yes", amount_sats: 50, remaining_sats: 50, timestamp: now + 1 });
-  const no1 = makeBet({ side: "no", amount_sats: 50, remaining_sats: 50, timestamp: now });
+  const yes1 = makeBet({
+    side: "yes",
+    amount_sats: 50,
+    remaining_sats: 50,
+    timestamp: now,
+  });
+  const yes2 = makeBet({
+    side: "yes",
+    amount_sats: 50,
+    remaining_sats: 50,
+    timestamp: now + 1,
+  });
+  const no1 = makeBet({
+    side: "no",
+    amount_sats: 50,
+    remaining_sats: 50,
+    timestamp: now,
+  });
 
   await ob.enqueue(yes1);
   await ob.enqueue(yes2);
@@ -133,9 +148,24 @@ test("findMatches: multiple matches across bets", async () => {
   const ob = createInMemoryMatchingQueue();
   const now = Math.floor(Date.now() / 1000);
 
-  const yes = makeBet({ side: "yes", amount_sats: 100, remaining_sats: 100, timestamp: now });
-  const no1 = makeBet({ side: "no", amount_sats: 60, remaining_sats: 60, timestamp: now });
-  const no2 = makeBet({ side: "no", amount_sats: 60, remaining_sats: 60, timestamp: now + 1 });
+  const yes = makeBet({
+    side: "yes",
+    amount_sats: 100,
+    remaining_sats: 100,
+    timestamp: now,
+  });
+  const no1 = makeBet({
+    side: "no",
+    amount_sats: 60,
+    remaining_sats: 60,
+    timestamp: now,
+  });
+  const no2 = makeBet({
+    side: "no",
+    amount_sats: 60,
+    remaining_sats: 60,
+    timestamp: now + 1,
+  });
 
   await ob.enqueue(yes);
   await ob.enqueue(no1);

@@ -1,10 +1,10 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  deriveRegionKey,
-  deriveConversationKey,
-  encryptNip44,
   decryptNip44,
+  deriveConversationKey,
+  deriveRegionKey,
+  encryptNip44,
 } from "./encryption.ts";
 import { generateEphemeralIdentity } from "./identity.ts";
 
@@ -51,7 +51,10 @@ describe("Nostr encryption", () => {
     const charlie = generateEphemeralIdentity();
 
     const aliceBobKey = deriveConversationKey(alice.secretKey, bob.publicKey);
-    const charlieKey = deriveConversationKey(charlie.secretKey, alice.publicKey);
+    const charlieKey = deriveConversationKey(
+      charlie.secretKey,
+      alice.publicKey,
+    );
 
     const encrypted = encryptNip44("secret message", aliceBobKey);
 

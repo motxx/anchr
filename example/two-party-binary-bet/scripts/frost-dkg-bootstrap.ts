@@ -18,7 +18,7 @@
  * the other.
  */
 
-import { mkdirSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   dkgRound1,
@@ -28,8 +28,8 @@ import {
 } from "@anchr/frost-oracle/frost-cli";
 import type { PeerConfig } from "@anchr/frost-oracle/config";
 import {
-  saveDualOutcomeFrostNodeConfigAsync,
   type DualOutcomeFrostNodeConfig,
+  saveDualOutcomeFrostNodeConfigAsync,
 } from "@anchr/frost-oracle/dual-outcome-config";
 
 // --- Parse CLI args ---
@@ -79,7 +79,9 @@ async function runDkg(groupLabel: string): Promise<DkgGroupResult> {
 
   // === Round 1 ===
   console.log(`\n--- ${groupLabel} Round 1 ---`);
-  const round1: Array<{ secretPackage: string; package: string; identifier: string }> = [];
+  const round1: Array<
+    { secretPackage: string; package: string; identifier: string }
+  > = [];
 
   for (let i = 1; i <= TOTAL; i++) {
     const r = await dkgRound1(i, TOTAL, THRESHOLD);
@@ -89,14 +91,17 @@ async function runDkg(groupLabel: string): Promise<DkgGroupResult> {
     }
     const sp = JSON.stringify(r.data!.secret_package);
     const pkg = JSON.stringify(r.data!.package);
-    const id = (r.data!.secret_package as Record<string, unknown>).identifier as string;
+    const id = (r.data!.secret_package as Record<string, unknown>)
+      .identifier as string;
     round1.push({ secretPackage: sp, package: pkg, identifier: id });
     console.log(`  Signer ${i}: OK (id=${id.slice(0, 8)}...)`);
   }
 
   // === Round 2 ===
   console.log(`\n--- ${groupLabel} Round 2 ---`);
-  const round2: Array<{ secretPackage: string; packages: Record<string, unknown> }> = [];
+  const round2: Array<
+    { secretPackage: string; packages: Record<string, unknown> }
+  > = [];
 
   for (let i = 0; i < TOTAL; i++) {
     const othersMap: Record<string, unknown> = {};
@@ -104,7 +109,10 @@ async function runDkg(groupLabel: string): Promise<DkgGroupResult> {
       if (j === i) continue;
       othersMap[round1[j]!.identifier] = JSON.parse(round1[j]!.package);
     }
-    const r = await dkgRound2(round1[i]!.secretPackage, JSON.stringify(othersMap));
+    const r = await dkgRound2(
+      round1[i]!.secretPackage,
+      JSON.stringify(othersMap),
+    );
     if (!r.ok) {
       console.error(`Round 2 failed for signer ${i + 1}:`, r.error);
       Deno.exit(1);
@@ -136,7 +144,11 @@ async function runDkg(groupLabel: string): Promise<DkgGroupResult> {
       r2ForMe[round1[j]!.identifier] = pkgsFromJ[round1[i]!.identifier];
     }
 
-    const r = await dkgRound3(round2[i]!.secretPackage, JSON.stringify(othersR1), JSON.stringify(r2ForMe));
+    const r = await dkgRound3(
+      round2[i]!.secretPackage,
+      JSON.stringify(othersR1),
+      JSON.stringify(r2ForMe),
+    );
     if (!r.ok) {
       console.error(`Round 3 failed for signer ${i + 1}:`, r.error);
       Deno.exit(1);
@@ -148,11 +160,15 @@ async function runDkg(groupLabel: string): Promise<DkgGroupResult> {
       group_pubkey: r.data!.group_pubkey as string,
     });
 
-    console.log(`  Signer ${i + 1}: OK (group_pubkey=${(r.data!.group_pubkey as string).slice(0, 16)}...)`);
+    console.log(
+      `  Signer ${i + 1}: OK (group_pubkey=${
+        (r.data!.group_pubkey as string).slice(0, 16)
+      }...)`,
+    );
   }
 
   // Verify all group pubkeys match
-  const gps = configs.map(c => c.group_pubkey);
+  const gps = configs.map((c) => c.group_pubkey);
   if (new Set(gps).size !== 1) {
     console.error(`ERROR: ${groupLabel} group pubkeys don't match!`);
     Deno.exit(1);
@@ -188,7 +204,9 @@ async function main() {
 
   // Verify the two groups have different pubkeys (independent DKG sessions)
   if (yesGroup.group_pubkey === noGroup.group_pubkey) {
-    console.error("ERROR: YES and NO groups have the same pubkey -- DKG may be broken");
+    console.error(
+      "ERROR: YES and NO groups have the same pubkey -- DKG may be broken",
+    );
     Deno.exit(1);
   }
 
@@ -229,7 +247,11 @@ async function main() {
 
     const path = join(OUTPUT_DIR, `signer-${i + 1}.json`);
     const passphrase = Deno.env.get("FROST_KEY_PASSPHRASE")?.trim();
-    await saveDualOutcomeFrostNodeConfigAsync(path, marketConfig, passphrase ? { passphrase } : undefined);
+    await saveDualOutcomeFrostNodeConfigAsync(
+      path,
+      marketConfig,
+      passphrase ? { passphrase } : undefined,
+    );
     if (passphrase) {
       console.log(`  ${path} (encrypted, AES-256-GCM, mode 0600)`);
     } else {
@@ -239,8 +261,8 @@ async function main() {
   if (!Deno.env.get("FROST_KEY_PASSPHRASE")?.trim()) {
     console.warn(
       "\n[warn] FROST_KEY_PASSPHRASE not set — DKG output written as plaintext.\n" +
-      "       For production, re-run with FROST_KEY_PASSPHRASE=<passphrase>\n" +
-      "       to encrypt the secret key shares at rest.",
+        "       For production, re-run with FROST_KEY_PASSPHRASE=<passphrase>\n" +
+        "       to encrypt the secret key shares at rest.",
     );
   }
 
@@ -248,7 +270,12 @@ async function main() {
   console.log(`  YES group pubkey: ${yesGroup.group_pubkey}`);
   console.log(`  NO  group pubkey: ${noGroup.group_pubkey}`);
   console.log(`\nTo start the market Oracle cluster:`);
-  console.log(`  deno run --allow-all example/two-party-binary-bet/scripts/frost-oracle-cluster.ts`);
+  console.log(
+    `  deno run --allow-all example/two-party-binary-bet/scripts/frost-oracle-cluster.ts`,
+  );
 }
 
-main().catch((e) => { console.error(e); Deno.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  Deno.exit(1);
+});

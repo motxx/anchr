@@ -1,6 +1,9 @@
-import { test, describe } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { validateNoCredentials, SENSITIVE_HEADER_NAMES } from "./proof-redaction.ts";
+import {
+  SENSITIVE_HEADER_NAMES,
+  validateNoCredentials,
+} from "./proof-redaction.ts";
 
 describe("SENSITIVE_HEADER_NAMES", () => {
   test("includes standard auth headers", () => {
@@ -36,7 +39,8 @@ describe("validateNoCredentials", () => {
   });
 
   test("passes [REDACTED] markers (from TLSNotary selective disclosure)", () => {
-    const text = "GET /api/data HTTP/1.1\r\nHost: example.com\r\nAuthorization: [REDACTED]";
+    const text =
+      "GET /api/data HTTP/1.1\r\nHost: example.com\r\nAuthorization: [REDACTED]";
     const error = validateNoCredentials(text);
     expect(error).toBeNull();
   });

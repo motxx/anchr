@@ -1,17 +1,17 @@
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createFrostSigner } from "./signer.ts";
 import {
   _setFrostSignerPathForTest,
-  findFrostSigner,
-  isFrostSignerAvailable,
   dkgRound1,
+  dkgRound2,
+  dkgRound3,
 } from "@anchr/frost-oracle/frost-cli";
 import type { AttachmentRef } from "../../domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 
-const PROJECT_ROOT = join(import.meta.dirname!, "../../..");
+const PROJECT_ROOT = join(import.meta.dirname!, "../../../../..");
 
 function findRealBinary(): string | null {
   const candidates = [
@@ -92,20 +92,84 @@ binaryDescribe("FrostSigner with real binary", () => {
     _setFrostSignerPathForTest(undefined);
   });
 
+  async function generateKeyPackageForSignerOne(): Promise<string> {
+    const total = 3;
+    const threshold = 2;
+    const round1Results: Array<{
+      identifier: string;
+      secretPackage: string;
+      package: string;
+    }> = [];
+
+    for (let i = 0; i < total; i++) {
+      const result = await dkgRound1(i + 1, total, threshold);
+      expect(result.ok).toBe(true);
+      expect(result.data).toBeDefined();
+      const secretPackage = result.data!.secret_package as Record<
+        string,
+        unknown
+      >;
+      round1Results.push({
+        identifier: secretPackage.identifier as string,
+        secretPackage: JSON.stringify(result.data!.secret_package),
+        package: JSON.stringify(result.data!.package),
+      });
+    }
+
+    const round2Results: Array<{
+      secretPackage: string;
+      packages: Record<string, string>;
+    }> = [];
+
+    for (let i = 0; i < total; i++) {
+      const round1PackagesFromOthers: Record<string, unknown> = {};
+      for (let j = 0; j < total; j++) {
+        if (j !== i) {
+          round1PackagesFromOthers[round1Results[j]!.identifier] = JSON.parse(
+            round1Results[j]!.package,
+          );
+        }
+      }
+      const result = await dkgRound2(
+        round1Results[i]!.secretPackage,
+        JSON.stringify(round1PackagesFromOthers),
+      );
+      expect(result.ok).toBe(true);
+      expect(result.data).toBeDefined();
+      round2Results.push({
+        secretPackage: JSON.stringify(result.data!.secret_package),
+        packages: result.data!.packages as Record<string, string>,
+      });
+    }
+
+    const round2PackagesForSignerOne: Record<string, unknown> = {};
+    const round1PackagesForSignerOne: Record<string, unknown> = {};
+    for (let j = 1; j < total; j++) {
+      round1PackagesForSignerOne[round1Results[j]!.identifier] = JSON.parse(
+        round1Results[j]!.package,
+      );
+      round2PackagesForSignerOne[round1Results[j]!.identifier] =
+        (round2Results[j]!.packages as Record<string, unknown>)[
+          round1Results[0]!.identifier
+        ];
+    }
+
+    const result = await dkgRound3(
+      round2Results[0]!.secretPackage,
+      JSON.stringify(round1PackagesForSignerOne),
+      JSON.stringify(round2PackagesForSignerOne),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.data).toBeDefined();
+    return JSON.stringify(result.data!.key_package);
+  }
+
   test("verifyAndSign round 1 returns nonce_commitment when verification passes", async () => {
     _setFrostSignerPathForTest(realBinary!);
 
-    // First, run DKG to get a real key package
-    const r1Result = await dkgRound1(1, 3, 2);
-    if (!r1Result.ok || !r1Result.data) {
-      // If DKG round 1 fails, we cannot proceed — skip gracefully
-      console.error("[signer.test] dkgRound1 failed, skipping round 1 signing test");
-      return;
-    }
-
     const signer = createFrostSigner({
       signerIndex: 1,
-      keyPackage: JSON.stringify(r1Result.data),
+      keyPackage: await generateKeyPackageForSignerOne(),
     });
 
     // ai_check is a soft check that passes by default in tests
@@ -116,14 +180,13 @@ binaryDescribe("FrostSigner with real binary", () => {
     };
     const input = { attachments: [] as AttachmentRef[] };
 
-    const output = await signer.verifyAndSign(requirement, input, "test_message");
-    // The sign-round1 CLI command may or may not work with a DKG round1 result
-    // as a key_package. If it returns a commitment, validate the structure.
-    if (output) {
-      expect(typeof output.nonce_commitment).toBe("string");
-      expect(typeof output.nonces).toBe("string");
-    }
-    // If output is null, the binary rejected the key_package format,
-    // which is expected since we used round1 data instead of a real key package.
+    const output = await signer.verifyAndSign(
+      requirement,
+      input,
+      "test_message",
+    );
+    expect(output).not.toBeNull();
+    expect(typeof output!.nonce_commitment).toBe("string");
+    expect(typeof output!.nonces).toBe("string");
   });
 });

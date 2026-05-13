@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Two-party binary bet Demo (N:M Conditional Swap)
+ * Two-party binary bet demo (N:M conditional swap)
  *
  * Demonstrates the full lifecycle using the protocol layer:
  *
@@ -43,7 +43,7 @@ const RESOLUTION_DEADLINE = Math.floor(Date.now() / 1000) + 86400; // 24h from n
 const ORACLE_FEE_PPM = 5_000;  // 0.5%
 const CREATOR_FEE_PPM = 10_000; // 1.0%
 
-console.log("=== 巫(Kannagi) — Bitcoin-Native Two-party binary bet Demo (N:M Conditional Swap) ===\n");
+console.log("=== Bitcoin-native two-party binary bet demo (N:M conditional swap) ===\n");
 console.log("Powered by Anchr: FROST P2PK Conditional Swap + Nostr + TLSNotary\n");
 console.log("\u2501".repeat(60));
 

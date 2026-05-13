@@ -1,5 +1,9 @@
 import type { EscrowProvider } from "../../application/ports.ts";
-import { createHtlcToken, swapHtlcBindWorker, type EscrowToken } from "@anchr/core-cashu/escrow";
+import {
+  createHtlcToken,
+  type EscrowToken,
+  swapHtlcBindWorker,
+} from "@anchr/core-cashu/escrow";
 import { verifyToken } from "@anchr/core-cashu/wallet";
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
 
@@ -11,7 +15,10 @@ export interface CashuEscrowProviderConfig {
 export function createCashuEscrowProvider(
   config?: CashuEscrowProviderConfig,
 ): EscrowProvider {
-  const tokenMap = new Map<string, { token: string; escrowToken: EscrowToken }>();
+  const tokenMap = new Map<
+    string,
+    { token: string; escrowToken: EscrowToken }
+  >();
   let refCounter = 0;
 
   return {
@@ -20,7 +27,9 @@ export function createCashuEscrowProvider(
         return null;
       }
 
-      const sourceProofs = await config.sourceProofsResolver(params.amount_sats);
+      const sourceProofs = await config.sourceProofsResolver(
+        params.amount_sats,
+      );
       const result = await createHtlcToken(params.amount_sats, {
         hash: params.payment_hash,
         requesterPubkey: params.requester_pubkey,
@@ -60,7 +69,9 @@ export function createCashuEscrowProvider(
         try {
           const secret = JSON.parse(firstProof?.secret ?? "[]");
           return secret[1]?.data ?? "";
-        } catch { return ""; }
+        } catch {
+          return "";
+        }
       })();
 
       const result = await swapHtlcBindWorker(entry.escrowToken.proofs, {
@@ -103,28 +114,44 @@ export function createCashuEscrowProvider(
         // malformed string bypass HTLC + P2PK verification.
         return {
           ok: false,
-          message: `Token failed to decode: ${err instanceof Error ? err.message : "unknown"}`,
+          message: `Token failed to decode: ${
+            err instanceof Error ? err.message : "unknown"
+          }`,
         };
       }
 
       for (const proof of decoded.proofs) {
         let secret: unknown;
-        try { secret = JSON.parse(proof.secret); } catch { continue; }
+        try {
+          secret = JSON.parse(proof.secret);
+        } catch {
+          continue;
+        }
         if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
 
         if (secret[1]?.data !== payment_hash) {
-          return { ok: false, message: "HTLC hash mismatch: token hashlock does not match query" };
+          return {
+            ok: false,
+            message: "HTLC hash mismatch: token hashlock does not match query",
+          };
         }
 
         const tags: string[][] | undefined = secret[1]?.tags;
         const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
         if (pubkeyTag) {
           const lockedKeys = pubkeyTag.slice(1);
-          const workerHex = worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-            ? worker_pubkey
-            : `02${worker_pubkey}`;
-          if (!lockedKeys.includes(worker_pubkey) && !lockedKeys.includes(workerHex)) {
-            return { ok: false, message: "HTLC token not locked to selected worker" };
+          const workerHex =
+            worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
+              ? worker_pubkey
+              : `02${worker_pubkey}`;
+          if (
+            !lockedKeys.includes(worker_pubkey) &&
+            !lockedKeys.includes(workerHex)
+          ) {
+            return {
+              ok: false,
+              message: "HTLC token not locked to selected worker",
+            };
           }
         }
       }
@@ -140,7 +167,8 @@ export function createCashuEscrowProvider(
       // immediately.
       return Promise.resolve({
         settled: false,
-        error: "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
+        error:
+          "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
       });
     },
 

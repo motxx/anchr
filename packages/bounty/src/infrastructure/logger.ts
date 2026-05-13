@@ -16,7 +16,10 @@
  */
 
 import { configure, getConsoleSink } from "@logtape/logtape";
-import { getLogger as sharedGetLogger, type Logger } from "@anchr/core-runtime/logger";
+import {
+  getLogger as sharedGetLogger,
+  type Logger,
+} from "@anchr/core-runtime/logger";
 
 let configured = false;
 
@@ -29,12 +32,22 @@ let configured = false;
  */
 export async function configureLogger(): Promise<void> {
   if (configured) return;
-  const level = (Deno.env.get("ANCHR_LOG_LEVEL") ?? Deno.env.get("LOG_LEVEL") ?? "info").toLowerCase();
+  const level =
+    (Deno.env.get("ANCHR_LOG_LEVEL") ?? Deno.env.get("LOG_LEVEL") ?? "info")
+      .toLowerCase();
   await configure({
     sinks: { console: getConsoleSink() },
     loggers: [
-      { category: ["anchr"], lowestLevel: level as "debug" | "info" | "warning" | "error" | "fatal", sinks: ["console"] },
-      { category: ["logtape", "meta"], lowestLevel: "warning", sinks: ["console"] },
+      {
+        category: ["anchr"],
+        lowestLevel: level as "debug" | "info" | "warning" | "error" | "fatal",
+        sinks: ["console"],
+      },
+      {
+        category: ["logtape", "meta"],
+        lowestLevel: "warning",
+        sinks: ["console"],
+      },
     ],
   });
   configured = true;

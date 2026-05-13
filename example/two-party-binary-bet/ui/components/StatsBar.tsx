@@ -19,7 +19,11 @@ export function StatsBar({ markets }: StatsBarProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
       <StatCard label="Active Markets" value={String(openMarkets)} />
-      <StatCard label="Total Volume" value={`${formatSats(totalVolume)} sats`} mono />
+      <StatCard
+        label="Total Volume"
+        value={`${formatSats(totalVolume)} sats`}
+        mono
+      />
       <StatCard label="Total Bettors" value={String(totalBettors)} />
       <StatCard
         label="Avg Pool"
@@ -32,11 +36,19 @@ export function StatsBar({ markets }: StatsBarProps) {
   );
 }
 
-function StatCard({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function StatCard(
+  { label, value, mono }: { label: string; value: string; mono?: boolean },
+) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="text-xs text-muted-foreground mb-1">{label}</div>
-      <div className={`text-lg font-bold text-foreground ${mono ? "font-mono" : ""}`}>{value}</div>
+      <div
+        className={`text-lg font-bold text-foreground ${
+          mono ? "font-mono" : ""
+        }`}
+      >
+        {value}
+      </div>
     </div>
   );
 }

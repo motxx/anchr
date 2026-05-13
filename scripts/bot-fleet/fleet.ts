@@ -79,7 +79,9 @@ export async function seedMarkets(
       body: JSON.stringify({
         title: seed.title,
         description: seed.description,
-        category: seed.category === "science" || seed.category === "culture" ? "custom" : seed.category,
+        category: seed.category === "science" || seed.category === "culture"
+          ? "custom"
+          : seed.category,
         resolution_url: seed.resolution_url,
         resolution_deadline: deadline,
         resolution_condition: {
@@ -92,7 +94,9 @@ export async function seedMarkets(
     });
     if (res.status !== 201) {
       const errText = await res.text();
-      throw new Error(`seed market ${seed.slug} failed: ${res.status} ${errText}`);
+      throw new Error(
+        `seed market ${seed.slug} failed: ${res.status} ${errText}`,
+      );
     }
     const market = await res.json() as { id: string };
     out.push({ id: market.id, seed });
@@ -149,7 +153,9 @@ export async function runOneRound(
       // Bet size = typical * (0.5..1.5) * factor, rounded to multiples of 100.
       const betSats = Math.max(
         100,
-        Math.round((market.seed.typical_bet_sats * (0.5 + r()) * betSizeFactor) / 100) * 100,
+        Math.round(
+          (market.seed.typical_bet_sats * (0.5 + r()) * betSizeFactor) / 100,
+        ) * 100,
       );
       if (profile.bot.balanceSats() < betSats) {
         // Skip bots that ran out of liquidity in this round.
@@ -159,7 +165,10 @@ export async function runOneRound(
         const result = await profile.bot.placeBet(market.id, side, betSats);
         totalBets++;
         totalCommittedSats += result.committedSats;
-        sideByBotMarket.set(`${profile.bot.identity.pubkey}:${market.id}`, side);
+        sideByBotMarket.set(
+          `${profile.bot.identity.pubkey}:${market.id}`,
+          side,
+        );
       } catch (err) {
         console.warn(
           `[fleet] ${profile.bot.label} failed to bet on ${market.seed.slug}:`,
@@ -173,7 +182,9 @@ export async function runOneRound(
   let pairsLocked = 0;
   for (const market of markets) {
     for (const profile of profiles) {
-      const side = sideByBotMarket.get(`${profile.bot.identity.pubkey}:${market.id}`);
+      const side = sideByBotMarket.get(
+        `${profile.bot.identity.pubkey}:${market.id}`,
+      );
       if (!side) continue;
       const submitted = await profile.bot.submitPendingMatches(market.id, side);
       pairsLocked += submitted;

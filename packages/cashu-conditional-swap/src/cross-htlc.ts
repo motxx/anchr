@@ -7,18 +7,14 @@
  * hash and pubkey oriented in opposite directions.
  */
 
-import {
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
-} from "@cashu/cashu-ts";
+import { P2PKBuilder, type P2PKOptions, type Proof } from "@cashu/cashu-ts";
 import type { EscrowToken } from "@anchr/core-cashu/escrow";
 import type { ConditionalSwapDef } from "./conditional-swap-types.ts";
 import {
-  getWalletAndConfig,
-  encodeProofs,
-  loadAndSend,
   type computeNetAmount,
+  encodeProofs,
+  getWalletAndConfig,
+  loadAndSend,
 } from "@anchr/core-cashu/escrow-helpers";
 
 import { getLogger } from "@anchr/core-runtime/logger";
@@ -104,8 +100,18 @@ export async function createSwapPairTokens(
   });
 
   try {
-    const sendA = await loadAndSend(ctx.wallet, amount, partyAProofs, optionsAtoB);
-    const sendB = await loadAndSend(ctx.wallet, amount, partyBProofs, optionsBtoA);
+    const sendA = await loadAndSend(
+      ctx.wallet,
+      amount,
+      partyAProofs,
+      optionsAtoB,
+    );
+    const sendB = await loadAndSend(
+      ctx.wallet,
+      amount,
+      partyBProofs,
+      optionsBtoA,
+    );
 
     const tokenAtoB: EscrowToken = {
       token: encodeProofs(ctx.config.mintUrl, sendA),
@@ -123,7 +129,8 @@ export async function createSwapPairTokens(
 
     return { tokenAtoB, tokenBtoA };
   } catch (error) {
-    log.error("Failed to create swap pair tokens:",
+    log.error(
+      "Failed to create swap pair tokens:",
       error instanceof Error ? error.message : error,
     );
     return null;

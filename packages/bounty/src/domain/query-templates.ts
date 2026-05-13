@@ -8,7 +8,13 @@
 
 import type { QueryInput } from "./types.ts";
 
-export const queryTemplates = {
+export interface QueryTemplates {
+  photoProof(locationOrSubject: string): QueryInput;
+  storeStatus(storeName: string, location?: string): QueryInput;
+  eventVerification(eventDescription: string, location?: string): QueryInput;
+}
+
+export const queryTemplates: QueryTemplates = {
   /** Request a photo proof of a location or scene. */
   photoProof(locationOrSubject: string): QueryInput {
     return {

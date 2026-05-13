@@ -32,7 +32,9 @@ interface FeaturedMarketProps {
  */
 export function FeaturedMarket({ market, onClick }: FeaturedMarketProps) {
   const total = market.yes_pool_sats + market.no_pool_sats;
-  const yesPercent = total > 0 ? Math.round((market.yes_pool_sats / total) * 100) : 50;
+  const yesPercent = total > 0
+    ? Math.round((market.yes_pool_sats / total) * 100)
+    : 50;
   const noPercent = 100 - yesPercent;
   const history = useMemo(() => generateHistory(market, 80), [market]);
   const v24 = volume24h(market);
@@ -65,7 +67,9 @@ export function FeaturedMarket({ market, onClick }: FeaturedMarketProps) {
               <span className="font-mono text-5xl font-bold text-yes leading-none">
                 {yesPercent}
               </span>
-              <span className="font-mono text-2xl text-yes/70 leading-none">%</span>
+              <span className="font-mono text-2xl text-yes/70 leading-none">
+                %
+              </span>
               <span className="text-sm text-muted-foreground ml-2">Yes</span>
             </div>
             <div>
@@ -91,7 +95,10 @@ export function FeaturedMarket({ market, onClick }: FeaturedMarketProps) {
         <div className="flex flex-col items-end gap-3">
           <Sparkline data={history} width={200} height={64} />
           <div className="flex items-center gap-4 font-mono text-xs">
-            <Stat label="Vol" value={`${formatSats(market.volume_sats)} sats`} />
+            <Stat
+              label="Vol"
+              value={`${formatSats(market.volume_sats)} sats`}
+            />
             <Stat label="24h" value={`${formatSats(v24)} sats`} />
             <Stat label="Bettors" value={String(market.num_bettors)} />
           </div>
@@ -104,7 +111,9 @@ export function FeaturedMarket({ market, onClick }: FeaturedMarketProps) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="text-right">
-      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-0.5">
+        {label}
+      </div>
       <div className="text-sm font-semibold text-foreground">{value}</div>
     </div>
   );

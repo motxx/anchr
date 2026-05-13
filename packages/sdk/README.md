@@ -1,7 +1,7 @@
 # @anchr/sdk
 
-Customer + Provider orchestration for the Anchr verified-data exchange:
-Nostr DVM events (NIP-90) over Cashu HTLC settlement.
+Customer + Provider orchestration for the Anchr verified-data exchange: Nostr
+DVM events (NIP-90) over Cashu HTLC settlement.
 
 ## Install
 
@@ -14,12 +14,16 @@ npm i @anchr/sdk
 ## Customer
 
 ```ts
-import { createCustomer, createCashuClient, createHttpOracleClient } from "@anchr/sdk";
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+} from "@anchr/sdk";
 
 const customer = createCustomer({
   oracles: ["npub1oracle1..."],
-  relays:  ["wss://relay.example.org"],
-  mint:    "https://mint.example.org",
+  relays: ["wss://relay.example.org"],
+  mint: "https://mint.example.org",
   oracleClient: createHttpOracleClient({
     endpoint: "https://oracle.example.org",
     oraclePubkey: "npub1oracle1...",
@@ -29,7 +33,7 @@ const customer = createCustomer({
 
 const result = await customer.request({
   spec: {
-    schema: "io.anchr.tlsn-https.v1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     predicate: { target: "https://api.github.com/users/alice" },
   },
   payment: { maxAmount: 1000 },
@@ -64,25 +68,30 @@ await provider.serve(async (request) => {
 });
 ```
 
-## Schema URIs
+Provider implementations must preflight a selected escrow before irreversible
+work and keep redeem decisions narrower than clean-settlement or audit
+decisions. The normative rules live in `specs/messaging.md` and
+`docs/threat-model.md`.
 
-The SDK is verification-format-agnostic. Each request carries a `schema` URI;
-the provider's handler interprets it. URIs the SDK ships as constants:
+## Proof Schema URLs
 
-| URI | Meaning |
-|---|---|
-| `io.anchr.tlsn-https.v1` | TLSNotary attestation of an HTTPS response |
-| `io.anchr.c2pa-image.v1` | C2PA-signed photo / video |
+The SDK is verification-format-agnostic. Each request carries a `schema` URL;
+the provider's handler interprets it. URLs the SDK ships as constants:
+
+| URL                                               | Meaning                                    |
+| ------------------------------------------------- | ------------------------------------------ |
+| `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response |
+| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo / video                  |
 
 The SDK does not bundle producers or verifiers. Wire your own
 `produce(): Promise<{ data, proof }>` in the provider handler, and pass an
-optional `schemaVerifiers` registry on the customer if you want local
-verification of returned proofs.
+optional `verifierAdapters` list on the customer if you want local verification
+of returned proofs.
 
 ## Testing
 
-The default `cashuClient` and `relayClient` open live connections.
-For unit tests, inject your own:
+The default `cashuClient` and `relayClient` open live connections. For unit
+tests, inject your own:
 
 ```ts
 import type { CashuWalletAdapter, RelayClient } from "@anchr/sdk";
@@ -95,7 +104,7 @@ const customer = createCustomer({
 ```
 
 Real e2e coverage against a regtest Cashu mint and Nostr relay lives at
-`e2e/sdk-integration.test.ts` in this repo.
+`e2e/regtest/sdk-integration.test.ts` in this repo.
 
 ## License
 

@@ -10,5 +10,11 @@
  */
 
 export { buildOracleApp } from "./server.ts";
-export { createOracleNostrService, createOracleNostrServiceFromEnv } from "./nostr-service.ts";
-export type { OracleNostrServiceConfig, OracleNostrService } from "./nostr-service.ts";
+export {
+  createOracleNostrService,
+  createOracleNostrServiceFromEnv,
+} from "./nostr-service.ts";
+export type {
+  OracleNostrService,
+  OracleNostrServiceConfig,
+} from "./nostr-service.ts";

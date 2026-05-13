@@ -1,9 +1,12 @@
 import React from "react";
-import { View, Text, Image } from "react-native";
+import { Image, Text, View } from "react-native";
 
 type AvatarSize = "sm" | "md" | "lg" | "xl";
 
-const SIZE_MAP: Record<AvatarSize, { container: string; text: string; dim: number }> = {
+const SIZE_MAP: Record<
+  AvatarSize,
+  { container: string; text: string; dim: number }
+> = {
   sm: { container: "w-8 h-8", text: "text-xs", dim: 32 },
   md: { container: "w-10 h-10", text: "text-sm", dim: 40 },
   lg: { container: "w-14 h-14", text: "text-lg", dim: 56 },
@@ -11,8 +14,14 @@ const SIZE_MAP: Record<AvatarSize, { container: string; text: string; dim: numbe
 };
 
 const COLORS = [
-  "bg-emerald-700", "bg-blue-700", "bg-purple-700", "bg-amber-700",
-  "bg-rose-700", "bg-cyan-700", "bg-indigo-700", "bg-teal-700",
+  "bg-emerald-700",
+  "bg-blue-700",
+  "bg-purple-700",
+  "bg-amber-700",
+  "bg-rose-700",
+  "bg-cyan-700",
+  "bg-indigo-700",
+  "bg-teal-700",
 ];
 
 function getColorFromPubkey(pubkey: string): string {
@@ -48,8 +57,12 @@ export function DSAvatar({ pubkey, imageUrl, size = "md" }: DSAvatarProps) {
 
   const bgColor = getColorFromPubkey(pubkey);
   return (
-    <View className={`${s.container} ${bgColor} rounded-full items-center justify-center`}>
-      <Text className={`${s.text} font-bold text-white`}>{getInitials(pubkey)}</Text>
+    <View
+      className={`${s.container} ${bgColor} rounded-full items-center justify-center`}
+    >
+      <Text className={`${s.text} font-bold text-white`}>
+        {getInitials(pubkey)}
+      </Text>
     </View>
   );
 }

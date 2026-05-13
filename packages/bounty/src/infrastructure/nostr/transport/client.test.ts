@@ -1,6 +1,11 @@
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getNostrConfig, isNostrEnabled, closePool, publishEvent } from "./client.ts";
+import {
+  closePool,
+  getNostrConfig,
+  isNostrEnabled,
+  publishEvent,
+} from "./client.ts";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
 import { buildQueryRequestEvent } from "../events/events.ts";
 import { withEnv } from "../../../testing/helpers.ts";
@@ -37,7 +42,9 @@ describe("getNostrConfig", () => {
   });
 
   test("parses multiple relay URLs", () => {
-    withEnv({ NOSTR_RELAYS: "ws://relay1.example.com,wss://relay2.example.com" }, () => {
+    withEnv({
+      NOSTR_RELAYS: "ws://relay1.example.com,wss://relay2.example.com",
+    }, () => {
       const config = getNostrConfig();
       expect(config).not.toBeNull();
       expect(config!.relayUrls).toEqual([
@@ -48,7 +55,9 @@ describe("getNostrConfig", () => {
   });
 
   test("trims whitespace from relay URLs", () => {
-    withEnv({ NOSTR_RELAYS: " ws://relay1.example.com , wss://relay2.example.com " }, () => {
+    withEnv({
+      NOSTR_RELAYS: " ws://relay1.example.com , wss://relay2.example.com ",
+    }, () => {
       const config = getNostrConfig();
       expect(config!.relayUrls).toEqual([
         "ws://relay1.example.com",

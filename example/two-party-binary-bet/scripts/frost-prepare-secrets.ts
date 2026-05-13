@@ -35,7 +35,9 @@ const EMIT_ENV = Deno.args.includes("--emit-env");
 
 const passphrase = Deno.env.get("FROST_KEY_PASSPHRASE")?.trim();
 if (!passphrase) {
-  console.error("ERROR: FROST_KEY_PASSPHRASE must be set (32+ hex chars recommended).");
+  console.error(
+    "ERROR: FROST_KEY_PASSPHRASE must be set (32+ hex chars recommended).",
+  );
   console.error("       Generate one with: openssl rand -hex 32");
   Deno.exit(1);
 }
@@ -49,16 +51,25 @@ const log = (msg: string) => {
   else console.log(msg);
 };
 
-log(`[prepare-secrets] Running ${THRESHOLD}-of-${TOTAL} DKG (output: ${OUTPUT_DIR}/)`);
+log(
+  `[prepare-secrets] Running ${THRESHOLD}-of-${TOTAL} DKG (output: ${OUTPUT_DIR}/)`,
+);
 
 const dkgCmd = new Deno.Command("deno", {
   args: [
-    "run", "--allow-all", "--config", "deno.json",
+    "run",
+    "--allow-all",
+    "--config",
+    "deno.json",
     "example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts",
-    "--threshold", String(THRESHOLD),
-    "--total", String(TOTAL),
-    "--output-dir", OUTPUT_DIR,
-    "--base-port", String(BASE_PORT),
+    "--threshold",
+    String(THRESHOLD),
+    "--total",
+    String(TOTAL),
+    "--output-dir",
+    OUTPUT_DIR,
+    "--base-port",
+    String(BASE_PORT),
   ],
   env: { ...Deno.env.toObject(), FROST_KEY_PASSPHRASE: passphrase },
   // Pipe stdout in emit-env mode so we can forward DKG progress to stderr
@@ -70,7 +81,9 @@ const dkg = dkgCmd.spawn();
 if (EMIT_ENV && dkg.stdout) {
   void dkg.stdout.pipeTo(
     new WritableStream({
-      write(chunk) { Deno.stderr.writeSync(chunk); },
+      write(chunk) {
+        Deno.stderr.writeSync(chunk);
+      },
     }),
   ).catch(() => {});
 }

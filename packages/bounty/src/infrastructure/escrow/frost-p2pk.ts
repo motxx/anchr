@@ -3,17 +3,17 @@
 // Refund after locktime uses the requester's single key.
 
 import {
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
   getDecodedToken,
+  P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
 } from "@cashu/cashu-ts";
 import type { EscrowProvider } from "../../application/ports.ts";
 import {
-  getWalletAndConfig,
-  encodeProofs,
-  loadAndSend,
   computeNetAmount,
+  encodeProofs,
+  getWalletAndConfig,
+  loadAndSend,
   sumProofAmounts,
 } from "@anchr/core-cashu/escrow-helpers";
 import { verifyToken } from "@anchr/core-cashu/wallet";
@@ -57,16 +57,25 @@ export function createFrostEscrowProvider(
       const ctx = await getWalletAndConfig();
       if (!ctx) return null;
 
-      const sourceProofs = await config.sourceProofsResolver(params.amount_sats);
+      const sourceProofs = await config.sourceProofsResolver(
+        params.amount_sats,
+      );
 
       try {
-        const send = await loadAndSend(ctx.wallet, params.amount_sats, sourceProofs);
+        const send = await loadAndSend(
+          ctx.wallet,
+          params.amount_sats,
+          sourceProofs,
+        );
         const token = encodeProofs(ctx.config.mintUrl, send);
         const ref = `frost_p2pk_${++refCounter}`;
         tokenMap.set(ref, { token, proofs: send });
         return { escrow_ref: ref };
       } catch (error) {
-        log.error("Failed to create hold:", error instanceof Error ? error.message : error);
+        log.error(
+          "Failed to create hold:",
+          error instanceof Error ? error.message : error,
+        );
         return null;
       }
     },
@@ -91,14 +100,22 @@ export function createFrostEscrowProvider(
         const amountSats = computeNetAmount(ctx.wallet, entry.proofs);
         if (amountSats === null) return null;
 
-        const send = await loadAndSend(ctx.wallet, amountSats, entry.proofs, p2pkOptions);
+        const send = await loadAndSend(
+          ctx.wallet,
+          amountSats,
+          entry.proofs,
+          p2pkOptions,
+        );
         const token = encodeProofs(ctx.config.mintUrl, send);
         const newRef = `frost_p2pk_${++refCounter}`;
         tokenMap.set(newRef, { token, proofs: send });
         tokenMap.delete(escrow_ref);
         return { escrow_ref: newRef };
       } catch (error) {
-        log.error("Failed to bind worker:", error instanceof Error ? error.message : error);
+        log.error(
+          "Failed to bind worker:",
+          error instanceof Error ? error.message : error,
+        );
         return null;
       }
     },
@@ -132,17 +149,28 @@ export function createFrostEscrowProvider(
             return { ok: false, message: "No pubkeys tag in P2PK proof" };
           }
           const hasWorker = pubkeys.slice(1).some((pk: string) =>
-            pk === worker_pubkey || pk === `02${worker_pubkey}` || pk === `03${worker_pubkey}`
+            pk === worker_pubkey || pk === `02${worker_pubkey}` ||
+            pk === `03${worker_pubkey}`
           );
           const hasGroup = pubkeys.slice(1).some((pk: string) =>
-            pk === config.groupPubkey || pk === `02${config.groupPubkey}` || pk === `03${config.groupPubkey}`
+            pk === config.groupPubkey || pk === `02${config.groupPubkey}` ||
+            pk === `03${config.groupPubkey}`
           );
-          if (!hasWorker) return { ok: false, message: "Worker pubkey not in P2PK lock" };
-          if (!hasGroup) return { ok: false, message: "Group pubkey not in P2PK lock" };
+          if (!hasWorker) {
+            return { ok: false, message: "Worker pubkey not in P2PK lock" };
+          }
+          if (!hasGroup) {
+            return { ok: false, message: "Group pubkey not in P2PK lock" };
+          }
         }
         return { ok: true };
       } catch (error) {
-        return { ok: false, message: `P2PK verification failed: ${error instanceof Error ? error.message : error}` };
+        return {
+          ok: false,
+          message: `P2PK verification failed: ${
+            error instanceof Error ? error.message : error
+          }`,
+        };
       }
     },
 
@@ -155,7 +183,8 @@ export function createFrostEscrowProvider(
       // port-level method sees the problem immediately.
       return Promise.resolve({
         settled: false,
-        error: "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+        error:
+          "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
       });
     },
 

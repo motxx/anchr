@@ -11,15 +11,16 @@
  * - sign-proofs endpoint lets winners get Oracle signatures
  */
 
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import {
-  registerMarketRoutes,
   createMarketState,
-  type MarketState,
   type MarketRouteContext,
+  type MarketState,
+  parseFaucetTokens,
+  registerMarketRoutes,
 } from "./server-routes.ts";
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,9 @@ import {
 // ---------------------------------------------------------------------------
 
 /** No-op middleware -- tests don't need auth or rate limiting. */
-const passthrough: MiddlewareHandler = async (_c, next) => { await next(); };
+const passthrough: MiddlewareHandler = async (_c, next) => {
+  await next();
+};
 
 function makeTestApp(state?: MarketState) {
   // Tests exercise pair-storage logic with placeholder cashuB tokens that
@@ -40,7 +43,10 @@ function makeTestApp(state?: MarketState) {
   });
   // deno-lint-ignore no-explicit-any
   const app = new Hono<any>();
-  const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+  const ctx: MarketRouteContext = {
+    writeAuth: passthrough,
+    rateLimit: passthrough,
+  };
   registerMarketRoutes(app, ctx, st);
   return { app, state: st };
 }
@@ -102,7 +108,22 @@ async function placeBet(
     body: JSON.stringify({ side, amount_sats, bettor_pubkey }),
   });
   expect(res.status).toBe(201);
-  return res.json() as Promise<{ bet_id: string; matches: Array<{ pair_id: string; amount_sats: number; counterparty_pubkey: string; group_pubkey_yes: string; group_pubkey_no: string; locktime_exchange: number; locktime_market: number }> }>;
+  return res.json() as Promise<
+    {
+      bet_id: string;
+      matches: Array<
+        {
+          pair_id: string;
+          amount_sats: number;
+          counterparty_pubkey: string;
+          group_pubkey_yes: string;
+          group_pubkey_no: string;
+          locktime_exchange: number;
+          locktime_market: number;
+        }
+      >;
+    }
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +173,8 @@ describe("Market API: CRUD", () => {
   });
 
   test("POST /markets publishes to Nostr when relays + identity configured", async () => {
-    const calls: Array<{ marketId: string; pubkey: string; relays: string[] }> = [];
+    const calls: Array<{ marketId: string; pubkey: string; relays: string[] }> =
+      [];
     const state = createMarketState({
       nostrIdentity: {
         secretKey: new Uint8Array(32).fill(7),
@@ -168,7 +190,10 @@ describe("Market API: CRUD", () => {
     const created = await createMarket(localApp);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.marketId).toBe(created.id);
-    expect(calls[0]!.relays).toEqual(["ws://relay-a.test", "ws://relay-b.test"]);
+    expect(calls[0]!.relays).toEqual([
+      "ws://relay-a.test",
+      "ws://relay-b.test",
+    ]);
     // The market record is updated with the published event id, surfaced via /:id detail.
     const detail = await localApp.request(`${BASE}/markets/${created.id}`);
     const detailJson = await detail.json() as { nostr_event_id?: string };
@@ -179,9 +204,15 @@ describe("Market API: CRUD", () => {
     let called = false;
     const state = createMarketState({
       // identity present, but no relays — feature disabled.
-      nostrIdentity: { secretKey: new Uint8Array(32).fill(1), pubkey: "a".repeat(64) },
+      nostrIdentity: {
+        secretKey: new Uint8Array(32).fill(1),
+        pubkey: "a".repeat(64),
+      },
       nostrRelays: [],
-      publishMarket: async () => { called = true; return "should_not_appear"; },
+      publishMarket: async () => {
+        called = true;
+        return "should_not_appear";
+      },
     });
     const { app: localApp } = makeTestApp(state);
     await createMarket(localApp);
@@ -256,9 +287,14 @@ describe("Market API: CRUD", () => {
 
   test("POST /markets succeeds even when Nostr publish throws", async () => {
     const state = createMarketState({
-      nostrIdentity: { secretKey: new Uint8Array(32).fill(2), pubkey: "b".repeat(64) },
+      nostrIdentity: {
+        secretKey: new Uint8Array(32).fill(2),
+        pubkey: "b".repeat(64),
+      },
       nostrRelays: ["ws://relay.test"],
-      publishMarket: async () => { throw new Error("relay unreachable"); },
+      publishMarket: async () => {
+        throw new Error("relay unreachable");
+      },
     });
     const { app: localApp } = makeTestApp(state);
     const created = await createMarket(localApp);
@@ -294,7 +330,12 @@ describe("Market API: CRUD", () => {
     const created = await createMarket(app);
     const res = await app.request(`${BASE}/markets/${created.id}`);
     expect(res.status).toBe(200);
-    const json = await res.json() as { id: string; title: string; pending_bets: number; matched_pairs: number };
+    const json = await res.json() as {
+      id: string;
+      title: string;
+      pending_bets: number;
+      matched_pairs: number;
+    };
     expect(json.id).toBe(created.id);
     expect(json.pending_bets).toBe(0);
     expect(json.matched_pairs).toBe(0);
@@ -386,7 +427,10 @@ describe("Market API: betting", () => {
     await placeBet(app, marketId, "no", 50, "bob");
 
     const res = await app.request(`${BASE}/markets/${marketId}`);
-    const json = await res.json() as { yes_pool_sats: number; no_pool_sats: number };
+    const json = await res.json() as {
+      yes_pool_sats: number;
+      no_pool_sats: number;
+    };
     expect(json.yes_pool_sats).toBe(100);
     expect(json.no_pool_sats).toBe(50);
   });
@@ -395,7 +439,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "maybe", amount_sats: 100, bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        side: "maybe",
+        amount_sats: 100,
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -404,7 +452,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "yes", amount_sats: 0, bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        side: "yes",
+        amount_sats: 0,
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -414,7 +466,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/${created.id}/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "yes", amount_sats: 10, bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        side: "yes",
+        amount_sats: 10,
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -424,7 +480,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/${created.id}/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "yes", amount_sats: 1000, bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        side: "yes",
+        amount_sats: 1000,
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(400);
   });
@@ -439,7 +499,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "yes", amount_sats: 100, bettor_pubkey: "charlie" }),
+      body: JSON.stringify({
+        side: "yes",
+        amount_sats: 100,
+        bettor_pubkey: "charlie",
+      }),
     });
     expect(res.status).toBe(409);
   });
@@ -448,7 +512,11 @@ describe("Market API: betting", () => {
     const res = await app.request(`${BASE}/markets/nonexistent/bet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ side: "yes", amount_sats: 100, bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        side: "yes",
+        amount_sats: 100,
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(404);
   });
@@ -530,7 +598,9 @@ describe("Market API: matching", () => {
     await placeBet(app, marketId, "yes", 100, "alice");
     const res = await app.request(`${BASE}/markets/${marketId}/bets`);
     expect(res.status).toBe(200);
-    const bets = await res.json() as Array<{ side: string; amount_sats: number }>;
+    const bets = await res.json() as Array<
+      { side: string; amount_sats: number }
+    >;
     expect(bets).toHaveLength(1);
     expect(bets[0]!.side).toBe("yes");
   });
@@ -545,13 +615,19 @@ describe("Market API: matching", () => {
     const betId = betRes.bet_id as string;
     expect(betId).toMatch(/^bet_/);
 
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/${betId}`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bettor_pubkey: "alice" }),
-    });
+    const cancelRes = await app.request(
+      `${BASE}/markets/${marketId}/bets/${betId}`,
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bettor_pubkey: "alice" }),
+      },
+    );
     expect(cancelRes.status).toBe(200);
-    const body = await cancelRes.json() as { refunded_sats: number; market: { yes_pool_sats: number } };
+    const body = await cancelRes.json() as {
+      refunded_sats: number;
+      market: { yes_pool_sats: number };
+    };
     expect(body.refunded_sats).toBe(100);
     expect(body.market.yes_pool_sats).toBe(0);
 
@@ -564,11 +640,14 @@ describe("Market API: matching", () => {
     const betRes = await placeBet(app, marketId, "yes", 100, "alice");
     const betId = betRes.bet_id as string;
 
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/${betId}`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bettor_pubkey: "mallory" }),
-    });
+    const cancelRes = await app.request(
+      `${BASE}/markets/${marketId}/bets/${betId}`,
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bettor_pubkey: "mallory" }),
+      },
+    );
     expect(cancelRes.status).toBe(403);
 
     // Bet remains in the queue.
@@ -577,11 +656,14 @@ describe("Market API: matching", () => {
   });
 
   test("DELETE returns 404 for unknown bet", async () => {
-    const cancelRes = await app.request(`${BASE}/markets/${marketId}/bets/bet_nonexistent`, {
-      method: "DELETE",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ bettor_pubkey: "alice" }),
-    });
+    const cancelRes = await app.request(
+      `${BASE}/markets/${marketId}/bets/bet_nonexistent`,
+      {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bettor_pubkey: "alice" }),
+      },
+    );
     expect(cancelRes.status).toBe(404);
   });
 });
@@ -621,8 +703,12 @@ describe("Market API: resolution (single-key)", () => {
     });
     expect(res.status).toBe(200);
     const json = await res.json() as {
-      market_id: string; outcome: string; oracle_signature?: string;
-      mode: string; status: string; settled_pairs: Array<{ amount_sats: number }>;
+      market_id: string;
+      outcome: string;
+      oracle_signature?: string;
+      mode: string;
+      status: string;
+      settled_pairs: Array<{ amount_sats: number }>;
     };
     expect(json.market_id).toBe(marketId);
     expect(json.outcome).toBe("yes");
@@ -639,7 +725,11 @@ describe("Market API: resolution (single-key)", () => {
       body: JSON.stringify({ outcome: "no" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { outcome: string; status: string; settled_pairs: unknown[] };
+    const json = await res.json() as {
+      outcome: string;
+      status: string;
+      settled_pairs: unknown[];
+    };
     expect(json.outcome).toBe("no");
     expect(json.status).toBe("resolved_no");
     expect(json.settled_pairs).toHaveLength(1);
@@ -670,6 +760,20 @@ describe("Market API: resolution (single-key)", () => {
     expect(res.status).toBe(400);
   });
 
+  test("manual resolve can be disabled for public deployments", async () => {
+    const t = makeTestApp(createMarketState({
+      verifyExchangeToken: () => ({ valid: true }),
+      allowManualResolve: false,
+    }));
+    const created = await createMarket(t.app);
+    const res = await t.app.request(`${BASE}/markets/${created.id}/resolve`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ outcome: "yes" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   test("unknown market returns 404", async () => {
     const res = await app.request(`${BASE}/markets/nonexistent/resolve`, {
       method: "POST",
@@ -689,7 +793,11 @@ describe("Market API: resolution (FROST mode mock)", () => {
     const state = createMarketState();
     const signCalls: Array<{ swapId: string; outcome: string }> = [];
     const origSign = state.dualKeyStore.sign.bind(state.dualKeyStore);
-    state.dualKeyStore.sign = (swapId: string, outcome: "a" | "b", message: Uint8Array): string | null => {
+    state.dualKeyStore.sign = (
+      swapId: string,
+      outcome: "a" | "b",
+      message: Uint8Array,
+    ): string | null => {
       signCalls.push({ swapId, outcome });
       return origSign(swapId, outcome, message);
     };
@@ -752,7 +860,11 @@ describe("Market API: redemption", () => {
       body: JSON.stringify({ pubkey: "alice" }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { winning_pairs: number; total_winning_sats: number; oracle_signature?: string };
+    const json = await res.json() as {
+      winning_pairs: number;
+      total_winning_sats: number;
+      oracle_signature?: string;
+    };
     expect(json.winning_pairs).toBe(1);
     expect(json.total_winning_sats).toBe(100);
     expect(json.oracle_signature).toBeTruthy();
@@ -826,7 +938,11 @@ describe("Market API: submit-token", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/submit-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pair_id: "unknown", cashu_token: "cashuBtest", bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        pair_id: "unknown",
+        cashu_token: "cashuBtest",
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(404);
   });
@@ -835,7 +951,11 @@ describe("Market API: submit-token", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/submit-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pair_id: pairId, cashu_token: "cashuBtest", bettor_pubkey: "charlie" }),
+      body: JSON.stringify({
+        pair_id: pairId,
+        cashu_token: "cashuBtest",
+        bettor_pubkey: "charlie",
+      }),
     });
     expect(res.status).toBe(403);
   });
@@ -847,7 +967,11 @@ describe("Market API: submit-token", () => {
     const res = await app.request(`${BASE}/markets/${marketId}/submit-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pair_id: pairId, cashu_token: "cashuBfake_yes_token", bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        pair_id: pairId,
+        cashu_token: "cashuBfake_yes_token",
+        bettor_pubkey: "alice",
+      }),
     });
     expect(res.status).toBe(200);
     const json = await res.json() as { pair_id: string; status: string };
@@ -859,17 +983,29 @@ describe("Market API: submit-token", () => {
     await app.request(`${BASE}/markets/${marketId}/submit-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pair_id: pairId, cashu_token: "cashuBfake_yes_token", bettor_pubkey: "alice" }),
+      body: JSON.stringify({
+        pair_id: pairId,
+        cashu_token: "cashuBfake_yes_token",
+        bettor_pubkey: "alice",
+      }),
     });
 
     // Submit NO side — should complete the exchange
     const res = await app.request(`${BASE}/markets/${marketId}/submit-token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pair_id: pairId, cashu_token: "cashuBfake_no_token", bettor_pubkey: "bob" }),
+      body: JSON.stringify({
+        pair_id: pairId,
+        cashu_token: "cashuBfake_no_token",
+        bettor_pubkey: "bob",
+      }),
     });
     expect(res.status).toBe(200);
-    const json = await res.json() as { pair_id: string; status: string; redeemable_token?: string };
+    const json = await res.json() as {
+      pair_id: string;
+      status: string;
+      redeemable_token?: string;
+    };
     expect(json.status).toBe("locked");
     // Bob (NO side) should receive the YES side's token
     expect(json.redeemable_token).toBe("cashuBfake_yes_token");
@@ -888,7 +1024,10 @@ describe("Market API: submit-token", () => {
     const state = createMarketState();
     // deno-lint-ignore no-explicit-any
     const app = new Hono<any>();
-    const ctx: MarketRouteContext = { writeAuth: passthrough, rateLimit: passthrough };
+    const ctx: MarketRouteContext = {
+      writeAuth: passthrough,
+      rateLimit: passthrough,
+    };
     registerMarketRoutes(app, ctx, state);
 
     const created = await createMarket(app);
@@ -896,10 +1035,8 @@ describe("Market API: submit-token", () => {
     // Force the market to look like it has a FROST group so the verifier
     // path is taken (production paths set this from the FROST config).
     const market = state.markets.get(marketIdLocal)!;
-    market.group_pubkey_yes =
-      "02" + "11".repeat(32);
-    market.group_pubkey_no =
-      "02" + "22".repeat(32);
+    market.group_pubkey_yes = "02" + "11".repeat(32);
+    market.group_pubkey_no = "02" + "22".repeat(32);
 
     await placeBet(app, marketIdLocal, "yes", 100, "alice");
     const betJson = await placeBet(app, marketIdLocal, "no", 100, "bob");
@@ -1010,14 +1147,17 @@ describe("Market API: sign-proofs", () => {
 
   test("sign-proofs rejects unresolved market", async () => {
     const created2 = await createMarket(app);
-    const res = await app.request(`${BASE}/markets/${created2.id}/sign-proofs`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        pubkey: "alice",
-        proof_secrets: ["secret1"],
-      }),
-    });
+    const res = await app.request(
+      `${BASE}/markets/${created2.id}/sign-proofs`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          pubkey: "alice",
+          proof_secrets: ["secret1"],
+        }),
+      },
+    );
     expect(res.status).toBe(409);
   });
 
@@ -1060,14 +1200,20 @@ describe("Market API: user pairs in detail", () => {
       body: JSON.stringify({ outcome: "yes" }),
     });
 
-    const resAlice = await app.request(`${BASE}/markets/${marketId}?pubkey=alice`);
-    const jsonAlice = await resAlice.json() as { user_pairs: Array<{ side: string; won: boolean }> };
+    const resAlice = await app.request(
+      `${BASE}/markets/${marketId}?pubkey=alice`,
+    );
+    const jsonAlice = await resAlice.json() as {
+      user_pairs: Array<{ side: string; won: boolean }>;
+    };
     expect(jsonAlice.user_pairs).toHaveLength(1);
     expect(jsonAlice.user_pairs[0]!.side).toBe("yes");
     expect(jsonAlice.user_pairs[0]!.won).toBe(true);
 
     const resBob = await app.request(`${BASE}/markets/${marketId}?pubkey=bob`);
-    const jsonBob = await resBob.json() as { user_pairs: Array<{ side: string; won: boolean }> };
+    const jsonBob = await resBob.json() as {
+      user_pairs: Array<{ side: string; won: boolean }>;
+    };
     expect(jsonBob.user_pairs).toHaveLength(1);
     expect(jsonBob.user_pairs[0]!.side).toBe("no");
     expect(jsonBob.user_pairs[0]!.won).toBe(false);
@@ -1079,6 +1225,16 @@ describe("Market API: user pairs in detail", () => {
 // ---------------------------------------------------------------------------
 
 describe("Market API: faucet (non-custodial)", () => {
+  test("parseFaucetTokens accepts amount-prefixed cashuB token bank entries", () => {
+    const tokens = parseFaucetTokens(
+      "1000:cashuB_test_one\n2500:cashuB_test_two",
+    );
+    expect(tokens).toHaveLength(2);
+    expect(tokens[0]!.amount_sats).toBe(1000);
+    expect(tokens[1]!.amount_sats).toBe(2500);
+    expect(tokens[0]!.id).toHaveLength(32);
+  });
+
   test("faucet returns 503 when no wallet configured", async () => {
     const state = createMarketState();
     state.getCashuWallet = async () => null;
@@ -1089,6 +1245,38 @@ describe("Market API: faucet (non-custodial)", () => {
       body: JSON.stringify({ amount_sats: 1000 }),
     });
     expect(res.status).toBe(503);
+  });
+
+  test("token-bank faucet dispenses each preloaded token only once", async () => {
+    const state = createMarketState();
+    state.faucetTokens.set("tok1", {
+      id: "tok1",
+      token: "cashuB_public_test_token",
+      amount_sats: 1000,
+    });
+    const { app } = makeTestApp(state);
+
+    const first = await app.request(`${BASE}/markets/wallet/faucet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amount_sats: 1000 }),
+    });
+    expect(first.status).toBe(200);
+    const firstJson = await first.json() as {
+      cashu_token: string;
+      source: string;
+      remaining_tokens: number;
+    };
+    expect(firstJson.cashu_token).toBe("cashuB_public_test_token");
+    expect(firstJson.source).toBe("token_bank");
+    expect(firstJson.remaining_tokens).toBe(0);
+
+    const second = await app.request(`${BASE}/markets/wallet/faucet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ amount_sats: 1000 }),
+    });
+    expect(second.status).toBe(503);
   });
 });
 
@@ -1102,6 +1290,7 @@ describe("Market API: wallet/config", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.mint_url).toBeNull();
+      expect(body.faucet.mode).toBe("disabled");
     } finally {
       if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
     }
@@ -1116,6 +1305,7 @@ describe("Market API: wallet/config", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.mint_url).toBe("http://mint.example:3338");
+      expect(body.faucet).toBeDefined();
     } finally {
       if (prev !== undefined) Deno.env.set("CASHU_MINT_URL", prev);
       else Deno.env.delete("CASHU_MINT_URL");
@@ -1147,13 +1337,19 @@ describe("Market API: full lifecycle", () => {
       }
     }
 
-    const resolveRes = await app.request(`${BASE}/markets/${marketId}/resolve`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ outcome: "yes" }),
-    });
+    const resolveRes = await app.request(
+      `${BASE}/markets/${marketId}/resolve`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ outcome: "yes" }),
+      },
+    );
     expect(resolveRes.status).toBe(200);
-    const resolveJson = await resolveRes.json() as { oracle_signature?: string; settled_pairs: unknown[] };
+    const resolveJson = await resolveRes.json() as {
+      oracle_signature?: string;
+      settled_pairs: unknown[];
+    };
     expect(resolveJson.oracle_signature).toBeTruthy();
     expect(resolveJson.settled_pairs).toHaveLength(1);
 
@@ -1163,7 +1359,10 @@ describe("Market API: full lifecycle", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "alice" }),
     });
-    const redeemJson = await redeemRes.json() as { winning_pairs: number; oracle_signature?: string };
+    const redeemJson = await redeemRes.json() as {
+      winning_pairs: number;
+      oracle_signature?: string;
+    };
     expect(redeemJson.winning_pairs).toBe(1);
     expect(redeemJson.oracle_signature).toBeTruthy();
 
@@ -1192,11 +1391,14 @@ describe("Market API: full lifecycle", () => {
       }
     }
 
-    const resolveRes = await app.request(`${BASE}/markets/${marketId}/resolve`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ outcome: "no" }),
-    });
+    const resolveRes = await app.request(
+      `${BASE}/markets/${marketId}/resolve`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ outcome: "no" }),
+      },
+    );
     expect(resolveRes.status).toBe(200);
     const resolveJson = await resolveRes.json() as { status: string };
     expect(resolveJson.status).toBe("resolved_no");
@@ -1206,15 +1408,21 @@ describe("Market API: full lifecycle", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ pubkey: "bob" }),
     });
-    const bobJson = await bobRedeem.json() as { winning_pairs: number; oracle_signature?: string };
+    const bobJson = await bobRedeem.json() as {
+      winning_pairs: number;
+      oracle_signature?: string;
+    };
     expect(bobJson.winning_pairs).toBe(1);
     expect(bobJson.oracle_signature).toBeTruthy();
 
-    const aliceRedeem = await app.request(`${BASE}/markets/${marketId}/redeem`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ pubkey: "alice" }),
-    });
+    const aliceRedeem = await app.request(
+      `${BASE}/markets/${marketId}/redeem`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pubkey: "alice" }),
+      },
+    );
     const aliceJson = await aliceRedeem.json() as { winning_pairs: number };
     expect(aliceJson.winning_pairs).toBe(0);
   });

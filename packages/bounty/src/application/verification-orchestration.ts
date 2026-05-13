@@ -50,14 +50,26 @@ export async function verifyAndFinalize(
   oracleId: string | undefined,
 ) {
   const { passed, attestations, verification } = await verifyWithQuorum(
-    query, normalizedResult, deps.oracleResolver, deps.multiOracleResolver, blossomKeys, oracleId,
+    query,
+    normalizedResult,
+    deps.oracleResolver,
+    deps.multiOracleResolver,
+    blossomKeys,
+    oracleId,
   );
   const newStatus: QueryStatus = passed ? "approved" : "rejected";
   const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
 
   let publishedProofs: string[] | undefined;
-  if (deps.proofDelivery && query.visibility === "public" && attestations.length > 0) {
-    publishedProofs = await publishAttestations(query, attestations, deps.proofDelivery)
+  if (
+    deps.proofDelivery && query.visibility === "public" &&
+    attestations.length > 0
+  ) {
+    publishedProofs = await publishAttestations(
+      query,
+      attestations,
+      deps.proofDelivery,
+    )
       .catch((err) => {
         log.error("failed to publish attestations", { err });
         return undefined;
@@ -84,6 +96,9 @@ export function tryRevealPreimage(
 ): string | undefined {
   if (!passed || !preimageStore || !htlcHash) return undefined;
   const preimage = preimageStore.getPreimage(htlcHash);
-  if (preimage) { preimageStore.delete(htlcHash); return preimage; }
+  if (preimage) {
+    preimageStore.delete(htlcHash);
+    return preimage;
+  }
   return undefined;
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Resolve Issues"
+  short_description: "Resolve and close docs/issues entries"
+  default_prompt: "Use $resolve-issues to implement and close a pending docs/issues entry."

@@ -5,8 +5,8 @@ import {
   buildFrostSignatureDM,
   buildPreimageDM,
   buildRejectionDM,
-  parseOracleDM,
   DM_KIND,
+  parseOracleDM,
 } from "./dm.ts";
 import type { FrostSignatureDMPayload } from "./events.ts";
 
@@ -50,7 +50,11 @@ describe("FROST DM building and parsing", () => {
       groupPubkey,
     );
 
-    const parsed = parseOracleDM(event.content, worker.secretKey, oracle.publicKey);
+    const parsed = parseOracleDM(
+      event.content,
+      worker.secretKey,
+      oracle.publicKey,
+    );
     expect(parsed.type).toBe("frost_signature");
   });
 
@@ -68,7 +72,11 @@ describe("FROST DM building and parsing", () => {
       groupPubkey,
     );
 
-    const parsed = parseOracleDM(event.content, worker.secretKey, oracle.publicKey) as FrostSignatureDMPayload;
+    const parsed = parseOracleDM(
+      event.content,
+      worker.secretKey,
+      oracle.publicKey,
+    ) as FrostSignatureDMPayload;
 
     expect(parsed.type).toBe("frost_signature");
     expect(parsed.query_id).toBe("query_frost_3");
@@ -84,8 +92,18 @@ describe("FROST DM building and parsing", () => {
     const groupSig = "ff".repeat(32);
     const groupPubkey = "ee".repeat(16);
 
-    const event = buildFrostSignatureDM(oracle, worker.publicKey, queryId, groupSig, groupPubkey);
-    const parsed = parseOracleDM(event.content, worker.secretKey, oracle.publicKey) as FrostSignatureDMPayload;
+    const event = buildFrostSignatureDM(
+      oracle,
+      worker.publicKey,
+      queryId,
+      groupSig,
+      groupPubkey,
+    );
+    const parsed = parseOracleDM(
+      event.content,
+      worker.secretKey,
+      oracle.publicKey,
+    ) as FrostSignatureDMPayload;
 
     expect(parsed.query_id).toBe(queryId);
     expect(parsed.group_signature).toBe(groupSig);
@@ -97,8 +115,17 @@ describe("FROST DM building and parsing", () => {
     const worker = generateEphemeralIdentity();
     const preimage = "abcdef0123456789".repeat(4);
 
-    const event = buildPreimageDM(oracle, worker.publicKey, "query_compat_1", preimage);
-    const parsed = parseOracleDM(event.content, worker.secretKey, oracle.publicKey);
+    const event = buildPreimageDM(
+      oracle,
+      worker.publicKey,
+      "query_compat_1",
+      preimage,
+    );
+    const parsed = parseOracleDM(
+      event.content,
+      worker.secretKey,
+      oracle.publicKey,
+    );
 
     expect(parsed.type).toBe("preimage");
     expect(parsed.query_id).toBe("query_compat_1");
@@ -109,8 +136,17 @@ describe("FROST DM building and parsing", () => {
     const oracle = generateEphemeralIdentity();
     const worker = generateEphemeralIdentity();
 
-    const event = buildRejectionDM(oracle, worker.publicKey, "query_compat_2", "Invalid C2PA");
-    const parsed = parseOracleDM(event.content, worker.secretKey, oracle.publicKey);
+    const event = buildRejectionDM(
+      oracle,
+      worker.publicKey,
+      "query_compat_2",
+      "Invalid C2PA",
+    );
+    const parsed = parseOracleDM(
+      event.content,
+      worker.secretKey,
+      oracle.publicKey,
+    );
 
     expect(parsed.type).toBe("rejection");
     expect(parsed.query_id).toBe("query_compat_2");

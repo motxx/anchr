@@ -1,6 +1,6 @@
-import { describe, test, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { fetchWithProof, _clearCacheForTest } from "./data-fetcher.ts";
+import { _clearCacheForTest, fetchWithProof } from "./data-fetcher.ts";
 
 describe("fetchWithProof SSRF protection", () => {
   beforeEach(() => {
@@ -9,7 +9,11 @@ describe("fetchWithProof SSRF protection", () => {
 
   test("rejects private IPv4 (cloud metadata)", async () => {
     await expect(
-      fetchWithProof("listing_1", "http://169.254.169.254/latest/meta-data/", 60),
+      fetchWithProof(
+        "listing_1",
+        "http://169.254.169.254/latest/meta-data/",
+        60,
+      ),
     ).rejects.toThrow("Source URL rejected");
   });
 

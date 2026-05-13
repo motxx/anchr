@@ -1,9 +1,11 @@
-import { builtInOracle, BUILT_IN_ORACLE_ID } from "./built-in.ts";
+import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
 import type { Oracle, OracleInfo } from "../../domain/oracle-types.ts";
 import type { OracleRegistry } from "../../application/ports.ts";
 export type { OracleRegistry } from "../../application/ports.ts";
 
-export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): OracleRegistry {
+export function createOracleRegistry(
+  options?: { skipBuiltIn?: boolean },
+): OracleRegistry {
   const oracles = new Map<string, Oracle>();
   if (!options?.skipBuiltIn) {
     oracles.set(BUILT_IN_ORACLE_ID, builtInOracle);
@@ -21,7 +23,9 @@ export function createOracleRegistry(options?: { skipBuiltIn?: boolean }): Oracl
     },
     resolve(oracleId, acceptableIds) {
       if (oracleId) {
-        if (acceptableIds?.length && !acceptableIds.includes(oracleId)) return null;
+        if (acceptableIds?.length && !acceptableIds.includes(oracleId)) {
+          return null;
+        }
         return registry.get(oracleId);
       }
       if (acceptableIds?.length === 1) return registry.get(acceptableIds[0]!);
@@ -64,6 +68,9 @@ export function registerOracle(oracle: Oracle): void {
   defaultRegistry.register(oracle);
 }
 
-export function resolveOracle(oracleId: string | undefined, acceptableIds: string[] | undefined): Oracle | null {
+export function resolveOracle(
+  oracleId: string | undefined,
+  acceptableIds: string[] | undefined,
+): Oracle | null {
   return defaultRegistry.resolve(oracleId, acceptableIds);
 }

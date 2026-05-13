@@ -35,12 +35,32 @@ history (`added for X` / `previously did Y`) — caught by
 
 ## Verification bar
 "Done" = full local pass:
-- `deno task test:all` — lint:strict + unit + protocol + frost +
-  integration + example + pentest
-- `deno task test:all:docker` — Docker-backed e2e (relay + regtest)
+- `deno task test:all` — lint:strict + test:unit + test:integration +
+  test:e2e:protocol + test:scripts + test:examples + test:e2e:frost +
+  local static checks
+- `deno task test:all:docker` — Docker-backed e2e
+  (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
+
+Use `docs/review-harness.md` to route recurring review findings to automated
+checks, semantic skills, universal docs, or follow-up issues.
 
 Failed test → fix the implementation. Never skip, weaken, or
 `--no-check`.
+
+## Tests
+Three tiers, one suffix per tier, directory = task:
+- **Unit:** `*.test.ts` next to source under `packages/<pkg>/src/`. No
+  I/O. Discovered by `deno task test:unit`.
+- **Integration:** `*.integration.test.ts` next to source under
+  `packages/<pkg>/src/`. In-process HTTP/WS/Blossom only. Discovered
+  by `deno task test:integration`.
+- **E2E:** `e2e/<bucket>/*.test.ts`. Bucket directory = infra profile
+  = deno task name. Buckets: `protocol` (no infra), `relay`, `regtest`,
+  `frost`, `tlsn`. Run via `deno task test:e2e:<bucket>`.
+
+Adding a new test means dropping the file in the right place — no
+`deno.json` edit. The `.unit.` / `.domain.` / `.application.` suffixes
+are forbidden (single source of truth: `*.test.ts` *is* the unit tier).
 
 ## Lint
 `deno task lint:strict` chains every gating lint. Rule catalogue and
@@ -52,13 +72,12 @@ pre-commit hook.
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
   `frost-oracle`, `cashu-conditional-swap`, `blossom`, `bounty`,
-  `sdk`). The host implementation (Query lifecycle, escrow,
-  oracle-client/service, worker-api, MCP) lives in
+  `sdk`). Migration scaffolding (Query lifecycle, escrow,
+  oracle-client/service, verification adapters) lives in
   `packages/bounty/src/{domain,application,infrastructure}/`.
 - `example/<app>/` — concrete apps; their own deno.json + design
   system. **Must reach Anchr through `@anchr/*` only** — relative
-  paths into `packages/<pkg>/src/...` are an E023 violation. The
-  reference deployment is `example/anchr-reference-host/`.
+  paths into `packages/<pkg>/src/...` are an E023 violation.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
@@ -71,3 +90,7 @@ Application vocabulary (`market`, `marketplace`, …) is forbidden in
 When a request matches an available skill, invoke it via `Skill` as the
 first action. Available skills appear in the system reminder; trust
 their own descriptions.
+
+Repository-local skills are shared with Codex. The canonical definitions live in
+`skills/<skill-name>/SKILL.md`; `.claude/skills` and `.codex/skills` are symlinks
+to that directory. Add or edit skills under `skills/` only.

@@ -7,7 +7,7 @@
  * 4. tlsn-prove で proof 生成
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
@@ -18,29 +18,35 @@ if (!SQUARE_ACCESS_TOKEN) {
 
 // --- Step 1: Get Location ID ---
 console.log("=== Step 1: Setup ===");
-const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
-  headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
-});
+const locResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/locations",
+  {
+    headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
+  },
+);
 const locData = await locResp.json();
 const LOCATION_ID = locData.locations?.[0]?.id;
 console.log("Location ID:", LOCATION_ID);
 
 // --- Step 2: Create Payment Link ---
 console.log("\n=== Step 2: Create Payment Link ===");
-const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-checkout/payment-links", {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    quick_pay: {
-      name: "BTC Swap Test ¥100",
-      price_money: { amount: 100, currency: "JPY" },
-      location_id: LOCATION_ID,
+const linkResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/online-checkout/payment-links",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  }),
-});
+    body: JSON.stringify({
+      quick_pay: {
+        name: "BTC Swap Test ¥100",
+        price_money: { amount: 100, currency: "JPY" },
+        location_id: LOCATION_ID,
+      },
+    }),
+  },
+);
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
 const ORDER_ID = linkData.payment_link?.order_id;
@@ -80,7 +86,9 @@ if (await nextButton.count() > 0) {
   console.log("Screenshot: /tmp/square-e2e-2-test-payment.png");
 
   // Step 2: On "Test Payment" step, there should be a button to complete
-  const completeButton = page.locator('button:has-text("Next"), button:has-text("Complete"), button:has-text("Pay"), button:has-text("Simulate")').first();
+  const completeButton = page.locator(
+    'button:has-text("Next"), button:has-text("Complete"), button:has-text("Pay"), button:has-text("Simulate")',
+  ).first();
   if (await completeButton.count() > 0) {
     console.log("Clicking to complete payment...");
     await completeButton.click();
@@ -98,25 +106,31 @@ await browser.close();
 // --- Step 4: Find Payment ID from Order ---
 console.log("\n=== Step 4: Find Payment ID ===");
 // Wait a moment for payment to process
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 // Get the order to find the payment
-const orderResp = await fetch(`https://connect.squareupsandbox.com/v2/orders/${ORDER_ID}`, {
-  method: "POST",  // Square's RetrieveOrder is POST-based via batch
-  headers: {
-    "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json",
+const orderResp = await fetch(
+  `https://connect.squareupsandbox.com/v2/orders/${ORDER_ID}`,
+  {
+    method: "POST", // Square's RetrieveOrder is POST-based via batch
+    headers: {
+      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
   },
-  body: JSON.stringify({}),
-});
+);
 
 // Also try listing recent payments
-const paymentsResp = await fetch("https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1", {
-  headers: {
-    "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json",
+const paymentsResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1",
+  {
+    headers: {
+      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
+    },
   },
-});
+);
 const paymentsData = await paymentsResp.json();
 const latestPayment = paymentsData.payments?.[0];
 
@@ -137,12 +151,17 @@ if (latestPayment) {
 
     const proc = spawn([
       "./crates/tlsn-prover/target/release/tlsn-prove",
-      "--verifier", "localhost:7046",
-      "--max-recv-data", "4096",
-      "--max-sent-data", "4096",
-      "-H", `Authorization: Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "--verifier",
+      "localhost:7046",
+      "--max-recv-data",
+      "4096",
+      "--max-sent-data",
+      "4096",
+      "-H",
+      `Authorization: Bearer ${SQUARE_ACCESS_TOKEN}`,
       `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
-      "-o", "/tmp/square-e2e-proof.presentation.tlsn",
+      "-o",
+      "/tmp/square-e2e-proof.presentation.tlsn",
     ], { stdout: "pipe", stderr: "pipe" });
 
     const startTime = Date.now();

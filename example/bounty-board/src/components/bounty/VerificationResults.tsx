@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import { DSCard, DSText, DSFeedbackBanner } from "../ds/index.ts";
+import { DSCard, DSFeedbackBanner, DSText } from "../ds/index.ts";
 import { Ionicons } from "@expo/vector-icons";
 import type { VerificationDetail } from "../../api/types.ts";
 
@@ -8,12 +8,16 @@ interface VerificationResultsProps {
   verification: VerificationDetail;
 }
 
-export function VerificationResults({ verification }: VerificationResultsProps) {
+export function VerificationResults(
+  { verification }: VerificationResultsProps,
+) {
   return (
     <View className="gap-3">
       <DSFeedbackBanner
         variant={verification.passed ? "success" : "error"}
-        message={verification.passed ? "All checks passed" : "Verification failed"}
+        message={verification.passed
+          ? "All checks passed"
+          : "Verification failed"}
       />
 
       {verification.checks.length > 0 && (

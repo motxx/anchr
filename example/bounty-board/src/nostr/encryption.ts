@@ -16,11 +16,17 @@ export function deriveConversationKey(
   return nip44.v2.utils.getConversationKey(secretKey, recipientPubKey);
 }
 
-export function encryptNip44(plaintext: string, conversationKey: Uint8Array): string {
+export function encryptNip44(
+  plaintext: string,
+  conversationKey: Uint8Array,
+): string {
   return nip44.v2.encrypt(plaintext, conversationKey);
 }
 
-export function decryptNip44(ciphertext: string, conversationKey: Uint8Array): string {
+export function decryptNip44(
+  ciphertext: string,
+  conversationKey: Uint8Array,
+): string {
   return nip44.v2.decrypt(ciphertext, conversationKey);
 }
 

@@ -2,7 +2,13 @@ import { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { extname, join } from "node:path";
-import { spawn, which, writeFile, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime/mod";
+import {
+  fileExists,
+  readFileAsArrayBuffer,
+  spawn,
+  which,
+  writeFile,
+} from "@anchr/core-runtime/mod";
 import { getRuntimeConfig } from "./config.ts";
 import type {
   AttachmentAccess,
@@ -14,10 +20,10 @@ import type {
 } from "../domain/types.ts";
 import {
   attachmentRefSource,
-  inferAttachmentId,
   extractBlossomFields,
-  normalizeFromResolved,
+  inferAttachmentId,
   normalizeFromRef,
+  normalizeFromResolved,
   normalizeFromString,
   readBlossomAttachment,
   readExternalAttachment,
@@ -43,6 +49,10 @@ export interface StoredAttachment {
   storageKind: AttachmentStorageKind;
 }
 
+export interface StoredAttachmentBuffer extends StoredAttachment {
+  data: Buffer;
+}
+
 export interface AttachmentPreview {
   data: string;
   mimeType: string;
@@ -51,8 +61,26 @@ export interface AttachmentPreview {
   maxDimension: number;
 }
 
+export interface QueryAttachmentUrls {
+  viewUrl: string;
+  metaUrl: string;
+  previewUrl: string;
+}
+
+export interface StoredAttachmentStats extends StoredAttachment {
+  size: number;
+}
+
 function resolvePreviewCommand():
-  | { command: string; args: (inputPath: string, outputPath: string, maxDimension: number, jpegQuality: number) => string[] }
+  | {
+    command: string;
+    args: (
+      inputPath: string,
+      outputPath: string,
+      maxDimension: number,
+      jpegQuality: number,
+    ) => string[];
+  }
   | null {
   if (process.platform === "darwin") {
     return {
@@ -111,26 +139,37 @@ function resolvePreviewCommand():
 }
 
 function inferMimeTypeFromFilename(filename: string): string {
-  return MIME_TYPES[extname(filename).toLowerCase()] ?? "application/octet-stream";
+  return MIME_TYPES[extname(filename).toLowerCase()] ??
+    "application/octet-stream";
 }
 
 export function attachmentPublicBaseUrl(requestUrl?: string): string {
-  const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ?? Deno.env.get("PUBLIC_BASE_URL");
+  const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ??
+    Deno.env.get("PUBLIC_BASE_URL");
   if (configured) return configured.replace(/\/+$/, "");
-  if (requestUrl) return new URL("/", requestUrl).toString().replace(/\/+$/, "");
+  if (requestUrl) {
+    return new URL("/", requestUrl).toString().replace(/\/+$/, "");
+  }
   return `http://localhost:${getRuntimeConfig().httpApiPort}`;
 }
 
-export function buildAttachmentAbsoluteUrl(ref: AttachmentLike, requestUrl?: string): string {
+export function buildAttachmentAbsoluteUrl(
+  ref: AttachmentLike,
+  requestUrl?: string,
+): string {
   const source = attachmentRefSource(ref);
   try {
     return new URL(source).toString();
   } catch {
-    return new URL(source, `${attachmentPublicBaseUrl(requestUrl)}/`).toString();
+    return new URL(source, `${attachmentPublicBaseUrl(requestUrl)}/`)
+      .toString();
   }
 }
 
-export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
+export function normalizeAttachmentRef(
+  ref: AttachmentLike,
+  requestUrl?: string,
+): AttachmentRef {
   const resolved = resolveStoredAttachment(ref, requestUrl);
   const blossomFields = extractBlossomFields(ref);
 
@@ -145,7 +184,10 @@ export function normalizeAttachmentRef(ref: AttachmentLike, requestUrl?: string)
   return normalizeFromString(ref);
 }
 
-export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: string): AttachmentRef {
+export function materializeAttachmentRef(
+  ref: AttachmentLike,
+  requestUrl?: string,
+): AttachmentRef {
   const normalized = normalizeAttachmentRef(ref, requestUrl);
   return {
     ...normalized,
@@ -153,20 +195,38 @@ export function materializeAttachmentRef(ref: AttachmentLike, requestUrl?: strin
   };
 }
 
-export function materializeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
+export function materializeQueryResult(
+  result: QueryResult,
+  requestUrl?: string,
+): QueryResult {
   if (!result.attachments?.length) return result;
   return {
     ...result,
-    attachments: result.attachments.map((attachment) => materializeAttachmentRef(attachment, requestUrl)),
+    attachments: result.attachments.map((attachment) =>
+      materializeAttachmentRef(attachment, requestUrl)
+    ),
   };
 }
 
-export function buildQueryAttachmentUrls(queryId: string, attachmentIndex: number, requestUrl?: string) {
+export function buildQueryAttachmentUrls(
+  queryId: string,
+  attachmentIndex: number,
+  requestUrl?: string,
+): QueryAttachmentUrls {
   const baseUrl = attachmentPublicBaseUrl(requestUrl);
   return {
-    viewUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}`, `${baseUrl}/`).toString(),
-    metaUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}/meta`, `${baseUrl}/`).toString(),
-    previewUrl: new URL(`/queries/${queryId}/attachments/${attachmentIndex}/preview`, `${baseUrl}/`).toString(),
+    viewUrl: new URL(
+      `/queries/${queryId}/attachments/${attachmentIndex}`,
+      `${baseUrl}/`,
+    ).toString(),
+    metaUrl: new URL(
+      `/queries/${queryId}/attachments/${attachmentIndex}/meta`,
+      `${baseUrl}/`,
+    ).toString(),
+    previewUrl: new URL(
+      `/queries/${queryId}/attachments/${attachmentIndex}/preview`,
+      `${baseUrl}/`,
+    ).toString(),
   };
 }
 
@@ -177,7 +237,11 @@ export function buildAttachmentAccess(
   requestUrl?: string,
 ): AttachmentAccess {
   const originalUrl = buildAttachmentAbsoluteUrl(ref, requestUrl);
-  const { viewUrl, metaUrl, previewUrl } = buildQueryAttachmentUrls(queryId, attachmentIndex, requestUrl);
+  const { viewUrl, metaUrl, previewUrl } = buildQueryAttachmentUrls(
+    queryId,
+    attachmentIndex,
+    requestUrl,
+  );
 
   return {
     original_url: originalUrl,
@@ -199,22 +263,33 @@ export function buildAttachmentHandle(
   };
 }
 
-export function normalizeQueryResult(result: QueryResult, requestUrl?: string): QueryResult {
+export function normalizeQueryResult(
+  result: QueryResult,
+  requestUrl?: string,
+): QueryResult {
   if (!result.attachments?.length) return result;
   return {
     ...result,
-    attachments: result.attachments.map((attachment) => normalizeAttachmentRef(attachment, requestUrl)),
+    attachments: result.attachments.map((attachment) =>
+      normalizeAttachmentRef(attachment, requestUrl)
+    ),
   };
 }
 
-export function resolveStoredAttachment(ref: AttachmentLike, _requestUrl?: string): StoredAttachment | null {
+export function resolveStoredAttachment(
+  ref: AttachmentLike,
+  _requestUrl?: string,
+): StoredAttachment | null {
   const source = attachmentRefSource(ref);
   try {
     const url = new URL(source);
-    const filename = url.pathname.split("/").filter(Boolean).pop() ?? "attachment";
+    const filename = url.pathname.split("/").filter(Boolean).pop() ??
+      "attachment";
     return {
       filename,
-      mimeType: typeof ref === "string" ? inferMimeTypeFromFilename(filename) : ref.mime_type || inferMimeTypeFromFilename(filename),
+      mimeType: typeof ref === "string"
+        ? inferMimeTypeFromFilename(filename)
+        : ref.mime_type || inferMimeTypeFromFilename(filename),
       absoluteUrl: url.toString(),
       storageKind: typeof ref === "string" ? "external" : ref.storage_kind,
     };
@@ -223,7 +298,10 @@ export function resolveStoredAttachment(ref: AttachmentLike, _requestUrl?: strin
   }
 }
 
-export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestUrl?: string) {
+export async function readStoredAttachmentAsBase64(
+  ref: AttachmentLike,
+  requestUrl?: string,
+): Promise<(Omit<StoredAttachmentBuffer, "data"> & { data: string }) | null> {
   const attachment = await readStoredAttachmentBuffer(ref, requestUrl);
   if (!attachment) return null;
 
@@ -233,9 +311,16 @@ export async function readStoredAttachmentAsBase64(ref: AttachmentLike, requestU
   };
 }
 
-export async function readStoredAttachmentBuffer(ref: AttachmentLike, requestUrl?: string, blossomKeyMaterial?: BlossomKeyMaterial) {
+export async function readStoredAttachmentBuffer(
+  ref: AttachmentLike,
+  requestUrl?: string,
+  blossomKeyMaterial?: BlossomKeyMaterial,
+): Promise<StoredAttachmentBuffer | null> {
   // Handle Blossom-hosted attachments (encrypted, content-addressed)
-  if (typeof ref !== "string" && ref.storage_kind === "blossom" && ref.blossom_hash && blossomKeyMaterial) {
+  if (
+    typeof ref !== "string" && ref.storage_kind === "blossom" &&
+    ref.blossom_hash && blossomKeyMaterial
+  ) {
     return readBlossomAttachment(ref, blossomKeyMaterial);
   }
 
@@ -258,7 +343,8 @@ export async function renderStoredAttachmentPreview(
   }
 
   const runtimeConfig = getRuntimeConfig();
-  const maxDimension = options?.maxDimension ?? runtimeConfig.previewMaxDimension;
+  const maxDimension = options?.maxDimension ??
+    runtimeConfig.previewMaxDimension;
   const jpegQuality = options?.jpegQuality ?? runtimeConfig.previewJpegQuality;
   const previewCommand = resolvePreviewCommand();
   if (!previewCommand) {
@@ -291,7 +377,9 @@ export async function renderStoredAttachmentPreview(
     return {
       data: data.toString("base64"),
       mimeType: "image/jpeg",
-      filename: `${attachment.filename.replace(/\.[^.]+$/, "") || "preview"}.preview.jpg`,
+      filename: `${
+        attachment.filename.replace(/\.[^.]+$/, "") || "preview"
+      }.preview.jpg`,
       size: data.length,
       maxDimension,
     };
@@ -300,7 +388,10 @@ export async function renderStoredAttachmentPreview(
   }
 }
 
-export async function statStoredAttachment(ref: AttachmentLike, requestUrl?: string) {
+export async function statStoredAttachment(
+  ref: AttachmentLike,
+  requestUrl?: string,
+): Promise<StoredAttachmentStats | null> {
   const attachment = resolveStoredAttachment(ref, requestUrl);
   if (!attachment) return null;
 

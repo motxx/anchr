@@ -1,5 +1,5 @@
 /**
- * P2P Token Exchange Protocol — trustless token creation and verification.
+ * P2P token exchange protocol — non-custodial token creation and verification.
  *
  * In the non-custodial two-party binary bet, users create their own P2PK-locked
  * tokens in the browser. The matchmaker only announces matches; it never
@@ -17,11 +17,11 @@
  */
 
 import {
-  P2PKBuilder,
-  type Proof,
-  type P2PKOptions,
-  getEncodedToken,
   getDecodedToken,
+  getEncodedToken,
+  P2PKBuilder,
+  type P2PKOptions,
+  type Proof,
   type Wallet,
 } from "@cashu/cashu-ts";
 
@@ -78,7 +78,10 @@ export interface VerificationResult {
  * "where the proofs go" decision to the mint, which they already trust
  * for P2PK enforcement.
  */
-function buildExchangeOptionsYes(config: ExchangeConfig, locktime: number): P2PKOptions {
+function buildExchangeOptionsYes(
+  config: ExchangeConfig,
+  locktime: number,
+): P2PKOptions {
   return new P2PKBuilder()
     .addLockPubkey([config.marketGroupPubkeyNo, config.counterpartyPubkey])
     .requireLockSignatures(2)
@@ -98,7 +101,10 @@ function buildExchangeOptionsYes(config: ExchangeConfig, locktime: number): P2PK
  *
  * See buildExchangeOptionsYes for the sigflag (SIG_INPUTS) rationale.
  */
-function buildExchangeOptionsNo(config: ExchangeConfig, locktime: number): P2PKOptions {
+function buildExchangeOptionsNo(
+  config: ExchangeConfig,
+  locktime: number,
+): P2PKOptions {
   return new P2PKBuilder()
     .addLockPubkey([config.marketGroupPubkeyYes, config.counterpartyPubkey])
     .requireLockSignatures(2)
@@ -108,7 +114,10 @@ function buildExchangeOptionsNo(config: ExchangeConfig, locktime: number): P2PKO
     .toOptions();
 }
 
-function buildOptionsForSide(config: ExchangeConfig, locktime: number): P2PKOptions {
+function buildOptionsForSide(
+  config: ExchangeConfig,
+  locktime: number,
+): P2PKOptions {
   return config.mySide === "yes"
     ? buildExchangeOptionsYes(config, locktime)
     : buildExchangeOptionsNo(config, locktime);
@@ -165,7 +174,9 @@ export async function createLockedToken(
 function toXOnlyPubkey(hex: string): string {
   const lower = hex.toLowerCase();
   if (lower.length === 64) return lower;
-  if (lower.length === 66 && (lower.startsWith("02") || lower.startsWith("03"))) {
+  if (
+    lower.length === 66 && (lower.startsWith("02") || lower.startsWith("03"))
+  ) {
     return lower.slice(2);
   }
   return lower;
@@ -203,7 +214,10 @@ export function verifyReceivedToken(
 ): VerificationResult {
   let decoded;
   try {
-    decoded = getDecodedToken(token, knownKeysets ? [...knownKeysets] : undefined);
+    decoded = getDecodedToken(
+      token,
+      knownKeysets ? [...knownKeysets] : undefined,
+    );
   } catch {
     return { valid: false, error: "Failed to decode cashu token" };
   }
@@ -213,7 +227,10 @@ export function verifyReceivedToken(
     return { valid: false, error: "Token contains no proofs" };
   }
 
-  const totalAmount = proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
+  const totalAmount = proofs.reduce(
+    (sum: number, p: Proof) => sum + p.amount,
+    0,
+  );
   if (totalAmount < expected.amount) {
     return {
       valid: false,
@@ -226,7 +243,10 @@ export function verifyReceivedToken(
   for (const proof of proofs) {
     const secretResult = parseP2PKSecret(proof.secret);
     if (!secretResult.valid) {
-      return { valid: false, error: `Invalid P2PK secret: ${secretResult.error}` };
+      return {
+        valid: false,
+        error: `Invalid P2PK secret: ${secretResult.error}`,
+      };
     }
 
     const { pubkeys, nSigs, locktime } = secretResult;
@@ -239,7 +259,8 @@ export function verifyReceivedToken(
     if (!lockKeysX.includes(expectedGroupX)) {
       return {
         valid: false,
-        error: `Missing group pubkey in lock conditions: ${expected.groupPubkey}`,
+        error:
+          `Missing group pubkey in lock conditions: ${expected.groupPubkey}`,
       };
     }
     if (!lockKeysX.includes(expectedMineX)) {
@@ -285,12 +306,22 @@ function parseP2PKSecret(secret: string): P2PKParseResult {
   try {
     const parsed = JSON.parse(secret);
     if (!Array.isArray(parsed) || parsed[0] !== "P2PK") {
-      return { valid: false, error: "Not a P2PK secret", pubkeys: [], nSigs: 0 };
+      return {
+        valid: false,
+        error: "Not a P2PK secret",
+        pubkeys: [],
+        nSigs: 0,
+      };
     }
 
     const payload = parsed[1];
     if (!payload || typeof payload !== "object") {
-      return { valid: false, error: "Invalid P2PK payload", pubkeys: [], nSigs: 0 };
+      return {
+        valid: false,
+        error: "Invalid P2PK payload",
+        pubkeys: [],
+        nSigs: 0,
+      };
     }
 
     const tags = payload.tags || [];
@@ -321,6 +352,11 @@ function parseP2PKSecret(secret: string): P2PKParseResult {
 
     return { valid: true, pubkeys, nSigs, locktime };
   } catch {
-    return { valid: false, error: "Failed to parse secret JSON", pubkeys: [], nSigs: 0 };
+    return {
+      valid: false,
+      error: "Failed to parse secret JSON",
+      pubkeys: [],
+      nSigs: 0,
+    };
   }
 }

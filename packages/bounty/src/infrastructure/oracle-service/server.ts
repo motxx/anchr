@@ -13,8 +13,15 @@
  */
 
 import { Hono } from "hono";
-import { createPreimageStore, createPersistentPreimageStore, type PreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createFrostCoordinator, type FrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import {
+  createPersistentPreimageStore,
+  createPreimageStore,
+  type PreimageStore,
+} from "@anchr/core-cashu/preimage-store";
+import {
+  createFrostCoordinator,
+  type FrostCoordinator,
+} from "@anchr/frost-oracle/coordinator";
 import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
 import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
 import { buildAuthMiddleware } from "./auth.ts";
@@ -66,13 +73,11 @@ export function buildOracleApp(
       id: oracleId,
       name: `Oracle ${oracleId}`,
       fee_ppm: Number(Deno.env.get("ORACLE_FEE_PPM")) || 0,
-    }),
-  );
+    }));
 
   // Per-app session state. Lives only as long as the app instance — the
   // route registrars hold references but never mutate the binding.
   const queryHashMap = new Map<string, string>();
-  const verifiedQueries = new Map<string, string>();
   const pendingNonces = new Map<string, string>();
 
   registerHtlcRoutes(app, {
@@ -80,7 +85,6 @@ export function buildOracleApp(
     authMiddleware,
     preimageStore,
     queryHashMap,
-    verifiedQueries,
   });
 
   registerFrostSignerRoutes(app, {
@@ -114,10 +118,16 @@ if (import.meta.main) {
   const frostConfigPath = Deno.env.get("FROST_CONFIG_PATH")?.trim();
   if (frostConfigPath) {
     try {
-      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import("@anchr/frost-oracle/config"); // allow-dynamic-import: deferred to avoid loading FROST config parser when FROST_CONFIG_PATH is unset
+      const { loadFrostNodeConfig, toThresholdOracleConfig } = await import(
+        "@anchr/frost-oracle/config"
+      ); // allow-dynamic-import: deferred to avoid loading FROST config parser when FROST_CONFIG_PATH is unset
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);
-      log.info(`FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${frostNodeConfig.group_pubkey.slice(0, 16)}...)`);
+      log.info(
+        `FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${
+          frostNodeConfig.group_pubkey.slice(0, 16)
+        }...)`,
+      );
     } catch (e) {
       log.error(`Failed to load FROST config from ${frostConfigPath}:`, e);
     }

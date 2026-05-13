@@ -22,10 +22,22 @@ import type {
 import { printReport, verifySupplyChain } from "./chain-verifier.ts";
 
 const GPS = {
-  sao_paulo_farm: { lat: -23.5505, lon: -46.6333, name: "Coffee Farm, Sao Paulo, Brazil" },
+  sao_paulo_farm: {
+    lat: -23.5505,
+    lon: -46.6333,
+    name: "Coffee Farm, Sao Paulo, Brazil",
+  },
   santos_port: { lat: -23.9608, lon: -46.3336, name: "Port of Santos, Brazil" },
-  kawasaki_roaster: { lat: 35.5311, lon: 139.6978, name: "Roastery, Kawasaki, Japan" },
-  shibuya_cafe: { lat: 35.6595, lon: 139.7004, name: "Cafe, Shibuya, Tokyo, Japan" },
+  kawasaki_roaster: {
+    lat: 35.5311,
+    lon: 139.6978,
+    name: "Roastery, Kawasaki, Japan",
+  },
+  shibuya_cafe: {
+    lat: 35.6595,
+    lon: 139.7004,
+    name: "Cafe, Shibuya, Tokyo, Japan",
+  },
 } as const;
 
 // Nostr pubkeys are placeholders for the demo.
@@ -54,7 +66,11 @@ const COFFEE_REQUIREMENTS: StepRequirement[] = [
     required_proofs: [
       {
         proof_type: "gps_photo",
-        conditions: [{ field: "distance_km", operator: "within_km", value: 50 }],
+        conditions: [{
+          field: "distance_km",
+          operator: "within_km",
+          value: 50,
+        }],
       },
       {
         proof_type: "c2pa_media",
@@ -86,7 +102,11 @@ const COFFEE_REQUIREMENTS: StepRequirement[] = [
     required_proofs: [
       {
         proof_type: "gps_photo",
-        conditions: [{ field: "distance_km", operator: "within_km", value: 10 }],
+        conditions: [{
+          field: "distance_km",
+          operator: "within_km",
+          value: 10,
+        }],
       },
       {
         proof_type: "tlsn_api",
@@ -133,11 +153,13 @@ function buildCoffeeSteps(): SupplyChainStep[] {
           lat: -23.5510,
           lon: -46.6340,
           distance_km: 0.08,
-          photo_hash: "sha256:a3f8c0d1e2b4a5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9",
+          photo_hash:
+            "sha256:a3f8c0d1e2b4a5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9",
           c2pa_manifest: "valid",
         },
         verified: true,
-        verification_details: "C2PA-signed photo from ProofMode camera, GPS within 80m of farm",
+        verification_details:
+          "C2PA-signed photo from ProofMode camera, GPS within 80m of farm",
       },
       {
         type: "c2pa_media",
@@ -149,7 +171,8 @@ function buildCoffeeSteps(): SupplyChainStep[] {
           camera_model: "Galaxy S24",
         },
         verified: true,
-        verification_details: "C2PA Content Credential chain valid, hardware-rooted signature",
+        verification_details:
+          "C2PA Content Credential chain valid, hardware-rooted signature",
       },
     ],
     nostr_event_id: "evt_origin_001",
@@ -202,7 +225,8 @@ function buildCoffeeSteps(): SupplyChainStep[] {
           lat: 35.5315,
           lon: 139.6982,
           distance_km: 0.06,
-          photo_hash: "sha256:b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4",
+          photo_hash:
+            "sha256:b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4",
           c2pa_manifest: "valid",
         },
         verified: true,
@@ -223,7 +247,8 @@ function buildCoffeeSteps(): SupplyChainStep[] {
           cupping_score: 87.5,
         },
         verified: true,
-        verification_details: "TLSNotary proof: SCA cupping score 87.5 by certified Q-Grader",
+        verification_details:
+          "TLSNotary proof: SCA cupping score 87.5 by certified Q-Grader",
       },
     ],
     previous_step_id: "step-002-transport",
@@ -244,7 +269,8 @@ function buildCoffeeSteps(): SupplyChainStep[] {
           lat: 35.6598,
           lon: 139.7008,
           distance_km: 0.05,
-          photo_hash: "sha256:c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5",
+          photo_hash:
+            "sha256:c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5",
         },
         verified: true,
         verification_details: "Photo at Shibuya cafe, GPS within 50m",
@@ -278,7 +304,9 @@ function main() {
 
   for (const step of product.steps) {
     const proofTypes = step.proofs.map((p) => p.type).join(", ");
-    console.log(`  [${step.step_type.toUpperCase().padEnd(10)}] ${step.location.name}`);
+    console.log(
+      `  [${step.step_type.toUpperCase().padEnd(10)}] ${step.location.name}`,
+    );
     console.log(`    Actor:  ${step.actor.name}`);
     console.log(`    Proofs: ${proofTypes}`);
     console.log(`    Time:   ${new Date(step.timestamp * 1000).toISOString()}`);
@@ -305,7 +333,9 @@ function main() {
       const released = stepResult?.verdict === "pass";
       const status = released ? "RELEASED" : "HELD";
       console.log(
-        `  ${step.actor.name.padEnd(25)} ${req.payment_condition.amount_sats.toLocaleString().padStart(6)} sats  [${status}]`,
+        `  ${step.actor.name.padEnd(25)} ${
+          req.payment_condition.amount_sats.toLocaleString().padStart(6)
+        } sats  [${status}]`,
       );
       if (released) {
         console.log(
@@ -326,7 +356,9 @@ function main() {
   for (const step of product.steps) {
     if (step.nostr_event_id) {
       console.log(
-        `  ${step.nostr_event_id.padEnd(25)} ${step.step_type.padEnd(12)} ${step.location.name}`,
+        `  ${step.nostr_event_id.padEnd(25)} ${
+          step.step_type.padEnd(12)
+        } ${step.location.name}`,
       );
     }
   }

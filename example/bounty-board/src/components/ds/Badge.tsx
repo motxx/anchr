@@ -1,7 +1,13 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { Text, View } from "react-native";
 
-type BadgeVariant = "default" | "success" | "warning" | "error" | "info" | "muted";
+type BadgeVariant =
+  | "default"
+  | "success"
+  | "warning"
+  | "error"
+  | "info"
+  | "muted";
 
 const VARIANT_CLASSES: Record<BadgeVariant, { dot: string; text: string }> = {
   default: { dot: "bg-status-pending", text: "text-status-pending" },
@@ -19,12 +25,16 @@ export interface DSBadgeProps {
   textColor?: string;
 }
 
-export function DSBadge({ label, variant = "default", dotColor, textColor }: DSBadgeProps) {
+export function DSBadge(
+  { label, variant = "default", dotColor, textColor }: DSBadgeProps,
+) {
   const v = VARIANT_CLASSES[variant];
   return (
     <View className="flex-row items-center gap-1.5">
       <View className={`w-2 h-2 rounded-full ${dotColor ?? v.dot}`} />
-      <Text className={`text-xs font-medium ${textColor ?? v.text}`}>{label}</Text>
+      <Text className={`text-xs font-medium ${textColor ?? v.text}`}>
+        {label}
+      </Text>
     </View>
   );
 }

@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "exports": {
     ".": "./src/mod.ts",
+    "./attachment-access": "./src/infrastructure/attachments.ts",
     "./domain-types": "./src/domain/types.ts",
-    "./mcp-query-backend": "./src/infrastructure/mcp-query-backend.ts",
-    "./mcp-server": "./src/infrastructure/mcp-server.ts",
     "./nostr-events": "./src/infrastructure/nostr/events/events.ts",
     "./nostr-transport": "./src/infrastructure/nostr/transport/client.ts",
     "./url-validation": "./src/infrastructure/url-validation.ts",
-    "./worker-api-schemas": "./src/infrastructure/worker-api-schemas.ts"
+    "./claim-gate": "./src/infrastructure/claim-gate/index.ts"
   },
   "imports": {
     "@anchr/blossom": "../blossom/src/mod.ts",
@@ -34,14 +33,9 @@
     "@anchr/photo-verification/proofmode-validation": "../photo-verification/src/proofmode-validation.ts",
     "@anchr/tlsn-toolkit/tlsn-types": "../tlsn-toolkit/src/tlsn-types.ts",
     "@anchr/tlsn-toolkit/tlsn-validation": "../tlsn-toolkit/src/tlsn-validation.ts",
+    "@db/sqlite": "jsr:@db/sqlite@^0.12",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
-    "@modelcontextprotocol/sdk/client/index.js": "npm:@modelcontextprotocol/sdk@^1/client/index.js",
-    "@modelcontextprotocol/sdk/client/stdio.js": "npm:@modelcontextprotocol/sdk@^1/client/stdio.js",
-    "@modelcontextprotocol/sdk/server/mcp.js": "npm:@modelcontextprotocol/sdk@^1/server/mcp.js",
-    "@modelcontextprotocol/sdk/server/stdio.js": "npm:@modelcontextprotocol/sdk@^1/server/stdio.js",
-    "@modelcontextprotocol/sdk/shared/transport.js": "npm:@modelcontextprotocol/sdk@^1/shared/transport.js",
-    "@modelcontextprotocol/sdk/types.js": "npm:@modelcontextprotocol/sdk@^1/types.js",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@std/expect": "jsr:@std/expect@^1",

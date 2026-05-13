@@ -36,10 +36,13 @@ export function DSText({
   className = "",
   ...props
 }: DSTextProps) {
-  const colorClass = color ?? (muted ? "text-muted-foreground" : "text-foreground");
+  const colorClass = color ??
+    (muted ? "text-muted-foreground" : "text-foreground");
   return (
     <RNText
-      className={`${VARIANT_CLASSES[variant]} ${WEIGHT_CLASSES[weight]} ${colorClass} ${className}`}
+      className={`${VARIANT_CLASSES[variant]} ${
+        WEIGHT_CLASSES[weight]
+      } ${colorClass} ${className}`}
       {...props}
     />
   );

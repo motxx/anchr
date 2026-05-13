@@ -1,10 +1,23 @@
 // NIP-44 DM (kind 4) for Oracle ↔ Worker preimage / rejection delivery.
 
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
 import type { NostrIdentity } from "../crypto/identity.ts";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "../crypto/encryption.ts";
-import type { OracleDMPayload, PreimageDMPayload, RejectionDMPayload, FrostSignatureDMPayload } from "./events.ts";
-export type { OracleDMPayload, FrostSignatureDMPayload } from "./events.ts";
+import {
+  decryptNip44,
+  deriveConversationKey,
+  encryptNip44,
+} from "../crypto/encryption.ts";
+import type {
+  FrostSignatureDMPayload,
+  OracleDMPayload,
+  PreimageDMPayload,
+  RejectionDMPayload,
+} from "./events.ts";
+export type { FrostSignatureDMPayload, OracleDMPayload } from "./events.ts";
 
 export const DM_KIND = 4;
 
@@ -20,7 +33,10 @@ export function buildPreimageDM(
     preimage,
   };
 
-  const conversationKey = deriveConversationKey(oracleIdentity.secretKey, workerPubKey);
+  const conversationKey = deriveConversationKey(
+    oracleIdentity.secretKey,
+    workerPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
@@ -47,7 +63,10 @@ export function buildRejectionDM(
     reason,
   };
 
-  const conversationKey = deriveConversationKey(oracleIdentity.secretKey, workerPubKey);
+  const conversationKey = deriveConversationKey(
+    oracleIdentity.secretKey,
+    workerPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
@@ -78,7 +97,10 @@ export function buildFrostSignatureDM(
     group_pubkey: groupPubkey,
   };
 
-  const conversationKey = deriveConversationKey(oracleIdentity.secretKey, workerPubKey);
+  const conversationKey = deriveConversationKey(
+    oracleIdentity.secretKey,
+    workerPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
@@ -98,7 +120,10 @@ export function parseOracleDM(
   recipientSecretKey: Uint8Array,
   senderPubKey: string,
 ): OracleDMPayload {
-  const conversationKey = deriveConversationKey(recipientSecretKey, senderPubKey);
+  const conversationKey = deriveConversationKey(
+    recipientSecretKey,
+    senderPubKey,
+  );
   const decrypted = decryptNip44(content, conversationKey);
   return JSON.parse(decrypted) as OracleDMPayload;
 }

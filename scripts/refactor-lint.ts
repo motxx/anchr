@@ -209,7 +209,8 @@ function checkFile(relPath: string, source: string): Violation[] {
       line: 1,
       code: "R005",
       severity: "warn",
-      message: `File has ${importCount} imports (max ${THRESHOLDS.imports}) — consider splitting`,
+      message:
+        `File has ${importCount} imports (max ${THRESHOLDS.imports}) — consider splitting`,
     });
   }
 
@@ -292,10 +293,12 @@ async function main() {
       violations.push(...checkFile(rel, source));
     }
   } else {
-    for await (const entry of walk(SRC_DIR, {
-      exts: [".ts", ".tsx"],
-      skip: [/\.test\.tsx?$/, /node_modules/],
-    })) {
+    for await (
+      const entry of walk(SRC_DIR, {
+        exts: [".ts", ".tsx"],
+        skip: [/\.test\.tsx?$/, /node_modules/],
+      })
+    ) {
       const rel = relative(SRC_DIR, entry.path);
       const source = await Deno.readTextFile(entry.path);
       violations.push(...checkFile(rel, source));

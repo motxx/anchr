@@ -31,8 +31,16 @@ function mapStdio(value?: string): "piped" | "inherit" | "null" {
  * This avoids Deno resource leaks from unconsumed streams.
  * Returns a new ReadableStream that replays the collected data.
  */
-function collectStream(stream: ReadableStream<Uint8Array> | null): ReadableStream<Uint8Array> {
-  if (!stream) return new ReadableStream({ start(c) { c.close(); } });
+function collectStream(
+  stream: ReadableStream<Uint8Array> | null,
+): ReadableStream<Uint8Array> {
+  if (!stream) {
+    return new ReadableStream({
+      start(c) {
+        c.close();
+      },
+    });
+  }
 
   // Eagerly consume the original stream into a buffer
   const chunks: Uint8Array[] = [];
@@ -81,9 +89,15 @@ export function spawn(cmd: string[], opts?: SpawnOptions): SpawnResult {
 
   return {
     exited,
-    get exitCode() { return _exitCode; },
+    get exitCode() {
+      return _exitCode;
+    },
     stdout,
     stderr,
-    kill() { try { child.kill(); } catch { /* already dead */ } },
+    kill() {
+      try {
+        child.kill();
+      } catch { /* already dead */ }
+    },
   };
 }

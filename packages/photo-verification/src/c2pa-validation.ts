@@ -10,7 +10,7 @@ import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn } from "@anchr/core-runtime";
+import { spawn, which, writeFile } from "@anchr/core-runtime";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "c2pa"]);
@@ -54,14 +54,40 @@ export function isC2paAvailable(): boolean {
   return findC2paTool() !== null;
 }
 
-const SUPPORTED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".mp4", ".mov"]);
+const SUPPORTED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".mp4",
+  ".mov",
+]);
 
 function noToolResult(): C2paValidationResult {
-  return { available: false, hasManifest: false, signatureValid: false, manifest: null, checks: ["c2patool not available (skipped)"], failures: [] };
+  return {
+    available: false,
+    hasManifest: false,
+    signatureValid: false,
+    manifest: null,
+    checks: ["c2patool not available (skipped)"],
+    failures: [],
+  };
 }
 
-function noManifestResult(checks: string[], failures: string[]): C2paValidationResult {
-  return { available: true, hasManifest: false, signatureValid: false, manifest: null, checks, failures };
+function noManifestResult(
+  checks: string[],
+  failures: string[],
+): C2paValidationResult {
+  return {
+    available: true,
+    hasManifest: false,
+    signatureValid: false,
+    manifest: null,
+    checks,
+    failures,
+  };
 }
 
 async function runC2paTool(
@@ -76,7 +102,11 @@ async function runC2paTool(
   if (proc.exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
     const stderrLower = stderr.toLowerCase();
-    if (stderrLower.includes("no claim found") || stderrLower.includes("manifestnotfound") || stderrLower.includes("no manifest")) {
+    if (
+      stderrLower.includes("no claim found") ||
+      stderrLower.includes("manifestnotfound") ||
+      stderrLower.includes("no manifest")
+    ) {
       checks.push("no C2PA manifest found");
       return null;
     }
@@ -95,17 +125,29 @@ async function runC2paTool(
 
 function parseActiveManifest(
   report: Record<string, unknown>,
-): { active: Record<string, unknown>; rawAssertions?: Array<{ label: string; data?: Record<string, unknown> }> } | null {
-  const manifests = report.manifests as Record<string, Record<string, unknown>> | undefined;
+): {
+  active: Record<string, unknown>;
+  rawAssertions?: Array<{ label: string; data?: Record<string, unknown> }>;
+} | null {
+  const manifests = report.manifests as
+    | Record<string, Record<string, unknown>>
+    | undefined;
   const activeManifestLabel = report.active_manifest as string | undefined;
-  if (!manifests || !activeManifestLabel || !manifests[activeManifestLabel]) return null;
+  if (!manifests || !activeManifestLabel || !manifests[activeManifestLabel]) {
+    return null;
+  }
 
   const active = manifests[activeManifestLabel]!;
-  const rawAssertions = active.assertions as Array<{ label: string; data?: Record<string, unknown> }> | undefined;
+  const rawAssertions = active.assertions as
+    | Array<{ label: string; data?: Record<string, unknown> }>
+    | undefined;
   return { active, rawAssertions };
 }
 
-function buildManifest(active: Record<string, unknown>, rawAssertions?: Array<{ label: string; data?: Record<string, unknown> }>): C2paManifest {
+function buildManifest(
+  active: Record<string, unknown>,
+  rawAssertions?: Array<{ label: string; data?: Record<string, unknown> }>,
+): C2paManifest {
   const manifest: C2paManifest = {
     title: active.title as string | undefined,
     claimGenerator: active.claim_generator as string | undefined,
@@ -124,19 +166,28 @@ function buildManifest(active: Record<string, unknown>, rawAssertions?: Array<{ 
 
 function evaluateSignature(report: Record<string, unknown>): boolean {
   const validationResults = report.validation_results as {
-    activeManifest?: { success?: Array<{ code: string }>; failure?: Array<{ code: string; explanation?: string }> };
+    activeManifest?: {
+      success?: Array<{ code: string }>;
+      failure?: Array<{ code: string; explanation?: string }>;
+    };
   } | undefined;
   const successCodes = validationResults?.activeManifest?.success ?? [];
   const failureCodes = validationResults?.activeManifest?.failure ?? [];
 
-  const claimSignatureOk = successCodes.some((v) => v.code === "claimSignature.validated");
+  const claimSignatureOk = successCodes.some((v) =>
+    v.code === "claimSignature.validated"
+  );
   const hasRealFailures = failureCodes.some((v) =>
-    v.code.startsWith("claimSignature.") || v.code.startsWith("assertion.dataHash."),
+    v.code.startsWith("claimSignature.") ||
+    v.code.startsWith("assertion.dataHash.")
   );
   return claimSignatureOk && !hasRealFailures;
 }
 
-export async function validateC2pa(data: Buffer, filename: string): Promise<C2paValidationResult> {
+export async function validateC2pa(
+  data: Buffer,
+  filename: string,
+): Promise<C2paValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
   const toolPath = findC2paTool();
@@ -167,9 +218,15 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
     const signatureValid = evaluateSignature(report);
 
     checks.push("C2PA manifest found");
-    if (manifest.claimGenerator) checks.push(`claim generator: ${manifest.claimGenerator}`);
-    if (manifest.signatureInfo?.issuer) checks.push(`signer: ${manifest.signatureInfo.issuer}`);
-    if (manifest.signatureInfo?.time) checks.push(`signed at: ${manifest.signatureInfo.time}`);
+    if (manifest.claimGenerator) {
+      checks.push(`claim generator: ${manifest.claimGenerator}`);
+    }
+    if (manifest.signatureInfo?.issuer) {
+      checks.push(`signer: ${manifest.signatureInfo.issuer}`);
+    }
+    if (manifest.signatureInfo?.time) {
+      checks.push(`signed at: ${manifest.signatureInfo.time}`);
+    }
 
     if (signatureValid) {
       checks.push("C2PA signature valid");
@@ -178,9 +235,21 @@ export async function validateC2pa(data: Buffer, filename: string): Promise<C2pa
     }
 
     const gps = extractC2paGps(parsed.rawAssertions);
-    if (gps) checks.push(`C2PA EXIF GPS: ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`);
+    if (gps) {
+      checks.push(
+        `C2PA EXIF GPS: ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`,
+      );
+    }
 
-    return { available: true, hasManifest: true, signatureValid, manifest, gps: gps ?? undefined, checks, failures };
+    return {
+      available: true,
+      hasManifest: true,
+      signatureValid,
+      manifest,
+      gps: gps ?? undefined,
+      checks,
+      failures,
+    };
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -204,13 +273,24 @@ function lookupGpsKeys(data: Record<string, unknown>, field: string): unknown {
   return undefined;
 }
 
-function applyGpsDirection(value: number, ref: unknown, raw: unknown, negativeChar: string): number {
-  if (typeof ref === "string" && ref.toUpperCase().startsWith(negativeChar)) return -value;
-  if (typeof raw === "string" && new RegExp(`${negativeChar}$`, "i").test(raw)) return -Math.abs(value);
+function applyGpsDirection(
+  value: number,
+  ref: unknown,
+  raw: unknown,
+  negativeChar: string,
+): number {
+  if (typeof ref === "string" && ref.toUpperCase().startsWith(negativeChar)) {
+    return -value;
+  }
+  if (
+    typeof raw === "string" && new RegExp(`${negativeChar}$`, "i").test(raw)
+  ) return -Math.abs(value);
   return value;
 }
 
-function extractC2paGps(assertions?: Array<{ label: string; data?: Record<string, unknown> }>): { lat: number; lon: number } | null {
+function extractC2paGps(
+  assertions?: Array<{ label: string; data?: Record<string, unknown> }>,
+): { lat: number; lon: number } | null {
   if (!assertions) return null;
 
   for (const assertion of assertions) {
@@ -231,7 +311,9 @@ function extractC2paGps(assertions?: Array<{ label: string; data?: Record<string
     const finalLat = applyGpsDirection(lat, latRef, latRaw, "S");
     const finalLon = applyGpsDirection(lon, lonRef, lonRaw, "W");
 
-    if (finalLat !== 0 || finalLon !== 0) return { lat: finalLat, lon: finalLon };
+    if (finalLat !== 0 || finalLon !== 0) {
+      return { lat: finalLat, lon: finalLon };
+    }
   }
 
   return null;

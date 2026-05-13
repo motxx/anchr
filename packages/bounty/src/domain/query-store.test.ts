@@ -1,4 +1,4 @@
-import { test, describe, beforeEach } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryStore, type QueryStore } from "./query-store.ts";
 import type { Query } from "./types.ts";

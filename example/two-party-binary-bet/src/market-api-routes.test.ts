@@ -204,7 +204,12 @@ test("FROST market signer round1 returns 503 when FROST not configured", async (
       market_id: "m-1",
       outcome: "yes",
       condition_data: {
-        resolution_condition: { type: "contains_text", target_url: "", expected_text: "yes", description: "" },
+        resolution_condition: {
+          type: "contains_text",
+          target_url: "",
+          expected_text: "yes",
+          description: "",
+        },
         verified_body: "yes",
       },
     }),

@@ -1,10 +1,12 @@
-# 巫(Kannagi)
+# Two-party Binary Bet
 
-> *Kannagi* (神和ぎ) — "spirit-pacifying"; in folk religion, the medium who consults the oracle and pacifies the verdict. Here: a Bitcoin-native two-party bet settled by oracle attestation.
+**Two-party binary bet, settled by oracle attestation.** A reference flow
+for Anchr's conditional-swap primitives: Oracle + TLSNotary verification
++ Cashu HTLC (or FROST P2PK) settlement.
 
-**Two-party binary bet, settled by oracle attestation.** Built on Anchr's Oracle + TLSNotary verification + Cashu HTLC (or FROST P2PK) atomic settlement.
-
-> **Status: Testnet.** Live deployment at <https://anchr-market.fly.dev>; testnut ecash, not real BTC.
+> **Status: hosted testnet demo.** <https://anchr-market.fly.dev> uses
+> testnut ecash, not real BTC. The Fly.io deployment is an integration
+> preview, not a production-readiness claim.
 
 > **Uses:** `@anchr/cashu-conditional-swap` + `@anchr/frost-oracle` + `@anchr/core-cashu` (direct imports, no SDK).
 > **Pattern:** two-party bet (two counterparties cross-lock; Oracle reveals outcome).
@@ -26,21 +28,22 @@
 > See [What you can build](#what-you-can-build-with-this-primitive) for the
 > use cases the current primitive supports.
 
-> **Live testnet deploy:** <https://anchr-market.fly.dev>
+> **Hosted testnet demo:** <https://anchr-market.fly.dev>
 > Funds are testnut ecash — *not real BTC*. Do not bridge mainnet sats in.
-> Backed by FROST 2-of-3 threshold signing on Fly.io (region `sin`),
-> the public testnut Cashu mint (<https://testnut.cashu.space>), the
-> Anchr Nostr relay, and the Anchr TLSN verifier. No accounts, no KYC.
+> Backed by a FROST 2-of-3 threshold-signing reference setup on Fly.io
+> (region `sin`), the public testnut Cashu mint
+> (<https://testnut.cashu.space>), the Anchr Nostr relay, and the Anchr
+> TLSN verifier. No accounts, no KYC.
 
 > **Operator runbook:** [`DEPLOYMENT.md`](../../DEPLOYMENT.md)
-> covers regtest setup, FROST DKG bootstrap, trustless TLSNotary
+> covers regtest setup, FROST DKG bootstrap, TLSNotary-backed
 > resolution, and the public-testnet deploy checklist. Screenshots of
 > the running UI live in [`screenshots/`](../../screenshots/).
 
 ## What you can build with this primitive
 
 If a question can be decided by a single HTTPS GET, two parties can
-wager sats on it with no custodian holding the funds. Kannagi supports
+wager sats on it with no custodian holding the funds. This example supports
 `jsonpath_gt`, `jsonpath_lt`, `jsonpath_equals`, and `contains_text` —
 anything that fits that shape works. Concrete examples:
 
@@ -120,8 +123,8 @@ layers:
 |---|---|---|
 | Unit (no infra) | `packages/cashu-conditional-swap/src/cross-htlc.test.ts` | `buildCrossHtlcForPartyA/B` produce HTLC P2PK options with the **counterparty's** hash and pubkey. 4 tests. |
 | Unit (no infra) | `packages/cashu-conditional-swap/src/frost-conditional-swap.test.ts` | `buildFrostSwapForPartyA/B` produce **2-of-2** P2PK options containing the FROST group pubkey **and** the counterparty pubkey; `DualKeyStore.sign` deletes the losing key on first sign and refuses to sign twice. 22 tests. |
-| E2E on regtest | `e2e/conditional-swap.test.ts` | Mints real Cashu proofs via Lightning, executes a YES/NO match, asserts each proof's HTLC secret carries `hash_a` / `hash_b` (not Oracle pubkey), oracle reveals `preimage_a`, **YES bettor** redeems NO's locked tokens with `preimage + YES private key`. 11 steps. Run via `deno task test:regtest`. |
-| E2E on regtest | `e2e/frost-p2pk-cashu.test.ts` | Locks Alice's proofs to `[group_pubkey_no, bob]` 2-of-2 and Bob's to `[group_pubkey_yes, alice]`; verifies that **only `[oracle_yes_sk, alice_sk]` together** can redeem Bob's proofs, and that Bob alone, the wrong group key, or a random third party each fail (only 1 of 2 required signatures). 9 lifecycle steps + 3 structural tests. |
+| E2E on regtest | `e2e/regtest/conditional-swap.test.ts` | Mints real Cashu proofs via Lightning, executes a YES/NO match, asserts each proof's HTLC secret carries `hash_a` / `hash_b` (not Oracle pubkey), oracle reveals `preimage_a`, **YES bettor** redeems NO's locked tokens with `preimage + YES private key`. 11 steps. Run via `deno task test:e2e:regtest`. |
+| E2E on regtest | `e2e/regtest/frost-p2pk-cashu.test.ts` | Locks Alice's proofs to `[group_pubkey_no, bob]` 2-of-2 and Bob's to `[group_pubkey_yes, alice]`; verifies that **only `[oracle_yes_sk, alice_sk]` together** can redeem Bob's proofs, and that Bob alone, the wrong group key, or a random third party each fail (only 1 of 2 required signatures). 9 lifecycle steps + 3 structural tests. |
 
 Run the unit subset locally without Docker:
 
@@ -175,18 +178,43 @@ stack).
 All durable state — the matching queue plus the six runtime maps (markets,
 matched pairs, resolved preimages, resolved signatures, per-proof
 signatures, and pending exchange tokens) — lives in a single SQLite file.
-The path is controlled by `KANNAGI_DB_PATH` (default `./kannagi.db`
-locally; set to `/data/kannagi.db` in production so the Fly volume is
+The path is controlled by `MARKET_DB_PATH` (default `./market.db`
+locally; set to `/data/market.db` in production so the Fly volume is
 used).
 
 The schema is created automatically on first open; there is no separate
 migration step. SQLite WAL mode gives concurrent readers + a single
-writer, which fits the Kannagi architecture (single Fly machine, FROST
+writer, which fits the example architecture (single Fly machine, FROST
 signers in-process on 127.0.0.1:4001-4003).
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `KANNAGI_DB_PATH` | `./kannagi.db` | SQLite DB path. Use `:memory:` for tests. |
+| `MARKET_DB_PATH` | `./market.db` | SQLite DB path. Use `:memory:` for tests. |
+| `MARKET_FAUCET_TOKENS` | unset | Public-testnet one-time token bank, as `amount_sats:cashuB...` entries separated by spaces or newlines. |
+| `MARKET_FAUCET_URL` | unset | External faucet URL when the server should not dispense tokens itself. |
+| `MARKET_FAUCET_MAX_AMOUNT_SATS` | `1000` | Maximum amount accepted by `/markets/wallet/faucet`. |
+| `MARKET_RATE_LIMIT_WINDOW_MS` | `60000` | Public write/faucet rate-limit window. |
+| `MARKET_RATE_LIMIT_MAX` | `60` | Max public write/faucet requests per client per window. |
+| `MARKET_ALLOW_MANUAL_RESOLVE` | unset | Set to `1` only for local demos that need `/markets/:id/resolve`; public deploys use auto-resolver or TLSN proof submission. |
+| `MARKET_SIGNER_API_KEY` | unset | Optional API key for FROST signer endpoints; loopback requests remain allowed for the local signer cluster. |
+
+## Public testnet readiness
+
+The public Fly deployment exposes `GET /health` for liveness and
+`GET /ready` for playability. `/ready` fails closed until the mint is
+reachable, at least one Nostr relay is configured, persistence is open,
+and either a token-bank faucet, regtest faucet, or external faucet URL is
+configured.
+
+For Fly/testnet, do not rely on the local regtest faucet. Seed small
+one-time testnut cashuB tokens instead:
+
+```bash
+flyctl secrets set --app anchr-market \
+  MARKET_FAUCET_TOKENS='1000:cashuB... 1000:cashuB...'
+```
+
+Each token is persisted and marked claimed after the first payout.
 
 ## Running
 
@@ -201,7 +229,7 @@ deno run --allow-all example/two-party-binary-bet/server.ts
 deno test --allow-all example/two-party-binary-bet/
 
 # Real Cashu mint E2E (requires `docker compose up -d` + init-regtest.sh)
-deno task test:regtest
+deno task test:e2e:regtest
 
 # FROST 2-of-3 cluster (after building crates/frost-signer)
 example/two-party-binary-bet/scripts/frost-dkg-bootstrap.ts --threshold 2 --total 3
@@ -216,7 +244,7 @@ src/
   market-types.ts           — Type definitions
   market-oracle.ts          — Condition evaluation, payout calculation
   matching-queue.ts             — FIFO matching interface + in-memory impl
-  kannagi-store.ts          — SQLite-backed durable store (matching queue + 6 runtime maps)
+  market-store.ts          — SQLite-backed durable store (matching queue + 6 runtime maps)
   resolution.ts             — DualPreimageStore (HTLC) / DualKeyStore (FROST) resolution
   match-coordinator.ts      — Cross-HTLC match execution via @anchr/cashu-conditional-swap
   market-api-routes.ts      — REST endpoints

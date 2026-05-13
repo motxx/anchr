@@ -1,12 +1,12 @@
 import type {
-  QuerySummary,
-  QueryDetail,
-  UploadResponse,
-  SubmitResponse,
   AttachmentRef,
   BlossomKeyMap,
   CreateQueryRequest,
+  QueryDetail,
+  QuerySummary,
   QuoteInfo,
+  SubmitResponse,
+  UploadResponse,
 } from "./types.ts";
 // Side-effect import: augments FormData.append with the RN { uri, name, type } overload.
 import "../types/rn-formdata.d.ts";
@@ -35,12 +35,16 @@ export async function fetchQueries(): Promise<QuerySummary[]> {
 }
 
 export async function fetchQueryDetail(id: string): Promise<QueryDetail> {
-  const res = await fetch(`${getBaseUrl()}/queries/${id}`, { headers: getHeaders() });
+  const res = await fetch(`${getBaseUrl()}/queries/${id}`, {
+    headers: getHeaders(),
+  });
   if (!res.ok) throw new Error(`Query fetch failed: ${res.status}`);
   return res.json();
 }
 
-export async function createQuery(body: CreateQueryRequest): Promise<{ id: string }> {
+export async function createQuery(
+  body: CreateQueryRequest,
+): Promise<{ id: string }> {
   const res = await fetch(`${getBaseUrl()}/queries`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
@@ -79,7 +83,10 @@ export async function uploadPhoto(
   return res.json();
 }
 
-export async function submitQuote(queryId: string, amountSats?: number): Promise<{ ok: boolean }> {
+export async function submitQuote(
+  queryId: string,
+  amountSats?: number,
+): Promise<{ ok: boolean }> {
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/quotes`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
@@ -89,11 +96,18 @@ export async function submitQuote(queryId: string, amountSats?: number): Promise
   return res.json();
 }
 
-export async function selectWorker(queryId: string, workerPubkey: string, escrowToken?: string): Promise<{ ok: boolean }> {
+export async function selectWorker(
+  queryId: string,
+  workerPubkey: string,
+  escrowToken?: string,
+): Promise<{ ok: boolean }> {
   const res = await fetch(`${getBaseUrl()}/queries/${queryId}/select`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify({ worker_pubkey: workerPubkey, htlc_token: escrowToken }),
+    body: JSON.stringify({
+      worker_pubkey: workerPubkey,
+      htlc_token: escrowToken,
+    }),
   });
   if (!res.ok) throw new Error(`Select failed: ${res.status}`);
   return res.json();
@@ -107,7 +121,9 @@ export async function submitResult(
 ): Promise<SubmitResponse> {
   const { publicKey } = useAuthStore.getState();
   if (!publicKey) {
-    throw new Error("Worker pubkey is required to submit a result. Sign in first.");
+    throw new Error(
+      "Worker pubkey is required to submit a result. Sign in first.",
+    );
   }
 
   const body: Record<string, unknown> = {
@@ -131,7 +147,9 @@ export async function submitResult(
   return res.json();
 }
 
-export async function fetchOracleHash(): Promise<{ hash: string; preimage?: string }> {
+export async function fetchOracleHash(): Promise<
+  { hash: string; preimage?: string }
+> {
   const res = await fetch(`${getBaseUrl()}/hash`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
@@ -140,10 +158,16 @@ export async function fetchOracleHash(): Promise<{ hash: string; preimage?: stri
   return res.json();
 }
 
-export async function fetchWalletBalance(pubkey: string, role: "requester" | "worker"): Promise<{ balance_sats: number }> {
-  const res = await fetch(`${getBaseUrl()}/wallet/balance?pubkey=${pubkey}&role=${role}`, {
-    headers: getHeaders(),
-  });
+export async function fetchWalletBalance(
+  pubkey: string,
+  role: "requester" | "worker",
+): Promise<{ balance_sats: number }> {
+  const res = await fetch(
+    `${getBaseUrl()}/wallet/balance?pubkey=${pubkey}&role=${role}`,
+    {
+      headers: getHeaders(),
+    },
+  );
   if (!res.ok) throw new Error(`Balance fetch failed: ${res.status}`);
   return res.json();
 }

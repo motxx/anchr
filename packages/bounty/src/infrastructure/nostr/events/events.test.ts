@@ -2,19 +2,19 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
 import {
+  ANCHR_QUERY_FEEDBACK,
+  ANCHR_QUERY_REQUEST,
+  ANCHR_QUERY_RESPONSE,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  parseFeedbackPayload,
+  parseOracleResponsePayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   parseQuerySettlementPayload,
-  parseOracleResponsePayload,
-  parseFeedbackPayload,
-  ANCHR_QUERY_REQUEST,
-  ANCHR_QUERY_RESPONSE,
-  ANCHR_QUERY_FEEDBACK,
   type QueryRequestPayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
@@ -50,7 +50,9 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(iTag?.[1]).toBe("テヘラン市街の様子");
     expect(iTag?.[2]).toBe("text");
 
-    const nonceTag = event.tags.find((t) => t[0] === "param" && t[1] === "nonce");
+    const nonceTag = event.tags.find((t) =>
+      t[0] === "param" && t[1] === "nonce"
+    );
     expect(nonceTag?.[2]).toBe("K7P4");
 
     const outputTag = event.tags.find((t) => t[0] === "output");
@@ -178,7 +180,9 @@ describe("Nostr events (NIP-90 DVM)", () => {
     );
 
     // Tags should include oracle pubkey, blob hash, blossom URL, and oracle_payload
-    const oracleP = response.tags.find((t) => t[0] === "p" && t[3] === "oracle");
+    const oracleP = response.tags.find((t) =>
+      t[0] === "p" && t[3] === "oracle"
+    );
     expect(oracleP?.[1]).toBe(oracle.publicKey);
 
     const xTag = response.tags.find((t) => t[0] === "x");
@@ -187,15 +191,22 @@ describe("Nostr events (NIP-90 DVM)", () => {
     const blossomTag = response.tags.find((t) => t[0] === "blossom");
     expect(blossomTag?.[1]).toBe("https://blossom.example/aabbccdd");
 
-    const oraclePayloadTag = response.tags.find((t) => t[0] === "oracle_payload");
+    const oraclePayloadTag = response.tags.find((t) =>
+      t[0] === "oracle_payload"
+    );
     expect(oraclePayloadTag).toBeTruthy();
 
     // Oracle can decrypt oracle_payload
-    const oraclePayload = parseOracleResponsePayload(response, oracle.secretKey);
+    const oraclePayload = parseOracleResponsePayload(
+      response,
+      oracle.secretKey,
+    );
     expect(oraclePayload).not.toBeNull();
     expect(oraclePayload!.nonce_echo).toBe("N1");
     expect(oraclePayload!.attachments).toHaveLength(1);
-    expect(oraclePayload!.attachments[0]!.decrypt_key_oracle).toBe("key_for_oracle");
+    expect(oraclePayload!.attachments[0]!.decrypt_key_oracle).toBe(
+      "key_for_oracle",
+    );
     expect(oraclePayload!.attachments[0]!.decrypt_iv).toBe("iv123");
     expect(oraclePayload!.notes).toBe("oracle test");
 
@@ -206,7 +217,9 @@ describe("Nostr events (NIP-90 DVM)", () => {
       worker.publicKey,
     );
     expect(requesterPayload.nonce_echo).toBe("N1");
-    expect(requesterPayload.attachments?.[0]?.decrypt_key_requester).toBe("key_for_requester");
+    expect(requesterPayload.attachments?.[0]?.decrypt_key_requester).toBe(
+      "key_for_requester",
+    );
   });
 
   test("oracle_payload not present when oraclePubKey omitted", () => {
@@ -220,7 +233,9 @@ describe("Nostr events (NIP-90 DVM)", () => {
       { nonce_echo: "N2" },
     );
 
-    const oraclePayloadTag = response.tags.find((t) => t[0] === "oracle_payload");
+    const oraclePayloadTag = response.tags.find((t) =>
+      t[0] === "oracle_payload"
+    );
     expect(oraclePayloadTag).toBeUndefined();
     expect(parseOracleResponsePayload(response, worker.secretKey)).toBeNull();
   });
@@ -248,7 +263,8 @@ describe("Nostr events (NIP-90 DVM)", () => {
       oracle.publicKey,
     );
 
-    expect(() => parseOracleResponsePayload(response, eavesdropper.secretKey)).toThrow();
+    expect(() => parseOracleResponsePayload(response, eavesdropper.secretKey))
+      .toThrow();
   });
 
   test("builds and decrypts QuoteFeedback event (kind 7000)", () => {
@@ -261,16 +277,27 @@ describe("Nostr events (NIP-90 DVM)", () => {
       amount_sats: 100,
     };
 
-    const event = buildQuoteFeedbackEvent(worker, "event_q1", requester.publicKey, payload);
+    const event = buildQuoteFeedbackEvent(
+      worker,
+      "event_q1",
+      requester.publicKey,
+      payload,
+    );
 
     expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("payment-required");
 
     // Requester can decrypt
-    const parsed = parseFeedbackPayload(event.content, requester.secretKey, worker.publicKey);
+    const parsed = parseFeedbackPayload(
+      event.content,
+      requester.secretKey,
+      worker.publicKey,
+    );
     expect(parsed.status).toBe("payment-required");
-    expect((parsed as QuoteFeedbackPayload).worker_pubkey).toBe(worker.publicKey);
+    expect((parsed as QuoteFeedbackPayload).worker_pubkey).toBe(
+      worker.publicKey,
+    );
     expect((parsed as QuoteFeedbackPayload).amount_sats).toBe(100);
   });
 
@@ -284,17 +311,30 @@ describe("Nostr events (NIP-90 DVM)", () => {
       htlc_token: "cashuToken123",
     };
 
-    const event = buildSelectionFeedbackEvent(requester, "event_s1", worker.publicKey, payload);
+    const event = buildSelectionFeedbackEvent(
+      requester,
+      "event_s1",
+      worker.publicKey,
+      payload,
+    );
 
     expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("processing");
 
     // Worker can decrypt
-    const parsed = parseFeedbackPayload(event.content, worker.secretKey, requester.publicKey);
+    const parsed = parseFeedbackPayload(
+      event.content,
+      worker.secretKey,
+      requester.publicKey,
+    );
     expect(parsed.status).toBe("processing");
-    expect((parsed as SelectionFeedbackPayload).selected_worker_pubkey).toBe(worker.publicKey);
-    expect((parsed as SelectionFeedbackPayload).htlc_token).toBe("cashuToken123");
+    expect((parsed as SelectionFeedbackPayload).selected_worker_pubkey).toBe(
+      worker.publicKey,
+    );
+    expect((parsed as SelectionFeedbackPayload).htlc_token).toBe(
+      "cashuToken123",
+    );
   });
 
   test("third party cannot decrypt response", () => {
@@ -315,7 +355,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
         response.content,
         eavesdropper.secretKey,
         worker.publicKey,
-      ),
+      )
     ).toThrow();
   });
 });

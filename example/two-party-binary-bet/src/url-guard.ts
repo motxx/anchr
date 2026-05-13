@@ -25,10 +25,16 @@ function isPrivateOrLoopbackHost(hostname: string): boolean {
   if (hostname === "localhost") return true;
   if (hostname === "::1" || hostname === "[::1]") return true;
   const lower = hostname.toLowerCase();
-  if (lower.startsWith("fe80:") || lower.startsWith("fc00:") || lower.startsWith("fd00:")) {
+  if (
+    lower.startsWith("fe80:") || lower.startsWith("fc00:") ||
+    lower.startsWith("fd00:")
+  ) {
     return true;
   }
-  if (lower.startsWith("[fe80:") || lower.startsWith("[fc00:") || lower.startsWith("[fd00:")) {
+  if (
+    lower.startsWith("[fe80:") || lower.startsWith("[fc00:") ||
+    lower.startsWith("[fd00:")
+  ) {
     return true;
   }
   for (const re of PRIVATE_HOST_RE) {

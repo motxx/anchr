@@ -1,4 +1,11 @@
-import { CashuMint, CashuWallet, CheckStateEnum, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
+import {
+  CashuMint,
+  CashuWallet,
+  CheckStateEnum,
+  getDecodedToken,
+  getEncodedToken,
+  type Proof,
+} from "@cashu/cashu-ts";
 import { useSettingsStore } from "../store/settings.ts";
 
 let _wallet: CashuWallet | null = null;
@@ -20,22 +27,29 @@ export function getMintUrl(): string {
   return useSettingsStore.getState().mintUrl;
 }
 
-export async function createBountyToken(amountSats: number): Promise<{
-  token: string;
-  proofs: Proof[];
-} | null> {
+export async function createBountyToken(amountSats: number): Promise<
+  {
+    token: string;
+    proofs: Proof[];
+  } | null
+> {
   const wallet = getCashuWallet();
   if (!wallet) return null;
 
   try {
     await wallet.loadMint();
     const mintQuote = await wallet.createMintQuote(amountSats);
-    console.error(`[cashu] Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
+    console.error(
+      `[cashu] Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`,
+    );
     const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
     const token = getEncodedToken({ mint: getMintUrl(), proofs });
     return { token, proofs };
   } catch (error) {
-    console.error("[cashu] Failed to create bounty token:", error instanceof Error ? error.message : error);
+    console.error(
+      "[cashu] Failed to create bounty token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -44,17 +58,27 @@ export function encodeToken(mintUrl: string, proofs: Proof[]): string {
   return getEncodedToken({ mint: mintUrl, proofs });
 }
 
-export async function verifyToken(token: string, expectedMinSats?: number): Promise<{
+export async function verifyToken(
+  token: string,
+  expectedMinSats?: number,
+): Promise<{
   valid: boolean;
   amountSats: number;
   error?: string;
 }> {
   try {
     const decoded = getDecodedToken(token);
-    const totalAmount = decoded.proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
+    const totalAmount = decoded.proofs.reduce(
+      (sum: number, p: Proof) => sum + p.amount,
+      0,
+    );
 
     if (expectedMinSats && totalAmount < expectedMinSats) {
-      return { valid: false, amountSats: totalAmount, error: `Insufficient: ${totalAmount} < ${expectedMinSats}` };
+      return {
+        valid: false,
+        amountSats: totalAmount,
+        error: `Insufficient: ${totalAmount} < ${expectedMinSats}`,
+      };
     }
 
     const wallet = getCashuWallet();
@@ -64,17 +88,29 @@ export async function verifyToken(token: string, expectedMinSats?: number): Prom
         const states = await wallet.checkProofsStates(decoded.proofs);
         const spent = states.filter((s) => s.state !== CheckStateEnum.UNSPENT);
         if (spent.length > 0) {
-          return { valid: false, amountSats: totalAmount, error: `${spent.length} proof(s) already spent` };
+          return {
+            valid: false,
+            amountSats: totalAmount,
+            error: `${spent.length} proof(s) already spent`,
+          };
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { valid: false, amountSats: totalAmount, error: `Mint verification failed: ${msg}` };
+        return {
+          valid: false,
+          amountSats: totalAmount,
+          error: `Mint verification failed: ${msg}`,
+        };
       }
     }
 
     return { valid: true, amountSats: totalAmount };
   } catch (error) {
-    return { valid: false, amountSats: 0, error: error instanceof Error ? error.message : "Invalid token" };
+    return {
+      valid: false,
+      amountSats: 0,
+      error: error instanceof Error ? error.message : "Invalid token",
+    };
   }
 }
 

@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { View, ScrollView, Pressable } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DSText, DSFeedbackBanner } from "../../../src/components/ds/index.ts";
+import { DSFeedbackBanner, DSText } from "../../../src/components/ds/index.ts";
 import { QuoteList } from "../../../src/components/bounty/QuoteList.tsx";
 import { selectWorker } from "../../../src/api/client.ts";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,7 +44,11 @@ export default function QuotesScreen() {
 
       <View className="px-4 gap-4">
         {error && <DSFeedbackBanner variant="error" message={error} />}
-        <QuoteList quotes={quotes} onSelectWorker={handleSelect} selecting={selecting} />
+        <QuoteList
+          quotes={quotes}
+          onSelectWorker={handleSelect}
+          selecting={selecting}
+        />
       </View>
     </ScrollView>
   );

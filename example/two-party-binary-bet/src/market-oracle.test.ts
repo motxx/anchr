@@ -1,20 +1,26 @@
-import { afterAll, beforeAll, beforeEach, describe, test } from "@std/testing/bdd";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  test,
+} from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Buffer } from "node:buffer";
 import {
+  OracleError,
   resolveMarket,
   verifyMarketResolution,
   verifyPreimage,
-  OracleError,
 } from "./market-oracle.ts";
 import {
-  _setVerifierPathForTest,
   _clearSeenPresentationsForTest,
+  _setVerifierPathForTest,
 } from "@anchr/tlsn-toolkit/tlsn-validation";
 import type { TwoPartyBinaryBet } from "./market-types.ts";
 
@@ -23,7 +29,9 @@ function makePreimage(): { preimage: string; hash: string } {
   return { preimage: bytesToHex(raw), hash: bytesToHex(sha256(raw)) };
 }
 
-function makeMarket(overrides: Partial<TwoPartyBinaryBet> = {}): TwoPartyBinaryBet {
+function makeMarket(
+  overrides: Partial<TwoPartyBinaryBet> = {},
+): TwoPartyBinaryBet {
   const { preimage, hash } = makePreimage();
   return {
     id: bytesToHex(randomBytes(16)),
@@ -73,7 +81,6 @@ test("resolveMarket works with htlc_hash_yes", () => {
   expect(result.preimage).toBe(preimage);
 });
 
-
 test("resolveMarket throws on preimage/hash mismatch", () => {
   const market = makeMarket();
   const wrongPreimage = bytesToHex(randomBytes(32));
@@ -81,7 +88,14 @@ test("resolveMarket throws on preimage/hash mismatch", () => {
   const body = JSON.stringify({ price: 200 });
 
   expect(() => {
-    resolveMarket(market, btoa("proof"), "api.example.com", body, now, wrongPreimage);
+    resolveMarket(
+      market,
+      btoa("proof"),
+      "api.example.com",
+      body,
+      now,
+      wrongPreimage,
+    );
   }).toThrow(OracleError);
 });
 
@@ -128,7 +142,9 @@ describe("verifyMarketResolution", () => {
   });
 
   function freshPresentation(): string {
-    return Buffer.from(`presentation-${randomBytes(8).join("")}`).toString("base64");
+    return Buffer.from(`presentation-${randomBytes(8).join("")}`).toString(
+      "base64",
+    );
   }
 
   test("derives YES outcome when condition met against verified body", async () => {
@@ -180,18 +196,23 @@ describe("verifyMarketResolution", () => {
   });
 
   test("rejects an invalid signature", async () => {
-    const market = makeMarket({ resolution_url: "https://api.example.com/price" });
+    const market = makeMarket({
+      resolution_url: "https://api.example.com/price",
+    });
     writeMockVerifier({
       valid: false,
       error: "signature mismatch",
     });
     _setVerifierPathForTest(mockVerifierPath);
 
-    await expect(verifyMarketResolution(market, freshPresentation())).rejects.toThrow(/signature invalid/);
+    await expect(verifyMarketResolution(market, freshPresentation())).rejects
+      .toThrow(/signature invalid/);
   });
 
   test("rejects when the verified server name doesn't match resolution_url", async () => {
-    const market = makeMarket({ resolution_url: "https://api.example.com/price" });
+    const market = makeMarket({
+      resolution_url: "https://api.example.com/price",
+    });
     writeMockVerifier({
       valid: true,
       server_name: "evil.example.net",
@@ -200,11 +221,14 @@ describe("verifyMarketResolution", () => {
     });
     _setVerifierPathForTest(mockVerifierPath);
 
-    await expect(verifyMarketResolution(market, freshPresentation())).rejects.toThrow(/server identity mismatch/);
+    await expect(verifyMarketResolution(market, freshPresentation())).rejects
+      .toThrow(/server identity mismatch/);
   });
 
   test("rejects when the proof is too old", async () => {
-    const market = makeMarket({ resolution_url: "https://api.example.com/price" });
+    const market = makeMarket({
+      resolution_url: "https://api.example.com/price",
+    });
     writeMockVerifier({
       valid: true,
       server_name: "api.example.com",
@@ -213,12 +237,14 @@ describe("verifyMarketResolution", () => {
     });
     _setVerifierPathForTest(mockVerifierPath);
 
-    await expect(verifyMarketResolution(market, freshPresentation())).rejects.toThrow(/too old/);
+    await expect(verifyMarketResolution(market, freshPresentation())).rejects
+      .toThrow(/too old/);
   });
 
   test("throws when the verifier binary isn't available", async () => {
     const market = makeMarket();
     _setVerifierPathForTest(null);
-    await expect(verifyMarketResolution(market, freshPresentation())).rejects.toThrow(/verifier binary not available/);
+    await expect(verifyMarketResolution(market, freshPresentation())).rejects
+      .toThrow(/verifier binary not available/);
   });
 });

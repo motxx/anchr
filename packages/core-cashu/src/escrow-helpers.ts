@@ -4,9 +4,14 @@
 
 import type { P2PKOptions, Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { getCashuWallet, getCashuConfig } from "./wallet.ts";
+import { type CashuConfig, getCashuConfig, getCashuWallet } from "./wallet.ts";
 
-export async function getWalletAndConfig() {
+export async function getWalletAndConfig(): Promise<
+  {
+    wallet: NonNullable<ReturnType<typeof getCashuWallet>>;
+    config: CashuConfig;
+  } | null
+> {
   const wallet = getCashuWallet();
   const config = getCashuConfig();
   if (!wallet || !config) return null;
@@ -34,7 +39,10 @@ export async function loadAndSend(
   try {
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(
-        () => reject(new Error(`Cashu mint operation timed out after ${timeoutMs}ms`)),
+        () =>
+          reject(
+            new Error(`Cashu mint operation timed out after ${timeoutMs}ms`),
+          ),
         timeoutMs,
       );
     });

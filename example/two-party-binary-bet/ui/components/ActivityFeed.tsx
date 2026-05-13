@@ -39,39 +39,41 @@ export function ActivityFeed({ events, limit = 8 }: ActivityFeedProps) {
         </span>
       </div>
 
-      {visible.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No activity yet.</p>
-      ) : (
-        <ul className="divide-y divide-border">
-          {visible.map((e) => (
-            <li
-              key={e.id}
-              className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span
-                  className={cn(
-                    "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                    e.side === "yes" ? "bg-yes/15 text-yes" : "bg-no/15 text-no",
-                  )}
-                >
-                  {e.side}
+      {visible.length === 0
+        ? <p className="text-sm text-muted-foreground">No activity yet.</p>
+        : (
+          <ul className="divide-y divide-border">
+            {visible.map((e) => (
+              <li
+                key={e.id}
+                className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                      e.side === "yes"
+                        ? "bg-yes/15 text-yes"
+                        : "bg-no/15 text-no",
+                    )}
+                  >
+                    {e.side}
+                  </span>
+                  <span className="font-mono text-sm text-foreground truncate">
+                    {formatSats(e.amount_sats)}
+                    <span className="text-muted-foreground">sats</span>
+                  </span>
+                  <span className="font-mono text-[11px] text-muted-foreground truncate hidden sm:inline">
+                    {truncate(e.pubkey)}
+                  </span>
+                </div>
+                <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                  {formatRelativeTime(e.t)} ago
                 </span>
-                <span className="font-mono text-sm text-foreground truncate">
-                  {formatSats(e.amount_sats)}
-                  <span className="text-muted-foreground"> sats</span>
-                </span>
-                <span className="font-mono text-[11px] text-muted-foreground truncate hidden sm:inline">
-                  {truncate(e.pubkey)}
-                </span>
-              </div>
-              <span className="font-mono text-[11px] text-muted-foreground shrink-0">
-                {formatRelativeTime(e.t)} ago
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
     </div>
   );
 }

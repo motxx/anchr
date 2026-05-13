@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface BountyTypeToggleProps {
@@ -7,7 +7,9 @@ interface BountyTypeToggleProps {
   onTypeChange: (type: "photo" | "web") => void;
 }
 
-export function BountyTypeToggle({ type, onTypeChange }: BountyTypeToggleProps) {
+export function BountyTypeToggle(
+  { type, onTypeChange }: BountyTypeToggleProps,
+) {
   return (
     <View className="flex-row bg-surface rounded-xl border border-border p-1">
       <Pressable

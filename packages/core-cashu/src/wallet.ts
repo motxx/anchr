@@ -13,7 +13,12 @@
  * - Tokens are bearer instruments (like physical cash)
  */
 
-import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
+import {
+  getDecodedToken,
+  getEncodedToken,
+  type Proof,
+  Wallet,
+} from "@cashu/cashu-ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "cashu"]);
@@ -70,10 +75,12 @@ export interface CreateBountyTokenOptions {
 export async function createBountyToken(
   amountSats: number,
   opts?: CreateBountyTokenOptions,
-): Promise<{
-  token: string;
-  proofs: Proof[];
-} | null> {
+): Promise<
+  {
+    token: string;
+    proofs: Proof[];
+  } | null
+> {
   const wallet = getCashuWallet();
   if (!wallet) return null;
 
@@ -83,7 +90,9 @@ export async function createBountyToken(
   try {
     await wallet.loadMint();
     const mintQuote = await wallet.createMintQuote(amountSats);
-    log.info(`Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`);
+    log.info(
+      `Pay this invoice to mint ${amountSats} sats: ${mintQuote.request}`,
+    );
     if (opts?.onInvoice) await opts.onInvoice(mintQuote.request);
 
     const deadline = Date.now() + timeoutMs;
@@ -111,7 +120,10 @@ export async function createBountyToken(
     });
     return { token, proofs };
   } catch (error) {
-    log.error("Failed to create bounty token:", error instanceof Error ? error.message : error);
+    log.error(
+      "Failed to create bounty token:",
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
@@ -127,17 +139,27 @@ export function encodeToken(mintUrl: string, proofs: Proof[]): string {
  * Verify that a Cashu token is valid and has sufficient value.
  * Queries the Cashu mint's /v1/checkstate to confirm proofs are UNSPENT.
  */
-export async function verifyToken(token: string, expectedMinSats?: number): Promise<{
+export async function verifyToken(
+  token: string,
+  expectedMinSats?: number,
+): Promise<{
   valid: boolean;
   amountSats: number;
   error?: string;
 }> {
   try {
     const decoded = getDecodedToken(token);
-    const totalAmount = decoded.proofs.reduce((sum: number, p: Proof) => sum + p.amount, 0);
+    const totalAmount = decoded.proofs.reduce(
+      (sum: number, p: Proof) => sum + p.amount,
+      0,
+    );
 
     if (expectedMinSats && totalAmount < expectedMinSats) {
-      return { valid: false, amountSats: totalAmount, error: `Insufficient amount: ${totalAmount} < ${expectedMinSats}` };
+      return {
+        valid: false,
+        amountSats: totalAmount,
+        error: `Insufficient amount: ${totalAmount} < ${expectedMinSats}`,
+      };
     }
 
     // Query the Cashu mint to verify proofs are actually unspent
@@ -148,13 +170,23 @@ export async function verifyToken(token: string, expectedMinSats?: number): Prom
         const states = await wallet.checkProofsStates(decoded.proofs);
         const spent = states.filter((s) => s.state !== "UNSPENT");
         if (spent.length > 0) {
-          return { valid: false, amountSats: totalAmount, error: `${spent.length} proof(s) already spent on mint` };
+          return {
+            valid: false,
+            amountSats: totalAmount,
+            error: `${spent.length} proof(s) already spent on mint`,
+          };
         }
-        log.error(`Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`);
+        log.error(
+          `Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`,
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         log.error(`Mint checkstate failed:`, msg);
-        return { valid: false, amountSats: totalAmount, error: `Mint verification failed: ${msg}` };
+        return {
+          valid: false,
+          amountSats: totalAmount,
+          error: `Mint verification failed: ${msg}`,
+        };
       }
     }
 

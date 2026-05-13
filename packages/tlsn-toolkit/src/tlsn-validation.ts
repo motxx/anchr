@@ -14,8 +14,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, which, writeFile, spawn } from "@anchr/core-runtime";
-import type { TlsnAttestation, TlsnCondition, TlsnRequirement, TlsnVerifiedData } from "./tlsn-types.ts";
+import { moduleDir, spawn, which, writeFile } from "@anchr/core-runtime";
+import type {
+  TlsnAttestation,
+  TlsnCondition,
+  TlsnRequirement,
+  TlsnVerifiedData,
+} from "./tlsn-types.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "tlsn"]);
@@ -48,7 +53,9 @@ export interface TlsnValidationResult {
   available: boolean;
   signatureValid: boolean;
   serverIdentityValid: boolean;
-  conditionResults: Array<{ condition: TlsnCondition; passed: boolean; actual_value?: string }>;
+  conditionResults: Array<
+    { condition: TlsnCondition; passed: boolean; actual_value?: string }
+  >;
   attestationFresh: boolean;
   /** Verified data extracted from the presentation (null if verification failed). */
   verifiedData?: TlsnVerifiedData;
@@ -68,8 +75,14 @@ function findTlsnVerifier(): string | null {
 
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
-    join(moduleDir(import.meta), "../../../crates/tlsn-verifier/target/release/tlsn-verifier"),
-    join(moduleDir(import.meta), "../../../crates/tlsn-verifier/target/debug/tlsn-verifier"),
+    join(
+      moduleDir(import.meta),
+      "../../../crates/tlsn-verifier/target/release/tlsn-verifier",
+    ),
+    join(
+      moduleDir(import.meta),
+      "../../../crates/tlsn-verifier/target/debug/tlsn-verifier",
+    ),
   ];
   for (const p of localPaths) {
     try {
@@ -117,18 +130,27 @@ export function evaluateCondition(
   switch (condition.type) {
     case "contains": {
       const passed = body.includes(condition.expression);
-      return { passed, actual_value: passed ? condition.expression : undefined };
+      return {
+        passed,
+        actual_value: passed ? condition.expression : undefined,
+      };
     }
     case "regex": {
       // Guard against catastrophic backtracking (ReDoS)
       const pattern = condition.expression;
       if (pattern.length > 500) {
-        return { passed: false, actual_value: "regex pattern too long (max 500 chars)" };
+        return {
+          passed: false,
+          actual_value: "regex pattern too long (max 500 chars)",
+        };
       }
       // Reject patterns with nested quantifiers that cause exponential backtracking.
       // Covers: (a+)+, ((a+))+, (a|a)+, (a{1,5})*, etc.
       if (isSuspiciousRegex(pattern)) {
-        return { passed: false, actual_value: "regex rejected: potential ReDoS pattern detected" };
+        return {
+          passed: false,
+          actual_value: "regex rejected: potential ReDoS pattern detected",
+        };
       }
       try {
         const re = new RegExp(pattern);
@@ -145,7 +167,10 @@ export function evaluateCondition(
         if (value === undefined) return { passed: false };
         const actual = String(value);
         if (condition.expected !== undefined) {
-          return { passed: actual === condition.expected, actual_value: actual };
+          return {
+            passed: actual === condition.expected,
+            actual_value: actual,
+          };
         }
         return { passed: true, actual_value: actual };
       } catch {
@@ -178,12 +203,16 @@ export async function validateTlsn(
 ): Promise<TlsnValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
-  const maxAgeSeconds = requirement.max_attestation_age_seconds ?? DEFAULT_MAX_AGE_SECONDS;
+  const maxAgeSeconds = requirement.max_attestation_age_seconds ??
+    DEFAULT_MAX_AGE_SECONDS;
 
   // --- Proof replay protection ---
-  const presentationHash = createHash("sha256").update(attestation.presentation).digest("hex");
+  const presentationHash = createHash("sha256").update(attestation.presentation)
+    .digest("hex");
   if (seenPresentations.has(presentationHash)) {
-    failures.push("TLSNotary: presentation already used — proof replay rejected");
+    failures.push(
+      "TLSNotary: presentation already used — proof replay rejected",
+    );
     return {
       available: true,
       signatureValid: false,
@@ -199,7 +228,9 @@ export async function validateTlsn(
 
   // --- Binary required ---
   if (!verifierPath) {
-    failures.push("TLSNotary: tlsn-verifier binary not available — cannot verify presentation");
+    failures.push(
+      "TLSNotary: tlsn-verifier binary not available — cannot verify presentation",
+    );
     return {
       available: false,
       signatureValid: false,
@@ -214,7 +245,11 @@ export async function validateTlsn(
   // --- Cryptographic verification ---
   const cryptoResult = await runVerifierBinary(verifierPath, attestation);
   if (!cryptoResult.signatureValid) {
-    failures.push(`TLSNotary: presentation signature invalid — ${cryptoResult.error ?? "verification failed"}`);
+    failures.push(
+      `TLSNotary: presentation signature invalid — ${
+        cryptoResult.error ?? "verification failed"
+      }`,
+    );
     return {
       available: true,
       signatureValid: false,
@@ -226,7 +261,9 @@ export async function validateTlsn(
     };
   }
 
-  checks.push("TLSNotary: presentation signature valid (cryptographically verified)");
+  checks.push(
+    "TLSNotary: presentation signature valid (cryptographically verified)",
+  );
 
   const verifiedServerName = cryptoResult.verifiedServerName;
   const verifiedBody = cryptoResult.verifiedBody ?? "";
@@ -234,12 +271,17 @@ export async function validateTlsn(
 
   // --- Server identity / domain matching ---
   let serverIdentityValid = false;
-  const expectedHostname = requirement.domain_hint ?? extractHostname(requirement.target_url);
+  const expectedHostname = requirement.domain_hint ??
+    extractHostname(requirement.target_url);
   if (expectedHostname && verifiedServerName === expectedHostname) {
     checks.push(`TLSNotary: server name matches target (${expectedHostname})`);
     serverIdentityValid = true;
   } else if (expectedHostname) {
-    failures.push(`TLSNotary: server name "${verifiedServerName ?? "unknown"}" does not match target "${expectedHostname}"`);
+    failures.push(
+      `TLSNotary: server name "${
+        verifiedServerName ?? "unknown"
+      }" does not match target "${expectedHostname}"`,
+    );
   }
 
   // --- Freshness check (using verified timestamp from the proof) ---
@@ -248,9 +290,17 @@ export async function validateTlsn(
     const ageMs = Date.now() - verifiedTime * 1000;
     attestationFresh = ageMs >= 0 && ageMs < maxAgeSeconds * 1000;
     if (attestationFresh) {
-      checks.push(`TLSNotary: attestation fresh (${Math.round(ageMs / 1000)}s old, max ${maxAgeSeconds}s)`);
+      checks.push(
+        `TLSNotary: attestation fresh (${
+          Math.round(ageMs / 1000)
+        }s old, max ${maxAgeSeconds}s)`,
+      );
     } else {
-      failures.push(`TLSNotary: attestation too old (${Math.round(ageMs / 1000)}s, max ${maxAgeSeconds}s)`);
+      failures.push(
+        `TLSNotary: attestation too old (${
+          Math.round(ageMs / 1000)
+        }s, max ${maxAgeSeconds}s)`,
+      );
     }
   } else {
     checks.push("TLSNotary: no timestamp in proof — freshness check skipped");
@@ -263,7 +313,8 @@ export async function validateTlsn(
     for (const condition of requirement.conditions) {
       const result = evaluateCondition(condition, verifiedBody);
       conditionResults.push({ condition, ...result });
-      const label = condition.description ?? `${condition.type}:${condition.expression}`;
+      const label = condition.description ??
+        `${condition.type}:${condition.expression}`;
       if (result.passed) {
         checks.push(`TLSNotary condition passed: ${label}`);
       } else {
@@ -360,7 +411,10 @@ async function runVerifierBinary(
         verifiedTime: result.time ?? undefined,
       };
     } catch {
-      return { signatureValid: false, error: "failed to parse verifier output" };
+      return {
+        signatureValid: false,
+        error: "failed to parse verifier output",
+      };
     }
   } catch (err) {
     return { signatureValid: false, error: String(err) };

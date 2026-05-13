@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Pressable, Text } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
@@ -11,7 +11,9 @@ const ROUTE_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   profile: "person",
 };
 
-export function DSTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export function DSTabBar(
+  { state, descriptors, navigation }: BottomTabBarProps,
+) {
   return (
     <View className="flex-row bg-surface border-t border-border pb-6 pt-2 px-2">
       {state.routes.map((route, index) => {

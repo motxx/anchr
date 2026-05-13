@@ -10,7 +10,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { which, writeFile, spawn, fileExists, readFileAsArrayBuffer } from "@anchr/core-runtime";
+import {
+  fileExists,
+  readFileAsArrayBuffer,
+  spawn,
+  which,
+  writeFile,
+} from "@anchr/core-runtime";
 /**
  * Subset of the host server's Query needed to build the vision-LLM prompt.
  * photo-bounty deliberately doesn't depend on the full host Query — callers
@@ -37,7 +43,9 @@ export interface AttachmentRefBase {
 }
 
 /** Subset of the host server's QueryResult needed for image extraction. */
-export interface AiContentCheckResult<TRef extends AttachmentRefBase = AttachmentRefBase> {
+export interface AiContentCheckResult<
+  TRef extends AttachmentRefBase = AttachmentRefBase,
+> {
   attachments: TRef[];
 }
 
@@ -70,7 +78,19 @@ export interface AttachmentBuffer {
   mimeType?: string;
 }
 
-export interface AiContentCheckDeps<TRef extends AttachmentRefBase = AttachmentRefBase> {
+export interface AnthropicVisionClient {
+  messages: {
+    create: (
+      params: Anthropic.MessageCreateParams,
+    ) => Promise<{ content: Array<{ type: string; text?: string }> }> | {
+      content: Array<{ type: string; text?: string }>;
+    };
+  };
+}
+
+export interface AiContentCheckDeps<
+  TRef extends AttachmentRefBase = AttachmentRefBase,
+> {
   /**
    * Returns config per call. Called inside `checkAttachmentContent` so that
    * env-driven config (`AI_CONTENT_CHECK`, `ANTHROPIC_API_KEY`) takes effect
@@ -78,8 +98,21 @@ export interface AiContentCheckDeps<TRef extends AttachmentRefBase = AttachmentR
    */
   getConfig: () => AiContentCheckConfig;
   /** Reader for attachment buffer. Returns null if attachment is unavailable. */
-  readAttachment: (ref: TRef, blossomKey?: BlossomKeyMaterial) => Promise<AttachmentBuffer | null>;
+  readAttachment: (
+    ref: TRef,
+    blossomKey?: BlossomKeyMaterial,
+  ) => Promise<AttachmentBuffer | null>;
+  /** Test seam for the Anthropic client; production callers use the SDK. */
+  createAnthropicClient?: (apiKey: string) => AnthropicVisionClient;
 }
+
+export type AiContentChecker<
+  TRef extends AttachmentRefBase = AttachmentRefBase,
+> = (
+  query: AiContentCheckQuery,
+  result: AiContentCheckResult<TRef>,
+  blossomKeys?: BlossomKeyMap,
+) => Promise<ContentCheckResult | null>;
 
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
@@ -120,7 +153,18 @@ async function extractVideoFrames(
     await writeFile(inputPath, videoBuffer);
 
     const proc = spawn(
-      [ffmpeg, "-i", inputPath, "-vf", "fps=1", "-frames:v", String(maxFrames), "-q:v", "2", outputPattern],
+      [
+        ffmpeg,
+        "-i",
+        inputPath,
+        "-vf",
+        "fps=1",
+        "-frames:v",
+        String(maxFrames),
+        "-q:v",
+        "2",
+        outputPattern,
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     await proc.exited;
@@ -128,7 +172,10 @@ async function extractVideoFrames(
 
     const frames: { data: Buffer; mimeType: ImageMediaType }[] = [];
     for (let i = 1; i <= maxFrames; i++) {
-      const framePath = join(tempDir, `frame_${String(i).padStart(3, "0")}.jpg`);
+      const framePath = join(
+        tempDir,
+        `frame_${String(i).padStart(3, "0")}.jpg`,
+      );
       if (await fileExists(framePath)) {
         frames.push({
           data: Buffer.from(await readFileAsArrayBuffer(framePath)),
@@ -192,7 +239,10 @@ async function loadImageContent<TRef extends AttachmentRefBase>(
         const ext = ref.filename?.match(/\.[^.]+$/)?.[0] ?? ".mp4";
         const frames = await extractVideoFrames(buf.data, ext);
         for (const frame of frames) {
-          images.push({ data: frame.data.toString("base64"), mimeType: frame.mimeType });
+          images.push({
+            data: frame.data.toString("base64"),
+            mimeType: frame.mimeType,
+          });
         }
       }
     }
@@ -211,7 +261,11 @@ async function loadImageContent<TRef extends AttachmentRefBase>(
  * });
  * const result = await check(query, result, blossomKeys);
  */
-export function createAiContentChecker<TRef extends AttachmentRefBase = AttachmentRefBase>(deps: AiContentCheckDeps<TRef>) {
+export function createAiContentChecker<
+  TRef extends AttachmentRefBase = AttachmentRefBase,
+>(
+  deps: AiContentCheckDeps<TRef>,
+): AiContentChecker<TRef> {
   return async function checkAttachmentContent(
     query: AiContentCheckQuery,
     result: AiContentCheckResult<TRef>,
@@ -220,19 +274,29 @@ export function createAiContentChecker<TRef extends AttachmentRefBase = Attachme
     const config = deps.getConfig();
     if (!config.enabled) return null;
     if (!config.anthropicApiKey) return null;
-    const client = new Anthropic({ apiKey: config.anthropicApiKey });
+    const client = deps.createAnthropicClient?.(config.anthropicApiKey) ??
+      new Anthropic({ apiKey: config.anthropicApiKey });
 
     const attachments = result.attachments;
     if (!attachments?.length) return null;
 
-    const images = await loadImageContent(attachments, blossomKeys, deps.readAttachment);
+    const images = await loadImageContent(
+      attachments,
+      blossomKeys,
+      deps.readAttachment,
+    );
     if (images.length === 0) return null;
 
     const prompt = buildPrompt(query);
-    const content: Anthropic.MessageCreateParams["messages"][0]["content"] = images.map((img) => ({
-      type: "image" as const,
-      source: { type: "base64" as const, media_type: img.mimeType, data: img.data },
-    }));
+    const content: Anthropic.MessageCreateParams["messages"][0]["content"] =
+      images.map((img) => ({
+        type: "image" as const,
+        source: {
+          type: "base64" as const,
+          media_type: img.mimeType,
+          data: img.data,
+        },
+      }));
     content.push({ type: "text" as const, text: prompt });
 
     try {
@@ -240,29 +304,43 @@ export function createAiContentChecker<TRef extends AttachmentRefBase = Attachme
         model: "claude-haiku-4-5-20251001",
         max_tokens: 256,
         messages: [{ role: "user", content }],
-      });
+      }) as { content: Array<{ type: string; text?: string }> };
 
       const text = response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .filter((block): block is { type: "text"; text: string } =>
+          block.type === "text" && typeof block.text === "string"
+        )
         .map((block) => block.text)
         .join("");
 
       const jsonMatch = text.match(/\{[\s\S]*?\}/);
       if (!jsonMatch) {
-        return { passed: true, reason: "AI response could not be parsed; skipping check" };
+        return {
+          passed: false,
+          reason: "AI response could not be parsed",
+        };
       }
 
-      const parsed = JSON.parse(jsonMatch[0]) as { relevant: boolean; nonce_visible?: boolean; reason: string };
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        relevant: boolean;
+        nonce_visible?: boolean;
+        reason: string;
+      };
       const nonceRequired = query.verification_requirements.includes("nonce");
-      const passed = Boolean(parsed.relevant) && (!nonceRequired || Boolean(parsed.nonce_visible));
+      const passed = Boolean(parsed.relevant) &&
+        (!nonceRequired || Boolean(parsed.nonce_visible));
       return {
         passed,
-        reason: parsed.reason || (passed ? "Content matches query" : "Content check failed"),
+        reason: parsed.reason ||
+          (passed ? "Content matches query" : "Content check failed"),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      log.error("API error, skipping:", message);
-      return null;
+      log.error("API error:", message);
+      return {
+        passed: false,
+        reason: `AI content check failed: ${message}`,
+      };
     }
   };
 }

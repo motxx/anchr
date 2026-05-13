@@ -5,8 +5,14 @@
  * Caches results per listing_id within max_age_seconds.
  */
 
-import type { TlsnRequirement, TlsnAttestation } from "@anchr/bounty/domain-types";
-import { validateTlsn, type TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+import type {
+  TlsnAttestation,
+  TlsnRequirement,
+} from "@anchr/bounty/domain-types";
+import {
+  type TlsnValidationResult,
+  validateTlsn,
+} from "@anchr/tlsn-toolkit/tlsn-validation";
 import { validateAttachmentUri } from "@anchr/bounty/url-validation";
 
 export interface FetchedData {
@@ -56,7 +62,9 @@ export async function fetchWithProof(
   });
 
   if (!response.ok) {
-    throw new Error(`Upstream fetch failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Upstream fetch failed: ${response.status} ${response.statusText}`,
+    );
   }
 
   const body = await response.text();

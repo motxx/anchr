@@ -2,7 +2,10 @@ import { Buffer } from "node:buffer";
 import { checkAttachmentContent } from "./ai-content-check.ts";
 import { validateC2pa } from "@anchr/photo-verification/c2pa-validation";
 import { haversineKm } from "@anchr/photo-verification/geo";
-import { getIntegrity, getIntegrityForQuery } from "@anchr/photo-verification/integrity-store";
+import {
+  getIntegrity,
+  getIntegrityForQuery,
+} from "@anchr/photo-verification/integrity-store";
 import { validateTlsn } from "@anchr/tlsn-toolkit/tlsn-validation";
 import { fetchBlossomAttachment } from "../blossom/fetch-attachment.ts";
 import { validateAttachmentUri } from "../url-validation.ts";
@@ -41,7 +44,9 @@ function verifyEmptySubmission(
   const requiresEvidence = factors.includes("nonce") || factors.includes("gps");
 
   if (requiresEvidence && !hasTlsn) {
-    acc.failures.push("no media evidence provided — photos are required when GPS or nonce verification is enabled");
+    acc.failures.push(
+      "no media evidence provided — photos are required when GPS or nonce verification is enabled",
+    );
   } else if (!hasTlsn) {
     acc.checks.push("no media evidence provided (weak verification)");
   }
@@ -54,19 +59,38 @@ function verifyBodyGps(
   acc: CheckAccumulator,
 ): void {
   if (input.gps && requirement.expected_gps) {
-    const dist = haversineKm(input.gps.lat, input.gps.lon, requirement.expected_gps.lat, requirement.expected_gps.lon);
+    const dist = haversineKm(
+      input.gps.lat,
+      input.gps.lon,
+      requirement.expected_gps.lat,
+      requirement.expected_gps.lon,
+    );
     if (dist <= maxGpsDist) {
-      acc.checks.push(`body GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+      acc.checks.push(
+        `body GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`,
+      );
     } else {
-      acc.failures.push(`body GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+      acc.failures.push(
+        `body GPS ${
+          dist.toFixed(1)
+        }km from expected location (max ${maxGpsDist}km)`,
+      );
     }
-  } else if (!input.gps && requirement.expected_gps && requirement.factors.includes("gps")) {
-    acc.failures.push("GPS coordinates missing from submission body — required by verification policy");
+  } else if (
+    !input.gps && requirement.expected_gps &&
+    requirement.factors.includes("gps")
+  ) {
+    acc.failures.push(
+      "GPS coordinates missing from submission body — required by verification policy",
+    );
   }
 }
 
 async function verifyTlsnExtensionResult(
-  extResult: { presentation?: string; results?: Array<{ type: string; part: string; value: string }> },
+  extResult: {
+    presentation?: string;
+    results?: Array<{ type: string; part: string; value: string }>;
+  },
   requirement: VerificationRequirement,
   acc: CheckAccumulator,
 ): Promise<TlsnVerifiedData | undefined> {
@@ -79,7 +103,9 @@ async function verifyTlsnExtensionResult(
     acc.failures.push(...tlsnResult.failures);
     return tlsnResult.verifiedData;
   } else if (!extResult.presentation) {
-    acc.failures.push("TLSNotary extension: no cryptographic presentation included — self-reported data cannot be trusted");
+    acc.failures.push(
+      "TLSNotary extension: no cryptographic presentation included — self-reported data cannot be trusted",
+    );
   } else {
     acc.failures.push("TLSNotary extension: query missing tlsn_requirements");
   }
@@ -152,7 +178,8 @@ export async function verifyProof(
 ): Promise<VerificationDetail> {
   const acc: CheckAccumulator = { checks: [], failures: [], warnings: [] };
   let tlsnVerifiedData: TlsnVerifiedData | undefined;
-  const maxGpsDist = requirement.max_gps_distance_km ?? DEFAULT_MAX_GPS_DISTANCE_KM;
+  const maxGpsDist = requirement.max_gps_distance_km ??
+    DEFAULT_MAX_GPS_DISTANCE_KM;
 
   const attachments = input.attachments ?? [];
   const hasTlsn = requirement.factors.includes("tlsn");
@@ -169,7 +196,15 @@ export async function verifyProof(
 
   if (attachments.length > 0) {
     acc.checks.push("attachment present");
-    await verifyPhotoIntegrity(requirement.id, attachments, acc.checks, acc.failures, requirement.expected_gps, maxGpsDist, options?.blossomKeys);
+    await verifyPhotoIntegrity(
+      requirement.id,
+      attachments,
+      acc.checks,
+      acc.failures,
+      requirement.expected_gps,
+      maxGpsDist,
+      options?.blossomKeys,
+    );
   }
 
   if (attachments.length > 0 && acc.failures.length === 0) {
@@ -178,7 +213,11 @@ export async function verifyProof(
       challenge_nonce: requirement.challenge_nonce,
       verification_requirements: requirement.factors,
     };
-    const aiResult = await checkAttachmentContent(aiQuery, { attachments }, options?.blossomKeys);
+    const aiResult = await checkAttachmentContent(
+      aiQuery,
+      { attachments },
+      options?.blossomKeys,
+    );
     applyAiContentResult(aiResult, acc);
   }
 
@@ -217,11 +256,17 @@ export function queryResultToInput(result: QueryResult): VerificationInput {
 /**
  * Query-aware verification — adapter over `verifyProof`.
  *
- * Used by the NIP-90 reference host. Standalone callers should construct a
+ * NIP-90 adapters can use this shape. Standalone callers should construct a
  * `VerificationRequirement` directly and call `verifyProof`.
  */
-export function verify(query: Query, result: QueryResult, blossomKeys?: BlossomKeyMap): Promise<VerificationDetail> {
-  return verifyProof(queryToRequirement(query), queryResultToInput(result), { blossomKeys });
+export function verify(
+  query: Query,
+  result: QueryResult,
+  blossomKeys?: BlossomKeyMap,
+): Promise<VerificationDetail> {
+  return verifyProof(queryToRequirement(query), queryResultToInput(result), {
+    blossomKeys,
+  });
 }
 
 function checkC2paSignature(
@@ -230,9 +275,13 @@ function checkC2paSignature(
   failures: string[],
 ): void {
   if (!c2pa.available) {
-    failures.push("C2PA: c2patool not available — cannot verify Content Credentials");
+    failures.push(
+      "C2PA: c2patool not available — cannot verify Content Credentials",
+    );
   } else if (!c2pa.hasManifest) {
-    failures.push("C2PA: no Content Credentials found — use a C2PA-enabled camera");
+    failures.push(
+      "C2PA: no Content Credentials found — use a C2PA-enabled camera",
+    );
   } else if (c2pa.signatureValid) {
     checks.push("C2PA: valid Content Credentials signature");
   } else {
@@ -249,11 +298,24 @@ function checkGpsProximity(
   failures: string[],
 ): void {
   if (gps && expectedGps) {
-    const dist = haversineKm(gps.lat, gps.lon, expectedGps.lat, expectedGps.lon);
+    const dist = haversineKm(
+      gps.lat,
+      gps.lon,
+      expectedGps.lat,
+      expectedGps.lon,
+    );
     if (dist <= maxGpsDist) {
-      checks.push(`${label} GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`);
+      checks.push(
+        `${label} GPS within ${maxGpsDist}km of expected (${
+          dist.toFixed(1)
+        }km)`,
+      );
     } else {
-      failures.push(`${label} GPS ${dist.toFixed(1)}km from expected location (max ${maxGpsDist}km)`);
+      failures.push(
+        `${label} GPS ${
+          dist.toFixed(1)
+        }km from expected location (max ${maxGpsDist}km)`,
+      );
     }
   } else if (gps) {
     checks.push(`${label} GPS: ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`);
@@ -261,7 +323,11 @@ function checkGpsProximity(
 }
 
 function checkProofModeRecord(
-  proofmode: { checks: string[]; failures: string[]; proof: { locationLatitude: number; locationLongitude: number } | null } | undefined,
+  proofmode: {
+    checks: string[];
+    failures: string[];
+    proof: { locationLatitude: number; locationLongitude: number } | null;
+  } | undefined,
   expectedGps: GpsCoord | undefined,
   maxGpsDist: number,
   checks: string[],
@@ -271,14 +337,36 @@ function checkProofModeRecord(
   for (const c of proofmode.checks) checks.push(c);
   for (const f of proofmode.failures) failures.push(f);
 
-  if (proofmode.proof && expectedGps && (proofmode.proof.locationLatitude !== 0 || proofmode.proof.locationLongitude !== 0)) {
-    const gps = { lat: proofmode.proof.locationLatitude, lon: proofmode.proof.locationLongitude };
-    checkGpsProximity(gps, expectedGps, maxGpsDist, "ProofMode", checks, failures);
+  if (
+    proofmode.proof && expectedGps &&
+    (proofmode.proof.locationLatitude !== 0 ||
+      proofmode.proof.locationLongitude !== 0)
+  ) {
+    const gps = {
+      lat: proofmode.proof.locationLatitude,
+      lon: proofmode.proof.locationLongitude,
+    };
+    checkGpsProximity(
+      gps,
+      expectedGps,
+      maxGpsDist,
+      "ProofMode",
+      checks,
+      failures,
+    );
   }
 }
 
 function checkExifRecord(
-  exif: { hasExif: boolean; hasCameraModel: boolean; hasTimestamp: boolean; timestampRecent: boolean; hasGps: boolean; gpsNearHint: boolean | null; metadata: { make?: string; model?: string } },
+  exif: {
+    hasExif: boolean;
+    hasCameraModel: boolean;
+    hasTimestamp: boolean;
+    timestampRecent: boolean;
+    hasGps: boolean;
+    gpsNearHint: boolean | null;
+    metadata: { make?: string; model?: string };
+  },
   checks: string[],
   failures: string[],
 ): void {
@@ -288,13 +376,23 @@ function checkExifRecord(
   }
 
   if (exif.hasCameraModel) {
-    checks.push(`EXIF: camera identified (${[exif.metadata.make, exif.metadata.model].filter(Boolean).join(" ")})`);
+    checks.push(
+      `EXIF: camera identified (${
+        [exif.metadata.make, exif.metadata.model].filter(Boolean).join(" ")
+      })`,
+    );
   } else {
-    checks.push("EXIF: present but no camera model (screenshot or processed image)");
+    checks.push(
+      "EXIF: present but no camera model (screenshot or processed image)",
+    );
   }
 
   if (exif.hasTimestamp) {
-    checks.push(exif.timestampRecent ? "EXIF: timestamp is recent" : "EXIF: timestamp is not recent (older photo)");
+    checks.push(
+      exif.timestampRecent
+        ? "EXIF: timestamp is recent"
+        : "EXIF: timestamp is not recent (older photo)",
+    );
   }
 
   if (exif.hasGps) {
@@ -328,14 +426,34 @@ async function verifyPhotoIntegrity(
   }
 
   if (integrityRecords.length === 0) {
-    await verifyC2paFromAttachments(attachments, checks, failures, expectedGps, maxGpsDist, blossomKeys);
+    await verifyC2paFromAttachments(
+      attachments,
+      checks,
+      failures,
+      expectedGps,
+      maxGpsDist,
+      blossomKeys,
+    );
     return;
   }
 
   for (const record of integrityRecords) {
     checkC2paSignature(record.c2pa, checks, failures);
-    checkGpsProximity(record.c2pa.gps, expectedGps, maxGpsDist, "C2PA", checks, failures);
-    checkProofModeRecord(record.proofmode, expectedGps, maxGpsDist, checks, failures);
+    checkGpsProximity(
+      record.c2pa.gps,
+      expectedGps,
+      maxGpsDist,
+      "C2PA",
+      checks,
+      failures,
+    );
+    checkProofModeRecord(
+      record.proofmode,
+      expectedGps,
+      maxGpsDist,
+      checks,
+      failures,
+    );
     checkExifRecord(record.exif, checks, failures);
   }
 }
@@ -392,11 +510,20 @@ async function verifyC2paFromAttachments(
     const c2pa = await validateC2pa(Buffer.from(data), filename);
 
     checkC2paSignature(c2pa, checks, failures);
-    checkGpsProximity(c2pa.gps, expectedGps, maxGpsDist, "C2PA", checks, failures);
+    checkGpsProximity(
+      c2pa.gps,
+      expectedGps,
+      maxGpsDist,
+      "C2PA",
+      checks,
+      failures,
+    );
     validated = true;
   }
 
-  if (!validated && attachments.some((a) => a.mime_type?.startsWith("image/"))) {
+  if (
+    !validated && attachments.some((a) => a.mime_type?.startsWith("image/"))
+  ) {
     failures.push("C2PA: no image attachments could be verified");
   }
 }

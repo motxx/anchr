@@ -6,61 +6,65 @@
  * Data Vending Machine event kinds (5300/6300/7000).
  */
 
-export { generateEphemeralIdentity, restoreIdentity, type NostrIdentity } from "./crypto/identity.ts";
 export {
-  deriveRegionKey,
-  deriveConversationKey,
-  encryptNip44,
+  generateEphemeralIdentity,
+  type NostrIdentity,
+  restoreIdentity,
+} from "./crypto/identity.ts";
+export {
   decryptNip44,
+  deriveConversationKey,
+  deriveRegionKey,
+  encryptNip44,
   regionKeyHex,
 } from "./crypto/encryption.ts";
 export {
+  ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
-  ANCHR_QUERY_FEEDBACK,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
+  buildQuerySettlementEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
-  buildQuerySettlementEvent,
+  type CompletionFeedbackPayload,
+  type FeedbackPayload,
+  type OracleDMPayload,
+  parseFeedbackPayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
-  parseFeedbackPayload,
   parseQuerySettlementPayload,
+  type PreimageDMPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
-  type SelectionFeedbackPayload,
-  type CompletionFeedbackPayload,
   type QuerySettlementPayload,
-  type FeedbackPayload,
-  type PreimageDMPayload,
+  type QuoteFeedbackPayload,
   type RejectionDMPayload,
-  type OracleDMPayload,
+  type SelectionFeedbackPayload,
 } from "./events/events.ts";
 export {
-  DM_KIND,
   buildPreimageDM,
   buildRejectionDM,
+  DM_KIND,
   parseOracleDM,
 } from "./events/dm.ts";
 export {
+  closePool,
+  fetchRecentQueries,
+  getNostrConfig,
+  isNostrEnabled,
   publishEvent,
+  subscribeToAttestations,
+  subscribeToDMs,
+  subscribeToFeedback,
   subscribeToQueries,
   subscribeToResponses,
   subscribeToSettlements,
-  subscribeToFeedback,
-  subscribeToDMs,
-  subscribeToAttestations,
-  fetchRecentQueries,
-  isNostrEnabled,
-  getNostrConfig,
-  closePool,
 } from "./transport/client.ts";
 export {
   ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
+  type OracleAttestationPayload,
   parseOracleAttestationPayload,
   toOracleAttestation,
-  type OracleAttestationPayload,
 } from "./events/oracle-attestation.ts";

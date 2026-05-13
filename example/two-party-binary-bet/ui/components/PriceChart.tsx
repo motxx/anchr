@@ -48,14 +48,20 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
     if (filtered.length < 2) {
       return { line: "", area: "", points: [], latest: 0, change: 0 };
     }
-    const xs = filtered.map((_, i) => padX + (i / (filtered.length - 1)) * innerW);
+    const xs = filtered.map((_, i) =>
+      padX + (i / (filtered.length - 1)) * innerW
+    );
     const ys = filtered.map((p) => padTop + (1 - p.yes) * innerH);
     const segs: string[] = [];
     for (let i = 0; i < xs.length; i++) {
-      segs.push(`${i === 0 ? "M" : "L"}${xs[i].toFixed(1)},${ys[i].toFixed(1)}`);
+      segs.push(
+        `${i === 0 ? "M" : "L"}${xs[i].toFixed(1)},${ys[i].toFixed(1)}`,
+      );
     }
     const linePath = segs.join(" ");
-    const areaPath = `${linePath} L${xs[xs.length - 1].toFixed(1)},${(padTop + innerH).toFixed(1)} L${xs[0].toFixed(1)},${(padTop + innerH).toFixed(1)} Z`;
+    const areaPath = `${linePath} L${xs[xs.length - 1].toFixed(1)},${
+      (padTop + innerH).toFixed(1)
+    } L${xs[0].toFixed(1)},${(padTop + innerH).toFixed(1)} Z`;
     const pts = xs.map((x, i) => ({ x, y: ys[i] }));
     const latest = filtered[filtered.length - 1].yes;
     const change = latest - filtered[0].yes;
@@ -71,7 +77,10 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
     if (filtered.length < 2) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = (e.clientX - rect.left) / rect.width;
-    const idx = Math.min(filtered.length - 1, Math.max(0, Math.round(ratio * (filtered.length - 1))));
+    const idx = Math.min(
+      filtered.length - 1,
+      Math.max(0, Math.round(ratio * (filtered.length - 1))),
+    );
     setHoverIdx(idx);
   }
 
@@ -100,9 +109,17 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
             YES Probability
           </div>
           <div className="flex items-baseline gap-3">
-            <span className="font-mono text-3xl font-bold text-foreground">{yesPercent}%</span>
-            <span className={cn("font-mono text-sm font-medium", trendingUp ? "text-yes" : "text-no")}>
-              {trendingUp ? "+" : ""}{changePct}%
+            <span className="font-mono text-3xl font-bold text-foreground">
+              {yesPercent}%
+            </span>
+            <span
+              className={cn(
+                "font-mono text-sm font-medium",
+                trendingUp ? "text-yes" : "text-no",
+              )}
+            >
+              {trendingUp ? "+" : ""}
+              {changePct}%
             </span>
           </div>
         </div>
@@ -176,12 +193,18 @@ export function PriceChart({ data, height = 220 }: PriceChartProps) {
           />
 
           {/* Time axis labels: first / mid / last */}
-          {[0, Math.floor(filtered.length / 2), filtered.length - 1].map((i) => (
+          {[0, Math.floor(filtered.length / 2), filtered.length - 1].map((
+            i,
+          ) => (
             <text
               key={i}
               x={points[i].x}
               y={height - 6}
-              textAnchor={i === 0 ? "start" : i === filtered.length - 1 ? "end" : "middle"}
+              textAnchor={i === 0
+                ? "start"
+                : i === filtered.length - 1
+                ? "end"
+                : "middle"}
               className="fill-muted-foreground"
               style={{ fontSize: 10, fontFamily: "Geist Mono, monospace" }}
             >

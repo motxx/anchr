@@ -1,26 +1,38 @@
 /**
- * 巫(Kannagi) — Two-party binary bet HTTP route registration.
+ * Two-party binary bet HTTP route registration.
  *
- * All routes are under /markets/* and follow the registerXxxRoutes(app, ctx)
- * pattern from worker-api-routes.ts. In-memory market store + matching queue +
- * dual preimage store, wired into Hono.
+ * All routes are under /markets/* and use an app-owned Hono route registrar.
+ * In-memory market store + matching queue + dual preimage store, wired into
+ * Hono.
  *
  * State is injectable via `MarketState` for testing. When no state is
  * provided, a lazily-constructed module-level state is reused.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
-import { Wallet, type Proof, getEncodedToken, getDecodedToken } from "@cashu/cashu-ts";
+import {
+  getDecodedToken,
+  getEncodedToken,
+  type Proof,
+  Wallet,
+} from "@cashu/cashu-ts";
 import type {
-  TwoPartyBinaryBet,
-  PendingBet,
-  MatchedBetPair,
   MarketStatus,
+  MatchedBetPair,
+  PendingBet,
+  TwoPartyBinaryBet,
 } from "./market-types.ts";
-import { createInMemoryMatchingQueue, type MatchingQueue } from "./matching-queue.ts";
-import type { HydratedState, KannagiPersist } from "./kannagi-store.ts";
+import {
+  createInMemoryMatchingQueue,
+  type MatchingQueue,
+} from "./matching-queue.ts";
+import type {
+  FaucetTokenRecord,
+  HydratedState,
+  MarketPersist,
+} from "./market-store.ts";
 import {
   type DualKeyStore,
 } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
@@ -29,21 +41,25 @@ import {
   frostDualKeySignAsync,
   frostSignProofSecretsAsync,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
-import { loadDualOutcomeFrostNodeConfig, type DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
+import {
+  type DualOutcomeFrostNodeConfig,
+  loadDualOutcomeFrostNodeConfig,
+} from "@anchr/frost-oracle/dual-outcome-config";
 import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
 import { resolveMarket } from "./resolution.ts";
-import { evaluateCondition, OracleError, verifyMarketResolution } from "./market-oracle.ts";
+import {
+  evaluateCondition,
+  OracleError,
+  verifyMarketResolution,
+} from "./market-oracle.ts";
 import { settleMarket } from "./market-settlement.ts";
 import {
   createDualPreimageStore,
   type DualPreimageStore,
 } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import {
-  isMintReachable,
-  mintProofsFromRegtest,
-} from "./market-wallet.ts";
+import { isMintReachable, mintProofsFromRegtest } from "./market-wallet.ts";
 import { verifyReceivedToken } from "./exchange-protocol.ts";
-import { publishMarket, type MarketIdentity } from "./nostr-market.ts";
+import { type MarketIdentity, publishMarket } from "./nostr-market.ts";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { validateTruthSourceUrl } from "./url-guard.ts";
@@ -63,6 +79,117 @@ function minMarketLifetimeSecs(): number {
   return Number.isFinite(n) && n >= 0 ? n : 60;
 }
 
+export type FaucetMode = "token_bank" | "regtest" | "external" | "disabled";
+
+function faucetTokenId(token: string): string {
+  return createHash("sha256").update(token).digest("hex").slice(0, 32);
+}
+
+function amountFromCashuToken(token: string): number {
+  try {
+    const decoded = getDecodedToken(token);
+    return decoded.proofs.reduce(
+      (sum: number, proof: Proof) => sum + proof.amount,
+      0,
+    );
+  } catch {
+    return 0;
+  }
+}
+
+export function parseFaucetTokens(
+  raw: string | undefined,
+): FaucetTokenRecord[] {
+  if (!raw?.trim()) return [];
+  const records: FaucetTokenRecord[] = [];
+  for (const part of raw.split(/[\s,]+/)) {
+    const item = part.trim();
+    if (!item) continue;
+    const match = item.match(/^(\d+):(cashuB.+)$/);
+    const token = match ? match[2]! : item;
+    if (!token.startsWith("cashuB")) continue;
+    const amount_sats = match ? Number(match[1]) : amountFromCashuToken(token);
+    records.push({
+      id: faucetTokenId(token),
+      token,
+      amount_sats: Number.isFinite(amount_sats) && amount_sats >= 0
+        ? amount_sats
+        : 0,
+    });
+  }
+  return records;
+}
+
+export async function seedFaucetTokensFromEnv(
+  state: MarketState,
+): Promise<number> {
+  let seeded = 0;
+  for (const token of parseFaucetTokens(Deno.env.get("MARKET_FAUCET_TOKENS"))) {
+    const existing = state.faucetTokens.get(token.id);
+    if (existing?.claimed_at) continue;
+    if (!existing) seeded++;
+    state.faucetTokens.set(
+      token.id,
+      existing ? { ...token, ...existing } : token,
+    );
+    await state.persist.faucetToken(state.faucetTokens.get(token.id)!);
+  }
+  return seeded;
+}
+
+function unclaimedFaucetTokens(state: MarketState): FaucetTokenRecord[] {
+  return Array.from(state.faucetTokens.values())
+    .filter((token) => token.claimed_at === undefined)
+    .sort((a, b) => a.amount_sats - b.amount_sats);
+}
+
+export function getFaucetStatus(state: MarketState, mintUrl: string | null) {
+  const unclaimed = unclaimedFaucetTokens(state);
+  const externalUrl = Deno.env.get("MARKET_FAUCET_URL")?.trim() || undefined;
+  const explicitMode = Deno.env.get("MARKET_FAUCET_MODE")?.trim();
+  const maxAmount = Number(
+    Deno.env.get("MARKET_FAUCET_MAX_AMOUNT_SATS") ?? "1000",
+  );
+  const max_amount_sats = Number.isFinite(maxAmount) && maxAmount > 0
+    ? maxAmount
+    : 1000;
+  const defaultAmount =
+    unclaimed.find((token) => token.amount_sats > 0)?.amount_sats ??
+      max_amount_sats;
+
+  let mode: FaucetMode = "disabled";
+  if (unclaimed.length > 0) {
+    mode = "token_bank";
+  } else if (explicitMode === "regtest") {
+    mode = "regtest";
+  } else if (externalUrl) {
+    mode = "external";
+  } else if (
+    mintUrl &&
+    /^(http:\/\/)?(localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(mintUrl)
+  ) {
+    mode = "regtest";
+  }
+
+  return {
+    enabled: mode === "token_bank" || mode === "regtest" || mode === "external",
+    mode,
+    amount_sats: Math.min(defaultAmount, max_amount_sats),
+    max_amount_sats,
+    available_tokens: unclaimed.length,
+    ...(externalUrl ? { external_url: externalUrl } : {}),
+  };
+}
+
+function clientIdFromRequest(
+  c: { req: { header(name: string): string | undefined } },
+): string {
+  const forwarded = c.req.header("fly-client-ip") ??
+    c.req.header("x-real-ip") ??
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwarded || "unknown";
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -70,6 +197,7 @@ function minMarketLifetimeSecs(): number {
 export interface MarketRouteContext {
   writeAuth: MiddlewareHandler;
   rateLimit: MiddlewareHandler;
+  signerAuth?: MiddlewareHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,11 +222,16 @@ export interface MarketState {
    */
   pendingExchangeTokens: Map<string, string>;
   /**
+   * Optional public-testnet token bank. Operators preload one-time cashuB
+   * tokens via MARKET_FAUCET_TOKENS; the server dispenses each token once.
+   */
+  faucetTokens: Map<string, FaucetTokenRecord>;
+  /**
    * Write-through persistence — call after each mutation to the maps above.
    * Defaults to a no-op for tests; production injects a SQLite-backed
-   * implementation via `openKannagiStore`.
+   * implementation via `openMarketStore`.
    */
-  persist: KannagiPersist;
+  persist: MarketPersist;
   dualPreimageStore: DualPreimageStore;
   dualKeyStore: DualKeyStore;
   matchingQueue: MatchingQueue;
@@ -137,10 +270,11 @@ export interface MarketState {
       minLocktime: number;
     },
   ) => { valid: boolean; error?: string };
+  /** Public deployments should settle through auto-resolver or TLSN proof submission. */
+  allowManualResolve: boolean;
 }
 
-
-const NOOP_PERSIST: KannagiPersist = {
+const NOOP_PERSIST: MarketPersist = {
   market: () => Promise.resolve(),
   pair: () => Promise.resolve(),
   preimage: () => Promise.resolve(),
@@ -148,6 +282,8 @@ const NOOP_PERSIST: KannagiPersist = {
   proofSignatures: () => Promise.resolve(),
   pendingExchangeToken: () => Promise.resolve(),
   deletePendingExchangeToken: () => Promise.resolve(),
+  faucetToken: () => Promise.resolve(),
+  claimFaucetToken: () => Promise.resolve(true),
 };
 
 /** Create a fresh MarketState. Used for tests and as default state. */
@@ -160,22 +296,27 @@ export function createMarketState(opts?: {
   matchingQueue?: MatchingQueue;
   /** Inject a custom exchange-token verifier (tests use this). */
   verifyExchangeToken?: MarketState["verifyExchangeToken"];
+  allowManualResolve?: boolean;
   /**
    * Pre-loaded state from disk. When the SQLite store is wired up the
    * caller passes `store.hydrate()`; otherwise fresh empty maps are used.
    */
   initial?: HydratedState;
   /** Write-through persistence — defaults to no-op (tests / in-memory). */
-  persist?: KannagiPersist;
+  persist?: MarketPersist;
 }): MarketState {
-  const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(opts?.frostConfig);
+  const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(
+    opts?.frostConfig,
+  );
   return {
     markets: opts?.initial?.markets ?? new Map(),
     matchedPairs: opts?.initial?.matchedPairs ?? new Map(),
     resolvedPreimages: opts?.initial?.resolvedPreimages ?? new Map(),
     resolvedSignatures: opts?.initial?.resolvedSignatures ?? new Map(),
-    resolvedProofSignatures: opts?.initial?.resolvedProofSignatures ?? new Map(),
+    resolvedProofSignatures: opts?.initial?.resolvedProofSignatures ??
+      new Map(),
     pendingExchangeTokens: opts?.initial?.pendingExchangeTokens ?? new Map(),
+    faucetTokens: opts?.initial?.faucetTokens ?? new Map(),
     persist: opts?.persist ?? NOOP_PERSIST,
     dualPreimageStore: createDualPreimageStore(),
     dualKeyStore,
@@ -186,6 +327,7 @@ export function createMarketState(opts?: {
     nostrRelays: opts?.nostrRelays ?? [],
     publishMarket: opts?.publishMarket,
     verifyExchangeToken: opts?.verifyExchangeToken,
+    allowManualResolve: opts?.allowManualResolve ?? true,
   };
 }
 
@@ -207,8 +349,10 @@ function resolveNostrIdentity(): MarketIdentity {
   const secretKey = generateSecretKey();
   const pubkey = getPublicKey(secretKey);
   console.warn(
-    `[market] NOSTR_MARKET_SECRET_KEY not set — generated ephemeral keypair (pubkey=${pubkey.slice(0, 16)}...). ` +
-    `Markets will be unsigned-by-this-server after restart. Pin the key with NOSTR_MARKET_SECRET_KEY=<hex>.`,
+    `[market] NOSTR_MARKET_SECRET_KEY not set — generated ephemeral keypair (pubkey=${
+      pubkey.slice(0, 16)
+    }...). ` +
+      `Markets will be unsigned-by-this-server after restart. Pin the key with NOSTR_MARKET_SECRET_KEY=<hex>.`,
   );
   return { secretKey, pubkey };
 }
@@ -247,18 +391,32 @@ function getDefaultState(): MarketState {
     if (configPath) {
       marketFrostConfig = loadDualOutcomeFrostNodeConfig(configPath);
       console.log(`[market] FROST market config loaded from ${configPath}`);
-      console.log(`[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`);
-      console.log(`[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`);
-      console.log(`[market] NO  group: ${marketFrostConfig.group_pubkey_b.slice(0, 16)}...`);
+      console.log(
+        `[market] FROST ${marketFrostConfig.threshold}-of-${marketFrostConfig.total_signers}`,
+      );
+      console.log(
+        `[market] YES group: ${marketFrostConfig.group_pubkey.slice(0, 16)}...`,
+      );
+      console.log(
+        `[market] NO  group: ${
+          marketFrostConfig.group_pubkey_b.slice(0, 16)
+        }...`,
+      );
     }
   } catch { /* FROST not configured — single-key mode */ }
 
   const nostrIdentity = resolveNostrIdentity();
   const nostrRelays = resolveNostrRelays();
   if (nostrRelays.length > 0) {
-    console.log(`[market] Nostr publishing enabled — pubkey=${nostrIdentity.pubkey.slice(0, 16)}... relays=${nostrRelays.length}`);
+    console.log(
+      `[market] Nostr publishing enabled — pubkey=${
+        nostrIdentity.pubkey.slice(0, 16)
+      }... relays=${nostrRelays.length}`,
+    );
   } else {
-    console.log(`[market] Nostr publishing disabled — set NOSTR_RELAYS=ws://... to enable.`);
+    console.log(
+      `[market] Nostr publishing disabled — set NOSTR_RELAYS=ws://... to enable.`,
+    );
   }
 
   _defaultState = createMarketState({
@@ -294,7 +452,9 @@ function generateId(prefix: string): string {
 }
 
 function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
-  const pairs = Array.from(state.matchedPairs.values()).filter((p) => p.market_id === m.id);
+  const pairs = Array.from(state.matchedPairs.values()).filter((p) =>
+    p.market_id === m.id
+  );
   const preimage = state.resolvedPreimages.get(m.id);
   const oracleSignature = state.resolvedSignatures.get(m.id);
   return {
@@ -331,8 +491,13 @@ function marketSummary(m: TwoPartyBinaryBet, state: MarketState) {
 // ---------------------------------------------------------------------------
 
 // deno-lint-ignore no-explicit-any
-export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, injectedState?: MarketState): void {
+export function registerMarketRoutes(
+  app: Hono<any>,
+  ctx: MarketRouteContext,
+  injectedState?: MarketState,
+): void {
   const { writeAuth, rateLimit } = ctx;
+  const signerAuth = ctx.signerAuth ?? writeAuth;
   const s = injectedState ?? getDefaultState();
   const getWallet = s.getCashuWallet ?? getCashuWalletDefault;
   const mkt = new Hono();
@@ -371,26 +536,15 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     // Surface the same relay set the server publishes markets to. The
     // browser-side NIP-60 wallet uses these to persist Cashu proofs as
     // encrypted kind:7375 token events.
-    return c.json({ mint_url: mintUrl, nostr_relays: s.nostrRelays });
+    return c.json({
+      mint_url: mintUrl,
+      nostr_relays: s.nostrRelays,
+      faucet: getFaucetStatus(s, mintUrl),
+    });
   });
 
   mkt.post("/wallet/faucet", rateLimit, async (c) => {
-    const wallet = await getWallet();
-    if (!wallet) {
-      return c.json(
-        { error: "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d" },
-        503,
-      );
-    }
-
-    const mintUrl = Deno.env.get("CASHU_MINT_URL")!;
-    const reachable = await isMintReachable(mintUrl);
-    if (!reachable) {
-      return c.json(
-        { error: "Cashu mint not reachable — ensure docker compose is running" },
-        503,
-      );
-    }
+    const mintUrl = Deno.env.get("CASHU_MINT_URL") ?? null;
 
     let body: Record<string, unknown>;
     try {
@@ -399,15 +553,104 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: "Invalid JSON" }, 400);
     }
 
-    const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 1000;
-    if (amount_sats <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
+    const requestedAmount = typeof body.amount_sats === "number"
+      ? body.amount_sats
+      : 1000;
+    if (requestedAmount <= 0) {
+      return c.json({ error: "amount_sats must be positive" }, 400);
+    }
+
+    const faucet = getFaucetStatus(s, mintUrl);
+    if (requestedAmount > faucet.max_amount_sats) {
+      return c.json(
+        { error: `amount_sats must be <= ${faucet.max_amount_sats}` },
+        400,
+      );
+    }
+
+    if (faucet.mode === "token_bank") {
+      const token = unclaimedFaucetTokens(s).find((candidate) =>
+        candidate.amount_sats === 0 || candidate.amount_sats >= requestedAmount
+      );
+      if (!token) {
+        return c.json(
+          { error: "Faucet is empty for the requested amount" },
+          503,
+        );
+      }
+      const claimedAt = Math.floor(Date.now() / 1000);
+      const claimedBy = clientIdFromRequest(c);
+      const claimed = await s.persist.claimFaucetToken(
+        token.id,
+        claimedAt,
+        claimedBy,
+      );
+      if (!claimed) {
+        return c.json(
+          { error: "Faucet token was already claimed; retry" },
+          409,
+        );
+      }
+      token.claimed_at = claimedAt;
+      token.claimed_by = claimedBy;
+      s.faucetTokens.set(token.id, token);
+      return c.json({
+        cashu_token: token.token,
+        amount_sats: token.amount_sats || requestedAmount,
+        source: "token_bank",
+        remaining_tokens: unclaimedFaucetTokens(s).length,
+      });
+    }
+
+    if (faucet.mode === "external") {
+      return c.json(
+        {
+          error: "Use the configured external faucet",
+          external_url: faucet.external_url,
+        },
+        503,
+      );
+    }
+
+    if (faucet.mode !== "regtest") {
+      return c.json(
+        { error: "Faucet is not configured for this deployment" },
+        503,
+      );
+    }
+
+    const wallet = await getWallet();
+    if (!wallet) {
+      return c.json(
+        {
+          error:
+            "Cashu mint not configured — set CASHU_MINT_URL and run docker compose up -d",
+        },
+        503,
+      );
+    }
+
+    if (!mintUrl) {
+      return c.json({ error: "Cashu mint not configured" }, 503);
+    }
+
+    const reachable = await isMintReachable(mintUrl);
+    if (!reachable) {
+      return c.json(
+        {
+          error: "Cashu mint not reachable — ensure docker compose is running",
+        },
+        503,
+      );
+    }
 
     try {
-      const proofs = await mintProofsFromRegtest(wallet, amount_sats);
+      const proofs = await mintProofsFromRegtest(wallet, requestedAmount);
       const cashu_token = getEncodedToken({ mint: mintUrl, proofs });
       return c.json({
         cashu_token,
-        amount_sats,
+        amount_sats: requestedAmount,
+        source: "regtest",
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -427,31 +670,37 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     if (!market) return c.json({ error: "Market not found" }, 404);
 
     const pendingBets = await s.matchingQueue.listPending(id);
-    const matchedPairs = Array.from(s.matchedPairs.values()).filter((b) => b.market_id === id);
+    const matchedPairs = Array.from(s.matchedPairs.values()).filter((b) =>
+      b.market_id === id
+    );
 
     // If a pubkey is provided, include that user's matched pairs with win status
     const queryPubkey = c.req.query("pubkey");
     const userPairs = queryPubkey
       ? matchedPairs
-          .filter((p) => p.yes_pubkey === queryPubkey || p.no_pubkey === queryPubkey)
-          .map((p) => {
-            const userSide = p.yes_pubkey === queryPubkey ? "yes" : "no";
-            const counterpartyPubkey = userSide === "yes" ? p.no_pubkey : p.yes_pubkey;
-            const won =
-              (market.status === "resolved_yes" && userSide === "yes") ||
-              (market.status === "resolved_no" && userSide === "no");
-            return {
-              pair_id: p.pair_id,
-              side: userSide,
-              counterparty_pubkey: counterpartyPubkey,
-              amount_sats: p.amount_sats,
-              status: p.status,
-              won,
-              token: won
-                ? (userSide === "yes" ? p.token_no_to_yes : p.token_yes_to_no)
-                : undefined,
-            };
-          })
+        .filter((p) =>
+          p.yes_pubkey === queryPubkey || p.no_pubkey === queryPubkey
+        )
+        .map((p) => {
+          const userSide = p.yes_pubkey === queryPubkey ? "yes" : "no";
+          const counterpartyPubkey = userSide === "yes"
+            ? p.no_pubkey
+            : p.yes_pubkey;
+          const won =
+            (market.status === "resolved_yes" && userSide === "yes") ||
+            (market.status === "resolved_no" && userSide === "no");
+          return {
+            pair_id: p.pair_id,
+            side: userSide,
+            counterparty_pubkey: counterpartyPubkey,
+            amount_sats: p.amount_sats,
+            status: p.status,
+            won,
+            token: won
+              ? (userSide === "yes" ? p.token_no_to_yes : p.token_yes_to_no)
+              : undefined,
+          };
+        })
       : undefined;
 
     return c.json({
@@ -480,14 +729,26 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
     // Required fields
     const title = typeof body.title === "string" ? body.title.trim() : "";
-    const description = typeof body.description === "string" ? body.description.trim() : "";
-    const category = typeof body.category === "string" ? body.category : "custom";
-    const resolution_url = typeof body.resolution_url === "string" ? body.resolution_url : "";
-    const resolution_deadline = typeof body.resolution_deadline === "number" ? body.resolution_deadline : 0;
+    const description = typeof body.description === "string"
+      ? body.description.trim()
+      : "";
+    const category = typeof body.category === "string"
+      ? body.category
+      : "custom";
+    const resolution_url = typeof body.resolution_url === "string"
+      ? body.resolution_url
+      : "";
+    const resolution_deadline = typeof body.resolution_deadline === "number"
+      ? body.resolution_deadline
+      : 0;
 
     if (!title) return c.json({ error: "title is required" }, 400);
-    if (!resolution_url) return c.json({ error: "resolution_url is required" }, 400);
-    if (!resolution_deadline) return c.json({ error: "resolution_deadline is required" }, 400);
+    if (!resolution_url) {
+      return c.json({ error: "resolution_url is required" }, 400);
+    }
+    if (!resolution_deadline) {
+      return c.json({ error: "resolution_deadline is required" }, 400);
+    }
 
     // SSRF guard: anyone can create a market, so the resolution_url is an
     // attacker-influenced URL the server's auto-resolver will fetch later.
@@ -508,55 +769,110 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     // Validate category
-    const validCategories = ["crypto", "sports", "politics", "economics", "custom"];
+    const validCategories = [
+      "crypto",
+      "sports",
+      "politics",
+      "economics",
+      "custom",
+    ];
     if (!validCategories.includes(category)) {
-      return c.json({ error: `category must be one of: ${validCategories.join(", ")}` }, 400);
+      return c.json({
+        error: `category must be one of: ${validCategories.join(", ")}`,
+      }, 400);
     }
 
     // Optional fields with defaults
-    const min_bet_sats = typeof body.min_bet_sats === "number" ? body.min_bet_sats : 1;
-    const max_bet_sats = typeof body.max_bet_sats === "number" ? body.max_bet_sats : 0;
+    const min_bet_sats = typeof body.min_bet_sats === "number"
+      ? body.min_bet_sats
+      : 1;
+    const max_bet_sats = typeof body.max_bet_sats === "number"
+      ? body.max_bet_sats
+      : 0;
     const fee_ppm = typeof body.fee_ppm === "number" ? body.fee_ppm : 10000; // 1% default
-    const creator_pubkey = typeof body.creator_pubkey === "string" ? body.creator_pubkey : "server";
-    const oracle_pubkey = typeof body.oracle_pubkey === "string" ? body.oracle_pubkey : "server";
+    const creator_pubkey = typeof body.creator_pubkey === "string"
+      ? body.creator_pubkey
+      : "server";
+    const oracle_pubkey = typeof body.oracle_pubkey === "string"
+      ? body.oracle_pubkey
+      : "server";
 
     // Resolution condition
-    const rawCondition = body.resolution_condition as Record<string, unknown> | undefined;
+    const rawCondition = body.resolution_condition as
+      | Record<string, unknown>
+      | undefined;
     const resolution_condition = rawCondition
       ? {
-          type: (typeof rawCondition.type === "string" ? rawCondition.type : "contains_text") as
-            "price_above" | "price_below" | "contains_text" | "jsonpath_equals" | "jsonpath_gt" | "jsonpath_lt",
-          target_url: typeof rawCondition.target_url === "string" ? rawCondition.target_url : resolution_url,
-          jsonpath: typeof rawCondition.jsonpath === "string" ? rawCondition.jsonpath : undefined,
-          threshold: typeof rawCondition.threshold === "number" ? rawCondition.threshold : undefined,
-          expected_text: typeof rawCondition.expected_text === "string" ? rawCondition.expected_text : undefined,
-          description: typeof rawCondition.description === "string" ? rawCondition.description : title,
-        }
+        type: (typeof rawCondition.type === "string"
+          ? rawCondition.type
+          : "contains_text") as
+            | "price_above"
+            | "price_below"
+            | "contains_text"
+            | "jsonpath_equals"
+            | "jsonpath_gt"
+            | "jsonpath_lt",
+        target_url: typeof rawCondition.target_url === "string"
+          ? rawCondition.target_url
+          : resolution_url,
+        jsonpath: typeof rawCondition.jsonpath === "string"
+          ? rawCondition.jsonpath
+          : undefined,
+        threshold: typeof rawCondition.threshold === "number"
+          ? rawCondition.threshold
+          : undefined,
+        expected_text: typeof rawCondition.expected_text === "string"
+          ? rawCondition.expected_text
+          : undefined,
+        description: typeof rawCondition.description === "string"
+          ? rawCondition.description
+          : title,
+      }
       : {
-          type: "contains_text" as const,
-          target_url: resolution_url,
-          description: title,
-        };
+        type: "contains_text" as const,
+        target_url: resolution_url,
+        description: title,
+      };
 
     // SSRF guard for the condition target URL too (defense in depth — usually
     // identical to resolution_url, but the schema permits it to differ).
     if (resolution_condition.target_url !== resolution_url) {
-      const targetError = validateTruthSourceUrl(resolution_condition.target_url);
+      const targetError = validateTruthSourceUrl(
+        resolution_condition.target_url,
+      );
       if (targetError) {
-        return c.json({ error: `resolution_condition.target_url: ${targetError}` }, 400);
+        return c.json({
+          error: `resolution_condition.target_url: ${targetError}`,
+        }, 400);
       }
     }
 
     // Validate resolution condition
     const ct = resolution_condition.type;
-    if ((ct === "jsonpath_gt" || ct === "jsonpath_lt" || ct === "price_above" || ct === "price_below") && resolution_condition.threshold === undefined) {
-      return c.json({ error: `resolution_condition.threshold is required for type "${ct}"` }, 400);
+    if (
+      (ct === "jsonpath_gt" || ct === "jsonpath_lt" || ct === "price_above" ||
+        ct === "price_below") && resolution_condition.threshold === undefined
+    ) {
+      return c.json({
+        error: `resolution_condition.threshold is required for type "${ct}"`,
+      }, 400);
     }
-    if ((ct === "jsonpath_gt" || ct === "jsonpath_lt" || ct === "jsonpath_equals") && !resolution_condition.jsonpath) {
-      return c.json({ error: `resolution_condition.jsonpath is required for type "${ct}"` }, 400);
+    if (
+      (ct === "jsonpath_gt" || ct === "jsonpath_lt" ||
+        ct === "jsonpath_equals") && !resolution_condition.jsonpath
+    ) {
+      return c.json({
+        error: `resolution_condition.jsonpath is required for type "${ct}"`,
+      }, 400);
     }
-    if ((ct === "contains_text" || ct === "jsonpath_equals") && !resolution_condition.expected_text) {
-      return c.json({ error: `resolution_condition.expected_text is required for type "${ct}"` }, 400);
+    if (
+      (ct === "contains_text" || ct === "jsonpath_equals") &&
+      !resolution_condition.expected_text
+    ) {
+      return c.json({
+        error:
+          `resolution_condition.expected_text is required for type "${ct}"`,
+      }, 400);
     }
 
     // Generate market ID, dual preimage pair (HTLC fallback), and FROST keypairs
@@ -580,9 +896,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       fee_ppm,
       oracle_pubkey,
       htlc_hash_yes: hashes.hash_a, // outcome A = YES (HTLC fallback)
-      htlc_hash_no: hashes.hash_b,  // outcome B = NO  (HTLC fallback)
+      htlc_hash_no: hashes.hash_b, // outcome B = NO  (HTLC fallback)
       group_pubkey_yes: frostKeys.pubkey_a, // FROST P2PK: outcome A = YES
-      group_pubkey_no: frostKeys.pubkey_b,  // FROST P2PK: outcome B = NO
+      group_pubkey_no: frostKeys.pubkey_b, // FROST P2PK: outcome B = NO
       nostr_event_id: "",
       status: "open",
     };
@@ -599,7 +915,11 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         const eventId = await publishFn(market, s.nostrIdentity, s.nostrRelays);
         market.nostr_event_id = eventId;
       } catch (err) {
-        console.warn(`[market] Nostr publish failed for ${id}: ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(
+          `[market] Nostr publish failed for ${id}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       }
     }
 
@@ -617,7 +937,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
     if (market.status !== "open") {
-      return c.json({ error: `Market is not open (status: ${market.status})` }, 409);
+      return c.json(
+        { error: `Market is not open (status: ${market.status})` },
+        409,
+      );
     }
 
     let body: Record<string, unknown>;
@@ -628,21 +951,35 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     const side = typeof body.side === "string" ? body.side : "";
-    const amount_sats = typeof body.amount_sats === "number" ? body.amount_sats : 0;
-    const bettor_pubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
+    const amount_sats = typeof body.amount_sats === "number"
+      ? body.amount_sats
+      : 0;
+    const bettor_pubkey = typeof body.bettor_pubkey === "string"
+      ? body.bettor_pubkey
+      : "";
 
     if (side !== "yes" && side !== "no") {
       return c.json({ error: 'side must be "yes" or "no"' }, 400);
     }
-    if (amount_sats <= 0) return c.json({ error: "amount_sats must be positive" }, 400);
-    if (!bettor_pubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
+    if (amount_sats <= 0) {
+      return c.json({ error: "amount_sats must be positive" }, 400);
+    }
+    if (!bettor_pubkey) {
+      return c.json({ error: "bettor_pubkey is required" }, 400);
+    }
 
     // Enforce bet limits
     if (amount_sats < market.min_bet_sats) {
-      return c.json({ error: `Minimum bet is ${market.min_bet_sats} sats` }, 400);
+      return c.json(
+        { error: `Minimum bet is ${market.min_bet_sats} sats` },
+        400,
+      );
     }
     if (market.max_bet_sats > 0 && amount_sats > market.max_bet_sats) {
-      return c.json({ error: `Maximum bet is ${market.max_bet_sats} sats` }, 400);
+      return c.json(
+        { error: `Maximum bet is ${market.max_bet_sats} sats` },
+        400,
+      );
     }
 
     // Enqueue the pending bet — matchmaker only, no token handling
@@ -746,12 +1083,18 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     const pair_id = typeof body.pair_id === "string" ? body.pair_id : "";
-    const cashu_token = typeof body.cashu_token === "string" ? body.cashu_token : "";
-    const bettor_pubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
+    const cashu_token = typeof body.cashu_token === "string"
+      ? body.cashu_token
+      : "";
+    const bettor_pubkey = typeof body.bettor_pubkey === "string"
+      ? body.bettor_pubkey
+      : "";
 
     if (!pair_id) return c.json({ error: "pair_id is required" }, 400);
     if (!cashu_token) return c.json({ error: "cashu_token is required" }, 400);
-    if (!bettor_pubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
+    if (!bettor_pubkey) {
+      return c.json({ error: "bettor_pubkey is required" }, 400);
+    }
 
     const pair = s.matchedPairs.get(pair_id);
     if (!pair || pair.market_id !== id) {
@@ -774,7 +1117,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const expectedGroupPubkey = side === "yes"
       ? (market.group_pubkey_no ?? "")
       : (market.group_pubkey_yes ?? "");
-    const expectedCounterpartyPubkey = side === "yes" ? pair.no_pubkey : pair.yes_pubkey;
+    const expectedCounterpartyPubkey = side === "yes"
+      ? pair.no_pubkey
+      : pair.yes_pubkey;
 
     // Verify the token has correct P2PK conditions when the market is
     // using a FROST-signed group pubkey (real Cashu deployment).
@@ -812,7 +1157,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         // encode) can be mapped back to their full keysets.
         const getWallet = s.getCashuWallet ?? getCashuWalletDefault;
         const wallet = await getWallet();
-        const knownKeysets = wallet ? wallet.keyChain.getAllKeysetIds() : undefined;
+        const knownKeysets = wallet
+          ? wallet.keyChain.getAllKeysetIds()
+          : undefined;
         verification = verifyReceivedToken(
           cashu_token,
           {
@@ -877,6 +1224,12 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   mkt.post("/:id/resolve", writeAuth, async (c) => {
     const id = c.req.param("id");
     if (!id) return c.json({ error: "Market id is required" }, 400);
+    if (!s.allowManualResolve) {
+      return c.json({
+        error:
+          "Manual resolution is disabled on this deployment; use /submit-resolution with a TLSNotary proof",
+      }, 403);
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -890,17 +1243,26 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: 'outcome must be "yes" or "no"' }, 400);
     }
 
-    const verifiedBody = typeof body.verified_body === "string" ? body.verified_body : undefined;
+    const verifiedBody = typeof body.verified_body === "string"
+      ? body.verified_body
+      : undefined;
     const result = await settleMarket(s, id, outcome, { verifiedBody });
     if (!result.ok) {
-      return c.json({ error: result.error, ...(result.mode ? { mode: result.mode } : {}) }, result.status as 400 | 404 | 409 | 500 | 503);
+      return c.json({
+        error: result.error,
+        ...(result.mode ? { mode: result.mode } : {}),
+      }, result.status as 400 | 404 | 409 | 500 | 503);
     }
     return c.json({
       market_id: result.market_id,
       outcome: result.outcome,
-      ...(result.oracle_signature ? { oracle_signature: result.oracle_signature } : {}),
+      ...(result.oracle_signature
+        ? { oracle_signature: result.oracle_signature }
+        : {}),
       ...(result.preimage ? { preimage: result.preimage } : {}),
-      ...(result.proof_signatures_count !== undefined ? { proof_signatures_count: result.proof_signatures_count } : {}),
+      ...(result.proof_signatures_count !== undefined
+        ? { proof_signatures_count: result.proof_signatures_count }
+        : {}),
       mode: result.mode,
       status: result.status,
       yes_pool_sats: result.yes_pool_sats,
@@ -913,9 +1275,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   // POST /markets/:id/submit-resolution — anyone can submit a TLSNotary
   // proof of the truth source's response. The server cryptographically
   // verifies the proof, evaluates the condition against the verified body,
-  // and settles the market. This is the trustless settlement path: no one
-  // — not even the server operator — needs to be trusted to read the URL
-  // honestly.
+  // and settles the market. The URL read is externally checkable through
+  // the TLSNotary proof; the operator or Oracle set still applies the
+  // configured condition and settlement action.
   //
   // Race semantics: first valid proof wins. The cryptographic binding is
   // (server name, response body, session timestamp); a proof captured at
@@ -953,19 +1315,28 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     if (typeof body.tlsn_presentation !== "string" || !body.tlsn_presentation) {
-      return c.json({ error: "tlsn_presentation is required (base64-encoded TLSNotary presentation)" }, 400);
+      return c.json({
+        error:
+          "tlsn_presentation is required (base64-encoded TLSNotary presentation)",
+      }, 400);
     }
     // Sanity-check: base64 alphabet + reasonable length. Real presentations
     // are tens of KiB; we cap an order of magnitude above expected to leave
     // headroom for future format expansion without becoming a DoS vector.
     if (!/^[A-Za-z0-9+/=\s]{16,1500000}$/.test(body.tlsn_presentation)) {
-      return c.json({ error: "tlsn_presentation must be base64 (16..1.5e6 chars)" }, 400);
+      return c.json({
+        error: "tlsn_presentation must be base64 (16..1.5e6 chars)",
+      }, 400);
     }
-    const maxAgeSeconds = typeof body.max_age_seconds === "number" ? body.max_age_seconds : undefined;
+    const maxAgeSeconds = typeof body.max_age_seconds === "number"
+      ? body.max_age_seconds
+      : undefined;
 
     let verified;
     try {
-      verified = await verifyMarketResolution(market, body.tlsn_presentation, { maxAgeSeconds });
+      verified = await verifyMarketResolution(market, body.tlsn_presentation, {
+        maxAgeSeconds,
+      });
     } catch (err) {
       const message = err instanceof OracleError
         ? err.message
@@ -979,7 +1350,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       verifiedBody: verified.verifiedBody,
     });
     if (!settled.ok) {
-      return c.json({ error: settled.error, ...(settled.mode ? { mode: settled.mode } : {}) }, settled.status as 400 | 404 | 409 | 500 | 503);
+      return c.json({
+        error: settled.error,
+        ...(settled.mode ? { mode: settled.mode } : {}),
+      }, settled.status as 400 | 404 | 409 | 500 | 503);
     }
 
     return c.json({
@@ -992,9 +1366,13 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
         verified_timestamp: verified.verifiedTimestamp,
         verified_body_length: verified.verifiedBody.length,
       },
-      ...(settled.oracle_signature ? { oracle_signature: settled.oracle_signature } : {}),
+      ...(settled.oracle_signature
+        ? { oracle_signature: settled.oracle_signature }
+        : {}),
       ...(settled.preimage ? { preimage: settled.preimage } : {}),
-      ...(settled.proof_signatures_count !== undefined ? { proof_signatures_count: settled.proof_signatures_count } : {}),
+      ...(settled.proof_signatures_count !== undefined
+        ? { proof_signatures_count: settled.proof_signatures_count }
+        : {}),
       yes_pool_sats: settled.yes_pool_sats,
       no_pool_sats: settled.no_pool_sats,
       settled_pairs: settled.settled_pairs,
@@ -1012,9 +1390,12 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
-    const isResolved = market.status === "resolved_yes" || market.status === "resolved_no";
+    const isResolved = market.status === "resolved_yes" ||
+      market.status === "resolved_no";
     if (!isResolved) {
-      return c.json({ error: `Market is not resolved (status: ${market.status})` }, 409);
+      return c.json({
+        error: `Market is not resolved (status: ${market.status})`,
+      }, 409);
     }
 
     let body: Record<string, unknown>;
@@ -1032,7 +1413,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const proofSigMap = s.resolvedProofSignatures.get(id);
 
     if (!preimage && !oracleSignature && !proofSigMap) {
-      return c.json({ error: "Resolution attestation not found — market may not be fully resolved" }, 500);
+      return c.json({
+        error:
+          "Resolution attestation not found — market may not be fully resolved",
+      }, 500);
     }
 
     const outcome = market.status === "resolved_yes" ? "yes" : "no";
@@ -1042,7 +1426,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     // per-proof signatures needed to satisfy NUT-11 P2PK spending conditions.
     // The user combines: locked_token + oracle_per_proof_signatures + own_signature → mint.
 
-    const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
+    const oraclePubkey = outcome === "yes"
+      ? market.group_pubkey_yes
+      : market.group_pubkey_no;
 
     // Collect winning pairs and per-proof oracle signatures for this user
     let winningPairCount = 0;
@@ -1058,7 +1444,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
         // Extract proof secrets from this user's redeemable token and collect signatures
         if (proofSigMap) {
-          const redeemableToken = outcome === "yes" ? pair.token_no_to_yes : pair.token_yes_to_no;
+          const redeemableToken = outcome === "yes"
+            ? pair.token_no_to_yes
+            : pair.token_yes_to_no;
           if (redeemableToken) {
             try {
               const decoded = getDecodedToken(redeemableToken);
@@ -1083,13 +1471,17 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       winning_pairs: winningPairCount,
       total_winning_sats: totalWinningSats,
       // Per-proof oracle signatures for NUT-11 P2PK redemption:
-      ...(hasPerProofSigs ? {
-        oracle_signatures: userOracleSignatures,
-        oracle_pubkey: oraclePubkey,
-      } : {}),
+      ...(hasPerProofSigs
+        ? {
+          oracle_signatures: userOracleSignatures,
+          oracle_pubkey: oraclePubkey,
+        }
+        : {}),
       // Single market-level signature when per-proof signing didn't run
       // (e.g. demo path with no real proofs to sign).
-      ...(oracleSignature && !hasPerProofSigs ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey } : {}),
+      ...(oracleSignature && !hasPerProofSigs
+        ? { oracle_signature: oracleSignature, oracle_pubkey: oraclePubkey }
+        : {}),
       ...(preimage ? { preimage } : {}),
       // Instructions for NUT-11 P2PK redemption
       redeem_instructions: hasPerProofSigs
@@ -1140,7 +1532,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
   mkt.delete("/:id/bets/:betId", rateLimit, writeAuth, async (c) => {
     const id = c.req.param("id");
     const betId = c.req.param("betId");
-    if (!id || !betId) return c.json({ error: "Market id and bet id are required" }, 400);
+    if (!id || !betId) {
+      return c.json({ error: "Market id and bet id are required" }, 400);
+    }
     if (!s.markets.has(id)) return c.json({ error: "Market not found" }, 404);
 
     let body: Record<string, unknown>;
@@ -1149,8 +1543,12 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     } catch {
       return c.json({ error: "Invalid JSON" }, 400);
     }
-    const bettorPubkey = typeof body.bettor_pubkey === "string" ? body.bettor_pubkey : "";
-    if (!bettorPubkey) return c.json({ error: "bettor_pubkey is required" }, 400);
+    const bettorPubkey = typeof body.bettor_pubkey === "string"
+      ? body.bettor_pubkey
+      : "";
+    if (!bettorPubkey) {
+      return c.json({ error: "bettor_pubkey is required" }, 400);
+    }
 
     // Look up the bet to enforce ownership and recover the unmatched
     // amount we owe back to the pool aggregates.
@@ -1172,13 +1570,18 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     }
 
     const removed = await s.matchingQueue.cancel(betId);
-    if (!removed) return c.json({ error: "Bet not found or already filled" }, 404);
+    if (!removed) {
+      return c.json({ error: "Bet not found or already filled" }, 404);
+    }
 
     return c.json({
       bet_id: betId,
       side: bet.side,
       refunded_sats: refundedSats,
-      market: { yes_pool_sats: market.yes_pool_sats, no_pool_sats: market.no_pool_sats },
+      market: {
+        yes_pool_sats: market.yes_pool_sats,
+        no_pool_sats: market.no_pool_sats,
+      },
     });
   });
 
@@ -1198,9 +1601,12 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
     const market = s.markets.get(id);
     if (!market) return c.json({ error: "Market not found" }, 404);
 
-    const isResolved = market.status === "resolved_yes" || market.status === "resolved_no";
+    const isResolved = market.status === "resolved_yes" ||
+      market.status === "resolved_no";
     if (!isResolved) {
-      return c.json({ error: `Market is not resolved (status: ${market.status})` }, 409);
+      return c.json({
+        error: `Market is not resolved (status: ${market.status})`,
+      }, 409);
     }
 
     let body: Record<string, unknown>;
@@ -1210,10 +1616,14 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       return c.json({ error: "Invalid JSON" }, 400);
     }
 
-    const proofSecrets = Array.isArray(body.proof_secrets) ? body.proof_secrets as string[] : [];
+    const proofSecrets = Array.isArray(body.proof_secrets)
+      ? body.proof_secrets as string[]
+      : [];
     const pubkey = typeof body.pubkey === "string" ? body.pubkey.trim() : "";
 
-    if (proofSecrets.length === 0) return c.json({ error: "proof_secrets array is required" }, 400);
+    if (proofSecrets.length === 0) {
+      return c.json({ error: "proof_secrets array is required" }, 400);
+    }
     if (!pubkey) return c.json({ error: "pubkey is required" }, 400);
 
     const outcome = market.status === "resolved_yes" ? "yes" : "no";
@@ -1252,11 +1662,18 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
           unseenSecrets,
         );
       } else {
-        newSigs = s.dualKeyStore.signProofSecrets(id, swapOutcome, unseenSecrets);
+        newSigs = s.dualKeyStore.signProofSecrets(
+          id,
+          swapOutcome,
+          unseenSecrets,
+        );
       }
 
       if (!newSigs) {
-        return c.json({ error: "Signing failed — key may be unavailable" }, 503);
+        return c.json(
+          { error: "Signing failed — key may be unavailable" },
+          503,
+        );
       }
 
       // Merge into existing map
@@ -1285,7 +1702,9 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       }
     }
 
-    const oraclePubkey = outcome === "yes" ? market.group_pubkey_yes : market.group_pubkey_no;
+    const oraclePubkey = outcome === "yes"
+      ? market.group_pubkey_yes
+      : market.group_pubkey_no;
 
     return c.json({
       outcome,
@@ -1293,7 +1712,8 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       oracle_signatures: oracleSignatures,
       signed_count: Object.keys(oracleSignatures).length,
       total_requested: proofSecrets.length,
-      redeem_instructions: "For each proof: set proof.witness = {signatures: [oracle_signatures[proof.secret], your_own_sig]}. Then swap at mint.",
+      redeem_instructions:
+        "For each proof: set proof.witness = {signatures: [oracle_signatures[proof.secret], your_own_sig]}. Then swap at mint.",
     });
   });
 
@@ -1304,20 +1724,28 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
 
   if (s.frostMode === "frost" && s.frostConfig) {
     const frostCfg = s.frostConfig;
-    const pendingMarketNonces = new Map<string, { nonces: string; outcomeKey: "a" | "b" }>();
+    const pendingMarketNonces = new Map<
+      string,
+      { nonces: string; outcomeKey: "a" | "b" }
+    >();
 
-    app.post("/frost/signer/round1", writeAuth, async (c) => {
+    app.post("/frost/signer/round1", signerAuth, async (c) => {
       const reqBody = await c.req.json<{
         message: string;
         query?: { id: string; resolution_url?: string };
         result?: { verified_body: string };
       }>().catch(() => null);
       if (!reqBody?.message || !frostCfg) {
-        return c.json({ error: "Missing message or FROST not configured" }, 400);
+        return c.json(
+          { error: "Missing message or FROST not configured" },
+          400,
+        );
       }
 
       // Parse "{marketId}:{outcome}" from the signing message
-      const msgBytes = new Uint8Array(reqBody.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)));
+      const msgBytes = new Uint8Array(
+        reqBody.message.match(/.{2}/g)!.map((b: string) => parseInt(b, 16)),
+      );
       const msgText = new TextDecoder().decode(msgBytes);
       const [marketId, sigOutcome] = msgText.split(":");
       if (!marketId || (sigOutcome !== "yes" && sigOutcome !== "no")) {
@@ -1328,7 +1756,10 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       if (reqBody.result?.verified_body) {
         const mkt = s.markets.get(marketId);
         if (mkt?.resolution_condition) {
-          const condMet = evaluateCondition(mkt.resolution_condition, reqBody.result.verified_body);
+          const condMet = evaluateCondition(
+            mkt.resolution_condition,
+            reqBody.result.verified_body,
+          );
           if ((condMet ? "yes" : "no") !== sigOutcome) {
             return c.json({ error: "Condition evaluation disagrees" }, 403);
           }
@@ -1336,33 +1767,51 @@ export function registerMarketRoutes(app: Hono<any>, ctx: MarketRouteContext, in
       }
 
       const outcomeKey = sigOutcome === "yes" ? "a" as const : "b" as const;
-      const keyPkg = outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_b;
-      
+      const keyPkg = outcomeKey === "a"
+        ? frostCfg.key_package
+        : frostCfg.key_package_b;
+
       const r1 = await signRound1(JSON.stringify(keyPkg));
       if (!r1.ok) return c.json({ error: r1.error }, 500);
 
       const nonceId = crypto.randomUUID();
-      pendingMarketNonces.set(nonceId, { nonces: JSON.stringify(r1.data!.nonces), outcomeKey });
+      pendingMarketNonces.set(nonceId, {
+        nonces: JSON.stringify(r1.data!.nonces),
+        outcomeKey,
+      });
       return c.json({ commitments: r1.data!.commitments, nonce_id: nonceId });
     });
 
-    app.post("/frost/signer/round2", writeAuth, async (c) => {
-      const reqBody = await c.req.json<{ commitments: string; message: string; nonce_id: string }>().catch(() => null);
-      if (!reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id || !frostCfg) {
+    app.post("/frost/signer/round2", signerAuth, async (c) => {
+      const reqBody = await c.req.json<
+        { commitments: string; message: string; nonce_id: string }
+      >().catch(() => null);
+      if (
+        !reqBody?.commitments || !reqBody?.message || !reqBody?.nonce_id ||
+        !frostCfg
+      ) {
         return c.json({ error: "Missing fields" }, 400);
       }
       const stored = pendingMarketNonces.get(reqBody.nonce_id);
       if (!stored) return c.json({ error: "Unknown nonce_id" }, 409);
       pendingMarketNonces.delete(reqBody.nonce_id);
 
-      const keyPkg = stored.outcomeKey === "a" ? frostCfg.key_package : frostCfg.key_package_b;
-      
-      const r2 = await signRound2(JSON.stringify(keyPkg), stored.nonces, reqBody.commitments, reqBody.message);
+      const keyPkg = stored.outcomeKey === "a"
+        ? frostCfg.key_package
+        : frostCfg.key_package_b;
+
+      const r2 = await signRound2(
+        JSON.stringify(keyPkg),
+        stored.nonces,
+        reqBody.commitments,
+        reqBody.message,
+      );
       if (!r2.ok) return c.json({ error: r2.error }, 500);
       return c.json({ signature_share: r2.data!.signature_share });
     });
 
-    console.log("[market] FROST signer endpoints registered (/frost/signer/round1,2)");
+    console.log(
+      "[market] FROST signer endpoints registered (/frost/signer/round1,2)",
+    );
   }
 }
-

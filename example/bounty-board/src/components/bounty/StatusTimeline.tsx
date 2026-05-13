@@ -13,7 +13,9 @@ const STEPS: { key: QueryStatus; label: string }[] = [
 ];
 
 const STATUS_ORDER: Record<string, number> = {};
-STEPS.forEach((s, i) => { STATUS_ORDER[s.key] = i; });
+STEPS.forEach((s, i) => {
+  STATUS_ORDER[s.key] = i;
+});
 STATUS_ORDER["processing"] = 2;
 STATUS_ORDER["verifying"] = 3;
 STATUS_ORDER["rejected"] = 4;
@@ -50,13 +52,11 @@ export function StatusTimeline({ status }: { status: QueryStatus }) {
                     : "bg-surface-raised"
                 }`}
               >
-                {isFailed ? (
-                  <Ionicons name="close" size={14} color="#fff" />
-                ) : isDone ? (
-                  <Ionicons name="checkmark" size={14} color="#fff" />
-                ) : (
-                  <View className="w-2 h-2 rounded-full bg-subtle" />
-                )}
+                {isFailed
+                  ? <Ionicons name="close" size={14} color="#fff" />
+                  : isDone
+                  ? <Ionicons name="checkmark" size={14} color="#fff" />
+                  : <View className="w-2 h-2 rounded-full bg-subtle" />}
               </View>
               <DSText
                 variant="caption"

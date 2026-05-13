@@ -44,7 +44,10 @@ export function selectProofs(
   return null;
 }
 
-export function computeBalance(data: WalletData, mintUrl: string | null): WalletBalance {
+export function computeBalance(
+  data: WalletData,
+  mintUrl: string | null,
+): WalletBalance {
   const pendingSats = [...data.pending.values()].reduce(
     (sum, proofs) => sum + sumProofs(proofs),
     0,
@@ -76,7 +79,8 @@ export async function pruneSpentProofs(
       data.confirmed = unspent;
     }
   } catch (err) {
-    log.error(`Mint verification failed for ${role}:${pubkey}:`,
+    log.error(
+      `Mint verification failed for ${role}:${pubkey}:`,
       err instanceof Error ? err.message : err,
     );
   }

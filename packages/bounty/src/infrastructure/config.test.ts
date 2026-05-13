@@ -1,4 +1,4 @@
-import { describe, test, afterEach } from "@std/testing/bdd";
+import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getRuntimeConfig } from "./config.ts";
 import { withEnv } from "../testing/helpers.ts";
@@ -6,13 +6,18 @@ import { withEnv } from "../testing/helpers.ts";
 describe("getRuntimeConfig", () => {
   // Save and clear env vars that affect config
   const envKeys = [
-    "HTTP_API_PORT", "PORT", "QUERY_SWEEP_INTERVAL_MS",
-    "PREVIEW_MAX_DIMENSION", "PREVIEW_JPEG_QUALITY",
-    "HTTP_API_KEYS", "HTTP_API_KEY",
-    "ANTHROPIC_API_KEY", "AI_CONTENT_CHECK",
-    "REMOTE_QUERY_API_BASE_URL", "REMOTE_QUERY_API_KEY",
+    "HTTP_API_PORT",
+    "PORT",
+    "QUERY_SWEEP_INTERVAL_MS",
+    "PREVIEW_MAX_DIMENSION",
+    "PREVIEW_JPEG_QUALITY",
+    "HTTP_API_KEYS",
+    "HTTP_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "AI_CONTENT_CHECK",
     "TRUSTED_ORACLE_PUBKEYS",
-    "TLSN_VERIFIER_URL", "TLSN_PROXY_URL",
+    "TLSN_VERIFIER_URL",
+    "TLSN_PROXY_URL",
   ];
 
   test("returns default values when env is empty", () => {

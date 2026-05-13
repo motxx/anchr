@@ -35,8 +35,14 @@ COPY packages/photo-verification/deno.json ./packages/photo-verification/
 COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 COPY packages/blossom/deno.json ./packages/blossom/
-COPY packages/runtime/deno.json ./packages/runtime/
+COPY packages/protocol/deno.json ./packages/protocol/
+COPY packages/oracle-sdk/deno.json ./packages/oracle-sdk/
+COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
+COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
+COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
+COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
+COPY example/tlsn-fiat-swap-square/deno.json ./example/tlsn-fiat-swap-square/
 RUN deno install
 
 COPY . .
@@ -44,13 +50,7 @@ COPY . .
 # Build the bundled UI + Tailwind output. The market UI is bundled
 # in-place under example/two-party-binary-bet/ui/.
 RUN deno task build:ui
-RUN cd /tmp && npm init -y -q && npm install -q tailwindcss @tailwindcss/cli 2>/dev/null \
-  && ln -sf /tmp/node_modules /app/example/two-party-binary-bet/ui/node_modules \
-  && /tmp/node_modules/.bin/tailwindcss \
-       -i /app/example/two-party-binary-bet/ui/globals.css \
-       -o /app/example/two-party-binary-bet/ui/generated.css \
-  && rm -f /app/example/two-party-binary-bet/ui/node_modules \
-  && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
+RUN deno task build:css
 
 ENV NODE_ENV=production
 ENV MARKET_PORT=8080

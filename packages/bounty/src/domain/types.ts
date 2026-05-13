@@ -18,12 +18,11 @@ export type PaymentStatus =
   | "cancelled";
 export type RequesterType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
-export type SubmissionChannel = "worker_api" | "mcp";
+export type SubmissionChannel = "adapter";
 export type AttachmentStorageKind = "blossom" | "external";
 
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
 export type ProofVisibility = "public" | "requester_only";
-
 
 export interface GpsCoord {
   lat: number;
@@ -34,10 +33,20 @@ export interface GpsCoord {
  * Verification factors that a Requester can request.
  * When omitted, defaults to ["gps", "ai_check"].
  */
-export const VERIFICATION_FACTORS = ["nonce", "gps", "timestamp", "oracle", "ai_check", "tlsn"] as const;
+export const VERIFICATION_FACTORS = [
+  "nonce",
+  "gps",
+  "timestamp",
+  "oracle",
+  "ai_check",
+  "tlsn",
+] as const;
 export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
-export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = ["gps", "ai_check"] as const;
+export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
+  "gps",
+  "ai_check",
+] as const;
 
 // TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
 // domain re-exports them so existing call sites keep the single import surface.
@@ -48,7 +57,13 @@ import type {
   TlsnRequirement,
   TlsnVerifiedData,
 } from "@anchr/tlsn-toolkit/tlsn-types";
-export type { TlsnAttestation, TlsnCondition, TlsnEncryptedContext, TlsnRequirement, TlsnVerifiedData };
+export type {
+  TlsnAttestation,
+  TlsnCondition,
+  TlsnEncryptedContext,
+  TlsnRequirement,
+  TlsnVerifiedData,
+};
 
 export interface QueryInput {
   description: string;
@@ -78,7 +93,7 @@ export interface AttachmentRef {
 /** Ephemeral key material for Blossom E2E encryption. Never persisted on the server. */
 export interface BlossomKeyMaterial {
   encrypt_key: string; // hex-encoded AES-256-GCM key
-  encrypt_iv: string;  // hex-encoded AES-256-GCM IV
+  encrypt_iv: string; // hex-encoded AES-256-GCM IV
 }
 
 /** Map of attachment ID → key material, used for one-time oracle verification. */
@@ -109,10 +124,8 @@ export interface QueryResult {
 
 /**
  * Query-independent verification policy. The transport-neutral input to the
- * core verifier — anyone can construct one without going through the NIP-90
- * Query type. The reference host derives this from a signed Query event; a
- * standalone caller (e.g. an HTTP service with fixed stakeholders) builds it
- * directly from authenticated requests.
+ * core verifier. NIP-90 adapters derive this from a signed Query event; a
+ * standalone caller builds it directly from authenticated requests.
  */
 export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */

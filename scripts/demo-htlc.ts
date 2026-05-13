@@ -11,31 +11,43 @@
  *   NOSTR_RELAYS=ws://localhost:7777 BLOSSOM_SERVERS=http://localhost:3333 CASHU_MINT_URL=http://localhost:3338 deno run --allow-all --env scripts/demo-htlc.ts
  */
 
-import { generateEphemeralIdentity, type NostrIdentity } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
 import {
+  generateEphemeralIdentity,
+  type NostrIdentity,
+} from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
+import {
+  ANCHR_QUERY_REQUEST,
   buildQueryRequestEvent,
+  buildQueryResponseEvent,
   buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
-  buildQueryResponseEvent,
-  parseQueryRequestPayload,
   parseFeedbackPayload,
-  parseQueryResponsePayload,
   parseOracleResponsePayload,
+  parseQueryRequestPayload,
+  parseQueryResponsePayload,
   type QueryRequestPayload,
+  type QueryResponsePayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-  type QueryResponsePayload,
-  ANCHR_QUERY_REQUEST,
 } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
-import { buildPreimageDM, parseOracleDM } from "../packages/bounty/src/infrastructure/nostr/events/dm.ts";
-import { publishEvent, closePool } from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
-import { deriveConversationKey, encryptNip44 } from "../packages/bounty/src/infrastructure/nostr/crypto/encryption.ts";
+import {
+  buildPreimageDM,
+  parseOracleDM,
+} from "../packages/bounty/src/infrastructure/nostr/events/dm.ts";
+import {
+  closePool,
+  publishEvent,
+} from "../packages/bounty/src/infrastructure/nostr/transport/client.ts";
+import {
+  deriveConversationKey,
+  encryptNip44,
+} from "../packages/bounty/src/infrastructure/nostr/crypto/encryption.ts";
 import { createPreimageStore } from "../packages/core-cashu/src/preimage-store.ts";
 import { createBountyToken } from "../packages/core-cashu/src/wallet.ts";
 import {
-  swapHtlcBindWorker,
-  redeemHtlcToken,
   inspectEscrowToken,
+  redeemHtlcToken,
+  swapHtlcBindWorker,
 } from "../packages/core-cashu/src/escrow.ts";
 import { workerUpload } from "../packages/bounty/src/infrastructure/blossom/worker-upload.ts";
 import { SimplePool } from "nostr-tools/pool";
@@ -62,8 +74,12 @@ let currentStep = 0;
 
 function header() {
   console.log(`\n${CYAN}${BOLD}${"═".repeat(60)}${RESET}`);
-  console.log(`${CYAN}${BOLD}  Anchr HTLC Demo — Full 3-Actor Lifecycle${RESET}`);
-  console.log(`${CYAN}${BOLD}  Requester → Worker → Oracle (with Cashu + Nostr + Blossom)${RESET}`);
+  console.log(
+    `${CYAN}${BOLD}  Anchr HTLC Demo — Full 3-Actor Lifecycle${RESET}`,
+  );
+  console.log(
+    `${CYAN}${BOLD}  Requester → Worker → Oracle (with Cashu + Nostr + Blossom)${RESET}`,
+  );
   console.log(`${CYAN}${BOLD}${"═".repeat(60)}${RESET}\n`);
 }
 
@@ -93,31 +109,48 @@ function fail(msg: string) {
 function summary() {
   console.log(`\n${CYAN}${BOLD}${"═".repeat(60)}${RESET}`);
   if (failed === 0) {
-    console.log(`  ${GREEN}${BOLD}All ${passed} checks passed.${RESET} HTLC lifecycle demo complete.`);
+    console.log(
+      `  ${GREEN}${BOLD}All ${passed} checks passed.${RESET} HTLC lifecycle demo complete.`,
+    );
   } else {
-    console.log(`  ${RED}${BOLD}${failed} check(s) failed${RESET}, ${passed} passed.`);
+    console.log(
+      `  ${RED}${BOLD}${failed} check(s) failed${RESET}, ${passed} passed.`,
+    );
   }
   console.log(`${CYAN}${BOLD}${"═".repeat(60)}${RESET}\n`);
 }
 
 // --- Infrastructure checks ---
 
-const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ?? "ws://localhost:7777";
-const BLOSSOM_URL = process.env.BLOSSOM_SERVERS?.split(",")[0]?.trim() ?? "http://localhost:3333";
-const CASHU_MINT_URL = process.env.CASHU_MINT_URL?.trim() ?? "http://localhost:3338";
+const RELAY_URL = process.env.NOSTR_RELAYS?.split(",")[0]?.trim() ??
+  "ws://localhost:7777";
+const BLOSSOM_URL = process.env.BLOSSOM_SERVERS?.split(",")[0]?.trim() ??
+  "http://localhost:3333";
+const CASHU_MINT_URL = process.env.CASHU_MINT_URL?.trim() ??
+  "http://localhost:3338";
 
 async function checkRelay(): Promise<boolean> {
   for (let i = 0; i < 3; i++) {
     try {
       const ws = new WebSocket(RELAY_URL);
       const ok = await new Promise<boolean>((resolve) => {
-        const t = setTimeout(() => { ws.close(); resolve(false); }, 2000);
-        ws.onopen = () => { clearTimeout(t); ws.close(); resolve(true); };
-        ws.onerror = () => { clearTimeout(t); resolve(false); };
+        const t = setTimeout(() => {
+          ws.close();
+          resolve(false);
+        }, 2000);
+        ws.onopen = () => {
+          clearTimeout(t);
+          ws.close();
+          resolve(true);
+        };
+        ws.onerror = () => {
+          clearTimeout(t);
+          resolve(false);
+        };
       });
       if (ok) return true;
     } catch { /* retry */ }
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1000));
   }
   return false;
 }
@@ -133,21 +166,37 @@ async function checkBlossom(): Promise<boolean> {
 
 async function checkCashuMint(): Promise<boolean> {
   try {
-    const res = await fetch(`${CASHU_MINT_URL}/v1/info`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${CASHU_MINT_URL}/v1/info`, {
+      signal: AbortSignal.timeout(3000),
+    });
     return res.ok;
   } catch {
     return false;
   }
 }
 
-async function readRelayEvents(filter: Filter, timeoutMs = 5000): Promise<Event[]> {
+async function readRelayEvents(
+  filter: Filter,
+  timeoutMs = 5000,
+): Promise<Event[]> {
   const pool = new SimplePool();
   const events: Event[] = [];
   return new Promise<Event[]>((resolve) => {
-    const timer = setTimeout(() => { sub.close(); pool.close([]); resolve(events); }, timeoutMs);
+    const timer = setTimeout(() => {
+      sub.close();
+      pool.close([]);
+      resolve(events);
+    }, timeoutMs);
     const sub = pool.subscribeMany([RELAY_URL], filter, {
-      onevent(event: Event) { events.push(event); },
-      oneose() { clearTimeout(timer); sub.close(); pool.close([]); resolve(events); },
+      onevent(event: Event) {
+        events.push(event);
+      },
+      oneose() {
+        clearTimeout(timer);
+        sub.close();
+        pool.close([]);
+        resolve(events);
+      },
     });
   });
 }
@@ -169,13 +218,22 @@ async function runDemo() {
   ]);
 
   if (relayOk) ok(`Nostr relay at ${RELAY_URL}`);
-  else { fail(`Relay not reachable at ${RELAY_URL}`); return; }
+  else {
+    fail(`Relay not reachable at ${RELAY_URL}`);
+    return;
+  }
 
   if (blossomOk) ok(`Blossom server at ${BLOSSOM_URL}`);
-  else { fail(`Blossom not reachable at ${BLOSSOM_URL}`); return; }
+  else {
+    fail(`Blossom not reachable at ${BLOSSOM_URL}`);
+    return;
+  }
 
   if (cashuOk) ok(`Cashu mint at ${CASHU_MINT_URL}`);
-  else { fail(`Cashu mint not reachable at ${CASHU_MINT_URL}`); return; }
+  else {
+    fail(`Cashu mint not reachable at ${CASHU_MINT_URL}`);
+    return;
+  }
 
   // ============================================================
   // Create identities for 3 actors
@@ -196,7 +254,9 @@ async function runDemo() {
   step("Oracle generates preimage, returns hash to Requester...");
 
   const preimageStore = createPreimageStore();
-  const queryId = `query_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const queryId = `query_${Date.now()}_${
+    Math.random().toString(36).slice(2, 8)
+  }`;
   const preimageEntry = preimageStore.create();
 
   ok(`Hash: ${preimageEntry.hash.slice(0, 16)}...`);
@@ -215,8 +275,12 @@ async function runDemo() {
   }
 
   const holdAmountSats = bountyResult.proofs.reduce((s, p) => s + p.amount, 0);
-  ok(`Minted ${holdAmountSats} sats (${bountyResult.proofs.length} proof(s)) — held as plain bearer tokens`);
-  info(`Phase 1: no HTLC conditions, no mint interaction — Requester simply holds proofs`);
+  ok(
+    `Minted ${holdAmountSats} sats (${bountyResult.proofs.length} proof(s)) — held as plain bearer tokens`,
+  );
+  info(
+    `Phase 1: no HTLC conditions, no mint interaction — Requester simply holds proofs`,
+  );
 
   // ============================================================
   // Step 3 (README): Requester publishes DVM Job Request (kind 5300)
@@ -234,7 +298,12 @@ async function runDemo() {
     expires_at: Date.now() + 600_000,
   };
 
-  const queryEvent = buildQueryRequestEvent(requester, queryId, queryPayload, "JP");
+  const queryEvent = buildQueryRequestEvent(
+    requester,
+    queryId,
+    queryPayload,
+    "JP",
+  );
   const pubResult = await publishEvent(queryEvent, [RELAY_URL]);
 
   if (pubResult.successes.length > 0) {
@@ -244,7 +313,7 @@ async function runDemo() {
     return;
   }
 
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   // ============================================================
   // Step 4 (README): Worker discovers query, verifies Oracle pubkey
@@ -262,7 +331,9 @@ async function runDemo() {
     try {
       const p = parseQueryRequestPayload(e.content);
       return p.description === uniqueDesc;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   });
 
   if (!matchingEvent) {
@@ -274,7 +345,10 @@ async function runDemo() {
 
   // Worker verifies Oracle pubkey against whitelist
   const trustedOracles = [oracle.publicKey];
-  if (discoveredPayload.oracle_pubkey && trustedOracles.includes(discoveredPayload.oracle_pubkey)) {
+  if (
+    discoveredPayload.oracle_pubkey &&
+    trustedOracles.includes(discoveredPayload.oracle_pubkey)
+  ) {
     ok(`Query discovered: "${discoveredPayload.description}"`);
     ok(`Oracle pubkey verified against whitelist`);
   } else {
@@ -302,7 +376,11 @@ async function runDemo() {
 
   const quotePubResult = await publishEvent(quoteEvent, [RELAY_URL]);
   if (quotePubResult.successes.length > 0) {
-    ok(`Quote published: ${quoteEvent.id.slice(0, 16)}... (${bountyAmount} sats)`);
+    ok(
+      `Quote published: ${
+        quoteEvent.id.slice(0, 16)
+      }... (${bountyAmount} sats)`,
+    );
   } else {
     fail("Failed to publish quote event");
     return;
@@ -313,7 +391,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives and decrypts Worker quote...");
 
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const feedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -340,7 +418,11 @@ async function runDemo() {
 
   if (receivedQuote.status === "payment-required") {
     const q = receivedQuote as QuoteFeedbackPayload;
-    ok(`Received quote from Worker: ${q.worker_pubkey.slice(0, 16)}... for ${q.amount_sats} sats`);
+    ok(
+      `Received quote from Worker: ${
+        q.worker_pubkey.slice(0, 16)
+      }... for ${q.amount_sats} sats`,
+    );
   } else {
     fail("Unexpected feedback status");
     return;
@@ -364,7 +446,9 @@ async function runDemo() {
   }
 
   const finalInspected = inspectEscrowToken(finalToken.token)!;
-  ok(`HTLC swapped: ${finalInspected.amountSats} sats, hashlock + P2PK(Worker) + refund(Requester)`);
+  ok(
+    `HTLC swapped: ${finalInspected.amountSats} sats, hashlock + P2PK(Worker) + refund(Requester)`,
+  );
 
   // ============================================================
   // Step 7 (README): Requester announces selection (kind 7000 status=processing)
@@ -397,7 +481,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives selection, confirms own pubkey...");
 
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const selFeedbackEvents = await readRelayEvents({
     kinds: [7000],
@@ -430,7 +514,9 @@ async function runDemo() {
   // ============================================================
   // Steps 8-9 (README): Worker photographs, encrypts, uploads to Blossom
   // ============================================================
-  step("Worker creates test data, encrypts (AES-256-GCM), uploads to Blossom...");
+  step(
+    "Worker creates test data, encrypts (AES-256-GCM), uploads to Blossom...",
+  );
 
   // Simulate a C2PA-signed photo (test image data with nonce)
   const testImageData = new TextEncoder().encode(
@@ -443,10 +529,15 @@ async function runDemo() {
     }),
   );
 
-  const uploadResult = await workerUpload(testImageData, "test-photo.jpg", "image/jpeg", {
-    serverUrls: [BLOSSOM_URL],
-    skipExifStrip: true,
-  });
+  const uploadResult = await workerUpload(
+    testImageData,
+    "test-photo.jpg",
+    "image/jpeg",
+    {
+      serverUrls: [BLOSSOM_URL],
+      skipExifStrip: true,
+    },
+  );
 
   if (!uploadResult) {
     fail("Failed to upload to Blossom");
@@ -462,8 +553,14 @@ async function runDemo() {
     iv: uploadResult.blossom.encryptIv,
   });
 
-  const kR = encryptNip44(keyMaterial, deriveConversationKey(worker.secretKey, requester.publicKey));
-  const kO = encryptNip44(keyMaterial, deriveConversationKey(worker.secretKey, oracle.publicKey));
+  const kR = encryptNip44(
+    keyMaterial,
+    deriveConversationKey(worker.secretKey, requester.publicKey),
+  );
+  const kO = encryptNip44(
+    keyMaterial,
+    deriveConversationKey(worker.secretKey, oracle.publicKey),
+  );
 
   ok(`K encrypted → K_R (Requester) and K_O (Oracle) via NIP-44`);
 
@@ -506,7 +603,7 @@ async function runDemo() {
   // ============================================================
   step("Requester receives result, decrypts K_R, accesses blob...");
 
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const responseEvents = await readRelayEvents({
     kinds: [6300],
@@ -528,13 +625,19 @@ async function runDemo() {
 
   ok(`Result decrypted: nonce_echo=${parsedResponse.nonce_echo}`);
   if (parsedResponse.attachments && parsedResponse.attachments.length > 0) {
-    info(`Attachment: ${parsedResponse.attachments[0]!.blossom_hash.slice(0, 16)}...`);
+    info(
+      `Attachment: ${
+        parsedResponse.attachments[0]!.blossom_hash.slice(0, 16)
+      }...`,
+    );
   }
 
   // ============================================================
   // Steps 11-12 (README): Oracle verifies C2PA, delivers preimage via DM
   // ============================================================
-  step("Oracle receives result, verifies C2PA (stub), delivers preimage via NIP-44 DM...");
+  step(
+    "Oracle receives result, verifies C2PA (stub), delivers preimage via NIP-44 DM...",
+  );
 
   // Verify Worker pubkey from event metadata (no decryption needed)
   const resultWorkerPubkey = firstResponse.pubkey;
@@ -546,13 +649,20 @@ async function runDemo() {
   }
 
   // Oracle decrypts oracle_payload tag (NIP-44 encrypted to Oracle)
-  const oraclePayload = parseOracleResponsePayload(firstResponse, oracle.secretKey);
+  const oraclePayload = parseOracleResponsePayload(
+    firstResponse,
+    oracle.secretKey,
+  );
   if (!oraclePayload) {
     fail("Oracle could not decrypt oracle_payload tag");
     return;
   }
   ok(`Oracle decrypted oracle_payload from kind 6300 tags`);
-  info(`Blossom hash: ${oraclePayload.attachments[0]?.blossom_hash.slice(0, 16)}...`);
+  info(
+    `Blossom hash: ${
+      oraclePayload.attachments[0]?.blossom_hash.slice(0, 16)
+    }...`,
+  );
   info(`K_O available for blob decryption`);
 
   // C2PA verification (stub — Oracle would download blob, decrypt with K_O, verify C2PA)
@@ -565,7 +675,12 @@ async function runDemo() {
     return;
   }
 
-  const preimageEvent = buildPreimageDM(oracle, worker.publicKey, queryId, preimage);
+  const preimageEvent = buildPreimageDM(
+    oracle,
+    worker.publicKey,
+    queryId,
+    preimage,
+  );
   const dmPubResult = await publishEvent(preimageEvent, [RELAY_URL]);
 
   if (dmPubResult.successes.length > 0) {
@@ -580,7 +695,7 @@ async function runDemo() {
   // ============================================================
   step("Worker receives preimage via DM, verifies Oracle pubkey...");
 
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const dmEvents = await readRelayEvents({
     kinds: [4],
@@ -600,7 +715,11 @@ async function runDemo() {
     return;
   }
 
-  const dmPayload = parseOracleDM(oracleDm.content, worker.secretKey, oracleDm.pubkey);
+  const dmPayload = parseOracleDM(
+    oracleDm.content,
+    worker.secretKey,
+    oracleDm.pubkey,
+  );
 
   if (dmPayload.type === "preimage" && dmPayload.query_id === queryId) {
     ok(`Preimage received: ${dmPayload.preimage.slice(0, 16)}...`);
@@ -611,12 +730,18 @@ async function runDemo() {
   }
 
   // Verify preimage matches hash
-  const computedHash = bytesToHex(sha256(Buffer.from(dmPayload.preimage, "hex")));
+  const computedHash = bytesToHex(
+    sha256(Buffer.from(dmPayload.preimage, "hex")),
+  );
 
   if (computedHash === preimageEntry.hash) {
     ok(`Preimage verification: hash(preimage) matches original hash`);
   } else {
-    fail(`Hash mismatch: expected ${preimageEntry.hash.slice(0, 16)}..., got ${computedHash.slice(0, 16)}...`);
+    fail(
+      `Hash mismatch: expected ${preimageEntry.hash.slice(0, 16)}..., got ${
+        computedHash.slice(0, 16)
+      }...`,
+    );
     return;
   }
 
@@ -632,14 +757,20 @@ async function runDemo() {
   );
 
   if (redeemResult) {
-    ok(`HTLC redeemed on mint: ${redeemResult.amountSats} sats → Worker's unlocked proofs`);
+    ok(
+      `HTLC redeemed on mint: ${redeemResult.amountSats} sats → Worker's unlocked proofs`,
+    );
     ok(`Worker now holds ${redeemResult.proofs.length} fresh proof(s)`);
   } else {
     // FakeWallet may not fully support NUT-14 witness verification
-    warn(`Mint redemption failed (FakeWallet may not support NUT-14 witnesses)`);
+    warn(
+      `Mint redemption failed (FakeWallet may not support NUT-14 witnesses)`,
+    );
     const redeemInspect = inspectEscrowToken(finalToken.token);
     if (redeemInspect && redeemInspect.amountSats > 0) {
-      ok(`HTLC token valid: ${redeemInspect.amountSats} sats (redemption requires NUT-14 compatible mint)`);
+      ok(
+        `HTLC token valid: ${redeemInspect.amountSats} sats (redemption requires NUT-14 compatible mint)`,
+      );
       ok(`Worker has preimage + private key → both conditions satisfied`);
     } else {
       fail("HTLC token invalid");

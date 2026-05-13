@@ -15,7 +15,7 @@
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import { finalizeEvent, type EventTemplate } from "nostr-tools";
+import { type EventTemplate, finalizeEvent } from "nostr-tools";
 
 import { getLogger } from "@anchr/core-runtime/logger";
 const log = getLogger(["anchr", "blossom"]);
@@ -157,8 +157,7 @@ export async function uploadToBlossom(
       if (response.ok) {
         successUrls.push(`${serverUrl}/${hash}`);
       } else {
-        log.error(`Upload to ${serverUrl} failed: ${response.status}`,
-        );
+        log.error(`Upload to ${serverUrl} failed: ${response.status}`);
       }
     }),
   );
@@ -205,13 +204,13 @@ export async function downloadFromBlossom(
     }
 
     if (attempt < maxRetries) {
-      log.warn(`Download attempt ${attempt}/${maxRetries} failed for ${hash}, retrying in ${retryDelayMs}ms...`,
+      log.warn(
+        `Download attempt ${attempt}/${maxRetries} failed for ${hash}, retrying in ${retryDelayMs}ms...`,
       );
       await new Promise((r) => setTimeout(r, retryDelayMs));
     }
   }
 
-  log.error(`All ${maxRetries} download attempts failed for ${hash}`,
-  );
+  log.error(`All ${maxRetries} download attempts failed for ${hash}`);
   return null;
 }

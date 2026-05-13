@@ -4,6 +4,12 @@
  */
 
 export { spawn, type SpawnOptions, type SpawnResult } from "./process.ts";
-export { readFile, writeFile, fileExists, fileLastModified, readFileAsArrayBuffer } from "./fs.ts";
+export {
+  fileExists,
+  fileLastModified,
+  readFile,
+  readFileAsArrayBuffer,
+  writeFile,
+} from "./fs.ts";
 export { which } from "./which.ts";
 export { moduleDir } from "./env.ts";

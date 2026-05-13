@@ -82,7 +82,12 @@ test("resolveMarketFrostPerProof signs each proof secret individually", () => {
     '["P2PK",{"data":"02ghi","nonce":"n3","tags":[]}]',
   ];
 
-  const result = resolveMarketFrostPerProof("market-frost-1", "yes", proofSecrets, keyStore);
+  const result = resolveMarketFrostPerProof(
+    "market-frost-1",
+    "yes",
+    proofSecrets,
+    keyStore,
+  );
 
   expect(result).not.toBeNull();
   expect(result!.outcome).toBe("yes");
@@ -90,7 +95,11 @@ test("resolveMarketFrostPerProof signs each proof secret individually", () => {
 
   for (const [secret, sig] of result!.proof_signatures) {
     const msgHash = sha256(new TextEncoder().encode(secret));
-    const valid = schnorr.verify(hexToBytes(sig), msgHash, hexToBytes(pubkeys.pubkey_a));
+    const valid = schnorr.verify(
+      hexToBytes(sig),
+      msgHash,
+      hexToBytes(pubkeys.pubkey_a),
+    );
     expect(valid).toBe(true);
   }
 });
@@ -104,7 +113,12 @@ test("resolveMarketFrostPerProof NO outcome signs with pubkey_b", () => {
     '["P2PK",{"data":"02xyz","nonce":"n4","tags":[]}]',
   ];
 
-  const result = resolveMarketFrostPerProof("market-frost-2", "no", proofSecrets, keyStore);
+  const result = resolveMarketFrostPerProof(
+    "market-frost-2",
+    "no",
+    proofSecrets,
+    keyStore,
+  );
 
   expect(result).not.toBeNull();
   expect(result!.outcome).toBe("no");
@@ -112,13 +126,22 @@ test("resolveMarketFrostPerProof NO outcome signs with pubkey_b", () => {
 
   const [secret, sig] = [...result!.proof_signatures.entries()][0]!;
   const msgHash = sha256(new TextEncoder().encode(secret));
-  const valid = schnorr.verify(hexToBytes(sig), msgHash, hexToBytes(pubkeys.pubkey_b));
+  const valid = schnorr.verify(
+    hexToBytes(sig),
+    msgHash,
+    hexToBytes(pubkeys.pubkey_b),
+  );
   expect(valid).toBe(true);
 });
 
 test("resolveMarketFrostPerProof returns null for unknown market", () => {
   const keyStore = createDualKeyStore();
-  const result = resolveMarketFrostPerProof("unknown", "yes", ["secret1"], keyStore);
+  const result = resolveMarketFrostPerProof(
+    "unknown",
+    "yes",
+    ["secret1"],
+    keyStore,
+  );
   expect(result).toBeNull();
 });
 
@@ -129,9 +152,15 @@ test("resolveMarketFrostPerProof signature matches NUT-11 format (SHA256 of secr
 
   // Realistic NUT-11 P2PK secret — the signing message must match what
   // cashu-ts signP2PKProofs computes (SHA256 of the secret bytes).
-  const realSecret = '["P2PK",{"data":"02abc123","nonce":"deadbeef","tags":[["pubkeys","02abc","02def"],["n_sigs","2"],["sigflag","SIG_ALL"]]}]';
+  const realSecret =
+    '["P2PK",{"data":"02abc123","nonce":"deadbeef","tags":[["pubkeys","02abc","02def"],["n_sigs","2"],["sigflag","SIG_ALL"]]}]';
 
-  const result = resolveMarketFrostPerProof("market-nut11", "yes", [realSecret], keyStore);
+  const result = resolveMarketFrostPerProof(
+    "market-nut11",
+    "yes",
+    [realSecret],
+    keyStore,
+  );
   expect(result).not.toBeNull();
 
   const sig = result!.proof_signatures.get(realSecret)!;
@@ -139,6 +168,10 @@ test("resolveMarketFrostPerProof signature matches NUT-11 format (SHA256 of secr
   expect(sig.length).toBe(128);
 
   const expectedMsg = sha256(new TextEncoder().encode(realSecret));
-  const valid = schnorr.verify(hexToBytes(sig), expectedMsg, hexToBytes(pubkeys.pubkey_a));
+  const valid = schnorr.verify(
+    hexToBytes(sig),
+    expectedMsg,
+    hexToBytes(pubkeys.pubkey_a),
+  );
   expect(valid).toBe(true);
 });

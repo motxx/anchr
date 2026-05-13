@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 
 interface Petal {
-  x: number;        // start position vw
-  size: number;     // px
+  x: number; // start position vw
+  size: number; // px
   hue: number;
   lightness: number;
   alpha: number;
   duration: number; // s
-  delay: number;    // s — within the burst window
-  sway: number;     // px
-  spin: number;     // deg
+  delay: number; // s — within the burst window
+  sway: number; // px
+  spin: number; // deg
   shape: 0 | 1 | 2;
   mirror: boolean;
 }
@@ -29,15 +29,15 @@ function buildBurst(seed: number, count: number): Petal[] {
   const r = rng(seed);
   const petals: Petal[] = [];
   for (let i = 0; i < count; i++) {
-    const duration = 5 + r() * 4;     // 5–9s — quick burst, not ambient
+    const duration = 5 + r() * 4; // 5–9s — quick burst, not ambient
     petals.push({
       x: r() * 100,
       size: 22 + r() * 24,
       hue: 348 + r() * 12,
       lightness: 76 + r() * 8,
-      alpha: 0.55 + r() * 0.35,        // brighter than ambient — celebratory
+      alpha: 0.55 + r() * 0.35, // brighter than ambient — celebratory
       duration,
-      delay: r() * 1.2,                // staggered over the first 1.2s
+      delay: r() * 1.2, // staggered over the first 1.2s
       sway: 28 + r() * 56,
       spin: (r() < 0.5 ? -1 : 1) * (60 + r() * 220),
       shape: Math.floor(r() * 3) as 0 | 1 | 2,
@@ -49,30 +49,24 @@ function buildBurst(seed: number, count: number): Petal[] {
 
 const PETAL_SHAPES: Array<{ body: string; specular: string }> = [
   {
-    body:
-      "M32 4 C 46 6 54 18 52 32 C 50 46 42 56 32 60 " +
+    body: "M32 4 C 46 6 54 18 52 32 C 50 46 42 56 32 60 " +
       "C 22 56 14 46 12 32 C 10 18 18 6 32 4 Z " +
       "M27 55 L 32 60 L 37 55 Z",
-    specular:
-      "M28 12 C 34 12 40 16 40 24 C 40 30 36 36 30 36 " +
+    specular: "M28 12 C 34 12 40 16 40 24 C 40 30 36 36 30 36 " +
       "C 25 36 22 30 22 24 C 22 16 24 12 28 12 Z",
   },
   {
-    body:
-      "M32 5 C 41 6 47 16 46 28 C 45 42 41 54 32 60 " +
+    body: "M32 5 C 41 6 47 16 46 28 C 45 42 41 54 32 60 " +
       "C 23 54 19 42 18 28 C 17 16 23 6 32 5 Z " +
       "M28 55 L 32 60 L 36 55 Z",
-    specular:
-      "M28 14 C 33 14 38 18 38 26 C 38 34 35 42 30 42 " +
+    specular: "M28 14 C 33 14 38 18 38 26 C 38 34 35 42 30 42 " +
       "C 26 42 23 34 23 26 C 23 18 25 14 28 14 Z",
   },
   {
-    body:
-      "M28 5 C 42 6 52 18 50 32 C 48 46 38 58 26 60 " +
+    body: "M28 5 C 42 6 52 18 50 32 C 48 46 38 58 26 60 " +
       "C 17 54 12 42 14 28 C 16 14 22 6 28 5 Z " +
       "M22 55 L 26 60 L 31 56 Z",
-    specular:
-      "M26 14 C 36 16 42 22 40 30 C 38 38 32 44 26 44 " +
+    specular: "M26 14 C 36 16 42 22 40 30 C 38 38 32 44 26 44 " +
       "C 21 42 19 34 21 26 C 22 18 24 14 26 14 Z",
   },
 ];
@@ -94,12 +88,13 @@ interface SakuraBurstProps {
  * places a bet, or a market resolves. Each `trigger` increment spawns a
  * fresh batch of petals that fall once and clean themselves up.
  *
- * Brand metaphor: 神和ぎ (kannagi) = the spirit-pacifying ritual; the
- * petals fall when an outcome is decided. Otherwise the chrome is silent.
+ * The petals fall when an outcome is decided. Otherwise the chrome is silent.
  */
 export function SakuraBurst({ trigger, count = 36 }: SakuraBurstProps) {
   // Each fire gets a unique key so React unmounts the previous batch.
-  const [activeBurst, setActiveBurst] = useState<{ id: number; petals: Petal[] } | null>(null);
+  const [activeBurst, setActiveBurst] = useState<
+    { id: number; petals: Petal[] } | null
+  >(null);
 
   useEffect(() => {
     if (trigger <= 0) return;
@@ -161,7 +156,11 @@ export function SakuraBurst({ trigger, count = 36 }: SakuraBurstProps) {
                   <stop offset="100%" stopColor="rgba(255,255,255,0)" />
                 </radialGradient>
               </defs>
-              <path d={shape.body} fill={`url(#${fillId})`} fillRule="evenodd" />
+              <path
+                d={shape.body}
+                fill={`url(#${fillId})`}
+                fillRule="evenodd"
+              />
               <path d={shape.specular} fill={`url(#${specId})`} />
               <path
                 d={shape.body}

@@ -1,6 +1,14 @@
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
 import type { NostrIdentity } from "./identity.ts";
-import { deriveConversationKey, encryptNip44, decryptNip44 } from "./encryption.ts";
+import {
+  decryptNip44,
+  deriveConversationKey,
+  encryptNip44,
+} from "./encryption.ts";
 
 export const DM_KIND = 4;
 
@@ -24,8 +32,15 @@ export function buildPreimageDM(
   queryId: string,
   preimage: string,
 ): VerifiedEvent {
-  const payload: PreimageDMPayload = { type: "preimage", query_id: queryId, preimage };
-  const conversationKey = deriveConversationKey(identity.secretKey, recipientPubKey);
+  const payload: PreimageDMPayload = {
+    type: "preimage",
+    query_id: queryId,
+    preimage,
+  };
+  const conversationKey = deriveConversationKey(
+    identity.secretKey,
+    recipientPubKey,
+  );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
@@ -43,7 +58,10 @@ export function parseOracleDM(
   recipientSecretKey: Uint8Array,
   senderPubKey: string,
 ): OracleDMPayload {
-  const conversationKey = deriveConversationKey(recipientSecretKey, senderPubKey);
+  const conversationKey = deriveConversationKey(
+    recipientSecretKey,
+    senderPubKey,
+  );
   const decrypted = decryptNip44(content, conversationKey);
   return JSON.parse(decrypted) as OracleDMPayload;
 }

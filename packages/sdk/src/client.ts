@@ -11,8 +11,8 @@ import {
   type QueryResult,
   type QueryStatusResponse,
   type QuerySummary,
-  type SubmitResponse,
   sleep,
+  type SubmitResponse,
 } from "./client-types.ts";
 
 /**
@@ -20,7 +20,7 @@ import {
  *
  * @example
  * ```typescript
- * import { Anchr } from "anchr-sdk";
+ * import { Anchr } from "@anchr/sdk";
  *
  * const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
  *
@@ -52,7 +52,8 @@ export class Anchr {
   async query(options: QueryOptions): Promise<QueryResult> {
     const queryId = await this.createQuery(options);
 
-    const pollTimeout = options.pollTimeoutSeconds ?? options.timeoutSeconds ?? this.config.defaultTimeoutSeconds;
+    const pollTimeout = options.pollTimeoutSeconds ?? options.timeoutSeconds ??
+      this.config.defaultTimeoutSeconds;
     const deadline = Date.now() + pollTimeout * 1000;
 
     while (Date.now() < deadline) {
@@ -86,7 +87,8 @@ export class Anchr {
    */
   async photo(options: PhotoQueryOptions): Promise<PhotoResult> {
     const queryId = await this.createPhotoQuery(options);
-    const photoTimeout = options.timeoutSeconds ?? this.config.defaultTimeoutSeconds;
+    const photoTimeout = options.timeoutSeconds ??
+      this.config.defaultTimeoutSeconds;
     const deadline = Date.now() + photoTimeout * 1000;
 
     while (Date.now() < deadline) {
@@ -96,7 +98,9 @@ export class Anchr {
         return {
           verified: true,
           checks: status.verification?.checks ?? [],
-          attachments: (status.result?.attachments ?? []).map((a: { uri: string; mime_type?: string; mimeType?: string }) => ({
+          attachments: (status.result?.attachments ?? []).map((
+            a: { uri: string; mime_type?: string; mimeType?: string },
+          ) => ({
             uri: a.uri,
             mimeType: a.mimeType ?? a.mime_type ?? "application/octet-stream",
           })),
@@ -108,7 +112,10 @@ export class Anchr {
       }
 
       if (status.status === "rejected") {
-        throw new VerificationFailedError(queryId, status.verification?.failures ?? []);
+        throw new VerificationFailedError(
+          queryId,
+          status.verification?.failures ?? [],
+        );
       }
 
       if (status.status === "expired") {
@@ -127,22 +134,34 @@ export class Anchr {
 
   async getQueryStatus(queryId: string): Promise<QueryStatusResponse> {
     const res = await this.fetch(`/queries/${queryId}`);
-    if (!res.ok) throw new AnchrError(`Failed to get query ${queryId}`, "API_ERROR", { status: res.status });
+    if (!res.ok) {
+      throw new AnchrError(`Failed to get query ${queryId}`, "API_ERROR", {
+        status: res.status,
+      });
+    }
     return res.json();
   }
 
-  async listOpenQueries(options?: { lat?: number; lon?: number; maxDistanceKm?: number }): Promise<QuerySummary[]> {
+  async listOpenQueries(
+    options?: { lat?: number; lon?: number; maxDistanceKm?: number },
+  ): Promise<QuerySummary[]> {
     const params = new URLSearchParams();
     if (options?.lat != null) params.set("lat", String(options.lat));
     if (options?.lon != null) params.set("lon", String(options.lon));
-    if (options?.maxDistanceKm != null) params.set("max_distance_km", String(options.maxDistanceKm));
+    if (options?.maxDistanceKm != null) {
+      params.set("max_distance_km", String(options.maxDistanceKm));
+    }
     const qs = params.toString();
     const res = await this.fetch(`/queries${qs ? `?${qs}` : ""}`);
     if (!res.ok) throw new AnchrError("Failed to list queries", "API_ERROR");
     return res.json();
   }
 
-  async submitPresentation(queryId: string, presentationBase64: string, workerPubkey = "sdk-worker"): Promise<SubmitResponse> {
+  async submitPresentation(
+    queryId: string,
+    presentationBase64: string,
+    workerPubkey = "sdk-worker",
+  ): Promise<SubmitResponse> {
     const res = await this.fetch(`/queries/${queryId}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -151,7 +170,9 @@ export class Anchr {
         tlsn_presentation: presentationBase64,
       }),
     });
-    if (!res.ok && res.status >= 500) throw new AnchrError("Submit failed", "API_ERROR");
+    if (!res.ok && res.status >= 500) {
+      throw new AnchrError("Submit failed", "API_ERROR");
+    }
     return res.json();
   }
 
@@ -197,7 +218,8 @@ export class Anchr {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new AnchrError(
-        (err as Record<string, string>).error ?? `Failed to create query (${res.status})`,
+        (err as Record<string, string>).error ??
+          `Failed to create query (${res.status})`,
         "API_ERROR",
         err,
       );
@@ -226,12 +248,17 @@ export class Anchr {
       body: JSON.stringify(body),
     });
 
-    if (!res.ok) throw new AnchrError("Failed to create photo query", "API_ERROR");
+    if (!res.ok) {
+      throw new AnchrError("Failed to create photo query", "API_ERROR");
+    }
     const data = (await res.json()) as { query_id: string };
     return data.query_id;
   }
 
-  private buildQueryResult(status: QueryStatusResponse, options: QueryOptions): QueryResult {
+  private buildQueryResult(
+    status: QueryStatusResponse,
+    options: QueryOptions,
+  ): QueryResult {
     const verified = status.verification?.tlsn_verified;
     const rawBody = verified?.revealed_body ?? "";
 
@@ -262,6 +289,9 @@ export class Anchr {
     if (this.config.apiKey) {
       headers["Authorization"] = `Bearer ${this.config.apiKey}`;
     }
-    return globalThis.fetch(`${this.config.serverUrl}${path}`, { ...init, headers });
+    return globalThis.fetch(`${this.config.serverUrl}${path}`, {
+      ...init,
+      headers,
+    });
   }
 }

@@ -1,0 +1,60 @@
+# 人間レビュー残差を追跡する
+
+Created: 2026-05-09
+Model: Codex GPT-5
+Completed: 2026-05-13
+
+## Priority
+
+design
+
+## Dependencies
+
+Depends on:
+- #0016 - 人間レビュー領域をハーネスへ写像する
+- #0017 - ハーネス保守ループを標準化する
+
+Blocks:
+- None
+
+## Summary
+
+AI が実装し、ハーネスが検査した後に、それでも人間が見る必要のある残差を明示する。人間レビューをゼロにするのではなく、普遍性、境界、リスク受容、仕様変更のような人間に残すべき判断へ限定する。
+
+## Rationale
+
+`CLAUDE.md` の verification bar は「完了」の機械的条件を定義しているが、機械的条件を通過した後に残る人間判断の種類は定義していない。残差を明示しないと、人間レビューが実装詳細やスタイル確認へ広がり、AI に任せる領域が曖昧になる。
+
+## Plan
+
+- 人間レビューに残す判断と、ハーネスへ委譲すべき判断を分けた短いチェックリストを作る。
+- pending issue または resolution note に、未自動化のレビュー残差を記録する形式を決める。
+- 残差が繰り返し出た場合に `0017` のハーネス保守ループへ戻す導線を定義する。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/review-harness.md`
+- `docs/issues/README.md`
+- `skills/resolve-issues/SKILL.md`
+
+Verified with:
+
+- `deno task test:all`
+- `deno task test:all:docker`
+- `deno task lint:strict`
+
+Harness update:
+
+- `docs/review-harness.md` now owns the residual-review checklist, and
+  `docs/issues/README.md` plus `skills/resolve-issues/SKILL.md` require
+  `Review residuals:` in issue resolution notes.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

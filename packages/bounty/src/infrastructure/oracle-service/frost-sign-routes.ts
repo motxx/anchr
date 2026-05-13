@@ -16,16 +16,25 @@ export interface FrostSignRouteDeps {
  *   POST /frost/sign/:queryId/shares           — submit a signature share (auto-aggregates at threshold)
  *   GET  /frost/sign/:queryId                  — read session state
  */
-export function registerFrostSignRoutes(app: Hono, deps: FrostSignRouteDeps): void {
+export function registerFrostSignRoutes(
+  app: Hono,
+  deps: FrostSignRouteDeps,
+): void {
   const { authMiddleware, frostCoordinator } = deps;
 
   app.post("/frost/sign/:queryId", authMiddleware, async (c) => {
     const queryId = c.req.param("queryId");
     const body = await c.req.json<{ message: string }>().catch(() => null);
     if (!body?.message) return c.json({ error: "Missing message" }, 400);
-    if (!deps.frostConfig) return c.json({ error: "FROST not configured" }, 503);
+    if (!deps.frostConfig) {
+      return c.json({ error: "FROST not configured" }, 503);
+    }
 
-    const session = frostCoordinator.startSigning(queryId, body.message, deps.frostConfig);
+    const session = frostCoordinator.startSigning(
+      queryId,
+      body.message,
+      deps.frostConfig,
+    );
     return c.json({
       session_id: session.session_id,
       query_id: session.query_id,
@@ -35,12 +44,20 @@ export function registerFrostSignRoutes(app: Hono, deps: FrostSignRouteDeps): vo
   });
 
   app.post("/frost/sign/:queryId/commitments", authMiddleware, async (c) => {
-    const body = await c.req.json<{ session_id: string; signer_pubkey: string; commitment: string }>().catch(() => null);
+    const body = await c.req.json<
+      { session_id: string; signer_pubkey: string; commitment: string }
+    >().catch(() => null);
     if (!body?.session_id || !body?.signer_pubkey || !body?.commitment) {
-      return c.json({ error: "Missing session_id, signer_pubkey, or commitment" }, 400);
+      return c.json({
+        error: "Missing session_id, signer_pubkey, or commitment",
+      }, 400);
     }
 
-    frostCoordinator.submitNonceCommitment(body.session_id, body.signer_pubkey, body.commitment);
+    frostCoordinator.submitNonceCommitment(
+      body.session_id,
+      body.signer_pubkey,
+      body.commitment,
+    );
     const session = frostCoordinator.getSigningSession(body.session_id);
     return c.json({
       commitments_count: session?.nonce_commitments.size ?? 0,
@@ -49,12 +66,21 @@ export function registerFrostSignRoutes(app: Hono, deps: FrostSignRouteDeps): vo
   });
 
   app.post("/frost/sign/:queryId/shares", authMiddleware, async (c) => {
-    const body = await c.req.json<{ session_id: string; signer_pubkey: string; share: string }>().catch(() => null);
+    const body = await c.req.json<
+      { session_id: string; signer_pubkey: string; share: string }
+    >().catch(() => null);
     if (!body?.session_id || !body?.signer_pubkey || !body?.share) {
-      return c.json({ error: "Missing session_id, signer_pubkey, or share" }, 400);
+      return c.json(
+        { error: "Missing session_id, signer_pubkey, or share" },
+        400,
+      );
     }
 
-    frostCoordinator.submitSignatureShare(body.session_id, body.signer_pubkey, body.share);
+    frostCoordinator.submitSignatureShare(
+      body.session_id,
+      body.signer_pubkey,
+      body.share,
+    );
     const session = frostCoordinator.getSigningSession(body.session_id);
 
     if (session && session.signature_shares.size >= session.config.threshold) {

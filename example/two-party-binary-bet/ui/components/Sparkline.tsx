@@ -28,7 +28,9 @@ export function Sparkline({
     const direction = data[data.length - 1].yes - data[0].yes;
     const color = direction >= 0 ? "hsl(var(--yes))" : "hsl(var(--no))";
 
-    const line = xs.map((x, i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`).join(" ");
+    const line = xs.map((x, i) =>
+      `${i === 0 ? "M" : "L"}${x.toFixed(1)},${ys[i].toFixed(1)}`
+    ).join(" ");
     const area = `${line} L${width.toFixed(1)},${height} L0,${height} Z`;
     return { path: line, fill: area, color };
   }, [data, width, height]);
@@ -45,7 +47,14 @@ export function Sparkline({
       aria-hidden="true"
     >
       <path d={fill} fill={color} fillOpacity={0.12} />
-      <path d={path} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

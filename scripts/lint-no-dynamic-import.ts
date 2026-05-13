@@ -210,7 +210,7 @@ function report(hits: Hit[]): void {
   console.error(
     "\nPolicy: prefer static `import` declarations. `import(...)` call\n" +
       "expressions — `await import(...)`, `import(...).then(...)`, and\n" +
-      "type-position `Promise<import(\"./foo.ts\").Bar>` — defeat static\n" +
+      'type-position `Promise<import("./foo.ts").Bar>` — defeat static\n' +
       "analysis and break bundler tree-shaking. Convert the call to a\n" +
       "top-of-file `import` (or `import type` for type-only references)\n" +
       "— or, if a genuine platform conditional / script-mode entry /\n" +

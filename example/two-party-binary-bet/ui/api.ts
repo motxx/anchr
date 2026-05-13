@@ -31,7 +31,13 @@ export interface BetResult {
   error?: string;
 }
 
-export type ConditionType = "jsonpath_gt" | "jsonpath_lt" | "jsonpath_equals" | "contains_text" | "price_above" | "price_below";
+export type ConditionType =
+  | "jsonpath_gt"
+  | "jsonpath_lt"
+  | "jsonpath_equals"
+  | "contains_text"
+  | "price_above"
+  | "price_below";
 
 export interface ResolutionCondition {
   type: ConditionType;
@@ -180,6 +186,14 @@ export interface WalletConfig {
   mint_url: string | null;
   /** Nostr relays the NIP-60 wallet client uses for kind:7375 token events. */
   nostr_relays: string[];
+  faucet?: {
+    enabled: boolean;
+    mode: "token_bank" | "regtest" | "external" | "disabled";
+    amount_sats: number;
+    max_amount_sats: number;
+    available_tokens: number;
+    external_url?: string;
+  };
 }
 
 export async function fetchWalletConfig(): Promise<WalletConfig> {
@@ -195,6 +209,8 @@ export async function fetchWalletConfig(): Promise<WalletConfig> {
 export interface FaucetResult {
   cashu_token: string;
   amount_sats: number;
+  source?: "token_bank" | "regtest";
+  remaining_tokens?: number;
 }
 
 /**
@@ -229,7 +245,10 @@ export interface RedeemResult {
   redeem_instructions?: string;
 }
 
-export async function redeemWinnings(marketId: string, pubkey: string): Promise<RedeemResult> {
+export async function redeemWinnings(
+  marketId: string,
+  pubkey: string,
+): Promise<RedeemResult> {
   const res = await apiFetch(`${API_BASE}/${marketId}/redeem`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

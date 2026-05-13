@@ -1,11 +1,14 @@
 import React from "react";
-import { View, FlatList } from "react-native";
-import { DSCard, DSText, DSSatsAmount, DSDivider } from "../ds/index.ts";
+import { FlatList, View } from "react-native";
+import { DSCard, DSDivider, DSSatsAmount, DSText } from "../ds/index.ts";
 import { Ionicons } from "@expo/vector-icons";
 import { formatShortTime } from "../../utils/time.ts";
-import type { WalletTransaction, TransactionType } from "../../store/wallet.ts";
+import type { TransactionType, WalletTransaction } from "../../store/wallet.ts";
 
-const TYPE_CONFIG: Record<TransactionType, { icon: string; color: string; prefix: string }> = {
+const TYPE_CONFIG: Record<
+  TransactionType,
+  { icon: string; color: string; prefix: string }
+> = {
   fund: { icon: "arrow-down-circle", color: "#3b82f6", prefix: "+" },
   earn: { icon: "flash", color: "#10b981", prefix: "+" },
   spend: { icon: "arrow-up-circle", color: "#f59e0b", prefix: "-" },

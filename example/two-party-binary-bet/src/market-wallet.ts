@@ -5,7 +5,7 @@
  * All functions take a `userProofs` map as parameter instead of accessing globals.
  */
 
-import { Wallet, type Proof } from "@cashu/cashu-ts";
+import { type Proof, Wallet } from "@cashu/cashu-ts";
 import { spawn } from "@anchr/core-runtime";
 
 /** Get user balance from stored proofs. */
@@ -131,9 +131,19 @@ export async function payInvoiceViaLndUser(bolt11: string): Promise<boolean> {
   try {
     const proc = spawn(
       [
-        "docker", "compose", "exec", "-T", "lnd-user",
-        "lncli", "--network", "regtest", "--rpcserver", "lnd-user:10009",
-        "payinvoice", "--force", bolt11,
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "lnd-user",
+        "lncli",
+        "--network",
+        "regtest",
+        "--rpcserver",
+        "lnd-user:10009",
+        "payinvoice",
+        "--force",
+        bolt11,
       ],
       { stdout: "pipe", stderr: "pipe" },
     );

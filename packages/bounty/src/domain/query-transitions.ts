@@ -16,11 +16,26 @@ const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
 /** Terminal states — no further transitions allowed. */
 const TERMINAL_STATUSES: QueryStatus[] = ["approved", "rejected", "expired"];
 
-const CANCELLABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing"];
+const CANCELLABLE_STATUSES: QueryStatus[] = [
+  "pending",
+  "awaiting_quotes",
+  "worker_selected",
+  "processing",
+];
 
-const EXPIRABLE_STATUSES: QueryStatus[] = ["pending", "awaiting_quotes", "worker_selected", "processing", "verifying"];
+const EXPIRABLE_STATUSES: QueryStatus[] = [
+  "pending",
+  "awaiting_quotes",
+  "worker_selected",
+  "processing",
+  "verifying",
+];
 
-export function isValidTransition(from: QueryStatus, to: QueryStatus, isHtlc: boolean): boolean {
+export function isValidTransition(
+  from: QueryStatus,
+  to: QueryStatus,
+  isHtlc: boolean,
+): boolean {
   const table = isHtlc ? ESCROW_TRANSITIONS : SIMPLE_TRANSITIONS;
   return table[from]?.includes(to) ?? false;
 }

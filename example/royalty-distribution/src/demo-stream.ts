@@ -54,7 +54,8 @@ function buildEdges(
     const proof: EdgeProof = {
       use_proof: `tlsn:platform_report:${use.platform}:${use.content_id}`,
       identity_proof: `tlsn:recognition_api:${use.content_id}`,
-      rights_proof: `tlsn:rights_db:${rights.content_id}:${holder.holder_pubkey}`,
+      rights_proof:
+        `tlsn:rights_db:${rights.content_id}:${holder.holder_pubkey}`,
     };
     return {
       edge_id: `edge_${use.content_id}_${i}`,
@@ -100,7 +101,9 @@ console.log("=".repeat(70));
 console.log();
 
 for (const edge of report.edges) {
-  const holder = songRights.holders.find((h) => h.holder_pubkey === edge.to_pubkey)!;
+  const holder = songRights.holders.find((h) =>
+    h.holder_pubkey === edge.to_pubkey
+  )!;
   console.log(
     `  ${holder.type.padEnd(10)} → ${edge.to_pubkey.padEnd(20)} ${
       edge.amount_sats.toLocaleString().padStart(8)
@@ -109,9 +112,15 @@ for (const edge of report.edges) {
 }
 
 console.log();
-console.log(`  Total distributed:    ${report.total_distributed_sats.toLocaleString()} sats`);
-console.log(`  All proofs verified:  ${report.all_proofs_verified ? "YES" : "NO"}`);
-console.log(`  Audit trail intact:   ${report.audit_trail_intact ? "YES" : "NO"}`);
+console.log(
+  `  Total distributed:    ${report.total_distributed_sats.toLocaleString()} sats`,
+);
+console.log(
+  `  All proofs verified:  ${report.all_proofs_verified ? "YES" : "NO"}`,
+);
+console.log(
+  `  Audit trail intact:   ${report.audit_trail_intact ? "YES" : "NO"}`,
+);
 console.log();
 console.log("  (proofs are simulated; real wiring would attach TLSNotary");
 console.log("   presentations against platform, recognition, and rights APIs)");

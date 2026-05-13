@@ -14,10 +14,12 @@
  * 10. Verify final status
  */
 import { chromium } from "playwright";
-import { spawn } from "../src/runtime/mod.ts";
+import { spawn } from "@anchr/core-runtime";
 import process from "node:process";
 
 const ANCHR_URL = process.env.ANCHR_SERVER_URL ?? "http://localhost:3000";
+const CASHU_MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
+const TLSN_VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 
 if (!SQUARE_ACCESS_TOKEN) {
@@ -54,7 +56,10 @@ const requesterBrowser = await pw.chromium.launch({
   args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=0,0`],
 });
 const requesterPage = await requesterBrowser.newPage();
-await requesterPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
+await requesterPage.setViewportSize({
+  width: HALF_W - 16,
+  height: HALF_H - 80,
+});
 await requesterPage.goto(`${ANCHR_URL}/requester`);
 
 // Worker UI — top right
@@ -73,13 +78,20 @@ const browser = await chromium.launch({
 });
 const blankPage = await browser.newPage();
 await blankPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
-await blankPage.setContent('<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Square Payment — waiting for Worker to accept job...</p></body></html>');
+await blankPage.setContent(
+  '<html><body style="background:#0a0a0a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0"><p style="color:#555;font-family:system-ui;font-size:14px">Square Payment — waiting for Worker to accept job...</p></body></html>',
+);
 
 // Flow visualization UI — bottom right
-const flowHtml = await Deno.readTextFile(new URL("./e2e-flow-ui.html", import.meta.url).pathname);
+const flowHtml = await Deno.readTextFile(
+  new URL("./e2e-flow-ui.html", import.meta.url).pathname,
+);
 const flowBrowser = await pw.chromium.launch({
   headless: false,
-  args: [`--window-size=${HALF_W},${HALF_H}`, `--window-position=${HALF_W},${HALF_H}`],
+  args: [
+    `--window-size=${HALF_W},${HALF_H}`,
+    `--window-position=${HALF_W},${HALF_H}`,
+  ],
 });
 const flowPage = await flowBrowser.newPage();
 await flowPage.setViewportSize({ width: HALF_W - 16, height: HALF_H - 80 });
@@ -88,23 +100,34 @@ await flowPage.goto("about:blank");
 await flowPage.setContent(flowHtml);
 // Poll for JS readiness instead of waitForFunction (avoids headed-mode timeout)
 for (let i = 0; i < 30; i++) {
-  const ready = await flowPage.evaluate(() => typeof (window as any).flowUpdate === 'function');
+  const ready = await flowPage.evaluate(() =>
+    typeof (window as any).flowUpdate === "function"
+  );
   if (ready) break;
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 200));
 }
 await flowPage.evaluate((ts) => (window as any).flowSetStart(ts), startTime);
 
-console.log(`[${elapsed()}] Requester: top-left | Worker: top-right | Square: bottom-left | Flow: bottom-right`);
+console.log(
+  `[${elapsed()}] Requester: top-left | Worker: top-right | Square: bottom-left | Flow: bottom-right`,
+);
 
 const flow = (step: number, status: string, detail?: string) =>
-  flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [step, status, detail ?? ""]);
+  flowPage.evaluate(([s, st, d]) => (window as any).flowUpdate(s, st, d), [
+    step,
+    status,
+    detail ?? "",
+  ]);
 
 const BOUNTY_SATS = 100;
 
 // Use fixed pubkeys (in production, these would be real Nostr pubkeys)
-const ORACLE_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000001";
-const REQUESTER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000002";
-const WORKER_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000003";
+const ORACLE_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000001";
+const REQUESTER_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000002";
+const WORKER_PUBKEY =
+  "0000000000000000000000000000000000000000000000000000000000000003";
 
 // ============================================================
 // Step 1: Oracle generates preimage hash (POST /hash)
@@ -122,27 +145,35 @@ await flow(0, "complete", `Hash: ${HTLC_HASH.slice(0, 8)}`);
 // Step 2: Seller creates Square Payment Link (URL only)
 // ============================================================
 await flow(1, "active", "Creating link...");
-console.log(`\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`);
+console.log(
+  `\n[${elapsed()}] === Step 2: Seller creates Square Payment Link ===`,
+);
 
-const locResp = await fetch("https://connect.squareupsandbox.com/v2/locations", {
-  headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
-});
+const locResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/locations",
+  {
+    headers: { "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}` },
+  },
+);
 const LOCATION_ID = (await locResp.json()).locations?.[0]?.id;
 
-const linkResp = await fetch("https://connect.squareupsandbox.com/v2/online-checkout/payment-links", {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    quick_pay: {
-      name: "BTC Swap ¥100",
-      price_money: { amount: 100, currency: "JPY" },
-      location_id: LOCATION_ID,
+const linkResp = await fetch(
+  "https://connect.squareupsandbox.com/v2/online-checkout/payment-links",
+  {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  }),
-});
+    body: JSON.stringify({
+      quick_pay: {
+        name: "BTC Swap ¥100",
+        price_money: { amount: 100, currency: "JPY" },
+        location_id: LOCATION_ID,
+      },
+    }),
+  },
+);
 const linkData = await linkResp.json();
 const PAYMENT_LINK_URL = linkData.payment_link?.url;
 const PAYMENT_LINK_ID = linkData.payment_link?.id;
@@ -155,20 +186,36 @@ console.log(`[${elapsed()}] Payment Link: ${PAYMENT_LINK_URL}`);
 await flow(2, "active", `Minting ${BOUNTY_SATS} sats...`);
 console.log(`\n[${elapsed()}] === Step 3: Seller mints Cashu bounty ===`);
 
-const { Wallet: CashuWallet, getEncodedToken } = await import("@cashu/cashu-ts"); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
-const cashuWallet = new CashuWallet("http://localhost:3338", { unit: "sat" });
+const { Wallet: CashuWallet, getEncodedToken } = await import(
+  "@cashu/cashu-ts"
+); // allow-dynamic-import: optional dep — only loaded when this CLI script runs interactively
+const cashuWallet = new CashuWallet(CASHU_MINT_URL, { unit: "sat" });
 await cashuWallet.loadMint();
 
 const mintQuote = await cashuWallet.createMintQuote(BOUNTY_SATS);
-const payProc = spawn(["bash", "-c",
-  `docker exec anchr-lnd-user-1 lncli --network=regtest --rpcserver=lnd-user:10009 payinvoice --force ${mintQuote.request}`
+const payProc = spawn([
+  "docker",
+  "compose",
+  "exec",
+  "-T",
+  "lnd-user",
+  "lncli",
+  "--network=regtest",
+  "--rpcserver=lnd-user:10009",
+  "payinvoice",
+  "--force",
+  mintQuote.request,
 ], { stdout: "pipe", stderr: "pipe" });
 await payProc.exited;
 const payOut = await new Response(payProc.stdout).text();
-console.log(`[${elapsed()}] Lightning: ${payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"}`);
+console.log(
+  `[${elapsed()}] Lightning: ${
+    payOut.includes("SUCCEEDED") ? "SUCCEEDED" : "FAILED"
+  }`,
+);
 
 const proofs = await cashuWallet.mintProofs(BOUNTY_SATS, mintQuote.quote);
-const cashuToken = getEncodedToken({ mint: "http://localhost:3338", proofs });
+const cashuToken = getEncodedToken({ mint: CASHU_MINT_URL, proofs });
 await flow(2, "complete", `${BOUNTY_SATS} sats minted`);
 console.log(`[${elapsed()}] Cashu token: ${cashuToken.slice(0, 40)}...`);
 
@@ -190,7 +237,8 @@ const queryResp = await fetch(`${ANCHR_URL}/queries`, {
     verification_requirements: ["tlsn"],
     ttl_seconds: 600,
     tlsn_requirements: {
-      target_url: "https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1",
+      target_url:
+        "https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1",
       domain_hint: "connect.squareupsandbox.com",
       conditions: [
         {
@@ -215,7 +263,11 @@ const queryData = await queryResp.json();
 const QUERY_ID = queryData.query_id;
 await flow(3, "complete", `ID: ${QUERY_ID?.slice(0, 12)}`);
 console.log(`[${elapsed()}] Query ID: ${QUERY_ID}`);
-console.log(`[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${HTLC_HASH.slice(0, 8)}...)`);
+console.log(
+  `[${elapsed()}] Status: ${queryData.status} (HTLC: hash=${
+    HTLC_HASH.slice(0, 8)
+  }...)`,
+);
 
 if (!QUERY_ID) {
   console.error("Failed to create query:", JSON.stringify(queryData));
@@ -224,7 +276,7 @@ if (!QUERY_ID) {
 
 // Wait for Worker UI to show the query
 console.log(`[${elapsed()}] Waiting for Worker UI to display the query...`);
-await new Promise(r => setTimeout(r, 5000));
+await new Promise((r) => setTimeout(r, 5000));
 
 // ============================================================
 // Step 5: Worker accepts job (quote + select)
@@ -243,7 +295,9 @@ const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
   }),
 });
 const quoteData = await quoteResp.json();
-console.log(`[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`);
+console.log(
+  `[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`,
+);
 
 // Seller selects worker + provides HTLC token
 const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
@@ -255,7 +309,11 @@ const selectResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {
   }),
 });
 const selectData = await selectResp.json();
-console.log(`[${elapsed()}] Select: ${selectData.ok ? "worker selected" : selectData.message}`);
+console.log(
+  `[${elapsed()}] Select: ${
+    selectData.ok ? "worker selected" : selectData.message
+  }`,
+);
 
 if (!selectData.ok) {
   console.error("Failed to select worker:", JSON.stringify(selectData));
@@ -264,7 +322,7 @@ if (!selectData.ok) {
 await flow(4, "complete", "Job accepted");
 
 // Wait for UI to reflect worker_selected state
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 // ============================================================
 // Step 6: Buyer pays via browser (Sandbox Testing Panel)
@@ -289,7 +347,7 @@ if (await nextBtn1.count() > 0) {
   await page.screenshot({ path: "/tmp/square-step2.png" });
 
   await page.waitForTimeout(1500);
-  const allButtons = page.locator('button:visible');
+  const allButtons = page.locator("button:visible");
   const btnCount = await allButtons.count();
   console.log(`[${elapsed()}] Test Payment page: ${btnCount} buttons found`);
   for (let i = 0; i < btnCount; i++) {
@@ -297,7 +355,9 @@ if (await nextBtn1.count() > 0) {
     console.log(`  Button ${i}: "${text?.trim()}"`);
   }
 
-  const payBtn = page.locator('button:has-text("Complete"), button:has-text("Pay"), button:has-text("Next"), button:has-text("Simulate"), button:has-text("Submit")').first();
+  const payBtn = page.locator(
+    'button:has-text("Complete"), button:has-text("Pay"), button:has-text("Next"), button:has-text("Simulate"), button:has-text("Submit")',
+  ).first();
   if (await payBtn.count() > 0) {
     const payBtnText = await payBtn.textContent();
     console.log(`[${elapsed()}] Clicking "${payBtnText?.trim()}"...`);
@@ -321,15 +381,21 @@ console.log(`\n[${elapsed()}] === Step 7: Get Payment ID ===`);
 let PAYMENT_ID = "";
 let paymentStatus = "";
 for (let attempt = 0; attempt < 10; attempt++) {
-  const paymentsResp = await fetch("https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1", {
-    headers: {
-      "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
+  const paymentsResp = await fetch(
+    "https://connect.squareupsandbox.com/v2/payments?sort_order=DESC&limit=1",
+    {
+      headers: {
+        "Authorization": `Bearer ${SQUARE_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
   const paymentsData = await paymentsResp.json();
   const payment = paymentsData.payments?.[0];
-  if (payment?.status === "COMPLETED" && new Date(payment.created_at).getTime() > startTime) {
+  if (
+    payment?.status === "COMPLETED" &&
+    new Date(payment.created_at).getTime() > startTime
+  ) {
     PAYMENT_ID = payment.id;
     paymentStatus = payment.status;
     break;
@@ -339,11 +405,15 @@ for (let attempt = 0; attempt < 10; attempt++) {
     paymentStatus = payment.status;
     break;
   }
-  console.log(`[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`);
-  await new Promise(r => setTimeout(r, 2000));
+  console.log(
+    `[${elapsed()}] Waiting for new payment... (attempt ${attempt + 1})`,
+  );
+  await new Promise((r) => setTimeout(r, 2000));
 }
 await flow(6, "complete", `ID: ${PAYMENT_ID.slice(0, 8)}`);
-console.log(`[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`);
+console.log(
+  `[${elapsed()}] Payment ID: ${PAYMENT_ID} (status: ${paymentStatus})`,
+);
 
 if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
   console.error("Payment not completed!");
@@ -354,7 +424,9 @@ if (!PAYMENT_ID || paymentStatus !== "COMPLETED") {
 // Step 8: Worker generates TLSNotary proof
 // ============================================================
 await flow(7, "active", "MPC-TLS...");
-console.log(`\n[${elapsed()}] === Step 8: Worker generates TLSNotary proof ===`);
+console.log(
+  `\n[${elapsed()}] === Step 8: Worker generates TLSNotary proof ===`,
+);
 
 const proofFile = `/tmp/e2e-square-${Date.now()}.presentation.tlsn`;
 const proveStart = Date.now();
@@ -362,12 +434,17 @@ const proveStart = Date.now();
 // Prove the specific payment endpoint (Payment ID is now known)
 const proc = spawn([
   "./crates/tlsn-prover/target/release/tlsn-prove",
-  "--verifier", "localhost:7046",
-  "--max-recv-data", "4096",
-  "--max-sent-data", "4096",
-  "-H", `Authorization: Bearer ${SQUARE_ACCESS_TOKEN}`,
+  "--verifier",
+  TLSN_VERIFIER_HOST,
+  "--max-recv-data",
+  "4096",
+  "--max-sent-data",
+  "4096",
+  "-H",
+  `Authorization: Bearer ${SQUARE_ACCESS_TOKEN}`,
   `https://connect.squareupsandbox.com/v2/payments/${PAYMENT_ID}`,
-  "-o", proofFile,
+  "-o",
+  proofFile,
 ], { stdout: "pipe", stderr: "pipe" });
 
 await proc.exited;
@@ -381,8 +458,12 @@ if (proc.exitCode !== 0) {
 }
 
 await flow(7, "complete", `${proveTime}s`);
-console.log(`[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`);
-for (const line of stderr.split("\n").filter(l => l.includes("[tlsn-prove]"))) {
+console.log(
+  `[${elapsed()}] Proof generated in ${proveTime}s (${proofB64.length} chars base64)`,
+);
+for (
+  const line of stderr.split("\n").filter((l) => l.includes("[tlsn-prove]"))
+) {
   console.log(`  ${line}`);
 }
 
@@ -402,7 +483,9 @@ const resultResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/result`, {
 });
 
 const resultData = await resultResp.json();
-console.log(`[${elapsed()}] Verification: ${resultData.ok ? "PASSED" : "FAILED"}`);
+console.log(
+  `[${elapsed()}] Verification: ${resultData.ok ? "PASSED" : "FAILED"}`,
+);
 if (resultData.verification?.checks) {
   for (const c of resultData.verification.checks) console.log(`  ✓ ${c}`);
 }
@@ -415,11 +498,13 @@ if (resultData.preimage) {
   console.log(`  Preimage: ${resultData.preimage.slice(0, 16)}...`);
   console.log(`  → Worker can now redeem HTLC token on Cashu mint`);
 } else {
-  console.log(`[${elapsed()}] preimage: null (verification failed or no preimage store)`);
+  console.log(
+    `[${elapsed()}] preimage: null (verification failed or no preimage store)`,
+  );
 }
 
 // Wait for UIs to show results
-await new Promise(r => setTimeout(r, 3000));
+await new Promise((r) => setTimeout(r, 3000));
 
 // ============================================================
 // Step 10: Verify query status

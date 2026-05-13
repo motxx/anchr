@@ -8,8 +8,8 @@
 
 import {
   createPreimageStore,
-  type PreimageStore,
   type PreimageEntry,
+  type PreimageStore,
 } from "@anchr/core-cashu/preimage-store";
 
 export interface DualPreimageEntry {

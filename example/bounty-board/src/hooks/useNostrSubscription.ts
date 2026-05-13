@@ -1,10 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { SubCloser } from "nostr-tools/pool";
 import type { Event } from "nostr-tools/core";
-import { subscribeToQueries, subscribeToFeedback } from "../nostr/client.ts";
+import { subscribeToFeedback, subscribeToQueries } from "../nostr/client.ts";
 import { useSettingsStore } from "../store/settings.ts";
 
-export function useQuerySubscription(onEvent: (event: Event) => void, enabled = true) {
+export function useQuerySubscription(
+  onEvent: (event: Event) => void,
+  enabled = true,
+) {
   const relayUrls = useSettingsStore((s) => s.relayUrls);
   const subRef = useRef<SubCloser | null>(null);
 

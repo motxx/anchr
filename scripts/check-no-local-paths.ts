@@ -167,4 +167,4 @@ if (import.meta.main) {
   Deno.exit(hits.length === 0 ? 0 : 1);
 }
 
-export { scanText, PATTERNS };
+export { PATTERNS, scanText };

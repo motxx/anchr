@@ -42,12 +42,15 @@ export const realClock: Clock = {
  * an opaque string from a downstream caller's perspective; the prefix is
  * a debugging convenience for log scanning, not a stable contract.
  */
-export function createDefaultIdGenerator(clock: Clock = realClock): IdGenerator {
+export function createDefaultIdGenerator(
+  clock: Clock = realClock,
+): IdGenerator {
   return {
     newQueryId(): string {
       const bytes = new Uint8Array(8);
       crypto.getRandomValues(bytes);
-      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0"))
+        .join("");
       return `query_${clock.now()}_${hex}`;
     },
   };

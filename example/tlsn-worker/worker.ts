@@ -26,7 +26,7 @@
  * ```
  */
 
-import { Anchr, type QueryCondition } from "@anchr/sdk";
+import { Anchr } from "@anchr/sdk";
 import { statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { unlink } from "node:fs/promises";
@@ -71,17 +71,38 @@ type EventHandler = {
   polling: (openCount: number) => void;
 };
 
+interface WorkerClient {
+  listOpenQueries(): Promise<QueryInfo[]>;
+  submitPresentation(
+    queryId: string,
+    presentation: string,
+  ): Promise<{ ok: boolean; message: string }>;
+}
+
+interface AnchrWorkerDeps {
+  anchr?: WorkerClient;
+  generateProof?: (
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ) => Promise<string>;
+}
+
 // --- Worker ---
 
 export class AnchrWorker {
   private config: Required<AnchrWorkerConfig>;
-  private anchr: Anchr;
+  private anchr: WorkerClient;
+  private proofGenerator: (
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ) => Promise<string>;
   private running = false;
   private activeCount = 0;
   private processedIds = new Set<string>();
-  private handlers: Partial<{ [K in keyof EventHandler]: EventHandler[K][] }> = {};
+  private handlers: Partial<{ [K in keyof EventHandler]: EventHandler[K][] }> =
+    {};
 
-  constructor(config: AnchrWorkerConfig) {
+  constructor(config: AnchrWorkerConfig, deps: AnchrWorkerDeps = {}) {
     this.config = {
       serverUrl: config.serverUrl,
       verifierHost: config.verifierHost,
@@ -95,10 +116,11 @@ export class AnchrWorker {
       maxRecvData: config.maxRecvData ?? 4096,
     };
 
-    this.anchr = new Anchr({
+    this.anchr = deps.anchr ?? new Anchr({
       serverUrl: this.config.serverUrl,
       apiKey: this.config.apiKey,
     });
+    this.proofGenerator = deps.generateProof ?? this.runTlsnProve.bind(this);
   }
 
   /** Register an event handler */
@@ -108,7 +130,10 @@ export class AnchrWorker {
     return this;
   }
 
-  private emit<K extends keyof EventHandler>(event: K, ...args: Parameters<EventHandler[K]>): void {
+  private emit<K extends keyof EventHandler>(
+    event: K,
+    ...args: Parameters<EventHandler[K]>
+  ): void {
     for (const handler of (this.handlers[event] ?? []) as EventHandler[K][]) {
       (handler as (...a: Parameters<EventHandler[K]>) => void)(...args);
     }
@@ -119,7 +144,9 @@ export class AnchrWorker {
     if (this.running) return;
     this.running = true;
 
-    console.error(`[anchr-worker] Started (server: ${this.config.serverUrl}, verifier: ${this.config.verifierHost})`);
+    console.error(
+      `[anchr-worker] Started (server: ${this.config.serverUrl}, verifier: ${this.config.verifierHost})`,
+    );
 
     while (this.running) {
       try {
@@ -178,7 +205,10 @@ export class AnchrWorker {
 
     return queries.filter((q) => {
       // Only TLSNotary queries
-      if (!Array.isArray(q.verification_requirements) || !q.verification_requirements.includes("tlsn")) return false;
+      if (
+        !Array.isArray(q.verification_requirements) ||
+        !q.verification_requirements.includes("tlsn")
+      ) return false;
       if (!q.tlsn_requirements?.target_url) return false;
 
       // Bounty filter
@@ -209,10 +239,13 @@ export class AnchrWorker {
     console.error(`[anchr-worker] Fulfilling ${query.id}: ${targetUrl}`);
 
     // 1. Run tlsn-prove to generate presentation
-    const presentationB64 = await this.generateProof(targetUrl);
+    const presentationB64 = await this.proofGenerator(targetUrl);
 
     // 2. Submit to Anchr
-    const result = await this.anchr.submitPresentation(query.id, presentationB64);
+    const result = await this.anchr.submitPresentation(
+      query.id,
+      presentationB64,
+    );
 
     const event: FulfilledEvent = {
       queryId: query.id,
@@ -223,21 +256,28 @@ export class AnchrWorker {
     };
 
     console.error(
-      `[anchr-worker] ${query.id}: ${result.ok ? "APPROVED" : "REJECTED"} (${event.durationMs}ms)`,
+      `[anchr-worker] ${query.id}: ${
+        result.ok ? "APPROVED" : "REJECTED"
+      } (${event.durationMs}ms)`,
     );
 
     this.emit("fulfilled", event);
     return event;
   }
 
-  private async generateProof(targetUrl: string, headers?: Record<string, string>): Promise<string> {
+  private async runTlsnProve(
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ): Promise<string> {
     const tmpFile = `/tmp/anchr-worker-${Date.now()}.presentation.tlsn`;
 
     const args = [
       this.config.proverBin,
-      "--verifier", this.config.verifierHost,
+      "--verifier",
+      this.config.verifierHost,
       targetUrl,
-      "-o", tmpFile,
+      "-o",
+      tmpFile,
     ];
     // Pass custom headers (e.g., Authorization from encrypted_context)
     if (headers) {
@@ -250,8 +290,14 @@ export class AnchrWorker {
     // are not revealed — this is a TLSNotary protocol-level feature, not tampering.
     // Keep in sync with SENSITIVE_HEADER_NAMES in packages/bounty/src/infrastructure/verification/proof-redaction.ts
     const sensitiveHeaders = [
-      "authorization", "cookie", "set-cookie", "x-api-key",
-      "x-auth-token", "proxy-authorization", "x-csrf-token", "x-xsrf-token",
+      "authorization",
+      "cookie",
+      "set-cookie",
+      "x-api-key",
+      "x-auth-token",
+      "proxy-authorization",
+      "x-csrf-token",
+      "x-xsrf-token",
     ];
     if (headers) {
       for (const name of Object.keys(headers)) {
@@ -263,24 +309,39 @@ export class AnchrWorker {
     const socksProxy = Deno.env.get("TLSN_SOCKS_PROXY");
     if (socksProxy) args.push("--socks-proxy", socksProxy);
 
-    const { stdout, stderr, exitCode } = await new Promise<{ stdout: string; stderr: string; exitCode: number }>((resolve, reject) => {
+    const { stdout, stderr, exitCode } = await new Promise<
+      { stdout: string; stderr: string; exitCode: number }
+    >((resolve, reject) => {
       const [cmd, ...rest] = args;
-      execFile(cmd!, rest, { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (err && (err as NodeJS.ErrnoException).code === "ENOENT") {
-          return reject(new Error(`tlsn-prove binary not found: ${cmd}`));
-        }
-        resolve({ stdout: stdout ?? "", stderr: stderr ?? "", exitCode: err?.code ? 1 : 0 });
-      });
+      execFile(
+        cmd!,
+        rest,
+        { maxBuffer: 50 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          if (err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+            return reject(new Error(`tlsn-prove binary not found: ${cmd}`));
+          }
+          resolve({
+            stdout: stdout ?? "",
+            stderr: stderr ?? "",
+            exitCode: err?.code ? 1 : 0,
+          });
+        },
+      );
     });
 
     if (exitCode !== 0) {
-      throw new Error(`tlsn-prove failed (exit ${exitCode}): ${stderr.slice(0, 1000)}`);
+      throw new Error(
+        `tlsn-prove failed (exit ${exitCode}): ${stderr.slice(0, 1000)}`,
+      );
     }
 
     const b64 = stdout.trim();
 
     // Clean up temp file
-    try { await unlink(tmpFile); } catch { /* ignore */ }
+    try {
+      await unlink(tmpFile);
+    } catch { /* ignore */ }
 
     if (!b64 || b64.length < 100) {
       throw new Error("tlsn-prove produced empty or invalid output");
@@ -313,7 +374,7 @@ interface QueryInfo {
   description: string;
   bounty?: { amount_sats: number };
   verification_requirements?: string[];
-  tlsn_requirements?: { target_url: string; conditions?: QueryCondition[] };
+  tlsn_requirements?: { target_url: string; conditions?: unknown[] };
   [key: string]: unknown;
 }
 

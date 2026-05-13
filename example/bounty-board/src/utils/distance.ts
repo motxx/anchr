@@ -8,8 +8,7 @@ export function haversineKm(a: GpsCoord, b: GpsCoord): number {
   const dLon = toRad(b.lon - a.lon);
   const sinLat = Math.sin(dLat / 2);
   const sinLon = Math.sin(dLon / 2);
-  const h =
-    sinLat * sinLat +
+  const h = sinLat * sinLat +
     Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinLon * sinLon;
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }

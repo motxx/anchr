@@ -1,10 +1,17 @@
 import React, { useState } from "react";
 import { View } from "react-native";
-import { DSInput, DSButton, DSSection, DSCard } from "../ds/index.ts";
+import { DSButton, DSCard, DSInput, DSSection } from "../ds/index.ts";
 import { useSettingsStore } from "../../store/settings.ts";
 
 export function SettingsForm() {
-  const { serverUrl, relayUrls, mintUrl, setServerUrl, setRelayUrls, setMintUrl } = useSettingsStore();
+  const {
+    serverUrl,
+    relayUrls,
+    mintUrl,
+    setServerUrl,
+    setRelayUrls,
+    setMintUrl,
+  } = useSettingsStore();
   const [server, setServer] = useState(serverUrl);
   const [relays, setRelays] = useState(relayUrls.join("\n"));
   const [mint, setMint] = useState(mintUrl);

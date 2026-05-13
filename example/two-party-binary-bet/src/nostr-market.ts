@@ -1,5 +1,5 @@
 /**
- * 巫(Kannagi) — Nostr Integration for Two-party binary bet Discovery
+ * Nostr integration for two-party binary bet discovery
  *
  * Markets are published as Nostr events so anyone can discover and
  * participate without a centralized server. Uses kind 30078
@@ -15,13 +15,17 @@
  *   Category filtering via #t=anchr-pm-{category}
  */
 
-import { finalizeEvent, type EventTemplate, type VerifiedEvent } from "nostr-tools/pure";
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools/pure";
 import type {
-  TwoPartyBinaryBet,
-  MarketResolution,
-  MarketEventContent,
   BetEventContent,
+  MarketEventContent,
+  MarketResolution,
   ResolutionEventContent,
+  TwoPartyBinaryBet,
 } from "./market-types.ts";
 
 // --- Constants ---
@@ -35,6 +39,12 @@ export const DEFAULT_RELAYS = [
   "wss://nos.lol",
   "wss://relay.nostr.band",
 ];
+
+const RELAY_CLOSE_GRACE_MS = 250;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // --- Identity ---
 
@@ -126,30 +136,42 @@ export async function publishMarket(
 
   // Publish to each relay
   const publishPromises = relayUrls.map(async (url) => {
+    let ws: WebSocket | null = null;
+    let openTimer: ReturnType<typeof setTimeout> | undefined;
+    let okTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const ws = new WebSocket(url);
+      ws = new WebSocket(url);
+      const socket = ws;
       await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => {
-          ws.send(JSON.stringify(["EVENT", event]));
+        socket.onopen = () => {
+          socket.send(JSON.stringify(["EVENT", event]));
           resolve();
         };
-        ws.onerror = (e) => reject(e);
-        setTimeout(() => reject(new Error("WebSocket timeout")), 5000);
+        socket.onerror = (e) => reject(e);
+        openTimer = setTimeout(
+          () => reject(new Error("WebSocket timeout")),
+          5000,
+        );
       });
+      if (openTimer) clearTimeout(openTimer);
       // Wait for OK response
       await new Promise<void>((resolve) => {
-        ws.onmessage = (msg) => {
+        socket.onmessage = (msg) => {
           const data = JSON.parse(msg.data);
           if (data[0] === "OK" && data[1] === event.id) {
             resolve();
           }
         };
-        setTimeout(resolve, 3000);
+        okTimer = setTimeout(resolve, 3000);
       });
-      ws.close();
       console.log(`  Published to ${url}`);
     } catch (err) {
       console.warn(`  Failed to publish to ${url}: ${err}`);
+    } finally {
+      if (openTimer) clearTimeout(openTimer);
+      if (okTimer) clearTimeout(okTimer);
+      ws?.close();
+      await delay(RELAY_CLOSE_GRACE_MS);
     }
   });
 
@@ -303,29 +325,41 @@ export async function publishResolution(
   const event = buildResolutionEvent(identity, market, resolution);
 
   const publishPromises = relayUrls.map(async (url) => {
+    let ws: WebSocket | null = null;
+    let openTimer: ReturnType<typeof setTimeout> | undefined;
+    let okTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const ws = new WebSocket(url);
+      ws = new WebSocket(url);
+      const socket = ws;
       await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => {
-          ws.send(JSON.stringify(["EVENT", event]));
+        socket.onopen = () => {
+          socket.send(JSON.stringify(["EVENT", event]));
           resolve();
         };
-        ws.onerror = (e) => reject(e);
-        setTimeout(() => reject(new Error("WebSocket timeout")), 5000);
+        socket.onerror = (e) => reject(e);
+        openTimer = setTimeout(
+          () => reject(new Error("WebSocket timeout")),
+          5000,
+        );
       });
+      if (openTimer) clearTimeout(openTimer);
       await new Promise<void>((resolve) => {
-        ws.onmessage = (msg) => {
+        socket.onmessage = (msg) => {
           const data = JSON.parse(msg.data);
           if (data[0] === "OK" && data[1] === event.id) {
             resolve();
           }
         };
-        setTimeout(resolve, 3000);
+        okTimer = setTimeout(resolve, 3000);
       });
-      ws.close();
       console.log(`  Resolution published to ${url}`);
     } catch (err) {
       console.warn(`  Failed to publish to ${url}: ${err}`);
+    } finally {
+      if (openTimer) clearTimeout(openTimer);
+      if (okTimer) clearTimeout(okTimer);
+      ws?.close();
+      await delay(RELAY_CLOSE_GRACE_MS);
     }
   });
 
@@ -344,7 +378,9 @@ export async function publishResolution(
 export async function discoverMarkets(
   relayUrls: string[] = DEFAULT_RELAYS,
   category?: string,
-): Promise<Array<{ eventId: string; pubkey: string; content: MarketEventContent }>> {
+): Promise<
+  Array<{ eventId: string; pubkey: string; content: MarketEventContent }>
+> {
   const markets: Array<{
     eventId: string;
     pubkey: string;
@@ -357,21 +393,24 @@ export async function discoverMarkets(
   }
 
   for (const url of relayUrls) {
+    let ws: WebSocket | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const ws = new WebSocket(url);
+      ws = new WebSocket(url);
+      const socket = ws;
 
       await new Promise<void>((resolve, reject) => {
-        ws.onopen = () => {
+        socket.onopen = () => {
           const filter = {
             kinds: [MARKET_EVENT_KIND],
             "#t": tags,
             limit: 50,
           };
-          ws.send(JSON.stringify(["REQ", "discover", filter]));
+          socket.send(JSON.stringify(["REQ", "discover", filter]));
         };
-        ws.onerror = () => reject();
+        socket.onerror = () => reject();
 
-        ws.onmessage = (msg) => {
+        socket.onmessage = (msg) => {
           const data = JSON.parse(msg.data);
           if (data[0] === "EVENT") {
             try {
@@ -394,13 +433,16 @@ export async function discoverMarkets(
           }
         };
 
-        setTimeout(resolve, 5000);
+        timer = setTimeout(resolve, 5000);
       });
 
-      ws.close();
       break;
     } catch {
       continue;
+    } finally {
+      if (timer) clearTimeout(timer);
+      ws?.close();
+      await delay(RELAY_CLOSE_GRACE_MS);
     }
   }
 

@@ -87,7 +87,10 @@ test("catches the original bun:test scenario", () => {
 });
 
 test("catches 'the original implementation'", () => {
-  const hits = scanText("// the original implementation polled every 5s", "x.ts");
+  const hits = scanText(
+    "// the original implementation polled every 5s",
+    "x.ts",
+  );
   expect(hits.length).toBe(1);
 });
 
@@ -107,7 +110,10 @@ test("does NOT flag 'was deleted' in test-scenario context", () => {
 });
 
 test("does NOT flag 'previously' inside a string literal", () => {
-  const hits = scanText('const msg = "previously authenticated"; // ok', "x.ts");
+  const hits = scanText(
+    'const msg = "previously authenticated"; // ok',
+    "x.ts",
+  );
   expect(hits.length).toBe(0);
 });
 

@@ -9,11 +9,26 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events/events.ts";
-import { type EscrowType, type VerificationFactor, VERIFICATION_FACTORS } from "../../domain/types.ts";
-import { isRecord, optionalNumber, optionalString, requireNumber, requireString } from "../lib/runtime-types.ts";
+import {
+  type EscrowType,
+  VERIFICATION_FACTORS,
+  type VerificationFactor,
+} from "../../domain/types.ts";
+import {
+  isRecord,
+  optionalNumber,
+  optionalString,
+  requireNumber,
+  requireString,
+} from "../lib/runtime-types.ts";
 
 const VERIFICATION_FACTOR_VALUES = new Set<string>(VERIFICATION_FACTORS);
 const ESCROW_TYPE_VALUES = new Set<string>(["htlc", "p2pk_frost"]);
+const RELAY_CLOSE_GRACE_MS = 250;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function isVerificationFactor(x: unknown): x is VerificationFactor {
   return typeof x === "string" && VERIFICATION_FACTOR_VALUES.has(x);
@@ -54,7 +69,9 @@ export interface OracleAnnouncement {
  * Parse a kind 30088 Nostr event into an OracleAnnouncement.
  * Returns null if the event content is malformed.
  */
-export function parseOracleAnnouncementEvent(event: Event): OracleAnnouncement | null {
+export function parseOracleAnnouncementEvent(
+  event: Event,
+): OracleAnnouncement | null {
   // Extract oracle id from the `d` tag
   const dTag = event.tags.find((t) => t[0] === "d");
   if (!dTag || !dTag[1]) return null;
@@ -133,5 +150,6 @@ export async function discoverOracles(
     return announcements;
   } finally {
     pool.close(relayUrls);
+    await delay(RELAY_CLOSE_GRACE_MS);
   }
 }

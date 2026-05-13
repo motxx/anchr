@@ -59,7 +59,13 @@ export interface VerificationDetail {
   tlsn_verified?: TlsnVerifiedData;
 }
 
-export type VerificationFactor = "nonce" | "gps" | "timestamp" | "oracle" | "ai_check" | "tlsn";
+export type VerificationFactor =
+  | "nonce"
+  | "gps"
+  | "timestamp"
+  | "oracle"
+  | "ai_check"
+  | "tlsn";
 
 export interface TlsnCondition {
   type: "contains" | "regex" | "jsonpath";

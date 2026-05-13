@@ -14,7 +14,11 @@ import type {
   QueryHooks,
   SubmitQueryOutcome,
 } from "./query-service.ts";
-import { ServiceDeps, identityNormalize, resolveTtlMs } from "./query-service-deps.ts";
+import {
+  identityNormalize,
+  resolveTtlMs,
+  ServiceDeps,
+} from "./query-service-deps.ts";
 import { verifyAndFinalize } from "./verification-orchestration.ts";
 
 export function doCreateQuery(
@@ -52,35 +56,63 @@ export async function doSubmitQueryResult(
   const { store } = deps;
   const query = store.get(id);
   if (!query) return { ok: false, query: null, message: "Query not found" };
-  if (query.status !== "pending") return { ok: false, query, message: `Query is ${query.status}, not pending` };
+  if (query.status !== "pending") {
+    return {
+      ok: false,
+      query,
+      message: `Query is ${query.status}, not pending`,
+    };
+  }
   if (query.expires_at < Date.now()) {
     store.set(id, { ...query, status: "expired", payment_status: "cancelled" });
     return { ok: false, query, message: "Query has expired" };
   }
 
   const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
-  const { passed, attestations, verification, updated } = await verifyAndFinalize(
-    query, normalizedResult, deps, blossomKeys, oracleId,
-  );
+  const { passed, attestations, verification, updated } =
+    await verifyAndFinalize(
+      query,
+      normalizedResult,
+      deps,
+      blossomKeys,
+      oracleId,
+    );
 
   if (!passed && attestations.length === 0) {
-    return { ok: false, query, message: verification.failures[0] ?? "No oracle available" };
+    return {
+      ok: false,
+      query,
+      message: verification.failures[0] ?? "No oracle available",
+    };
   }
 
-  const final: Query = { ...updated, submitted_at: Date.now(), result: normalizedResult, submission_meta: submissionMeta, blossom_keys: blossomKeys };
+  const final: Query = {
+    ...updated,
+    submitted_at: Date.now(),
+    result: normalizedResult,
+    submission_meta: submissionMeta,
+    blossom_keys: blossomKeys,
+  };
   store.set(id, final);
 
   return {
     ok: passed,
     query: final,
-    message: passed ? "Verification passed. Result accepted." : `Verification failed: ${verification.failures.join(", ")}`,
+    message: passed
+      ? "Verification passed. Result accepted."
+      : `Verification failed: ${verification.failures.join(", ")}`,
   };
 }
 
-export function doCancelQuery(store: QueryStore, id: string): CancelQueryOutcome {
+export function doCancelQuery(
+  store: QueryStore,
+  id: string,
+): CancelQueryOutcome {
   const query = store.get(id);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isCancellable(query.status)) return { ok: false, message: `Query is already ${query.status}` };
+  if (!isCancellable(query.status)) {
+    return { ok: false, message: `Query is already ${query.status}` };
+  }
   store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });
   return { ok: true, message: "Query cancelled" };
 }
@@ -90,7 +122,11 @@ export function doExpireQueries(store: QueryStore): number {
   let count = 0;
   for (const query of store.values()) {
     if (isExpirable(query.status) && query.expires_at < now) {
-      store.set(query.id, { ...query, status: "expired", payment_status: "cancelled" });
+      store.set(query.id, {
+        ...query,
+        status: "expired",
+        payment_status: "cancelled",
+      });
       count++;
     }
   }

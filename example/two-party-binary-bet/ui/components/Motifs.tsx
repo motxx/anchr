@@ -6,8 +6,7 @@ interface IconProps {
 }
 
 /**
- * Stylized torii (鳥居) — the shrine gate that anchors Kannagi's
- * brand mark. Two horizontal beams (kasagi + nuki) on two pillars.
+ * Compact app mark. Two horizontal beams on two pillars.
  */
 export function ToriiIcon({ className, size = 18 }: IconProps) {
   return (
