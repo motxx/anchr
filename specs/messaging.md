@@ -6,6 +6,11 @@ Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending
 Machine (DVM) pattern. This spec defines the event kinds, payloads, and
 lifecycle for Customer, Provider, and Oracle actors.
 
+The role-neutral lifecycle, state transitions, preflight ticket, and redeem
+rules are defined in
+[`protocol-contract.md`](protocol-contract.md). This document specifies their
+Nostr event encoding.
+
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
 schema URL in an `s` tag for discovery, and encrypted payloads carry the same
@@ -113,24 +118,12 @@ purposes.
 ## Provider Preflight
 
 Before irreversible work, the Provider verifies the selected escrow and records
-an immutable preflight ticket. The preflight report is structured:
-
-| Field      | Description                                                        |
-| ---------- | ------------------------------------------------------------------ |
-| `ok`       | Whether the Provider may start work                                |
-| `errors`   | Hard failures that prevent `produce()`                             |
-| `warnings` | Non-fatal risks to record before proceeding                        |
-| `details`  | Parsed escrow facts used to build the ticket and explain decisions |
-
-The ticket binds the work decision to concrete escrow facts: `query_id`,
-original request event id, expected Oracle pubkey or FROST group key, Provider
-pubkey, mint URL, payment hash, token fingerprint, accepted amount, quote
-amount, locktime, and Provider policy version. If the ticket cannot be created,
-the Provider declines selection and does not call `produce()`.
-
-Provider policy is closed at preflight. After the Provider starts work, later
-policy changes can affect future quotes and audit outcomes, but they must not
-block redeem of the accepted token.
+the immutable preflight ticket required by
+[`protocol-contract.md#provider-preflight`](protocol-contract.md#provider-preflight).
+For this Nostr profile, the original request reference is the kind 5300 event
+id, the expected authority is the Oracle pubkey or FROST group key referenced by
+the encrypted request and selection payloads, and the selected offer reference
+is the kind 7000 `status=payment-required` event id when available.
 
 ## Proof Submission (kind 6300)
 
@@ -182,7 +175,9 @@ direct messages between specific pubkeys.
 
 ## Release Material and Redeem Gate
 
-Oracle release material is not just a bare preimage. A release message binds:
+Oracle release material follows
+[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
+For this Nostr profile, a release message binds:
 
 | Field                 | Description                                                  |
 | --------------------- | ------------------------------------------------------------ |
@@ -195,23 +190,11 @@ Oracle release material is not just a bare preimage. A release message binds:
 | `preimage`            | HTLC preimage, when the payment profile uses NUT-14 hashlock |
 | `signature`           | Oracle or FROST signature over the release fields            |
 
-Provider-side settlement has three separate decisions:
-
-- Mint-level redeem checks token spendability: matching preimage, Provider
-  pubkey lock, Provider signature, and mint acceptance.
-- Clean settlement checks expected authority and release signature binding.
-- Audit / reputation records mismatched source, signature, `query_id`,
-  `request_event_id`, reply thread, or other correlation anomalies.
-
-Correlation mismatches are not redeem hard failures by themselves. If release
-material is not a clean valid release but still unlocks the Provider's current
-bound token, the Provider should attempt economic redeem and record the anomaly.
-If the preimage does not match the token hashlock, the token is not locked to
-the Provider, or the Provider cannot sign, redeem fails.
-
-Oracle release is driven by proof validity and the expected release authority. A
-host, coordinator, or Customer cancel observed after proof verification must not
-suppress release material for valid completed work.
+Correlation mismatches are audit inputs, not redeem hard failures by
+themselves. If release material is not clean but still unlocks the Provider's
+current bound token, the Provider should attempt economic redeem and record the
+anomaly. If the preimage does not match the token hashlock, the token is not
+locked to the Provider, or the Provider cannot sign, redeem fails.
 
 ## Preimage Delivery Reliability
 

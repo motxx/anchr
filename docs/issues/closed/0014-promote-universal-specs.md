@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-13
 
 ## Priority
 
@@ -32,3 +33,26 @@ component agnostic 化で残る普遍的な protocol、message、state transitio
 - Provider preflight、preflight ticket、token spendability redeem gate、clean settlement、audit-only correlation fields の universal contract を #0008 から抽出して仕様化する。
 - reference implementation が spec のどの節を実装しているかを追跡できるリンクまたはテスト名の方針を決める。
 - 具体 adapter/plugin の仕様は、universal spec とは別に implementation profile として記録する。
+
+## Resolution
+
+Implemented by updating:
+
+- `specs/protocol-contract.md`
+- `specs/README.md`
+- `specs/messaging.md`
+- `docs/architecture.md`
+
+Verified with:
+
+- `deno task lint:strict`
+- `check-silent-bypass` scope check: no in-scope TypeScript implementation files
+  were changed.
+
+Harness update:
+
+- Universal protocol placement is now locked in `specs/protocol-contract.md` and referenced from `specs/README.md`; no deterministic lint was added because this is a one-time `human universal decision` about where future normative text belongs.
+
+Follow-up:
+
+- None

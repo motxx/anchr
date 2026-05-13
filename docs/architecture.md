@@ -163,8 +163,9 @@ encrypted-store primitive ships in `packages/blossom/`.
 
 ## Specs and threat model
 
-- Wire-format specs (Nostr DVM messaging, conditional-swap primitive, oracle
-  registry) live under [`specs/`](../specs/), CC0. Anyone may implement them.
+- Universal protocol and wire-format specs (role-neutral lifecycle, Nostr DVM
+  messaging, conditional-swap primitive, oracle registry, and proof schema URL
+  identity) live under [`specs/`](../specs/), CC0. Anyone may implement them.
 - Per-package implementation guides are each package's `SPEC.md`.
 - Threat-model invariants and the attack tests pinning them are in
   [`docs/threat-model.md`](threat-model.md).
