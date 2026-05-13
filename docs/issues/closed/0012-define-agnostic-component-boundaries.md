@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-13
 
 ## Priority
 
@@ -31,3 +32,28 @@ Anchr は実験的な技術採用が多く、個別技術に問題があれば�
 - 既存 component を棚卸しし、各 component の不変な責務、入力、出力、失敗条件を具体技術抜きで記述する。
 - `docs/architecture.md` に、component と adapter/plugin の境界を追加する。
 - 具体技術名が domain API、package boundary、spec vocabulary に入り込んでいる箇所を特定し、置き換え方針を決める。
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+
+The architecture guide now records agnostic component boundaries for actor
+coordination, evidence contracts, verification decisions, settlement locks,
+release authority, attachment transport, local actor state, and runtime
+adapters. Each boundary lists stable responsibility, inputs, outputs, failure
+conditions, and current bindings. Placement of rules derived from the table
+defers to `docs/universality-boundaries.md` (universal vs. adapter) and the
+existing Naming migration section (actor names), so the architecture entry
+stays focused on component contracts.
+
+Verified with:
+
+- `deno task lint:strict`
+- `deno task test:all`
+- `deno task test:all:docker`
+
+Follow-up:
+
+- None
