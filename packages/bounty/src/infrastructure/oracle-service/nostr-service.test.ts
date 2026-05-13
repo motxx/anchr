@@ -102,6 +102,45 @@ describe("verifyAndDeliver", () => {
     expect(store.has(hash)).toBe(false);
   });
 
+  test("returns false and retains preimage when delivery fails", async () => {
+    const store = createPreimageStore();
+    const config = makeConfig({
+      deliveryRetryDelaysMs: [0, 0],
+      preimageStore: store,
+    });
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateHash("q-delivery-fail");
+
+    _setPublishEventForTest(async () => ({
+      successes: [],
+      failures: ["relay1"],
+    }));
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    const query = {
+      id: "q-delivery-fail",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    const passed = await service.verifyAndDeliver(
+      "q-delivery-fail",
+      query,
+      { attachments: [] },
+      workerPubkey,
+    );
+    expect(passed).toBe(false);
+    expect(store.has(hash)).toBe(true);
+  });
+
   test("publishes rejection DM on verification fail", async () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });

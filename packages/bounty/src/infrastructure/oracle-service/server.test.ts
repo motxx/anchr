@@ -107,98 +107,18 @@ describe("oracle-server HTLC endpoints", () => {
     await res.body?.cancel();
   });
 
-  // --- POST /preimage (gated by verification) ---
-
-  test("POST /preimage rejects before verification", async () => {
-    const hashRes = await app.request("/hash", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: "q-preimage-gate" }),
-    });
-    await hashRes.json();
-
+  test("POST /preimage is not exposed as an HTTP fallback", async () => {
     const res = await app.request("/preimage", {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ query_id: "q-preimage-gate" }),
+      body: JSON.stringify({ query_id: "q-no-http-preimage" }),
     });
-    expect(res.status).toBe(403);
-    const body = await res.json();
-    expect(body.error).toContain("Verification has not passed");
+    expect(res.status).toBe(404);
+    await res.body?.cancel();
   });
 
-  test("POST /preimage returns preimage after verification passes", async () => {
-    const qid = "q-preimage-ok";
-
-    const hashRes = await app.request("/hash", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    await hashRes.json();
-
-    const query = makeQuery(qid);
-    const result: QueryResult = { attachments: [], notes: "test" };
-    const verifyRes = await app.request("/verify", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query, result }),
-    });
-    const attestation = await verifyRes.json();
-    expect(attestation.passed).toBe(true);
-
-    const res = await app.request("/preimage", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.query_id).toBe(qid);
-    expect(typeof body.preimage).toBe("string");
-    expect(body.preimage.length).toBeGreaterThan(0);
-  });
-
-  test("POST /preimage returns 404 on second request (preimage deleted after delivery)", async () => {
-    const qid = "q-preimage-once";
-
-    const hashRes = await app.request("/hash", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    await hashRes.json();
-
-    const query = makeQuery(qid);
-    const result: QueryResult = { attachments: [], notes: "test" };
-    const verifyRes = await app.request("/verify", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query, result }),
-    });
-    const attestation = await verifyRes.json();
-    expect(attestation.passed).toBe(true);
-
-    const res1 = await app.request("/preimage", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    expect(res1.status).toBe(200);
-    const body1 = await res1.json();
-    expect(typeof body1.preimage).toBe("string");
-
-    const res2 = await app.request("/preimage", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    expect(res2.status).toBe(403);
-    await res2.body?.cancel();
-  });
-
-  test("GET /hash/:queryId returns 404 after preimage delivery", async () => {
-    const qid = "q-hash-gone";
+  test("GET /hash/:queryId remains available after verification", async () => {
+    const qid = "q-hash-after-verify";
 
     const hashRes = await app.request("/hash", {
       method: "POST",
@@ -218,29 +138,12 @@ describe("oracle-server HTLC endpoints", () => {
     const attestation = await verifyRes.json();
     expect(attestation.passed).toBe(true);
 
-    const preRes = await app.request("/preimage", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ query_id: qid }),
-    });
-    expect(preRes.status).toBe(200);
-    await preRes.json();
-
     const getRes = await app.request(`/hash/${qid}`, {
       headers: { "authorization": `Bearer ${API_KEY}` },
     });
-    expect(getRes.status).toBe(404);
-    await getRes.body?.cancel();
-  });
-
-  test("POST /preimage rejects missing query_id", async () => {
-    const res = await app.request("/preimage", {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({}),
-    });
-    expect(res.status).toBe(400);
-    await res.body?.cancel();
+    expect(getRes.status).toBe(200);
+    const body = await getRes.json();
+    expect(body.hash).toBe(created.hash);
   });
 
   // --- X-API-Key header ---
