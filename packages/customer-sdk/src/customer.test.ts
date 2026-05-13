@@ -12,12 +12,15 @@ import {
   selectCheapestQuote,
   validateCustomerOptions,
 } from "./customer.ts";
-import { buildQueryResponseEvent, buildQuoteFeedbackEvent } from "./events.ts";
-import { generateKeypair } from "./nostr.ts";
+import {
+  buildQueryResponseEvent,
+  buildQuoteFeedbackEvent,
+} from "@anchr/protocol/events";
+import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
 import { CashuMintError } from "./cashu.ts";
-import { InvalidSchemaUriError } from "./schema.ts";
-import type { OracleClient } from "./oracle.ts";
+import { InvalidSchemaUriError } from "@anchr/protocol/schema";
+import type { OracleClient } from "@anchr/oracle-sdk/oracle";
 import type {
   BindProviderParams,
   BuildHtlcLockParams,
@@ -26,8 +29,8 @@ import type {
   RedeemHtlcParams,
   RedeemResult,
 } from "./cashu.ts";
+import type { Event } from "@anchr/protocol/nostr";
 import type {
-  Event,
   Filter,
   PublishResult,
   RelayClient,

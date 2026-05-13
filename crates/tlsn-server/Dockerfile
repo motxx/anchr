@@ -2,8 +2,9 @@ FROM rust:1-bookworm@sha256:503651ea31e66ecb74623beabde781059a5978df1595a9e8ed03
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY Cargo.toml ./
+COPY Cargo.lock ./
 COPY src/ src/
-RUN cargo build --release --bin tlsn-server
+RUN cargo build --locked --release --bin tlsn-server
 
 FROM debian:bookworm-slim@sha256:67b30a61dc87758f0caf819646104f29ecbda97d920aaf5edc834128ac8493d3
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tor && rm -rf /var/lib/apt/lists/*

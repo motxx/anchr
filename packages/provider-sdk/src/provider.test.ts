@@ -11,15 +11,17 @@ import {
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
-} from "./events.ts";
+} from "@anchr/protocol/events";
 import {
   decryptNip44,
   type Event,
-  type Filter,
   generateKeypair,
-  type PublishResult,
-  type RelayClient,
-  type Subscription,
+} from "@anchr/protocol/nostr";
+import type {
+  Filter,
+  PublishResult,
+  RelayClient,
+  Subscription,
 } from "./nostr.ts";
 import type {
   CashuClient,
@@ -28,7 +30,7 @@ import type {
   RedeemResult,
 } from "./cashu.ts";
 import { bytesToHex } from "./test-helpers.ts";
-import { DEFINED_SCHEMAS } from "./schema.ts";
+import { DEFINED_SCHEMAS } from "@anchr/protocol/schema";
 import type { ProofGenerator, ProviderOptions } from "./types.ts";
 
 // --- Test doubles ---

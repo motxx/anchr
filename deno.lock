@@ -2760,10 +2760,25 @@
           "jsr:@logtape/logtape@2"
         ]
       },
+      "packages/customer-sdk": {
+        "dependencies": [
+          "jsr:@noble/hashes@2",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1",
+          "npm:@cashu/cashu-ts@3",
+          "npm:nostr-tools@2"
+        ]
+      },
       "packages/frost-oracle": {
         "dependencies": [
           "jsr:@hono/hono@4",
           "jsr:@logtape/logtape@2",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1"
+        ]
+      },
+      "packages/oracle-sdk": {
+        "dependencies": [
           "jsr:@std/expect@1",
           "jsr:@std/testing@1"
         ]
@@ -2775,6 +2790,22 @@
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
           "npm:@anthropic-ai/sdk@0.78"
+        ]
+      },
+      "packages/protocol": {
+        "dependencies": [
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1",
+          "npm:nostr-tools@2"
+        ]
+      },
+      "packages/provider-sdk": {
+        "dependencies": [
+          "jsr:@noble/hashes@2",
+          "jsr:@std/expect@1",
+          "jsr:@std/testing@1",
+          "npm:@cashu/cashu-ts@3",
+          "npm:nostr-tools@2"
         ]
       },
       "packages/sdk": {

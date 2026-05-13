@@ -43,7 +43,7 @@ export {
   SchemaVerificationError,
   selectCheapestQuote,
   validateCustomerOptions,
-} from "./customer.ts";
+} from "@anchr/customer-sdk/customer";
 
 export {
   buildPreimageDeliveryEvent,
@@ -63,7 +63,7 @@ export {
   type QueryResponsePayload,
   type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
-} from "./events.ts";
+} from "@anchr/protocol/events";
 
 export {
   createProvider,
@@ -73,7 +73,7 @@ export {
   ProviderConfigError,
   shouldQuote,
   validateProviderOptions,
-} from "./provider.ts";
+} from "@anchr/provider-sdk/provider";
 
 export {
   DEFINED_SCHEMAS,
@@ -84,32 +84,34 @@ export {
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
-} from "./schema.ts";
+} from "@anchr/protocol/schema";
 
 export type {
-  CustomerOptions,
   Payment,
   ProofGenerator,
   ProviderHandler,
-  ProviderOptions,
   ProviderQuote,
   ProviderRequestEvent,
   Quote,
-  QuoteSelector,
-  RequestOptions,
   RequestResult,
   SchemaProducer,
   SchemaProducerContext,
   SchemaVerifier,
   Spec,
   VerifierAdapter,
-} from "./types.ts";
+} from "@anchr/protocol/types";
+
+export type {
+  CustomerOptions,
+  QuoteSelector,
+  RequestOptions,
+} from "@anchr/customer-sdk/types";
+
+export type { ProviderOptions } from "@anchr/provider-sdk/types";
 
 export {
-  createRelayClient,
   decryptNip44,
   encryptNip44,
-  type Filter,
   findAllTagValues,
   findTagValue,
   generateKeypair,
@@ -120,12 +122,16 @@ export {
   KIND_QUERY_RESPONSE,
   normalizePubkey,
   normalizeSecretKey,
-  publishOnce,
+  signEvent,
+} from "@anchr/protocol/nostr";
+
+export {
+  createRelayClient,
+  type Filter,
   type PublishResult,
   type RelayClient,
-  signEvent,
   type Subscription,
-} from "./nostr.ts";
+} from "@anchr/customer-sdk/nostr";
 
 export {
   createHttpOracleClient,
@@ -133,7 +139,7 @@ export {
   type OracleClient,
   OracleHttpError,
   OracleResponseError,
-} from "./oracle.ts";
+} from "@anchr/oracle-sdk/oracle";
 
 export {
   type BindProviderParams,
@@ -151,4 +157,4 @@ export {
   type RedeemResult,
   validateHashHex,
   validateLocktime,
-} from "./cashu.ts";
+} from "@anchr/customer-sdk/cashu";

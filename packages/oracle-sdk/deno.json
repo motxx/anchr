@@ -1,0 +1,30 @@
+{
+  "name": "@anchr/oracle-sdk",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/mod.ts",
+    "./oracle": "./src/oracle.ts"
+  },
+  "imports": {
+    "@std/expect": "jsr:@std/expect@^1",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd"
+  },
+  "publish": {
+    "include": [
+      "src/mod.ts",
+      "src/oracle.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/*.test.ts"
+    ]
+  },
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "strict": true
+  },
+  "tasks": {
+    "test": "deno test src/"
+  }
+}

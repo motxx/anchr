@@ -1,6 +1,7 @@
 # bounty を SDK に分割する
 
 Created: 2026-05-09 Model: Codex GPT-5
+Completed: 2026-05-13
 
 ## Priority
 
@@ -52,3 +53,28 @@ actor SDK 側に置き、protocol package から adapter や host runtime に依
   wire/domain 互換名として扱い、新 SDK API では Customer/Provider の名前を使う。
 - `@anchr/protocol` に versioned replacements を導入した後は、requester/worker
   語彙を alias として残さず、wire/domain からも削除する。
+
+## Resolution
+
+Implemented the SDK package split:
+
+- Added `@anchr/protocol` for pure event, Nostr crypto/key helper, schema, and role-neutral type contracts.
+- Added `@anchr/customer-sdk`, `@anchr/provider-sdk`, and `@anchr/oracle-sdk` for actor-owned ports and flows.
+- Kept `@anchr/sdk` as an aggregate compatibility surface that re-exports the actor SDKs and protocol helpers alongside the existing HTTP client.
+- Updated workspace imports, package publish manifests, architecture docs, architecture lint package graph, and regtest E2E imports.
+- Fixed the TLSN verifier Docker build to use the checked-in `Cargo.lock` and align `async-tungstenite` with `ws_stream_tungstenite`.
+
+Verification:
+
+- `deno check packages/protocol/src/mod.ts packages/customer-sdk/src/mod.ts packages/provider-sdk/src/mod.ts packages/oracle-sdk/src/mod.ts packages/sdk/src/index.ts`
+- `deno test packages/protocol/src packages/oracle-sdk/src packages/customer-sdk/src packages/provider-sdk/src packages/sdk/src/index.test.ts --allow-env --allow-read --allow-net`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `deno task test:all`
+- `cargo check` in `crates/tlsn-server`
+- `deno task test:all:docker`
+- `deno task publish:dry-run`
+- `check-silent-bypass`: no silent-bypass patterns detected in the edited package implementation files.
+- `security-max-audit`: no Critical or Warning findings for the SDK split and dependency alignment diff.
+
+Residuals: none.

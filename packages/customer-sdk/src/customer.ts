@@ -17,15 +17,17 @@ import {
   InvalidSchemaUriError,
   isSchemaUri,
   resolveVerifierAdapter,
-} from "./schema.ts";
+} from "@anchr/protocol/schema";
 import {
   createRelayClient,
-  type Event as NostrEvent,
-  generateKeypair,
-  type Keypair,
   type PublishResult,
   type RelayClient,
 } from "./nostr.ts";
+import {
+  type Event as NostrEvent,
+  generateKeypair,
+  type Keypair,
+} from "@anchr/protocol/nostr";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -33,7 +35,7 @@ import {
   parseQuoteFeedbackEvent,
   type QueryRequestPayload,
   type SelectionFeedbackPayload,
-} from "./events.ts";
+} from "@anchr/protocol/events";
 
 /**
  * Default quote-window in milliseconds. The SDK waits this long for
