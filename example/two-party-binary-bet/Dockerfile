@@ -35,6 +35,10 @@ COPY packages/photo-verification/deno.json ./packages/photo-verification/
 COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
 COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
 COPY packages/blossom/deno.json ./packages/blossom/
+COPY packages/protocol/deno.json ./packages/protocol/
+COPY packages/oracle-sdk/deno.json ./packages/oracle-sdk/
+COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
+COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
 COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
