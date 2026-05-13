@@ -36,7 +36,7 @@ only after the work is implemented and verified.
    expected for the affected scope. Do not call the issue fully resolved if
    required checks are failing or skipped without a clear blocker.
 9. Classify the finding using the maintenance loop in
-   [`docs/review-harness.md`](../docs/review-harness.md#maintenance-loop) and
+   [`docs/review-harness.md`](../../docs/review-harness.md#maintenance-loop) and
    decide whether the change adds a test, lint, skill, threat-model entry,
    universality-boundary entry, spec edit, or none of those. If no harness
    update is needed, prepare a short rationale for the resolution note.
