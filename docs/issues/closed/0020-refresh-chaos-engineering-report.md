@@ -40,7 +40,7 @@ Some findings appear to have been fixed already. For example, the report says `v
 
 Implemented by updating:
 
-- `docs/chaos-engineering-report.md`
+- `docs/archive/chaos-engineering-report-2026-04-06.md`
 - `docs/resilience-checklist.md`
 
 Verified with:

@@ -10,7 +10,7 @@
 > Customer/Provider/Oracle vocabulary, `packages/bounty/src/...` layout, or
 > resolved resilience fixes. Treat paths, code snippets, and recommendations
 > below as historical context, not current implementation guidance. Use
-> [`docs/resilience-checklist.md`](resilience-checklist.md) for the current
+> [`docs/resilience-checklist.md`](../resilience-checklist.md) for the current
 > resilience review entry point.
 
 ---
@@ -1484,4 +1484,4 @@ export async function withChaos<T>(
 ---
 
 **文書の管理:**
-このレポートは `docs/chaos-engineering-report.md` として管理する。実験実施後は結果と学びを「実験ログ」セクションとして追記すること。
+このレポートは `docs/archive/chaos-engineering-report-2026-04-06.md` として保管する。現在のレジリエンスレビューは `docs/resilience-checklist.md` を入口にすること。
