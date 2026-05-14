@@ -13,10 +13,7 @@ export async function writeFile(
   if (typeof data === "string") {
     await Deno.writeTextFile(path, data);
   } else {
-    await Deno.writeFile(
-      path,
-      data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer),
-    );
+    await Deno.writeFile(path, toUint8Array(data));
   }
 }
 
@@ -38,5 +35,15 @@ export async function readFileAsArrayBuffer(
   path: string,
 ): Promise<ArrayBuffer> {
   const data = await Deno.readFile(path);
-  return data.buffer as ArrayBuffer;
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  return copy.buffer;
+}
+
+function toUint8Array(data: Uint8Array | BufferSource): Uint8Array {
+  if (data instanceof Uint8Array) return data;
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+  return new Uint8Array(data);
 }

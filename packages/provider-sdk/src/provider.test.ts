@@ -32,6 +32,7 @@ import type {
 import { bytesToHex } from "./test-helpers.ts";
 import { DEFINED_SCHEMAS } from "@anchr/protocol/schema";
 import type { ProofGenerator, ProviderOptions } from "./types.ts";
+import { createMemoryStateStore } from "./storage.ts";
 
 // --- Test doubles ---
 
@@ -132,6 +133,15 @@ test("validateProviderOptions rejects missing relayClient adapter", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.relayClient;
   expect(() => validateProviderOptions(opts)).toThrow(ProviderConfigError);
+});
+
+test("validateProviderOptions rejects malformed stateStore adapter", () => {
+  expect(() =>
+    validateProviderOptions({
+      ...validOptions(),
+      stateStore: { set: () => Promise.resolve() },
+    })
+  ).toThrow(ProviderConfigError);
 });
 
 test("validateProviderOptions accepts proof generator adapters", () => {
@@ -595,6 +605,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   let onSelectionEvent: ((e: Event) => void) | null = null;
   let onPreimageEvent: ((e: Event) => void) | null = null;
   const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
+  const stateStore = createMemoryStateStore();
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
@@ -622,6 +633,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     oracles: [oracleKey.publicKey],
     relayClient,
     cashuClient,
+    stateStore,
     selectionTimeoutMs: 200,
     preimageTimeoutMs: 200,
   });
@@ -690,6 +702,14 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   expect(redeemRecorder.params.providerSecretKey).toEqual(
     providerKey.secretKey,
   );
+
+  const stored = await stateStore.get(`provider:${requestEvent.id}`);
+  expect(stored).not.toBe(null);
+  if (stored === null) throw new Error("provider state was not stored");
+  const parsed = JSON.parse(stored) as Record<string, unknown>;
+  expect(parsed.status).toBe("redeemed");
+  expect(parsed.queryId).toBe("q-redeem");
+  expect(parsed.responseEventId).toBe(published[1].id);
 });
 
 test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {

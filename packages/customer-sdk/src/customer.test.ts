@@ -36,6 +36,7 @@ import type {
   RelayClient,
   Subscription,
 } from "./nostr.ts";
+import { createMemoryStateStore } from "./storage.ts";
 import type { CustomerOptions, Quote } from "./types.ts";
 
 const ORACLE_A = "a".repeat(64);
@@ -152,6 +153,15 @@ test("validateCustomerOptions rejects missing relayClient adapter", () => {
   const opts: Record<string, unknown> = { ...validOptions() };
   delete opts.relayClient;
   expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
+});
+
+test("validateCustomerOptions rejects malformed stateStore adapter", () => {
+  expect(() =>
+    validateCustomerOptions({
+      ...validOptions(),
+      stateStore: { get: () => Promise.resolve(null) },
+    })
+  ).toThrow(CustomerConfigError);
 });
 
 test("validateCustomerOptions rejects a non-object input", () => {
@@ -356,6 +366,14 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
+  const queryIdRef: { value: string | null } = { value: null };
+  const oracleClient = makeOracleClient({
+    requestHash: async (queryId: string) => {
+      queryIdRef.value = queryId;
+      return { hash: HASH_HEX, oraclePubkey: ORACLE_A };
+    },
+  });
+  const stateStore = createMemoryStateStore();
 
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
@@ -394,7 +412,9 @@ test("Customer.request happy path: returns the verified data + proof from a prov
 
   const customer = createCustomer({
     ...validOptions(),
+    oracleClient,
     relayClient,
+    stateStore,
     quoteWindowMs: 30,
     resultTimeoutMs: 1000,
   });
@@ -412,6 +432,15 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   expect(result.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(result.data).toEqual({ hello: "world" });
   expect(result.proof).toBe("base64proofbytes==");
+
+  if (queryIdRef.value === null) throw new Error("query id was not recorded");
+  const stored = await stateStore.get(`customer:${queryIdRef.value}`);
+  expect(stored).not.toBe(null);
+  if (stored === null) throw new Error("customer state was not stored");
+  const parsed = JSON.parse(stored) as Record<string, unknown>;
+  expect(parsed.status).toBe("result_received");
+  expect(parsed.providerPubkey).toBe(provider.publicKey);
+  expect(parsed.requestEventId).toBe(requestEventId.id);
 });
 
 test("Customer.request runs verifierAdapters when provided", async () => {

@@ -6,6 +6,7 @@
     "./cashu": "./src/cashu.ts",
     "./customer": "./src/customer.ts",
     "./nostr": "./src/nostr.ts",
+    "./storage": "./src/storage.ts",
     "./types": "./src/types.ts"
   },
   "imports": {
@@ -33,6 +34,7 @@
       "src/cashu.ts",
       "src/customer.ts",
       "src/nostr.ts",
+      "src/storage.ts",
       "src/types.ts",
       "README.md",
       "deno.json"

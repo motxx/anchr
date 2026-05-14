@@ -8,6 +8,7 @@ import type {
 } from "@anchr/protocol/types";
 import type { CashuClient } from "./cashu.ts";
 import type { RelayClient } from "./nostr.ts";
+import type { ActorStateStore } from "./storage.ts";
 
 export type {
   ProofGenerator,
@@ -32,6 +33,8 @@ export interface ProviderOptions {
   cashuClient: CashuClient;
   /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
   relayClient: RelayClient;
+  /** Optional local state adapter for browser, Node, Deno, or test persistence. */
+  stateStore?: ActorStateStore;
   /** Optional: TLSN notary URL. */
   notary?: string;
   selectionTimeoutMs?: number;

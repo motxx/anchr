@@ -8,6 +8,7 @@
     "./process": "./src/process.ts",
     "./which": "./src/which.ts",
     "./env": "./src/env.ts",
+    "./runtime": "./src/runtime.ts",
     "./logger": "./src/logger.ts"
   },
   "imports": {

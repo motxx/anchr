@@ -30,6 +30,7 @@ import type {
 } from "./types.ts";
 import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
 import type { CashuClient } from "./cashu.ts";
+import type { ActorStateStore } from "./storage.ts";
 
 /** Default timeout for waiting for the customer's selection event after a quote (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -104,6 +105,27 @@ export function validateProviderOptions(
   if (o.relayClient === undefined || o.relayClient === null) {
     throw new ProviderConfigError("relayClient adapter is required");
   }
+  if (o.stateStore !== undefined) {
+    if (typeof o.stateStore !== "object" || o.stateStore === null) {
+      throw new ProviderConfigError(
+        "stateStore, when provided, must be an object",
+      );
+    }
+    const get = "get" in o.stateStore ? o.stateStore.get : undefined;
+    const set = "set" in o.stateStore ? o.stateStore.set : undefined;
+    const deleteValue = "delete" in o.stateStore
+      ? o.stateStore.delete
+      : undefined;
+    if (
+      typeof get !== "function" ||
+      typeof set !== "function" ||
+      typeof deleteValue !== "function"
+    ) {
+      throw new ProviderConfigError(
+        "stateStore must expose get, set, and delete methods",
+      );
+    }
+  }
   if (o.notary !== undefined) {
     if (typeof o.notary !== "string" || o.notary.length === 0) {
       throw new ProviderConfigError(
@@ -166,6 +188,7 @@ export function createProvider(options: ProviderOptions): Provider {
   const preimageTimeoutMs = options.preimageTimeoutMs ??
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
+  const stateStore = options.stateStore;
 
   const secretKey = normalizeSecretKey(options.privKey);
   const pubkey = getPublicKey(secretKey);
@@ -194,6 +217,7 @@ export function createProvider(options: ProviderOptions): Provider {
               oracles,
               cashuClient,
               relayClient,
+              stateStore,
               selectionTimeoutMs,
               preimageTimeoutMs,
               proofGenerators,
@@ -222,6 +246,7 @@ interface JobContext {
   oracles: readonly string[];
   cashuClient: CashuClient;
   relayClient: RelayClient;
+  stateStore?: ActorStateStore;
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
@@ -274,6 +299,18 @@ async function handleJob(
     },
   );
   await ctx.relayClient.publish(quoteEvent);
+  if (ctx.stateStore !== undefined) {
+    await writeProviderState(ctx.stateStore, {
+      requestEventId: event.id,
+      queryId: payload.query_id,
+      customerPubkey: payload.customer_pubkey,
+      schema: payload.schema,
+      status: "quote_published",
+      amountSats: quote.amountSats,
+      quoteEventId: quoteEvent.id,
+      updatedAt: Date.now(),
+    });
+  }
 
   const selection = await waitForSelection(
     ctx,
@@ -302,6 +339,19 @@ async function handleJob(
     payload.query_id,
   );
   await ctx.relayClient.publish(responseEvent);
+  if (ctx.stateStore !== undefined) {
+    await writeProviderState(ctx.stateStore, {
+      requestEventId: event.id,
+      queryId: payload.query_id,
+      customerPubkey: payload.customer_pubkey,
+      schema: payload.schema,
+      status: "result_published",
+      amountSats: quote.amountSats,
+      quoteEventId: quoteEvent.id,
+      responseEventId: responseEvent.id,
+      updatedAt: Date.now(),
+    });
+  }
 
   const preimage = await waitForPreimage(
     ctx,
@@ -317,9 +367,53 @@ async function handleJob(
       preimageHex: preimage,
       providerSecretKey: ctx.identity.secretKey,
     });
+    if (ctx.stateStore !== undefined) {
+      await writeProviderState(ctx.stateStore, {
+        requestEventId: event.id,
+        queryId: payload.query_id,
+        customerPubkey: payload.customer_pubkey,
+        schema: payload.schema,
+        status: "redeemed",
+        amountSats: quote.amountSats,
+        quoteEventId: quoteEvent.id,
+        responseEventId: responseEvent.id,
+        updatedAt: Date.now(),
+      });
+    }
   } catch {
     return;
   }
+}
+
+type ProviderStateStatus =
+  | "quote_published"
+  | "result_published"
+  | "redeemed";
+
+interface ProviderStateRecord {
+  requestEventId: string;
+  queryId: string;
+  customerPubkey: string;
+  schema: string;
+  status: ProviderStateStatus;
+  amountSats: number;
+  quoteEventId: string;
+  responseEventId?: string;
+  updatedAt: number;
+}
+
+function providerStateKey(requestEventId: string): string {
+  return `provider:${requestEventId}`;
+}
+
+async function writeProviderState(
+  store: ActorStateStore,
+  record: ProviderStateRecord,
+): Promise<void> {
+  await store.set(
+    providerStateKey(record.requestEventId),
+    JSON.stringify(record),
+  );
 }
 
 /**

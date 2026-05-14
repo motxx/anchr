@@ -120,6 +120,8 @@ export type {
 export type { ProviderOptions } from "@anchr/provider-sdk/types";
 
 export {
+  createKeypairSigner,
+  createNip07Signer,
   decryptNip44,
   encryptNip44,
   findAllTagValues,
@@ -130,8 +132,11 @@ export {
   KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
+  type Nip07Provider,
+  Nip07UnavailableError,
   normalizePubkey,
   normalizeSecretKey,
+  type NostrSigner,
   signEvent,
 } from "@anchr/protocol/nostr";
 
@@ -142,6 +147,15 @@ export {
   type RelayClient,
   type Subscription,
 } from "@anchr/customer-sdk/nostr";
+
+export {
+  type ActorStateStore,
+  createIndexedDbStateStore,
+  createMemoryStateStore,
+  IndexedDbStateStoreError,
+  type IndexedDbStateStoreOptions,
+  type MemoryStateStoreOptions,
+} from "@anchr/customer-sdk/storage";
 
 export {
   createHttpOracleClient,

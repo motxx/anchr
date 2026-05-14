@@ -106,6 +106,11 @@ Current reference adapters:
   over relay clients.
 - `@anchr/customer-sdk/cashu` and `@anchr/provider-sdk/cashu`: Cashu HTLC
   payment and redeem.
+- `@anchr/customer-sdk/storage` and `@anchr/provider-sdk/storage`: actor local
+  state stores, including in-memory stores for tests/server runtimes and
+  IndexedDB stores for browser runtimes.
+- `createKeypairSigner()` and `createNip07Signer()` in `@anchr/protocol/nostr`:
+  signer ports for local keys and browser NIP-07 providers.
 - `ProofGenerator` and `VerifierAdapter`: schema-selected proof engine ports.
 - `@anchr/blossom` and bounty attachment helpers: encrypted attachment
   transport primitives.

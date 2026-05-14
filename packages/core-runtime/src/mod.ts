@@ -13,3 +13,11 @@ export {
 } from "./fs.ts";
 export { which } from "./which.ts";
 export { moduleDir } from "./env.ts";
+export {
+  detectRuntimeTarget,
+  isBrowserRuntime,
+  isDenoRuntime,
+  isNodeRuntime,
+  isWorkerRuntime,
+  type RuntimeTarget,
+} from "./runtime.ts";

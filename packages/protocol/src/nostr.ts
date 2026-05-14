@@ -20,6 +20,7 @@ import {
   getConversationKey,
 } from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
+import type { AdapterManifest } from "./capabilities.ts";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;
@@ -36,10 +37,68 @@ export interface Keypair {
   publicKey: string;
 }
 
+export interface NostrSigner {
+  readonly manifest?: AdapterManifest;
+  getPublicKey(): Promise<string>;
+  signEvent(template: EventTemplate | UnsignedEvent): Promise<Event>;
+}
+
+export interface Nip07Provider {
+  getPublicKey(): Promise<string>;
+  signEvent(template: EventTemplate | UnsignedEvent): Promise<Event>;
+}
+
+export class Nip07UnavailableError extends Error {
+  constructor() {
+    super("NIP-07 provider is not available");
+    this.name = "Nip07UnavailableError";
+  }
+}
+
 /** Generate a fresh keypair. The secret key is a 32-byte CSPRNG value. */
 export function generateKeypair(): Keypair {
   const secretKey = generateSecretKey();
   return { secretKey, publicKey: getPublicKey(secretKey) };
+}
+
+export function createKeypairSigner(identity: Keypair): NostrSigner {
+  return {
+    manifest: {
+      id: "nostr-keypair-signer",
+      technology: "nostr",
+      capabilities: ["signer"],
+      runtimes: ["browser", "deno", "node", "worker"],
+      experimental: false,
+    },
+    getPublicKey(): Promise<string> {
+      return Promise.resolve(identity.publicKey);
+    },
+    signEvent(template: EventTemplate | UnsignedEvent): Promise<Event> {
+      return Promise.resolve(signEvent(template, identity.secretKey));
+    },
+  };
+}
+
+export function createNip07Signer(provider?: Nip07Provider): NostrSigner {
+  const resolved = provider ?? resolveWindowNostr();
+  if (resolved === null) {
+    throw new Nip07UnavailableError();
+  }
+  return {
+    manifest: {
+      id: "nip07-signer",
+      technology: "nostr-nip07",
+      capabilities: ["signer"],
+      runtimes: ["browser"],
+      experimental: false,
+    },
+    getPublicKey(): Promise<string> {
+      return resolved.getPublicKey();
+    },
+    signEvent(template: EventTemplate | UnsignedEvent): Promise<Event> {
+      return resolved.signEvent(template);
+    },
+  };
 }
 
 /**
@@ -115,6 +174,19 @@ export function signEvent(
   secretKey: Uint8Array,
 ): Event {
   return finalizeEvent(template, secretKey);
+}
+
+function resolveWindowNostr(): Nip07Provider | null {
+  const value: unknown = Reflect.get(globalThis, "nostr");
+  if (!isNip07Provider(value)) return null;
+  return value;
+}
+
+function isNip07Provider(value: unknown): value is Nip07Provider {
+  if (typeof value !== "object" || value === null) return false;
+  const getPublicKey = "getPublicKey" in value ? value.getPublicKey : undefined;
+  const signer = "signEvent" in value ? value.signEvent : undefined;
+  return typeof getPublicKey === "function" && typeof signer === "function";
 }
 
 /**

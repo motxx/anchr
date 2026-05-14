@@ -19,6 +19,7 @@ import {
   resolveVerifierAdapter,
 } from "@anchr/protocol/schema";
 import type { PublishResult, RelayClient } from "./nostr.ts";
+import type { ActorStateStore } from "./storage.ts";
 import {
   type Event as NostrEvent,
   generateKeypair,
@@ -183,6 +184,27 @@ export function validateCustomerOptions(
   if (o.relayClient === undefined || o.relayClient === null) {
     throw new CustomerConfigError("relayClient adapter is required");
   }
+  if (o.stateStore !== undefined) {
+    if (typeof o.stateStore !== "object" || o.stateStore === null) {
+      throw new CustomerConfigError(
+        "stateStore, when provided, must be an object",
+      );
+    }
+    const get = "get" in o.stateStore ? o.stateStore.get : undefined;
+    const set = "set" in o.stateStore ? o.stateStore.set : undefined;
+    const deleteValue = "delete" in o.stateStore
+      ? o.stateStore.delete
+      : undefined;
+    if (
+      typeof get !== "function" ||
+      typeof set !== "function" ||
+      typeof deleteValue !== "function"
+    ) {
+      throw new CustomerConfigError(
+        "stateStore must expose get, set, and delete methods",
+      );
+    }
+  }
 }
 
 /** Generate a unique query identifier for a single request. */
@@ -209,6 +231,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
   const selector = options.quoteSelector ?? selectCheapestQuote;
   const verifierAdapters = options.verifierAdapters ?? [];
+  const stateStore = options.stateStore;
 
   return {
     oracles,
@@ -273,6 +296,15 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (publishResult.successes.length === 0) {
         throw new RelayPublishError(publishResult);
       }
+      if (stateStore !== undefined) {
+        await writeCustomerState(stateStore, {
+          queryId,
+          requestEventId: requestEvent.id,
+          schema: req.spec.schema,
+          status: "request_published",
+          updatedAt: Date.now(),
+        });
+      }
 
       const quotes: Quote[] = [];
       let totalReceived = 0;
@@ -335,6 +367,17 @@ export function createCustomer(options: CustomerOptions): Customer {
         selectionPayload,
       );
       await relayClient.publish(selectionEvent);
+      if (stateStore !== undefined) {
+        await writeCustomerState(stateStore, {
+          queryId,
+          requestEventId: requestEvent.id,
+          schema: req.spec.schema,
+          status: "provider_selected",
+          providerPubkey: selected.providerPubkey,
+          quoteEventId: selected.quoteEventId,
+          updatedAt: Date.now(),
+        });
+      }
 
       const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
         // Mutable holder so the subscribe callback can reach the
@@ -390,12 +433,50 @@ export function createCustomer(options: CustomerOptions): Customer {
         }
       }
 
-      return {
+      const result = {
         data: response.data,
         proof: response.proof,
         providerPubkey: selected.providerPubkey,
         schema: response.schema,
       };
+      if (stateStore !== undefined) {
+        await writeCustomerState(stateStore, {
+          queryId,
+          requestEventId: requestEvent.id,
+          schema: req.spec.schema,
+          status: "result_received",
+          providerPubkey: selected.providerPubkey,
+          quoteEventId: selected.quoteEventId,
+          updatedAt: Date.now(),
+        });
+      }
+      return result;
     },
   };
+}
+
+type CustomerStateStatus =
+  | "request_published"
+  | "provider_selected"
+  | "result_received";
+
+interface CustomerStateRecord {
+  queryId: string;
+  requestEventId: string;
+  schema: string;
+  status: CustomerStateStatus;
+  providerPubkey?: string;
+  quoteEventId?: string;
+  updatedAt: number;
+}
+
+function customerStateKey(queryId: string): string {
+  return `customer:${queryId}`;
+}
+
+async function writeCustomerState(
+  store: ActorStateStore,
+  record: CustomerStateRecord,
+): Promise<void> {
+  await store.set(customerStateKey(record.queryId), JSON.stringify(record));
 }

@@ -8,6 +8,7 @@ import type {
 } from "@anchr/protocol/types";
 import type { CashuClient, CashuProof } from "./cashu.ts";
 import type { RelayClient } from "./nostr.ts";
+import type { ActorStateStore } from "./storage.ts";
 
 export type { Payment, Quote, RequestResult, Spec, VerifierAdapter };
 
@@ -28,6 +29,8 @@ export interface CustomerOptions {
   cashuClient: CashuClient;
   /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
   relayClient: RelayClient;
+  /** Optional local state adapter for browser, Node, Deno, or test persistence. */
+  stateStore?: ActorStateStore;
   quoteSelector?: QuoteSelector;
   quoteWindowMs?: number;
   resultTimeoutMs?: number;
