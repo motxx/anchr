@@ -2,6 +2,34 @@ import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+interface BunBuildPlugin {
+  name: string;
+  setup(build: BunBuildHandle): void;
+}
+
+interface BunBuildHandle {
+  onResolve(
+    options: { filter: RegExp },
+    callback: (args: { path: string }) => { path: string } | undefined,
+  ): void;
+}
+
+interface BunBuildConfig {
+  entrypoints: readonly string[];
+  outdir: string;
+  target: "node";
+  plugins: readonly BunBuildPlugin[];
+}
+
+interface BunBuildResult {
+  success: boolean;
+  logs: readonly unknown[];
+}
+
+declare const Bun: {
+  build(config: BunBuildConfig): Promise<BunBuildResult>;
+};
+
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
 

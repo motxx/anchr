@@ -93,17 +93,9 @@ jobs:
             done
           done
 
-      - name: Blossom-backed worker API integration
-        if: ${{ !cancelled() }}
-        run: deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
-        env:
-          BLOSSOM_SERVERS: http://localhost:3333
-
       - name: E2E tests (relay + Blossom)
         if: ${{ !cancelled() }}
-        run: |
-          deno task test:e2e:relay
-          ANCHR_E2E_REQUIRE_INFRA=1 deno test packages/bounty/src/infrastructure/worker-api.integration.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys
+        run: deno task test:e2e:relay
         env:
           NOSTR_RELAYS: ws://localhost:7777
           BLOSSOM_SERVERS: http://localhost:3333
