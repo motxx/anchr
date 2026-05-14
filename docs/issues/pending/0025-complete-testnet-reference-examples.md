@@ -11,6 +11,9 @@ feature
 
 Depends on:
 - 0024
+- 0027
+- 0028
+- 0029
 
 Blocks:
 - None
@@ -43,13 +46,8 @@ compile-only demos:
 
 ## Plan
 
-- Audit the two Testnet example READMEs against the current SDK API and local
-  stack commands.
-- Add or update `.env.example` / config documentation for every required
-  variable, without committing secrets or fund-bearing material.
-- Add runnable commands for customer, provider, and oracle/notary components as
-  applicable.
-- Add focused smoke tests or `deno task` entries that exercise the documented
-  happy path.
-- Update the README status table only after the examples meet the documented
-  completion bar.
+- Resolve 0027 for the C2PA media verification example.
+- Resolve 0028 for the TLSN fiat swap example.
+- Resolve 0029 for shared example smoke/runbook conventions.
+- Update the README status table only after the child issues meet the
+  documented completion bar.

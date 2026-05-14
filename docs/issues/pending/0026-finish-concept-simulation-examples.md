@@ -10,7 +10,9 @@ design
 ## Dependencies
 
 Depends on:
-- None
+- 0030
+- 0031
+- 0032
 
 Blocks:
 - None
@@ -46,12 +48,8 @@ Relevant files:
 
 ## Plan
 
-- Define the status vocabulary for `Concept`, `Simulation`, `Testnet`, and
-  `Implemented` in README or a linked example guide.
-- For `auto-claim`, decide whether the target is a runnable browser automation
-  flow or a documented concept-only design.
-- For `airdrop-bot-shield`, decide whether the target is a runnable
-  verification service flow or a simulation-only proof gate.
-- Add missing runbooks, env templates, and smoke tests for any example promoted
-  beyond concept/simulation status.
-- Update the top-level README status table to match the implemented target.
+- Resolve 0030 to define the example status vocabulary.
+- Resolve 0031 for the `auto-claim` completion target.
+- Resolve 0032 for the `airdrop-bot-shield` completion target.
+- Update the top-level README status table after the child issues settle the
+  implemented targets.
