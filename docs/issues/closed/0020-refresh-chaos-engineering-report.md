@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -34,3 +35,26 @@ Some findings appear to have been fixed already. For example, the report says `v
 - Replace obsolete file references with current `packages/bounty/src/...` paths and remove references to deleted locations.
 - Recheck each recommendation against current code and tests, removing items already implemented or rewriting them as current residual risks.
 - If historical, add a clear dated status note at the top and create or link a current chaos/resilience checklist.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/chaos-engineering-report.md`
+- `docs/resilience-checklist.md`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- `docs/resilience-checklist.md` now provides the current resilience review entry point and links the active architecture, protocol, messaging, and threat-model sources.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

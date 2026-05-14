@@ -54,7 +54,7 @@ packages/
 ├── provider-sdk/              Provider request handling, offer/result flow, redeem gate, and ports.
 ├── bounty/                    Migration scaffolding: Query lifecycle, escrow,
 │                              oracle-client/service, verification adapters.
-└── sdk/                       Aggregate convenience package plus host REST client facade.
+└── sdk/                       Aggregate convenience package for actor SDKs and app adapter clients.
 
 example/                       Runnable apps; each owns its design system + deno.json
   ├── anchr-mcp/               MCP stdio adapter for agent runtime integration
@@ -154,6 +154,8 @@ This removes a convenient central demo target. In return:
 - Customers, Providers, and Oracles must choose explicit relays, mints, oracle
   pubkeys/endpoints, and notaries.
 - Agents and examples must not assume a default hosted Anchr server.
+- The aggregate SDK's app adapter clients target concrete app-owned HTTP
+  surfaces, not a shared protocol host.
 - Interop moves to Nostr/Cashu/Blossom wire compatibility instead of
   compatibility with a reference host REST API.
 - Operators can still publish adapter endpoints, but those endpoints are app

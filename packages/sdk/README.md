@@ -3,6 +3,10 @@
 Customer + Provider orchestration for the Anchr verified-data exchange: Nostr
 DVM events (NIP-90) over Cashu HTLC settlement.
 
+The actor SDK APIs below are the primary integration path. Anchr has no default
+hosted server or mandatory REST API; any HTTP client surface exposed by this
+package is for concrete app-owned adapters.
+
 ## Install
 
 ```sh

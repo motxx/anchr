@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -31,3 +32,27 @@ Align SDK-facing documentation with the hostless architecture. The current docs 
 - Audit nearby architecture prose for any implication that a shared Reference Host or mandatory Anchr REST API remains.
 - Update `packages/sdk/README.md` if needed to make the Customer/Provider actor SDK path primary and label any HTTP client usage as app-owned adapter integration, not protocol infrastructure.
 - Add a short cross-reference to the "Reference host removal" section where it helps prevent the same confusion from returning.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `packages/sdk/README.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — the hostless SDK placement is a one-time architecture documentation decision now locked in `docs/architecture.md` and `packages/sdk/README.md`.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
