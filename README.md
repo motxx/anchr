@@ -69,16 +69,29 @@ The snippet shows the Customer-side API shape. For a complete running flow, see
 [`example/c2pa-media-verification/`](example/c2pa-media-verification/).
 
 ```ts
-import { createCustomer, createHttpOracleClient } from "@anchr/sdk";
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createRelayClient,
+  type CashuProof,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
+const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  oracles: ["npub1oracle1..."],
-  relays: ["wss://relay.example.org"],
-  mint: "https://mint.example.org",
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
   oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.example.org",
-    oraclePubkey: "npub1oracle1...",
+    endpoint: "https://oracle.test.example",
+    oraclePubkey,
   }),
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 
 const { data, proof, providerPubkey } = await customer.request({

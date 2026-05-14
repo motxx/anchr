@@ -22,17 +22,25 @@ import {
   createCashuClient,
   createCustomer,
   createHttpOracleClient,
+  createRelayClient,
+  type CashuProof,
 } from "@anchr/sdk";
 
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
+const cashuProofsFromYourWallet: CashuProof[] = [];
+
 const customer = createCustomer({
-  oracles: ["npub1oracle1..."],
-  relays: ["wss://relay.example.org"],
-  mint: "https://mint.example.org",
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
   oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.example.org",
-    oraclePubkey: "npub1oracle1...",
+    endpoint: "https://oracle.test.example",
+    oraclePubkey,
   }),
-  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 
 const result = await customer.request({
@@ -50,14 +58,23 @@ console.log(result.data, result.proof, result.providerPubkey);
 ## Provider
 
 ```ts
-import { createProvider, createCashuClient } from "@anchr/sdk";
+import {
+  createCashuClient,
+  createProvider,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
 
 const provider = createProvider({
-  oracles: ["npub1oracle1..."],
-  relays:  ["wss://relay.example.org"],
-  mint:    "https://mint.example.org",
-  privKey: "nsec1...",
-  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
+  privKey: "provider-secret-key-placeholder",
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 
 await provider.serve(async (request) => {
@@ -66,7 +83,7 @@ await provider.serve(async (request) => {
     amountSats: 100,
     produce: async () => ({
       data: { /* schema-specific payload */ },
-      proof: /* schema-specific proof bytes/string */,
+      proof: "schema-specific-proof-placeholder",
     }),
   };
 });
@@ -98,11 +115,49 @@ The default `cashuClient` and `relayClient` open live connections. For unit
 tests, inject your own:
 
 ```ts
-import type { CashuWalletAdapter, RelayClient } from "@anchr/sdk";
+import {
+  createCustomer,
+  createHttpOracleClient,
+  type CashuClient,
+  type RelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
+
+const fakeCashuClient: CashuClient = {
+  mintUrl,
+  async buildHtlcLock() {
+    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
+  },
+  async bindProvider() {
+    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
+  },
+  async redeemHtlc() {
+    return { amountSats: 1000, proofs: [] };
+  },
+};
+
+const fakeRelayClient: RelayClient = {
+  async publish() {
+    return { successes: relayUrls, failures: [] };
+  },
+  subscribe() {
+    return { close() {} };
+  },
+  close() {},
+};
 
 const customer = createCustomer({
-  /* ... */,
-  cashuClient: createCashuClient({ mintUrl, wallet: fakeWalletAdapter }),
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
+  oracleClient: createHttpOracleClient({
+    endpoint: "https://oracle.test.example",
+    oraclePubkey,
+  }),
+  cashuClient: fakeCashuClient,
   relayClient: fakeRelayClient,
 });
 ```
