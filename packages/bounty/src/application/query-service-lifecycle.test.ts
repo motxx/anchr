@@ -198,24 +198,24 @@ describe("Application Service — HTLC lifecycle", () => {
     bounty: { amount_sats: 100 },
   });
 
-  test("create HTLC query starts at awaiting_quotes", () => {
+  test("create HTLC query starts at awaiting_offers", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
     expect(query.escrow).toBeDefined();
-    expect(query.quotes).toEqual([]);
+    expect(query.offers).toEqual([]);
   });
 
-  test("full HTLC lifecycle: create → quote → select → submit → approve", async () => {
+  test("full HTLC lifecycle: create → offer → select → submit → approve", async () => {
     const { svc } = setup({ pass: true });
     const query = svc.createQuery(defaultInput, htlcOptions());
 
-    const quoteOutcome = svc.recordQuote(query.id, {
+    const offerOutcome = svc.recordOffer(query.id, {
       worker_pubkey: "worker1",
-      quote_event_id: "evt1",
+      offer_event_id: "evt1",
       received_at: Date.now(),
     });
-    expect(quoteOutcome.ok).toBe(true);
+    expect(offerOutcome.ok).toBe(true);
 
     const selectOutcome = await svc.selectWorker(query.id, "worker1");
     svc.beginWork(query.id);
@@ -234,9 +234,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC lifecycle: rejected verification", async () => {
     const { svc } = setup({ pass: false });
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, {
+    svc.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
@@ -250,9 +250,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: recordResult + completeVerification separately", async () => {
     const { svc } = setup({ pass: true });
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, {
+    svc.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
@@ -270,9 +270,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: completeVerification rejected", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, {
+    svc.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
@@ -284,7 +284,7 @@ describe("Application Service — HTLC lifecycle", () => {
     expect(svc.getQuery(query.id)?.status).toBe("rejected");
   });
 
-  test("HTLC: cancel at awaiting_quotes", () => {
+  test("HTLC: cancel at awaiting_offers", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
     const outcome = svc.cancelQuery(query.id);
@@ -295,9 +295,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: expire at processing", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, { ...htlcOptions(), ttlMs: 1 });
-    svc.recordQuote(query.id, {
+    svc.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");
@@ -320,9 +320,9 @@ describe("Application Service — HTLC lifecycle", () => {
   test("HTLC: worker pubkey mismatch", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
-    svc.recordQuote(query.id, {
+    svc.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await svc.selectWorker(query.id, "w1");

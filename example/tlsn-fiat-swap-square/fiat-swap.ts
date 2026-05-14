@@ -26,7 +26,7 @@ export interface SellerConfig extends SharedFiatSwapConfig {
   oracleApiKey?: string;
   sourceProofs: CashuProof[];
   providerPubkey?: string;
-  quoteWindowMs: number;
+  offerWindowMs: number;
   resultTimeoutMs: number;
 }
 
@@ -204,7 +204,7 @@ export function loadSellerConfig(env: Env = Deno.env.toObject()): SellerConfig {
     oracleApiKey: optional(env, "FIAT_SWAP_ORACLE_API_KEY"),
     sourceProofs: parseSourceProofs(env),
     providerPubkey: optional(env, "FIAT_SWAP_PROVIDER_PUBKEY"),
-    quoteWindowMs: positiveInt(env, "FIAT_SWAP_QUOTE_WINDOW_MS", 30_000),
+    offerWindowMs: positiveInt(env, "FIAT_SWAP_OFFER_WINDOW_MS", 30_000),
     resultTimeoutMs: positiveInt(
       env,
       "FIAT_SWAP_RESULT_TIMEOUT_MS",
@@ -252,13 +252,13 @@ export function buildFiatSwapPredicate(
       type: "jsonpath",
       expression: "payment.amount_money.amount",
       expected: String(input.fiatAmountMinor),
-      description: "Square amount matches the fiat swap quote",
+      description: "Square amount matches the fiat swap offer",
     },
     {
       type: "jsonpath",
       expression: "payment.amount_money.currency",
       expected: input.fiatCurrency,
-      description: "Square currency matches the fiat swap quote",
+      description: "Square currency matches the fiat swap offer",
     },
   ];
 

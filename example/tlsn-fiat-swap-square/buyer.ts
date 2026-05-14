@@ -1,7 +1,7 @@
 /**
  * TLSN Fiat Swap — Buyer / Provider
  *
- * Provider-side flow: listen for Customer job requests, quote matching
+ * Provider-side flow: listen for Customer job requests, offer matching
  * Square Sandbox payment predicates, publish a TLSN result after selection,
  * and redeem the HTLC when the Oracle releases the preimage.
  */

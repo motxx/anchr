@@ -12,7 +12,7 @@ export interface Spec {
 
 /** Payment terms a customer attaches to a request. */
 export interface Payment {
-  /** Maximum amount in sats the customer will pay for a single quote. */
+  /** Maximum amount in sats the customer will pay for a single offer. */
   maxAmount: number;
   /** Locktime in seconds from now (default: 3600). */
   locktimeSeconds?: number;
@@ -30,20 +30,20 @@ export interface RequestResult {
   schema: string;
 }
 
-/** A quote received from a provider in response to a request. */
-export interface Quote {
+/** An offer received from a provider in response to a request. */
+export interface Offer {
   /** Provider's hex pubkey. */
   providerPubkey: string;
-  /** Quoted amount in sats. */
+  /** Offered amount in sats. */
   amountSats: number;
-  /** Provider's quote event id (for selection). */
-  quoteEventId: string;
-  /** Local timestamp when the quote was received. */
+  /** Provider's offer event id (for selection). */
+  offerEventId: string;
+  /** Local timestamp when the offer was received. */
   receivedAt: number;
 }
 
-/** Quote returned by a Provider handler when accepting a request. */
-export interface ProviderQuote {
+/** Offer returned by a Provider handler when accepting a request. */
+export interface ProviderOffer {
   /** Amount in sats the provider asks for. Must be <= request's maxAmountSats. */
   amountSats: number;
   produce: () => Promise<{ data: unknown; proof: Uint8Array | string }>;
@@ -95,4 +95,4 @@ export interface ProviderRequestEvent {
 
 export type ProviderHandler = (
   request: ProviderRequestEvent,
-) => Promise<ProviderQuote | null>;
+) => Promise<ProviderOffer | null>;

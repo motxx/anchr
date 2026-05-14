@@ -2,6 +2,7 @@
 
 Created: 2026-05-09
 Model: Codex GPT-5
+Completed: 2026-05-15
 
 ## Priority
 
@@ -36,3 +37,40 @@ pre-1.0 のため後方互換 alias や deprecated shim は置かず、public SD
 - 既存 wire field / host-shaped domain state の `quote_event_id`、`awaiting_quotes`、`quotes` も `offer_event_id`、`awaiting_offers`、`offers` へ改名し、旧名 alias は残さない。
 - `specs/messaging.md` と SDK README の用語を Customer request、Provider offer、Customer selection の流れに揃える。
 - 旧 `Quote` / `quote` vocabulary が public API、wire schema、domain state、tests、docs に残っていないことを `rg "Quote|quote|quotes|awaiting_quotes|quote_event_id"` で確認する。
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/protocol/src/`, `packages/customer-sdk/src/`, `packages/provider-sdk/src/`, `packages/sdk/src/`
+- `packages/bounty/src/`
+- `e2e/protocol/`, `e2e/regtest/`, `scripts/`
+- `example/tlsn-fiat-swap-square/`, `example/c2pa-media-verification/`, `example/auto-claim/`, `example/bounty-board/`, `example/expo-worker-app/`
+- `README.md`, `specs/`, `docs/architecture.md`
+
+Verified with:
+
+- `deno check packages/ e2e/ scripts/ example/tlsn-fiat-swap-square/ example/c2pa-media-verification/ example/auto-claim/`
+- `deno task lint:strict`
+- `deno task lint:deps`
+- `deno task test:unit`
+- `deno task test:integration`
+- `deno task test:e2e:protocol`
+- `deno task test:scripts`
+- `deno task test:examples`
+- `deno task test:all`
+- `deno task test:all:docker`
+- `check-silent-bypass`
+- `rg "Quote|quote|quotes|awaiting_quotes|quote_event_id"` over the public SDK, protocol, bounty, spec, docs, examples, e2e, and script scope. The only remaining matches are Cashu mint quote vocabulary, which is a different protocol term and intentionally unchanged.
+
+Harness update:
+
+- Specs, docs, SDK tests, bounty lifecycle tests, protocol e2e tests, regtest tests, and example tests now lock the Provider offer vocabulary (`ProviderOffer`, `OfferSelector`, `offerWindowMs`, `offer_event_id`, `awaiting_offers`, `offers`). No extra deterministic lint was added because Cashu mint quote and generic quote wording remain valid outside the Anchr provider-response vocabulary.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

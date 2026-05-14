@@ -42,8 +42,8 @@ Nostr pubkeys, and each app chooses its own relay, mint, oracle, and notary.
 ## How It Works
 
 1. Customer creates a request and locks payment in a Cashu HTLC.
-2. Providers see the request over Nostr and return quotes.
-3. Customer accepts a quote and binds the escrow to the Provider.
+2. Providers see the request over Nostr and return offers.
+3. Customer accepts an offer and binds the escrow to the Provider.
 4. Provider produces data plus proof.
 5. Oracle verifies the proof and releases the unlock secret.
 6. Provider redeems; otherwise the Customer refunds after timeout.

@@ -170,7 +170,7 @@ export function makeEscrowInfo(preimageStore: PreimageStore) {
   };
 }
 
-/** Drive query through: create -> quote -> select -> ready for result submission. */
+/** Drive query through: create -> offer -> select -> ready for result submission. */
 export async function driveToProcessing(
   service: ReturnType<typeof createQueryService>,
   preimageStore: PreimageStore,
@@ -194,9 +194,9 @@ export async function driveToProcessing(
       quorum: opts?.quorum,
     },
   );
-  service.recordQuote(query.id, {
+  service.recordOffer(query.id, {
     worker_pubkey: workerPub,
-    quote_event_id: "evt_1",
+    offer_event_id: "evt_1",
     received_at: Date.now(),
   });
   const token = makeFakeToken(bounty);
@@ -253,9 +253,9 @@ export async function driveQuorumToProcessing(
       quorum: { min_approvals: minApprovals },
     },
   );
-  service.recordQuote(query.id, {
+  service.recordOffer(query.id, {
     worker_pubkey: workerPub,
-    quote_event_id: "evt_1",
+    offer_event_id: "evt_1",
     received_at: Date.now(),
   });
   await service.selectWorker(query.id, workerPub, makeFakeToken(bounty));

@@ -2,9 +2,9 @@ import type {
   AttachmentRef,
   BlossomKeyMap,
   CreateQueryRequest,
+  OfferInfo,
   QueryDetail,
   QuerySummary,
-  QuoteInfo,
   SubmitResponse,
   UploadResponse,
 } from "./types.ts";
@@ -83,16 +83,16 @@ export async function uploadPhoto(
   return res.json();
 }
 
-export async function submitQuote(
+export async function submitOffer(
   queryId: string,
   amountSats?: number,
 ): Promise<{ ok: boolean }> {
-  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/quotes`, {
+  const res = await fetch(`${getBaseUrl()}/queries/${queryId}/offers`, {
     method: "POST",
     headers: { ...getHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ amount_sats: amountSats }),
   });
-  if (!res.ok) throw new Error(`Quote failed: ${res.status}`);
+  if (!res.ok) throw new Error(`Offer failed: ${res.status}`);
   return res.json();
 }
 

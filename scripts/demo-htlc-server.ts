@@ -12,17 +12,17 @@ import {
 } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
 import {
   ANCHR_QUERY_REQUEST,
+  buildOfferFeedbackEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
 import {
@@ -389,34 +389,34 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
     return;
   }
 
-  // 7. Worker sends quote
-  emitStep("worker", "Sending quote (kind 7000 status=payment-required)...");
+  // 7. Worker sends offer
+  emitStep("worker", "Sending offer (kind 7000 status=payment-required)...");
 
-  const quotePayload: QuoteFeedbackPayload = {
+  const offerPayload: OfferFeedbackPayload = {
     status: "payment-required",
     worker_pubkey: worker.publicKey,
     amount_sats: bountyAmount,
   };
 
-  const quoteEvent = buildQuoteFeedbackEvent(
+  const offerEvent = buildOfferFeedbackEvent(
     worker,
     matchingEvent.id,
     requester.publicKey,
-    quotePayload,
+    offerPayload,
   );
-  const quotePubResult = await publishEvent(quoteEvent, [RELAY_URL]);
+  const offerPubResult = await publishEvent(offerEvent, [RELAY_URL]);
 
-  if (quotePubResult.successes.length > 0) {
-    emitOk("worker", `Quote published: ${bountyAmount} sats`, {
-      event_id: quoteEvent.id.slice(0, 16) + "...",
+  if (offerPubResult.successes.length > 0) {
+    emitOk("worker", `Offer published: ${bountyAmount} sats`, {
+      event_id: offerEvent.id.slice(0, 16) + "...",
     });
   } else {
-    emitFail("worker", "Failed to publish quote event");
+    emitFail("worker", "Failed to publish offer event");
     return;
   }
 
-  // 8. Requester receives quote
-  emitStep("requester", "Receiving and decrypting Worker quote...");
+  // 8. Requester receives offer
+  emitStep("requester", "Receiving and decrypting Worker offer...");
 
   await new Promise((r) => setTimeout(r, 500));
 
@@ -425,26 +425,26 @@ async function runHtlcDemo(emit: Emit): Promise<void> {
     "#e": [matchingEvent.id],
     since,
   });
-  const quoteEvents = feedbackEvents.filter((e) => {
+  const offerEvents = feedbackEvents.filter((e) => {
     const statusTag = e.tags.find((t) => t[0] === "status");
     return statusTag?.[1] === "payment-required";
   });
 
-  if (quoteEvents.length === 0) {
-    emitFail("requester", "Could not find quote events on relay");
+  if (offerEvents.length === 0) {
+    emitFail("requester", "Could not find offer events on relay");
     return;
   }
 
-  const firstQuote = quoteEvents[0]!;
-  const receivedQuote = parseFeedbackPayload(
-    firstQuote.content,
+  const firstOffer = offerEvents[0]!;
+  const receivedOffer = parseFeedbackPayload(
+    firstOffer.content,
     requester.secretKey,
-    firstQuote.pubkey,
+    firstOffer.pubkey,
   );
 
-  if (receivedQuote.status === "payment-required") {
-    const q = receivedQuote as QuoteFeedbackPayload;
-    emitOk("requester", `Quote received: ${q.amount_sats} sats`, {
+  if (receivedOffer.status === "payment-required") {
+    const q = receivedOffer as OfferFeedbackPayload;
+    emitOk("requester", `Offer received: ${q.amount_sats} sats`, {
       worker: q.worker_pubkey.slice(0, 16) + "...",
     });
   } else {

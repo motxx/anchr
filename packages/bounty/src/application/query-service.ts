@@ -19,7 +19,7 @@ import {
 import {
   doBeginWork,
   doCompleteVerification,
-  doRecordQuote,
+  doRecordOffer,
   doRecordResult,
   doSelectWorker,
   doSubmitEscrowResult,
@@ -31,11 +31,11 @@ import type {
   EscrowInfo,
   EscrowSubmitOutcome,
   ExecutorType,
+  OfferInfo,
   Query,
   QueryInput,
   QueryResult,
   QuorumConfig,
-  QuoteInfo,
   RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
@@ -124,7 +124,7 @@ export interface QueryService {
   purgeExpiredFromStore(): Query[];
   clearQueryStore(): void;
 
-  recordQuote(queryId: string, quote: QuoteInfo): HtlcOutcome;
+  recordOffer(queryId: string, offer: OfferInfo): HtlcOutcome;
   selectWorker(
     queryId: string,
     workerPubkey: string,
@@ -197,7 +197,7 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     expireQueries: () => doExpireQueries(store),
     purgeExpiredFromStore: () => doPurgeExpired(store),
     clearQueryStore: () => store.clear(),
-    recordQuote: (queryId, quote) => doRecordQuote(store, queryId, quote),
+    recordOffer: (queryId, offer) => doRecordOffer(store, queryId, offer),
     selectWorker: (queryId, wp, ht) => doSelectWorker(svcDeps, queryId, wp, ht),
     beginWork: (queryId) => doBeginWork(store, queryId),
     recordResult: (queryId, result, wp, bk) =>

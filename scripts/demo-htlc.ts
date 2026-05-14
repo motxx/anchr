@@ -17,17 +17,17 @@ import {
 } from "../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
 import {
   ANCHR_QUERY_REQUEST,
+  buildOfferFeedbackEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "../packages/bounty/src/infrastructure/nostr/events/events.ts";
 import {
@@ -357,39 +357,39 @@ async function runDemo() {
   }
 
   // ============================================================
-  // Step 5 (README): Worker sends quote (kind 7000 status=payment-required)
+  // Step 5 (README): Worker sends offer (kind 7000 status=payment-required)
   // ============================================================
-  step("Worker sends quote (kind 7000 status=payment-required)...");
+  step("Worker sends offer (kind 7000 status=payment-required)...");
 
-  const quotePayload: QuoteFeedbackPayload = {
+  const offerPayload: OfferFeedbackPayload = {
     status: "payment-required",
     worker_pubkey: worker.publicKey,
     amount_sats: bountyAmount,
   };
 
-  const quoteEvent = buildQuoteFeedbackEvent(
+  const offerEvent = buildOfferFeedbackEvent(
     worker,
     matchingEvent.id,
     requester.publicKey,
-    quotePayload,
+    offerPayload,
   );
 
-  const quotePubResult = await publishEvent(quoteEvent, [RELAY_URL]);
-  if (quotePubResult.successes.length > 0) {
+  const offerPubResult = await publishEvent(offerEvent, [RELAY_URL]);
+  if (offerPubResult.successes.length > 0) {
     ok(
-      `Quote published: ${
-        quoteEvent.id.slice(0, 16)
+      `Offer published: ${
+        offerEvent.id.slice(0, 16)
       }... (${bountyAmount} sats)`,
     );
   } else {
-    fail("Failed to publish quote event");
+    fail("Failed to publish offer event");
     return;
   }
 
   // ============================================================
-  // Requester receives quote (verify decryption)
+  // Requester receives offer (verify decryption)
   // ============================================================
-  step("Requester receives and decrypts Worker quote...");
+  step("Requester receives and decrypts Worker offer...");
 
   await new Promise((r) => setTimeout(r, 500));
 
@@ -399,27 +399,27 @@ async function runDemo() {
     since,
   });
 
-  const quoteEvents = feedbackEvents.filter((e) => {
+  const offerEvents = feedbackEvents.filter((e) => {
     const statusTag = e.tags.find((t) => t[0] === "status");
     return statusTag?.[1] === "payment-required";
   });
 
-  if (quoteEvents.length === 0) {
-    fail("Requester could not find quote events on relay");
+  if (offerEvents.length === 0) {
+    fail("Requester could not find offer events on relay");
     return;
   }
 
-  const firstQuote = quoteEvents[0]!;
-  const receivedQuote = parseFeedbackPayload(
-    firstQuote.content,
+  const firstOffer = offerEvents[0]!;
+  const receivedOffer = parseFeedbackPayload(
+    firstOffer.content,
     requester.secretKey,
-    firstQuote.pubkey,
+    firstOffer.pubkey,
   );
 
-  if (receivedQuote.status === "payment-required") {
-    const q = receivedQuote as QuoteFeedbackPayload;
+  if (receivedOffer.status === "payment-required") {
+    const q = receivedOffer as OfferFeedbackPayload;
     ok(
-      `Received quote from Worker: ${
+      `Received offer from Worker: ${
         q.worker_pubkey.slice(0, 16)
       }... for ${q.amount_sats} sats`,
     );
@@ -786,7 +786,7 @@ async function runDemo() {
   info("  2. Requester: plain Cashu proofs (Phase 1, no conditions)");
   info("  3. Requester → Relay: kind 5300 Job Request");
   info("  4. Worker ← Relay: discover + verify Oracle pubkey");
-  info("  5. Worker → Relay: kind 7000 quote (NIP-44 encrypted)");
+  info("  5. Worker → Relay: kind 7000 offer (NIP-44 encrypted)");
   info("  6. Requester: swap HTLC → hashlock + P2PK(Worker) (Phase 2)");
   info("  7. Requester → Relay: kind 7000 selection (NIP-44 encrypted)");
   info("  8. Worker → Blossom: encrypted blob (AES-256-GCM)");

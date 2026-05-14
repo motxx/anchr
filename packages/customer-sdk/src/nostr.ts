@@ -27,7 +27,7 @@ import type { AdapterManifest } from "@anchr/protocol/capabilities";
 export const KIND_QUERY_REQUEST = 5300;
 /** Anchr Job Result (NIP-90 standard kind 6300). */
 export const KIND_QUERY_RESPONSE = 6300;
-/** Anchr Job Feedback — quotes / selection / completion (NIP-90 standard kind 7000). */
+/** Anchr Job Feedback — offers / selection / completion (NIP-90 standard kind 7000). */
 export const KIND_QUERY_FEEDBACK = 7000;
 /** NIP-44 encrypted DM (kind 4). */
 export const KIND_DIRECT_MESSAGE = 4;

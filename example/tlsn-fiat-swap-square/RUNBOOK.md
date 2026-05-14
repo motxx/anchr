@@ -5,7 +5,7 @@ Square Sandbox 決済を TLSNotary で証明し、testnet/regtest Cashu ecash
 
 このexampleはCustomer/Provider package primitivesで動きます。必要な通信相手は
 Nostr relay、Cashu mint、Oracleだけです。reference host / middleman の
-`/queries`、`/quotes`、`/select`、`/begin` APIは使いません。
+`/queries`、`/offers`、`/select`、`/begin` APIは使いません。
 
 ## 0. Square Sandbox
 
@@ -71,7 +71,7 @@ Optional:
 
 ```bash
 export FIAT_SWAP_PROVIDER_PUBKEY=<buyer-provider-pubkey-hex>
-export FIAT_SWAP_QUOTE_WINDOW_MS=30000
+export FIAT_SWAP_OFFER_WINDOW_MS=30000
 export FIAT_SWAP_RESULT_TIMEOUT_MS=300000
 export FIAT_SWAP_LOCKTIME_SECONDS=3600
 ```
@@ -83,7 +83,7 @@ deno task fiat-swap:seller
 ```
 
 Keep this terminal open. It publishes a kind 5300 request, waits for Provider
-quotes, binds the selected Provider at the Cashu mint, and waits for the kind
+offers, binds the selected Provider at the Cashu mint, and waits for the kind
 6300 result.
 
 ## 3. Buyer Pays Square
@@ -115,7 +115,7 @@ curl -s https://connect.squareupsandbox.com/v2/payments \
 
 ## 4. Buyer / Provider
 
-Buyer runs the Provider primitive. It quotes only matching fiat swap predicates
+Buyer runs the Provider primitive. It offers only matching fiat swap predicates
 and redeems only after the Oracle releases the preimage.
 
 ```bash
@@ -185,8 +185,8 @@ ANCHR_E2E_REQUIRE_INFRA=1 deno test --node-modules-dir=false --no-lock \
 
 | Problem                 | Action                                                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Buyer never quotes      | Check `FIAT_SWAP_AMOUNT_SATS`, fiat amount/currency, optional location id, and Oracle pubkey match the Seller request.    |
-| Seller gets no quotes   | Check both sides use the same `NOSTR_RELAYS` and the Buyer process is running before `FIAT_SWAP_QUOTE_WINDOW_MS` expires. |
+| Buyer never offers      | Check `FIAT_SWAP_AMOUNT_SATS`, fiat amount/currency, optional location id, and Oracle pubkey match the Seller request.    |
+| Seller gets no offers   | Check both sides use the same `NOSTR_RELAYS` and the Buyer process is running before `FIAT_SWAP_OFFER_WINDOW_MS` expires. |
 | Provider cannot produce | Set `FIAT_SWAP_PAYMENT_ID` and either `FIAT_SWAP_PROOF_FILE` or `FIAT_SWAP_PROOF_BASE64`.                                 |
 | Redeem never happens    | The Oracle must verify the kind 6300 result and send the preimage DM to the selected Provider.                            |
 | Square API 401          | Use the Sandbox Access Token against `connect.squareupsandbox.com`.                                                       |

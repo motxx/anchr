@@ -2,7 +2,7 @@
  * TLSN Fiat Swap — Seller / Customer
  *
  * Customer-side flow: lock Cashu proofs, publish a Nostr job request, select
- * a Provider quote, and wait for the Provider's Square Sandbox TLSN result.
+ * a Provider offer, and wait for the Provider's Square Sandbox TLSN result.
  */
 
 import {
@@ -25,7 +25,7 @@ function printConfig(config: SellerConfig) {
   console.log(`Oracle:   ${config.oraclePubkey}`);
   console.log(`Payment:  ${config.paymentLink}`);
   console.log(
-    `Quote:    ${config.fiatCurrency} ${
+    `Offer:    ${config.fiatCurrency} ${
       (config.fiatAmountMinor / 100).toFixed(2)
     } -> ${config.amountSats} sats`,
   );
@@ -49,12 +49,12 @@ try {
     oracleClient,
     cashuClient: createCashuClient({ mintUrl: config.mintUrl }),
     relayClient: createRelayClient(config.relays),
-    quoteWindowMs: config.quoteWindowMs,
+    offerWindowMs: config.offerWindowMs,
     resultTimeoutMs: config.resultTimeoutMs,
   });
 
   console.log(
-    "Publishing TLSN fiat swap request and waiting for Provider quotes...",
+    "Publishing TLSN fiat swap request and waiting for Provider offers...",
   );
   const result = await customer.request({
     spec: buildFiatSwapSpec(config),

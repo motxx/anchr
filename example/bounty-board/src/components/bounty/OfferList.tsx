@@ -7,24 +7,24 @@ import {
   DSSatsAmount,
   DSText,
 } from "../ds/index.ts";
-import type { QuoteInfo } from "../../api/types.ts";
+import type { OfferInfo } from "../../api/types.ts";
 import { truncateNpub } from "../../utils/format.ts";
 import { npubEncode } from "../../nostr/nip19.ts";
 
-interface QuoteListProps {
-  quotes: QuoteInfo[];
+interface OfferListProps {
+  offers: OfferInfo[];
   onSelectWorker: (workerPubkey: string) => void;
   selecting?: boolean;
 }
 
-export function QuoteList(
-  { quotes, onSelectWorker, selecting }: QuoteListProps,
+export function OfferList(
+  { offers, onSelectWorker, selecting }: OfferListProps,
 ) {
-  if (quotes.length === 0) {
+  if (offers.length === 0) {
     return (
       <DSCard>
         <DSText variant="body" muted className="text-center py-4">
-          No quotes yet. Workers will submit quotes soon.
+          No offers yet. Workers will submit offers soon.
         </DSText>
       </DSCard>
     );
@@ -32,24 +32,24 @@ export function QuoteList(
 
   return (
     <View className="gap-2">
-      {quotes.map((quote) => {
-        const npub = npubEncode(quote.worker_pubkey);
+      {offers.map((offer) => {
+        const npub = npubEncode(offer.worker_pubkey);
         return (
-          <DSCard key={quote.worker_pubkey}>
+          <DSCard key={offer.worker_pubkey}>
             <View className="flex-row items-center gap-3">
-              <DSAvatar pubkey={quote.worker_pubkey} size="sm" />
+              <DSAvatar pubkey={offer.worker_pubkey} size="sm" />
               <View className="flex-1">
                 <DSText variant="body" weight="medium">
                   {truncateNpub(npub)}
                 </DSText>
-                {quote.amount_sats && (
-                  <DSSatsAmount amount={quote.amount_sats} size="sm" />
+                {offer.amount_sats && (
+                  <DSSatsAmount amount={offer.amount_sats} size="sm" />
                 )}
               </View>
               <DSButton
                 label="Select"
                 size="sm"
-                onPress={() => onSelectWorker(quote.worker_pubkey)}
+                onPress={() => onSelectWorker(offer.worker_pubkey)}
                 loading={selecting}
               />
             </View>

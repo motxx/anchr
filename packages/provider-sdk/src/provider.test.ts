@@ -2,9 +2,9 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
+  canOfferForRequest,
   createProvider,
   ProviderConfigError,
-  shouldQuote,
   validateProviderOptions,
 } from "./provider.ts";
 import {
@@ -184,18 +184,18 @@ test("createProvider does not require notary (defaults to undefined)", () => {
   expect(provider.notary).toBe(undefined);
 });
 
-// --- shouldQuote helper ---
+// --- canOfferForRequest helper ---
 
-test("shouldQuote returns true when oracle is in whitelist", () => {
-  expect(shouldQuote(["a", "b", "c"], "b")).toBe(true);
+test("canOfferForRequest returns true when oracle is in whitelist", () => {
+  expect(canOfferForRequest(["a", "b", "c"], "b")).toBe(true);
 });
 
-test("shouldQuote returns false when oracle is not in whitelist", () => {
-  expect(shouldQuote(["a", "b"], "c")).toBe(false);
+test("canOfferForRequest returns false when oracle is not in whitelist", () => {
+  expect(canOfferForRequest(["a", "b"], "c")).toBe(false);
 });
 
-test("shouldQuote returns false on empty whitelist", () => {
-  expect(shouldQuote([], "a")).toBe(false);
+test("canOfferForRequest returns false on empty whitelist", () => {
+  expect(canOfferForRequest([], "a")).toBe(false);
 });
 
 // --- Subscription + handler invocation ---
@@ -340,7 +340,7 @@ function requireOnEvent(
   return onEvent;
 }
 
-test("Provider.serve publishes a kind 7000 quote when handler returns a ProviderQuote", async () => {
+test("Provider.serve publishes a kind 7000 offer when handler returns a ProviderOffer", async () => {
   const published: Event[] = [];
   let onEventRef: ((e: Event) => void) | null = null;
 
@@ -495,7 +495,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   });
   fireRequest(requestEvent);
 
-  // Wait for the provider to publish its quote and open the selection
+  // Wait for the provider to publish its offer and open the selection
   // subscription before we deliver the selection event.
   await new Promise((r) => setTimeout(r, 30));
   if (onSelectionEvent === null) {
@@ -522,7 +522,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   await servePromise;
 
   expect(producerCalled).toBe(true);
-  // Two publishes from the provider: kind 7000 quote + kind 6300 result.
+  // Two publishes from the provider: kind 7000 offer + kind 6300 result.
   expect(published).toHaveLength(2);
   expect(published[0].kind).toBe(7000);
   expect(published[1].kind).toBe(6300);
@@ -594,7 +594,7 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   await servePromise;
 
   expect(producerCalled).toBe(false);
-  // Only the kind 7000 quote was published; no kind 6300 result.
+  // Only the kind 7000 offer was published; no kind 6300 result.
   expect(published).toHaveLength(1);
   expect(published[0].kind).toBe(7000);
 });
@@ -712,7 +712,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   expect(parsed.responseEventId).toBe(published[1].id);
 });
 
-test("Provider.serve does not publish a quote that exceeds the request's maxAmountSats", async () => {
+test("Provider.serve does not publish an offer that exceeds the request's maxAmountSats", async () => {
   const published: Event[] = [];
   let onEventRef: ((e: Event) => void) | null = null;
 

@@ -1,7 +1,7 @@
 import type {
   ProofGenerator,
   ProviderHandler,
-  ProviderQuote,
+  ProviderOffer,
   ProviderRequestEvent,
   SchemaProducer,
   SchemaProducerContext,
@@ -13,7 +13,7 @@ import type { ActorStateStore } from "./storage.ts";
 export type {
   ProofGenerator,
   ProviderHandler,
-  ProviderQuote,
+  ProviderOffer,
   ProviderRequestEvent,
   SchemaProducer,
   SchemaProducerContext,

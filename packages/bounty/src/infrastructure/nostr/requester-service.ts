@@ -5,7 +5,7 @@
  *   1. Request hash(preimage) from Oracle
  *   2. Lock escrow token (Worker TBD)
  *   3. Publish DVM Job Request (kind 5300) with Oracle pubkey
- *   4. Listen for Worker quotes (kind 7000 status=payment-required)
+ *   4. Listen for Worker offers (kind 7000 status=payment-required)
  *   5. Select Worker, swap escrow to add Worker pubkey
  *   6. Announce selection (kind 7000 status=processing)
  *   7. Receive result (kind 6300), download blob, decrypt K_R
@@ -18,16 +18,16 @@ import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   parseFeedbackPayload,
   type QueryRequestPayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
 import type { EscrowProvider } from "../../application/ports.ts";
 import type {
   EscrowInfo,
-  QuoteInfo,
+  OfferInfo,
   TlsnEncryptedContext,
 } from "../../domain/types.ts";
 
@@ -67,7 +67,7 @@ export interface RequesterQueryState {
   escrow: EscrowInfo;
   escrowRef: string;
   nostrEventId: string;
-  quotes: QuoteInfo[];
+  offers: OfferInfo[];
   selectedWorkerPubkey?: string;
   finalEscrowRef?: string;
 }
@@ -176,16 +176,16 @@ export async function createHtlcQuery(
     escrow,
     escrowRef: hold.escrow_ref,
     nostrEventId: event.id,
-    quotes: [],
+    offers: [],
   };
 }
 
 /**
- * Step 4: Listen for Worker quotes.
+ * Step 4: Listen for Worker offers.
  */
-export function subscribeToQuotes(
+export function subscribeToOffers(
   state: RequesterQueryState,
-  onQuote: (quote: QuoteInfo) => void,
+  onOffer: (offer: OfferInfo) => void,
   relayUrls?: string[],
 ): SubCloser {
   return subscribeToFeedback(
@@ -198,15 +198,15 @@ export function subscribeToQuotes(
           event.pubkey,
         );
         if (payload.status === "payment-required") {
-          const quote = payload as QuoteFeedbackPayload;
-          const info: QuoteInfo = {
-            worker_pubkey: quote.worker_pubkey,
-            amount_sats: quote.amount_sats,
-            quote_event_id: event.id,
+          const offer = payload as OfferFeedbackPayload;
+          const info: OfferInfo = {
+            worker_pubkey: offer.worker_pubkey,
+            amount_sats: offer.amount_sats,
+            offer_event_id: event.id,
             received_at: Date.now(),
           };
-          state.quotes.push(info);
-          onQuote(info);
+          state.offers.push(info);
+          onOffer(info);
         }
       } catch {
         // Cannot decrypt, not for us

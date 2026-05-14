@@ -45,7 +45,7 @@ const customer = createCustomer({
   }),
   cashuClient: createCashuClient({ mintUrl: mint }),
   relayClient: createRelayClient(relays),
-  quoteWindowMs: Number(Deno.env.get("QUOTE_WINDOW_MS") ?? "30000"),
+  offerWindowMs: Number(Deno.env.get("OFFER_WINDOW_MS") ?? "30000"),
   resultTimeoutMs: Number(Deno.env.get("RESULT_TIMEOUT_MS") ?? "600000"),
 });
 

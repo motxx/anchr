@@ -278,14 +278,14 @@ if (!QUERY_ID) {
   process.exit(1);
 }
 
-// Quote + select (required by query-service, hidden from demo UI)
-await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
+// Offer + select (required by query-service, hidden from demo UI)
+await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/offers`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
     worker_pubkey: WORKER_PUBKEY,
     amount_sats: 0,
-    quote_event_id: `demo_${Date.now()}`,
+    offer_event_id: `demo_${Date.now()}`,
   }),
 });
 await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/select`, {

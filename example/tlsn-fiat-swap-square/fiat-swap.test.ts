@@ -43,13 +43,13 @@ Deno.test("fiat swap predicate is pinned to Square Sandbox and exact payment fie
       type: "jsonpath",
       expression: "payment.amount_money.amount",
       expected: "100",
-      description: "Square amount matches the fiat swap quote",
+      description: "Square amount matches the fiat swap offer",
     },
     {
       type: "jsonpath",
       expression: "payment.amount_money.currency",
       expected: "JPY",
-      description: "Square currency matches the fiat swap quote",
+      description: "Square currency matches the fiat swap offer",
     },
   ]);
   expect(predicate.fiat_swap).toEqual({

@@ -1,7 +1,7 @@
 import type { OracleClient } from "@anchr/oracle-sdk";
 import type {
+  Offer,
   Payment,
-  Quote,
   RequestResult,
   Spec,
   VerifierAdapter,
@@ -10,10 +10,10 @@ import type { CashuClient, CashuProof } from "./cashu.ts";
 import type { RelayClient } from "./nostr.ts";
 import type { ActorStateStore } from "./storage.ts";
 
-export type { Payment, Quote, RequestResult, Spec, VerifierAdapter };
+export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
 
-/** Strategy for picking a quote among the ones received within `quoteWindowMs`. */
-export type QuoteSelector = (quotes: Quote[]) => Quote | null;
+/** Strategy for picking an offer among the ones received within `offerWindowMs`. */
+export type OfferSelector = (offers: Offer[]) => Offer | null;
 
 /** Customer-side construction options. */
 export interface CustomerOptions {
@@ -31,8 +31,8 @@ export interface CustomerOptions {
   relayClient: RelayClient;
   /** Optional local state adapter for browser, Node, Deno, or test persistence. */
   stateStore?: ActorStateStore;
-  quoteSelector?: QuoteSelector;
-  quoteWindowMs?: number;
+  offerSelector?: OfferSelector;
+  offerWindowMs?: number;
   resultTimeoutMs?: number;
   verifierAdapters?: readonly VerifierAdapter[];
 }

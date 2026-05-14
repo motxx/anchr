@@ -1,7 +1,7 @@
 /**
  * C2PA Media Verification - Journalist / Provider
  *
- * Listens for C2PA image requests on Nostr, quotes matching requests, and
+ * Listens for C2PA image requests on Nostr, offers matching requests, and
  * returns the C2PA-signed photo as an encrypted kind 6300 result after
  * selection. The Oracle reads the oracle_payload tag, verifies the proof, and
  * DMs the HTLC preimage to this Provider.
@@ -31,7 +31,7 @@ const oraclePubkey = requiredEnv("ORACLE_PUBKEY");
 const privKey = requiredEnv("C2PA_PROVIDER_PRIVKEY");
 const photoPath = Deno.args[0] ?? Deno.env.get("C2PA_PHOTO_PATH") ??
   "signed-photo.jpg";
-const quoteSats = Number(Deno.env.get("C2PA_QUOTE_SATS") ?? "100");
+const offerSats = Number(Deno.env.get("C2PA_OFFER_SATS") ?? "100");
 
 interface C2paPredicate {
   locationHint?: string;
@@ -72,10 +72,10 @@ await provider.serve(async (request: ProviderRequestEvent) => {
 
   console.log(`Matched request from ${request.customerPubkey}`);
   console.log(`  Location: ${predicate.locationHint ?? "unspecified"}`);
-  console.log(`  Quote:    ${Math.min(quoteSats, request.maxAmountSats)} sats`);
+  console.log(`  Offer:    ${Math.min(offerSats, request.maxAmountSats)} sats`);
 
   return {
-    amountSats: Math.min(quoteSats, request.maxAmountSats),
+    amountSats: Math.min(offerSats, request.maxAmountSats),
     produce: async () => {
       const bytes = await Deno.readFile(photoPath);
       const filename = photoPath.split("/").pop() ?? "signed-photo.jpg";

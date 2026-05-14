@@ -2,7 +2,7 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { makeQuery } from "../testing/factories.ts";
 import {
-  addQuote,
+  addOffer,
   beginWork,
   cancelQuery,
   completeVerification,
@@ -15,10 +15,10 @@ import {
 } from "./query-aggregate.ts";
 import type {
   EscrowInfo,
+  OfferInfo,
   Query,
   QueryInput,
   QueryResult,
-  QuoteInfo,
   SubmissionMeta,
   VerificationDetail,
 } from "./types.ts";
@@ -68,7 +68,7 @@ function makeHtlcOptions(
 
 function makeHtlcQuery(overrides?: Partial<Query>): Query {
   return makeQuery({
-    status: "awaiting_quotes",
+    status: "awaiting_offers",
     payment_status: "escrow_locked",
     escrow: {
       type: "htlc",
@@ -77,7 +77,7 @@ function makeHtlcQuery(overrides?: Partial<Query>): Query {
       requester_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
-    quotes: [],
+    offers: [],
     ...overrides,
   });
 }
@@ -113,15 +113,15 @@ describe("createQueryAggregate", () => {
     expect(q.description).toBe("Take a photo of Tokyo Tower");
     expect(q.payment_status).toBe("locked");
     expect(q.escrow).toBeUndefined();
-    expect(q.quotes).toBeUndefined();
+    expect(q.offers).toBeUndefined();
   });
 
-  test("creates an HTLC query with awaiting_quotes status", () => {
+  test("creates an HTLC query with awaiting_offers status", () => {
     const q = expectOk(createQueryAggregate(defaultInput, makeHtlcOptions()));
-    expect(q.status).toBe("awaiting_quotes");
+    expect(q.status).toBe("awaiting_offers");
     expect(q.payment_status).toBe("escrow_locked");
     expect(q.escrow).toBeDefined();
-    expect(q.quotes).toEqual([]);
+    expect(q.offers).toEqual([]);
   });
 
   test("sets expires_at from ttlMs", () => {
@@ -403,7 +403,7 @@ describe("expireQuery", () => {
     expect(q.payment_status).toBe("cancelled");
   });
 
-  test("expires awaiting_quotes query past deadline", () => {
+  test("expires awaiting_offers query past deadline", () => {
     const query = makeHtlcQuery({ expires_at: 1000 });
     const q = expectOk(expireQuery(query, 2000));
     expect(q.status).toBe("expired");
@@ -457,7 +457,7 @@ describe("cancelQuery", () => {
     expect(q.payment_status).toBe("cancelled");
   });
 
-  test("cancels awaiting_quotes query", () => {
+  test("cancels awaiting_offers query", () => {
     const query = makeHtlcQuery();
     const q = expectOk(cancelQuery(query));
     expect(q.status).toBe("rejected");
@@ -495,87 +495,87 @@ describe("cancelQuery", () => {
   });
 });
 
-// --- HTLC: addQuote ---
+// --- HTLC: addOffer ---
 
-describe("addQuote", () => {
-  test("adds quote to awaiting_quotes query", () => {
+describe("addOffer", () => {
+  test("adds offer to awaiting_offers query", () => {
     const query = makeHtlcQuery();
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "worker1",
-      quote_event_id: "evt1",
+      offer_event_id: "evt1",
       received_at: Date.now(),
     };
-    const q = expectOk(addQuote(query, quote));
-    expect(q.quotes?.length).toBe(1);
-    expect(q.quotes?.[0].worker_pubkey).toBe("worker1");
+    const q = expectOk(addOffer(query, offer));
+    expect(q.offers?.length).toBe(1);
+    expect(q.offers?.[0].worker_pubkey).toBe("worker1");
   });
 
-  test("appends to existing quotes", () => {
+  test("appends to existing offers", () => {
     const query = makeHtlcQuery({
-      quotes: [{
+      offers: [{
         worker_pubkey: "w1",
-        quote_event_id: "e1",
+        offer_event_id: "e1",
         received_at: Date.now(),
       }],
     });
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "w2",
-      quote_event_id: "e2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     };
-    const q = expectOk(addQuote(query, quote));
-    expect(q.quotes?.length).toBe(2);
+    const q = expectOk(addOffer(query, offer));
+    expect(q.offers?.length).toBe(2);
   });
 
   test("rejects non-HTLC query", () => {
     const query = makeQuery();
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "w",
-      quote_event_id: "e",
+      offer_event_id: "e",
       received_at: Date.now(),
     };
-    const err = expectErr(addQuote(query, quote));
+    const err = expectErr(addOffer(query, offer));
     expect(err).toContain("escrow");
   });
 
-  test("rejects when not awaiting_quotes", () => {
+  test("rejects when not awaiting_offers", () => {
     const query = makeHtlcQuery({ status: "processing" });
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "w",
-      quote_event_id: "e",
+      offer_event_id: "e",
       received_at: Date.now(),
     };
-    const err = expectErr(addQuote(query, quote));
+    const err = expectErr(addOffer(query, offer));
     expect(err).toContain("processing");
   });
 
-  test("rejects quote with empty worker_pubkey", () => {
+  test("rejects offer with empty worker_pubkey", () => {
     const query = makeHtlcQuery();
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "",
-      quote_event_id: "e",
+      offer_event_id: "e",
       received_at: Date.now(),
     };
-    const err = expectErr(addQuote(query, quote));
+    const err = expectErr(addOffer(query, offer));
     expect(err).toContain("worker_pubkey");
   });
 
-  test("rejects quote with empty quote_event_id", () => {
+  test("rejects offer with empty offer_event_id", () => {
     const query = makeHtlcQuery();
-    const quote: QuoteInfo = {
+    const offer: OfferInfo = {
       worker_pubkey: "w",
-      quote_event_id: "",
+      offer_event_id: "",
       received_at: Date.now(),
     };
-    const err = expectErr(addQuote(query, quote));
-    expect(err).toContain("quote_event_id");
+    const err = expectErr(addOffer(query, offer));
+    expect(err).toContain("offer_event_id");
   });
 });
 
 // --- HTLC: selectWorker ---
 
 describe("selectWorker", () => {
-  test("transitions awaiting_quotes → worker_selected", () => {
+  test("transitions awaiting_offers → worker_selected", () => {
     const query = makeHtlcQuery();
     const q = expectOk(selectWorker(query, "worker_pub", {}));
     expect(q.status).toBe("worker_selected");
@@ -677,7 +677,7 @@ describe("recordResult", () => {
     expect(err).toContain("escrow");
   });
 
-  test("rejects wrong state (awaiting_quotes)", () => {
+  test("rejects wrong state (awaiting_offers)", () => {
     const query = makeHtlcQuery();
     expect(recordResult(query, defaultResult, "w").ok).toBe(false);
   });
@@ -771,7 +771,7 @@ describe("completeVerification", () => {
     );
   });
 
-  test("rejects wrong state (awaiting_quotes)", () => {
+  test("rejects wrong state (awaiting_offers)", () => {
     const query = makeHtlcQuery();
     expect(completeVerification(query, true, passedVerification).ok).toBe(
       false,
@@ -789,13 +789,13 @@ describe("completeVerification", () => {
 // --- Full HTLC lifecycle ---
 
 describe("HTLC full lifecycle", () => {
-  test("awaiting_quotes → worker_selected → processing → verifying → approved", () => {
+  test("awaiting_offers → worker_selected → processing → verifying → approved", () => {
     const q0 = makeHtlcQuery();
-    expect(q0.status).toBe("awaiting_quotes");
+    expect(q0.status).toBe("awaiting_offers");
 
-    const q1 = expectOk(addQuote(q0, {
+    const q1 = expectOk(addOffer(q0, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     }));
 
@@ -815,12 +815,12 @@ describe("HTLC full lifecycle", () => {
     expect(q4.payment_status).toBe("released");
   });
 
-  test("awaiting_quotes → worker_selected → processing → verifying → rejected", () => {
+  test("awaiting_offers → worker_selected → processing → verifying → rejected", () => {
     const q0 = makeHtlcQuery();
     const q1 = expectOk(
-      addQuote(q0, {
+      addOffer(q0, {
         worker_pubkey: "w1",
-        quote_event_id: "e1",
+        offer_event_id: "e1",
         received_at: Date.now(),
       }),
     );
@@ -832,7 +832,7 @@ describe("HTLC full lifecycle", () => {
     expect(q4.payment_status).toBe("cancelled");
   });
 
-  test("can expire at awaiting_quotes", () => {
+  test("can expire at awaiting_offers", () => {
     const q = makeHtlcQuery({ expires_at: 1000 });
     const expired = expectOk(expireQuery(q, 2000));
     expect(expired.status).toBe("expired");
@@ -849,7 +849,7 @@ describe("HTLC full lifecycle", () => {
     expect(expired.status).toBe("expired");
   });
 
-  test("can cancel at awaiting_quotes", () => {
+  test("can cancel at awaiting_offers", () => {
     expectOk(cancelQuery(makeHtlcQuery()));
   });
 

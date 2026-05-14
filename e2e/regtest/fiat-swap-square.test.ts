@@ -177,7 +177,7 @@ suite(
         oracleClient,
         cashuClient: createCashuClient({ mintUrl: MINT_URL }),
         relayClient: customerRelay,
-        quoteWindowMs: 3_000,
+        offerWindowMs: 3_000,
         resultTimeoutMs: 30_000,
         verifierAdapters: [{
           canHandle: (schema) => schema === FIAT_SWAP_SCHEMA,

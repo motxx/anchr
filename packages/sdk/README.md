@@ -57,7 +57,7 @@ const provider = createProvider({
 });
 
 await provider.serve(async (request) => {
-  // Decide whether to quote and at what price; return null to decline.
+  // Decide whether to offer and at what price; return null to decline.
   return {
     amountSats: 100,
     produce: async () => ({

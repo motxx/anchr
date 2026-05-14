@@ -21,7 +21,7 @@ HTLC after the Oracle verifies the proof and releases the preimage.
 ```mermaid
 flowchart LR
   Seller[Seller / Customer] -->|kind 5300 request + HTLC token| Relay[(Nostr Relay)]
-  Buyer[Buyer / Provider] -->|kind 7000 quote| Relay
+  Buyer[Buyer / Provider] -->|kind 7000 offer| Relay
   Seller -->|binds selected Provider| Mint[(Cashu Mint)]
   Buyer -.fiat payment.-> Square[(Square Sandbox)]
   Buyer -->|kind 6300 result + TLSN proof| Relay
@@ -34,7 +34,7 @@ The SDK flow is direct Customer/Provider interaction over Nostr:
 - Seller calls `createCustomer(...).request(...)`.
 - Buyer calls `createProvider(...).serve(...)`.
 - The Oracle exposes only its hash/preimage role, for example `POST /hash`.
-- The SDK does not add swap-specific `/queries`, `/quotes`, `/select`, or
+- The SDK does not add swap-specific `/queries`, `/offers`, `/select`, or
   `/begin` APIs.
 
 **Trust model: no swap custodian, oracle-gated release:**
@@ -52,7 +52,7 @@ The SDK flow is direct Customer/Provider interaction over Nostr:
 
 - `seller.ts` fails closed without `FIAT_SWAP_SOURCE_PROOFS_JSON`,
   `FIAT_SWAP_ORACLE_ENDPOINT`, and `FIAT_SWAP_ORACLE_PUBKEY`.
-- `buyer.ts` fails closed without `FIAT_SWAP_PROVIDER_PRIVKEY`, and only quotes
+- `buyer.ts` fails closed without `FIAT_SWAP_PROVIDER_PRIVKEY`, and only offers
   predicates matching the configured fiat terms.
 - TLSNotary predicate is pinned to `connect.squareupsandbox.com` and checks
   `payment.status=COMPLETED`, exact amount, exact currency, and optionally
@@ -63,8 +63,8 @@ The SDK flow is direct Customer/Provider interaction over Nostr:
 ## Files
 
 - `seller.ts` — Seller/Customer side: locks Cashu proofs, publishes the request,
-  selects a Provider quote, and waits for the result.
-- `buyer.ts` — Buyer/Provider side: listens for requests, quotes matching
+  selects a Provider offer, and waits for the result.
+- `buyer.ts` — Buyer/Provider side: listens for requests, offers matching
   predicates, publishes the TLSN result, and redeems after Oracle preimage
   delivery.
 - `fiat-swap.ts` — shared testnet config, Square predicate builder, proof

@@ -18,13 +18,13 @@ describe("query-transitions", () => {
   });
 
   describe("isValidTransition (HTLC)", () => {
-    test("awaiting_quotes -> worker_selected is valid", () => {
-      expect(isValidTransition("awaiting_quotes", "worker_selected", true))
+    test("awaiting_offers -> worker_selected is valid", () => {
+      expect(isValidTransition("awaiting_offers", "worker_selected", true))
         .toBe(true);
     });
 
-    test("awaiting_quotes -> processing is no longer valid (must go through worker_selected)", () => {
-      expect(isValidTransition("awaiting_quotes", "processing", true)).toBe(
+    test("awaiting_offers -> processing is no longer valid (must go through worker_selected)", () => {
+      expect(isValidTransition("awaiting_offers", "processing", true)).toBe(
         false,
       );
     });

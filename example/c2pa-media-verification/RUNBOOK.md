@@ -4,7 +4,8 @@
 
 - [Bun](https://bun.sh/)
 - Docker & Docker Compose
-- (任意) [c2patool](https://github.com/contentauth/c2patool) — C2PA 署名付き画像を作成する場合
+- (任意) [c2patool](https://github.com/contentauth/c2patool) — C2PA
+  署名付き画像を作成する場合
 
 ## 1. インフラ起動
 
@@ -45,10 +46,12 @@ bun run example/c2pa-media-verification/requester.ts
 SDK が photo クエリを作成し、Worker の提出をポーリングで待ちます。
 
 期待される出力:
+
 ```
 === C2PA Media Verification — Requester (News Desk) ===
 Server: http://localhost:3000
 ```
+
 (Worker が提出するまでブロック)
 
 ### Terminal 2: Worker (記者)
@@ -71,6 +74,7 @@ bun run example/c2pa-media-verification/worker.ts /tmp/test-photo.jpg
 ```
 
 期待される出力:
+
 ```
 Step 1: Finding open photo queries...
 Found query: query_xxxxx
@@ -147,9 +151,9 @@ docker compose down
 
 ## トラブルシューティング
 
-| 問題 | 対処 |
-|------|------|
-| `Blossom upload failed` | `docker compose ps` で blossom が Up か確認 |
-| `port 3000 in use` | `lsof -ti:3000 \| xargs kill -9` |
-| Worker が "No open photo queries" | Requester を先に実行してクエリを作成する |
-| `anchr-sdk` module not found | `packages/sdk/` が存在することを確認 |
+| 問題                              | 対処                                        |
+| --------------------------------- | ------------------------------------------- |
+| `Blossom upload failed`           | `docker compose ps` で blossom が Up か確認 |
+| `port 3000 in use`                | `lsof -ti:3000 \| xargs kill -9`            |
+| Worker が "No open photo queries" | Requester を先に実行してクエリを作成する    |
+| `anchr-sdk` module not found      | `packages/sdk/` が存在することを確認        |

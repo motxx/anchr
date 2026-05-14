@@ -166,9 +166,9 @@ describe("NUT-07: Requester cannot revoke payment", () => {
       { description: "Escrow verify test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -193,16 +193,16 @@ describe("NUT-07: Requester cannot revoke payment", () => {
       { description: "Invalid token test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
     const outcome = await service.selectWorker(query.id, "w1", "garbage_token");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Escrow token verification failed");
-    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 });
 
@@ -230,7 +230,7 @@ describe("NUT-11: Timeout refund", () => {
 
   test("cancelled non-HTLC query refunds locked proofs to Requester wallet", () => {
     // cancelQuery only works on "pending" status (non-HTLC queries).
-    // HTLC queries start as "awaiting_quotes" and are refunded via
+    // HTLC queries start as "awaiting_offers" and are refunded via
     // rejected verification or timeout. This tests the non-HTLC refund path.
     const { service } = makeServiceWithPreimage();
 
@@ -262,9 +262,9 @@ describe("NUT-11: Timeout refund", () => {
         oracleIds: ["strict-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -308,7 +308,7 @@ describe("Worker impersonation prevention", () => {
     expect(service.getQuery(query.id)?.status).toBe("processing");
   });
 
-  test("only quoted Worker can be selected", async () => {
+  test("only offered Worker can be selected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { escrowInfo } = makeEscrowInfo(preimageStore);
 
@@ -316,14 +316,14 @@ describe("Worker impersonation prevention", () => {
       { description: "Worker check" },
       { escrow: escrowInfo },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "legit_worker",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
-    // Select a worker who never quoted — should still succeed at protocol level
-    // (worker selection is Requester's choice from available quotes)
+    // Select a worker who never offered — should still succeed at protocol level
+    // (worker selection is Requester's choice from available offers)
     // The real protection is P2PK: only the selected Worker's key can redeem
     const outcome = await service.selectWorker(query.id, "other_worker");
     expect(outcome.ok).toBe(true);
@@ -379,9 +379,9 @@ describe("Oracle + Requester collusion limits", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -415,9 +415,9 @@ describe("Oracle + Requester collusion limits", () => {
         oracleIds: ["strict-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -504,7 +504,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
       { escrow: escrowInfo },
     );
 
-    // Still in awaiting_quotes
+    // Still in awaiting_offers
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
@@ -524,9 +524,9 @@ describe("HTLC state machine — invalid transitions blocked", () => {
       { description: "Double select" },
       { escrow: escrowInfo },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -535,7 +535,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     const second = await service.selectWorker(query.id, "w2");
 
     expect(second.ok).toBe(false);
-    expect(second.message).toContain("not awaiting_quotes");
+    expect(second.message).toContain("not awaiting_offers");
   });
 
   test("cannot submit result twice", async () => {
@@ -567,14 +567,14 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     const { service } = makeServiceWithPreimage();
     const query = service.createQuery({ description: "Simple query" });
 
-    // recordQuote fails
-    const quoteResult = service.recordQuote(query.id, {
+    // recordOffer fails
+    const offerResult = service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    expect(quoteResult.ok).toBe(false);
-    expect(quoteResult.message).toContain("Not an escrow query");
+    expect(offerResult.ok).toBe(false);
+    expect(offerResult.message).toContain("Not an escrow query");
 
     // submitEscrowResult fails
     const htlcResult = await service.submitEscrowResult(

@@ -2,7 +2,7 @@
  * Auto-Claim Agent - User / Provider
  *
  * Runs on the user's device. It listens for NIP-90 job requests over Nostr,
- * quotes on auto-claim predicates it can satisfy, then waits until the
+ * offers on auto-claim predicates it can satisfy, then waits until the
  * predicate becomes true before generating a TLSNotary proof.
  *
  * There is no Anchr server in this flow. The only long-running process here is
@@ -35,7 +35,7 @@ const CHECK_INTERVAL_MS = Number(Deno.env.get("CHECK_INTERVAL_MS") ?? "10000");
 const PRODUCE_TIMEOUT_MS = Number(
   Deno.env.get("PRODUCE_TIMEOUT_MS") ?? "3600000",
 );
-const QUOTE_SATS = Number(Deno.env.get("AUTO_CLAIM_QUOTE_SATS") ?? "10000");
+const OFFER_SATS = Number(Deno.env.get("AUTO_CLAIM_OFFER_SATS") ?? "10000");
 
 interface Condition {
   type: string;
@@ -84,10 +84,10 @@ await provider.serve(async (request: ProviderRequestEvent) => {
 
   console.log(`Matched request from ${request.customerPubkey}`);
   console.log(`  Target: ${predicate.targetUrl}`);
-  console.log(`  Quote:  ${Math.min(QUOTE_SATS, request.maxAmountSats)} sats`);
+  console.log(`  Offer:  ${Math.min(OFFER_SATS, request.maxAmountSats)} sats`);
 
   return {
-    amountSats: Math.min(QUOTE_SATS, request.maxAmountSats),
+    amountSats: Math.min(OFFER_SATS, request.maxAmountSats),
     produce: async () => {
       const observed = await waitForTriggeredPredicate(predicate);
       console.log("  Generating TLSNotary proof...");

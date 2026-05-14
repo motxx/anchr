@@ -33,7 +33,7 @@ export function createInMemoryQueryRepository(): QueryRepository {
     findOpen(now) {
       const openStatuses: QueryStatus[] = [
         "pending",
-        "awaiting_quotes",
+        "awaiting_offers",
         "worker_selected",
         "processing",
       ];
@@ -74,7 +74,7 @@ export function toRepository(store: QueryStore): QueryRepository {
     findOpen(now) {
       const openStatuses: QueryStatus[] = [
         "pending",
-        "awaiting_quotes",
+        "awaiting_offers",
         "worker_selected",
         "processing",
       ];

@@ -6,10 +6,10 @@ import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../nostr/crypto/identity.ts";
 import {
+  type OfferFeedbackPayload,
   type OracleResponsePayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
-  type QuoteFeedbackPayload,
 } from "../nostr/events/events.ts";
 import type { Query, QueryResult } from "../../domain/types.ts";
 
@@ -18,7 +18,7 @@ export interface WatchedQuery {
   queryEventId: string;
   requesterPubkey: string;
   selectedWorkerPubkey?: string;
-  quotedWorkers: Set<string>;
+  offeredWorkers: Set<string>;
   subs: SubCloser[];
 }
 
@@ -60,7 +60,7 @@ export function handleFeedbackEvent(
   watched: Map<string, WatchedQuery>,
   queryId: string,
   event: Event,
-  onQuote?: (
+  onOffer?: (
     queryId: string,
     workerPubkey: string,
     amountSats?: number,
@@ -77,9 +77,9 @@ export function handleFeedbackEvent(
     );
 
     if (payload.status === "payment-required") {
-      const quote = payload as QuoteFeedbackPayload;
-      entry.quotedWorkers.add(quote.worker_pubkey);
-      onQuote?.(queryId, quote.worker_pubkey, quote.amount_sats);
+      const offer = payload as OfferFeedbackPayload;
+      entry.offeredWorkers.add(offer.worker_pubkey);
+      onOffer?.(queryId, offer.worker_pubkey, offer.amount_sats);
     }
   } catch {
     // Cannot decrypt — event not for us, ignore

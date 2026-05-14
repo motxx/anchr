@@ -1,6 +1,6 @@
 export type QueryStatus =
   | "pending"
-  | "awaiting_quotes"
+  | "awaiting_offers"
   | "worker_selected"
   | "processing"
   | "verifying"
@@ -221,15 +221,15 @@ export interface P2pkFrostEscrow extends EscrowCommonFields {
 /** Escrow information for an in-flight Query. Discriminated by `type`. */
 export type EscrowInfo = HtlcEscrow | P2pkFrostEscrow;
 
-/** A quote from a Worker offering to fulfill a query. */
-export interface QuoteInfo {
+/** An offer from a Worker offering to fulfill a query. */
+export interface OfferInfo {
   /** Worker's Nostr pubkey (hex). */
   worker_pubkey: string;
   /** Requested amount in sats (optional; may match bounty). */
   amount_sats?: number;
-  /** Nostr event ID of the kind 7000 quote event. */
-  quote_event_id: string;
-  /** Timestamp when the quote was received. */
+  /** Nostr event ID of the kind 7000 offer event. */
+  offer_event_id: string;
+  /** Timestamp when the offer was received. */
   received_at: number;
 }
 
@@ -296,8 +296,8 @@ export interface Query {
   payment_status: PaymentStatus;
   /** Escrow details (present when payment escrow is used). */
   escrow?: EscrowInfo;
-  /** Worker quotes received for this query. */
-  quotes?: QuoteInfo[];
+  /** Worker offers received for this query. */
+  offers?: OfferInfo[];
   /** Nostr event ID of the kind 5300 Job Request. */
   nostr_event_id?: string;
   /** Ephemeral Blossom encryption keys — stored for requester download via HTTP API. */

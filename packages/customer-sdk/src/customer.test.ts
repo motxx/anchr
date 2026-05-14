@@ -5,16 +5,16 @@ import {
   createCustomer,
   CustomerConfigError,
   generateQueryId,
-  NoQuotesReceivedError,
+  NoOffersReceivedError,
   OracleWhitelistMismatchError,
   pickOracleForRequest,
   RelayPublishError,
-  selectCheapestQuote,
+  selectCheapestOffer,
   validateCustomerOptions,
 } from "./customer.ts";
 import {
+  buildOfferFeedbackEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
 } from "@anchr/protocol/events";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
@@ -37,7 +37,7 @@ import type {
   Subscription,
 } from "./nostr.ts";
 import { createMemoryStateStore } from "./storage.ts";
-import type { CustomerOptions, Quote } from "./types.ts";
+import type { CustomerOptions, Offer } from "./types.ts";
 
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
@@ -110,7 +110,7 @@ const validOptions = (): CustomerOptions => ({
   cashuClient: makeCashuClient(),
   relayClient: makeRelayClient(),
   // Short window so tests don't wait the 30s default.
-  quoteWindowMs: 10,
+  offerWindowMs: 10,
 });
 
 test("validateCustomerOptions accepts a well-formed options object", () => {
@@ -221,7 +221,7 @@ test("Customer.request calls oracleClient.requestHash", async () => {
   const customer = createCustomer({
     ...validOptions(),
     oracleClient,
-    quoteWindowMs: 10,
+    offerWindowMs: 10,
   });
 
   await expect(
@@ -273,7 +273,7 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
   const customer = createCustomer({
     ...validOptions(),
     cashuClient,
-    quoteWindowMs: 10,
+    offerWindowMs: 10,
   });
 
   await expect(
@@ -317,8 +317,8 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
   ).rejects.toThrow(CashuMintError);
 });
 
-test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the window", async () => {
-  const customer = createCustomer({ ...validOptions(), quoteWindowMs: 10 });
+test("Customer.request throws NoOffersReceivedError when no offers arrive in the window", async () => {
+  const customer = createCustomer({ ...validOptions(), offerWindowMs: 10 });
   await expect(
     customer.request({
       spec: {
@@ -328,7 +328,7 @@ test("Customer.request throws NoQuotesReceivedError when no quotes arrive in the
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(NoQuotesReceivedError);
+  ).rejects.toThrow(NoOffersReceivedError);
 });
 
 test("Customer.request publishes a kind 5300 Job Request event via relayClient", async () => {
@@ -342,7 +342,7 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
   const customer = createCustomer({
     ...validOptions(),
     relayClient,
-    quoteWindowMs: 10,
+    offerWindowMs: 10,
   });
 
   await expect(
@@ -388,7 +388,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
       if (filterKinds.includes(7000)) {
         queueMicrotask(() => {
           const id = requestEventId.id ?? "unknown";
-          onEvent(buildQuoteFeedbackEvent(provider, id, "00".repeat(32), {
+          onEvent(buildOfferFeedbackEvent(provider, id, "00".repeat(32), {
             status: "payment-required",
             provider_pubkey: provider.publicKey,
             amount_sats: 500,
@@ -415,7 +415,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     oracleClient,
     relayClient,
     stateStore,
-    quoteWindowMs: 30,
+    offerWindowMs: 30,
     resultTimeoutMs: 1000,
   });
 
@@ -463,7 +463,7 @@ test("Customer.request runs verifierAdapters when provided", async () => {
       if (filterKinds.includes(7000)) {
         queueMicrotask(() => {
           onEvent(
-            buildQuoteFeedbackEvent(
+            buildOfferFeedbackEvent(
               provider,
               requestEventId.id ?? "x",
               "00".repeat(32),
@@ -496,7 +496,7 @@ test("Customer.request runs verifierAdapters when provided", async () => {
   const customer = createCustomer({
     ...validOptions(),
     relayClient,
-    quoteWindowMs: 30,
+    offerWindowMs: 30,
     resultTimeoutMs: 1000,
     verifierAdapters: [
       {
@@ -543,7 +543,7 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
       if (filterKinds.includes(7000)) {
         queueMicrotask(() => {
           onEvent(
-            buildQuoteFeedbackEvent(
+            buildOfferFeedbackEvent(
               provider,
               requestEventId.id ?? "x",
               "00".repeat(32),
@@ -576,7 +576,7 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
   const customer = createCustomer({
     ...validOptions(),
     relayClient,
-    quoteWindowMs: 30,
+    offerWindowMs: 30,
     resultTimeoutMs: 1000,
     verifierAdapters: [{
       canHandle: (schema) =>
@@ -610,7 +610,7 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
       if ((filter.kinds ?? []).includes(7000)) {
         queueMicrotask(() => {
           onEvent(
-            buildQuoteFeedbackEvent(
+            buildOfferFeedbackEvent(
               provider,
               requestEventId.id ?? "x",
               "00".repeat(32),
@@ -630,7 +630,7 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
   const customer = createCustomer({
     ...validOptions(),
     relayClient,
-    quoteWindowMs: 20,
+    offerWindowMs: 20,
     resultTimeoutMs: 50,
   });
 
@@ -646,7 +646,7 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
   ).rejects.toThrow(ResultTimeoutError);
 });
 
-test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishes selection", async () => {
+test("Customer.request collects offers, picks cheapest, binds HTLC, and publishes selection", async () => {
   const providerA = generateKeypair();
   const providerB = generateKeypair();
   const requestEventRecorder: { id: string | null } = { id: null };
@@ -662,7 +662,7 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const requestId = requestEventRecorder.id ?? "unknown";
-        const quoteA = buildQuoteFeedbackEvent(
+        const offerA = buildOfferFeedbackEvent(
           providerA,
           requestId,
           "00".repeat(32),
@@ -672,7 +672,7 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
             amount_sats: 800,
           },
         );
-        const quoteB = buildQuoteFeedbackEvent(
+        const offerB = buildOfferFeedbackEvent(
           providerB,
           requestId,
           "00".repeat(32),
@@ -682,8 +682,8 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
             amount_sats: 500,
           },
         );
-        onEvent(quoteA);
-        onEvent(quoteB);
+        onEvent(offerA);
+        onEvent(offerB);
       });
       void filter;
       return { close: () => {} };
@@ -701,7 +701,7 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
     ...validOptions(),
     relayClient,
     cashuClient,
-    quoteWindowMs: 30,
+    offerWindowMs: 30,
     resultTimeoutMs: 50,
   });
 
@@ -726,7 +726,7 @@ test("Customer.request collects quotes, picks cheapest, binds HTLC, and publishe
   expect(publishedEvents[1].kind).toBe(7000);
 });
 
-test("Customer.request rejects quotes above the maxAmount budget", async () => {
+test("Customer.request rejects offers above the maxAmount budget", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
 
@@ -738,7 +738,7 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
     subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const id = requestEventId.id ?? "unknown";
-        const expensive = buildQuoteFeedbackEvent(
+        const expensive = buildOfferFeedbackEvent(
           provider,
           id,
           "00".repeat(32),
@@ -757,7 +757,7 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
   const customer = createCustomer({
     ...validOptions(),
     relayClient,
-    quoteWindowMs: 20,
+    offerWindowMs: 20,
   });
 
   await expect(
@@ -769,7 +769,7 @@ test("Customer.request rejects quotes above the maxAmount budget", async () => {
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(NoQuotesReceivedError);
+  ).rejects.toThrow(NoOffersReceivedError);
 });
 
 test("Customer.request honors `provider` pinning when set", async () => {
@@ -786,12 +786,12 @@ test("Customer.request honors `provider` pinning when set", async () => {
     subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
       queueMicrotask(() => {
         const id = requestEventId.id ?? "unknown";
-        onEvent(buildQuoteFeedbackEvent(otherProvider, id, "00".repeat(32), {
+        onEvent(buildOfferFeedbackEvent(otherProvider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: otherProvider.publicKey,
           amount_sats: 100,
         }));
-        onEvent(buildQuoteFeedbackEvent(wantedProvider, id, "00".repeat(32), {
+        onEvent(buildOfferFeedbackEvent(wantedProvider, id, "00".repeat(32), {
           status: "payment-required",
           provider_pubkey: wantedProvider.publicKey,
           amount_sats: 500,
@@ -811,7 +811,7 @@ test("Customer.request honors `provider` pinning when set", async () => {
     ...validOptions(),
     relayClient,
     cashuClient,
-    quoteWindowMs: 30,
+    offerWindowMs: 30,
     resultTimeoutMs: 50,
   });
 
@@ -863,22 +863,22 @@ test("pickOracleForRequest throws on empty whitelist", () => {
   expect(() => pickOracleForRequest([])).toThrow(CustomerConfigError);
 });
 
-test("selectCheapestQuote returns null on empty input", () => {
-  expect(selectCheapestQuote([])).toBe(null);
+test("selectCheapestOffer returns null on empty input", () => {
+  expect(selectCheapestOffer([])).toBe(null);
 });
 
-test("selectCheapestQuote picks the lowest amount", () => {
-  const quotes: Quote[] = [
+test("selectCheapestOffer picks the lowest amount", () => {
+  const offers: Offer[] = [
     {
       providerPubkey: "a",
       amountSats: 1000,
-      quoteEventId: "ea",
+      offerEventId: "ea",
       receivedAt: 1,
     },
-    { providerPubkey: "b", amountSats: 500, quoteEventId: "eb", receivedAt: 2 },
-    { providerPubkey: "c", amountSats: 750, quoteEventId: "ec", receivedAt: 3 },
+    { providerPubkey: "b", amountSats: 500, offerEventId: "eb", receivedAt: 2 },
+    { providerPubkey: "c", amountSats: 750, offerEventId: "ec", receivedAt: 3 },
   ];
-  expect(selectCheapestQuote(quotes)?.providerPubkey).toBe("b");
+  expect(selectCheapestOffer(offers)?.providerPubkey).toBe("b");
 });
 
 test("generateQueryId produces unique identifiers", () => {

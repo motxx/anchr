@@ -3,7 +3,7 @@
  *
  * Responsibilities (per README):
  *   1. Generate preimage, return hash(preimage) to Requester
- *   2. Listen for kind 7000 quotes → record Worker pubkeys
+ *   2. Listen for kind 7000 offers → record Worker pubkeys
  *   3. On selection announcement → verify HTLC condition, record selected Worker
  *   4. Listen for kind 6300 results → verify Worker pubkey, download blob,
  *      verify blob hash, decrypt K_O, verify C2PA
@@ -78,8 +78,8 @@ export interface OracleNostrServiceConfig {
   frostConfig?: ThresholdOracleConfig;
   /** Per-node FROST config with key material and peer endpoints. */
   frostNodeConfig?: FrostNodeConfig;
-  /** Callback when a Worker submits a quote. */
-  onQuote?: (
+  /** Callback when a Worker submits an offer. */
+  onOffer?: (
     queryId: string,
     workerPubkey: string,
     amountSats?: number,
@@ -97,7 +97,7 @@ export interface OracleNostrServiceConfig {
 export interface OracleNostrService {
   /** Generate a preimage for a query and return the hash. */
   generateHash(queryId: string): { hash: string };
-  /** Start watching a query for quotes and results. */
+  /** Start watching a query for offers and results. */
   watchQuery(
     queryId: string,
     queryEventId: string,
@@ -237,7 +237,7 @@ export function createOracleNostrService(
         queryId,
         queryEventId,
         requesterPubkey,
-        quotedWorkers: new Set(),
+        offeredWorkers: new Set(),
         subs: [],
       };
 
@@ -249,7 +249,7 @@ export function createOracleNostrService(
             watched,
             queryId,
             event,
-            config.onQuote,
+            config.onOffer,
           ),
         config.relayUrls,
       );

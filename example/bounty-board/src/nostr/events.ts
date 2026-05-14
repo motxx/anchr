@@ -39,7 +39,7 @@ export interface QueryResponsePayload {
   notes?: string;
 }
 
-export interface QuoteFeedbackPayload {
+export interface OfferFeedbackPayload {
   status: "payment-required";
   worker_pubkey: string;
   amount_sats?: number;
@@ -58,7 +58,7 @@ export interface CompletionFeedbackPayload {
 }
 
 export type FeedbackPayload =
-  | QuoteFeedbackPayload
+  | OfferFeedbackPayload
   | SelectionFeedbackPayload
   | CompletionFeedbackPayload;
 
@@ -101,11 +101,11 @@ export function buildQueryRequestEvent(
   return finalizeEvent(template, identity.secretKey);
 }
 
-export function buildQuoteFeedbackEvent(
+export function buildOfferFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
   requesterPubKey: string,
-  payload: QuoteFeedbackPayload,
+  payload: OfferFeedbackPayload,
 ): VerifiedEvent {
   const conversationKey = deriveConversationKey(
     identity.secretKey,

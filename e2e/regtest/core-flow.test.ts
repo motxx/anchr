@@ -4,7 +4,7 @@
  * Tests the complete Anchr protocol flow in one pass:
  *   1. Requester mints Cashu tokens via regtest Lightning
  *   2. Requester creates HTLC query (Oracle generates preimage → hash)
- *   3. Worker submits quote
+ *   3. Worker submits offer
  *   4. Requester selects Worker (escrow locked with HTLC)
  *   5. Worker acknowledges (beginWork)
  *   6. Worker submits result
@@ -97,7 +97,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     store.clear();
   });
 
-  test("full core flow: mint → HTLC lock → quote → select → begin → verify → preimage → redeem", async () => {
+  test("full core flow: mint → HTLC lock → offer → select → begin → verify → preimage → redeem", async () => {
     // === Phase 1: Setup ===
 
     // 1a. Oracle generates preimage/hash pair
@@ -144,17 +144,17 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
 
     // Verify initial state
     const q0 = service.getQuery(queryId)!;
-    expect(q0.status).toBe("awaiting_quotes");
+    expect(q0.status).toBe("awaiting_offers");
     expect(q0.payment_status).toBe("escrow_locked");
 
-    // 2b. Worker submits quote
-    const quoteOutcome = service.recordQuote(queryId, {
+    // 2b. Worker submits offer
+    const offerOutcome = service.recordOffer(queryId, {
       worker_pubkey: "e2e_worker_pub",
       amount_sats: BOUNTY_SATS,
-      quote_event_id: "e2e_quote_1",
+      offer_event_id: "e2e_offer_1",
       received_at: Date.now(),
     });
-    expect(quoteOutcome.ok).toBe(true);
+    expect(offerOutcome.ok).toBe(true);
 
     // 2c. Requester selects Worker
     const selectOutcome = await service.selectWorker(queryId, "e2e_worker_pub");
@@ -233,7 +233,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     const proofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
     const token = getEncodedToken({ mint: MINT_URL, proofs });
 
-    // Create query, quote, select, begin
+    // Create query, offer, select, begin
     const query = service.createQuery(
       { description: "E2E rejection test" },
       {
@@ -242,9 +242,9 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
         oracleIds: ["strict-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1");
@@ -281,7 +281,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       { description: "E2E expiry test" },
       { escrow: escrowInfo, ttlMs: 1 }, // Expires immediately
     );
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
 
     // Wait for expiry
     await new Promise((r) => setTimeout(r, 10));

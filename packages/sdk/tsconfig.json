@@ -26,6 +26,7 @@
       "@anchr/customer-sdk/cashu": ["../customer-sdk/src/cashu.ts"],
       "@anchr/customer-sdk/customer": ["../customer-sdk/src/customer.ts"],
       "@anchr/customer-sdk/nostr": ["../customer-sdk/src/nostr.ts"],
+      "@anchr/customer-sdk/storage": ["../customer-sdk/src/storage.ts"],
       "@anchr/customer-sdk/types": ["../customer-sdk/src/types.ts"],
       "@anchr/provider-sdk": ["../provider-sdk/src/mod.ts"],
       "@anchr/provider-sdk/cashu": ["../provider-sdk/src/cashu.ts"],

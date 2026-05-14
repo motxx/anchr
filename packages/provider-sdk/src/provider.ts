@@ -1,14 +1,14 @@
 /**
  * Provider — fulfillment-side of the Anchr verified-data exchange.
  *
- * Subscribes to NIP-90 kind 5300 job requests, quotes via kind 7000,
+ * Subscribes to NIP-90 kind 5300 job requests, offers via kind 7000,
  * produces proofs after selection, publishes kind 6300 results, and
  * redeems the HTLC once the oracle releases the preimage.
  */
 
 import {
+  buildOfferFeedbackEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
   parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseSelectionFeedbackEvent,
@@ -24,15 +24,15 @@ import { getPublicKey } from "nostr-tools/pure";
 import type {
   ProofGenerator,
   ProviderHandler,
+  ProviderOffer,
   ProviderOptions,
-  ProviderQuote,
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
 import type { CashuClient } from "./cashu.ts";
 import type { ActorStateStore } from "./storage.ts";
 
-/** Default timeout for waiting for the customer's selection event after a quote (60s). */
+/** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
 
 /** Default timeout for waiting for the oracle's preimage NIP-44 DM after publishing the result (5 min). */
@@ -161,9 +161,9 @@ export function validateProviderOptions(
 
 /**
  * Returns true when the request's oracle pubkey is in this provider's
- * whitelist. Used as the gate before quoting.
+ * whitelist. Used as the gate before offering.
  */
-export function shouldQuote(
+export function canOfferForRequest(
   providerOracles: readonly string[],
   requestOraclePubkey: string,
 ): boolean {
@@ -259,7 +259,7 @@ async function handleJob(
 ): Promise<void> {
   const payload = parseQueryRequestEvent(event);
   if (payload === null) return;
-  if (!shouldQuote(ctx.oracles, payload.oracle_pubkey)) return;
+  if (!canOfferForRequest(ctx.oracles, payload.oracle_pubkey)) return;
   if (!isSchemaUri(payload.schema)) return;
   const proofGenerator = ctx.proofGenerators.length === 0
     ? null
@@ -278,36 +278,36 @@ async function handleJob(
     proofGenerator: proofGenerator ?? undefined,
   };
 
-  let quote: ProviderQuote | null;
+  let offer: ProviderOffer | null;
   try {
-    quote = await handler(request);
+    offer = await handler(request);
   } catch {
     return;
   }
-  if (quote === null) return;
-  if (typeof quote.amountSats !== "number" || quote.amountSats <= 0) return;
-  if (quote.amountSats > payload.max_amount_sats) return;
+  if (offer === null) return;
+  if (typeof offer.amountSats !== "number" || offer.amountSats <= 0) return;
+  if (offer.amountSats > payload.max_amount_sats) return;
 
-  const quoteEvent = buildQuoteFeedbackEvent(
+  const offerEvent = buildOfferFeedbackEvent(
     ctx.identity,
     event.id,
     payload.customer_pubkey,
     {
       status: "payment-required",
       provider_pubkey: ctx.identity.publicKey,
-      amount_sats: quote.amountSats,
+      amount_sats: offer.amountSats,
     },
   );
-  await ctx.relayClient.publish(quoteEvent);
+  await ctx.relayClient.publish(offerEvent);
   if (ctx.stateStore !== undefined) {
     await writeProviderState(ctx.stateStore, {
       requestEventId: event.id,
       queryId: payload.query_id,
       customerPubkey: payload.customer_pubkey,
       schema: payload.schema,
-      status: "quote_published",
-      amountSats: quote.amountSats,
-      quoteEventId: quoteEvent.id,
+      status: "offer_published",
+      amountSats: offer.amountSats,
+      offerEventId: offerEvent.id,
       updatedAt: Date.now(),
     });
   }
@@ -321,7 +321,7 @@ async function handleJob(
 
   let result: { data: unknown; proof: Uint8Array | string };
   try {
-    result = await quote.produce();
+    result = await offer.produce();
   } catch {
     return;
   }
@@ -346,8 +346,8 @@ async function handleJob(
       customerPubkey: payload.customer_pubkey,
       schema: payload.schema,
       status: "result_published",
-      amountSats: quote.amountSats,
-      quoteEventId: quoteEvent.id,
+      amountSats: offer.amountSats,
+      offerEventId: offerEvent.id,
       responseEventId: responseEvent.id,
       updatedAt: Date.now(),
     });
@@ -374,8 +374,8 @@ async function handleJob(
         customerPubkey: payload.customer_pubkey,
         schema: payload.schema,
         status: "redeemed",
-        amountSats: quote.amountSats,
-        quoteEventId: quoteEvent.id,
+        amountSats: offer.amountSats,
+        offerEventId: offerEvent.id,
         responseEventId: responseEvent.id,
         updatedAt: Date.now(),
       });
@@ -386,7 +386,7 @@ async function handleJob(
 }
 
 type ProviderStateStatus =
-  | "quote_published"
+  | "offer_published"
   | "result_published"
   | "redeemed";
 
@@ -397,7 +397,7 @@ interface ProviderStateRecord {
   schema: string;
   status: ProviderStateStatus;
   amountSats: number;
-  quoteEventId: string;
+  offerEventId: string;
   responseEventId?: string;
   updatedAt: number;
 }
@@ -461,7 +461,7 @@ function waitForPreimage(
 
 /**
  * Wait for the customer's kind 7000 status=processing selection event
- * referencing our quote. Returns the parsed selection payload, or
+ * referencing our offer. Returns the parsed selection payload, or
  * null on timeout / no addressed-to-us event.
  */
 function waitForSelection(

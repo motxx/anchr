@@ -6,7 +6,7 @@
  * 2. Seller: Create Square Payment Link (URL only, no payment yet)
  * 3. Seller: Mint Cashu bounty + create HTLC token
  * 4. Seller: POST /queries — Worker UI now shows the job
- * 5. Buyer:  POST /quotes → Seller selects Worker (Worker accepts the job)
+ * 5. Buyer:  POST /offers → Seller selects Worker (Worker accepts the job)
  * 6. Buyer:  Browser pays via Payment Link (Sandbox Testing Panel)
  * 7. Buyer:  Get Payment ID from Square API
  * 8. Buyer:  Generate TLSNotary proof via CLI
@@ -279,24 +279,24 @@ console.log(`[${elapsed()}] Waiting for Worker UI to display the query...`);
 await new Promise((r) => setTimeout(r, 5000));
 
 // ============================================================
-// Step 5: Worker accepts job (quote + select)
+// Step 5: Worker accepts job (offer + select)
 // ============================================================
 await flow(4, "active", "Worker accepting...");
 console.log(`\n[${elapsed()}] === Step 5: Worker accepts job ===`);
 
-// Worker submits quote
-const quoteResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/quotes`, {
+// Worker submits offer
+const offerResp = await fetch(`${ANCHR_URL}/queries/${QUERY_ID}/offers`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({
     worker_pubkey: WORKER_PUBKEY,
     amount_sats: BOUNTY_SATS,
-    quote_event_id: `quote_${Date.now()}`,
+    offer_event_id: `offer_${Date.now()}`,
   }),
 });
-const quoteData = await quoteResp.json();
+const offerData = await offerResp.json();
 console.log(
-  `[${elapsed()}] Quote: ${quoteData.ok ? "recorded" : quoteData.message}`,
+  `[${elapsed()}] Offer: ${offerData.ok ? "recorded" : offerData.message}`,
 );
 
 // Seller selects worker + provides HTLC token

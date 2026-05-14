@@ -9,11 +9,11 @@ import type {
   BlossomKeyMap,
   EscrowInfo,
   EscrowSubmitOutcome,
+  OfferInfo,
   PaymentStatus,
   Query,
   QueryResult,
   QueryStatus,
-  QuoteInfo,
 } from "../domain/types.ts";
 import type { HtlcOutcome } from "./query-service.ts";
 import { identityNormalize, ServiceDeps } from "./query-service-deps.ts";
@@ -25,26 +25,26 @@ import { getLogger } from "@anchr/core-runtime/logger";
 
 const log = getLogger(["anchr", "query-service", "escrow"]);
 
-export function doRecordQuote(
+export function doRecordOffer(
   store: QueryStore,
   queryId: string,
-  quote: QuoteInfo,
+  offer: OfferInfo,
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
   if (!isEscrowQuery(query)) {
     return { ok: false, message: "Not an escrow query" };
   }
-  if (query.status !== "awaiting_quotes") {
+  if (query.status !== "awaiting_offers") {
     return {
       ok: false,
-      message: `Query is ${query.status}, not awaiting_quotes`,
+      message: `Query is ${query.status}, not awaiting_offers`,
     };
   }
 
-  const quotes = [...(query.quotes ?? []), quote];
-  store.set(queryId, { ...query, quotes });
-  return { ok: true, message: "Quote recorded" };
+  const offers = [...(query.offers ?? []), offer];
+  store.set(queryId, { ...query, offers });
+  return { ok: true, message: "Offer recorded" };
 }
 
 export async function doSelectWorker(
@@ -62,7 +62,7 @@ export async function doSelectWorker(
   if (!validateEscrowTransition(query.status, "worker_selected")) {
     return {
       ok: false,
-      message: `Query is ${query.status}, not awaiting_quotes`,
+      message: `Query is ${query.status}, not awaiting_offers`,
     };
   }
 

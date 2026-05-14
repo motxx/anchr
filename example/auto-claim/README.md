@@ -43,7 +43,7 @@ Insurance Provider              User's Browser Extension
   │ kind 5300 request ───► Nostr   │
   │ + Cashu HTLC          relay    │   ◄── Extension receives request
   │                        │       │
-  │ ◄──── kind 7000 quote ─┼────── │
+  │ ◄──── kind 7000 offer ─┼────── │
   │ kind 7000 selection ─► │       │
   │                        │       │ fetch(airline API)
   │                        │       │ "status: on_time" → skip

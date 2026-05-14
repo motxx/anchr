@@ -122,5 +122,5 @@ c2patool test-photo.jpg -m manifest.json -o signed-photo.jpg
 
 - **requester.ts** — News desk / Customer: publishes a NIP-90 photo request and
   locks Cashu proofs
-- **worker.ts** — Journalist / Provider: listens on Nostr, quotes, and publishes
+- **worker.ts** — Journalist / Provider: listens on Nostr, offers, and publishes
   an encrypted result

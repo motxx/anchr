@@ -11,7 +11,7 @@ import {
   DSText,
 } from "../../../src/components/ds/index.ts";
 import {
-  submitQuote,
+  submitOffer,
   submitResult,
   uploadPhoto,
 } from "../../../src/api/client.ts";
@@ -35,8 +35,8 @@ export default function SubmitScreen() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const isQuotePhase = bounty?.status === "pending" ||
-    bounty?.status === "awaiting_quotes";
+  const isOfferPhase = bounty?.status === "pending" ||
+    bounty?.status === "awaiting_offers";
 
   const handleTakePhoto = async () => {
     const granted = await cameraProvider.requestPermission();
@@ -57,15 +57,15 @@ export default function SubmitScreen() {
     }
   };
 
-  const handleSubmitQuote = async () => {
+  const handleSubmitOffer = async () => {
     if (!id) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitQuote(id);
+      await submitOffer(id);
       setSuccess(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Quote failed");
+      setError(e instanceof Error ? e.message : "Offer failed");
     } finally {
       setSubmitting(false);
     }
@@ -107,11 +107,11 @@ export default function SubmitScreen() {
       <View className="flex-1 bg-background items-center justify-center px-6">
         <Ionicons name="checkmark-circle" size={64} color="#10b981" />
         <DSText variant="heading" weight="bold" className="mt-4 text-center">
-          {isQuotePhase ? "Quote Submitted!" : "Proof Submitted!"}
+          {isOfferPhase ? "Offer Submitted!" : "Proof Submitted!"}
         </DSText>
         <DSText variant="body" muted className="mt-2 text-center">
-          {isQuotePhase
-            ? "The requester will review your quote."
+          {isOfferPhase
+            ? "The requester will review your offer."
             : "Your proof is being verified."}
         </DSText>
         <DSButton
@@ -134,28 +134,28 @@ export default function SubmitScreen() {
           <Ionicons name="arrow-back" size={24} color="#fafafa" />
         </Pressable>
         <DSText variant="heading" weight="bold">
-          {isQuotePhase ? "Submit Quote" : "Submit Proof"}
+          {isOfferPhase ? "Submit Offer" : "Submit Proof"}
         </DSText>
       </View>
 
       <View className="px-4 gap-4">
         {error && <DSFeedbackBanner variant="error" message={error} />}
 
-        {isQuotePhase
+        {isOfferPhase
           ? (
             <>
               <DSCard>
                 <DSText variant="body" muted>
-                  Submit a quote to let the requester know you can fulfill this
+                  Submit an offer to let the requester know you can fulfill this
                   bounty.
                 </DSText>
               </DSCard>
               <DSButton
-                label="Submit Quote"
+                label="Submit Offer"
                 icon="hand-right"
                 fullWidth
                 loading={submitting}
-                onPress={handleSubmitQuote}
+                onPress={handleSubmitOffer}
               />
             </>
           )

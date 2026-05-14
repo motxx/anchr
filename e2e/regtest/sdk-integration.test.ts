@@ -155,7 +155,7 @@ suite(
         oracleClient,
         cashuClient: customerCashu,
         relayClient: customerRelay,
-        quoteWindowMs: 3_000,
+        offerWindowMs: 3_000,
         resultTimeoutMs: 30_000,
       });
 

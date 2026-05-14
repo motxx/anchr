@@ -35,9 +35,9 @@ describe("Attack: Preimage Isolation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(q1.id, {
+    service.recordOffer(q1.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
@@ -70,9 +70,9 @@ describe("Attack: Preimage Isolation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(q2.id, {
+    service.recordOffer(q2.id, {
       worker_pubkey: "w2",
-      quote_event_id: "e2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
     await service.selectWorker(q2.id, "w2", makeFakeToken(100));
@@ -150,9 +150,9 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Cancel attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -179,9 +179,9 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expiry attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -212,9 +212,9 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expired submit" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -298,9 +298,9 @@ describe("Attack: Oracle Manipulation", () => {
         oracleIds: ["flip-oracle"],
       },
     );
-    service.recordQuote(q1.id, {
+    service.recordOffer(q1.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(q1.id, "w1", makeFakeToken(100));
@@ -326,9 +326,9 @@ describe("Attack: Oracle Manipulation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service2.recordQuote(q2.id, {
+    service2.recordOffer(q2.id, {
       worker_pubkey: "w2",
-      quote_event_id: "e2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
     await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
@@ -365,9 +365,9 @@ describe("Attack: Oracle Manipulation", () => {
         quorum: { min_approvals: 2 },
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -407,9 +407,9 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "No oracle" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -427,7 +427,7 @@ describe("Attack: Oracle Manipulation", () => {
 });
 
 describe("Attack: State Machine — illegal transitions", () => {
-  test("skip awaiting_quotes -> verifying: submit result directly", async () => {
+  test("skip awaiting_offers -> verifying: submit result directly", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { escrowInfo } = makeEscrowInfo(preimageStore);
 
@@ -444,7 +444,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
-    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
   test("revert approved to processing: submit another result after approval", async () => {
@@ -474,18 +474,18 @@ describe("Attack: State Machine — illegal transitions", () => {
     expect(service.getQuery(query.id)?.status).toBe("approved");
   });
 
-  test("record quote on processing query fails", async () => {
+  test("record offer on processing query fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);
 
-    const quoteResult = service.recordQuote(query.id, {
+    const offerResult = service.recordOffer(query.id, {
       worker_pubkey: "w2",
-      quote_event_id: "e2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
 
-    expect(quoteResult.ok).toBe(false);
-    expect(quoteResult.message).toContain("not awaiting_quotes");
+    expect(offerResult.ok).toBe(false);
+    expect(offerResult.message).toContain("not awaiting_offers");
   });
 
   test("complete verification on non-verifying query fails", async () => {
@@ -513,9 +513,9 @@ describe("Attack: Cross-Query", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(qA.id, {
+    service.recordOffer(qA.id, {
       worker_pubkey: "worker_a",
-      quote_event_id: "eA",
+      offer_event_id: "eA",
       received_at: Date.now(),
     });
     await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
@@ -532,9 +532,9 @@ describe("Attack: Cross-Query", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(qB.id, {
+    service.recordOffer(qB.id, {
       worker_pubkey: "worker_b",
-      quote_event_id: "eB",
+      offer_event_id: "eB",
       received_at: Date.now(),
     });
     await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));

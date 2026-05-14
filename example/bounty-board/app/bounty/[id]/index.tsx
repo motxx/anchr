@@ -121,8 +121,8 @@ export default function BountyDetailScreen() {
             </View>
 
             <View className="flex-row items-center justify-between">
-              <DSText variant="body" muted>Quotes</DSText>
-              <DSText variant="body">{bounty.quotes_count}</DSText>
+              <DSText variant="body" muted>Offers</DSText>
+              <DSText variant="body">{bounty.offers_count}</DSText>
             </View>
           </View>
         </DSCard>
@@ -152,13 +152,13 @@ export default function BountyDetailScreen() {
         )}
 
         <View className="gap-2 mt-2">
-          {bounty.status === "awaiting_quotes" && (
+          {bounty.status === "awaiting_offers" && (
             <DSButton
-              label="View Quotes"
+              label="View Offers"
               icon="people"
               variant="secondary"
               fullWidth
-              onPress={() => router.push(`/bounty/${id}/quotes`)}
+              onPress={() => router.push(`/bounty/${id}/offers`)}
             />
           )}
 
@@ -173,9 +173,9 @@ export default function BountyDetailScreen() {
           )}
 
           {(bounty.status === "pending" ||
-            bounty.status === "awaiting_quotes") && (
+            bounty.status === "awaiting_offers") && (
             <DSButton
-              label="Submit Quote"
+              label="Submit Offer"
               icon="hand-right"
               variant="secondary"
               fullWidth

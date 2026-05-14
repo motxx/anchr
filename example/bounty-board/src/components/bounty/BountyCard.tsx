@@ -15,7 +15,7 @@ interface BountyCardProps {
 function getStatusVariant(status: string) {
   switch (status) {
     case "pending":
-    case "awaiting_quotes":
+    case "awaiting_offers":
       return "default" as const;
     case "worker_selected":
     case "processing":

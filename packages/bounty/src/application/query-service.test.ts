@@ -442,56 +442,56 @@ describe("HTLC lifecycle", () => {
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
 
-  test("createQuery with htlc option sets awaiting_quotes status", async () => {
+  test("createQuery with htlc option sets awaiting_offers status", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
     expect(query.payment_status).toBe("escrow_locked");
     expect(query.escrow?.type).toBe("htlc");
     if (query.escrow?.type === "htlc") {
       expect(query.escrow.hash).toBe("abcd1234");
     }
-    expect(query.quotes).toEqual([]);
+    expect(query.offers).toEqual([]);
   });
 
-  test("recordQuote adds quote to awaiting_quotes query", async () => {
+  test("recordOffer adds offer to awaiting_offers query", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    const outcome = service.recordQuote(query.id, {
+    const outcome = service.recordOffer(query.id, {
       worker_pubkey: "worker_pub_1",
       amount_sats: 100,
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     });
     expect(outcome.ok).toBe(true);
-    expect(service.getQuery(query.id)?.quotes).toHaveLength(1);
+    expect(service.getQuery(query.id)?.offers).toHaveLength(1);
   });
 
-  test("recordQuote fails on non-HTLC query", async () => {
+  test("recordOffer fails on non-HTLC query", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "Simple query" });
-    const outcome = service.recordQuote(query.id, {
+    const outcome = service.recordOffer(query.id, {
       worker_pubkey: "worker_pub_1",
       amount_sats: 100,
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     });
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Not an escrow query");
   });
 
-  test("selectWorker transitions awaiting_quotes → worker_selected", async () => {
+  test("selectWorker transitions awaiting_offers → worker_selected", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "worker_pub_1",
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     });
     const outcome = await service.selectWorker(
@@ -538,7 +538,7 @@ describe("HTLC lifecycle", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Insufficient amount");
     expect(outcome.message).toContain("50");
-    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
   test("selectWorker rejects invalid escrow token", async () => {
@@ -554,7 +554,7 @@ describe("HTLC lifecycle", () => {
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Escrow token verification failed");
-    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
   test("selectWorker accepts token with more than bounty amount", async () => {
@@ -581,7 +581,7 @@ describe("HTLC lifecycle", () => {
     await service.selectWorker(query.id, "worker_pub_1");
     const outcome = await service.selectWorker(query.id, "worker_pub_2");
     expect(outcome.ok).toBe(false);
-    expect(outcome.message).toContain("not awaiting_quotes");
+    expect(outcome.message).toContain("not awaiting_offers");
   });
 
   test("recordResult transitions processing → verifying", async () => {
@@ -656,25 +656,25 @@ describe("HTLC lifecycle", () => {
     expect(open).toHaveLength(2);
   });
 
-  test("full HTLC lifecycle: create → quote → select → result → verify", async () => {
+  test("full HTLC lifecycle: create → offer → select → result → verify", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "Full HTLC" }, {
       escrow: escrowInfo,
     });
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
 
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w2",
       amount_sats: 50,
-      quote_event_id: "e2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
-    expect(service.getQuery(query.id)?.quotes).toHaveLength(2);
+    expect(service.getQuery(query.id)?.offers).toHaveLength(2);
 
     await service.selectWorker(query.id, "w1", "final_htlc_token");
     expect(service.getQuery(query.id)?.status).toBe("worker_selected");

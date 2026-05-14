@@ -23,7 +23,7 @@ describe("Badge variants", () => {
     // Map query statuses to badge variants
     const STATUS_TO_VARIANT: Record<string, string> = {
       pending: "default",
-      awaiting_quotes: "default", // custom bg/text override
+      awaiting_offers: "default", // custom bg/text override
       worker_selected: "default",
       processing: "warning",
       verifying: "info",

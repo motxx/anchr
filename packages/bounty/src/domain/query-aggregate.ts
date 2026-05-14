@@ -2,6 +2,7 @@ import type {
   BlossomKeyMap,
   BountyInfo,
   EscrowInfo,
+  OfferInfo,
   OracleAttestationRecord,
   PaymentStatus,
   Query,
@@ -9,7 +10,6 @@ import type {
   QueryResult,
   QueryStatus,
   QuorumConfig,
-  QuoteInfo,
   RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
@@ -25,8 +25,8 @@ import {
 import {
   MIN_ESCROW_LOCKTIME_SECS,
   validateEscrowLocktime,
+  validateOfferInfo,
   validateQueryInput,
-  validateQuoteInfo,
 } from "./value-objects.ts";
 
 export { MIN_ESCROW_LOCKTIME_SECS };
@@ -76,7 +76,7 @@ export function createQueryAggregate(
 
   const query: Query = {
     id: services.idGenerator.newQueryId(),
-    status: isEscrow ? "awaiting_quotes" : "pending",
+    status: isEscrow ? "awaiting_offers" : "pending",
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
@@ -91,7 +91,7 @@ export function createQueryAggregate(
     oracle_ids: options.oracleIds,
     payment_status: isEscrow ? "escrow_locked" : "locked",
     escrow: options.escrow,
-    quotes: isEscrow ? [] : undefined,
+    offers: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
     expected_gps: input.expected_gps,
     max_gps_distance_km: input.max_gps_distance_km,
@@ -181,22 +181,22 @@ export function cancelQuery(query: Query): TransitionResult {
 
 // --- Escrow path ---
 
-/** Record a worker quote for an escrow query. */
-export function addQuote(query: Query, quote: QuoteInfo): TransitionResult {
+/** Record a worker offer for an escrow query. */
+export function addOffer(query: Query, offer: OfferInfo): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
   }
-  if (query.status !== "awaiting_quotes") {
+  if (query.status !== "awaiting_offers") {
     return {
       ok: false,
-      error: `Query is ${query.status}, not awaiting_quotes`,
+      error: `Query is ${query.status}, not awaiting_offers`,
     };
   }
-  const quoteError = validateQuoteInfo(quote);
-  if (quoteError) return { ok: false, error: quoteError };
+  const offerError = validateOfferInfo(offer);
+  if (offerError) return { ok: false, error: offerError };
 
-  const quotes = [...(query.quotes ?? []), quote];
-  return { ok: true, query: { ...query, quotes } };
+  const offers = [...(query.offers ?? []), offer];
+  return { ok: true, query: { ...query, offers } };
 }
 
 /**
@@ -211,7 +211,7 @@ export type EscrowSelectionUpdates = Partial<
   >
 >;
 
-/** Select a worker and transition awaiting_quotes → worker_selected. */
+/** Select a worker and transition awaiting_offers → worker_selected. */
 export function selectWorker(
   query: Query,
   workerPubkey: string,
@@ -223,7 +223,7 @@ export function selectWorker(
   if (!isValidTransition(query.status, "worker_selected", true)) {
     return {
       ok: false,
-      error: `Query is ${query.status}, not awaiting_quotes`,
+      error: `Query is ${query.status}, not awaiting_offers`,
     };
   }
 

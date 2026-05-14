@@ -1,6 +1,6 @@
 export { queryTemplates } from "./domain/query-templates.ts";
 export {
-  addQuote,
+  addOffer,
   cancelQuery as cancelQueryAggregate,
   completeVerification,
   createQueryAggregate,
@@ -28,13 +28,13 @@ export {
   validateBountyInfo,
   validateEscrowLocktime,
   validateGpsCoord,
+  validateOfferInfo,
   validateQueryInput,
-  validateQuoteInfo,
 } from "./domain/value-objects.ts";
 export type {
   EscrowInfo,
   EscrowType,
-  QuoteInfo,
+  OfferInfo,
   VerificationDetail,
   VerificationFactor,
   VerificationInput,
@@ -77,7 +77,7 @@ export {
   discoverQueries,
   encryptAndUpload,
   publishResult,
-  submitQuote,
+  submitOffer,
   waitForPreimage,
   waitForSelection,
 } from "./infrastructure/nostr/worker-service.ts";
@@ -91,7 +91,7 @@ export {
   createHtlcQuery,
   requestOracleHash,
   selectWorker,
-  subscribeToQuotes,
+  subscribeToOffers,
 } from "./infrastructure/nostr/requester-service.ts";
 export type {
   CreateQueryRequest,

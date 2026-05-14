@@ -31,7 +31,7 @@ removed rather than retained as aliases.
 | ---- | ------------ | ----------------- | ----------------------------- |
 | 5300 | Job Request  | Customer -> Relay | Post a query                  |
 | 6300 | Job Result   | Provider -> Relay | Submit proof                  |
-| 7000 | Job Feedback | Various           | Quotes, selection, completion |
+| 7000 | Job Feedback | Various           | Offers, selection, completion |
 
 ## Query Posting (kind 5300)
 
@@ -66,9 +66,9 @@ The Customer broadcasts a DVM Job Request:
 | `quorum`                    | `{ min_approvals }`                 |
 | `visibility`                | `public` or `requester_only`        |
 
-## Provider Quote (kind 7000, status=payment-required)
+## Provider Offer (kind 7000, status=payment-required)
 
-A Provider discovers the query and submits a quote:
+A Provider discovers the query and submits an offer:
 
 ```json
 {

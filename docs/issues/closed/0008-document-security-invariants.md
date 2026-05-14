@@ -35,7 +35,7 @@ Unexpected Oracle から届いた release material は clean valid release と�
 ## Design Notes
 
 - Provider preflight は `ok`、`errors`、`warnings`、`details` を持つ structured report を返す。`true | false` だけにはしない。
-- Provider preflight が成功したら、`query_id`、expected Oracle、Provider pubkey、mint URL、payment hash、token fingerprint、accepted amount、locktime、quote amount、policy version を含む preflight ticket を残す。
+- Provider preflight が成功したら、`query_id`、expected Oracle、Provider pubkey、mint URL、payment hash、token fingerprint、accepted amount、locktime、offer amount、policy version を含む preflight ticket を残す。
 - Provider redeem gate は現在の Provider policy を再評価せず、preflight ticket の token fingerprint / payment hash / Provider pubkey lock と release material の preimage を照合する。
 - `query_id`、`request_event_id`、Nostr reply thread、expected Oracle authority の mismatch は anomaly として audit record に残す。preimage が bound token の hashlock に一致し、token が Provider に bind されているなら、それだけで redeem を止めない。
 - expected Oracle が valid proof に対して release しない liveness failure は、Oracle selection policy または FROST threshold 構成で事前に引き受ける risk として扱う。
@@ -47,8 +47,8 @@ Happy path:
 
 | Phase | Customer | Provider | Oracle | Mint |
 | --- | --- | --- | --- | --- |
-| Request | Query と accepted Oracle を公開し、Oracle hash commitment を取得する | schema、mint、Oracle policy を見て quote 可否を決める | query 用 preimage を保持し hash を返す | まだ final bound lock は持たない |
-| Quote | quote を集め Provider を選ぶ | quote 額と条件を提示する | 待機する | 変化なし |
+| Request | Query と accepted Oracle を公開し、Oracle hash commitment を取得する | schema、mint、Oracle policy を見て offer 可否を決める | query 用 preimage を保持し hash を返す | まだ final bound lock は持たない |
+| Offer | offer を集め Provider を選ぶ | offer 額と条件を提示する | 待機する | 変化なし |
 | Selection | selected Provider 向け bound token を作る | bound token を受け取り preflight する | selected Provider / query context を観測する | hashlock + Provider lock + refund locktime を持つ token を発行する |
 | Work | result / proof を待つ | preflight ticket を保存して `produce()` する | proof を待つ | token を保持する |
 | Release | result / proof を受け取る | release material を受け取る | valid proof なら release material を送る | token 条件だけを enforcement する |
@@ -59,7 +59,7 @@ Failure handling:
 
 | Condition | Provider action | Clean settlement | Audit / reputation |
 | --- | --- | --- | --- |
-| quote 前に Oracle / schema / mint が policy 外 | quote しない | なし | optional policy log |
+| offer 前に Oracle / schema / mint が policy 外 | offer しない | なし | optional policy log |
 | selection 後 token が amount / mint / hash / Provider lock / locktime を満たさない | preflight reject。`produce()` しない | なし | Customer / implementation anomaly |
 | valid proof 後、expected Oracle が release しない | redeem できない | 失敗 | Oracle liveness failure |
 | release source、signature、`query_id`、`request_event_id` が ticket とずれる | token spendability があれば redeem を妨げない | clean valid release ではない | leak / misdelivery / drift evidence |
@@ -70,7 +70,7 @@ Failure handling:
 ## Candidate Invariants
 
 - 盗まれた preimage だけでは escrow を redeem できない。redeem には bound Provider signature も必要である。
-- Provider は `produce()` の前に、bound token が quote 額以上、expected mint、expected payment hash、Provider pubkey lock、十分な locktime を満たすことを preflight する。
+- Provider は `produce()` の前に、bound token が offer 額以上、expected mint、expected payment hash、Provider pubkey lock、十分な locktime を満たすことを preflight する。
 - Provider preflight で accepted された escrow は、redeem 時に mutable policy で拒否されない。redeem 時は token spendability と preflight ticket の token fingerprint / payment hash / Provider pubkey lock だけを hard gate にする。
 - expected Oracle または expected Oracle group 以外からの release material は、protocol 上の clean valid release として扱わない。ただし hashlock が一致し、Provider が redeem できる場合は資金回収を妨げず、audit / reputation event として記録する。
 - `query_id` または `request_event_id` mismatch は audit anomaly であり、単独では redeem failure の理由にしない。

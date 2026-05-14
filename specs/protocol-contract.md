@@ -101,7 +101,7 @@ Rules:
 - `expired` is the Customer refund path. It must not allow the Customer to
   redeem before the settlement locktime.
 
-Implementation-specific states such as current `awaiting_quotes` or
+Implementation-specific states such as current `awaiting_offers` or
 `worker_selected` names are reference implementation details. New public SDK and
 spec prose should use Customer, Provider, Oracle, request, offer, selection,
 proof, release, and redeem vocabulary.

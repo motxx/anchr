@@ -7,10 +7,10 @@
  * Event kind mapping:
  *   ANCHR_QUERY_REQUEST   = 5300  (DVM Job Request)
  *   ANCHR_QUERY_RESPONSE  = 6300  (DVM Job Result)
- *   ANCHR_QUERY_FEEDBACK  = 7000  (DVM Job Feedback — quotes, selection, completion)
+ *   ANCHR_QUERY_FEEDBACK  = 7000  (DVM Job Feedback — offers, selection, completion)
  *
  * Kind 7000 is used for multiple sub-types per NIP-90:
- *   status=payment-required  → Worker quote
+ *   status=payment-required  → Worker offer
  *   status=processing        → Worker selection announcement
  *   status=success/error     → Completion feedback
  */
@@ -24,7 +24,7 @@ import { decryptNip44, deriveConversationKey } from "../crypto/encryption.ts";
 // NIP-90 DVM event kinds for Anchr.
 export const ANCHR_QUERY_REQUEST = 5300; // DVM Job Request
 export const ANCHR_QUERY_RESPONSE = 6300; // DVM Job Result
-export const ANCHR_QUERY_FEEDBACK = 7000; // DVM Job Feedback (quotes, selection, settlement)
+export const ANCHR_QUERY_FEEDBACK = 7000; // DVM Job Feedback (offers, selection, settlement)
 
 // Oracle announcement (NIP-78 style parameterized replaceable).
 export const ANCHR_ORACLE_ANNOUNCEMENT = 30088;
@@ -67,8 +67,8 @@ export interface QueryResponsePayload {
   notes?: string;
 }
 
-/** Worker quote: kind 7000 with status=payment-required. */
-export interface QuoteFeedbackPayload {
+/** Worker offer: kind 7000 with status=payment-required. */
+export interface OfferFeedbackPayload {
   status: "payment-required";
   /** Worker's Nostr pubkey (hex). */
   worker_pubkey: string;
@@ -104,7 +104,7 @@ export interface QuerySettlementPayload {
 
 /** Union of all kind 7000 feedback payload types. */
 export type FeedbackPayload =
-  | QuoteFeedbackPayload
+  | OfferFeedbackPayload
   | SelectionFeedbackPayload
   | CompletionFeedbackPayload
   | QuerySettlementPayload;
@@ -157,11 +157,11 @@ export interface OracleResponsePayload {
 // --- Event builders (delegated to event-builders.ts) ---
 
 export {
+  buildOfferFeedbackEvent,
   buildOracleAnnouncementEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
 } from "./event-builders.ts";
 

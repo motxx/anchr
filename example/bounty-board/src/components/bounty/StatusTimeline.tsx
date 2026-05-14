@@ -6,7 +6,7 @@ import type { QueryStatus } from "../../api/types.ts";
 
 const STEPS: { key: QueryStatus; label: string }[] = [
   { key: "pending", label: "Created" },
-  { key: "awaiting_quotes", label: "Quoted" },
+  { key: "awaiting_offers", label: "Offered" },
   { key: "worker_selected", label: "Selected" },
   { key: "submitted", label: "Submitted" },
   { key: "approved", label: "Verified" },

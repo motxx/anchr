@@ -34,9 +34,9 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -74,9 +74,9 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -127,9 +127,9 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     );
     expect(query.oracle_ids).toBeUndefined();
 
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -177,9 +177,9 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     );
     expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
 
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -223,9 +223,9 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
       },
     );
 
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
     await service.selectWorker(query.id, "w1", makeFakeToken(100));
@@ -284,9 +284,9 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
         bounty: { amount_sats: 100 },
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "02worker_hex_pubkey",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -323,9 +323,9 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
         bounty: { amount_sats: 100 },
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "02worker_hex_pubkey",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -361,9 +361,9 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
         bounty: { amount_sats: 100 },
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "02worker_hex_pubkey",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -399,9 +399,9 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
         bounty: { amount_sats: 100 },
       },
     );
-    service.recordQuote(query.id, {
+    service.recordOffer(query.id, {
       worker_pubkey: "w1",
-      quote_event_id: "e1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
 
@@ -490,7 +490,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
         },
       },
     );
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
   });
 
   test("ALLOWED: 1 hour locktime passes", () => {

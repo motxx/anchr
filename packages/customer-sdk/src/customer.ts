@@ -1,7 +1,7 @@
 /**
  * Customer — buyer-side of the Anchr verified-data exchange.
  *
- * Broadcasts a request to Nostr, collects provider quotes, locks a
+ * Broadcasts a request to Nostr, collects provider offers, locks a
  * Cashu HTLC against the chosen provider, decrypts the response, and
  * returns the verified data + proof.
  */
@@ -9,7 +9,7 @@
 import type { CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
-  Quote,
+  Offer,
   RequestOptions,
   RequestResult,
 } from "./types.ts";
@@ -28,17 +28,17 @@ import {
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
+  parseOfferFeedbackEvent,
   parseQueryResponseEvent,
-  parseQuoteFeedbackEvent,
   type QueryRequestPayload,
   type SelectionFeedbackPayload,
 } from "@anchr/protocol/events";
 
 /**
- * Default quote-window in milliseconds. The SDK waits this long for
- * provider quotes before selecting one.
+ * Default offer-window in milliseconds. The SDK waits this long for
+ * provider offers before selecting one.
  */
-export const DEFAULT_QUOTE_WINDOW_MS = 30_000;
+export const DEFAULT_OFFER_WINDOW_MS = 30_000;
 
 /** Default locktime offset (1 hour) for HTLC-locked tokens. */
 export const DEFAULT_LOCKTIME_SECONDS = 3600;
@@ -46,10 +46,10 @@ export const DEFAULT_LOCKTIME_SECONDS = 3600;
 /** Default result-event timeout (5 minutes). */
 export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 
-/** Default selector: cheapest quote within the customer's `payment.maxAmount`. */
-export function selectCheapestQuote(quotes: Quote[]): Quote | null {
-  if (quotes.length === 0) return null;
-  return quotes.reduce((min, q) => (q.amountSats < min.amountSats ? q : min));
+/** Default selector: cheapest offer within the customer's `payment.maxAmount`. */
+export function selectCheapestOffer(offers: Offer[]): Offer | null {
+  if (offers.length === 0) return null;
+  return offers.reduce((min, q) => (q.amountSats < min.amountSats ? q : min));
 }
 
 /** Customer client returned by `createCustomer`. */
@@ -94,17 +94,17 @@ export class RelayPublishError extends Error {
   }
 }
 
-/** Thrown when no provider sent a (selectable) quote within the configured window. */
-export class NoQuotesReceivedError extends Error {
+/** Thrown when no provider sent a (selectable) offer within the configured window. */
+export class NoOffersReceivedError extends Error {
   constructor(
-    public readonly quoteWindowMs: number,
+    public readonly offerWindowMs: number,
     public readonly receivedCount: number,
   ) {
     super(
-      `No selectable quote received within ${quoteWindowMs}ms ` +
-        `(received ${receivedCount} candidate quote(s) total).`,
+      `No selectable offer received within ${offerWindowMs}ms ` +
+        `(received ${receivedCount} candidate offer(s) total).`,
     );
-    this.name = "NoQuotesReceivedError";
+    this.name = "NoOffersReceivedError";
   }
 }
 
@@ -227,9 +227,9 @@ export function createCustomer(options: CustomerOptions): Customer {
   const mint = options.mint;
   const oracleClient = options.oracleClient;
   const cashuClient = options.cashuClient;
-  const quoteWindowMs = options.quoteWindowMs ?? DEFAULT_QUOTE_WINDOW_MS;
+  const offerWindowMs = options.offerWindowMs ?? DEFAULT_OFFER_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
-  const selector = options.quoteSelector ?? selectCheapestQuote;
+  const selector = options.offerSelector ?? selectCheapestOffer;
   const verifierAdapters = options.verifierAdapters ?? [];
   const stateStore = options.stateStore;
 
@@ -288,7 +288,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         bounty_token: initialLock.token,
         max_amount_sats: req.payment.maxAmount,
         locktime_seconds: locktimeSeconds,
-        expires_at: Date.now() + quoteWindowMs,
+        expires_at: Date.now() + offerWindowMs,
       };
       const requestEvent = buildQueryRequestEvent(identity, requestPayload);
       const publishResult = await relayClient.publish(requestEvent);
@@ -306,7 +306,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         });
       }
 
-      const quotes: Quote[] = [];
+      const offers: Offer[] = [];
       let totalReceived = 0;
       const sub = relayClient.subscribe(
         {
@@ -314,7 +314,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           "#e": [requestEvent.id],
         },
         (event) => {
-          const parsed = parseQuoteFeedbackEvent(event);
+          const parsed = parseOfferFeedbackEvent(event);
           if (parsed === null) return;
           totalReceived++;
           if (parsed.amount_sats > req.payment.maxAmount) return;
@@ -322,10 +322,10 @@ export function createCustomer(options: CustomerOptions): Customer {
             req.provider !== undefined &&
             parsed.provider_pubkey !== req.provider
           ) return;
-          quotes.push({
+          offers.push({
             providerPubkey: parsed.provider_pubkey,
             amountSats: parsed.amount_sats,
-            quoteEventId: event.id,
+            offerEventId: event.id,
             receivedAt: Date.now(),
           });
         },
@@ -333,15 +333,15 @@ export function createCustomer(options: CustomerOptions): Customer {
 
       try {
         await new Promise<void>((resolve) =>
-          setTimeout(resolve, quoteWindowMs)
+          setTimeout(resolve, offerWindowMs)
         );
       } finally {
         sub.close();
       }
 
-      const selected = selector(quotes);
+      const selected = selector(offers);
       if (selected === null) {
-        throw new NoQuotesReceivedError(quoteWindowMs, totalReceived);
+        throw new NoOffersReceivedError(offerWindowMs, totalReceived);
       }
 
       // Pass proofs directly rather than re-decoding the broadcast token:
@@ -374,7 +374,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           schema: req.spec.schema,
           status: "provider_selected",
           providerPubkey: selected.providerPubkey,
-          quoteEventId: selected.quoteEventId,
+          offerEventId: selected.offerEventId,
           updatedAt: Date.now(),
         });
       }
@@ -446,7 +446,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           schema: req.spec.schema,
           status: "result_received",
           providerPubkey: selected.providerPubkey,
-          quoteEventId: selected.quoteEventId,
+          offerEventId: selected.offerEventId,
           updatedAt: Date.now(),
         });
       }
@@ -466,7 +466,7 @@ interface CustomerStateRecord {
   schema: string;
   status: CustomerStateStatus;
   providerPubkey?: string;
-  quoteEventId?: string;
+  offerEventId?: string;
   updatedAt: number;
 }
 

@@ -5,7 +5,7 @@
  * pay 10,000 sats to the Provider that returns a valid TLSNotary proof."
  *
  * No Anchr-operated host is involved. The request is announced on Nostr,
- * Providers quote over Nostr, the selected Provider publishes an encrypted
+ * Providers offer over Nostr, the selected Provider publishes an encrypted
  * result event, and the Oracle settles by DMing the preimage to the Provider.
  *
  * Usage:
@@ -35,7 +35,7 @@ const sourceProofs = parseSourceProofs();
 const AIRLINE_URL = Deno.env.get("AIRLINE_URL") ?? "http://localhost:4000";
 const FLIGHT = Deno.env.get("FLIGHT") ?? "NH123";
 const PAYOUT_SATS = Number(Deno.env.get("PAYOUT_SATS") ?? "10000");
-const QUOTE_WINDOW_MS = Number(Deno.env.get("QUOTE_WINDOW_MS") ?? "30000");
+const OFFER_WINDOW_MS = Number(Deno.env.get("OFFER_WINDOW_MS") ?? "30000");
 const RESULT_TIMEOUT_MS = Number(
   Deno.env.get("RESULT_TIMEOUT_MS") ?? "3600000",
 );
@@ -51,7 +51,7 @@ const customer = createCustomer({
   }),
   cashuClient: createCashuClient({ mintUrl: mint }),
   relayClient: createRelayClient(relays),
-  quoteWindowMs: QUOTE_WINDOW_MS,
+  offerWindowMs: OFFER_WINDOW_MS,
   resultTimeoutMs: RESULT_TIMEOUT_MS,
 });
 

@@ -4,8 +4,8 @@ import {
   validateBountyInfo,
   validateEscrowLocktime,
   validateGpsCoord,
+  validateOfferInfo,
   validateQueryInput,
-  validateQuoteInfo,
 } from "./value-objects.ts";
 
 describe("validateGpsCoord", () => {
@@ -190,40 +190,40 @@ describe("validateQueryInput", () => {
   });
 });
 
-describe("validateQuoteInfo", () => {
-  test("valid quote", () => {
-    expect(validateQuoteInfo({
+describe("validateOfferInfo", () => {
+  test("valid offer", () => {
+    expect(validateOfferInfo({
       worker_pubkey: "abc123",
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     })).toBeNull();
   });
   test("empty worker_pubkey", () => {
-    expect(validateQuoteInfo({
+    expect(validateOfferInfo({
       worker_pubkey: "",
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     })).toContain("worker_pubkey");
   });
   test("whitespace worker_pubkey", () => {
-    expect(validateQuoteInfo({
+    expect(validateOfferInfo({
       worker_pubkey: "  ",
-      quote_event_id: "evt_1",
+      offer_event_id: "evt_1",
       received_at: Date.now(),
     })).toContain("worker_pubkey");
   });
-  test("empty quote_event_id", () => {
-    expect(validateQuoteInfo({
+  test("empty offer_event_id", () => {
+    expect(validateOfferInfo({
       worker_pubkey: "abc",
-      quote_event_id: "",
+      offer_event_id: "",
       received_at: Date.now(),
-    })).toContain("quote_event_id");
+    })).toContain("offer_event_id");
   });
-  test("whitespace quote_event_id", () => {
-    expect(validateQuoteInfo({
+  test("whitespace offer_event_id", () => {
+    expect(validateOfferInfo({
       worker_pubkey: "abc",
-      quote_event_id: "  ",
+      offer_event_id: "  ",
       received_at: Date.now(),
-    })).toContain("quote_event_id");
+    })).toContain("offer_event_id");
   });
 });

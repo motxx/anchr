@@ -5,18 +5,18 @@ import {
   ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
+  buildOfferFeedbackEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   parseQuerySettlementPayload,
   type QueryRequestPayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events.ts";
 
@@ -267,17 +267,17 @@ describe("Nostr events (NIP-90 DVM)", () => {
       .toThrow();
   });
 
-  test("builds and decrypts QuoteFeedback event (kind 7000)", () => {
+  test("builds and decrypts OfferFeedback event (kind 7000)", () => {
     const worker = generateEphemeralIdentity();
     const requester = generateEphemeralIdentity();
 
-    const payload: QuoteFeedbackPayload = {
+    const payload: OfferFeedbackPayload = {
       status: "payment-required",
       worker_pubkey: worker.publicKey,
       amount_sats: 100,
     };
 
-    const event = buildQuoteFeedbackEvent(
+    const event = buildOfferFeedbackEvent(
       worker,
       "event_q1",
       requester.publicKey,
@@ -295,10 +295,10 @@ describe("Nostr events (NIP-90 DVM)", () => {
       worker.publicKey,
     );
     expect(parsed.status).toBe("payment-required");
-    expect((parsed as QuoteFeedbackPayload).worker_pubkey).toBe(
+    expect((parsed as OfferFeedbackPayload).worker_pubkey).toBe(
       worker.publicKey,
     );
-    expect((parsed as QuoteFeedbackPayload).amount_sats).toBe(100);
+    expect((parsed as OfferFeedbackPayload).amount_sats).toBe(100);
   });
 
   test("builds and decrypts SelectionFeedback event (kind 7000)", () => {

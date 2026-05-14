@@ -2,7 +2,7 @@
 
 export type QueryStatus =
   | "pending"
-  | "awaiting_quotes"
+  | "awaiting_offers"
   | "worker_selected"
   | "processing"
   | "verifying"
@@ -103,7 +103,7 @@ export interface QuerySummary {
   expires_at: number;
   expires_in_seconds: number;
   htlc: HtlcSummary | null;
-  quotes_count: number;
+  offers_count: number;
   expected_gps: GpsCoord | null;
   tlsn_requirements: TlsnRequirement | null;
 }

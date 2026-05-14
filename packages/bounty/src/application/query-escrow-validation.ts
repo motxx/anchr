@@ -23,7 +23,7 @@ export async function verifyEscrowLock(
 export { MIN_ESCROW_LOCKTIME_SECS } from "../domain/value-objects.ts";
 
 export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_quotes: ["worker_selected"],
+  awaiting_offers: ["worker_selected"],
   worker_selected: ["processing"],
   processing: ["verifying"],
   verifying: ["approved", "rejected"],

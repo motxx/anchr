@@ -32,16 +32,16 @@ export {
   type Customer,
   CustomerConfigError,
   DEFAULT_LOCKTIME_SECONDS,
-  DEFAULT_QUOTE_WINDOW_MS,
+  DEFAULT_OFFER_WINDOW_MS,
   DEFAULT_RESULT_TIMEOUT_MS,
   generateQueryId,
-  NoQuotesReceivedError,
+  NoOffersReceivedError,
   OracleWhitelistMismatchError,
   pickOracleForRequest,
   RelayPublishError,
   ResultTimeoutError,
   SchemaVerificationError,
-  selectCheapestQuote,
+  selectCheapestOffer,
   validateCustomerOptions,
 } from "@anchr/customer-sdk/customer";
 
@@ -56,32 +56,32 @@ export {
 } from "@anchr/protocol/capabilities";
 
 export {
+  buildOfferFeedbackEvent,
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   type OracleQueryResponsePayload,
+  parseOfferFeedbackEvent,
   parseOracleQueryResponseEvent,
   parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseQueryResponseEvent,
-  parseQuoteFeedbackEvent,
   parseSelectionFeedbackEvent,
   type PreimageDeliveryPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "@anchr/protocol/events";
 
 export {
+  canOfferForRequest,
   createProvider,
   DEFAULT_PREIMAGE_TIMEOUT_MS,
   DEFAULT_SELECTION_TIMEOUT_MS,
   type Provider,
   ProviderConfigError,
-  shouldQuote,
   validateProviderOptions,
 } from "@anchr/provider-sdk/provider";
 
@@ -97,12 +97,12 @@ export {
 } from "@anchr/protocol/schema";
 
 export type {
+  Offer,
   Payment,
   ProofGenerator,
   ProviderHandler,
-  ProviderQuote,
+  ProviderOffer,
   ProviderRequestEvent,
-  Quote,
   RequestResult,
   SchemaProducer,
   SchemaProducerContext,
@@ -113,7 +113,7 @@ export type {
 
 export type {
   CustomerOptions,
-  QuoteSelector,
+  OfferSelector,
   RequestOptions,
 } from "@anchr/customer-sdk/types";
 

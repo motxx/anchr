@@ -67,7 +67,7 @@ function runRepositoryTests(name: string, factory: () => QueryRepository) {
       repo.save(
         makeQuery({
           id: "q4",
-          status: "awaiting_quotes",
+          status: "awaiting_offers",
           expires_at: now + 10000,
         }),
       );
@@ -97,7 +97,7 @@ function runRepositoryTests(name: string, factory: () => QueryRepository) {
       repo.save(
         makeQuery({
           id: "q4",
-          status: "awaiting_quotes",
+          status: "awaiting_offers",
           expires_at: now - 500,
         }),
       );

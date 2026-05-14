@@ -3,7 +3,7 @@
  *
  * Per README:
  *   1. Subscribe to kind 5300 queries, verify Oracle pubkey against whitelist
- *   2. Send quote (kind 7000 status=payment-required)
+ *   2. Send offer (kind 7000 status=payment-required)
  *   3. Wait for selection (kind 7000 status=processing), verify own pubkey
  *   4. Verify own pubkey is in HTLC condition on Cashu Mint
  *   5. Photograph on-site, C2PA sign, EXIF strip
@@ -20,13 +20,13 @@ import type { TlsnEncryptedContext } from "../../domain/types.ts";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
+  buildOfferFeedbackEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
+  type OfferFeedbackPayload,
   parseFeedbackPayload,
   parseQueryRequestPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { type OracleDMPayload, parseOracleDM } from "./events/dm.ts";
@@ -109,21 +109,21 @@ export function discoverQueries(
 }
 
 /**
- * Step 2: Submit a quote for a discovered query.
+ * Step 2: Submit an offer for a discovered query.
  */
-export async function submitQuote(
+export async function submitOffer(
   identity: NostrIdentity,
   query: DiscoveredQuery,
   amountSats?: number,
   relayUrls?: string[],
 ): Promise<string> {
-  const payload: QuoteFeedbackPayload = {
+  const payload: OfferFeedbackPayload = {
     status: "payment-required",
     worker_pubkey: identity.publicKey,
     amount_sats: amountSats,
   };
 
-  const event = buildQuoteFeedbackEvent(
+  const event = buildOfferFeedbackEvent(
     identity,
     query.eventId,
     query.requesterPubkey ?? query.pubkey,

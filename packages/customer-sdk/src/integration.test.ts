@@ -209,7 +209,7 @@ test("in-process wiring: customer.request returns the provider's data via a shar
     oracleClient: makeOracleClient(oracleKey.publicKey),
     cashuClient: customerCashuClient,
     relayClient: relay.asClient(),
-    quoteWindowMs: 50,
+    offerWindowMs: 50,
     resultTimeoutMs: 500,
   });
 

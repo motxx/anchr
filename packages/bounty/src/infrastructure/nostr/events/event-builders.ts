@@ -14,11 +14,11 @@ import {
   ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,
+  type OfferFeedbackPayload,
   type OracleResponsePayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
   type QuerySettlementPayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "./events.ts";
 import type { OracleInfo } from "../../../domain/oracle-types.ts";
@@ -165,11 +165,11 @@ export function buildQueryResponseEvent(
   return finalizeEvent(template, identity.secretKey);
 }
 
-export function buildQuoteFeedbackEvent(
+export function buildOfferFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
   requesterPubKey: string,
-  payload: QuoteFeedbackPayload,
+  payload: OfferFeedbackPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
     kind: ANCHR_QUERY_FEEDBACK,
