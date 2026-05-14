@@ -36,7 +36,6 @@ export {
   DEFAULT_RESULT_TIMEOUT_MS,
   generateQueryId,
   NoOffersReceivedError,
-  OracleWhitelistMismatchError,
   pickOracleForRequest,
   RelayPublishError,
   ResultTimeoutError,
@@ -113,7 +112,9 @@ export type {
 
 export type {
   CustomerOptions,
+  CustomerOracle,
   OfferSelector,
+  OracleSelector,
   RequestOptions,
 } from "@anchr/customer-sdk/types";
 
@@ -161,6 +162,7 @@ export {
   createHttpOracleClient,
   type HttpOracleOptions,
   type OracleClient,
+  OracleConfigError,
   OracleHttpError,
   OracleResponseError,
 } from "@anchr/oracle-sdk/oracle";

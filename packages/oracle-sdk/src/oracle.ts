@@ -26,21 +26,27 @@ export interface OracleClient {
    * a valid proof for the same query id.
    *
    * @param queryId — caller-chosen unique id for this query
-   * @returns the hash (hex) and the oracle's pubkey (hex)
+   * @returns the hash (hex)
    */
-  requestHash(queryId: string): Promise<{ hash: string; oraclePubkey: string }>;
+  requestHash(queryId: string): Promise<{ hash: string }>;
 }
 
 /** Construction options for {@link DefaultHttpOracleClient}. */
 export interface HttpOracleOptions {
   /** Endpoint URL serving `POST /hash`. */
   endpoint: string;
-  /** Hex pubkey of the oracle, used to verify it matches the customer's whitelist. */
-  oraclePubkey: string;
   /** Optional API key sent as `Authorization: Bearer <apiKey>`. */
   apiKey?: string;
   /** Optional custom fetch implementation; defaults to `globalThis.fetch`. */
   fetchImpl?: typeof globalThis.fetch;
+}
+
+/** Thrown when the oracle client is configured with invalid options. */
+export class OracleConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OracleConfigError";
+  }
 }
 
 /** Thrown when the oracle returns an unsuccessful HTTP response. */
@@ -67,13 +73,10 @@ export function createHttpOracleClient(
   options: HttpOracleOptions,
 ): OracleClient {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const endpoint = options.endpoint.replace(/\/$/, "");
-  const oraclePubkey = options.oraclePubkey;
+  const endpoint = normalizeEndpoint(options.endpoint);
 
   return {
-    async requestHash(
-      queryId: string,
-    ): Promise<{ hash: string; oraclePubkey: string }> {
+    async requestHash(queryId: string): Promise<{ hash: string }> {
       const headers: Record<string, string> = {
         "content-type": "application/json",
       };
@@ -94,20 +97,28 @@ export function createHttpOracleClient(
       }
 
       const payload: unknown = await res.json();
-      if (
-        typeof payload !== "object" ||
-        payload === null ||
-        !("hash" in payload) ||
-        typeof (payload as { hash: unknown }).hash !== "string"
-      ) {
+      const hash = readHash(payload);
+      if (hash === null) {
         throw new OracleResponseError(
           `Oracle response missing 'hash' field: ${JSON.stringify(payload)}`,
         );
       }
-      return {
-        hash: (payload as { hash: string }).hash,
-        oraclePubkey,
-      };
+      return { hash };
     },
   };
+}
+
+function normalizeEndpoint(endpoint: string): string {
+  if (endpoint.length === 0) {
+    throw new OracleConfigError("oracle endpoint must be a non-empty string");
+  }
+  return endpoint.replace(/\/+$/, "");
+}
+
+function readHash(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null || !("hash" in payload)) {
+    return null;
+  }
+  const hash = payload.hash;
+  return typeof hash === "string" ? hash : null;
 }

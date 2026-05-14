@@ -112,9 +112,11 @@ function matchesFilter(event: Event, filter: Filter): boolean {
 const HASH_HEX = "deadbeef".repeat(8);
 const PREIMAGE_HEX = "ffeeddcc".repeat(8);
 
-function makeOracleClient(oraclePubkey: string): OracleClient {
+function makeOracleClient(): OracleClient {
   return {
-    requestHash: async (_queryId: string) => ({ hash: HASH_HEX, oraclePubkey }),
+    requestHash: async (_queryId: string) => ({
+      hash: HASH_HEX,
+    }),
   };
 }
 
@@ -203,10 +205,12 @@ test("in-process wiring: customer.request returns the provider's data via a shar
   await new Promise((r) => setTimeout(r, 5));
 
   const customer = createCustomer({
-    oracles: [oracleKey.publicKey],
+    oracles: [{
+      pubkey: oracleKey.publicKey,
+      client: makeOracleClient(),
+    }],
     relays: ["mock://relay"],
     mint: "https://mint.example.org",
-    oracleClient: makeOracleClient(oracleKey.publicKey),
     cashuClient: customerCashuClient,
     relayClient: relay.asClient(),
     offerWindowMs: 50,

@@ -7,8 +7,6 @@ import {
   OracleResponseError,
 } from "./oracle.ts";
 
-const ORACLE_PUBKEY = "1234567890abcdef".repeat(4);
-
 function mockFetch(
   impl: (url: string, init?: RequestInit) => Promise<Response>,
 ): typeof globalThis.fetch {
@@ -19,7 +17,7 @@ function mockFetch(
     )) as typeof globalThis.fetch;
 }
 
-test("createHttpOracleClient returns the hash and oracle pubkey on a 200 response", async () => {
+test("createHttpOracleClient returns the hash on a 200 response", async () => {
   const fetchImpl = mockFetch(async (url, init) => {
     expect(url).toBe("https://oracle.example.org/hash");
     expect(init?.method).toBe("POST");
@@ -30,13 +28,11 @@ test("createHttpOracleClient returns the hash and oracle pubkey on a 200 respons
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
   const result = await oracle.requestHash("query_123");
   expect(result.hash).toBe("deadbeef");
-  expect(result.oraclePubkey).toBe(ORACLE_PUBKEY);
 });
 
 test("createHttpOracleClient strips trailing slashes from the endpoint", async () => {
@@ -48,7 +44,6 @@ test("createHttpOracleClient strips trailing slashes from the endpoint", async (
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org/",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
@@ -66,7 +61,6 @@ test("createHttpOracleClient sends the API key as a Bearer header when provided"
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     apiKey: "secret-token",
     fetchImpl,
   });
@@ -82,11 +76,12 @@ test("createHttpOracleClient throws OracleHttpError on a non-2xx response", asyn
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
-  await expect(oracle.requestHash("q")).rejects.toThrow(OracleHttpError);
+  await expect(oracle.requestHash("q")).rejects.toThrow(
+    OracleHttpError,
+  );
 });
 
 test("OracleHttpError carries the status and body for debugging", async () => {
@@ -96,7 +91,6 @@ test("OracleHttpError carries the status and body for debugging", async () => {
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
@@ -118,11 +112,12 @@ test("createHttpOracleClient throws OracleResponseError when payload lacks `hash
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
-  await expect(oracle.requestHash("q")).rejects.toThrow(OracleResponseError);
+  await expect(oracle.requestHash("q")).rejects.toThrow(
+    OracleResponseError,
+  );
 });
 
 test("createHttpOracleClient throws OracleResponseError when `hash` is not a string", async () => {
@@ -132,9 +127,10 @@ test("createHttpOracleClient throws OracleResponseError when `hash` is not a str
 
   const oracle = createHttpOracleClient({
     endpoint: "https://oracle.example.org",
-    oraclePubkey: ORACLE_PUBKEY,
     fetchImpl,
   });
 
-  await expect(oracle.requestHash("q")).rejects.toThrow(OracleResponseError);
+  await expect(oracle.requestHash("q")).rejects.toThrow(
+    OracleResponseError,
+  );
 });

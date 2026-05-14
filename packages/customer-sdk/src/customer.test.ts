@@ -6,7 +6,6 @@ import {
   CustomerConfigError,
   generateQueryId,
   NoOffersReceivedError,
-  OracleWhitelistMismatchError,
   pickOracleForRequest,
   RelayPublishError,
   selectCheapestOffer,
@@ -15,6 +14,7 @@ import {
 import {
   buildOfferFeedbackEvent,
   buildQueryResponseEvent,
+  parseQueryRequestEvent,
 } from "@anchr/protocol/events";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
@@ -37,7 +37,7 @@ import type {
   Subscription,
 } from "./nostr.ts";
 import { createMemoryStateStore } from "./storage.ts";
-import type { CustomerOptions, Offer } from "./types.ts";
+import type { CustomerOptions, CustomerOracle, Offer } from "./types.ts";
 
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
@@ -45,7 +45,6 @@ const HASH_HEX = "deadbeef".repeat(8);
 
 function makeOracleClient(
   overrides?: Partial<OracleClient> & {
-    fixedOracle?: string;
     fixedHash?: string;
   },
 ): OracleClient {
@@ -53,10 +52,16 @@ function makeOracleClient(
     requestHash: overrides?.requestHash ?? (
       async (_queryId: string) => ({
         hash: overrides?.fixedHash ?? HASH_HEX,
-        oraclePubkey: overrides?.fixedOracle ?? ORACLE_A,
       })
     ),
   };
+}
+
+function makeCustomerOracle(
+  pubkey: string,
+  client: OracleClient = makeOracleClient(),
+): CustomerOracle {
+  return { pubkey, client };
 }
 
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
@@ -103,10 +108,12 @@ function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
 }
 
 const validOptions = (): CustomerOptions => ({
-  oracles: [ORACLE_A, ORACLE_B],
+  oracles: [
+    makeCustomerOracle(ORACLE_A),
+    makeCustomerOracle(ORACLE_B),
+  ],
   relays: ["wss://relay.example.org"],
   mint: "https://mint.example.org",
-  oracleClient: makeOracleClient(),
   cashuClient: makeCashuClient(),
   relayClient: makeRelayClient(),
   // Short window so tests don't wait the 30s default.
@@ -127,6 +134,27 @@ test("validateCustomerOptions rejects empty oracle entries", () => {
     .toThrow(CustomerConfigError);
 });
 
+test("validateCustomerOptions rejects oracle entries without a client", () => {
+  expect(() =>
+    validateCustomerOptions({
+      ...validOptions(),
+      oracles: [{ pubkey: ORACLE_A }],
+    })
+  ).toThrow(CustomerConfigError);
+});
+
+test("validateCustomerOptions rejects duplicate oracle pubkeys", () => {
+  expect(() =>
+    validateCustomerOptions({
+      ...validOptions(),
+      oracles: [
+        makeCustomerOracle(ORACLE_A),
+        makeCustomerOracle(ORACLE_A),
+      ],
+    })
+  ).toThrow(CustomerConfigError);
+});
+
 test("validateCustomerOptions rejects empty relays array", () => {
   expect(() => validateCustomerOptions({ ...validOptions(), relays: [] }))
     .toThrow(CustomerConfigError);
@@ -135,12 +163,6 @@ test("validateCustomerOptions rejects empty relays array", () => {
 test("validateCustomerOptions rejects missing mint", () => {
   expect(() => validateCustomerOptions({ ...validOptions(), mint: "" }))
     .toThrow(CustomerConfigError);
-});
-
-test("validateCustomerOptions rejects missing oracleClient", () => {
-  const opts: Record<string, unknown> = { ...validOptions() };
-  delete opts.oracleClient;
-  expect(() => validateCustomerOptions(opts)).toThrow(CustomerConfigError);
 });
 
 test("validateCustomerOptions rejects missing cashuClient adapter", () => {
@@ -164,6 +186,15 @@ test("validateCustomerOptions rejects malformed stateStore adapter", () => {
   ).toThrow(CustomerConfigError);
 });
 
+test("validateCustomerOptions rejects malformed oracleSelector", () => {
+  expect(() =>
+    validateCustomerOptions({
+      ...validOptions(),
+      oracleSelector: "not-a-function",
+    })
+  ).toThrow(CustomerConfigError);
+});
+
 test("validateCustomerOptions rejects a non-object input", () => {
   expect(() => validateCustomerOptions(null)).toThrow(CustomerConfigError);
   expect(() => validateCustomerOptions(42)).toThrow(CustomerConfigError);
@@ -173,15 +204,18 @@ test("validateCustomerOptions rejects a non-object input", () => {
 test("createCustomer exposes oracles / relays / mint as readonly copies", () => {
   const opts = validOptions();
   const customer = createCustomer(opts);
-  expect([...customer.oracles]).toEqual(opts.oracles);
+  expect([...customer.oracles]).toEqual([ORACLE_A, ORACLE_B]);
   expect([...customer.relays]).toEqual(opts.relays);
   expect(customer.mint).toEqual(opts.mint);
 });
 
 test("createCustomer copies arrays so mutating the original does not affect the client", () => {
-  const oracles = [ORACLE_A, ORACLE_B];
+  const oracles = [
+    makeCustomerOracle(ORACLE_A),
+    makeCustomerOracle(ORACLE_B),
+  ];
   const customer = createCustomer({ ...validOptions(), oracles });
-  oracles.push("c".repeat(64));
+  oracles.push(makeCustomerOracle("c".repeat(64)));
   expect(customer.oracles).toHaveLength(2);
 });
 
@@ -210,17 +244,20 @@ test("Customer.request rejects non-positive maxAmount", async () => {
   ).rejects.toThrow(CustomerConfigError);
 });
 
-test("Customer.request calls oracleClient.requestHash", async () => {
+test("Customer.request calls the selected oracle client's requestHash", async () => {
   let receivedQueryId = "";
   const oracleClient = makeOracleClient({
     requestHash: async (queryId: string) => {
       receivedQueryId = queryId;
-      return { hash: HASH_HEX, oraclePubkey: ORACLE_A };
+      return { hash: HASH_HEX };
     },
   });
   const customer = createCustomer({
     ...validOptions(),
-    oracleClient,
+    oracles: [
+      makeCustomerOracle(ORACLE_A, oracleClient),
+      makeCustomerOracle(ORACLE_B),
+    ],
     offerWindowMs: 10,
   });
 
@@ -238,12 +275,39 @@ test("Customer.request calls oracleClient.requestHash", async () => {
   expect(receivedQueryId).toMatch(/^query_\d+_[a-z0-9]+$/);
 });
 
-test("Customer.request rejects when oracleClient returns a pubkey not matching the picked oracle", async () => {
-  const oracleClient = makeOracleClient({ fixedOracle: ORACLE_B });
+test("Customer.request can select a non-first trusted oracle", async () => {
+  const recorder: {
+    selectedClientCalled: boolean;
+    publishedOracle: string | null;
+  } = {
+    selectedClientCalled: false,
+    publishedOracle: null,
+  };
+  const oracleClient = makeOracleClient({
+    requestHash: async (_queryId: string) => {
+      recorder.selectedClientCalled = true;
+      return { hash: HASH_HEX };
+    },
+  });
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) {
+        recorder.publishedOracle =
+          parseQueryRequestEvent(event)?.oracle_pubkey ??
+            null;
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
   const customer = createCustomer({
     ...validOptions(),
-    oracles: [ORACLE_A],
-    oracleClient,
+    oracles: [
+      makeCustomerOracle(ORACLE_A),
+      makeCustomerOracle(ORACLE_B, oracleClient),
+    ],
+    relayClient,
+    oracleSelector: () => ORACLE_B,
+    offerWindowMs: 10,
   });
 
   await expect(
@@ -255,7 +319,28 @@ test("Customer.request rejects when oracleClient returns a pubkey not matching t
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(OracleWhitelistMismatchError);
+  ).rejects.toThrow(NoOffersReceivedError);
+
+  expect(recorder.selectedClientCalled).toBe(true);
+  expect(recorder.publishedOracle).toBe(ORACLE_B);
+});
+
+test("Customer.request rejects when oracleSelector returns outside the whitelist", async () => {
+  const customer = createCustomer({
+    ...validOptions(),
+    oracleSelector: () => "c".repeat(64),
+  });
+
+  await expect(
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(CustomerConfigError);
 });
 
 test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", async () => {
@@ -370,7 +455,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   const oracleClient = makeOracleClient({
     requestHash: async (queryId: string) => {
       queryIdRef.value = queryId;
-      return { hash: HASH_HEX, oraclePubkey: ORACLE_A };
+      return { hash: HASH_HEX };
     },
   });
   const stateStore = createMemoryStateStore();
@@ -412,7 +497,10 @@ test("Customer.request happy path: returns the verified data + proof from a prov
 
   const customer = createCustomer({
     ...validOptions(),
-    oracleClient,
+    oracles: [
+      makeCustomerOracle(ORACLE_A, oracleClient),
+      makeCustomerOracle(ORACLE_B),
+    ],
     relayClient,
     stateStore,
     offerWindowMs: 30,

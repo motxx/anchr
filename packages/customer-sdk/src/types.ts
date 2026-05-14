@@ -15,22 +15,33 @@ export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
 /** Strategy for picking an offer among the ones received within `offerWindowMs`. */
 export type OfferSelector = (offers: Offer[]) => Offer | null;
 
+/** Strategy for picking one trusted oracle pubkey for a request. */
+export type OracleSelector = (oracles: readonly string[]) => string;
+
+/** Trusted oracle plus the transport used to request its hash. */
+export interface CustomerOracle {
+  /** Trusted oracle pubkey selected into the query request. */
+  pubkey: string;
+  /** Adapter for talking to this oracle. */
+  client: OracleClient;
+}
+
 /** Customer-side construction options. */
 export interface CustomerOptions {
-  /** Whitelist of accepted oracle pubkeys (npub or hex). The SDK selects one per query. */
-  oracles: string[];
+  /** Trusted oracles. The SDK selects exactly one per query. */
+  oracles: CustomerOracle[];
   /** Nostr relay URLs the SDK will publish to and subscribe from. */
   relays: string[];
   /** Cashu mint URL (must support HTLC / NUT-14). */
   mint: string;
-  /** Adapter for talking to the oracle. */
-  oracleClient: OracleClient;
   /** Payment adapter. The bundled Cashu HTLC adapter is one implementation. */
   cashuClient: CashuClient;
   /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
   relayClient: RelayClient;
   /** Optional local state adapter for browser, Node, Deno, or test persistence. */
   stateStore?: ActorStateStore;
+  /** Optional strategy for selecting one oracle from the whitelist per request. */
+  oracleSelector?: OracleSelector;
   offerSelector?: OfferSelector;
   offerWindowMs?: number;
   resultTimeoutMs?: number;

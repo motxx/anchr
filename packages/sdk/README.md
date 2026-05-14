@@ -19,11 +19,11 @@ npm i @anchr/sdk
 
 ```ts
 import {
+  type CashuProof,
   createCashuClient,
   createCustomer,
   createHttpOracleClient,
   createRelayClient,
-  type CashuProof,
 } from "@anchr/sdk";
 
 const mintUrl = "https://mint.test.example";
@@ -32,13 +32,14 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  oracles: [oraclePubkey],
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: "https://oracle.test.example",
+    }),
+  }],
   relays: relayUrls,
   mint: mintUrl,
-  oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.test.example",
-    oraclePubkey,
-  }),
   cashuClient: createCashuClient({ mintUrl }),
   relayClient: createRelayClient(relayUrls),
 });
@@ -53,6 +54,45 @@ const result = await customer.request({
 });
 
 console.log(result.data, result.proof, result.providerPubkey);
+```
+
+For a multi-oracle whitelist, keep `oracles` as the trust policy and make the
+selected transport explicit:
+
+```ts
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oracleA = "npub1exampleoraclea";
+const oracleB = "npub1exampleoracleb";
+
+const multiOracleCustomer = createCustomer({
+  oracles: [
+    {
+      pubkey: oracleA,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-a.test.example",
+      }),
+    },
+    {
+      pubkey: oracleB,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-b.test.example",
+      }),
+    },
+  ],
+  relays: relayUrls,
+  mint: mintUrl,
+  oracleSelector: (oracles: readonly string[]) => oracles[1] ?? oracles[0],
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
+});
 ```
 
 ## Provider
@@ -82,7 +122,7 @@ await provider.serve(async (request) => {
   return {
     amountSats: 100,
     produce: async () => ({
-      data: { /* schema-specific payload */ },
+      data: {/* schema-specific payload */},
       proof: "schema-specific-proof-placeholder",
     }),
   };
@@ -116,9 +156,9 @@ tests, inject your own:
 
 ```ts
 import {
+  type CashuClient,
   createCustomer,
   createHttpOracleClient,
-  type CashuClient,
   type RelayClient,
 } from "@anchr/sdk";
 
@@ -150,13 +190,14 @@ const fakeRelayClient: RelayClient = {
 };
 
 const customer = createCustomer({
-  oracles: [oraclePubkey],
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: "https://oracle.test.example",
+    }),
+  }],
   relays: relayUrls,
   mint: mintUrl,
-  oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.test.example",
-    oraclePubkey,
-  }),
   cashuClient: fakeCashuClient,
   relayClient: fakeRelayClient,
 });

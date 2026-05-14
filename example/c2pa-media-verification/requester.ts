@@ -35,14 +35,15 @@ const MAX_DISTANCE_KM = Number(Deno.env.get("C2PA_MAX_DISTANCE_KM") ?? "0.5");
 const MAX_SATS = Number(Deno.env.get("C2PA_MAX_SATS") ?? "100");
 
 const customer = createCustomer({
-  oracles: [oraclePubkey],
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: oracleEndpoint,
+      apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
+    }),
+  }],
   relays,
   mint,
-  oracleClient: createHttpOracleClient({
-    endpoint: oracleEndpoint,
-    oraclePubkey,
-    apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
-  }),
   cashuClient: createCashuClient({ mintUrl: mint }),
   relayClient: createRelayClient(relays),
   offerWindowMs: Number(Deno.env.get("OFFER_WINDOW_MS") ?? "30000"),

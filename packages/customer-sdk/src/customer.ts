@@ -9,6 +9,7 @@
 import type { CashuToken } from "./cashu.ts";
 import type {
   CustomerOptions,
+  CustomerOracle,
   Offer,
   RequestOptions,
   RequestResult,
@@ -69,17 +70,6 @@ export class CustomerConfigError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "CustomerConfigError";
-  }
-}
-
-/** Thrown when the oracle returns a pubkey that doesn't match the customer's whitelist. */
-export class OracleWhitelistMismatchError extends Error {
-  constructor(
-    public readonly expected: string,
-    public readonly received: string,
-  ) {
-    super(`Oracle pubkey mismatch: expected ${expected}, got ${received}`);
-    this.name = "OracleWhitelistMismatchError";
   }
 }
 
@@ -160,12 +150,35 @@ export function validateCustomerOptions(
   }
   const o = options as Record<string, unknown>;
   if (!Array.isArray(o.oracles) || o.oracles.length === 0) {
-    throw new CustomerConfigError("oracles must be a non-empty string array");
+    throw new CustomerConfigError("oracles must be a non-empty array");
   }
+  const oraclePubkeys = new Set<string>();
   for (const entry of o.oracles) {
-    if (typeof entry !== "string" || entry.length === 0) {
+    if (typeof entry !== "object" || entry === null) {
+      throw new CustomerConfigError("oracles entries must be objects");
+    }
+    const pubkey = "pubkey" in entry ? entry.pubkey : undefined;
+    const client = "client" in entry ? entry.client : undefined;
+    if (typeof pubkey !== "string" || pubkey.length === 0) {
       throw new CustomerConfigError(
-        "oracles entries must be non-empty strings",
+        "oracles entries must include a non-empty pubkey",
+      );
+    }
+    if (oraclePubkeys.has(pubkey)) {
+      throw new CustomerConfigError("oracles entries must have unique pubkeys");
+    }
+    oraclePubkeys.add(pubkey);
+    if (typeof client !== "object" || client === null) {
+      throw new CustomerConfigError(
+        "oracles entries must include an oracle client",
+      );
+    }
+    const requestHash = "requestHash" in client
+      ? client.requestHash
+      : undefined;
+    if (typeof requestHash !== "function") {
+      throw new CustomerConfigError(
+        "oracle clients must expose requestHash",
       );
     }
   }
@@ -175,14 +188,18 @@ export function validateCustomerOptions(
   if (typeof o.mint !== "string" || o.mint.length === 0) {
     throw new CustomerConfigError("mint must be a non-empty string");
   }
-  if (o.oracleClient === undefined || o.oracleClient === null) {
-    throw new CustomerConfigError("oracleClient is required");
-  }
   if (o.cashuClient === undefined || o.cashuClient === null) {
     throw new CustomerConfigError("cashuClient adapter is required");
   }
   if (o.relayClient === undefined || o.relayClient === null) {
     throw new CustomerConfigError("relayClient adapter is required");
+  }
+  if (
+    o.oracleSelector !== undefined && typeof o.oracleSelector !== "function"
+  ) {
+    throw new CustomerConfigError(
+      "oracleSelector, when provided, must be a function",
+    );
   }
   if (o.stateStore !== undefined) {
     if (typeof o.stateStore !== "object" || o.stateStore === null) {
@@ -222,19 +239,20 @@ export function generateQueryId(): string {
  */
 export function createCustomer(options: CustomerOptions): Customer {
   validateCustomerOptions(options);
-  const oracles = [...options.oracles];
+  const oracleEntries = [...options.oracles];
+  const oraclePubkeys = oracleEntries.map((entry) => entry.pubkey);
   const relays = [...options.relays];
   const mint = options.mint;
-  const oracleClient = options.oracleClient;
   const cashuClient = options.cashuClient;
   const offerWindowMs = options.offerWindowMs ?? DEFAULT_OFFER_WINDOW_MS;
   const resultTimeoutMs = options.resultTimeoutMs ?? DEFAULT_RESULT_TIMEOUT_MS;
+  const oracleSelector = options.oracleSelector ?? pickOracleForRequest;
   const selector = options.offerSelector ?? selectCheapestOffer;
   const verifierAdapters = options.verifierAdapters ?? [];
   const stateStore = options.stateStore;
 
   return {
-    oracles,
+    oracles: oraclePubkeys,
     relays,
     mint,
 
@@ -255,15 +273,18 @@ export function createCustomer(options: CustomerOptions): Customer {
         );
       }
 
-      const expectedOracle = pickOracleForRequest(oracles);
+      const expectedOracle = oracleSelector(oraclePubkeys);
+      const selectedOracle = findCustomerOracle(oracleEntries, expectedOracle);
+      if (selectedOracle === null) {
+        throw new CustomerConfigError(
+          "oracleSelector returned an oracle outside the whitelist",
+        );
+      }
 
       const identity: Keypair = generateKeypair();
       const queryId = generateQueryId();
 
-      const { hash, oraclePubkey } = await oracleClient.requestHash(queryId);
-      if (oraclePubkey !== expectedOracle) {
-        throw new OracleWhitelistMismatchError(expectedOracle, oraclePubkey);
-      }
+      const { hash } = await selectedOracle.client.requestHash(queryId);
 
       const locktimeSeconds = Math.floor(Date.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
@@ -283,7 +304,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         predicate: req.spec.predicate,
         description: req.spec.description,
         customer_pubkey: identity.publicKey,
-        oracle_pubkey: oraclePubkey,
+        oracle_pubkey: expectedOracle,
         mint_url: mint,
         bounty_token: initialLock.token,
         max_amount_sats: req.payment.maxAmount,
@@ -453,6 +474,13 @@ export function createCustomer(options: CustomerOptions): Customer {
       return result;
     },
   };
+}
+
+function findCustomerOracle(
+  oracles: readonly CustomerOracle[],
+  pubkey: string,
+): CustomerOracle | null {
+  return oracles.find((entry) => entry.pubkey === pubkey) ?? null;
 }
 
 type CustomerStateStatus =

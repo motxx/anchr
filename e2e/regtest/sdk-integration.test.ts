@@ -81,11 +81,7 @@ suite(
 
       // The OracleClient that the customer uses for the pre-flight hash.
       const oracleClient: OracleClient = {
-        requestHash: () =>
-          Promise.resolve({
-            hash: hashHex,
-            oraclePubkey: oracleKey.publicKey,
-          }),
+        requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
       };
 
       // The simulated oracle subscribes to kind 6300 result events. When
@@ -149,10 +145,12 @@ suite(
       await new Promise((r) => setTimeout(r, 500));
 
       const customer = createCustomer({
-        oracles: [oracleKey.publicKey],
+        oracles: [{
+          pubkey: oracleKey.publicKey,
+          client: oracleClient,
+        }],
         relays: [RELAY_URL],
         mint: MINT_URL,
-        oracleClient,
         cashuClient: customerCashu,
         relayClient: customerRelay,
         offerWindowMs: 3_000,

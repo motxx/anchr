@@ -84,11 +84,7 @@ suite(
       const providerRelay = createRelayClient([RELAY_URL]);
 
       const oracleClient: OracleClient = {
-        requestHash: () =>
-          Promise.resolve({
-            hash: hashHex,
-            oraclePubkey: oracleKey.publicKey,
-          }),
+        requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
       };
 
       const queryIdsByRequest = new Map<string, string>();
@@ -171,10 +167,12 @@ suite(
 
       const expectedData = buildFiatSwapResultData(buyerConfig);
       const customer = createCustomer({
-        oracles: [oracleKey.publicKey],
+        oracles: [{
+          pubkey: oracleKey.publicKey,
+          client: oracleClient,
+        }],
         relays: [RELAY_URL],
         mint: MINT_URL,
-        oracleClient,
         cashuClient: createCashuClient({ mintUrl: MINT_URL }),
         relayClient: customerRelay,
         offerWindowMs: 3_000,

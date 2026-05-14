@@ -83,13 +83,14 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  oracles: [oraclePubkey],
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: "https://oracle.test.example",
+    }),
+  }],
   relays: relayUrls,
   mint: mintUrl,
-  oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.test.example",
-    oraclePubkey,
-  }),
   cashuClient: createCashuClient({ mintUrl }),
   relayClient: createRelayClient(relayUrls),
 });
@@ -104,6 +105,45 @@ const { data, proof, providerPubkey } = await customer.request({
   },
   payment: { maxAmount: 1000 },
   sourceProofs: cashuProofsFromYourWallet,
+});
+```
+
+For multiple trusted oracles, keep the whitelist and its matching transport in
+one `oracles` list:
+
+```ts
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oracleA = "npub1exampleoraclea";
+const oracleB = "npub1exampleoracleb";
+
+const multiOracleCustomer = createCustomer({
+  oracles: [
+    {
+      pubkey: oracleA,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-a.test.example",
+      }),
+    },
+    {
+      pubkey: oracleB,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-b.test.example",
+      }),
+    },
+  ],
+  relays: relayUrls,
+  mint: mintUrl,
+  oracleSelector: (oracles: readonly string[]) => oracles[1] ?? oracles[0],
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 ```
 

@@ -12,7 +12,8 @@ The SDK core requires explicit adapters:
   reference adapter.
 - `cashuClient` for settlement. `createCashuClient()` is the bundled Cashu HTLC
   reference adapter.
-- `oracleClient` for hash/release authority access.
+- `oracles: [{ pubkey, client }]` for the trusted oracle pubkey and its
+  hash/release authority access.
 - `stateStore` when the app wants durable local Customer progress. The bundled
   memory store works in browser, Node, Deno, and workers; the IndexedDB store is
   the browser reference adapter.

@@ -41,14 +41,15 @@ const RESULT_TIMEOUT_MS = Number(
 );
 
 const customer = createCustomer({
-  oracles: [oraclePubkey],
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: oracleEndpoint,
+      apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
+    }),
+  }],
   relays,
   mint,
-  oracleClient: createHttpOracleClient({
-    endpoint: oracleEndpoint,
-    oraclePubkey,
-    apiKey: Deno.env.get("ORACLE_API_KEY") ?? undefined,
-  }),
   cashuClient: createCashuClient({ mintUrl: mint }),
   relayClient: createRelayClient(relays),
   offerWindowMs: OFFER_WINDOW_MS,

@@ -39,14 +39,15 @@ try {
 
   const oracleClient = createHttpOracleClient({
     endpoint: config.oracleEndpoint,
-    oraclePubkey: config.oraclePubkey,
     apiKey: config.oracleApiKey,
   });
   const customer = createCustomer({
-    oracles: [config.oraclePubkey],
+    oracles: [{
+      pubkey: config.oraclePubkey,
+      client: oracleClient,
+    }],
     relays: config.relays,
     mint: config.mintUrl,
-    oracleClient,
     cashuClient: createCashuClient({ mintUrl: config.mintUrl }),
     relayClient: createRelayClient(config.relays),
     offerWindowMs: config.offerWindowMs,
