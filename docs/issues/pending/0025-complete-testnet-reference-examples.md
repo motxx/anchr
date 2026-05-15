@@ -10,10 +10,8 @@ feature
 ## Dependencies
 
 Depends on:
-- 0024
 - 0027
 - 0028
-- 0029
 
 Blocks:
 - None

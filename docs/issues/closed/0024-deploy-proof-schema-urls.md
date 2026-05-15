@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -55,3 +56,35 @@ Relevant files:
   URLs resolve before README examples are advertised as complete.
 - Update README/spec links if the deployed URL layout differs from the current
   table.
+
+## Resolution
+
+Implemented by updating:
+
+- `spec-site/`
+- `.github/workflows/deploy-proof-schema-site.yml`
+- `scripts/check-proof-schema-pages.ts`
+- `deno.json`
+- `specs/proof-schemas.md`
+- `docs/issues/pending/0025-complete-testnet-reference-examples.md`
+- `docs/issues/pending/0027-complete-c2pa-media-example.md`
+- `docs/issues/pending/0028-complete-tlsn-fiat-swap-example.md`
+
+Verified with:
+
+- `deno task lint:proof-schema-pages`
+- `deno task lint:strict`
+
+Harness update:
+
+- Added `deno task lint:proof-schema-pages` to check the `anchr-spec.org`
+  static source, CNAME, canonical schema URLs, and required documentation
+  sections before deployment.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
