@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -45,3 +46,31 @@ compile-only demos:
 
 - Update the README status table only after the child issues meet the
   documented completion bar.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/issues/closed/0027-complete-c2pa-media-example.md`
+- `docs/issues/closed/0028-complete-tlsn-fiat-swap-example.md`
+
+Verified with:
+
+- `deno task --config example/c2pa-media-verification/deno.json smoke`
+- `deno task --config example/tlsn-fiat-swap-square/deno.json smoke`
+- `deno task test:examples`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — this aggregate issue is closed by the child smoke harness updates in
+  0027 and 0028; the top-level README already marked both examples as
+  `Testnet`.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
