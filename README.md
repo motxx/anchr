@@ -165,13 +165,16 @@ the Provider and Oracle interpret it.
 
 ## Reference Implementations
 
+Status labels are defined in
+[`docs/universality-boundaries.md`](docs/universality-boundaries.md#example-status-vocabulary).
+
 | Example                                                    | What it shows                                  | Status      |
 | ---------------------------------------------------------- | ---------------------------------------------- | ----------- |
 | [C2PA photo marketplace](example/c2pa-media-verification/) | Customer/Provider flow with photo verification | Testnet     |
 | [TLSN fiat swap](example/tlsn-fiat-swap-square/)           | Customer/Provider flow with TLSNotary          | Testnet     |
 | [Browser auto-claim](example/auto-claim/)                  | TLSNotary-based browser automation             | Concept     |
 | [Two-party binary bet](example/two-party-binary-bet/)      | Conditional swap primitive outside the SDK     | Implemented |
-| [Airdrop bot shield](example/airdrop-bot-shield/)          | Verification-only attestation flow             | Simulation  |
+| [Airdrop bot shield](example/airdrop-bot-shield/)          | Verification-only attestation flow             | Implemented |
 
 ## More Detail
 

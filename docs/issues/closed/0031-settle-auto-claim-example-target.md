@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -44,3 +45,34 @@ Relevant files:
 - If concept-only, make the README explicit about the intentional non-runnable
   boundary and what future issue would be needed to graduate it.
 - Update the top-level README status to match the chosen target.
+
+## Resolution
+
+Implemented by updating:
+
+- `example/auto-claim/README.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+- `deno task lint:paths`
+- `deno task lint:no-history-comments`
+- `deno task lint:strict`
+- `deno check --config ../../deno.json agent.ts insurer.ts mock-airline.ts`
+  from `example/auto-claim/`
+
+Harness update:
+
+- `example/auto-claim/README.md` now records the example-specific Concept
+  boundary and graduation bar using the status vocabulary from
+  `docs/universality-boundaries.md`.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None. A future graduation issue should add the browser entry point, local
+  service runbook, fixture-backed smoke command, and privacy/permission notes
+  before changing this example away from `Concept`.

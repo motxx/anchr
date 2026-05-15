@@ -2,15 +2,29 @@
 
 **Airdrop bot shield.**
 
-> **Status: Mainnet-capable operator preview.** The demo remains available,
-> but the example now includes a durable HTTP verifier service with SQLite
-> persistence, TLSNotary sidecar verification, replay protection, per-account
-> nullifiers, and mainnet startup guards.
+> **Status: Implemented.** This example's maintained target is the HTTP verifier
+> service: SQLite persistence, TLSNotary sidecar verification, replay
+> protection, per-account nullifiers, Cashu HTLC settlement wiring, tests, and
+> mainnet startup guards. The standalone demo remains a simulation fixture.
 
 > **Uses:** `@anchr/tlsn-toolkit` + Cashu HTLC preimage release.
 > **Pattern:** bounty (Project pays each verified Claimant on TLSN-attested Web2 attribute).
 
 TLSNotary-based Sybil resistance for token airdrops — prove you're human without revealing who you are.
+
+## Completion Target
+
+This example is maintained as an implemented operator preview for a
+verification-only airdrop claim service.
+
+Operators can run the HTTP service with their own campaign criteria, Cashu mint,
+funded source tokens, admin token, nullifier secret, TLSNotary verifier, and
+durable SQLite DB. The repository does not ship a claimant wallet UI, a campaign
+admin UI, hosted infrastructure, or production credentials. Those remain
+deployment-owned pieces outside this example.
+
+The simulation demo is retained only to explain the flow without funded tokens
+or claimant credentials. It is not the completion target.
 
 ## Problem
 
@@ -274,7 +288,7 @@ Check airdrop campaign status (remaining budget, total claims, etc.).
 }
 ```
 
-## Running the Example
+## Running the Simulation Demo
 
 ```bash
 # From the repository root
@@ -291,6 +305,17 @@ The demo simulates the full flow with mock data:
 2. Shows the TLSNotary proof requests that would be generated
 3. Verifies mock proofs against the criteria (simulating what the oracle does)
 4. Demonstrates the Cashu HTLC escrow and redemption flow
+
+## Smoke Check
+
+```bash
+cd example/airdrop-bot-shield
+deno task test
+```
+
+The smoke check covers campaign creation, admin authorization, TLSNotary-backed
+claim approval with injected validation, durable replay/nullifier behavior, and
+pre-reserved HTLC hash approval.
 
 ## Running the HTTP Service
 

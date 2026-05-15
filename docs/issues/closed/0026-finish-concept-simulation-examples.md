@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -53,3 +54,44 @@ Relevant files:
 - Resolve 0032 for the `airdrop-bot-shield` completion target.
 - Update the top-level README status table after the child issues settle the
   implemented targets.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/universality-boundaries.md`
+- `README.md`
+- `example/auto-claim/README.md`
+- `example/airdrop-bot-shield/README.md`
+- `docs/issues/closed/0030-define-example-status-vocabulary.md`
+- `docs/issues/closed/0031-settle-auto-claim-example-target.md`
+- `docs/issues/closed/0032-settle-airdrop-shield-target.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+- `deno task lint:paths`
+- `deno task lint:no-history-comments`
+- `deno task lint:strict`
+- `deno task test:all` (all local lint/tests passed except sandbox-blocked
+  dependency audit)
+- `deno task lint:deps` (rerun outside sandbox after the advisory DB lock was
+  blocked under the sandbox)
+- `deno check --config ../../deno.json agent.ts insurer.ts mock-airline.ts`
+  from `example/auto-claim/`
+- `deno task test` from `example/airdrop-bot-shield/`
+
+Harness update:
+
+- `docs/universality-boundaries.md` now owns the status vocabulary.
+- `example/auto-claim/README.md` locks the `Concept` target and graduation bar.
+- `example/airdrop-bot-shield/README.md` locks the `Implemented`
+  operator-preview target, smoke command, and simulation-demo boundary.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None.

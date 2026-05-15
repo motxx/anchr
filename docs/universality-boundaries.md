@@ -45,6 +45,25 @@ Do not duplicate the same normative rule in several places.
   are not protocol actors and must not be required by Customer, Provider, or
   Oracle SDKs.
 
+## Example status vocabulary
+
+The top-level `README.md` Reference Implementations table uses these labels for
+example maturity. The labels are repository documentation policy, not protocol
+status, and belong to the owning example plus this boundary document.
+
+| Status | Meaning | Minimum bar |
+| --- | --- | --- |
+| `Concept` | A design sketch or UX target that may contain runnable fragments, but is not maintained as an end-to-end example. | README states the intentional non-runnable boundary, names the target architecture, and avoids promising deployable behavior. |
+| `Simulation` | A runnable or partially runnable flow with mocked, in-process, fixture, or non-fund-bearing dependencies. | README names the simulated pieces, provides the command or test that exercises the simulation, and states what must change before testnet or mainnet use. |
+| `Testnet` | A reproducible reference flow for non-production relays, mints, notaries, or external sandboxes. | README lists required services and non-secret env vars, provides a runbook or command sequence for both sides of the flow, and has a smoke check or documented verification command that catches SDK/API drift. |
+| `Implemented` | A maintained implementation whose advertised behavior is covered by repository tests or an equivalent example-specific harness. | README links the relevant commands, tests, or deployment runbook and states any remaining non-production limitation. |
+
+Do not promote a status label to `specs/`: it does not change the universal
+Customer, Provider, Oracle, proof, or settlement contracts. If an example needs
+stricter requirements, record them in that example's README. If several
+examples need the same repeatable smoke harness, route the convention through
+`docs/review-harness.md` or a repository script.
+
 ## Human review scope
 
 Human review should decide whether a change moves a boundary between these

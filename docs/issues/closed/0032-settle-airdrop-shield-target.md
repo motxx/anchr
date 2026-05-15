@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -46,3 +47,31 @@ Relevant files:
 - If simulation-only, make the README explicit about the simulated boundary and
   what future issue would be needed to graduate it.
 - Update the top-level README status to match the chosen target.
+
+## Resolution
+
+Implemented by updating:
+
+- `README.md`
+- `example/airdrop-bot-shield/README.md`
+
+Verified with:
+
+- `deno task test` from `example/airdrop-bot-shield/`
+- `deno task lint:strict`
+- `check-silent-bypass`: no in-scope TypeScript files changed; the diff only
+  updates README and issue documentation.
+
+Harness update:
+
+- `example/airdrop-bot-shield/README.md` now records the example-specific
+  `Implemented` operator-preview target, smoke command, and simulation-demo
+  boundary using the status vocabulary from `docs/universality-boundaries.md`.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None.

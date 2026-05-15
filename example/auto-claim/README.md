@@ -2,6 +2,8 @@
 
 > **Status: Concept.** Browser extension is the target UX; the current demo runs
 > the same agent logic as a Deno script. No extension is shipping yet.
+> The Deno scripts are developer fixtures for the protocol shape, not a
+> maintained Testnet reference flow.
 
 > **Uses:** `anchr-sdk` Customer / Provider primitives, Nostr, Cashu HTLC,
 > TLSNotary, and an Oracle. No Anchr-operated host or reference `/queries`
@@ -17,6 +19,24 @@ automatically."
 
 > The browser extension is the target UX. The demo below runs the same agent
 > logic as a Deno script — no extension is shipping yet.
+
+## Completion Target
+
+This example intentionally remains `Concept`.
+
+The repository keeps the insurer and agent scripts to show the Customer/Provider
+role mapping, predicate shape, and TLSNotary proof handoff. It does not yet
+ship the expected browser extension, extension permission model, TLSNotary
+browser integration, or smoke harness needed for a reproducible Testnet flow.
+
+To graduate from `Concept`, a future issue should add:
+
+- a browser extension or equivalent browser automation entry point;
+- a non-secret local runbook for relay, mint, Oracle, notary, and verifier
+  services;
+- a fixture-backed smoke command that catches SDK/API drift without requiring
+  real claimant credentials;
+- explicit privacy and permission notes for the pages the agent can observe.
 
 ## Concept
 
