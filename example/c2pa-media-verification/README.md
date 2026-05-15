@@ -105,6 +105,16 @@ C2PA_SOURCE_PROOFS_JSON='[...]' \
 deno task requester
 ```
 
+### Smoke Check
+
+```bash
+deno task smoke
+```
+
+The smoke check type-checks the requester and worker scripts against the
+current SDK API. It does not start relay, mint, Oracle, Blossom, or `c2patool`;
+use the runbook for live-service validation.
+
 ### Prerequisites
 
 - `c2patool` installed

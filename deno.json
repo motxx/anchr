@@ -13,6 +13,7 @@
     "./packages/provider-sdk",
     "./packages/bounty",
     "./packages/sdk",
+    "./example/c2pa-media-verification",
     "./example/airdrop-bot-shield",
     "./example/tlsn-fiat-swap-square"
   ],

@@ -7,6 +7,17 @@
 - (任意) [c2patool](https://github.com/contentauth/c2patool) — C2PA
   署名付き画像を作成する場合
 
+## 0. Smoke check
+
+```bash
+cd example/c2pa-media-verification
+deno task smoke
+```
+
+この smoke check は requester / worker が現在の SDK API に対して
+type-check できることを確認します。relay、mint、Oracle、Blossom、
+`c2patool` は起動しません。以降の手順が live-service validation です。
+
 ## 1. インフラ起動
 
 ```bash

@@ -76,6 +76,16 @@ The SDK flow is direct Customer/Provider interaction over Nostr:
 
 See [`RUNBOOK.md`](RUNBOOK.md).
 
+Smoke check:
+
+```bash
+deno task smoke
+```
+
+This check type-checks the Seller/Buyer scripts and runs the local predicate
+and config tests. It does not contact Square Sandbox, generate a TLSNotary
+presentation, or start relay/mint/Oracle infrastructure.
+
 The short version:
 
 ```bash

@@ -7,6 +7,7 @@
     "buyer": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net --allow-read buyer.ts",
     "seller": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net seller.ts",
     "check": "deno check --node-modules-dir=false --no-lock buyer.ts seller.ts fiat-swap.ts fiat-swap.test.ts",
-    "test": "deno test --node-modules-dir=false --no-lock --allow-read fiat-swap.test.ts"
+    "test": "deno test --node-modules-dir=false --no-lock --allow-read fiat-swap.test.ts",
+    "smoke": "deno task check && deno task test"
   }
 }

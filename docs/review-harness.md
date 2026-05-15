@@ -44,9 +44,41 @@ from ad hoc review into one of these homes.
 | `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues. |
 | `skills/test-regtest/SKILL.md` | `semantic skill` | Manual and automated regtest runbook selection. |
 | `skills/test-tlsn/SKILL.md` | `semantic skill` | Manual and automated TLSNotary verification runbook selection. |
+| `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
 | `docs/issues/README.md` | `automated` process input | Issue structure, dependency recording, closure format, review residual recording, and security-sensitive issue limits. |
+
+## Example Testnet Smoke Convention
+
+Every README-listed `Testnet` example must provide a consistent local
+completion bar:
+
+- A README status line and runbook that name the local services the example
+  assumes, such as relay, mint, Oracle, notary, verifier, sandbox API, or media
+  fixture.
+- A non-secret environment section or template. Placeholders are fine; private
+  keys, source ecash proofs, bearer tokens, or production credentials are not.
+- A command sequence for both sides of the demonstrated flow, using the
+  example's actual Customer/Provider or requester/worker vocabulary.
+- `deno task smoke` from the example directory. The smoke task must be
+  deterministic and safe for local review: it can type-check scripts, run
+  fixture-backed tests, and parse config, but it must not require funded tokens,
+  production credentials, or live external accounts.
+- A runbook section for live or Docker-backed validation when the smoke task
+  cannot cover relays, mints, notaries, or third-party sandboxes.
+
+Task naming is intentionally narrow:
+
+- `check` means compile/type/API-drift coverage.
+- `test` means local fixture-backed behavior coverage.
+- `smoke` is the maintained pre-advertising command and should call `check`,
+  `test`, or both.
+
+Before marking or keeping an example as `Testnet`, maintainers should run its
+`deno task smoke`, then follow the runbook's live-service path when the README
+claims a reproducible end-to-end flow. If the smoke task only compiles scripts,
+the runbook must state which live dependencies remain outside the smoke check.
 
 ## Review Concern Map
 

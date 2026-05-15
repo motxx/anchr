@@ -3,6 +3,8 @@
     "anchr-sdk": "../../packages/sdk/src/index.ts"
   },
   "tasks": {
+    "check": "deno check --config ../../deno.json requester.ts worker.ts",
+    "smoke": "deno task check",
     "requester": "deno run --allow-all requester.ts",
     "worker": "deno run --allow-all worker.ts"
   }

@@ -158,7 +158,17 @@ HTLC at the mint.
 
 ## 6. Verification
 
-Run local checks:
+Run the local smoke check:
+
+```bash
+deno task smoke
+```
+
+This calls the example's type/API check and local predicate/config tests. It
+does not contact Square Sandbox, generate a TLSNotary presentation, or start
+relay/mint/Oracle infrastructure.
+
+From the repository root, the equivalent commands are:
 
 ```bash
 deno task fiat-swap:check
@@ -166,8 +176,7 @@ deno task fiat-swap:test
 ```
 
 Docker/regtest integration is optional for this example path. Use it when you
-need to validate the live mint/relay/oracle wiring, not for the pure predicate
-and config checks above.
+need to validate the live mint/relay/oracle wiring.
 
 The fiat swap regtest integration uses the real Docker-backed Cashu mint and
 Nostr relay, with Square/TLSNotary represented by a fixture proof:
