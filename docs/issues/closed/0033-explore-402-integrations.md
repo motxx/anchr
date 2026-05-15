@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -61,3 +62,27 @@ External protocols to consider:
   it should touch.
 - If implementation is recommended, create follow-up issues with narrowly
   closeable scope.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/http-402-integrations.md`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- `docs/http-402-integrations.md` records the boundary decision and routes
+  future implementation through existing example smoke, universality-boundary,
+  threat-model, and silent-bypass harnesses.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
