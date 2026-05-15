@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -51,3 +52,33 @@ Relevant files:
   flow far enough to catch SDK/API drift.
 - Update the top-level README status only when the documented flow is
   reproducible.
+
+## Resolution
+
+Implemented by updating:
+
+- `example/tlsn-fiat-swap-square/.env.example`
+- `example/tlsn-fiat-swap-square/env-example.test.ts`
+- `example/tlsn-fiat-swap-square/deno.json`
+- `example/tlsn-fiat-swap-square/README.md`
+- `example/tlsn-fiat-swap-square/RUNBOOK.md`
+- `docs/issues/pending/0025-complete-testnet-reference-examples.md`
+
+Verified with:
+
+- `deno task --config example/tlsn-fiat-swap-square/deno.json smoke`
+- `deno task lint:strict`
+
+Harness update:
+
+- `example/tlsn-fiat-swap-square/env-example.test.ts` is now included in the
+  example's `deno task smoke` path and checks required non-secret local
+  configuration.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

@@ -89,27 +89,18 @@ presentation, or start relay/mint/Oracle infrastructure.
 The short version:
 
 ```bash
-docker compose up -d
-
-export NOSTR_RELAYS=ws://localhost:7777
-export CASHU_MINT_URL=http://localhost:3338
-export FIAT_SWAP_ORACLE_ENDPOINT=http://localhost:3001
-export FIAT_SWAP_ORACLE_PUBKEY=<oracle-pubkey-hex>
-export SQUARE_PAYMENT_LINK=https://square.link/u/...
-export FIAT_SWAP_SOURCE_PROOFS_JSON='[...]'
-deno task fiat-swap:seller
+cd example/tlsn-fiat-swap-square
+cp .env.example .env
+# Replace the placeholders for Oracle, Square Sandbox, Provider key, and
+# non-production Cashu proofs.
+deno task seller
 ```
 
 In another terminal:
 
 ```bash
-export NOSTR_RELAYS=ws://localhost:7777
-export CASHU_MINT_URL=http://localhost:3338
-export FIAT_SWAP_ORACLE_PUBKEY=<oracle-pubkey-hex>
-export FIAT_SWAP_PROVIDER_PRIVKEY=<buyer-provider-secret-key>
-export FIAT_SWAP_PAYMENT_ID=<square-payment-id>
-export FIAT_SWAP_PROOF_FILE=proof.presentation.tlsn
-deno task fiat-swap:buyer
+cd example/tlsn-fiat-swap-square
+deno task buyer
 ```
 
 ## Trust Model Recap

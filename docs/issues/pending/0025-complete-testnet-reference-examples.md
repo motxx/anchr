@@ -10,7 +10,7 @@ feature
 ## Dependencies
 
 Depends on:
-- 0028
+- None
 
 Blocks:
 - None
@@ -43,6 +43,5 @@ compile-only demos:
 
 ## Plan
 
-- Resolve 0028 for the TLSN fiat swap example.
 - Update the README status table only after the child issues meet the
   documented completion bar.

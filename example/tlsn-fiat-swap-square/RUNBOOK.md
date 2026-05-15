@@ -45,7 +45,29 @@ Oracle must also be running. The Customer side needs an Oracle hash endpoint
 such as `http://localhost:3001/hash`; after verifying the Provider's kind 6300
 TLSN result, the Oracle must send the preimage to the Provider over Nostr DM.
 
-## 2. Seller / Customer
+## 2. Configure
+
+```bash
+cd example/tlsn-fiat-swap-square
+cp .env.example .env
+```
+
+Replace these placeholders in `.env`:
+
+- `FIAT_SWAP_ORACLE_PUBKEY`: Oracle authority pubkey accepted by both sides.
+- `FIAT_SWAP_ORACLE_ENDPOINT`: local Oracle HTTP endpoint for the Seller.
+- `FIAT_SWAP_PROVIDER_PRIVKEY`: Buyer/Provider Nostr signing key.
+- `FIAT_SWAP_SOURCE_PROOFS_JSON`: non-production Cashu proofs from the local
+  mint.
+- `SQUARE_ACCESS_TOKEN`, `SQUARE_PAYMENT_LINK`, and `FIAT_SWAP_PAYMENT_ID`:
+  Square Sandbox values only.
+- `FIAT_SWAP_PROOF_FILE` or `FIAT_SWAP_PROOF_BASE64`: TLSNotary presentation
+  produced for the Square payment lookup.
+
+Do not commit `.env`, source ecash proofs, Nostr private keys, Square access
+tokens, or TLSNotary presentations that reveal private account data.
+
+## 3. Seller / Customer
 
 Seller locks testnet/regtest Cashu proofs and requests proof that the Square
 payment completed.
@@ -79,14 +101,14 @@ export FIAT_SWAP_LOCKTIME_SECONDS=3600
 Run:
 
 ```bash
-deno task fiat-swap:seller
+deno task seller
 ```
 
 Keep this terminal open. It publishes a kind 5300 request, waits for Provider
 offers, binds the selected Provider at the Cashu mint, and waits for the kind
 6300 result.
 
-## 3. Buyer Pays Square
+## 4. Buyer Pays Square
 
 Use the Square Payment Link, or create a Sandbox payment by API:
 
@@ -113,7 +135,7 @@ curl -s https://connect.squareupsandbox.com/v2/payments \
   | jq '.payments[0] | {id, status, amount_money}'
 ```
 
-## 4. Buyer / Provider
+## 5. Buyer / Provider
 
 Buyer runs the Provider primitive. It offers only matching fiat swap predicates
 and redeems only after the Oracle releases the preimage.
@@ -131,7 +153,7 @@ export FIAT_SWAP_SQUARE_LOCATION_ID=<seller-square-location-id> # if Seller pinn
 export FIAT_SWAP_PAYMENT_ID=<square-payment-id>
 ```
 
-## 5. TLSNotary Proof
+## 6. TLSNotary Proof
 
 Square uses ECDSA certificates, so the CLI path is fast enough for Testnet.
 
@@ -149,14 +171,14 @@ Then run the Provider:
 
 ```bash
 export FIAT_SWAP_PROOF_FILE=proof.presentation.tlsn
-deno task fiat-swap:buyer
+deno task buyer
 ```
 
 The Provider publishes the encrypted kind 6300 result after selection. Once the
 Oracle verifies the result and DMs the preimage, the Provider redeems the Cashu
 HTLC at the mint.
 
-## 6. Verification
+## 7. Verification
 
 Run the local smoke check:
 
@@ -164,9 +186,9 @@ Run the local smoke check:
 deno task smoke
 ```
 
-This calls the example's type/API check and local predicate/config tests. It
-does not contact Square Sandbox, generate a TLSNotary presentation, or start
-relay/mint/Oracle infrastructure.
+This calls the example's type/API check, local predicate/config tests, and
+`.env.example` coverage. It does not contact Square Sandbox, generate a
+TLSNotary presentation, or start relay/mint/Oracle infrastructure.
 
 From the repository root, the equivalent commands are:
 
