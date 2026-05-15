@@ -1,5 +1,5 @@
 /**
- * C2PA Media Verification - Journalist / Provider
+ * C2PA Media Verification - Provider
  *
  * Listens for C2PA image requests on Nostr, offers matching requests, and
  * returns the C2PA-signed photo as an encrypted kind 6300 result after

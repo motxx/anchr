@@ -5,7 +5,7 @@
 
 > **Uses:** `anchr-sdk` Customer / Provider primitives, Nostr, Cashu HTLC, and
 > an Oracle. No Anchr-operated host or reference `/queries` server is required.
-> **Pattern:** bounty (News desk pays Journalist on verified C2PA + GPS proof).
+> **Pattern:** bounty (Customer pays Provider on verified C2PA + GPS proof).
 
 Prove that a news photo is a real camera capture — not AI-generated — using
 [C2PA Content Credentials](https://c2pa.org/) and Anchr's decentralized
@@ -23,8 +23,8 @@ Anchr combines **C2PA hardware-rooted signatures** with **GPS proximity checks**
 for cryptographic proof of camera capture, plus an **AI-generation heuristic**
 as a soft filter.
 
-A news desk posts a bounty requesting a photo from a specific location. An
-on-ground journalist takes the photo with a C2PA-enabled camera, which embeds a
+A Customer posts a bounty requesting a photo from a specific location. A
+Provider takes the photo with a C2PA-enabled camera, which embeds a
 hardware-signed Content Credential. Anchr's oracle verifies the credential
 chain, GPS proximity, and absence of AI generation markers before releasing
 payment.
@@ -32,7 +32,7 @@ payment.
 ## Architecture
 
 ```
-News Desk (Requester)                    On-ground Journalist (Worker)
+Customer                                  Provider
 ┌─────────────────────┐                  ┌──────────────────────────┐
 │ createCustomer      │                  │ createProvider           │
 │   expectedGps,      │  ── Nostr ──▶    │   ↓                      │
@@ -78,7 +78,7 @@ News Desk (Requester)                    On-ground Journalist (Worker)
 | Component       | Trust Assumption                                                                                                                                                 |
 | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | C2PA signature  | Rooted in the camera's signing key (typically hardware-protected on compliant cameras). Forgery requires either physical access or a compromised software signer |
-| GPS coordinates | Extracted from C2PA-signed EXIF assertion — Worker cannot spoof without breaking the signature                                                                   |
+| GPS coordinates | Extracted from C2PA-signed EXIF assertion — Provider cannot spoof without breaking the signature                                                                 |
 | AI detection    | Heuristic only (EXIF camera model presence) — raises the bar but offers no cryptographic guarantee                                                               |
 | Timestamp       | Signed by the camera at capture time. Replay is bounded by freshness checks                                                                                      |
 | Privacy         | Server verifies EXIF on upload, strips it before storage, and persists only the result                                                                           |
@@ -86,22 +86,33 @@ News Desk (Requester)                    On-ground Journalist (Worker)
 ## Running the Example
 
 ```bash
-# Start local relay, mint, and your chosen Oracle
-docker compose up -d
+# Copy the non-secret local template, then replace placeholders.
+cp .env.example .env
+```
 
-# Terminal 1: Journalist / Provider listens for photo requests
-NOSTR_RELAYS=ws://localhost:7777 \
-CASHU_MINT_URL=http://localhost:3338 \
-ORACLE_PUBKEY=<oracle-pubkey-hex> \
-C2PA_PROVIDER_PRIVKEY=<provider-nsec-or-hex> \
+Required services:
+
+- Nostr relay, for Customer/Provider coordination.
+- Cashu mint, for non-production HTLC settlement.
+- Oracle HTTP endpoint, for hash and verification requests.
+- Optional Blossom server, if you adapt the example to external attachments.
+- Optional `c2patool`, if you need to create or validate C2PA test media.
+
+```bash
+# From the repository root: start local relay and Cashu dependencies.
+docker compose up -d relay bitcoind lnd-mint lnd-user
+./scripts/init-regtest.sh
+docker compose up -d cashu-mint
+
+# Terminal 1: Oracle HTTP endpoint.
+ORACLE_PORT=3001 \
+ORACLE_API_KEY=<optional-oracle-api-key> \
+deno run --allow-all packages/bounty/src/infrastructure/oracle-service/server.ts
+
+# Terminal 2: Provider listens for C2PA photo requests.
 deno task worker -- signed-photo.jpg
 
-# Terminal 2: News desk / Customer creates a photo request
-NOSTR_RELAYS=ws://localhost:7777 \
-CASHU_MINT_URL=http://localhost:3338 \
-ORACLE_ENDPOINT=http://localhost:3001 \
-ORACLE_PUBKEY=<oracle-pubkey-hex> \
-C2PA_SOURCE_PROOFS_JSON='[...]' \
+# Terminal 3: Customer creates a photo request.
 deno task requester
 ```
 
@@ -111,9 +122,10 @@ deno task requester
 deno task smoke
 ```
 
-The smoke check type-checks the requester and worker scripts against the
-current SDK API. It does not start relay, mint, Oracle, Blossom, or `c2patool`;
-use the runbook for live-service validation.
+The smoke check type-checks the Customer and Provider scripts against the
+current SDK API and verifies that `.env.example` documents the required
+non-secret configuration. It does not start relay, mint, Oracle, Blossom, or
+`c2patool`; use the runbook for live-service validation.
 
 ### Prerequisites
 
@@ -130,7 +142,7 @@ c2patool test-photo.jpg -m manifest.json -o signed-photo.jpg
 
 ## Files
 
-- **requester.ts** — News desk / Customer: publishes a NIP-90 photo request and
+- **requester.ts** — Customer: publishes a NIP-90 photo request and
   locks Cashu proofs
-- **worker.ts** — Journalist / Provider: listens on Nostr, offers, and publishes
+- **worker.ts** — Provider: listens on Nostr, offers, and publishes
   an encrypted result

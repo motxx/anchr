@@ -1,5 +1,5 @@
 /**
- * C2PA Media Verification - Requester / Customer
+ * C2PA Media Verification - Customer
  *
  * A news desk requests a verified photo from a location. The request is a
  * NIP-90 job announced on Nostr; no Anchr-operated host is involved.
@@ -50,7 +50,7 @@ const customer = createCustomer({
   resultTimeoutMs: Number(Deno.env.get("RESULT_TIMEOUT_MS") ?? "600000"),
 });
 
-console.log("=== C2PA Media Verification - Requester / Customer ===\n");
+console.log("=== C2PA Media Verification - Customer ===\n");
 console.log(`Relays:   ${relays.join(", ")}`);
 console.log(`Mint:     ${mint}`);
 console.log(`Oracle:   ${oraclePubkey}`);

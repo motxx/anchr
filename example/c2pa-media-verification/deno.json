@@ -4,8 +4,9 @@
   },
   "tasks": {
     "check": "deno check --config ../../deno.json requester.ts worker.ts",
-    "smoke": "deno task check",
-    "requester": "deno run --allow-all requester.ts",
-    "worker": "deno run --allow-all worker.ts"
+    "test": "deno test --config ../../deno.json --allow-read env-example.test.ts",
+    "smoke": "deno task check && deno task test",
+    "requester": "deno run --allow-all --env requester.ts",
+    "worker": "deno run --allow-all --env worker.ts"
   }
 }

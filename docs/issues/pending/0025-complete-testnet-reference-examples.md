@@ -10,7 +10,6 @@ feature
 ## Dependencies
 
 Depends on:
-- 0027
 - 0028
 
 Blocks:
@@ -44,8 +43,6 @@ compile-only demos:
 
 ## Plan
 
-- Resolve 0027 for the C2PA media verification example.
 - Resolve 0028 for the TLSN fiat swap example.
-- Resolve 0029 for shared example smoke/runbook conventions.
 - Update the README status table only after the child issues meet the
   documented completion bar.

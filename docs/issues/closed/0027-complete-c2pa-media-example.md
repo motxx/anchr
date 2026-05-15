@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: Codex (GPT-5)
+Completed: 2026-05-15
 
 ## Priority
 
@@ -48,3 +49,36 @@ Relevant files:
   happy path far enough to catch SDK/API drift.
 - Update the top-level README status only when the example is actually
   reproducible by the documented commands.
+
+## Resolution
+
+Implemented by updating:
+
+- `example/c2pa-media-verification/.env.example`
+- `example/c2pa-media-verification/env-example.test.ts`
+- `example/c2pa-media-verification/deno.json`
+- `example/c2pa-media-verification/README.md`
+- `example/c2pa-media-verification/RUNBOOK.md`
+- `example/c2pa-media-verification/requester.ts`
+- `example/c2pa-media-verification/worker.ts`
+- `docs/issues/pending/0025-complete-testnet-reference-examples.md`
+
+Verified with:
+
+- `deno task --config example/c2pa-media-verification/deno.json smoke`
+- `deno task test:examples`
+- `deno task lint:strict`
+
+Harness update:
+
+- `example/c2pa-media-verification/env-example.test.ts` is now included in the
+  example's `deno task smoke` path and checks required non-secret local
+  configuration.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
