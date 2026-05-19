@@ -41,12 +41,32 @@ Nostr pubkeys, and each app chooses its own relay, mint, oracle, and notary.
 
 ## How It Works
 
-1. Customer creates a request and locks payment in a Cashu HTLC.
-2. Providers see the request over Nostr and return offers.
-3. Customer accepts an offer and binds the escrow to the Provider.
-4. Provider produces data plus proof.
-5. Oracle verifies the proof and releases the unlock secret.
-6. Provider redeems; otherwise the Customer refunds after timeout.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Relay as Nostr Relay
+    participant Provider
+    participant Oracle
+    participant Mint as Cashu Mint
+
+    Customer->>Mint: Lock payment in a Cashu HTLC
+    Customer->>Relay: Publish work request
+    Relay-->>Provider: Deliver request
+    Provider->>Relay: Publish offer
+    Relay-->>Customer: Deliver offer
+    Customer->>Relay: Accept offer and bind escrow
+    Relay-->>Provider: Deliver selection
+    Provider->>Provider: Produce data and proof
+    Provider->>Oracle: Submit proof for verification
+
+    alt Proof accepted before timeout
+        Oracle-->>Provider: Release unlock secret
+        Provider->>Mint: Redeem HTLC
+    else No valid proof before timeout
+        Customer->>Mint: Refund after timeout
+    end
+```
 
 The oracle never holds funds. It only controls whether the unlock secret is
 released, so oracle trust still matters. Use solo oracles for simple flows, or a
