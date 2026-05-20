@@ -34,7 +34,12 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
 
 const aliases = new Map<string, string>([
+  ["@anchr/adapters", "../adapters/src/mod.ts"],
+  ["@anchr/adapters/cashu", "../adapters/src/cashu.ts"],
+  ["@anchr/adapters/nostr", "../adapters/src/nostr.ts"],
+  ["@anchr/adapters/storage", "../adapters/src/storage.ts"],
   ["@anchr/protocol", "../protocol/src/mod.ts"],
+  ["@anchr/protocol/adapters", "../protocol/src/adapters.ts"],
   ["@anchr/protocol/capabilities", "../protocol/src/capabilities.ts"],
   ["@anchr/protocol/events", "../protocol/src/events.ts"],
   ["@anchr/protocol/nostr", "../protocol/src/nostr.ts"],
@@ -43,14 +48,9 @@ const aliases = new Map<string, string>([
   ["@anchr/oracle-sdk", "../oracle-sdk/src/mod.ts"],
   ["@anchr/oracle-sdk/oracle", "../oracle-sdk/src/oracle.ts"],
   ["@anchr/customer-sdk", "../customer-sdk/src/mod.ts"],
-  ["@anchr/customer-sdk/cashu", "../customer-sdk/src/cashu.ts"],
   ["@anchr/customer-sdk/customer", "../customer-sdk/src/customer.ts"],
-  ["@anchr/customer-sdk/nostr", "../customer-sdk/src/nostr.ts"],
-  ["@anchr/customer-sdk/storage", "../customer-sdk/src/storage.ts"],
   ["@anchr/customer-sdk/types", "../customer-sdk/src/types.ts"],
   ["@anchr/provider-sdk", "../provider-sdk/src/mod.ts"],
-  ["@anchr/provider-sdk/cashu", "../provider-sdk/src/cashu.ts"],
-  ["@anchr/provider-sdk/nostr", "../provider-sdk/src/nostr.ts"],
   ["@anchr/provider-sdk/provider", "../provider-sdk/src/provider.ts"],
   ["@anchr/provider-sdk/types", "../provider-sdk/src/types.ts"],
 ]);

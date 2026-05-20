@@ -1,4 +1,9 @@
 import type {
+  ActorStateStore,
+  CashuClient,
+  RelayClient,
+} from "@anchr/protocol/adapters";
+import type {
   ProofGenerator,
   ProviderHandler,
   ProviderOffer,
@@ -6,15 +11,15 @@ import type {
   SchemaProducer,
   SchemaProducerContext,
 } from "@anchr/protocol/types";
-import type { CashuClient } from "./cashu.ts";
-import type { RelayClient } from "./nostr.ts";
-import type { ActorStateStore } from "./storage.ts";
 
 export type {
+  ActorStateStore,
+  CashuClient,
   ProofGenerator,
   ProviderHandler,
   ProviderOffer,
   ProviderRequestEvent,
+  RelayClient,
   SchemaProducer,
   SchemaProducerContext,
 };

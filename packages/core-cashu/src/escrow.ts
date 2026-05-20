@@ -44,6 +44,26 @@ import {
 } from "./escrow-helpers.ts";
 
 import { getLogger } from "@anchr/core-runtime/logger";
+import {
+  buildHtlcFinalOptions,
+  buildHtlcInitialOptions,
+  buildHtlcPreselectionOptions,
+  type HtlcInitialLockParams,
+  type HtlcPreselectionLockParams,
+  type HtlcWorkerBindParams,
+} from "./htlc-options.ts";
+
+export {
+  buildHtlcFinalOptions,
+  buildHtlcInitialOptions,
+  buildHtlcPreselectionOptions,
+};
+export type {
+  HtlcInitialLockParams,
+  HtlcPreselectionLockParams,
+  HtlcWorkerBindParams,
+};
+
 const log = getLogger(["anchr", "cashu-escrow"]);
 
 // --- 2-of-2 P2PK escrow primitive ---
@@ -195,92 +215,6 @@ export async function executeEscrowSwap(
 }
 
 // --- HTLC escrow (NUT-14, per README architecture) ---
-
-/** Parameters for Phase 1: initial HTLC lock before Worker is known. */
-export interface HtlcInitialLockParams {
-  /** SHA-256 hash of preimage (from Oracle). */
-  hash: string;
-  /** Requester's public key (hex) — used as placeholder lock + refund. */
-  requesterPubkey: string;
-  /** Locktime as unix timestamp (seconds). */
-  locktimeSeconds: number;
-}
-
-/** Parameters for Phase 1 when preselection proofs are visible to other actors. */
-export interface HtlcPreselectionLockParams {
-  /**
-   * Requester's public key (hex). Spending or swapping the preselection proofs
-   * requires the Requester's signature.
-   */
-  requesterPubkey: string;
-}
-
-/** Parameters for Phase 2: HTLC swap to bind a selected Worker. */
-export interface HtlcWorkerBindParams {
-  /** SHA-256 hash of preimage. */
-  hash: string;
-  /** Worker's public key (hex) — spending requires Worker signature + preimage. */
-  workerPubkey: string;
-  /** Requester's public key for timeout refund (hex). */
-  requesterRefundPubkey: string;
-  /** Locktime as unix timestamp (seconds). */
-  locktimeSeconds: number;
-}
-
-/**
- * Build P2PK options for Phase 1: Hold token before Worker is known.
- *
- * Returns null for local-hold mode. The Requester holds plain proofs locally
- * and does not publish or transfer them before Worker selection. No P2PK or
- * hashlock is applied because:
- *   - Adding hashlock would require preimage to swap (Requester doesn't have it)
- *
- * The "escrow" aspect comes only in Phase 2 when HTLC conditions are applied.
- */
-export function buildHtlcInitialOptions(params: HtlcInitialLockParams): null {
-  // Phase 1: no conditions — plain proofs held locally by Requester.
-  // params.hash is retained for Phase 2 but not used here.
-  return null;
-}
-
-/**
- * Build P2PK options for Phase 1 when the preselection token or proofs are
- * visible outside the Requester's process before a Worker is selected.
- *
- * This is not the final HTLC. It deliberately omits the hashlock because the
- * Requester still needs to swap these proofs in Phase 2 before the Oracle
- * releases the preimage. P2PK(Requester) prevents relay observers or other
- * unselected actors from spending the visible proofs as bearer instruments.
- */
-export function buildHtlcPreselectionOptions(
-  params: HtlcPreselectionLockParams,
-): P2PKOptions {
-  return new P2PKBuilder()
-    .addLockPubkey(params.requesterPubkey)
-    .requireLockSignatures(1)
-    .sigAll()
-    .toOptions();
-}
-
-/**
- * Build P2PK options for Phase 2: HTLC with Worker bound.
- *
- * hashlock(hash) + P2PK(Worker) + locktime + refund(Requester).
- * Worker redeems with preimage + Worker signature.
- */
-export function buildHtlcFinalOptions(
-  params: HtlcWorkerBindParams,
-): P2PKOptions {
-  return new P2PKBuilder()
-    .addHashlock(params.hash)
-    .addLockPubkey(params.workerPubkey)
-    .requireLockSignatures(1)
-    .lockUntil(params.locktimeSeconds)
-    .addRefundPubkey(params.requesterRefundPubkey)
-    .requireRefundSignatures(1)
-    .sigAll()
-    .toOptions();
-}
 
 /**
  * Phase 1: Create hold token (Worker unknown).

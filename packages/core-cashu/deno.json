@@ -5,6 +5,7 @@
     ".": "./src/mod.ts",
     "./escrow": "./src/escrow.ts",
     "./escrow-helpers": "./src/escrow-helpers.ts",
+    "./htlc-options": "./src/htlc-options.ts",
     "./preimage-store": "./src/preimage-store.ts",
     "./preimage-port": "./src/preimage-port.ts",
     "./wallet": "./src/wallet.ts"

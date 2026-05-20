@@ -21,7 +21,19 @@ import {
   getConversationKey,
 } from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
-import type { AdapterManifest } from "@anchr/protocol/capabilities";
+import type {
+  Filter,
+  PublishResult,
+  RelayClient,
+  Subscription,
+} from "@anchr/protocol/adapters";
+
+export type {
+  Filter,
+  PublishResult,
+  RelayClient,
+  Subscription,
+} from "@anchr/protocol/adapters";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;
@@ -119,12 +131,6 @@ export function signEvent(
   return finalizeEvent(template, secretKey);
 }
 
-/** Result of publishing one event to N relays. */
-export interface PublishResult {
-  successes: string[];
-  failures: { relay: string; reason: string }[];
-}
-
 /**
  * Publish a signed event to a list of relays. Returns per-relay outcomes.
  *
@@ -155,36 +161,6 @@ export async function publishOnce(
   } finally {
     pool.close([...relays]);
   }
-}
-
-/** A long-lived relay client for repeated publish + subscribe. */
-export interface RelayClient {
-  /** Adapter metadata for capability/conformance checks. */
-  readonly manifest?: AdapterManifest;
-  publish(event: Event): Promise<PublishResult>;
-  subscribe(
-    filter: Filter,
-    onEvent: (event: Event) => void,
-    onEose?: () => void,
-  ): Subscription;
-  close(): void;
-}
-
-/** Filter shape accepted by Nostr relays (subset that Anchr actually uses). */
-export interface Filter {
-  kinds?: number[];
-  authors?: string[];
-  ids?: string[];
-  since?: number;
-  until?: number;
-  limit?: number;
-  // Single-letter tag filters (e.g. `#e`, `#p`, `#d`).
-  [tagFilter: `#${string}`]: string[] | undefined;
-}
-
-/** Handle returned by `subscribe`. Call `close()` to stop receiving events. */
-export interface Subscription {
-  close(): void;
 }
 
 /** Construct a long-lived relay client over the given relay URLs. */

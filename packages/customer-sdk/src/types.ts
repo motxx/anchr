@@ -1,16 +1,25 @@
 import type { OracleClient } from "@anchr/oracle-sdk";
 import type {
+  ActorStateStore,
+  CashuClient,
+  CashuProof,
+  RelayClient,
+} from "@anchr/protocol/adapters";
+import type {
   Offer,
   Payment,
   RequestResult,
   Spec,
   VerifierAdapter,
 } from "@anchr/protocol/types";
-import type { CashuClient, CashuProof } from "./cashu.ts";
-import type { RelayClient } from "./nostr.ts";
-import type { ActorStateStore } from "./storage.ts";
 
 export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
+export type {
+  ActorStateStore,
+  CashuClient,
+  CashuProof,
+  RelayClient,
+} from "@anchr/protocol/adapters";
 
 /** Strategy for picking an offer among the ones received within `offerWindowMs`. */
 export type OfferSelector = (offers: Offer[]) => Offer | null;

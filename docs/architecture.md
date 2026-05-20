@@ -47,6 +47,7 @@ packages/
 ├── frost-oracle/              FROST t-of-n threshold-signing primitives (BIP-340 Schnorr)
 ├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
 ├── blossom/                   Encrypted attachment store (BUD-01–06 client)
+├── adapters/                  Shared Cashu, Nostr, and state adapter implementations.
 ├── protocol/                  Pure protocol helpers: wire event builders/parsers,
 │                              schema identifiers, and role-neutral types.
 ├── oracle-sdk/                Oracle client port and simple HTTP hash-client adapter.
@@ -78,6 +79,7 @@ by historical placement.
 | --- | --- | --- |
 | `protocol` | Core protocol helper package. | Keep as the role-neutral wire/schema/event surface. It must not depend on other `@anchr/*` packages. |
 | `customer-sdk`, `provider-sdk`, `oracle-sdk` | Core actor SDKs. | Keep actor orchestration and public actor ports here; move concrete Cashu, Nostr, and state implementations to adapter packages when those boundaries exist. |
+| `adapters` | Shared concrete adapter package. | Own Cashu, Nostr, and state implementations used by apps and the aggregate SDK; actor SDKs consume only the injected port shapes. |
 | `sdk` | Aggregate developer entry point. | Keep as the convenience package that re-exports actor SDKs and standard adapters; do not let lower-level packages depend on it. |
 | `core-runtime` | Cross-runtime support primitive. | Keep as the dependency root for process, fs, env, which, and logging helpers. |
 | `core-cashu` | Settlement primitive. | Make this the canonical Cashu HTLC/P2PK implementation before adapter extraction; avoid parallel settlement semantics in SDK adapter code. |
@@ -195,13 +197,11 @@ tests can check whether an adapter satisfies the capabilities a flow needs.
 
 Current reference adapters:
 
-- `@anchr/customer-sdk/nostr` and `@anchr/provider-sdk/nostr`: Nostr transport
-  over relay clients.
-- `@anchr/customer-sdk/cashu` and `@anchr/provider-sdk/cashu`: Cashu HTLC
-  payment and redeem.
-- `@anchr/customer-sdk/storage` and `@anchr/provider-sdk/storage`: actor local
-  state stores, including in-memory stores for tests/server runtimes and
-  IndexedDB stores for browser runtimes.
+- `@anchr/adapters/nostr`: Nostr transport over relay clients.
+- `@anchr/adapters/cashu`: Cashu HTLC payment and redeem over the canonical
+  `@anchr/core-cashu` settlement primitives.
+- `@anchr/adapters/storage`: actor local state stores, including in-memory
+  stores for tests/server runtimes and IndexedDB stores for browser runtimes.
 - `createKeypairSigner()` and `createNip07Signer()` in `@anchr/protocol/nostr`:
   signer ports for local keys and browser NIP-07 providers.
 - `ProofGenerator` and `VerifierAdapter`: schema-selected proof engine ports.

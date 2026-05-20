@@ -18,30 +18,51 @@ import {
 } from "@anchr/protocol/events";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
-import { CashuMintError } from "./cashu.ts";
 import { InvalidSchemaUriError } from "@anchr/protocol/schema";
 import type { OracleClient } from "@anchr/oracle-sdk/oracle";
 import type {
+  ActorStateStore,
   BindProviderParams,
   BuildHtlcLockParams,
   CashuClient,
   CashuToken,
-  RedeemHtlcParams,
-  RedeemResult,
-} from "./cashu.ts";
-import type { Event } from "@anchr/protocol/nostr";
-import type {
   Filter,
   PublishResult,
+  RedeemHtlcParams,
+  RedeemResult,
   RelayClient,
   Subscription,
-} from "./nostr.ts";
-import { createMemoryStateStore } from "./storage.ts";
+} from "@anchr/protocol/adapters";
+import type { Event } from "@anchr/protocol/nostr";
 import type { CustomerOptions, CustomerOracle, Offer } from "./types.ts";
 
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);
 const HASH_HEX = "deadbeef".repeat(8);
+
+class TestCashuMintError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TestCashuMintError";
+  }
+}
+
+function createMemoryStateStore(): ActorStateStore {
+  const values = new Map<string, string>();
+  return {
+    get(key) {
+      return Promise.resolve(values.get(key) ?? null);
+    },
+    set(key, value) {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+    delete(key) {
+      values.delete(key);
+      return Promise.resolve();
+    },
+  };
+}
 
 function makeOracleClient(
   overrides?: Partial<OracleClient> & {
@@ -383,10 +404,10 @@ test("Customer.request calls cashuClient.buildHtlcLock with the oracle hash", as
   expect(recorder.params.sourceProofs).toHaveLength(1);
 });
 
-test("Customer.request propagates CashuMintError from buildHtlcLock", async () => {
+test("Customer.request propagates payment adapter errors from buildHtlcLock", async () => {
   const cashuClient = makeCashuClient({
     buildHtlcLock: () =>
-      Promise.reject(new CashuMintError("simulated mint failure")),
+      Promise.reject(new TestCashuMintError("simulated mint failure")),
   });
   const customer = createCustomer({ ...validOptions(), cashuClient });
 
@@ -399,7 +420,7 @@ test("Customer.request propagates CashuMintError from buildHtlcLock", async () =
       payment: { maxAmount: 1000 },
       sourceProofs: [],
     }),
-  ).rejects.toThrow(CashuMintError);
+  ).rejects.toThrow(TestCashuMintError);
 });
 
 test("Customer.request throws NoOffersReceivedError when no offers arrive in the window", async () => {

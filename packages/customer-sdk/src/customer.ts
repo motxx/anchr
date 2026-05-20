@@ -6,7 +6,12 @@
  * returns the verified data + proof.
  */
 
-import type { CashuToken } from "./cashu.ts";
+import type {
+  ActorStateStore,
+  CashuToken,
+  PublishResult,
+  RelayClient,
+} from "@anchr/protocol/adapters";
 import type {
   CustomerOptions,
   CustomerOracle,
@@ -19,8 +24,6 @@ import {
   isSchemaUri,
   resolveVerifierAdapter,
 } from "@anchr/protocol/schema";
-import type { PublishResult, RelayClient } from "./nostr.ts";
-import type { ActorStateStore } from "./storage.ts";
 import {
   type Event as NostrEvent,
   generateKeypair,

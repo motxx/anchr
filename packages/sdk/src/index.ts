@@ -147,7 +147,7 @@ export {
   type PublishResult,
   type RelayClient,
   type Subscription,
-} from "@anchr/customer-sdk/nostr";
+} from "@anchr/adapters/nostr";
 
 export {
   type ActorStateStore,
@@ -156,7 +156,7 @@ export {
   IndexedDbStateStoreError,
   type IndexedDbStateStoreOptions,
   type MemoryStateStoreOptions,
-} from "@anchr/customer-sdk/storage";
+} from "@anchr/adapters/storage";
 
 export {
   createHttpOracleClient,
@@ -183,4 +183,4 @@ export {
   type RedeemResult,
   validateHashHex,
   validateLocktime,
-} from "@anchr/customer-sdk/cashu";
+} from "@anchr/adapters/cashu";

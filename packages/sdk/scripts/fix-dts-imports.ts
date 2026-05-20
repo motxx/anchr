@@ -6,7 +6,12 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const distDir = join(scriptDir, "..", "dist");
 
 const aliases = new Map<string, string>([
+  ["@anchr/adapters", "adapters/src/mod.js"],
+  ["@anchr/adapters/cashu", "adapters/src/cashu.js"],
+  ["@anchr/adapters/nostr", "adapters/src/nostr.js"],
+  ["@anchr/adapters/storage", "adapters/src/storage.js"],
   ["@anchr/protocol", "protocol/src/mod.js"],
+  ["@anchr/protocol/adapters", "protocol/src/adapters.js"],
   ["@anchr/protocol/capabilities", "protocol/src/capabilities.js"],
   ["@anchr/protocol/events", "protocol/src/events.js"],
   ["@anchr/protocol/nostr", "protocol/src/nostr.js"],
@@ -15,13 +20,9 @@ const aliases = new Map<string, string>([
   ["@anchr/oracle-sdk", "oracle-sdk/src/mod.js"],
   ["@anchr/oracle-sdk/oracle", "oracle-sdk/src/oracle.js"],
   ["@anchr/customer-sdk", "customer-sdk/src/mod.js"],
-  ["@anchr/customer-sdk/cashu", "customer-sdk/src/cashu.js"],
   ["@anchr/customer-sdk/customer", "customer-sdk/src/customer.js"],
-  ["@anchr/customer-sdk/nostr", "customer-sdk/src/nostr.js"],
   ["@anchr/customer-sdk/types", "customer-sdk/src/types.js"],
   ["@anchr/provider-sdk", "provider-sdk/src/mod.js"],
-  ["@anchr/provider-sdk/cashu", "provider-sdk/src/cashu.js"],
-  ["@anchr/provider-sdk/nostr", "provider-sdk/src/nostr.js"],
   ["@anchr/provider-sdk/provider", "provider-sdk/src/provider.js"],
   ["@anchr/provider-sdk/types", "provider-sdk/src/types.js"],
 ]);

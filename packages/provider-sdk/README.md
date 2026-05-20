@@ -7,15 +7,14 @@ Runtime-dependent relay and wallet integrations stay behind injected ports.
 
 The SDK core requires explicit adapters:
 
-- `relayClient` for actor transport. `createRelayClient()` is the bundled Nostr
-  reference adapter.
-- `cashuClient` for settlement and redeem. `createCashuClient()` is the bundled
-  Cashu HTLC reference adapter.
+- `relayClient` for actor transport. `createRelayClient()` from
+  `@anchr/adapters/nostr` is the shared Nostr reference adapter.
+- `cashuClient` for settlement and redeem. `createCashuClient()` from
+  `@anchr/adapters/cashu` is the shared Cashu HTLC reference adapter.
 - `proofGenerators` for proof production. TLSNotary, C2PA, or other proof
   engines should be supplied as adapters selected by schema URL.
-- `stateStore` when the app wants durable local Provider progress. The bundled
-  memory store works in browser, Node, Deno, and workers; the IndexedDB store is
-  the browser reference adapter.
+- `stateStore` when the app wants durable local Provider progress.
+  `@anchr/adapters/storage` provides memory and IndexedDB stores.
 
 Constructors do not create runtime clients implicitly. Apps choose concrete
 adapters so Provider flow logic remains independent of a specific relay,

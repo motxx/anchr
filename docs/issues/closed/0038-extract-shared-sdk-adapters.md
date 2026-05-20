@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -55,3 +56,42 @@ awkward.
 - Update `packages/sdk` aggregate exports and package READMEs.
 - Add or move tests so adapter behavior is verified once at the adapter
   boundary instead of duplicated per actor SDK.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/adapters/`
+- `packages/protocol/src/adapters.ts`
+- `packages/customer-sdk/src/customer.ts`
+- `packages/customer-sdk/src/types.ts`
+- `packages/provider-sdk/src/provider.ts`
+- `packages/provider-sdk/src/types.ts`
+- `packages/sdk/src/index.ts`
+- `packages/core-cashu/src/htlc-options.ts`
+- `docs/architecture.md`
+
+Verified with:
+
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/adapters/src/cashu.test.ts packages/adapters/src/storage.test.ts packages/customer-sdk/src/customer.test.ts packages/customer-sdk/src/integration.test.ts packages/provider-sdk/src/provider.test.ts packages/sdk/src/index.test.ts`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task lint:arch -- --errors-only`
+- `check-silent-bypass` review for changed settlement/payment files
+
+Harness update:
+
+- Adapter behavior tests moved to `packages/adapters/src/cashu.test.ts` and
+  `packages/adapters/src/storage.test.ts`; actor SDK tests now use local port
+  fakes instead of importing concrete adapters.
+
+Review residuals:
+
+- `packages/adapters` is a transitional flat package that maps to the accepted
+  adapter boundary. The final nested package taxonomy and stricter linting are
+  tracked by #0043.
+
+Follow-up:
+
+- #0041
+- #0043

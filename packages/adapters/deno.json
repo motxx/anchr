@@ -1,21 +1,19 @@
 {
-  "name": "@anchr/customer-sdk",
+  "name": "@anchr/adapters",
   "version": "0.1.0",
   "exports": {
     ".": "./src/mod.ts",
-    "./customer": "./src/customer.ts",
-    "./types": "./src/types.ts"
+    "./cashu": "./src/cashu.ts",
+    "./nostr": "./src/nostr.ts",
+    "./storage": "./src/storage.ts"
   },
   "imports": {
-    "@anchr/oracle-sdk": "../oracle-sdk/src/mod.ts",
-    "@anchr/oracle-sdk/oracle": "../oracle-sdk/src/oracle.ts",
+    "@anchr/core-cashu": "../core-cashu/src/mod.ts",
+    "@anchr/core-cashu/htlc-options": "../core-cashu/src/htlc-options.ts",
     "@anchr/protocol": "../protocol/src/mod.ts",
     "@anchr/protocol/adapters": "../protocol/src/adapters.ts",
     "@anchr/protocol/capabilities": "../protocol/src/capabilities.ts",
-    "@anchr/protocol/events": "../protocol/src/events.ts",
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
-    "@anchr/protocol/schema": "../protocol/src/schema.ts",
-    "@anchr/protocol/types": "../protocol/src/types.ts",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
@@ -29,14 +27,14 @@
   "publish": {
     "include": [
       "src/mod.ts",
-      "src/customer.ts",
-      "src/types.ts",
+      "src/cashu.ts",
+      "src/nostr.ts",
+      "src/storage.ts",
       "README.md",
       "deno.json"
     ],
     "exclude": [
-      "src/*.test.ts",
-      "src/test-helpers.ts"
+      "src/*.test.ts"
     ]
   },
   "compilerOptions": {

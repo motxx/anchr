@@ -13,7 +13,11 @@ import {
   parseQueryRequestEvent,
   parseSelectionFeedbackEvent,
 } from "@anchr/protocol/events";
-import type { RelayClient } from "./nostr.ts";
+import type {
+  ActorStateStore,
+  CashuClient,
+  RelayClient,
+} from "@anchr/protocol/adapters";
 import {
   type Event as NostrEvent,
   findTagValue,
@@ -29,8 +33,6 @@ import type {
   ProviderRequestEvent,
 } from "./types.ts";
 import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
-import type { CashuClient } from "./cashu.ts";
-import type { ActorStateStore } from "./storage.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;

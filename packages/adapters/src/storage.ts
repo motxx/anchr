@@ -1,11 +1,6 @@
-import type { AdapterManifest } from "@anchr/protocol/capabilities";
+import type { ActorStateStore } from "@anchr/protocol/adapters";
 
-export interface ActorStateStore {
-  readonly manifest?: AdapterManifest;
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<void>;
-}
+export type { ActorStateStore } from "@anchr/protocol/adapters";
 
 export interface MemoryStateStoreOptions {
   initialEntries?: readonly (readonly [string, string])[];

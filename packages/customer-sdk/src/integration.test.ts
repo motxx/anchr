@@ -26,17 +26,15 @@ import {
 } from "@anchr/protocol/events";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
 import type {
-  Filter,
-  PublishResult,
-  RelayClient,
-  Subscription,
-} from "./nostr.ts";
-import type {
   CashuClient,
   CashuToken,
+  Filter,
+  PublishResult,
   RedeemHtlcParams,
   RedeemResult,
-} from "./cashu.ts";
+  RelayClient,
+  Subscription,
+} from "@anchr/protocol/adapters";
 import type { OracleClient } from "@anchr/oracle-sdk/oracle";
 import { bytesToHex } from "./test-helpers.ts";
 

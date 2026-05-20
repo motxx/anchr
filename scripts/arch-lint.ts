@@ -35,6 +35,7 @@
  *   [E016] cashu-conditional-swap may only depend on
  *          core-runtime, core-cashu, frost-oracle
  *   [E019] blossom may only depend on core-runtime
+ *   [E027] adapters may depend on protocol and primitive packages
  *   [E025] protocol may not depend on other @anchr/* packages
  *   [E026] actor SDKs may depend on protocol and their explicit peer SDKs
  *   [E024] bounty may depend on every primitive package except actor SDKs
@@ -96,6 +97,7 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
     "frost-oracle",
   ]),
   "blossom": new Set<string>(["core-runtime"]),
+  "adapters": new Set<string>(["core-cashu", "protocol"]),
   "protocol": new Set<string>(),
   "oracle-sdk": new Set<string>(["protocol"]),
   "customer-sdk": new Set<string>(["protocol", "oracle-sdk"]),
@@ -111,6 +113,7 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
   ]),
   "sdk": new Set<string>([
     "core-runtime",
+    "adapters",
     "protocol",
     "oracle-sdk",
     "customer-sdk",

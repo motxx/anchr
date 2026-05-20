@@ -25,105 +25,35 @@
 import {
   getDecodedToken,
   getEncodedToken,
-  P2PKBuilder,
   type P2PKOptions,
   type Proof,
   signP2PKProofs,
   verifyHTLCHash,
   Wallet,
 } from "@cashu/cashu-ts";
-import type { AdapterManifest } from "@anchr/protocol/capabilities";
+import {
+  buildHtlcFinalOptions,
+  buildHtlcPreselectionOptions,
+} from "@anchr/core-cashu/htlc-options";
+import type {
+  BindProviderParams,
+  BuildHtlcLockParams,
+  CashuClient,
+  CashuProof,
+  CashuToken,
+  RedeemHtlcParams,
+  RedeemResult,
+} from "@anchr/protocol/adapters";
 
-/**
- * A Cashu proof — typed as `unknown` so downstream cashu-ts types do not
- * leak through SDK consumers. Internally narrowed to cashu-ts `Proof`
- * before any operation that depends on its shape.
- */
-export type CashuProof = unknown;
-
-/** Parameters for the Phase-1 HTLC lock (provider unknown yet). */
-export interface BuildHtlcLockParams {
-  /** Amount in sats to lock. */
-  amountSats: number;
-  /** Hex hash `H` whose preimage `S` the oracle will release on a valid proof. */
-  hashHex: string;
-  /** Hex pubkey of the customer (refund recipient after locktime). */
-  customerPubkey: string;
-  /** Locktime as Unix timestamp (seconds). */
-  locktimeSeconds: number;
-  /** Source proofs to lock from (the customer's wallet supplies these). */
-  sourceProofs: CashuProof[];
-}
-
-/** Parameters for the Phase-2 swap that binds a selected provider to the lock. */
-export interface BindProviderParams {
-  /**
-   * Phase-1 proofs (returned by `buildHtlcLock` as `proofs`). Passed
-   * directly rather than via the encoded token to sidestep the V4
-   * cashu-ts encoding which truncates keyset IDs to a short form that
-   * requires wallet keychain access to map back on decode.
-   */
-  initialProofs: CashuProof[];
-  /** Hex pubkey of the selected provider. */
-  providerPubkey: string;
-  /** Hash `H` whose preimage `S` the oracle releases on a valid proof. */
-  hashHex: string;
-  /** Locktime as Unix timestamp (seconds). After this, customer can refund. */
-  locktimeSeconds: number;
-  /** Customer's hex pubkey (refund recipient). */
-  customerPubkey: string;
-  /**
-   * Customer's secret key (32 bytes). Required because Phase-1 proofs are
-   * P2PK-locked to `customerPubkey`; the swap to the Phase-2 lock can only
-   * be authorised by a signature from this key.
-   */
-  customerSecretKey: Uint8Array;
-}
-
-/** Parameters for redeeming an HTLC token at the mint (provider side). */
-export interface RedeemHtlcParams {
-  /** The Phase-2 (provider-bound) token to redeem. */
-  token: string;
-  /** Hex preimage `S` such that `sha256(S) = H`, delivered by the oracle. */
-  preimageHex: string;
-  /** Provider's secret key (32 bytes) used to satisfy the P2PK requirement. */
-  providerSecretKey: Uint8Array;
-}
-
-/** Result of redeeming an HTLC token. */
-export interface RedeemResult {
-  /** Net proofs received after redemption (provider's spendable wallet state). */
-  proofs: CashuProof[];
-  /** Total amount in sats. */
-  amountSats: number;
-}
-
-/** Result of building / binding an HTLC token. */
-export interface CashuToken {
-  /** Encoded Cashu token string (cashuB...). */
-  token: string;
-  /** Total amount in sats locked. */
-  amountSats: number;
-  /** Raw proofs (opaque to the SDK, used by the next phase). */
-  proofs: CashuProof[];
-}
-
-/**
- * Customer-side methods: `buildHtlcLock`, `bindProvider`.
- * Provider-side method:  `redeemHtlc`.
- */
-export interface CashuClient {
-  /** Adapter metadata for capability/conformance checks. */
-  readonly manifest?: AdapterManifest;
-  /** Phase 1: build the initial HTLC lock with no provider bound yet. */
-  buildHtlcLock(params: BuildHtlcLockParams): Promise<CashuToken>;
-  /** Phase 2: swap to add the selected provider's pubkey to the lock. */
-  bindProvider(params: BindProviderParams): Promise<CashuToken>;
-  /** Provider-side: redeem an HTLC token using preimage + provider signature. */
-  redeemHtlc(params: RedeemHtlcParams): Promise<RedeemResult>;
-  /** Mint URL the client is configured to talk to. */
-  readonly mintUrl: string;
-}
+export type {
+  BindProviderParams,
+  BuildHtlcLockParams,
+  CashuClient,
+  CashuProof,
+  CashuToken,
+  RedeemHtlcParams,
+  RedeemResult,
+} from "@anchr/protocol/adapters";
 
 /**
  * Minimal cashu-ts surface used by the SDK.
@@ -241,23 +171,16 @@ function bytesToHexLocal(bytes: Uint8Array): string {
  * preimage (which only the oracle holds) to spend before locktime.
  */
 function buildPhase1P2PKOptions(customerPubkey: string): P2PKOptions {
-  return new P2PKBuilder()
-    .addLockPubkey(customerPubkey)
-    .requireLockSignatures(1)
-    .sigAll()
-    .toOptions();
+  return buildHtlcPreselectionOptions({ requesterPubkey: customerPubkey });
 }
 
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
-  return new P2PKBuilder()
-    .addHashlock(p.hashHex)
-    .addLockPubkey(p.providerPubkey)
-    .requireLockSignatures(1)
-    .lockUntil(p.locktimeSeconds)
-    .addRefundPubkey(p.customerPubkey)
-    .requireRefundSignatures(1)
-    .sigAll()
-    .toOptions();
+  return buildHtlcFinalOptions({
+    hash: p.hashHex,
+    workerPubkey: p.providerPubkey,
+    requesterRefundPubkey: p.customerPubkey,
+    locktimeSeconds: p.locktimeSeconds,
+  });
 }
 
 /**

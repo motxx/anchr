@@ -18,21 +18,22 @@ import {
   generateKeypair,
 } from "@anchr/protocol/nostr";
 import type {
-  Filter,
-  PublishResult,
-  RelayClient,
-  Subscription,
-} from "./nostr.ts";
-import type {
   CashuClient,
   CashuToken,
+  Filter,
+  PublishResult,
   RedeemHtlcParams,
   RedeemResult,
-} from "./cashu.ts";
+  RelayClient,
+  Subscription,
+} from "@anchr/protocol/adapters";
 import { bytesToHex } from "./test-helpers.ts";
 import { DEFINED_SCHEMAS } from "@anchr/protocol/schema";
-import type { ProofGenerator, ProviderOptions } from "./types.ts";
-import { createMemoryStateStore } from "./storage.ts";
+import type {
+  ActorStateStore,
+  ProofGenerator,
+  ProviderOptions,
+} from "./types.ts";
 
 // --- Test doubles ---
 
@@ -41,6 +42,23 @@ const ORACLE_A = "a".repeat(64);
 const customerKey = generateKeypair();
 const providerKey = generateKeypair();
 const oracleKey = generateKeypair();
+
+function createMemoryStateStore(): ActorStateStore {
+  const values = new Map<string, string>();
+  return {
+    get(key) {
+      return Promise.resolve(values.get(key) ?? null);
+    },
+    set(key, value) {
+      values.set(key, value);
+      return Promise.resolve();
+    },
+    delete(key) {
+      values.delete(key);
+      return Promise.resolve();
+    },
+  };
+}
 
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
