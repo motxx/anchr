@@ -218,6 +218,8 @@ the Provider and Oracle interpret it.
 
 Status labels are defined in
 [`docs/universality-boundaries.md`](docs/universality-boundaries.md#example-status-vocabulary).
+The checklist for promoting or maintaining an advertised example lives in
+[`docs/example-delivery-lifecycle.md`](docs/example-delivery-lifecycle.md).
 
 | Example                                                    | What it shows                                  | Status      |
 | ---------------------------------------------------------- | ---------------------------------------------- | ----------- |

@@ -106,6 +106,20 @@ maintainer explicitly accepts the remaining dependency risk. When closing an
 issue, update other pending issues whose `Depends on` or `Blocks` lists should
 change as a result.
 
+## Example Issues
+
+Issues that create, promote, demote, or retire an advertised example must follow
+[`docs/example-delivery-lifecycle.md`](../example-delivery-lifecycle.md).
+Include the `Example requirements` section from that document before changing
+example code when the target status, actors, real dependencies, simulated
+dependencies, or non-production boundary is not already clear.
+
+If the example work spans requirements, package boundaries, user-facing code,
+runbook, smoke harness, and README promotion, split the issue before
+implementation. The parent issue should lock the accepted requirements and the
+child issues should own the concrete implementation, docs/runbook, and
+verification work.
+
 The harness-update field follows the maintenance loop in
 [`docs/review-harness.md`](../review-harness.md#maintenance-loop). "Out of
 scope" alone is not a rationale; pair it with the pending issue number that

@@ -2,6 +2,7 @@
 
 Created: 2026-05-15
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -56,3 +57,36 @@ Relevant references:
   smoke or e2e command, top-level README status, and closure notes.
 - Document how future per-example issues should depend on this lifecycle and how
   to split follow-up implementation work when one issue would become too broad.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/example-delivery-lifecycle.md`
+- `docs/universality-boundaries.md`
+- `docs/review-harness.md`
+- `docs/issues/README.md`
+- `README.md`
+
+Defined the reusable example delivery process: current status inventory,
+requirements template, status promotion checklist, verification routing,
+splitting rule, and closure-note expectations. Linked that lifecycle from the
+README status table, universality boundary notes, review harness map, and issue
+workflow.
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- Added `docs/example-delivery-lifecycle.md` as the process harness for future
+  example issues, and registered it in `docs/review-harness.md`.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None.

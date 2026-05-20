@@ -47,6 +47,7 @@ from ad hoc review into one of these homes.
 | `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
+| `docs/example-delivery-lifecycle.md` | `automated` process input | Requirements, promotion checklist, verification routing, and closure notes for README-listed examples. |
 | `docs/issues/README.md` | `automated` process input | Issue structure, dependency recording, closure format, review residual recording, and security-sensitive issue limits. |
 
 ## Example Testnet Smoke Convention

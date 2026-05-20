@@ -64,6 +64,10 @@ stricter requirements, record them in that example's README. If several
 examples need the same repeatable smoke harness, route the convention through
 `docs/review-harness.md` or a repository script.
 
+For the checklist that takes an example from initial requirements to an
+advertised README status, see
+[`docs/example-delivery-lifecycle.md`](example-delivery-lifecycle.md).
+
 ## Human review scope
 
 Human review should decide whether a change moves a boundary between these
