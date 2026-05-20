@@ -20,10 +20,9 @@ import {
   createDualPreimageStore,
   type DualPreimageStore,
 } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import type { DualKeyStore } from "@anchr/cashu-conditional-swap/frost-conditional-swap";
 import {
-  createAdaptiveDualKeyStore,
-  frostDualKeySignAsync,
+  type BinaryOutcomeReleaseAuthority,
+  createAdaptiveReleaseAuthority,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
 import type { DualOutcomeFrostNodeConfig } from "@anchr/frost-oracle/dual-outcome-config";
 import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
@@ -57,8 +56,8 @@ export interface MarketApiState {
   matchingQueue: MatchingQueue;
   /** Dual preimage store (HTLC fallback). */
   dualPreimageStore: DualPreimageStore;
-  /** Dual key store (single-key or FROST). */
-  dualKeyStore: DualKeyStore;
+  /** Async release authority (single-key local or FROST threshold). */
+  releaseAuthority: BinaryOutcomeReleaseAuthority;
   /** Resolution mode. */
   mode: "frost" | "single-key";
   /** FROST config (if available). */
@@ -70,8 +69,8 @@ export function buildMarketApiRoutes(
 ): { app: Hono; state: MarketApiState } {
   const oracleFeePpm = config.oracleFeePpm ?? 5_000;
 
-  const { store: dualKeyStore, mode, config: frostConfig } =
-    createAdaptiveDualKeyStore(
+  const { authority: releaseAuthority, mode, config: frostConfig } =
+    createAdaptiveReleaseAuthority(
       config.marketFrostConfig,
     );
 
@@ -99,7 +98,7 @@ export function buildMarketApiRoutes(
     bets: new Map(),
     matchingQueue: createInMemoryMatchingQueue(),
     dualPreimageStore: createDualPreimageStore(),
-    dualKeyStore,
+    releaseAuthority,
     mode,
     frostConfig,
   };
@@ -141,7 +140,7 @@ export function buildMarketApiRoutes(
     }
 
     const preimages = state.dualPreimageStore.create(body.id);
-    const keys = state.dualKeyStore.create(body.id);
+    const keys = state.releaseAuthority.create(body.id);
 
     const market: TwoPartyBinaryBet = {
       id: body.id,
@@ -227,24 +226,23 @@ export function buildMarketApiRoutes(
     );
     const outcome: "yes" | "no" = conditionMet ? "yes" : "no";
     const swapOutcome: "a" | "b" = outcome === "yes" ? "a" : "b";
+    const message = new TextEncoder().encode(`${marketId}:${outcome}`);
 
     let oracleSignature: string | null = null;
     let preimage: string | undefined;
 
     if (state.mode === "frost" && state.frostConfig) {
       market.status = "resolving";
-      const message = new TextEncoder().encode(`${marketId}:${outcome}`);
-
-      oracleSignature = await frostDualKeySignAsync(
-        state.frostConfig,
-        swapOutcome,
+      oracleSignature = await state.releaseAuthority.releaseSignature({
+        swap_id: marketId,
+        outcome: swapOutcome,
         message,
-        {
+        conditionData: {
           condition_id: marketId,
           resolution_url: market.resolution_url,
           verified_body: body.verified_body,
         },
-      );
+      });
 
       if (!oracleSignature) {
         market.status = "open";
@@ -256,8 +254,11 @@ export function buildMarketApiRoutes(
         }, 503);
       }
     } else {
-      const message = new TextEncoder().encode(`${marketId}:${outcome}`);
-      oracleSignature = state.dualKeyStore.sign(marketId, swapOutcome, message);
+      oracleSignature = await state.releaseAuthority.releaseSignature({
+        swap_id: marketId,
+        outcome: swapOutcome,
+        message,
+      });
     }
 
     // Also resolve the HTLC preimage side so callers that settle through the

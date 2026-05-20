@@ -178,7 +178,7 @@ export function createFrostEscrowProvider(
       // FROST settlement requires threshold signing across the oracle
       // cluster (NOT a single private key the EscrowProvider could
       // hold). The worker drives redemption via the FROST coordinator
-      // path (see `frostDualKeySignAsync`). Return a clear error rather
+      // or release-authority path. Return a clear error rather
       // than a silent {settled:true} so any caller depending on this
       // port-level method sees the problem immediately.
       return Promise.resolve({

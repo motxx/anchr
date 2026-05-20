@@ -1,21 +1,22 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  createAdaptiveDualKeyStore,
-  createFrostDualKeyStore,
+  createAdaptiveReleaseAuthority,
+  createFrostReleaseAuthority,
+  createSingleKeyReleaseAuthority,
 } from "./frost-dual-key-store.ts";
 import { createDualKeyStore } from "./frost-conditional-swap.ts";
 import { _setFrostSignerPathForTest } from "@anchr/frost-oracle/frost-cli";
 
 const originalPath = null;
 
-test("createAdaptiveDualKeyStore falls back to single-key when no config", () => {
-  const { store, mode } = createAdaptiveDualKeyStore(undefined);
+test("createAdaptiveReleaseAuthority uses single-key when no config", () => {
+  const { authority, mode } = createAdaptiveReleaseAuthority(undefined);
   expect(mode).toBe("single-key");
-  expect(store).toBeTruthy();
+  expect(authority).toBeTruthy();
 });
 
-test("createAdaptiveDualKeyStore falls back to single-key when frost-signer unavailable", () => {
+test("createAdaptiveReleaseAuthority uses single-key when frost-signer unavailable", () => {
   _setFrostSignerPathForTest(null);
   try {
     const mockConfig = {
@@ -31,10 +32,10 @@ test("createAdaptiveDualKeyStore falls back to single-key when frost-signer unav
       group_pubkey_b: "bb".repeat(32),
     };
 
-    const { store, mode } = createAdaptiveDualKeyStore(mockConfig);
+    const { authority, mode } = createAdaptiveReleaseAuthority(mockConfig);
     expect(mode).toBe("single-key");
 
-    const entry = store.create("test-swap");
+    const entry = authority.create("test-swap");
     expect(entry.pubkey_a).toBeTruthy();
     expect(entry.pubkey_b).toBeTruthy();
     expect(entry.pubkey_a.length).toBe(64);
@@ -44,9 +45,9 @@ test("createAdaptiveDualKeyStore falls back to single-key when frost-signer unav
   }
 });
 
-test("single-key DualKeyStore create + sign lifecycle", () => {
-  const store = createDualKeyStore();
-  const entry = store.create("swap-1");
+test("single-key release authority create + sign lifecycle", async () => {
+  const authority = createSingleKeyReleaseAuthority();
+  const entry = authority.create("swap-1");
 
   expect(entry.swap_id).toBe("swap-1");
   expect(entry.pubkey_a).toBeTruthy();
@@ -54,38 +55,54 @@ test("single-key DualKeyStore create + sign lifecycle", () => {
   expect(entry.signed).toBe(false);
 
   const msg = new TextEncoder().encode("swap-1:yes");
-  const sig = store.sign("swap-1", "a", msg);
+  const sig = await authority.releaseSignature({
+    swap_id: "swap-1",
+    outcome: "a",
+    message: msg,
+  });
   expect(sig).toBeTruthy();
   expect(sig!.length).toBe(128);
 
-  const sig2 = store.sign("swap-1", "b", msg);
+  const sig2 = await authority.releaseSignature({
+    swap_id: "swap-1",
+    outcome: "b",
+    message: msg,
+  });
   expect(sig2).toBeNull();
 });
 
-test("createFrostDualKeyStore falls back when frost-signer unavailable", () => {
-  _setFrostSignerPathForTest(null);
-  try {
-    const store = createFrostDualKeyStore({
-      yesConfig: {
-        signer_index: 1,
-        total_signers: 3,
-        threshold: 2,
-        key_package: {},
-        pubkey_package: {},
-        group_pubkey: "aa".repeat(32),
-        peers: [],
-        key_package_b: {},
-        pubkey_package_b: {},
-        group_pubkey_b: "bb".repeat(32),
-      },
-    });
+test("single-key release authority rejects empty proof-secret signing requests", async () => {
+  const authority = createSingleKeyReleaseAuthority();
+  authority.create("swap-1");
 
-    const entry = store.create("test-swap");
-    expect(entry.pubkey_a).toBeTruthy();
-    expect(entry.pubkey_b).toBeTruthy();
-  } finally {
-    _setFrostSignerPathForTest(null);
-  }
+  const signatures = await authority.releaseProofSecretSignatures({
+    swap_id: "swap-1",
+    outcome: "a",
+    proofSecrets: [],
+  });
+
+  expect(signatures).toBeNull();
+});
+
+test("createFrostReleaseAuthority exposes FROST group pubkeys without synchronous signing", () => {
+  const authority = createFrostReleaseAuthority({
+    nodeConfig: {
+      signer_index: 1,
+      total_signers: 3,
+      threshold: 2,
+      key_package: {},
+      pubkey_package: {},
+      group_pubkey: "aa".repeat(32),
+      peers: [],
+      key_package_b: {},
+      pubkey_package_b: {},
+      group_pubkey_b: "bb".repeat(32),
+    },
+  });
+
+  const entry = authority.create("test-swap");
+  expect(entry.pubkey_a).toBe("aa".repeat(32));
+  expect(entry.pubkey_b).toBe("bb".repeat(32));
 });
 
 test("DualKeyStore getPubkeys returns null for unknown swap", () => {

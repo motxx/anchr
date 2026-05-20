@@ -34,12 +34,8 @@ import type {
   MarketPersist,
 } from "./market-store.ts";
 import {
-  type DualKeyStore,
-} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
-import {
-  createAdaptiveDualKeyStore,
-  frostDualKeySignAsync,
-  frostSignProofSecretsAsync,
+  type BinaryOutcomeReleaseAuthority,
+  createAdaptiveReleaseAuthority,
 } from "@anchr/cashu-conditional-swap/frost-dual-key-store";
 import {
   type DualOutcomeFrostNodeConfig,
@@ -233,7 +229,7 @@ export interface MarketState {
    */
   persist: MarketPersist;
   dualPreimageStore: DualPreimageStore;
-  dualKeyStore: DualKeyStore;
+  releaseAuthority: BinaryOutcomeReleaseAuthority;
   matchingQueue: MatchingQueue;
   frostMode: "frost" | "single-key";
   frostConfig?: DualOutcomeFrostNodeConfig;
@@ -305,9 +301,8 @@ export function createMarketState(opts?: {
   /** Write-through persistence — defaults to no-op (tests / in-memory). */
   persist?: MarketPersist;
 }): MarketState {
-  const { store: dualKeyStore, mode: frostMode } = createAdaptiveDualKeyStore(
-    opts?.frostConfig,
-  );
+  const { authority: releaseAuthority, mode: frostMode } =
+    createAdaptiveReleaseAuthority(opts?.frostConfig);
   return {
     markets: opts?.initial?.markets ?? new Map(),
     matchedPairs: opts?.initial?.matchedPairs ?? new Map(),
@@ -319,7 +314,7 @@ export function createMarketState(opts?: {
     faucetTokens: opts?.initial?.faucetTokens ?? new Map(),
     persist: opts?.persist ?? NOOP_PERSIST,
     dualPreimageStore: createDualPreimageStore(),
-    dualKeyStore,
+    releaseAuthority,
     matchingQueue: opts?.matchingQueue ?? createInMemoryMatchingQueue(),
     frostMode,
     frostConfig: opts?.frostConfig,
@@ -878,7 +873,7 @@ export function registerMarketRoutes(
     // Generate market ID, dual preimage pair (HTLC fallback), and FROST keypairs
     const id = generateId("mkt");
     const hashes = s.dualPreimageStore.create(id);
-    const frostKeys = s.dualKeyStore.create(id);
+    const frostKeys = s.releaseAuthority.create(id);
 
     const market: TwoPartyBinaryBet = {
       id,
@@ -1655,19 +1650,11 @@ export function registerMarketRoutes(
       // Sign the unseen proof secrets
       let newSigs: Map<string, string> | null = null;
 
-      if (s.frostMode === "frost" && s.frostConfig) {
-        newSigs = await frostSignProofSecretsAsync(
-          s.frostConfig,
-          swapOutcome,
-          unseenSecrets,
-        );
-      } else {
-        newSigs = s.dualKeyStore.signProofSecrets(
-          id,
-          swapOutcome,
-          unseenSecrets,
-        );
-      }
+      newSigs = await s.releaseAuthority.releaseProofSecretSignatures({
+        swap_id: id,
+        outcome: swapOutcome,
+        proofSecrets: unseenSecrets,
+      });
 
       if (!newSigs) {
         return c.json(

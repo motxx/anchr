@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -78,3 +79,58 @@ Important implementation facts to preserve:
   implementations.
 - Update FROST tests and examples to prove threshold signing and fallback paths
   remain explicit.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/cashu-conditional-swap/src/frost-dual-key-store.ts`
+- `packages/cashu-conditional-swap/src/frost-dual-key-store.test.ts`
+- `example/two-party-binary-bet/src/market-api-routes.ts`
+- `example/two-party-binary-bet/src/server-routes.ts`
+- `example/two-party-binary-bet/src/market-settlement.ts`
+- `packages/cashu-conditional-swap/README.md`
+- `specs/conditional-swap.md`
+
+Changed the binary-bet FROST path from a synchronous `DualKeyStore`
+implementation into an async `BinaryOutcomeReleaseAuthority`. Local single-key
+demo signing remains available through `createSingleKeyReleaseAuthority`, while
+distributed FROST signing uses `createFrostReleaseAuthority` and delegates to
+`coordinateSigning()` without exposing synchronous placeholder signing.
+
+Verified with:
+
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/cashu-conditional-swap/src/frost-dual-key-store.test.ts packages/cashu-conditional-swap/src/frost-conditional-swap.test.ts`
+- `deno test --allow-all example/two-party-binary-bet/src/server-routes.test.ts example/two-party-binary-bet/src/auto-resolver.test.ts example/two-party-binary-bet/src/market-api-routes.test.ts example/two-party-binary-bet/src/market-signer-endpoints.test.ts example/two-party-binary-bet/src/resolution.test.ts example/two-party-binary-bet/src/resolution-flow.test.ts`
+- `deno task lint:strict`
+- `deno task test:unit`
+
+Harness update:
+
+- Added `packages/cashu-conditional-swap/src/frost-dual-key-store.test.ts`
+  coverage for the async release-authority lifecycle, explicit single-key mode,
+  FROST group-pubkey exposure without synchronous signing, and empty
+  proof-secret signing rejection.
+- Updated `specs/conditional-swap.md` to record the async release-authority
+  boundary and the rule that FROST implementations must not hide threshold
+  failure behind synchronous success-shaped APIs.
+
+Silent-bypass review:
+
+- Reviewed the changed signing/settlement files. `releaseSignature()` and
+  `releaseProofSecretSignatures()` return `null` for unknown swaps, double
+  release, empty proof-secret requests, and threshold failures; they only mark a
+  swap signed after a concrete signature result is returned.
+
+Review residuals:
+
+- `packages/bounty/src/application/ports.ts` still has the query-specific
+  `FrostSignaturePort`; reconciling that with the package-wide release
+  authority taxonomy belongs with #0041.
+- Final package placement for the release-authority implementation belongs with
+  #0043.
+
+Follow-up:
+
+- #0041
+- #0043

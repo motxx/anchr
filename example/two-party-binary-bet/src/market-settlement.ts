@@ -14,10 +14,6 @@
  */
 
 import { getDecodedToken } from "@cashu/cashu-ts";
-import {
-  frostDualKeySignAsync,
-  frostSignProofSecretsAsync,
-} from "@anchr/cashu-conditional-swap/frost-dual-key-store";
 import type { MarketStatus, MatchedBetPair } from "./market-types.ts";
 import { resolveMarket as revealHtlcPreimage } from "./resolution.ts";
 import type { MarketState } from "./server-routes.ts";
@@ -79,7 +75,7 @@ export async function settleMarket(
 
   const useFrost = !!market.group_pubkey_yes &&
     !!market.group_pubkey_no &&
-    state.dualKeyStore.has(marketId);
+    state.releaseAuthority.has(marketId);
 
   let resolvedPreimage: string | undefined;
   let oracleSignature: string | undefined;
@@ -110,26 +106,18 @@ export async function settleMarket(
     let proofSigs: Map<string, string> | null = null;
 
     if (allProofSecrets.length > 0) {
-      if (state.frostMode === "frost" && state.frostConfig) {
-        proofSigs = await frostSignProofSecretsAsync(
-          state.frostConfig,
-          swapOutcome,
-          allProofSecrets,
-          opts?.verifiedBody
-            ? {
-              condition_id: marketId,
-              resolution_url: market.resolution_url,
-              verified_body: opts.verifiedBody,
-            }
-            : undefined,
-        );
-      } else {
-        proofSigs = state.dualKeyStore.signProofSecrets(
-          marketId,
-          swapOutcome,
-          allProofSecrets,
-        );
-      }
+      proofSigs = await state.releaseAuthority.releaseProofSecretSignatures({
+        swap_id: marketId,
+        outcome: swapOutcome,
+        proofSecrets: allProofSecrets,
+        conditionData: opts?.verifiedBody
+          ? {
+            condition_id: marketId,
+            resolution_url: market.resolution_url,
+            verified_body: opts.verifiedBody,
+          }
+          : undefined,
+      });
 
       if (!proofSigs) {
         return {
@@ -154,24 +142,18 @@ export async function settleMarket(
     } else {
       // Demo mode without Cashu — sign a market-level message.
       const signMessage = new TextEncoder().encode(`${marketId}:${outcome}`);
-      let sig: string | null = null;
-
-      if (state.frostMode === "frost" && state.frostConfig) {
-        sig = await frostDualKeySignAsync(
-          state.frostConfig,
-          swapOutcome,
-          signMessage,
-          opts?.verifiedBody
-            ? {
-              condition_id: marketId,
-              resolution_url: market.resolution_url,
-              verified_body: opts.verifiedBody,
-            }
-            : undefined,
-        );
-      } else {
-        sig = state.dualKeyStore.sign(marketId, swapOutcome, signMessage);
-      }
+      const sig = await state.releaseAuthority.releaseSignature({
+        swap_id: marketId,
+        outcome: swapOutcome,
+        message: signMessage,
+        conditionData: opts?.verifiedBody
+          ? {
+            condition_id: marketId,
+            resolution_url: market.resolution_url,
+            verified_body: opts.verifiedBody,
+          }
+          : undefined,
+      });
 
       if (!sig) {
         return {

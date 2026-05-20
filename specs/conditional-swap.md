@@ -222,6 +222,8 @@ means:
 
 ### DualKeyStore Interface
 
+`DualKeyStore` is the local single-key implementation used for demos and tests:
+
 ```
 create(swap_id) -> { pubkey_a, pubkey_b }
 sign(swap_id, outcome, message) -> signature | null
@@ -231,6 +233,22 @@ has(swap_id) -> boolean
 
 `sign()` is a one-time operation: the losing side's secret is permanently
 deleted, same irreversibility guarantee as HTLC preimage reveal.
+
+Distributed FROST signing uses the async release-authority port instead:
+
+```
+create(swap_id) -> { pubkey_a, pubkey_b }
+releaseSignature({ swap_id, outcome, message, conditionData? })
+  -> Promise<signature | null>
+releaseProofSecretSignatures({ swap_id, outcome, proofSecrets, conditionData? })
+  -> Promise<Map<proofSecret, signature> | null>
+getPubkeys(swap_id) -> { pubkey_a, pubkey_b } | null
+has(swap_id) -> boolean
+```
+
+FROST implementations must not expose a synchronous `sign()` path that returns
+placeholder success or hides threshold failure. `null` means the threshold was
+not met, the release was rejected, or the swap was already released.
 
 ## Relationship to Core Protocol
 

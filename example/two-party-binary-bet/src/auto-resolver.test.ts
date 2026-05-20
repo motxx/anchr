@@ -45,7 +45,7 @@ describe("auto-resolver", () => {
     const state = createMarketState();
     // Seed a real preimage pair so settleMarket's HTLC fallback path can complete.
     const hashes = state.dualPreimageStore.create("mkt_test");
-    state.dualKeyStore.create("mkt_test");
+    state.releaseAuthority.create("mkt_test");
     state.markets.set(
       "mkt_test",
       makeMarket({ htlc_hash_yes: hashes.hash_a, htlc_hash_no: hashes.hash_b }),
@@ -74,7 +74,7 @@ describe("auto-resolver", () => {
   test("settles NO when the body fails the condition", async () => {
     const state = createMarketState();
     state.dualPreimageStore.create("mkt_no");
-    state.dualKeyStore.create("mkt_no");
+    state.releaseAuthority.create("mkt_no");
     state.markets.set(
       "mkt_no",
       makeMarket({
@@ -154,7 +154,7 @@ describe("auto-resolver", () => {
   test("survives a fetch error and leaves the market open for retry", async () => {
     const state = createMarketState();
     state.dualPreimageStore.create("mkt_flaky");
-    state.dualKeyStore.create("mkt_flaky");
+    state.releaseAuthority.create("mkt_flaky");
     state.markets.set("mkt_flaky", makeMarket({ id: "mkt_flaky" }));
 
     const logged: Array<{ level: string; msg: string }> = [];
@@ -179,7 +179,7 @@ describe("auto-resolver", () => {
   test("survives a condition-evaluation error and leaves the market open", async () => {
     const state = createMarketState();
     state.dualPreimageStore.create("mkt_badcond");
-    state.dualKeyStore.create("mkt_badcond");
+    state.releaseAuthority.create("mkt_badcond");
     state.markets.set(
       "mkt_badcond",
       makeMarket({

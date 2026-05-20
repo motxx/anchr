@@ -789,17 +789,15 @@ describe("Market API: resolution (single-key)", () => {
 // ---------------------------------------------------------------------------
 
 describe("Market API: resolution (FROST mode mock)", () => {
-  test("dualKeyStore.sign is called with correct outcome", async () => {
+  test("releaseAuthority.releaseSignature is called with correct outcome", async () => {
     const state = createMarketState();
     const signCalls: Array<{ swapId: string; outcome: string }> = [];
-    const origSign = state.dualKeyStore.sign.bind(state.dualKeyStore);
-    state.dualKeyStore.sign = (
-      swapId: string,
-      outcome: "a" | "b",
-      message: Uint8Array,
-    ): string | null => {
-      signCalls.push({ swapId, outcome });
-      return origSign(swapId, outcome, message);
+    const origSign = state.releaseAuthority.releaseSignature.bind(
+      state.releaseAuthority,
+    );
+    state.releaseAuthority.releaseSignature = (request) => {
+      signCalls.push({ swapId: request.swap_id, outcome: request.outcome });
+      return origSign(request);
     };
 
     const { app } = makeTestApp(state);
