@@ -43,6 +43,7 @@ COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
 COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
+COPY example/c2pa-media-verification/deno.json ./example/c2pa-media-verification/
 COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
 COPY example/tlsn-fiat-swap-square/deno.json ./example/tlsn-fiat-swap-square/
 RUN deno install
