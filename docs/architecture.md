@@ -102,6 +102,63 @@ The accepted migration order is:
 This review is tracked by issues `0037` through `0043`. Those issues own the
 actual moves, API changes, lint updates, and documentation edits.
 
+### Target directory taxonomy
+
+The accepted target tree is a package taxonomy, not only a filesystem cleanup.
+Each top-level package group names the owner of a boundary:
+
+```
+packages/
+├── protocol/                  Wire events, schema ids, role-neutral types
+├── sdk/
+│   ├── customer/              Customer actor orchestration and ports
+│   ├── provider/              Provider actor orchestration and ports
+│   ├── oracle/                Oracle actor/client ports
+│   └── anchr/                 Aggregate developer entry point
+├── adapters/
+│   ├── nostr/                 Relay transport, NIP-44/NIP-90 bindings
+│   ├── cashu/                 Cashu HTLC wallet adapter over settlement primitives
+│   ├── blossom/               Attachment transport adapter
+│   ├── state/                 Memory, IndexedDB, and future durable actor state
+│   └── oracle-http/           HTTP Oracle client/server adapter surfaces
+├── proofs/
+│   ├── tlsn/                  TLSNotary validation and redaction
+│   └── photo/                 C2PA, EXIF, ProofMode, AI-content checks, GPS
+├── settlement/
+│   ├── cashu-htlc/            Canonical Cashu HTLC/P2PK construction
+│   ├── conditional-swap/      Binary-outcome conditional swap composition
+│   └── frost-oracle/          FROST threshold signing and release authority
+├── runtime/                   Cross-runtime helpers and logging
+└── flows/
+    ├── bounty/                Reusable bounty/query lifecycle
+    └── claim-gate/            Reusable claim-gating flow, if kept package-owned
+
+apps/                          Maintained runnable product or adapter surfaces
+examples/                      Small demos, sketches, and integration fixtures
+crates/                        Native helper binaries
+specs/                         Universal wire/protocol contracts
+```
+
+Public import names do not need to mirror the target directory names one-to-one,
+but every published name must have one clear owner. During pre-1.0 migration,
+prefer direct rewrites over compatibility shims: move a surface, update all
+imports and docs in the same change, and delete the replaced path unless the
+maintainer explicitly accepts a temporary facade. The intended stable public
+families are:
+
+- `@anchr/protocol` for wire and schema helpers.
+- `@anchr/customer`, `@anchr/provider`, `@anchr/oracle`, and `@anchr/sdk` for
+  actor SDK entry points if public names are simplified.
+- `@anchr/adapters-*` or equivalent adapter packages for Nostr, Cashu, Blossom,
+  state, and Oracle HTTP bindings.
+- `@anchr/proofs-*` for proof engines.
+- `@anchr/settlement-*` for Cashu, conditional-swap, and FROST settlement
+  primitives.
+
+If the package names stay as `@anchr/customer-sdk`, `@anchr/provider-sdk`, and
+similar, the same ownership rules still apply: actor SDK packages own actor
+orchestration, not concrete technology adapters.
+
 ## Agnostic component boundaries
 
 Component names describe protocol responsibilities, not today's bindings. A

@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -69,3 +70,33 @@ The working taxonomy from the boundary review is:
   exports exist.
 - Update issue dependencies if the accepted taxonomy changes the follow-up
   sequence.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+
+Harness update:
+
+- None — this is an architecture-boundary decision now recorded in
+  `docs/architecture.md`; deterministic enforcement is tracked by #0043.
+
+Review residuals:
+
+- Maintainer must choose final public package names before implementation
+  issues rewrite imports. The directory ownership decision is recorded here;
+  naming can be settled inside the relevant follow-up issue.
+
+Follow-up:
+
+- #0038
+- #0039
+- #0040
+- #0041
+- #0042
+- #0043
