@@ -28,6 +28,15 @@ Numbers are never reused, even when an issue is closed or abandoned.
 5. If later work should wait for this issue, record those issue numbers under
    `Blocks`.
 
+Initial issue creation is problem capture, not final implementation planning.
+Record the problem, known constraints, important references, and obvious
+dependencies. Do not force a detailed child-issue split before a resolver has
+re-read the current repository state.
+
+When a finding is broad but the correct implementation split depends on current
+code, create a tracking issue with enough context for the future resolver. The
+resolver decides whether to close it directly or split it first.
+
 Use this structure:
 
 ```text
@@ -105,6 +114,25 @@ If the issue has unresolved `Depends on` entries, do not close it unless the
 maintainer explicitly accepts the remaining dependency risk. When closing an
 issue, update other pending issues whose `Depends on` or `Blocks` lists should
 change as a result.
+
+## Resolver-Led Splitting
+
+Resolution starts by re-reading the current repository state. If the target
+issue is too broad for one coherent, verifiable change, split it before editing
+implementation code:
+
+1. Use `skills/make-sub-issues/SKILL.md` to create independently closeable
+   child issues.
+2. Set each child issue's `Blocks` list to the parent issue number.
+3. Add each child issue number to the parent issue's `Depends on` list.
+4. Leave the parent pending until the required children close, unless the
+   parent is purely a tracking issue whose resolution is the split itself.
+5. Resolve child issues one at a time with their own verification and
+   resolution notes.
+
+Do not implement a broad parent and all of its children in one change just
+because the parent contains a detailed plan. The resolver's current context and
+verification scope decide the split.
 
 ## Example Issues
 

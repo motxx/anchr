@@ -44,6 +44,10 @@ history (`added for X` / `previously did Y`) — caught by
 Use `docs/review-harness.md` to route recurring review findings to automated
 checks, semantic skills, universal docs, or follow-up issues.
 
+Issue creation captures the problem and constraints. Issue resolution re-reads
+the current repository state and splits broad work with `make-sub-issues`
+before implementation when one coherent verified change would be too large.
+
 Failed test → fix the implementation. Never skip, weaken, or
 `--no-check`.
 

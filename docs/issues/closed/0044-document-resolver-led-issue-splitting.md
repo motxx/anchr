@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -144,3 +145,34 @@ Resolver-facing implications:
   independently verifiable units instead of implementing the whole parent at
   once.
 - Add only concise review-harness guidance needed to support this workflow.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/issues/README.md`
+- `docs/review-harness.md`
+- `skills/make-issues/SKILL.md`
+- `skills/make-sub-issues/SKILL.md`
+- `skills/resolve-issues/SKILL.md`
+- `CLAUDE.md`
+
+Verified with:
+
+- `git diff --check`
+- `deno task lint:strict`
+
+Harness update:
+
+- `skills/make-issues/SKILL.md`, `skills/make-sub-issues/SKILL.md`, and
+  `skills/resolve-issues/SKILL.md` now encode resolver-led splitting as the
+  issue workflow harness; `docs/review-harness.md` maps broad issue
+  decomposition to those skills.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None

@@ -9,6 +9,9 @@ argument-hint: "<parent issue number/path and desired child issue split>"
 Create one or more child issues for an existing file-based issue in
 `docs/issues/`. Use this when a pending issue is too broad, an implementation
 reveals independently closeable follow-up work, or the user asks for sub-issues.
+The preferred timing is resolver-led: split after reading the current
+repository state, when the resolver can see the actual boundaries and
+verification scope.
 
 This skill follows the same issue format and sequence rules as
 `skills/make-issues/SKILL.md`, but it also updates the parent issue so the
@@ -40,8 +43,10 @@ Do not add ad-hoc `Parent`, `Subtasks`, or custom metadata fields unless
    - Prefer one issue per independently closeable change.
    - Use the user's requested child list when provided.
    - If the user only says "split this", derive children from the parent
-     `Plan`, `Summary`, and relevant repository context.
+     `Plan`, `Summary`, and current repository context.
    - Avoid creating a child that merely repeats the whole parent.
+   - Do not split just to mirror every bullet in the parent plan; split only
+     where each child can close with its own verification.
 5. Determine the next issue number:
    - Parse `SEQUENCE` as the last allocated number.
    - Parse existing issue filenames in `docs/issues/pending/` and

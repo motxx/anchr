@@ -18,9 +18,15 @@ Create one or more file-based issues in `docs/issues/pending/` and update
    - Also parse existing issue filenames.
    - Use `max(sequence, highest_existing_number) + 1`.
    - Update `SEQUENCE` to the last number created.
-4. Turn the user's request into scoped issues:
-   - Prefer one issue per independently closeable change.
-   - Avoid dumping a broad roadmap into one issue.
+4. Turn the user's request into issue-ready problem statements:
+   - Capture the problem, known constraints, important references, and obvious
+     dependencies.
+   - Create multiple issues only when the independent changes are already clear
+     without implementation-time repository inspection.
+   - For broad findings whose correct split depends on current code, create a
+     tracking issue and state that the resolver should split it before
+     implementation if one coherent change is too broad.
+   - Avoid baking in over-specific implementation plans during issue creation.
    - If the request is too vague to produce a useful issue, inspect relevant
      local context before asking a question.
 5. Write each issue as `docs/issues/pending/NNNN-short-title.md`.
@@ -81,11 +87,15 @@ Priority must be one of:
 
 ## Content Rules
 
-- Keep each issue closeable in one change when possible.
+- Keep each issue closeable in one change when possible, but prefer a broad
+  tracking issue over a guessed child split when the split requires resolver
+  context.
 - Record issue prerequisites in `Depends on` and downstream work in `Blocks`.
   Use `- None` when there is no known relationship.
 - Include concrete file paths, commands, logs, or docs references only when they
   help the implementer act.
+- Use the `Plan` section for immediate orientation and acceptance cues, not a
+  full implementation design when the resolver has not inspected current code.
 - Do not include private keys, proofs, personal data, fund-bearing details, or
   unpatched vulnerability details.
 - For security-sensitive work, write a safe high-level tracking issue and say
