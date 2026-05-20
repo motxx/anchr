@@ -66,6 +66,42 @@ specs/                         Wire-format specs (CC0)
 docs/                          Architecture + threat model
 ```
 
+### Package boundary review
+
+The current `packages/` tree is intentionally transitional. The repository's
+primary deliverables are the protocol/spec contract, actor SDKs, replaceable
+adapters, proof engines, settlement primitives, and runnable reference
+implementations. Package ownership should be judged by that purpose rather than
+by historical placement.
+
+| Current package | Boundary decision | Migration note |
+| --- | --- | --- |
+| `protocol` | Core protocol helper package. | Keep as the role-neutral wire/schema/event surface. It must not depend on other `@anchr/*` packages. |
+| `customer-sdk`, `provider-sdk`, `oracle-sdk` | Core actor SDKs. | Keep actor orchestration and public actor ports here; move concrete Cashu, Nostr, and state implementations to adapter packages when those boundaries exist. |
+| `sdk` | Aggregate developer entry point. | Keep as the convenience package that re-exports actor SDKs and standard adapters; do not let lower-level packages depend on it. |
+| `core-runtime` | Cross-runtime support primitive. | Keep as the dependency root for process, fs, env, which, and logging helpers. |
+| `core-cashu` | Settlement primitive. | Make this the canonical Cashu HTLC/P2PK implementation before adapter extraction; avoid parallel settlement semantics in SDK adapter code. |
+| `cashu-conditional-swap` | Settlement composition primitive. | Keep as a reusable conditional-swap package layered on Cashu/FROST primitives. |
+| `frost-oracle` | Threshold-signing settlement primitive. | Treat as a FROST/P2PK release-authority component, not as the actor-level Oracle SDK. Distributed FROST signing should use async signing ports. |
+| `tlsn-toolkit`, `photo-verification` | Proof engines. | Keep as reusable verification packages. Flow-specific dispatch belongs in adapters or flow packages. |
+| `blossom` | Attachment transport/storage primitive. | Keep replaceable; it may become an adapter package once the adapter tree exists. |
+| `bounty` | Transitional flow scaffold. | Shrink toward `flows/bounty` plus separate Nostr, Cashu, Blossom, Oracle, and proof adapters. Do not add new app-specific vocabulary here. |
+
+The accepted migration order is:
+
+1. Document the target taxonomy and public package naming decision.
+2. Canonicalise Cashu settlement semantics in the settlement primitive layer.
+3. Extract duplicated SDK adapter implementations into shared adapter packages.
+4. Introduce an explicit async threshold-signing/release-authority port for
+   FROST-backed settlement.
+5. Split `bounty` into flow logic plus adapter/proof packages.
+6. Separate maintained apps from small examples and sketches.
+7. Update architecture lint, workspace config, package READMEs, and agent docs
+   to enforce the final boundaries.
+
+This review is tracked by issues `0037` through `0043`. Those issues own the
+actual moves, API changes, lint updates, and documentation edits.
+
 ## Agnostic component boundaries
 
 Component names describe protocol responsibilities, not today's bindings. A

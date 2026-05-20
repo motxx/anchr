@@ -2,6 +2,7 @@
 
 Created: 2026-05-16
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -78,3 +79,39 @@ Examples of boundary questions to settle:
   move under `example/`, split, or document as intentionally external-facing.
 - Update `docs/architecture.md`, package READMEs, and `scripts/arch-lint.ts`
   rules to match the chosen boundaries.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `docs/issues/pending/0037-document-target-boundary-taxonomy.md`
+- `docs/issues/pending/0038-extract-shared-sdk-adapters.md`
+- `docs/issues/pending/0039-canonicalize-cashu-settlement-primitives.md`
+- `docs/issues/pending/0040-introduce-threshold-signing-port.md`
+- `docs/issues/pending/0041-split-bounty-flow-and-adapters.md`
+- `docs/issues/pending/0042-separate-apps-and-examples.md`
+- `docs/issues/pending/0043-update-boundary-lints-and-docs.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+
+Harness update:
+
+- None — this issue records the boundary review decision in
+  `docs/architecture.md`; enforcement and config updates are tracked by #0043.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0037
+- #0038
+- #0039
+- #0040
+- #0041
+- #0042
+- #0043
