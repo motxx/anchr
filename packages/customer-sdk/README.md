@@ -6,6 +6,16 @@ locking Cashu payment, selecting a Provider, and verifying the returned result.
 Runtime-dependent pieces such as relays, wallets, or Oracle access are injected
 through ports.
 
+## Install
+
+```jsonc
+{
+  "imports": {
+    "@anchr/customer-sdk": "jsr:@anchr/customer-sdk@^0.1"
+  }
+}
+```
+
 The SDK core requires explicit adapters:
 
 - `relayClient` for actor transport. `createRelayClient()` from

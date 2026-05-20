@@ -238,10 +238,10 @@ Migration rules:
 
 ## Reference host removal
 
-`example/anchr-reference-host/` and the shared `worker-api` HTTP gateway have
-been removed from the tracked source tree. MCP stdio remains in
-`apps/anchr-mcp/`, while HTTP routes now belong to concrete apps such as
-`apps/data-marketplace/`. The network has no
+The reference-host tree and the shared `worker-api` HTTP gateway have been
+removed from the tracked source tree. MCP stdio remains in `apps/anchr-mcp/`,
+while HTTP routes now belong to concrete apps such as `apps/data-marketplace/`.
+The network has no
 default Anchr server, hosted reference URL, or mandatory REST compatibility
 surface.
 
@@ -260,7 +260,7 @@ This removes a convenient central demo target. In return:
 ## Layer dependency rules
 
 The package graph is one-directional. `scripts/arch-lint.ts` enforces the
-allow-list; the rule codes (E001-E024) are the canonical reference. Highlights:
+allow-list; the rule codes in that file are the canonical reference. Highlights:
 
 - Inside `packages/bounty/src/`:
   - `domain/` is pure — no `Date.now()`, no `randomBytes`, no `Deno.*`. Side
@@ -270,8 +270,9 @@ allow-list; the rule codes (E001-E024) are the canonical reference. Highlights:
     calls.
   - `infrastructure/` implements ports. The only layer allowed to call `Deno.*`
     and external SDKs.
-- `packages/bounty/` may import any non-sdk primitive package. Other packages
-  may only depend on the small allow-list under E010-E019.
+- `packages/bounty/` may import primitive proof, settlement, storage, and
+  runtime packages, but not actor SDKs. Other packages may only depend on the
+  small allow-list in `scripts/arch-lint.ts`.
 - `bounty` (and any package) must not import from `@anchr/sdk` (the SDK is
   downstream of the host).
 - Application vocabulary (`market`, `marketplace`, …) is forbidden inside

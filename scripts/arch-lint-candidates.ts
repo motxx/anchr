@@ -2,7 +2,7 @@
 /**
  * Architecture-review candidate picker.
  *
- * Lists the largest non-test files per layer / package so the
+ * Lists the largest non-test files per layer, package, app, and example so the
  * `arch-lint-llm` skill (semantic review) can focus on the files most
  * likely to harbour cohesion / locator / leak smells. Pure selection;
  * no analysis happens here.
@@ -22,16 +22,6 @@ import { relative } from "jsr:@std/path@^1";
 const ROOT = new URL("../", import.meta.url).pathname;
 
 const SRC_LAYERS = ["domain", "application", "infrastructure"] as const;
-const PKG_NAMES = [
-  "core-runtime",
-  "core-cashu",
-  "tlsn-toolkit",
-  "photo-bounty",
-  "cashu-frost-oracle",
-  "cashu-conditional-swap",
-  "sdk",
-] as const;
-
 const TOP_PER_LAYER = 4;
 
 interface Candidate {
@@ -67,15 +57,35 @@ async function main() {
   const full = args.includes("--full");
   const layerArg = args.find((a, i, all) => all[i - 1] === "--layer");
 
+  async function workspaceGroups(
+    topDir: string,
+    childDir = "src",
+  ): Promise<{ label: string; absDir: string }[]> {
+    const out: { label: string; absDir: string }[] = [];
+    try {
+      for await (const entry of Deno.readDir(`${ROOT}${topDir}`)) {
+        if (!entry.isDirectory) continue;
+        const label = `${topDir}/${entry.name}/${childDir}/`;
+        out.push({
+          label,
+          absDir: `${ROOT}${topDir}/${entry.name}/${childDir}`,
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }
+
   const groups: { label: string; absDir: string }[] = [
     ...SRC_LAYERS.map((l) => ({
       label: `src/${l}/`,
       absDir: `${ROOT}src/${l}`,
     })),
-    ...PKG_NAMES.map((p) => ({
-      label: `packages/${p}/src/`,
-      absDir: `${ROOT}packages/${p}/src`,
-    })),
+    ...(await workspaceGroups("packages")),
+    ...(await workspaceGroups("apps")),
+    ...(await workspaceGroups("examples")),
   ];
 
   const filtered = layerArg

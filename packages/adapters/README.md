@@ -2,6 +2,16 @@
 
 Shared concrete adapters for actor SDK ports.
 
+## Install
+
+```jsonc
+{
+  "imports": {
+    "@anchr/adapters": "jsr:@anchr/adapters@^0.1"
+  }
+}
+```
+
 - `@anchr/adapters/cashu`: Cashu HTLC client backed by `@cashu/cashu-ts`.
 - `@anchr/adapters/nostr`: Nostr relay transport adapter.
 - `@anchr/adapters/storage`: memory and IndexedDB actor state stores.

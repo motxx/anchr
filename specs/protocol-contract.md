@@ -228,7 +228,7 @@ profiles belong in separate specs or package docs:
 | Cashu HTLC / P2PK implementation details                          | `packages/core-cashu/SPEC.md` and package tests                         |
 | TLSNotary, C2PA, GPS, ProofMode verifier behavior                 | Owning package `SPEC.md` and tests                                      |
 | Blossom or other attachment backend details                       | Adapter or package docs; only interoperable profiles belong in `specs/` |
-| MCP, HTTP gateway, CLI, mobile, web, Discord, or hosted endpoints | Adapter package docs or `example/<app>/`                                |
+| MCP, HTTP gateway, CLI, mobile, web, Discord, or hosted endpoints | Adapter package docs, `apps/<app>/`, or `examples/<name>/`              |
 
 Adapter or example choices must not become protocol requirements unless they are
 promoted into `specs/` as an interoperability profile.

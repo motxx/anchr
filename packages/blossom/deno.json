@@ -14,6 +14,17 @@
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1"
   },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "README.md",
+      "SPEC.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/**/*.test.ts"
+    ]
+  },
   "compilerOptions": {
     "lib": [
       "esnext",

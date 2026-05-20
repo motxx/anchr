@@ -84,7 +84,7 @@ shares without any party learning the group secret key.
 When a Worker submits a proof for a threshold query:
 
 1. Each Oracle independently runs `verify(query, result)` (see
-   `tlsn-toolkit/SPEC.md` and `photo-bounty/SPEC.md` for verifier specs).
+   `tlsn-toolkit/SPEC.md` and `photo-verification/SPEC.md` for verifier specs).
 2. Oracles that pass produce a FROST nonce commitment (Round 1).
 3. Nonce commitments are exchanged via coordinator or peer-to-peer.
 4. Each passing Oracle produces a signature share (Round 2).

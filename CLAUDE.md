@@ -71,20 +71,24 @@ pre-commit hook.
 ## Layout
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
-  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `bounty`,
-  `sdk`). Migration scaffolding (Query lifecycle, escrow,
-  oracle-client/service, verification adapters) lives in
-  `packages/bounty/src/{domain,application,infrastructure}/`.
-- `example/<app>/` — concrete apps; their own deno.json + design
-  system. **Must reach Anchr through `@anchr/*` only** — relative
-  paths into `packages/<pkg>/src/...` are an E023 violation.
+  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `adapters`,
+  `protocol`, `oracle-sdk`, `customer-sdk`, `provider-sdk`, `bounty`,
+  `sdk`). Transitional Query lifecycle scaffolding lives in
+  `packages/bounty/src/{domain,application,infrastructure}/`; new protocol,
+  adapter, proof, settlement, and actor SDK surfaces belong in their named
+  packages.
+- `apps/<app>/` — maintained runnable product or adapter surfaces with their
+  own runtime/config/ops policy. **Must reach Anchr through `@anchr/*` only** —
+  relative paths into `packages/<pkg>/src/...` are an E023 violation.
+- `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
+  Same E023 public-surface rule as `apps/`.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
 
 Application vocabulary (`market`, `marketplace`, …) is forbidden in
 `packages/` (E022). Concrete apps own their vocabulary in
-`example/<app>/`.
+`apps/<app>/` or `examples/<name>/`.
 
 ## Skill routing
 When a request matches an available skill, invoke it via `Skill` as the

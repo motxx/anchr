@@ -14,6 +14,16 @@
   "imports": {
     "@logtape/logtape": "jsr:@logtape/logtape@^2"
   },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/**/*.test.ts"
+    ]
+  },
   "compilerOptions": {
     "lib": [
       "esnext",

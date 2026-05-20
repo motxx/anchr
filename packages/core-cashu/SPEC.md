@@ -69,7 +69,7 @@ Requester unable to perform the Phase 2 swap before Oracle release.
 
 | Field | Description |
 |-------|-------------|
-| `type` | `htlc` or `p2pk_frost` (P2PK+FROST is described in `cashu-frost-oracle/SPEC.md`) |
+| `type` | `htlc` or `p2pk_frost` (P2PK+FROST is described in `frost-oracle/SPEC.md` and `cashu-conditional-swap/README.md`) |
 | `hash` | SHA-256 hash of preimage (HTLC only) |
 | `oracle_pubkeys` | Oracle pubkey(s); single for HTLC, group for FROST |
 | `requester_pubkey` | Requester's Nostr pubkey (hex) |

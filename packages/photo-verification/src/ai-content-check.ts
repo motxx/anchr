@@ -19,7 +19,7 @@ import {
 } from "@anchr/core-runtime";
 /**
  * Subset of the host server's Query needed to build the vision-LLM prompt.
- * photo-bounty deliberately doesn't depend on the full host Query — callers
+ * photo-verification deliberately doesn't depend on the full host Query — callers
  * pass exactly the fields the prompt uses, decoupling the package from
  * core-domain.
  */

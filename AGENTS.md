@@ -6,6 +6,10 @@ Read `CLAUDE.md` for the core project rules. This repository keeps the main
 runtime, logging, type, test, lint, and layout guidance there so Claude and
 Codex share one source of truth.
 
+Current package, app, and example boundaries are documented in `CLAUDE.md` and
+`docs/architecture.md`; keep agent-specific notes as pointers instead of
+duplicating the layout rules here.
+
 ## Shared skills
 
 - Canonical skill definitions live in `skills/<skill-name>/SKILL.md`.

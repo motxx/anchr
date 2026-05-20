@@ -22,7 +22,7 @@ Read the relevant `.ts` / `.tsx` files, apply the rubric below, and report findi
 ## Scope
 
 - **Include:** `src/**/*.ts(x)`, `packages/**/*.ts(x)`
-- **Exclude:** `*.test.ts(x)`, `src/testing/`, `e2e/`, `scripts/`, `example/`, `mobile/`, `dist/`, `node_modules/`
+- **Exclude:** `*.test.ts(x)`, `src/testing/`, `e2e/`, `scripts/`, `apps/`, `examples/`, `mobile/`, `dist/`, `node_modules/`
 
 If the user supplies file paths or globs as arguments, scan exactly those (still respecting the exclude list). Otherwise, default behavior:
 
@@ -134,7 +134,7 @@ Detect by **reading** both files, not by file-name matching. Quote the duplicate
 A module reaches into another module's internals.
 
 **Flag this:**
-- Imports from a deep subpath like `@anchr/cashu-frost-oracle/internal/signing-coordinator` when a public port exists.
+- Imports from a deep subpath like `@anchr/frost-oracle/internal/signing-coordinator` when a public port exists.
 - Imports a test-only export (`_setFooForTest`) from non-test code.
 - A package depending on three concrete sub-files of another package instead of one stable interface.
 

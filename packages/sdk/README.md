@@ -15,6 +15,16 @@ deno add @anchr/sdk
 npm i @anchr/sdk
 ```
 
+Workspace consumers can also pin the Deno import map directly:
+
+```jsonc
+{
+  "imports": {
+    "@anchr/sdk": "jsr:@anchr/sdk@^0.0.1"
+  }
+}
+```
+
 ## Customer
 
 ```ts

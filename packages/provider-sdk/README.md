@@ -5,6 +5,16 @@ producing proof-backed results, and redeeming settlement after Oracle release.
 
 Runtime-dependent relay and wallet integrations stay behind injected ports.
 
+## Install
+
+```jsonc
+{
+  "imports": {
+    "@anchr/provider-sdk": "jsr:@anchr/provider-sdk@^0.1"
+  }
+}
+```
+
 The SDK core requires explicit adapters:
 
 - `relayClient` for actor transport. `createRelayClient()` from

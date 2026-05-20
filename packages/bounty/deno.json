@@ -54,6 +54,18 @@
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
     "zod": "jsr:@zod/zod@^4"
   },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "README.md",
+      "deno.json"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "src/**/*.integration.test.ts",
+      "src/testing/**"
+    ]
+  },
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
     "strict": true

@@ -35,11 +35,11 @@
  *   [E016] cashu-conditional-swap may only depend on
  *          core-runtime, core-cashu, frost-oracle
  *   [E019] blossom may only depend on core-runtime
- *   [E027] adapters may depend on protocol and primitive packages
+ *   [E027] adapters may depend on protocol and the primitive packages they bind
  *   [E025] protocol may not depend on other @anchr/* packages
- *   [E026] actor SDKs may depend on protocol and their explicit peer SDKs
+ *   [E026] actor SDKs may depend on protocol and explicit peer actor ports
  *   [E024] bounty may depend on every primitive package except actor SDKs
- *   [E017] sdk may only aggregate protocol and actor SDK packages
+ *   [E017] sdk may aggregate protocol, adapters, oracle-sdk, and actor SDKs
  *
  * Rules (apps/ and examples/):
  *   [E023] apps/<app>/ and examples/<name>/ must reach Anchr only through `@anchr/*`
