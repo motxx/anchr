@@ -6,9 +6,9 @@ import {
   finalizeEvent,
   type VerifiedEvent,
 } from "nostr-tools/pure";
-import { publishEvent } from "@anchr/bounty/nostr-transport";
+import { publishEvent } from "@anchr/bounty/nostr";
 import { getCashuConfig } from "@anchr/core-cashu/wallet";
-import { ANCHR_MARKETPLACE_LISTING } from "@anchr/bounty/nostr-events";
+import { ANCHR_MARKETPLACE_LISTING } from "@anchr/bounty/nostr";
 import type { DataListing } from "./types.ts";
 
 async function getIdentityKey(): Promise<Uint8Array | null> {

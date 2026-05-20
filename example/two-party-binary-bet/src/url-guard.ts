@@ -10,7 +10,7 @@
  *     for tests with a mock server). The env var must be set explicitly so
  *     production deploys can't accidentally allow it.
  */
-import { validateAttachmentUri } from "@anchr/bounty/url-validation";
+import { validateAttachmentUri } from "@anchr/bounty/attachments";
 
 const PRIVATE_HOST_RE = [
   /^127\./,

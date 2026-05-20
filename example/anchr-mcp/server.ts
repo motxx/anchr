@@ -1,5 +1,6 @@
-import { createOracleRegistry, createQueryService } from "@anchr/bounty";
-import { normalizeQueryResult } from "@anchr/bounty/attachment-access";
+import { createQueryService } from "@anchr/bounty/flow";
+import { createOracleRegistry } from "@anchr/bounty/oracle-client";
+import { normalizeQueryResult } from "@anchr/bounty/attachments";
 import { startMcpServer } from "./src/mcp-server.ts";
 
 const queryService = createQueryService({

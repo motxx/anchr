@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -73,3 +74,61 @@ Boundary facts to preserve while splitting:
   surfaces.
 - Reduce the `@anchr/bounty` public facade or mark it explicitly transitional
   until it can be removed.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/bounty/src/mod.ts`
+- `packages/bounty/src/flow.ts`
+- `packages/bounty/src/attachments.ts`
+- `packages/bounty/src/escrow.ts`
+- `packages/bounty/src/nostr.ts`
+- `packages/bounty/src/oracle-client.ts`
+- `packages/bounty/src/oracle-service.ts`
+- `packages/bounty/src/verification.ts`
+- `packages/bounty/src/claim-gate.ts`
+- `packages/bounty/deno.json`
+- `packages/bounty/README.md`
+- `example/anchr-mcp/`
+- `example/data-marketplace/`
+- `example/airdrop-bot-shield/deno.json`
+- `example/two-party-binary-bet/src/url-guard.ts`
+- `docs/architecture.md`
+
+Reduced the `@anchr/bounty` root facade to the query/domain/application flow and
+moved concrete public surfaces behind explicit subpath exports:
+`attachments`, `escrow`, `nostr`, `oracle-client`, `oracle-service`,
+`verification`, and `claim-gate`. Updated example imports away from the removed
+legacy subpaths (`attachment-access`, `domain-types`, `nostr-events`,
+`nostr-transport`, and `url-validation`) to the narrower boundary they use.
+
+Verified with:
+
+- `deno check packages/bounty/src/mod.ts packages/bounty/src/flow.ts packages/bounty/src/attachments.ts packages/bounty/src/escrow.ts packages/bounty/src/nostr.ts packages/bounty/src/oracle-client.ts packages/bounty/src/oracle-service.ts packages/bounty/src/verification.ts packages/bounty/src/claim-gate.ts`
+- `deno test --allow-all example/anchr-mcp/src/mcp-query-backend.test.ts example/anchr-mcp/src/mcp-server.integration.test.ts example/data-marketplace/src/marketplace/marketplace-routes.test.ts example/airdrop-bot-shield/src/service.test.ts example/two-party-binary-bet/src/server-routes.test.ts`
+- `deno task lint:strict`
+- `deno task test:examples`
+- `deno task test:unit`
+
+Harness update:
+
+- Added `packages/bounty/README.md` to document the narrowed public surfaces and
+  updated `docs/architecture.md` to record the transitional root/subpath split.
+
+Silent-bypass review:
+
+- No findings. The changed in-scope package files are re-export boundary files;
+  no verification, validation, settlement, redemption, auth, signing, or quorum
+  branch behavior changed.
+
+Review residuals:
+
+- The filesystem package names remain transitional until #0043 updates boundary
+  lints, workspace config, and docs around the final layout.
+- `claim-gate` remains a reusable bounty subpath for now; final ownership is
+  still part of the #0043 boundary cleanup.
+
+Follow-up:
+
+- #0043

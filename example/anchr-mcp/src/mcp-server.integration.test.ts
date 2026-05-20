@@ -124,8 +124,9 @@ async function createMcpClient(
   // globalThis.__queryService so the test bootstrapPreamble can seed the
   // same in-memory backend that the MCP server reads.
   const setupImports = [
-    `import { createQueryService, createOracleRegistry } from "@anchr/bounty";`,
-    `import { normalizeQueryResult } from "@anchr/bounty/attachment-access";`,
+    `import { createQueryService } from "@anchr/bounty/flow";`,
+    `import { createOracleRegistry } from "@anchr/bounty/oracle-client";`,
+    `import { normalizeQueryResult } from "@anchr/bounty/attachments";`,
     `import { startMcpServer } from "@anchr/anchr-mcp/mcp-server";`,
     `import { storeIntegrity } from "@anchr/photo-verification/integrity-store";`,
   ].join("\n");

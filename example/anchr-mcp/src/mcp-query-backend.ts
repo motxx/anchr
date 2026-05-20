@@ -4,14 +4,14 @@ import {
   materializeQueryResult,
   renderStoredAttachmentPreview,
   statStoredAttachment,
-} from "@anchr/bounty/attachment-access";
-import type { QueryInput, QueryResult, QueryService } from "@anchr/bounty";
+} from "@anchr/bounty/attachments";
+import type { QueryInput, QueryResult, QueryService } from "@anchr/bounty/flow";
 import type {
   AttachmentHandle,
   AttachmentRef,
   Query,
   RequesterMeta,
-} from "@anchr/bounty/domain-types";
+} from "@anchr/bounty/flow";
 
 const httpApiPort = Number(Deno.env.get("HTTP_API_PORT")) || 3000;
 const previewMaxDimension = Number(Deno.env.get("PREVIEW_MAX_DIMENSION")) ||

@@ -2,7 +2,7 @@
   "imports": {
     "@anchr/tlsn-toolkit/tlsn-validation": "../../packages/tlsn-toolkit/src/tlsn-validation.ts",
     "@anchr/tlsn-toolkit/tlsn-types": "../../packages/tlsn-toolkit/src/tlsn-types.ts",
-    "@anchr/bounty/claim-gate": "../../packages/bounty/src/infrastructure/claim-gate/index.ts",
+    "@anchr/bounty/claim-gate": "../../packages/bounty/src/claim-gate.ts",
     "hono": "jsr:@hono/hono@^4",
     "@std/expect": "jsr:@std/expect@^1",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",

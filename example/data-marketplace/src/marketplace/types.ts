@@ -1,7 +1,7 @@
 // Two payment modes: cashu-direct (immediate, buyer-risk) and cashu-htlc
 // (Oracle releases preimage only after TLSNotary proof verification).
 
-import type { TlsnRequirement } from "@anchr/bounty/domain-types";
+import type { TlsnRequirement } from "@anchr/bounty/flow";
 import type { MiddlewareHandler } from "hono";
 import type { ListingStore } from "./listing-store.ts";
 import type { PreimageStore } from "@anchr/core-cashu/preimage-store";

@@ -53,8 +53,8 @@ packages/
 ├── oracle-sdk/                Oracle client port and simple HTTP hash-client adapter.
 ├── customer-sdk/              Customer local state, request flow, HTLC lock/bind, and ports.
 ├── provider-sdk/              Provider request handling, offer/result flow, redeem gate, and ports.
-├── bounty/                    Migration scaffolding: Query lifecycle, escrow,
-│                              oracle-client/service, verification adapters.
+├── bounty/                    Migration scaffolding: root flow surface plus
+│                              explicit adapter/proof/oracle subpaths.
 └── sdk/                       Aggregate convenience package for actor SDKs and app adapter clients.
 
 example/                       Runnable apps; each owns its design system + deno.json
@@ -87,7 +87,7 @@ by historical placement.
 | `frost-oracle` | Threshold-signing settlement primitive. | Treat as a FROST/P2PK release-authority component, not as the actor-level Oracle SDK. Distributed FROST signing should use async signing ports. |
 | `tlsn-toolkit`, `photo-verification` | Proof engines. | Keep as reusable verification packages. Flow-specific dispatch belongs in adapters or flow packages. |
 | `blossom` | Attachment transport/storage primitive. | Keep replaceable; it may become an adapter package once the adapter tree exists. |
-| `bounty` | Transitional flow scaffold. | Shrink toward `flows/bounty` plus separate Nostr, Cashu, Blossom, Oracle, and proof adapters. Do not add new app-specific vocabulary here. |
+| `bounty` | Transitional flow scaffold. | Root exports are limited to the query/domain/application flow. Concrete surfaces are exposed through explicit subpaths: `@anchr/bounty/attachments`, `/escrow`, `/nostr`, `/oracle-client`, `/oracle-service`, `/verification`, and `/claim-gate`. Continue shrinking toward `flows/bounty` plus final adapter/proof packages; do not add new app-specific vocabulary here. |
 
 The accepted migration order is:
 

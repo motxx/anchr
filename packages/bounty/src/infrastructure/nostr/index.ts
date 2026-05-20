@@ -19,6 +19,7 @@ export {
   regionKeyHex,
 } from "./crypto/encryption.ts";
 export {
+  ANCHR_MARKETPLACE_LISTING,
   ANCHR_QUERY_FEEDBACK,
   ANCHR_QUERY_REQUEST,
   ANCHR_QUERY_RESPONSE,

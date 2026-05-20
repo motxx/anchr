@@ -3,12 +3,14 @@
   "version": "0.1.0",
   "exports": {
     ".": "./src/mod.ts",
-    "./attachment-access": "./src/infrastructure/attachments.ts",
-    "./domain-types": "./src/domain/types.ts",
-    "./nostr-events": "./src/infrastructure/nostr/events/events.ts",
-    "./nostr-transport": "./src/infrastructure/nostr/transport/client.ts",
-    "./url-validation": "./src/infrastructure/url-validation.ts",
-    "./claim-gate": "./src/infrastructure/claim-gate/index.ts"
+    "./attachments": "./src/attachments.ts",
+    "./claim-gate": "./src/claim-gate.ts",
+    "./escrow": "./src/escrow.ts",
+    "./flow": "./src/flow.ts",
+    "./nostr": "./src/nostr.ts",
+    "./oracle-client": "./src/oracle-client.ts",
+    "./oracle-service": "./src/oracle-service.ts",
+    "./verification": "./src/verification.ts"
   },
   "imports": {
     "@anchr/blossom": "../blossom/src/mod.ts",

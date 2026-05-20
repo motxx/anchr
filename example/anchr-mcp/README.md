@@ -8,4 +8,4 @@ Anchr protocol or actor SDK surface.
 deno run --allow-all example/anchr-mcp/server.ts
 ```
 
-The MCP server uses an in-process `QueryService` from `@anchr/bounty`.
+The MCP server uses an in-process `QueryService` from `@anchr/bounty/flow`.
