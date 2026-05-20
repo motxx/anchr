@@ -1,11 +1,14 @@
 /**
  * Cashu HTLC escrow for Anchr protocol (NUT-14).
  *
- * Two-phase HTLC pattern (per README):
+ * Canonical two-phase HTLC pattern:
  *
  *   Phase 1 (initial lock, Worker unknown):
- *     HTLC: hashlock(hash) + locktime + refund(Requester)
- *     → Only Requester holds this token; not yet spendable by anyone.
+ *     - Local-hold mode: plain proofs stay with the Requester and are
+ *       never published before Worker selection.
+ *     - Preselection-transfer mode: P2PK(Requester) proofs may be shown
+ *       in a request so providers can inspect the bounty amount, but relay
+ *       observers cannot spend them.
  *
  *   Phase 2 (after Worker selected, swap to bind Worker):
  *     HTLC: hashlock(hash) + P2PK(Worker) + locktime + refund(Requester)
@@ -203,6 +206,15 @@ export interface HtlcInitialLockParams {
   locktimeSeconds: number;
 }
 
+/** Parameters for Phase 1 when preselection proofs are visible to other actors. */
+export interface HtlcPreselectionLockParams {
+  /**
+   * Requester's public key (hex). Spending or swapping the preselection proofs
+   * requires the Requester's signature.
+   */
+  requesterPubkey: string;
+}
+
 /** Parameters for Phase 2: HTLC swap to bind a selected Worker. */
 export interface HtlcWorkerBindParams {
   /** SHA-256 hash of preimage. */
@@ -218,11 +230,10 @@ export interface HtlcWorkerBindParams {
 /**
  * Build P2PK options for Phase 1: Hold token before Worker is known.
  *
- * Returns null — Phase 1 uses plain (unlocked) proofs. The Requester
- * holds them locally as bearer instruments. No P2PK or hashlock is
- * applied because:
+ * Returns null for local-hold mode. The Requester holds plain proofs locally
+ * and does not publish or transfer them before Worker selection. No P2PK or
+ * hashlock is applied because:
  *   - Adding hashlock would require preimage to swap (Requester doesn't have it)
- *   - Adding P2PK(Requester) would require witness signing for swap
  *
  * The "escrow" aspect comes only in Phase 2 when HTLC conditions are applied.
  */
@@ -230,6 +241,25 @@ export function buildHtlcInitialOptions(params: HtlcInitialLockParams): null {
   // Phase 1: no conditions — plain proofs held locally by Requester.
   // params.hash is retained for Phase 2 but not used here.
   return null;
+}
+
+/**
+ * Build P2PK options for Phase 1 when the preselection token or proofs are
+ * visible outside the Requester's process before a Worker is selected.
+ *
+ * This is not the final HTLC. It deliberately omits the hashlock because the
+ * Requester still needs to swap these proofs in Phase 2 before the Oracle
+ * releases the preimage. P2PK(Requester) prevents relay observers or other
+ * unselected actors from spending the visible proofs as bearer instruments.
+ */
+export function buildHtlcPreselectionOptions(
+  params: HtlcPreselectionLockParams,
+): P2PKOptions {
+  return new P2PKBuilder()
+    .addLockPubkey(params.requesterPubkey)
+    .requireLockSignatures(1)
+    .sigAll()
+    .toOptions();
 }
 
 /**
@@ -255,9 +285,11 @@ export function buildHtlcFinalOptions(
 /**
  * Phase 1: Create hold token (Worker unknown).
  *
- * The Requester holds plain (unlocked) proofs locally until a Worker
- * is selected. These are bearer instruments — no P2PK or hashlock.
- * Phase 2 (swapHtlcBindWorker) adds the HTLC conditions.
+ * The Requester holds plain proofs locally until a Worker is selected. These
+ * are bearer instruments and must not be published before Phase 2. Flows that
+ * need to expose a preselection token should use
+ * `buildHtlcPreselectionOptions()` with their own wallet adapter and require
+ * the Requester's signature when binding the selected Worker.
  */
 export async function createHtlcToken(
   amountSats: number,

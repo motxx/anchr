@@ -2,6 +2,8 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
   buildEscrowP2PKOptions,
+  buildHtlcInitialOptions,
+  buildHtlcPreselectionOptions,
   calculateOracleFee,
   inspectEscrowToken,
 } from "./escrow.ts";
@@ -49,4 +51,24 @@ test("calculateOracleFee computes correct fee", () => {
 test("inspectEscrowToken returns null for invalid token", () => {
   expect(inspectEscrowToken("invalid")).toBe(null);
   expect(inspectEscrowToken("")).toBe(null);
+});
+
+test("buildHtlcInitialOptions returns null for local-hold Phase 1", () => {
+  const opts = buildHtlcInitialOptions({
+    hash: "00".repeat(32),
+    requesterPubkey: REQUESTER_PUB,
+    locktimeSeconds: 1700000000,
+  });
+
+  expect(opts).toBe(null);
+});
+
+test("buildHtlcPreselectionOptions locks visible Phase-1 proofs to requester P2PK", () => {
+  const opts = buildHtlcPreselectionOptions({
+    requesterPubkey: REQUESTER_PUB,
+  });
+
+  expect(opts.pubkey).toBe(`02${REQUESTER_PUB}`);
+  expect(opts.sigFlag).toBe("SIG_ALL");
+  expect(JSON.stringify(opts)).not.toContain("00".repeat(32));
 });

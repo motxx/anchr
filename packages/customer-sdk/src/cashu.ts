@@ -2,14 +2,12 @@
  * Cashu HTLC client — wraps `@cashu/cashu-ts` v3 for the SDK's
  * Customer / Provider wire flow.
  *
- * Two-phase HTLC pattern (mirrors `@anchr/core-cashu/src/escrow.ts`):
+ * Two-phase HTLC pattern using the core-cashu preselection-transfer model:
  *
  *   Phase 1 (initial lock — provider unknown):
- *     The customer holds raw proofs locally; no on-chain (mint-side)
- *     lock yet. `buildHtlcLock` tokenizes the source proofs into a
- *     transferable Cashu token string so the provider sees the bounty
- *     amount in the kind 5300 event but cannot spend it (no preimage,
- *     no P2PK signature on these plain proofs).
+ *     `buildHtlcLock` swaps the source proofs into P2PK(customer) proofs.
+ *     The resulting token can appear in the kind 5300 event so providers
+ *     see the bounty amount, but relay observers cannot spend it.
  *
  *   Phase 2 (swap to bind provider after selection):
  *     `bindProvider` swaps the held proofs at the mint into new proofs

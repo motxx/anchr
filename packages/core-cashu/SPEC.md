@@ -31,11 +31,23 @@ implementing a new provider — not changing the protocol or the host.
 
 1. Oracle generates a random preimage and returns
    `hash = SHA-256(preimage)` to the Requester.
-2. Requester creates a Cashu token with three spending conditions:
+2. Requester chooses the Phase 1 exposure mode:
+   - **Local hold.** The Requester keeps plain proofs private until a Worker is
+     selected. `buildHtlcInitialOptions()` returns `null` for this mode.
+   - **Preselection transfer.** If a token or proof set is visible before
+     Worker selection, the Requester locks it with P2PK(Requester) using
+     `buildHtlcPreselectionOptions()`. This prevents relay observers or
+     unselected actors from spending the visible proofs.
+3. After Worker selection, Requester swaps into a Cashu token with three
+   spending conditions:
    - `hash(preimage)` — HTLC condition (NUT-14)
    - `Worker pubkey` — P2PK condition (NUT-11)
    - `locktime` — refund after expiry
-3. Requester sends the escrow token to the Worker (via Nostr or HTTP).
+4. Requester sends the final escrow token to the Worker (via Nostr or HTTP).
+
+The preselection-transfer token deliberately omits the hashlock. The Requester
+does not yet have the preimage, so adding the hashlock in Phase 1 would make the
+Requester unable to perform the Phase 2 swap before Oracle release.
 
 ### Redemption
 
@@ -49,6 +61,7 @@ implementing a new provider — not changing the protocol or the host.
 |----------|-----------|
 | Oracle cannot steal | HTLC requires Worker's signature |
 | Worker cannot redeem without proof | Oracle holds the preimage |
+| Relay observer cannot spend preselection token | Preselection transfer mode uses P2PK(Requester) |
 | Requester cannot revoke | Sats locked before work begins |
 | Timeout refund | Automatic after locktime |
 

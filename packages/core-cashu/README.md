@@ -17,8 +17,9 @@ Cashu HTLC escrow + preimage store helpers. Self-contained — bring your own Ca
 ```typescript
 import {
   // HTLC escrow
-  createHtlcToken, redeemHtlcToken, swapHtlcBindWorker,
-  verifyHtlcProofs,
+  buildHtlcFinalOptions, buildHtlcInitialOptions,
+  buildHtlcPreselectionOptions, createHtlcToken,
+  redeemHtlcToken, swapHtlcBindWorker, verifyHtlcProofs,
   // 2-of-2 P2PK escrow primitives
   buildEscrowP2PKOptions, inspectEscrowToken, calculateOracleFee,
   type EscrowToken, type EscrowParams,
@@ -39,6 +40,21 @@ import {
   createBountyToken, encodeToken, verifyToken,
 } from "@anchr/core-cashu/wallet";
 ```
+
+## HTLC Phases
+
+`@anchr/core-cashu` owns the canonical Cashu HTLC/P2PK construction. Phase 1
+has two valid modes:
+
+- **Local hold:** `buildHtlcInitialOptions()` returns `null`; the Requester keeps
+  plain proofs private until a Worker is selected. Do not publish those proofs.
+- **Preselection transfer:** `buildHtlcPreselectionOptions()` creates a
+  P2PK(Requester) lock for flows that need to show a bounty token before Worker
+  selection. It omits the hashlock so the Requester can still sign and swap the
+  proofs into the final Worker-bound HTLC.
+
+Phase 2 is always `buildHtlcFinalOptions()`: hashlock(preimage) + P2PK(Worker)
++ locktime refund to the Requester.
 
 ## Configuration
 

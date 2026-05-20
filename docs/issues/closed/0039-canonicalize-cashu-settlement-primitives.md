@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -56,3 +57,39 @@ canonical package and one test suite that downstream adapters reuse.
 - Update package READMEs and `SPEC.md` files to describe one settlement model.
 - Verify with unit tests plus the relevant `e2e/protocol` and `e2e/regtest`
   coverage.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/core-cashu/src/escrow.ts`
+- `packages/core-cashu/src/escrow.test.ts`
+- `packages/core-cashu/README.md`
+- `packages/core-cashu/SPEC.md`
+- `packages/customer-sdk/src/cashu.ts`
+- `packages/provider-sdk/src/cashu.ts`
+
+Verified with:
+
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/core-cashu/src/escrow.test.ts packages/customer-sdk/src/cashu.test.ts`
+- `deno task lint:fmt`
+- `deno task lint:arch -- --errors-only`
+- `check-silent-bypass` review for `packages/core-cashu/src/escrow.ts`
+
+Harness update:
+
+- `packages/core-cashu/src/escrow.test.ts` now covers both local-hold Phase 1
+  and preselection-transfer P2PK(Requester) Phase 1, so the canonical settlement
+  distinction is pinned at the primitive boundary.
+
+Review residuals:
+
+- SDK/adapters still carry their own Cashu adapter implementation until #0038
+  extracts shared adapters and can delegate to the canonical primitive without
+  making actor SDK packages depend directly on settlement packages.
+
+Follow-up:
+
+- #0038
+- #0041
+- #0043
