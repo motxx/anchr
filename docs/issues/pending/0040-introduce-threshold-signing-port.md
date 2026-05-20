@@ -26,6 +26,8 @@ store interfaces.
 
 Relevant references:
 
+- `docs/architecture.md` target directory taxonomy and release-authority row
+- `docs/issues/closed/0037-document-target-boundary-taxonomy.md`
 - `packages/frost-oracle/src/signing-coordinator.ts`
 - `packages/frost-oracle/src/frost-cli.ts`
 - `packages/cashu-conditional-swap/src/frost-dual-key-store.ts`
@@ -41,6 +43,28 @@ async helpers. That is a boundary mismatch.
 
 The better boundary is an explicit async signing authority or release authority
 port, with local single-key signing as a separate implementation where needed.
+
+Important implementation facts to preserve:
+
+- FROST/DKG is already a real cryptographic path, not a mock-only surface:
+  `crates/frost-signer` runs the DKG and signing operations,
+  `packages/frost-oracle/src/frost-cli.ts` wraps that binary, and
+  `e2e/frost/frost-threshold.test.ts` covers DKG, threshold signing,
+  below-threshold failure, and signature verification.
+- `packages/bounty/src/infrastructure/oracle-service/frost-signer-routes.ts`
+  is a peer Oracle verify-and-sign endpoint. It should remain a path where each
+  signer independently verifies evidence before producing nonce commitments or
+  signature shares.
+- `packages/bounty/src/infrastructure/oracle-service/frost-dkg-routes.ts` is
+  DKG session/package coordination, not the cryptographic DKG implementation
+  itself. The actual round operations happen in signer-side FROST code.
+- Do not collapse FROST threshold signing into the simple `oracle-sdk` HTTP hash
+  client. The architecture treats `frost-oracle` as a threshold
+  release-authority component, not as the actor-level Oracle SDK.
+- The new boundary should account for both release forms described by the
+  architecture: single-Oracle preimage release and FROST threshold signatures.
+  It should separate the abstract release decision/signing request from concrete
+  transports such as HTTP routes, Nostr DMs, or local demo stores.
 
 ## Plan
 

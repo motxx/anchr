@@ -30,6 +30,8 @@ one public surface.
 
 Relevant references:
 
+- `docs/architecture.md` target directory taxonomy
+- `docs/issues/closed/0037-document-target-boundary-taxonomy.md`
 - `packages/bounty/src/mod.ts`
 - `packages/bounty/src/domain/`
 - `packages/bounty/src/application/`
@@ -44,6 +46,21 @@ Relevant references:
 As long as it remains the place where every adapter and proof integration is
 publicly re-exported, package ownership remains hard to reason about and
 downstream examples keep depending on a transitional surface.
+
+Boundary facts to preserve while splitting:
+
+- The FROST files under `packages/bounty/src/infrastructure/oracle-service/`
+  are not bounty-specific business logic. They are currently the HTTP
+  orchestration layer for threshold Oracle release authority:
+  `frost-dkg-routes.ts`, `frost-sign-routes.ts`, and `frost-signer-routes.ts`.
+- Moving those routes should preserve the existing real DKG/signing path:
+  Rust sidecar in `crates/frost-signer`, TypeScript wrapper in
+  `packages/frost-oracle/src/frost-cli.ts`, and peer coordination in
+  `packages/frost-oracle/src/signing-coordinator.ts`.
+- The split should keep local single-key/demo release stores distinct from
+  distributed FROST signing. Treating all Oracle implementations as either
+  simple HTTP hash clients or synchronous key stores would reintroduce the
+  boundary mismatch tracked by 0040.
 
 ## Plan
 
