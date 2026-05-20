@@ -2,6 +2,7 @@
 
 Created: 2026-05-16
 Model: GPT-5
+Completed: 2026-05-20
 
 ## Priority
 
@@ -70,3 +71,27 @@ against a declared repository goal rather than local history.
   consistent.
 - Leave package moves or renames to follow-up work; this issue should settle
   the purpose and documentation contract that those changes depend on.
+
+## Resolution
+
+Implemented by updating:
+
+- `README.md`
+
+Verified with:
+
+- `deno task lint:fmt`
+
+Harness update:
+
+- None — this is a one-time repository-purpose documentation decision now
+  locked in `README.md`; package-boundary enforcement is tracked by #0036 and
+  follow-up issues #0037 through #0043.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0036

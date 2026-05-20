@@ -4,9 +4,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Anchr is an experimental SDK for P2P verified work: pay a stranger to fetch data
-or take an action, with payment released only after a whitelisted oracle
-verifies the proof.
+Anchr is a protocol and SDK set for peer-to-peer verified work. A Customer can
+pay an unknown Provider to fetch data, produce evidence, or take an action, and
+the Provider can redeem payment only after a trusted Oracle accepts the proof.
+
+This repository makes that flow usable for implementers. Its primary
+deliverables are the wire-format specs, actor SDKs for Customer/Provider/Oracle
+roles, reference adapters for Nostr/Cashu/proof tooling, and runnable examples
+that show how those pieces compose. It is not an Anchr-operated marketplace,
+hosted server, wallet, oracle network, or production deployment.
 
 It combines:
 
@@ -22,7 +28,8 @@ It combines:
 
 ## What It Solves
 
-Anchr removes the pay-first / deliver-first deadlock.
+Anchr removes the pay-first / deliver-first deadlock for verifiable off-chain
+work.
 
 The Customer locks payment before work begins. The Provider can redeem only if a
 trusted oracle accepts the proof. If no valid proof arrives before the timeout,
@@ -30,6 +37,28 @@ the Customer gets an automatic refund from the Cashu mint.
 
 Anchr does not run a central server. Customers and Providers are pseudonymous
 Nostr pubkeys, and each app chooses its own relay, mint, oracle, and notary.
+
+## Repository Map
+
+Start with `@anchr/sdk` when you want to build an app. Use the lower-level
+packages when you are implementing a custom actor, adapter, proof engine, or
+settlement primitive.
+
+| Area | Paths | Role |
+| --- | --- | --- |
+| Protocol contract | [`specs/`](specs/), [`packages/protocol/`](packages/protocol/) | Wire shapes, schema identifiers, event builders, signing helpers, and role-neutral types. |
+| Actor SDKs | [`packages/sdk/`](packages/sdk/), [`packages/customer-sdk/`](packages/customer-sdk/), [`packages/provider-sdk/`](packages/provider-sdk/), [`packages/oracle-sdk/`](packages/oracle-sdk/) | Public integration APIs for app developers. Runtime pieces are injected through explicit ports. |
+| Supporting primitives | [`packages/core-cashu/`](packages/core-cashu/), [`packages/cashu-conditional-swap/`](packages/cashu-conditional-swap/), [`packages/frost-oracle/`](packages/frost-oracle/), [`packages/blossom/`](packages/blossom/) | Reusable settlement, threshold-signing, and attachment-storage building blocks. |
+| Proof toolkits | [`packages/tlsn-toolkit/`](packages/tlsn-toolkit/), [`packages/photo-verification/`](packages/photo-verification/) | Verification engines for TLSNotary, C2PA, EXIF, ProofMode, and related evidence. |
+| Runtime support | [`packages/core-runtime/`](packages/core-runtime/) | Cross-runtime helpers for Deno/Bun/Node boundaries, process spawning, file I/O, env, and logging. |
+| Transitional flow code | [`packages/bounty/`](packages/bounty/) | Migration scaffolding for the older bounty/query lifecycle while actor SDK and adapter boundaries are split. |
+| Reference implementations | [`example/`](example/) | Testnet flows, maintained previews, concept sketches, and integration fixtures. Status is per example. |
+| Native helpers | [`crates/`](crates/) | Rust binaries used by FROST and TLSNotary tooling. |
+
+The intended long-term shape is a small protocol/SDK core with concrete
+adapters and examples kept replaceable. See
+[`docs/architecture.md`](docs/architecture.md) for current and target package
+boundaries.
 
 ## Example Uses
 
@@ -80,8 +109,10 @@ deno add @anchr/sdk
 npm i @anchr/sdk
 ```
 
-You also need a Cashu mint URL, Nostr relay URL, oracle endpoint/pubkey, and a
-Provider Nostr secret key. TLSNotary-based schemas also need a notary.
+You also need deployment-owned infrastructure: a Cashu mint URL, Nostr relay
+URL, oracle endpoint/pubkey, and Provider Nostr secret key. TLSNotary-based
+schemas also need a notary. The repository supplies reference clients and
+examples, not default production infrastructure.
 
 ## Quick Start
 
