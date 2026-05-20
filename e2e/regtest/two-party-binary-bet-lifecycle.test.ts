@@ -36,12 +36,12 @@ import {
   type MarketRouteContext,
   type MarketState,
   registerMarketRoutes,
-} from "../../example/two-party-binary-bet/src/server-routes.ts";
+} from "../../apps/two-party-binary-bet/src/server-routes.ts";
 import {
   type MarketStore,
   openMarketStore,
-} from "../../example/two-party-binary-bet/src/market-store.ts";
-import { createLockedToken } from "../../example/two-party-binary-bet/src/exchange-protocol.ts";
+} from "../../apps/two-party-binary-bet/src/market-store.ts";
+import { createLockedToken } from "../../apps/two-party-binary-bet/src/exchange-protocol.ts";
 import {
   checkInfraReady,
   createWallet,

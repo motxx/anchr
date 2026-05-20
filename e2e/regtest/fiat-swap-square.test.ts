@@ -38,7 +38,7 @@ import {
   FIAT_SWAP_SCHEMA,
   isFiatSwapPredicate,
   predicateMatchesBuyerConfig,
-} from "../../example/tlsn-fiat-swap-square/fiat-swap.ts";
+} from "../../examples/tlsn-fiat-swap-square/fiat-swap.ts";
 
 import {
   checkInfraReady,

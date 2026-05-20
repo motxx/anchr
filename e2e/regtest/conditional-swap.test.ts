@@ -35,14 +35,14 @@ import {
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createDualPreimageStore } from "@anchr/cashu-conditional-swap/dual-preimage-store";
-import { createInMemoryMatchingQueue } from "../../example/two-party-binary-bet/src/matching-queue.ts";
-import { resolveMarket } from "../../example/two-party-binary-bet/src/resolution.ts";
+import { createInMemoryMatchingQueue } from "../../apps/two-party-binary-bet/src/matching-queue.ts";
+import { resolveMarket } from "../../apps/two-party-binary-bet/src/resolution.ts";
 import type { ConditionalSwapDef } from "@anchr/cashu-conditional-swap/conditional-swap-types";
 import type {
   MatchedBetPair,
   MatchProposal,
   PendingBet,
-} from "../../example/two-party-binary-bet/src/market-types.ts";
+} from "../../apps/two-party-binary-bet/src/market-types.ts";
 import {
   checkInfraReady,
   createWallet,

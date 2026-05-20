@@ -52,7 +52,7 @@ settlement primitive.
 | Proof toolkits | [`packages/tlsn-toolkit/`](packages/tlsn-toolkit/), [`packages/photo-verification/`](packages/photo-verification/) | Verification engines for TLSNotary, C2PA, EXIF, ProofMode, and related evidence. |
 | Runtime support | [`packages/core-runtime/`](packages/core-runtime/) | Cross-runtime helpers for Deno/Bun/Node boundaries, process spawning, file I/O, env, and logging. |
 | Transitional flow code | [`packages/bounty/`](packages/bounty/) | Migration scaffolding for the older bounty/query lifecycle while actor SDK and adapter boundaries are split. |
-| Reference implementations | [`example/`](example/) | Testnet flows, maintained previews, concept sketches, and integration fixtures. Status is per example. |
+| Apps and examples | [`apps/`](apps/), [`examples/`](examples/) | Maintained runnable surfaces live in `apps/`; small demos, testnet flows, concept sketches, and fixtures live in `examples/`. Status is per entry. |
 | Native helpers | [`crates/`](crates/) | Rust binaries used by FROST and TLSNotary tooling. |
 
 The intended long-term shape is a small protocol/SDK core with concrete
@@ -117,7 +117,7 @@ examples, not default production infrastructure.
 ## Quick Start
 
 The snippet shows the Customer-side API shape. For a complete running flow, see
-[`example/c2pa-media-verification/`](example/c2pa-media-verification/).
+[`examples/c2pa-media-verification/`](examples/c2pa-media-verification/).
 
 ```ts
 import {
@@ -223,11 +223,11 @@ The checklist for promoting or maintaining an advertised example lives in
 
 | Example                                                    | What it shows                                  | Status      |
 | ---------------------------------------------------------- | ---------------------------------------------- | ----------- |
-| [C2PA photo marketplace](example/c2pa-media-verification/) | Customer/Provider flow with photo verification | Testnet     |
-| [TLSN fiat swap](example/tlsn-fiat-swap-square/)           | Customer/Provider flow with TLSNotary          | Testnet     |
-| [Browser auto-claim](example/auto-claim/)                  | TLSNotary-based browser automation             | Concept     |
-| [Two-party binary bet](example/two-party-binary-bet/)      | Conditional swap primitive outside the SDK     | Implemented |
-| [Airdrop bot shield](example/airdrop-bot-shield/)          | Verification-only attestation flow             | Implemented |
+| [C2PA photo marketplace](examples/c2pa-media-verification/) | Customer/Provider flow with photo verification | Testnet     |
+| [TLSN fiat swap](examples/tlsn-fiat-swap-square/)           | Customer/Provider flow with TLSNotary          | Testnet     |
+| [Browser auto-claim](examples/auto-claim/)                  | TLSNotary-based browser automation             | Concept     |
+| [Two-party binary bet](apps/two-party-binary-bet/)          | Conditional swap primitive outside the SDK     | Implemented |
+| [Airdrop bot shield](apps/airdrop-bot-shield/)              | Verification-only attestation flow             | Implemented |
 
 ## More Detail
 

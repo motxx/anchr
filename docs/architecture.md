@@ -16,8 +16,9 @@ protocol actor and must not be required for interoperability.
 
 The repository still contains `@anchr/bounty` as migration scaffolding around
 the three actor model, but the bundled Reference Host and shared worker HTTP
-gateway have been removed. Concrete deployments live in `example/`. No package
-depends on `example/` code: packages flow into examples, never the other way.
+gateway have been removed. Concrete deployments live in `apps/`; small demos
+and fixtures live in `examples/`. No package depends on `apps/` or `examples/`
+code: packages flow outward, never the other way.
 
 ## Target layer stack
 
@@ -57,11 +58,12 @@ packages/
 │                              explicit adapter/proof/oracle subpaths.
 └── sdk/                       Aggregate convenience package for actor SDKs and app adapter clients.
 
-example/                       Runnable apps; each owns its design system + deno.json
+apps/                          Maintained runnable product or adapter surfaces
   ├── anchr-mcp/               MCP stdio adapter for agent runtime integration
   ├── data-marketplace/        App-owned `/marketplace/*` routes plus MCP tools
   ├── two-party-binary-bet/    Market pattern (no host needed)
-  └── …                        SDK consumers + standalone primitives demos
+  └── …                        Product, adapter, and maintained app surfaces
+examples/                      Small demos, testnet flows, concept sketches, fixtures
 crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
 specs/                         Wire-format specs (CC0)
 docs/                          Architecture + threat model
@@ -184,7 +186,7 @@ Customer/Provider/Oracle actor names follow
 | Release authority     | Produce the material that unlocks settlement only after verification succeeds, and bind that material to the selected work.                                     | Verification verdict, query id, request event id, payment hash, Provider key, authority key or quorum state. | Signed release message, preimage, threshold signature, or equivalent unlock material.     | Verification failure, wrong authority, quorum not met, signature mismatch, release fields not bound to the accepted work.    | Single Oracle preimage release, FROST threshold signatures.                           |
 | Attachment transport  | Store and retrieve large or sensitive proof material without making the storage service a protocol actor.                                                       | Plaintext bytes, encryption key material, retention policy, recipient set.                                   | Encrypted attachment reference, content address, delivery key material.                   | Encryption failure, content-address mismatch, unavailable storage server, missing key material, retention expiry.            | Encrypted Blossom blobs; see [Attachment registry](#attachment-registry-blossom).     |
 | Local actor state     | Track one actor's private progress without making local implementation state part of the network contract.                                                      | Actor configuration, observed messages, wallet state, verifier state, retry state, persisted tickets.        | Local projections, preflight tickets, idempotency records, retry schedule, audit records. | Corrupt store, conflicting events, missing idempotency record, stale local policy, failed persistence.                       | Actor SDK storage ports; current `@anchr/bounty` Query lifecycle scaffolding.         |
-| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, app-owned HTTP route, MCP tool, mobile or web bridge.                        | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | `example/anchr-mcp`, `example/data-marketplace`, example apps.                         |
+| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, app-owned HTTP route, MCP tool, mobile or web bridge.                        | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | `apps/anchr-mcp`, `apps/data-marketplace`, maintained apps.                          |
 
 ### Adapter Capability Contracts
 
@@ -237,8 +239,9 @@ Migration rules:
 ## Reference host removal
 
 `example/anchr-reference-host/` and the shared `worker-api` HTTP gateway have
-been removed. MCP stdio remains in `example/anchr-mcp/`, while HTTP routes now
-belong to concrete apps such as `example/data-marketplace/`. The network has no
+been removed from the tracked source tree. MCP stdio remains in
+`apps/anchr-mcp/`, while HTTP routes now belong to concrete apps such as
+`apps/data-marketplace/`. The network has no
 default Anchr server, hosted reference URL, or mandatory REST compatibility
 surface.
 
@@ -272,10 +275,12 @@ allow-list; the rule codes (E001-E024) are the canonical reference. Highlights:
 - `bounty` (and any package) must not import from `@anchr/sdk` (the SDK is
   downstream of the host).
 - Application vocabulary (`market`, `marketplace`, …) is forbidden inside
-  `packages/`. Concrete apps own their vocabulary in `example/<app>/`.
-- `example/<app>/` reaches Anchr through `@anchr/*` only — relative paths into
-  `packages/<pkg>/src/...` are an E023 violation. The expo-worker-app and
-  bounty-board mobile apps are excluded (they speak HTTP only).
+  `packages/`. Concrete apps own their vocabulary in `apps/<app>/` or
+  `examples/<name>/`.
+- `apps/<app>/` and `examples/<name>/` reach Anchr through `@anchr/*` only —
+  relative paths into `packages/<pkg>/src/...` are an E023 violation. The
+  expo-worker-app and bounty-board mobile apps are excluded (they speak HTTP
+  only).
 
 ## Attachment registry (Blossom)
 
@@ -324,9 +329,9 @@ transport (HTTP, MQTT) and would still be Anchr.
 
 ## Composition patterns
 
-Three patterns are demonstrated in `example/`. The first two share the same
-invariant — **the Cashu Mint is the only party that moves money; the Oracle only
-reveals secrets** — the third skips Cashu entirely.
+Three patterns are demonstrated in `apps/` and `examples/`. The first two
+share the same invariant — **the Cashu Mint is the only party that moves money;
+the Oracle only reveals secrets** — the third skips Cashu entirely.
 
 ### Bounty (asymmetric: one Customer, competing Providers)
 

@@ -23,13 +23,13 @@ import {
   discoverMarkets,
   type MarketIdentity,
   publishMarket,
-} from "../../example/two-party-binary-bet/src/nostr-market.ts";
-import { createMarketHtlc } from "../../example/two-party-binary-bet/src/market-oracle.ts";
+} from "../../apps/two-party-binary-bet/src/nostr-market.ts";
+import { createMarketHtlc } from "../../apps/two-party-binary-bet/src/market-oracle.ts";
 import type {
   BetEventContent,
   MarketResolution,
   TwoPartyBinaryBet,
-} from "../../example/two-party-binary-bet/src/market-types.ts";
+} from "../../apps/two-party-binary-bet/src/market-types.ts";
 import { isRelayReachable } from "../helpers/regtest.ts";
 
 // ---------------------------------------------------------------------------

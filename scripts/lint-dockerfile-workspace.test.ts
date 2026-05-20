@@ -26,10 +26,10 @@ test("flags Dockerfile COPY for non-workspace member", () => {
 test("clean when workspace and Dockerfile match", () => {
   const dockerfile = [
     "COPY packages/foo/deno.json ./packages/foo/",
-    "COPY example/bar/deno.json ./example/bar/",
+    "COPY examples/bar/deno.json ./examples/bar/",
   ].join("\n");
   const diff = diffWorkspace(
-    ["./packages/foo", "./example/bar"],
+    ["./packages/foo", "./examples/bar"],
     dockerfile,
   );
   expect(diff).toEqual({ missing: [], extra: [] });

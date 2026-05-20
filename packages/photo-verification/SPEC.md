@@ -94,7 +94,7 @@ fields the prompt builder reads (`description`, `challenge_nonce`,
 
 - Unit: `packages/photo-verification/src/{geo,c2pa-validation,exif-validation,
   proofmode-validation,ai-content-check}.test.ts`
-- E2E: `example/c2pa-media-verification/`,
-  `example/supply-chain-proof/` (compose this package + Anchr host).
+- E2E: `examples/c2pa-media-verification/`,
+  `examples/supply-chain-proof/` (compose this package + Anchr host).
 - Optional system binaries: `c2patool`, `unzip`, `gpg`, `ffmpeg`. Tests
   skip gracefully when any are absent.

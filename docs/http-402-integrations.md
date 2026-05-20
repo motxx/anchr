@@ -52,8 +52,8 @@ The useful integration points are therefore adapter-owned:
 
 | Candidate | Placement | Preserves Anchr invariants? | Notes |
 | --- | --- | --- | --- |
-| Paid app-owned HTTP route that creates or reads Anchr requests | `example/<app>/` or an app adapter | Yes, if the paid route only gates access to the app API | Good first target because it does not change Customer, Provider, Oracle, or Cashu HTLC semantics. |
-| Paid MCP tool invocation for agents | `example/anchr-mcp/` | Yes, if the MCP adapter charges for tool access before calling SDK use cases | Useful for agent demos, but should stay adapter-local. |
+| Paid app-owned HTTP route that creates or reads Anchr requests | `apps/<app>/` or an app adapter | Yes, if the paid route only gates access to the app API | Good first target because it does not change Customer, Provider, Oracle, or Cashu HTLC semantics. |
+| Paid MCP tool invocation for agents | `apps/anchr-mcp/` | Yes, if the MCP adapter charges for tool access before calling SDK use cases | Useful for agent demos, but should stay adapter-local. |
 | Paid Oracle verification endpoint | Oracle adapter or example | Risky unless the Oracle still releases material only after proof success | Requires explicit denial-mode handling so payment failure cannot suppress a valid release after work is complete. |
 | Provider API monetization outside the Anchr escrow | Provider-owned app route | Yes, when it charges for discovery, previews, or non-settlement services | Must not be represented as the Provider's Anchr redeem path. |
 | SDK helper for calling paid HTTP resources | Maybe `@anchr/sdk` only after examples prove repeatability | Usually yes, but premature as a core SDK dependency | Needs a chain/provider-neutral port, not a hard dependency on a specific x402 or L402 implementation. |

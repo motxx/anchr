@@ -41,8 +41,8 @@
  *   [E024] bounty may depend on every primitive package except actor SDKs
  *   [E017] sdk may only aggregate protocol and actor SDK packages
  *
- * Rules (example/):
- *   [E023] example/<app>/ must reach Anchr only through `@anchr/*`
+ * Rules (apps/ and examples/):
+ *   [E023] apps/<app>/ and examples/<name>/ must reach Anchr only through `@anchr/*`
  *          (or external npm/jsr). Reaching into `packages/<pkg>/src/...`
  *          via relative path is a violation — that bypasses the
  *          package's public surface.
@@ -57,7 +57,8 @@ import { relative } from "jsr:@std/path@^1";
 const ROOT = new URL("../", import.meta.url).pathname;
 const RUNTIME_SRC = `${ROOT}packages/bounty/src/`;
 const PKG_DIR = `${ROOT}packages/`;
-const EXAMPLE_DIR = `${ROOT}example/`;
+const APP_DIR = `${ROOT}apps/`;
+const EXAMPLES_DIR = `${ROOT}examples/`;
 
 interface Violation {
   file: string;
@@ -245,7 +246,7 @@ const CONSOLE_CALL = /\bconsole\.(log|error|warn|info|debug|trace)\b/;
  * The lint catches naming drift before it spreads — e.g. a fresh contributor
  * adding a `marketX` field to a `domain/` type would be reminded that the
  * SDK is application-agnostic. Concrete usage of these terms lives in
- * `example/<app>/` and is fine there.
+ * `apps/<app>/` or `examples/<name>/` and is fine there.
  */
 const APP_VOCAB =
   /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces)\b/;
@@ -413,7 +414,7 @@ function checkSrcFile(rel: string, source: string): Violation[] {
         code: "E022",
         severity: "error",
         message:
-          `application vocabulary "${h.match}" not allowed in packages/bounty — concrete apps belong in example/`,
+          `application vocabulary "${h.match}" not allowed in packages/bounty — concrete apps belong in apps/`,
       });
     }
   }
@@ -421,27 +422,31 @@ function checkSrcFile(rel: string, source: string): Violation[] {
   return violations;
 }
 
-// ── example/ rule ──────────────────────────────────────────────────
+// ── apps/ and examples/ rule ───────────────────────────────────────
 
 /**
- * Returns the example app name (`example/<app>/...`) if the file lives
- * inside one, else null. Used to scope per-example checks.
+ * Returns the app/example owner (`apps/<name>/...` or `examples/<name>/...`)
+ * if the file lives inside one, else null. Used to scope per-surface checks.
  */
 function exampleNameOf(fileRel: string): string | null {
-  if (!fileRel.startsWith("example/")) return null;
+  if (!fileRel.startsWith("apps/") && !fileRel.startsWith("examples/")) {
+    return null;
+  }
   return fileRel.split("/")[1] ?? null;
 }
 
 /**
- * Detect when an example file imports from `packages/<pkg>/src/...` via
- * a relative path. Examples must reach Anchr only through `@anchr/*`.
+ * Detect when an app/example file imports from `packages/<pkg>/src/...` via
+ * a relative path. These surfaces must reach Anchr only through `@anchr/*`.
  */
 function exampleReachesIntoPackageSrc(
   specifier: string,
   fileRel: string,
 ): boolean {
   if (!specifier.startsWith(".")) return false;
-  if (!fileRel.startsWith("example/")) return false;
+  if (!fileRel.startsWith("apps/") && !fileRel.startsWith("examples/")) {
+    return false;
+  }
   const fileParts = fileRel.split("/").slice(0, -1);
   const specParts = specifier.split("/");
   const merged: string[] = [...fileParts];
@@ -467,7 +472,9 @@ function checkExampleFile(fileRel: string, source: string): Violation[] {
         code: "E023",
         severity: "error",
         message:
-          `example/${example}/ must reach Anchr through "@anchr/*" only ` +
+          `${
+            fileRel.split("/")[0]
+          }/${example}/ must reach Anchr through "@anchr/*" only ` +
           `(found relative path "${specifier}" pointing into packages/)`,
       });
     }
@@ -489,7 +496,7 @@ function checkPackageFile(
       code: "E022",
       severity: "error",
       message:
-        `application vocabulary "${h.match}" not allowed in packages/ — concrete apps belong in example/`,
+        `application vocabulary "${h.match}" not allowed in packages/ — concrete apps belong in apps/`,
     });
   }
 
@@ -570,7 +577,7 @@ async function main() {
       const pkgPath = relative(PKG_DIR, abs);
       const pkg = pkgPath.split("/")[0];
       violations.push(...checkPackageFile(pkg, rel, source));
-    } else if (abs.startsWith(EXAMPLE_DIR)) {
+    } else if (abs.startsWith(APP_DIR) || abs.startsWith(EXAMPLES_DIR)) {
       const rel = relative(ROOT, abs);
       violations.push(...checkExampleFile(rel, source));
     }
@@ -590,18 +597,24 @@ async function main() {
     ) {
       await checkPath(entry.path);
     }
-    for await (
-      const entry of walk(EXAMPLE_DIR, {
-        exts: [".ts", ".tsx"],
-        skip: [
-          /\.test\.tsx?$/,
-          /node_modules/,
-          /expo-worker-app/,
-          /bounty-board/,
-        ],
-      })
-    ) {
-      await checkPath(entry.path);
+    for (const dir of [APP_DIR, EXAMPLES_DIR]) {
+      try {
+        for await (
+          const entry of walk(dir, {
+            exts: [".ts", ".tsx"],
+            skip: [
+              /\.test\.tsx?$/,
+              /node_modules/,
+              /expo-worker-app/,
+              /bounty-board/,
+            ],
+          })
+        ) {
+          await checkPath(entry.path);
+        }
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+      }
     }
   }
 

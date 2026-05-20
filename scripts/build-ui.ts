@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const PROJECT_ROOT = dirname(dirname(new URL(import.meta.url).pathname));
-const MARKET_UI = join(PROJECT_ROOT, "example/two-party-binary-bet/ui");
+const MARKET_UI = join(PROJECT_ROOT, "apps/two-party-binary-bet/ui");
 
 interface EntryPoint {
   name: string;

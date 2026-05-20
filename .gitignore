@@ -55,8 +55,8 @@ uploads/*
 generated.css
 
 # bundled UI outputs (rebuilt by `deno task build:ui`)
-example/two-party-binary-bet/ui/main.js
-example/two-party-binary-bet/ui/main.js.map
+apps/two-party-binary-bet/ui/main.js
+apps/two-party-binary-bet/ui/main.js.map
 
 # mobile (expo)
 mobile/.expo/

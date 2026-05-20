@@ -1,8 +1,8 @@
 # Example Delivery Lifecycle
 
-This document defines the repeatable path for taking an `example/<name>/` from
-an idea to a README-listed repository example. It is repository policy, not a
-protocol contract.
+This document defines the repeatable path for taking an `apps/<name>/` or
+`examples/<name>/` surface from an idea to a README-listed repository entry. It
+is repository policy, not a protocol contract.
 
 Use it when creating or resolving issues that add, promote, demote, or retire an
 example.
@@ -14,11 +14,11 @@ example must keep its own README consistent with the advertised status.
 
 | Example | Advertised status | Required local owner |
 | --- | --- | --- |
-| `example/c2pa-media-verification/` | `Testnet` | Example README plus `deno task smoke` |
-| `example/tlsn-fiat-swap-square/` | `Testnet` | Example README, `RUNBOOK.md`, and `deno task smoke` |
-| `example/auto-claim/` | `Concept` | Example README or issue text that states the non-runnable boundary |
-| `example/two-party-binary-bet/` | `Implemented` | Example README and repository tests covering the advertised flow |
-| `example/airdrop-bot-shield/` | `Implemented` | Example README and repository tests covering the advertised flow |
+| `examples/c2pa-media-verification/` | `Testnet` | Example README plus `deno task smoke` |
+| `examples/tlsn-fiat-swap-square/` | `Testnet` | Example README, `RUNBOOK.md`, and `deno task smoke` |
+| `examples/auto-claim/` | `Concept` | Example README or issue text that states the non-runnable boundary |
+| `apps/two-party-binary-bet/` | `Implemented` | App README and repository tests covering the advertised flow |
+| `apps/airdrop-bot-shield/` | `Implemented` | App README and repository tests covering the advertised flow |
 
 If an example is not listed in the top-level README, it may still exist as a
 sketch, fixture, or migration artifact, but it must not be described as a

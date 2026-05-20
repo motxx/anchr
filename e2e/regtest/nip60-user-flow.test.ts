@@ -28,7 +28,7 @@ import {
   type MarketRouteContext,
   type MarketState,
   registerMarketRoutes,
-} from "../../example/two-party-binary-bet/src/server-routes.ts";
+} from "../../apps/two-party-binary-bet/src/server-routes.ts";
 import {
   checkInfraReady,
   createWallet,

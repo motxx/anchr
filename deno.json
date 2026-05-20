@@ -14,9 +14,9 @@
     "./packages/provider-sdk",
     "./packages/bounty",
     "./packages/sdk",
-    "./example/c2pa-media-verification",
-    "./example/airdrop-bot-shield",
-    "./example/tlsn-fiat-swap-square"
+    "./examples/c2pa-media-verification",
+    "./apps/airdrop-bot-shield",
+    "./examples/tlsn-fiat-swap-square"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
@@ -65,9 +65,9 @@
     "@anchr/provider-sdk": "./packages/provider-sdk/src/mod.ts",
     "@anchr/provider-sdk/provider": "./packages/provider-sdk/src/provider.ts",
     "@anchr/provider-sdk/types": "./packages/provider-sdk/src/types.ts",
-    "@anchr/anchr-mcp": "./example/anchr-mcp/src/mcp-server.ts",
-    "@anchr/anchr-mcp/mcp-query-backend": "./example/anchr-mcp/src/mcp-query-backend.ts",
-    "@anchr/anchr-mcp/mcp-server": "./example/anchr-mcp/src/mcp-server.ts",
+    "@anchr/anchr-mcp": "./apps/anchr-mcp/src/mcp-server.ts",
+    "@anchr/anchr-mcp/mcp-query-backend": "./apps/anchr-mcp/src/mcp-query-backend.ts",
+    "@anchr/anchr-mcp/mcp-server": "./apps/anchr-mcp/src/mcp-server.ts",
     "@modelcontextprotocol/sdk/client/index.js": "npm:@modelcontextprotocol/sdk@^1/client/index.js",
     "@modelcontextprotocol/sdk/client/stdio.js": "npm:@modelcontextprotocol/sdk@^1/client/stdio.js",
     "@modelcontextprotocol/sdk/server/mcp.js": "npm:@modelcontextprotocol/sdk@^1/server/mcp.js",
@@ -99,7 +99,7 @@
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'files=$(find packages -name \"*.integration.test.ts\" -type f); if [ -z \"$files\" ]; then echo \"No package integration tests\"; exit 0; fi; deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $files'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:examples": "deno test --allow-all example/ --ignore=example/expo-worker-app",
+    "test:examples": "deno test --allow-all examples/ apps/ --ignore=apps/expo-worker-app --ignore=apps/bounty-board",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
@@ -131,20 +131,20 @@
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
     "build:ui": "deno run --allow-all scripts/build-ui.ts",
     "build:css": "deno run --allow-all scripts/build-css.ts",
-    "fiat-swap:buyer": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net --allow-read example/tlsn-fiat-swap-square/buyer.ts",
-    "fiat-swap:seller": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net example/tlsn-fiat-swap-square/seller.ts",
-    "fiat-swap:check": "deno check --node-modules-dir=false --no-lock example/tlsn-fiat-swap-square/buyer.ts example/tlsn-fiat-swap-square/seller.ts example/tlsn-fiat-swap-square/fiat-swap.ts example/tlsn-fiat-swap-square/fiat-swap.test.ts",
-    "fiat-swap:test": "deno test --node-modules-dir=false --no-lock --allow-read example/tlsn-fiat-swap-square/fiat-swap.test.ts",
+    "fiat-swap:buyer": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net --allow-read examples/tlsn-fiat-swap-square/buyer.ts",
+    "fiat-swap:seller": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net examples/tlsn-fiat-swap-square/seller.ts",
+    "fiat-swap:check": "deno check --node-modules-dir=false --no-lock examples/tlsn-fiat-swap-square/buyer.ts examples/tlsn-fiat-swap-square/seller.ts examples/tlsn-fiat-swap-square/fiat-swap.ts examples/tlsn-fiat-swap-square/fiat-swap.test.ts",
+    "fiat-swap:test": "deno test --node-modules-dir=false --no-lock --allow-read examples/tlsn-fiat-swap-square/fiat-swap.test.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": [
-    "example/expo-worker-app",
+    "apps/expo-worker-app",
     "node_modules",
     "dist/",
-    "example/two-party-binary-bet/src/demo.ts",
-    "example/two-party-binary-bet/src/nostr-market.ts",
-    "example/two-party-binary-bet/ui/main.js",
-    "example/two-party-binary-bet/ui/main.js.map"
+    "apps/two-party-binary-bet/src/demo.ts",
+    "apps/two-party-binary-bet/src/nostr-market.ts",
+    "apps/two-party-binary-bet/ui/main.js",
+    "apps/two-party-binary-bet/ui/main.js.map"
   ],
   "lint": {
     "rules": {
@@ -164,11 +164,11 @@
       ]
     },
     "exclude": [
-      "example/expo-worker-app",
-      "example/two-party-binary-bet/src/demo.ts",
-      "example/two-party-binary-bet/src/nostr-market.ts",
-      "example/two-party-binary-bet/ui/main.js",
-      "example/two-party-binary-bet/ui/main.js.map",
+      "apps/expo-worker-app",
+      "apps/two-party-binary-bet/src/demo.ts",
+      "apps/two-party-binary-bet/src/nostr-market.ts",
+      "apps/two-party-binary-bet/ui/main.js",
+      "apps/two-party-binary-bet/ui/main.js.map",
       "dist/",
       "scripts/",
       "packages/bounty/src/infrastructure/log-stream.ts"
@@ -176,7 +176,7 @@
   },
   "fmt": {
     "exclude": [
-      "example/expo-worker-app",
+      "apps/expo-worker-app",
       "docs",
       "docs/issues",
       "*.md",

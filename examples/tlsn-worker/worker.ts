@@ -1,0 +1,385 @@
+/**
+ * Anchr Auto-Worker — example TLSNotary auto-fulfiller.
+ *
+ * This is a TLSNotary-specific reference worker, not part of the
+ * schema-agnostic SDK (`packages/sdk`). It polls the Anchr server for
+ * open queries that declare `verification_requirements: ["tlsn"]`,
+ * runs `tlsn-prove` against the declared target URL, and submits the
+ * resulting presentation back. Use as a template for building workers
+ * around other verification schemas (C2PA, fiat-payment-proof, etc.).
+ *
+ * @example
+ * ```typescript
+ * import { AnchrWorker } from "../../examples/tlsn-worker/worker.ts";
+ *
+ * const worker = new AnchrWorker({
+ *   serverUrl: "http://localhost:3000",
+ *   verifierHost: "localhost:7047",
+ *   proverBin: "./crates/tlsn-prover/target/debug/tlsn-prove",
+ * });
+ *
+ * worker.on("fulfilled", (event) => {
+ *   console.log(`Query ${event.queryId}: ${event.ok ? "approved" : "rejected"}`);
+ * });
+ *
+ * await worker.start();
+ * ```
+ */
+
+import { Anchr } from "@anchr/sdk";
+import { statSync } from "node:fs";
+import { execFile } from "node:child_process";
+import { unlink } from "node:fs/promises";
+
+// --- Types ---
+
+export interface AnchrWorkerConfig {
+  /** Anchr server URL */
+  serverUrl: string;
+  /** Verifier server host:port for TCP mode, or ws:// URL for WS mode */
+  verifierHost: string;
+  /** Path to tlsn-prove binary */
+  proverBin?: string;
+  /** API key for Anchr server */
+  apiKey?: string;
+  /** Polling interval in ms (default: 5000) */
+  pollIntervalMs?: number;
+  /** Max concurrent proofs (default: 1) */
+  maxConcurrent?: number;
+  /** Minimum bounty in sats to accept (default: 0) */
+  minBountySats?: number;
+  /** Filter: only accept queries for these domains (empty = all) */
+  allowedDomains?: string[];
+  /** Max bytes of sent data for MPC-TLS circuit (default: 4096) */
+  maxSentData?: number;
+  /** Max bytes of received data for MPC-TLS circuit (default: 4096).
+   *  Smaller values reduce MPC computation time. Set close to expected response size. */
+  maxRecvData?: number;
+}
+
+export interface FulfilledEvent {
+  queryId: string;
+  ok: boolean;
+  message: string;
+  targetUrl: string;
+  durationMs: number;
+}
+
+type EventHandler = {
+  fulfilled: (event: FulfilledEvent) => void;
+  error: (queryId: string, error: Error) => void;
+  polling: (openCount: number) => void;
+};
+
+interface WorkerClient {
+  listOpenQueries(): Promise<QueryInfo[]>;
+  submitPresentation(
+    queryId: string,
+    presentation: string,
+  ): Promise<{ ok: boolean; message: string }>;
+}
+
+interface AnchrWorkerDeps {
+  anchr?: WorkerClient;
+  generateProof?: (
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ) => Promise<string>;
+}
+
+// --- Worker ---
+
+export class AnchrWorker {
+  private config: Required<AnchrWorkerConfig>;
+  private anchr: WorkerClient;
+  private proofGenerator: (
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ) => Promise<string>;
+  private running = false;
+  private activeCount = 0;
+  private processedIds = new Set<string>();
+  private handlers: Partial<{ [K in keyof EventHandler]: EventHandler[K][] }> =
+    {};
+
+  constructor(config: AnchrWorkerConfig, deps: AnchrWorkerDeps = {}) {
+    this.config = {
+      serverUrl: config.serverUrl,
+      verifierHost: config.verifierHost,
+      proverBin: config.proverBin ?? this.findProverBin(),
+      apiKey: config.apiKey ?? "",
+      pollIntervalMs: config.pollIntervalMs ?? 5000,
+      maxConcurrent: config.maxConcurrent ?? 1,
+      minBountySats: config.minBountySats ?? 0,
+      allowedDomains: config.allowedDomains ?? [],
+      maxSentData: config.maxSentData ?? 4096,
+      maxRecvData: config.maxRecvData ?? 4096,
+    };
+
+    this.anchr = deps.anchr ?? new Anchr({
+      serverUrl: this.config.serverUrl,
+      apiKey: this.config.apiKey,
+    });
+    this.proofGenerator = deps.generateProof ?? this.runTlsnProve.bind(this);
+  }
+
+  /** Register an event handler */
+  on<K extends keyof EventHandler>(event: K, handler: EventHandler[K]): this {
+    if (!this.handlers[event]) this.handlers[event] = [];
+    (this.handlers[event] as EventHandler[K][]).push(handler);
+    return this;
+  }
+
+  private emit<K extends keyof EventHandler>(
+    event: K,
+    ...args: Parameters<EventHandler[K]>
+  ): void {
+    for (const handler of (this.handlers[event] ?? []) as EventHandler[K][]) {
+      (handler as (...a: Parameters<EventHandler[K]>) => void)(...args);
+    }
+  }
+
+  /** Start the auto-worker loop */
+  async start(): Promise<void> {
+    if (this.running) return;
+    this.running = true;
+
+    console.error(
+      `[anchr-worker] Started (server: ${this.config.serverUrl}, verifier: ${this.config.verifierHost})`,
+    );
+
+    while (this.running) {
+      try {
+        await this.poll();
+      } catch (e) {
+        console.error("[anchr-worker] Poll error:", (e as Error).message);
+      }
+      await sleep(this.config.pollIntervalMs);
+    }
+  }
+
+  /** Stop the auto-worker */
+  stop(): void {
+    this.running = false;
+    console.error("[anchr-worker] Stopped");
+  }
+
+  /** Run once: poll, fulfill one query, return */
+  async runOnce(): Promise<FulfilledEvent | null> {
+    const queries = await this.fetchEligibleQueries();
+    if (queries.length === 0 || !queries[0]) return null;
+    return this.fulfillQuery(queries[0]);
+  }
+
+  // --- Internal ---
+
+  private async poll(): Promise<void> {
+    if (this.activeCount >= this.config.maxConcurrent) return;
+
+    const queries = await this.fetchEligibleQueries();
+    this.emit("polling", queries.length);
+
+    for (const query of queries) {
+      if (this.activeCount >= this.config.maxConcurrent) break;
+      if (this.processedIds.has(query.id)) continue;
+
+      this.processedIds.add(query.id);
+      this.activeCount++;
+
+      // Fire and forget (don't block the poll loop)
+      this.fulfillQuery(query)
+        .catch((e) => this.emit("error", query.id, e as Error))
+        .finally(() => {
+          this.activeCount--;
+          // Clean up old IDs to prevent memory leak
+          if (this.processedIds.size > 10000) {
+            const ids = Array.from(this.processedIds);
+            this.processedIds = new Set(ids.slice(-5000));
+          }
+        });
+    }
+  }
+
+  private async fetchEligibleQueries(): Promise<QueryInfo[]> {
+    const queries = await this.anchr.listOpenQueries();
+
+    return queries.filter((q) => {
+      // Only TLSNotary queries
+      if (
+        !Array.isArray(q.verification_requirements) ||
+        !q.verification_requirements.includes("tlsn")
+      ) return false;
+      if (!q.tlsn_requirements?.target_url) return false;
+
+      // Bounty filter
+      const bounty = q.bounty?.amount_sats ?? 0;
+      if (bounty < this.config.minBountySats) return false;
+
+      // Domain filter
+      if (this.config.allowedDomains.length > 0) {
+        try {
+          const domain = new URL(q.tlsn_requirements.target_url).hostname;
+          if (!this.config.allowedDomains.includes(domain)) return false;
+        } catch {
+          return false;
+        }
+      }
+
+      // Not already processed
+      if (this.processedIds.has(q.id)) return false;
+
+      return true;
+    }) as QueryInfo[];
+  }
+
+  private async fulfillQuery(query: QueryInfo): Promise<FulfilledEvent> {
+    const targetUrl = query.tlsn_requirements!.target_url;
+    const start = Date.now();
+
+    console.error(`[anchr-worker] Fulfilling ${query.id}: ${targetUrl}`);
+
+    // 1. Run tlsn-prove to generate presentation
+    const presentationB64 = await this.proofGenerator(targetUrl);
+
+    // 2. Submit to Anchr
+    const result = await this.anchr.submitPresentation(
+      query.id,
+      presentationB64,
+    );
+
+    const event: FulfilledEvent = {
+      queryId: query.id,
+      ok: result.ok,
+      message: result.message,
+      targetUrl,
+      durationMs: Date.now() - start,
+    };
+
+    console.error(
+      `[anchr-worker] ${query.id}: ${
+        result.ok ? "APPROVED" : "REJECTED"
+      } (${event.durationMs}ms)`,
+    );
+
+    this.emit("fulfilled", event);
+    return event;
+  }
+
+  private async runTlsnProve(
+    targetUrl: string,
+    headers?: Record<string, string>,
+  ): Promise<string> {
+    const tmpFile = `/tmp/anchr-worker-${Date.now()}.presentation.tlsn`;
+
+    const args = [
+      this.config.proverBin,
+      "--verifier",
+      this.config.verifierHost,
+      targetUrl,
+      "-o",
+      tmpFile,
+    ];
+    // Pass custom headers (e.g., Authorization from encrypted_context)
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        args.push("-H", `${key}: ${value}`);
+      }
+    }
+    // Selective disclosure: redact sensitive header values from the presentation.
+    // Redacted headers are committed to (proving they existed) but their values
+    // are not revealed — this is a TLSNotary protocol-level feature, not tampering.
+    // Keep in sync with SENSITIVE_HEADER_NAMES in packages/bounty/src/infrastructure/verification/proof-redaction.ts
+    const sensitiveHeaders = [
+      "authorization",
+      "cookie",
+      "set-cookie",
+      "x-api-key",
+      "x-auth-token",
+      "proxy-authorization",
+      "x-csrf-token",
+      "x-xsrf-token",
+    ];
+    if (headers) {
+      for (const name of Object.keys(headers)) {
+        if (sensitiveHeaders.some((s) => s === name.toLowerCase())) {
+          args.push("--redact-sent-header", name);
+        }
+      }
+    }
+    const socksProxy = Deno.env.get("TLSN_SOCKS_PROXY");
+    if (socksProxy) args.push("--socks-proxy", socksProxy);
+
+    const { stdout, stderr, exitCode } = await new Promise<
+      { stdout: string; stderr: string; exitCode: number }
+    >((resolve, reject) => {
+      const [cmd, ...rest] = args;
+      execFile(
+        cmd!,
+        rest,
+        { maxBuffer: 50 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          if (err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+            return reject(new Error(`tlsn-prove binary not found: ${cmd}`));
+          }
+          resolve({
+            stdout: stdout ?? "",
+            stderr: stderr ?? "",
+            exitCode: err?.code ? 1 : 0,
+          });
+        },
+      );
+    });
+
+    if (exitCode !== 0) {
+      throw new Error(
+        `tlsn-prove failed (exit ${exitCode}): ${stderr.slice(0, 1000)}`,
+      );
+    }
+
+    const b64 = stdout.trim();
+
+    // Clean up temp file
+    try {
+      await unlink(tmpFile);
+    } catch { /* ignore */ }
+
+    if (!b64 || b64.length < 100) {
+      throw new Error("tlsn-prove produced empty or invalid output");
+    }
+
+    return b64;
+  }
+
+  private findProverBin(): string {
+    // Try common locations
+    const candidates = [
+      "./crates/tlsn-prover/target/release/tlsn-prove",
+      "./crates/tlsn-prover/target/debug/tlsn-prove",
+    ];
+    for (const path of candidates) {
+      try {
+        if (statSync(path).isFile()) return path;
+      } catch { /* not found */ }
+    }
+    // Fallback to PATH
+    return "tlsn-prove";
+  }
+}
+
+// --- Helper types ---
+
+interface QueryInfo {
+  id: string;
+  status: string;
+  description: string;
+  bounty?: { amount_sats: number };
+  verification_requirements?: string[];
+  tlsn_requirements?: { target_url: string; conditions?: unknown[] };
+  [key: string]: unknown;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+export default AnchrWorker;
