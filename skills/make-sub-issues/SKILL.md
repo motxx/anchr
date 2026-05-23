@@ -105,6 +105,14 @@ Parent issue, relevant files, logs, threat-model notes, compatibility
 constraints, or context that lets the child be resolved without rereading the
 whole discussion.
 
+## Acceptance
+
+- Observable completion condition
+
+## Verification
+
+- Command or manual check to run
+
 ## Plan
 
 - Concrete next step

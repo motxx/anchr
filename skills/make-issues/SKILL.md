@@ -62,6 +62,14 @@ What needs to change, and why.
 
 Links, code references, logs, threat-model notes, or compatibility constraints.
 
+## Acceptance
+
+- Observable completion condition
+
+## Verification
+
+- Command or manual check to run
+
 ## Plan
 
 - Concrete next step
@@ -94,6 +102,11 @@ Priority must be one of:
   Use `- None` when there is no known relationship.
 - Include concrete file paths, commands, logs, or docs references only when they
   help the implementer act.
+- Use `Acceptance` for observable completion conditions, not implementation
+  steps.
+- Use `Verification` for focused commands or manual checks that should prove the
+  issue is resolved. Use `- Unknown until investigation` for investigation
+  issues where the correct verification depends on the root cause.
 - Use the `Plan` section for immediate orientation and acceptance cues, not a
   full implementation design when the resolver has not inspected current code.
 - Do not include private keys, proofs, personal data, fund-bearing details, or

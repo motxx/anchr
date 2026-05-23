@@ -65,11 +65,24 @@ What needs to change, and why.
 
 Links, code references, logs, threat-model notes, or compatibility constraints.
 
+## Acceptance
+
+- Observable completion condition
+
+## Verification
+
+- Command or manual check to run
+
 ## Plan
 
 - Concrete next step
 - Another concrete next step
 ```
+
+`Acceptance` should state observable completion conditions, not implementation
+steps. `Verification` should state focused commands or manual checks that prove
+the issue is resolved. Use `- Unknown until investigation` for investigation
+issues where the correct verification depends on the root cause.
 
 ## Closing an Issue
 
