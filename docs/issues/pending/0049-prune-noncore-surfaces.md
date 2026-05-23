@@ -21,7 +21,8 @@ Blocks:
 Remove repository surfaces that make Anchr look like it does more than
 verifiable paid requests. Delete `apps/` as a category, do not introduce
 `tools/`, and keep only tiny examples that directly teach `@anchr/sdk` or
-`@anchr/protocol`.
+`@anchr/protocol`. This issue owns apps/examples only; package collapse belongs
+to #0047 and final lint/docs enforcement belongs to #0048.
 
 ## Rationale
 
@@ -56,6 +57,27 @@ Relevant current surfaces:
 - `examples/supply-chain-proof/`
 - `examples/tlsn-worker/`
 
+## Acceptance
+
+- The repository has no `apps/` directory.
+- The repository has no `tools/` directory created as a replacement category.
+- Every remaining `examples/<name>/` entry teaches one SDK/protocol lesson for
+  verifiable paid requests and imports only `@anchr/sdk` or `@anchr/protocol`
+  for Anchr code.
+- Non-core product shells, marketplaces, bots, mobile apps, operational
+  adapters, bounty boards, binary-bet flows, royalty explorations, and
+  supply-chain explorations are deleted or moved outside this repository.
+- README and docs describe examples as optional learning material, not required
+  infrastructure.
+
+## Verification
+
+- `test ! -d apps`
+- `test ! -d tools`
+- No matches are expected in remaining examples:
+  `rg -n "@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters|bounty)" examples`
+- `deno task test:examples`
+
 ## Plan
 
 - Classify every app/example against #0046's one-thing statement.
@@ -65,6 +87,8 @@ Relevant current surfaces:
 - Delete or move out surfaces that are product shells, marketplaces, bots,
   mobile apps, operational adapters, bounty boards, binary-bet flows, or
   non-core domain explorations.
+- Do not alter package boundaries except where an app/example import must be
+  removed because the surface is deleted or shrunk.
 - Enforce a strict example shape: one lesson, no production app shell, no
   deployment surface, no persistent service, no extra public Anchr packages,
   README plus smoke/test command when runnable.

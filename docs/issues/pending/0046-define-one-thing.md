@@ -22,7 +22,9 @@ Blocks:
 
 Lock Anchr's Unix-philosophy design contract before moving code. Define the one
 thing, the two public packages, the allowed SDK/protocol subpaths, and the
-absorb/delete map for all existing public package and app/example concepts.
+absorb/delete policy for all existing public package and app/example concepts.
+This issue decides the map; it does not execute package moves or app/example
+deletions.
 
 ## Rationale
 
@@ -71,6 +73,29 @@ Current surfaces to classify:
 - `apps/*`
 - `examples/*`
 
+## Acceptance
+
+- `docs/architecture.md` contains the one-thing statement and defines
+  `@anchr/sdk` and `@anchr/protocol` as the only public Anchr packages.
+- The design records allowed public subpaths for `@anchr/sdk` and
+  `@anchr/protocol`.
+- The design includes an absorption/deletion policy for every current package,
+  app, and example surface listed above, with enough specificity for #0047 and
+  #0049 to execute without re-litigating the product concept.
+- `bounty`, claim-gate, conditional-swap side quests, apps, tools, and non-core
+  domain examples are classified as delete, move out, or tiny optional example;
+  none remains a core concept.
+- Adapter capability/manifest checks are classified under SDK responsibility
+  unless a concrete wire-compatibility reason is documented.
+
+## Verification
+
+- Manual review of `docs/architecture.md` confirms the one-thing statement,
+  two-package contract, public subpath list, and absorption/deletion table.
+- No non-historical matches are expected unless the design explicitly documents
+  them as delete/move-out targets:
+  `rg -n "@anchr/bounty|@anchr/sdk/bounty|@anchr/protocol/capabilities|apps/|tools/" docs/architecture.md README.md`
+
 ## Plan
 
 - Update `docs/architecture.md` with the Unix-philosophy framing, the one-thing
@@ -80,8 +105,8 @@ Current surfaces to classify:
   learning internal taxonomy.
 - Define the intended `@anchr/protocol` subpaths. Keep it to wire
   compatibility: events, schemas, validators, and role-neutral types.
-- Produce an absorption/deletion table for every current package, app, and
-  example surface.
+- Produce an absorption/deletion policy table for every current package, app,
+  and example surface. Do not move code or delete directories in this issue.
 - Mark `bounty`, claim-gate, conditional-swap side quests, app/product shells,
   and non-core domain demos for deletion unless the issue documents a concrete
   reason they are required for verifiable paid requests.

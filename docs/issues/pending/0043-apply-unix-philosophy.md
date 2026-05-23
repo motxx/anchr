@@ -71,6 +71,22 @@ Relevant files:
 - `scripts/arch-lint.ts`
 - `scripts/arch-lint-candidates.ts`
 
+## Acceptance
+
+- Pending child issues #0046, #0047, #0048, and #0049 are closed or explicitly
+  replaced by narrower follow-up issues.
+- `README.md` and `docs/architecture.md` describe Anchr's one thing as
+  verifiable paid requests.
+- The repository map does not present extra public package families, apps,
+  tools, bounty surfaces, or non-core examples as part of Anchr's required
+  surface.
+
+## Verification
+
+- No matches are expected outside historical closed issue text:
+  `rg -n "apps/|tools/|@anchr/bounty|@anchr/sdk/bounty|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|@anchr/adapters" README.md docs/architecture.md deno.json packages examples`
+- `deno task lint:strict`
+
 ## Plan
 
 - Resolve #0046 to define Anchr's one thing and the minimal public contract.

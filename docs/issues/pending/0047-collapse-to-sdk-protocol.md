@@ -61,6 +61,27 @@ Relevant files:
 - `packages/bounty/`
 - `e2e/`
 
+## Acceptance
+
+- Only `packages/sdk/deno.json` and `packages/protocol/deno.json` remain as
+  public Anchr package manifests.
+- Package and e2e imports no longer reference deleted Anchr package names.
+- `packages/protocol/src/` contains only wire events, schemas, validators, and
+  role-neutral protocol types.
+- SDK-owned implementation code needed for verifiable paid requests lives under
+  `packages/sdk/src/`.
+- `packages/bounty/` and `@anchr/sdk/bounty` do not exist as package or public
+  module surfaces.
+- This issue does not preserve apps/examples by rewriting them; #0049 owns
+  pruning or shrinking apps/examples, and #0048 owns final cleanup.
+
+## Verification
+
+- No matches are expected in packages, e2e, or root workspace config:
+  `rg -n "@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters|bounty)" packages e2e deno.json`
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `deno task test`
+
 ## Plan
 
 - Re-read #0046 and current package exports before moving code.
@@ -73,8 +94,11 @@ Relevant files:
 - Absorb necessary `packages/bounty/` lifecycle code into paid-request,
   Customer, Provider, Oracle, payment, proof, attachment, and adapter modules
   without preserving `bounty` as a public module name.
-- Rewrite repository imports to use `@anchr/sdk` or `@anchr/protocol`; do not
-  leave imports from deleted package names.
+- Rewrite package and e2e imports to use `@anchr/sdk` or `@anchr/protocol`; do
+  not leave imports from deleted package names in the package surface.
+- Do not spend effort preserving apps/examples here. If a file under
+  `apps/` or `examples/` blocks package tests, make the smallest local update
+  and leave final pruning or shrinking to #0049.
 - Delete package directories and manifests that #0046 marks as absorbed or
   non-core.
 - Run focused checks during migration, then leave final repository-wide

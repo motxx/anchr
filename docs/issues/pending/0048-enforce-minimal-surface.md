@@ -22,7 +22,8 @@ Blocks:
 Make repository tooling and documentation enforce the Unix-philosophy surface
 after #0047 and #0049. The final repository map should show only the SDK,
 protocol, specs, docs, scripts needed to build/test/publish, curated examples,
-native helper crates when required, and e2e tests.
+native helper crates when required, and e2e tests. This is the final cleanup
+issue, not the package-collapse or app-pruning implementation issue.
 
 ## Rationale
 
@@ -57,6 +58,27 @@ Relevant files:
 - `examples/`
 - `e2e/`
 
+## Acceptance
+
+- `deno.json` workspace, import map, and publish dry-run task list only
+  `packages/sdk`, `packages/protocol`, and curated examples that remain after
+  #0049.
+- Architecture lint enforces the minimal dependency surface: protocol has no
+  Anchr package dependencies, SDK may depend on protocol, examples/tests use
+  only `@anchr/sdk` or `@anchr/protocol`.
+- README, architecture docs, package READMEs, and agent docs present Anchr as an
+  SDK/protocol for verifiable paid requests.
+- No non-historical docs or tooling references advertise deleted package names,
+  `apps/`, `tools/`, or bounty as a core surface.
+
+## Verification
+
+- `deno task lint:strict`
+- `deno task test`
+- `deno task publish:dry-run`
+- No non-historical matches are expected:
+  `rg -n "apps/|tools/|@anchr/bounty|@anchr/sdk/bounty|@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters)" README.md docs packages examples e2e deno.json scripts`
+
 ## Plan
 
 - Reduce the Deno workspace, import map, and publish dry-run task to
@@ -70,5 +92,8 @@ Relevant files:
 - Remove stale references to deleted package names, `apps/`, `tools/`, and
   non-core product surfaces unless the reference is historical closed-issue
   text.
+- Do not reopen product/API classification from #0046, package movement from
+  #0047, or app/example pruning from #0049 except to file a focused follow-up
+  issue for a concrete blocker.
 - Verify with `deno task lint:strict`, `deno task test`, affected e2e smoke
   commands, and `deno task publish:dry-run`.
