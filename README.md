@@ -4,15 +4,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Anchr is a protocol and SDK set for peer-to-peer verified work. A Customer can
-pay an unknown Provider to fetch data, produce evidence, or take an action, and
-the Provider can redeem payment only after a trusted Oracle accepts the proof.
+Anchr is an SDK for verifiable paid requests. A Customer pays an unknown
+Provider to fetch data, produce evidence, or take an action, and the Provider
+can redeem payment only after a trusted Oracle accepts the proof.
 
-This repository makes that flow usable for implementers. Its primary
-deliverables are the wire-format specs, actor SDKs for Customer/Provider/Oracle
-roles, reference adapters for Nostr/Cashu/proof tooling, and runnable examples
-that show how those pieces compose. It is not an Anchr-operated marketplace,
-hosted server, wallet, oracle network, or production deployment.
+This repository makes that flow usable for implementers. Its primary public
+deliverables are `@anchr/sdk` for application developers and `@anchr/protocol`
+for interoperable wire contracts. Everything else is implementation detail,
+native helper code, specification material, test harness, documentation, or
+optional learning material. It is not an Anchr-operated marketplace, hosted
+server, wallet, oracle network, or production deployment.
 
 It combines:
 
@@ -40,25 +41,20 @@ Nostr pubkeys, and each app chooses its own relay, mint, oracle, and notary.
 
 ## Repository Map
 
-Start with `@anchr/sdk` when you want to build an app. Use the lower-level
-packages when you are implementing a custom actor, adapter, proof engine, or
-settlement primitive.
+Start with `@anchr/sdk` when you want to build an app. Use `@anchr/protocol`
+only when you are implementing compatible wire events, schemas, validators, or
+role-neutral protocol types.
 
 | Area | Paths | Role |
 | --- | --- | --- |
-| Protocol contract | [`specs/`](specs/), [`packages/protocol/`](packages/protocol/) | Wire shapes, schema identifiers, event builders, signing helpers, and role-neutral types. |
-| Actor SDKs | [`packages/sdk/`](packages/sdk/), [`packages/customer-sdk/`](packages/customer-sdk/), [`packages/provider-sdk/`](packages/provider-sdk/), [`packages/oracle-sdk/`](packages/oracle-sdk/) | Public integration APIs for app developers. Runtime pieces are injected through explicit ports. |
-| Supporting primitives | [`packages/core-cashu/`](packages/core-cashu/), [`packages/cashu-conditional-swap/`](packages/cashu-conditional-swap/), [`packages/frost-oracle/`](packages/frost-oracle/), [`packages/blossom/`](packages/blossom/) | Reusable settlement, threshold-signing, and attachment-storage building blocks. |
-| Proof toolkits | [`packages/tlsn-toolkit/`](packages/tlsn-toolkit/), [`packages/photo-verification/`](packages/photo-verification/) | Verification engines for TLSNotary, C2PA, EXIF, ProofMode, and related evidence. |
-| Runtime support | [`packages/core-runtime/`](packages/core-runtime/) | Cross-runtime helpers for Deno/Bun/Node boundaries, process spawning, file I/O, env, and logging. |
-| Transitional flow code | [`packages/bounty/`](packages/bounty/) | Migration scaffolding for the older bounty/query lifecycle while actor SDK and adapter boundaries are split. |
-| Apps and examples | [`apps/`](apps/), [`examples/`](examples/) | Maintained runnable surfaces live in `apps/`; small demos, testnet flows, concept sketches, and fixtures live in `examples/`. Status is per entry. |
+| SDK | [`packages/sdk/`](packages/sdk/) | Customer, Provider, and Oracle orchestration plus standard payment, proof, attachment, adapter, and testing helpers. |
+| Protocol contract | [`packages/protocol/`](packages/protocol/), [`specs/`](specs/) | Wire events, schema identifiers, validators, and role-neutral types. |
+| Optional examples | [`examples/`](examples/) | Tiny learning material, when present, that demonstrates one SDK/protocol lesson for verifiable paid requests. |
 | Native helpers | [`crates/`](crates/) | Rust binaries used by FROST and TLSNotary tooling. |
 
-The intended long-term shape is a small protocol/SDK core with concrete
-adapters and examples kept replaceable. See
-[`docs/architecture.md`](docs/architecture.md) for current and target package
-boundaries.
+The target public shape is deliberately small: one SDK package and one protocol
+package. See [`docs/architecture.md`](docs/architecture.md) for the current
+surface classification and migration policy.
 
 ## Example Uses
 
@@ -116,8 +112,9 @@ examples, not default production infrastructure.
 
 ## Quick Start
 
-The snippet shows the Customer-side API shape. For a complete running flow, see
-[`examples/c2pa-media-verification/`](examples/c2pa-media-verification/).
+The snippet shows the Customer-side API shape. Maintained examples are optional
+learning material and are kept only when they directly teach `@anchr/sdk` or
+`@anchr/protocol`.
 
 ```ts
 import {
@@ -201,8 +198,7 @@ const multiOracleCustomer = createCustomer({
 Providers use `createProvider(...)` and attach a proof producer for the
 requested schema. That Provider process can be long-running, because it must
 receive Customer requests and produce proofs, but it is not an Anchr-operated
-middleman. See the examples for Provider setup, adapter wiring, and local stack
-commands.
+middleman.
 
 ## Verification Schemas
 
@@ -214,20 +210,16 @@ the Provider and Oracle interpret it.
 | `https://anchr-spec.org/spec/proof/tlsn/v1` | TLSNotary attestation of an HTTPS response |
 | `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo/video provenance and GPS |
 
-## Reference Implementations
+## Examples
 
 Status labels are defined in
 [`docs/universality-boundaries.md`](docs/universality-boundaries.md#example-status-vocabulary).
 The checklist for promoting or maintaining an advertised example lives in
 [`docs/example-delivery-lifecycle.md`](docs/example-delivery-lifecycle.md).
 
-| Example                                                    | What it shows                                  | Status      |
-| ---------------------------------------------------------- | ---------------------------------------------- | ----------- |
-| [C2PA photo marketplace](examples/c2pa-media-verification/) | Customer/Provider flow with photo verification | Testnet     |
-| [TLSN fiat swap](examples/tlsn-fiat-swap-square/)           | Customer/Provider flow with TLSNotary          | Testnet     |
-| [Browser auto-claim](examples/auto-claim/)                  | TLSNotary-based browser automation             | Concept     |
-| [Two-party binary bet](apps/two-party-binary-bet/)          | Conditional swap primitive outside the SDK     | Implemented |
-| [Airdrop bot shield](apps/airdrop-bot-shield/)              | Verification-only attestation flow             | Implemented |
+No maintained examples are advertised right now. New examples must be tiny
+lessons for verifiable paid requests and must use only `@anchr/sdk` or
+`@anchr/protocol` for Anchr imports.
 
 ## More Detail
 

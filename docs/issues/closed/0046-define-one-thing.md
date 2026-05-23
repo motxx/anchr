@@ -2,6 +2,7 @@
 
 Created: 2026-05-21
 Model: GPT-5
+Completed: 2026-05-23
 
 ## Priority
 
@@ -112,3 +113,32 @@ Current surfaces to classify:
   reason they are required for verifiable paid requests.
 - Do not perform broad code moves in this issue; leave implementation to #0047,
   repository pruning to #0049, and final enforcement to #0048.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `README.md`
+
+Verified with:
+
+- Manual review of `docs/architecture.md`
+- `rg -n "@anchr/bounty|@anchr/sdk/bounty|@anchr/protocol/capabilities|apps/|tools/" docs/architecture.md README.md`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — this issue records a one-time design decision in
+  `docs/architecture.md`; #0048 owns final lint, workspace, publish, README,
+  and package README enforcement for the decided surface.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0047 implements the package collapse.
+- #0049 prunes app and example surfaces.
+- #0048 enforces the final minimal surface.

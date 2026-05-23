@@ -1,309 +1,176 @@
 # Architecture
 
-Anchr's target architecture has three protocol actors:
+Anchr does one thing:
 
-- **Customer**: creates a request, chooses a Provider, locks payment, and
-  refunds after timeout when no valid proof arrives.
-- **Provider**: discovers Customer requests, offers work, produces data plus
-  proof, and redeems only after Oracle approval.
-- **Oracle**: verifies proofs and releases the unlock material. The Oracle never
-  takes custody of Customer or Provider funds.
+```text
+Anchr is an SDK for verifiable paid requests.
 
-Customer, Provider, and Oracle coordinate directly through Nostr events, Cashu
-mint state, and encrypted Blossom attachments. A deployment may bundle multiple
-roles into one process for development, but that process is not a fourth
+Customer posts a paid request.
+Provider returns work with proof.
+Oracle verifies and releases payment.
+```
+
+The repository should teach that concept before it teaches any implementation
+taxonomy. Customer, Provider, and Oracle coordinate through interoperable wire
+events, payment locks, proof material, and release authorization. A deployment
+may bundle roles into one process for development, but that process is not a
 protocol actor and must not be required for interoperability.
 
-The repository still contains `@anchr/bounty` as migration scaffolding around
-the three actor model, but the bundled Reference Host and shared worker HTTP
-gateway have been removed. Concrete deployments live in `apps/`; small demos
-and fixtures live in `examples/`. No package depends on `apps/` or `examples/`
-code: packages flow outward, never the other way.
+## Public Contract
 
-## Target layer stack
+The stable public Anchr package surface is intentionally small:
 
-The refactor target is five layers, from most reusable to most concrete:
+- `@anchr/sdk`: the developer-facing SDK for building verifiable paid request
+  flows.
+- `@anchr/protocol`: the role-neutral wire contract for compatible
+  implementations.
 
-1. `@anchr/protocol`: wire event builders/parsers, shared state machines, schema
-   identifiers, validation helpers, and role-neutral types.
-2. Cryptographic and storage primitives: Cashu HTLC/P2PK, FROST threshold
-   signing, TLSNotary validation, photo verification, and Blossom storage.
-3. Actor SDKs: `@anchr/customer-sdk`, `@anchr/provider-sdk`, and
-   `@anchr/oracle-sdk`. Each SDK owns local state and injects ports for relays,
-   wallets, signers, proof generation, verification, and storage.
-4. Adapters: CLI, app-owned HTTP routes, MCP, Discord bot, mobile bridge, web UI bridge,
-   or any other runtime integration. Adapters call SDKs; SDKs do not depend on
-   adapters.
-5. Examples and apps: runnable compositions that choose relays, mints, oracles,
-   schemas, UI, and operational policy.
+Everything else in this repository is implementation detail, native helper code,
+specification material, test harness, documentation, or optional learning
+material. Pre-1.0 replacements should be direct: move callers to the new owner
+and delete the replaced path instead of preserving compatibility shims.
 
-The current package layout before that split is:
+## Public Subpaths
 
-```
-packages/
-├── core-runtime/              Bun ↔ Deno runtime helpers (spawn, fs, which, logger, env)
-├── core-cashu/                Cashu HTLC escrow + preimage store
-├── tlsn-toolkit/              TLSNotary application layer (validation, replay defence, ReDoS guard)
-├── photo-verification/        C2PA + EXIF + ProofMode + AI content check + GPS Haversine
-├── frost-oracle/              FROST t-of-n threshold-signing primitives (BIP-340 Schnorr)
-├── cashu-conditional-swap/    N:M binary-outcome conditional swap primitive (HTLC / FROST dual-key)
-├── blossom/                   Encrypted attachment store (BUD-01–06 client)
-├── adapters/                  Shared Cashu, Nostr, and state adapter implementations.
-├── protocol/                  Pure protocol helpers: wire event builders/parsers,
-│                              schema identifiers, and role-neutral types.
-├── oracle-sdk/                Oracle client port and simple HTTP hash-client adapter.
-├── customer-sdk/              Customer local state, request flow, HTLC lock/bind, and ports.
-├── provider-sdk/              Provider request handling, offer/result flow, redeem gate, and ports.
-├── bounty/                    Migration scaffolding: root flow surface plus
-│                              explicit adapter/proof/oracle subpaths.
-└── sdk/                       Aggregate convenience package for actor SDKs and app adapter clients.
+Public subpaths are allowed only when they help a user build or interoperate
+with verifiable paid requests without learning the repository's internal
+taxonomy.
 
-apps/                          Maintained runnable product or adapter surfaces
-  ├── anchr-mcp/               MCP stdio adapter for agent runtime integration
-  ├── data-marketplace/        App-owned `/marketplace/*` routes plus MCP tools
-  ├── two-party-binary-bet/    Market pattern (no host needed)
-  └── …                        Product, adapter, and maintained app surfaces
-examples/                      Small demos, testnet flows, concept sketches, fixtures
-crates/                        Rust: frost-signer, tlsn-prover, tlsn-server, tlsn-verifier
-specs/                         Wire-format specs (CC0)
-docs/                          Architecture + threat model
-```
+`@anchr/sdk` may expose:
 
-### Package boundary review
+- root exports for the common Customer, Provider, and Oracle setup path.
+- `/customer`, `/provider`, and `/oracle` for role-specific orchestration.
+- `/payments` for payment-lock and redemption ports plus standard Cashu helpers.
+- `/proofs` for proof producer, verifier, schema dispatch, and policy ports.
+- `/attachments` for encrypted attachment references and transport helpers.
+- `/adapters` for standard Nostr, Cashu, Blossom, Oracle HTTP, local state, and
+  signer adapters.
+- `/testing` for deterministic in-memory helpers used by examples and tests.
 
-The current `packages/` tree is intentionally transitional. The repository's
-primary deliverables are the protocol/spec contract, actor SDKs, replaceable
-adapters, proof engines, settlement primitives, and runnable reference
-implementations. Package ownership should be judged by that purpose rather than
-by historical placement.
+`@anchr/protocol` may expose:
 
-| Current package | Boundary decision | Migration note |
+- root exports for the common interoperable contract.
+- `/events` for wire event builders and parsers.
+- `/schemas` for proof schema identifiers and schema metadata.
+- `/validators` for role-neutral validation helpers.
+- `/types` for role-neutral protocol types.
+- `/nostr` only for Nostr event encoding details that are part of wire
+  compatibility.
+
+Adapter manifests, adapter capability checks, concrete payment clients, proof
+engines, attachment stores, runtime helpers, and application policies belong to
+`@anchr/sdk` or SDK internals. They do not belong in `@anchr/protocol` unless a
+concrete cross-implementation wire compatibility reason is recorded in `specs/`.
+The current `@anchr/protocol/capabilities` surface is therefore a deletion or
+absorption target for the package-collapse work.
+
+## Surface Policy
+
+The current repository is transitional. These decisions define the target map
+for issues `0047`, `0049`, and `0048`; this document does not move code by
+itself.
+
+| Current surface | Target classification | Policy |
 | --- | --- | --- |
-| `protocol` | Core protocol helper package. | Keep as the role-neutral wire/schema/event surface. It must not depend on other `@anchr/*` packages. |
-| `customer-sdk`, `provider-sdk`, `oracle-sdk` | Core actor SDKs. | Keep actor orchestration and public actor ports here; move concrete Cashu, Nostr, and state implementations to adapter packages when those boundaries exist. |
-| `adapters` | Shared concrete adapter package. | Own Cashu, Nostr, and state implementations used by apps and the aggregate SDK; actor SDKs consume only the injected port shapes. |
-| `sdk` | Aggregate developer entry point. | Keep as the convenience package that re-exports actor SDKs and standard adapters; do not let lower-level packages depend on it. |
-| `core-runtime` | Cross-runtime support primitive. | Keep as the dependency root for process, fs, env, which, and logging helpers. |
-| `core-cashu` | Settlement primitive. | Make this the canonical Cashu HTLC/P2PK implementation before adapter extraction; avoid parallel settlement semantics in SDK adapter code. |
-| `cashu-conditional-swap` | Settlement composition primitive. | Keep as a reusable conditional-swap package layered on Cashu/FROST primitives. |
-| `frost-oracle` | Threshold-signing settlement primitive. | Treat as a FROST/P2PK release-authority component, not as the actor-level Oracle SDK. Distributed FROST signing should use async signing ports. |
-| `tlsn-toolkit`, `photo-verification` | Proof engines. | Keep as reusable verification packages. Flow-specific dispatch belongs in adapters or flow packages. |
-| `blossom` | Attachment transport/storage primitive. | Keep replaceable; it may become an adapter package once the adapter tree exists. |
-| `bounty` | Transitional flow scaffold. | Root exports are limited to the query/domain/application flow. Concrete surfaces are exposed through explicit subpaths: `@anchr/bounty/attachments`, `/escrow`, `/nostr`, `/oracle-client`, `/oracle-service`, `/verification`, and `/claim-gate`. Continue shrinking toward `flows/bounty` plus final adapter/proof packages; do not add new app-specific vocabulary here. |
+| `@anchr/sdk` | Keep public | Make this the one developer entry point for building verifiable paid request flows. Absorb role SDKs, standard adapters, payment helpers, proof dispatch, attachment helpers, and testing helpers here. |
+| `@anchr/protocol` | Keep public | Keep only wire events, schemas, validators, Nostr wire encoding, and role-neutral protocol types here. It must not depend on any other Anchr package. |
+| `@anchr/customer-sdk` | Absorb into SDK | Move Customer orchestration and ports under `@anchr/sdk`; delete the standalone public package. |
+| `@anchr/provider-sdk` | Absorb into SDK | Move Provider orchestration and ports under `@anchr/sdk`; delete the standalone public package. |
+| `@anchr/oracle-sdk` | Absorb into SDK | Move Oracle verification client/server ports under `@anchr/sdk`; keep interoperable attestation shapes in protocol only when they are wire contracts. |
+| `@anchr/core-runtime` | Absorb into SDK internals or scripts | Runtime helpers may remain as internal code used by SDK, tests, or scripts, but not as a public Anchr package. |
+| `@anchr/core-cashu` | Absorb into SDK payments | Keep Cashu HTLC/P2PK behavior as the standard SDK payment adapter; delete the standalone public package. |
+| `@anchr/frost-oracle` | Absorb or move out | Keep threshold release authority only if it directly supports paid-request settlement through SDK ports; otherwise move it outside this repository. |
+| `@anchr/tlsn-toolkit` | Absorb into SDK proofs | Keep TLSNotary validation and replay safeguards as SDK proof internals or standard proof helpers. |
+| `@anchr/photo-verification` | Absorb into SDK proofs | Keep C2PA, EXIF, ProofMode, AI-content, and GPS checks as SDK proof internals or standard proof helpers. |
+| `@anchr/cashu-conditional-swap` | Delete or move out | Binary-outcome conditional swaps are not the core paid-request flow. Preserve only pieces needed by SDK payment locks. |
+| `@anchr/blossom` | Absorb into SDK attachments | Keep encrypted Blossom transport as a standard SDK attachment adapter, not as a public package. |
+| `@anchr/adapters` | Absorb into SDK adapters | Standard Nostr, Cashu, Blossom, local state, signer, and Oracle HTTP bindings belong under `@anchr/sdk/adapters`. |
+| `@anchr/bounty` | Delete as a concept | Absorb any reusable paid-request lifecycle pieces into SDK role modules. Do not preserve `bounty`, query lifecycle, claim-gate, or bounty subpaths as public nouns. |
+| Product and adapter applications | Deleted | MCP, marketplace, bot-shield, binary-bet, bounty-board, and mobile-shell surfaces are outside the core repository surface. |
+| `examples/c2pa-media-verification` | Deleted | It was not reduced to a tiny SDK/protocol lesson in this repository. |
+| `examples/tlsn-fiat-swap-square` | Deleted | It was not reduced to a tiny SDK/protocol lesson in this repository. |
+| `examples/auto-claim` | Deleted | Browser automation product code is outside the core paid-request SDK/protocol shape. |
+| `examples/royalty-distribution` | Deleted | Royalty distribution was non-core domain exploration. |
+| `examples/supply-chain-proof` | Deleted | Supply-chain proof was non-core domain exploration. |
+| `examples/tlsn-worker` | Deleted | The worker was not a minimal SDK/protocol proof lesson or test fixture. |
 
-The accepted migration order is:
+No top-level tool category should be introduced to preserve deleted app or
+package surfaces. Developer-only commands belong under `scripts/` when required
+to build, test, lint, publish, or verify the SDK/protocol.
 
-1. Document the target taxonomy and public package naming decision.
-2. Canonicalise Cashu settlement semantics in the settlement primitive layer.
-3. Extract duplicated SDK adapter implementations into shared adapter packages.
-4. Introduce an explicit async threshold-signing/release-authority port for
-   FROST-backed settlement.
-5. Split `bounty` into flow logic plus adapter/proof packages.
-6. Separate maintained apps from small examples and sketches.
-7. Update architecture lint, workspace config, package READMEs, and agent docs
-   to enforce the final boundaries.
+## Component Boundaries
 
-This review is tracked by issues `0037` through `0043`. Those issues own the
-actual moves, API changes, lint updates, and documentation edits.
+Each target unit has one owner responsibility:
 
-### Target directory taxonomy
+| Unit | Responsibility |
+| --- | --- |
+| Protocol | Define the interoperable wire contract for verifiable paid requests. |
+| SDK | Orchestrate Customer, Provider, and Oracle roles through explicit ports and standard adapters. |
+| Specs | Record universal wire contracts and proof schema identities that other implementations may use. |
+| Native helpers | Provide low-level prover, verifier, signer, or cryptographic binaries required by SDK adapters. |
+| Scripts | Build, test, lint, publish, and verification automation for this repository. |
+| Examples | Optional, tiny lessons that demonstrate one SDK/protocol behavior. |
+| E2E tests | Verify real protocol, payment, proof, relay, native-helper, and SDK integration behavior. |
 
-The accepted target tree is a package taxonomy, not only a filesystem cleanup.
-Each top-level package group names the owner of a boundary:
+The SDK may own concrete standard adapters because the SDK is the developer
+composition surface. Protocol must stay narrower: it owns compatibility, not
+runtime convenience.
 
-```
-packages/
-├── protocol/                  Wire events, schema ids, role-neutral types
-├── customer-sdk/              Customer actor orchestration and ports
-├── provider-sdk/              Provider actor orchestration and ports
-├── oracle-sdk/                Oracle actor/client ports
-├── sdk/                       Aggregate developer entry point
-├── adapters/
-│   ├── nostr/                 Relay transport, NIP-44/NIP-90 bindings
-│   ├── cashu/                 Cashu HTLC wallet adapter over settlement primitives
-│   ├── blossom/               Attachment transport adapter
-│   ├── state/                 Memory, IndexedDB, and future durable actor state
-│   └── oracle-http/           HTTP Oracle client/server adapter surfaces
-├── proofs/
-│   ├── tlsn/                  TLSNotary validation and redaction
-│   └── photo/                 C2PA, EXIF, ProofMode, AI-content checks, GPS
-├── settlement/
-│   ├── cashu-htlc/            Canonical Cashu HTLC/P2PK construction
-│   ├── conditional-swap/      Binary-outcome conditional swap composition
-│   └── frost-oracle/          FROST threshold signing and release authority
-├── runtime/                   Cross-runtime helpers and logging
-└── flows/
-    ├── bounty/                Reusable bounty/query lifecycle
-    └── claim-gate/            Reusable claim-gating flow, if kept package-owned
-
-apps/                          Maintained runnable product or adapter surfaces
-examples/                      Small demos, sketches, and integration fixtures
-crates/                        Native helper binaries
-specs/                         Universal wire/protocol contracts
-```
-
-Public import names do not need to mirror the target directory names one-to-one,
-but every published name must have one clear owner. During pre-1.0 migration,
-prefer direct rewrites over compatibility shims: move a surface, update all
-imports and docs in the same change, and delete the replaced path. Do not keep
-temporary facades or compatibility paths for replaced architecture. The intended
-stable public families are:
-
-- `@anchr/protocol` for wire and schema helpers.
-- `@anchr/customer-sdk`, `@anchr/provider-sdk`, `@anchr/oracle-sdk`, and
-  `@anchr/sdk` for actor SDK entry points and the aggregate SDK.
-- `@anchr/adapters-*` or equivalent adapter packages for Nostr, Cashu, Blossom,
-  state, and Oracle HTTP bindings.
-- `@anchr/proofs-*` for proof engines.
-- `@anchr/settlement-*` for Cashu, conditional-swap, and FROST settlement
-  primitives.
-
-Actor SDK packages intentionally stay as flat top-level packages in the
-pre-1.0 tree. The ownership rule is still strict: actor SDK packages own actor
-orchestration and ports, not concrete technology adapters.
-
-## Agnostic component boundaries
+## Agnostic Component Boundaries
 
 Component names describe protocol responsibilities, not today's bindings. A
-boundary is stable when replacing its current binding changes only adapter
-code, primitive-package implementation, or package `SPEC.md` guidance.
-Normative cross-implementation capability requirements live in
-[`specs/protocol-contract.md`](../specs/protocol-contract.md). This table records
-architecture placement, failure surfaces, and current repository bindings.
-Placement of any rule derived from this table — universal contract, security
-invariant, package contract, or adapter detail — follows
-[`docs/universality-boundaries.md`](universality-boundaries.md); the
-Customer/Provider/Oracle actor names follow
-[Naming migration](#naming-migration) below.
+boundary is stable when replacing its current binding changes only SDK adapter
+code, native helper code, or `specs/` guidance. Normative
+cross-implementation requirements live in
+[`specs/protocol-contract.md`](../specs/protocol-contract.md). Placement of any
+rule derived from this table follows
+[`docs/universality-boundaries.md`](universality-boundaries.md).
 
-| Component             | Stable responsibility                                                                                                                                           | Inputs                                                                                                       | Outputs                                                                                   | Failure conditions                                                                                                           | Current binding                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Actor coordination    | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Role pubkeys, message lifecycle state, encrypted payloads, attachment references.                            | Authenticated actor messages, reply-thread references, encrypted direct messages.         | Invalid signature, unknown role, missing causal parent, replayed or expired message, undecryptable payload.                  | Nostr DVM events, NIP-44 direct messages, relay subscriptions.                        |
-| Evidence contract     | Identify what evidence a query requires and how verifiers dispatch it without embedding a verifier implementation in the protocol.                              | Proof schema URL, verification requirements, revealed evidence fields, attachment references.                | Typed proof payloads and verifier dispatch keys.                                          | Unknown schema, malformed payload, missing required evidence, schema mismatch between public tags and encrypted content.     | Proof schema URLs, TLSNotary presentations, photo / C2PA / ProofMode bundles.         |
-| Verification decision | Decide whether submitted evidence satisfies the Customer's constraints and whether release material may be produced.                                            | Query constraints, submitted proof package, Oracle policy, freshness and replay context.                     | Verifier verdict, attestation, release authorization, warnings or failures.               | Forged proof, stale proof, failed condition, replay, unsupported factor, unavailable required verifier.                      | Oracle SDK, `@anchr/tlsn-toolkit`, `@anchr/photo-verification`.                       |
-| Settlement lock       | Hold Customer value so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout.                                   | Amount, selected Provider key, refund key, release condition, locktime, mint or settlement backend.          | Locked payment reference, spendability facts, refund path, redeem result.                 | Insufficient amount, wrong Provider binding, expired or too-short locktime, mismatched release condition, backend rejection. | Cashu HTLC / P2PK, future Fedimint or DLC adapters.                                   |
-| Release authority     | Produce the material that unlocks settlement only after verification succeeds, and bind that material to the selected work.                                     | Verification verdict, query id, request event id, payment hash, Provider key, authority key or quorum state. | Signed release message, preimage, threshold signature, or equivalent unlock material.     | Verification failure, wrong authority, quorum not met, signature mismatch, release fields not bound to the accepted work.    | Single Oracle preimage release, FROST threshold signatures.                           |
-| Attachment transport  | Store and retrieve large or sensitive proof material without making the storage service a protocol actor.                                                       | Plaintext bytes, encryption key material, retention policy, recipient set.                                   | Encrypted attachment reference, content address, delivery key material.                   | Encryption failure, content-address mismatch, unavailable storage server, missing key material, retention expiry.            | Encrypted Blossom blobs; see [Attachment registry](#attachment-registry-blossom).     |
-| Local actor state     | Track one actor's private progress without making local implementation state part of the network contract.                                                      | Actor configuration, observed messages, wallet state, verifier state, retry state, persisted tickets.        | Local projections, preflight tickets, idempotency records, retry schedule, audit records. | Corrupt store, conflicting events, missing idempotency record, stale local policy, failed persistence.                       | Actor SDK storage ports; current `@anchr/bounty` Query lifecycle scaffolding.         |
-| Runtime adapter       | Bind an actor SDK or primitive to a concrete runtime or product surface.                                                                                        | SDK use case calls, operator config, credentials, UI or tool invocation.                                     | CLI command, app-owned HTTP route, MCP tool, mobile or web bridge.                        | Missing config, unauthorized caller, runtime I/O failure, adapter-specific validation failure.                               | `apps/anchr-mcp`, `apps/data-marketplace`, maintained apps.                          |
+| Component | Stable responsibility | Target owner |
+| --- | --- | --- |
+| Actor coordination | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Protocol for wire shapes; SDK for orchestration and relay adapters. |
+| Evidence contract | Identify what evidence a request requires and how verifiers dispatch it without embedding verifier implementation in the protocol. | Protocol for schema identifiers; SDK for dispatch and verifier ports. |
+| Verification decision | Decide whether submitted evidence satisfies Customer constraints and whether release material may be produced. | SDK Oracle/proof modules and native helpers. |
+| Settlement lock | Hold Customer value so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and standard payment adapters. |
+| Release authority | Produce material that unlocks settlement only after verification succeeds and bind it to the selected work. | SDK Oracle/payment modules; protocol only for interoperable release messages. |
+| Attachment transport | Store and retrieve large or sensitive proof material without making storage a protocol actor. | SDK attachment ports and standard adapters; protocol only for attachment references. |
+| Local actor state | Track one actor's private progress without making local implementation state part of the network contract. | SDK state ports and standard test/runtime stores. |
+| Runtime adapter | Bind an SDK role or standard adapter to a concrete process, UI, or operator policy. | Outside the public protocol; optional examples only when tiny. |
 
-### Adapter Capability Contracts
+## Naming
 
-Nostr, Cashu, TLSNotary, Blossom, and similar concrete technologies are adapter
-or primitive-package choices. Actor SDK core code must depend on injected ports
-for transport, payment, proof production, proof verification, attachments,
-local state, and signing. Concrete adapters may expose
-`AdapterManifest` metadata from `@anchr/protocol/capabilities` so apps and
-tests can check whether an adapter satisfies the capabilities a flow needs.
+Public protocol, docs, SDKs, and examples should use **Customer**,
+**Provider**, and **Oracle**.
 
-Current reference adapters:
+Older requester/worker terms may remain only where a current wire field already
+uses that spelling. Versioned protocol replacements should remove those names
+instead of retaining aliases. New SDK APIs, docs, and examples should not copy
+the old vocabulary.
 
-- `@anchr/adapters/nostr`: Nostr transport over relay clients.
-- `@anchr/adapters/cashu`: Cashu HTLC payment and redeem over the canonical
-  `@anchr/core-cashu` settlement primitives.
-- `@anchr/adapters/storage`: actor local state stores, including in-memory
-  stores for tests/server runtimes and IndexedDB stores for browser runtimes.
-- `createKeypairSigner()` and `createNip07Signer()` in `@anchr/protocol/nostr`:
-  signer ports for local keys and browser NIP-07 providers.
-- `ProofGenerator` and `VerifierAdapter`: schema-selected proof engine ports.
-- `@anchr/blossom` and bounty attachment helpers: encrypted attachment
-  transport primitives.
+Application vocabulary such as market, marketplace, bounty, bot shield, binary
+bet, royalty, and supply chain is not core Anchr vocabulary. It may appear in
+historical issue text or in explicitly non-core migration notes, but not as the
+default repository theme or public package surface.
 
-Customer and Provider constructors require the runtime adapters explicitly.
-They do not create relay or wallet clients behind the caller's back.
+## Dependency Rules
 
-## Naming migration
+The target package graph is one-directional:
 
-Public protocol, docs, SDKs, and examples should use **Customer**, **Provider**,
-and **Oracle**. The older **Requester** and **Worker** names are implementation
-terms that should disappear from public surfaces as the host-shaped code is
-split.
+- `@anchr/protocol` depends on no other Anchr package.
+- `@anchr/sdk` may depend on `@anchr/protocol`.
+- Examples, tests, and native-helper harnesses use only `@anchr/sdk` or
+  `@anchr/protocol` for Anchr TypeScript imports.
+- No package depends on optional examples or app/product code.
+- Product shells are not a maintained top-level category in the target
+  repository.
+- Architecture lint should enforce these rules after the package collapse and
+  repository pruning work lands.
 
-Migration rules:
+## Specs and Threat Model
 
-- Protocol prose and public examples use Customer/Provider/Oracle now.
-- New package names use `protocol`, `customer-sdk`, `provider-sdk`, and
-  `oracle-sdk`.
-- Current wire fields such as `requester_pubkey`, `worker_pubkey`, and
-  `requester_only` remain documented as compatibility names until
-  `@anchr/protocol` introduces versioned replacements.
-- Internal `@anchr/bounty` domain states such as `worker_selected` may remain
-  while that package exists. They should not be copied into new SDK APIs.
-- After versioned replacements exist, requester/worker vocabulary should be
-  removed from wire and domain contracts instead of retained as aliases.
-- Adapter names should describe the integration surface, not a protocol role:
-  `anchr-mcp`, CLI, mobile app, web UI, and app-owned HTTP surfaces are
-  adapters.
-
-## Reference host removal
-
-The reference-host tree and the shared `worker-api` HTTP gateway have been
-removed from the tracked source tree. MCP stdio remains in `apps/anchr-mcp/`,
-while HTTP routes now belong to concrete apps such as `apps/data-marketplace/`.
-The network has no
-default Anchr server, hosted reference URL, or mandatory REST compatibility
-surface.
-
-This removes a convenient central demo target. In return:
-
-- Customers, Providers, and Oracles must choose explicit relays, mints, oracle
-  pubkeys/endpoints, and notaries.
-- Agents and examples must not assume a default hosted Anchr server.
-- The aggregate SDK's app adapter clients target concrete app-owned HTTP
-  surfaces, not a shared protocol host.
-- Interop moves to Nostr/Cashu/Blossom wire compatibility instead of
-  compatibility with a reference host REST API.
-- Operators can still publish adapter endpoints, but those endpoints are app
-  infrastructure, not mandatory Anchr infrastructure.
-
-## Layer dependency rules
-
-The package graph is one-directional. `scripts/arch-lint.ts` enforces the
-allow-list; the rule codes in that file are the canonical reference. Highlights:
-
-- Inside `packages/bounty/src/`:
-  - `domain/` is pure — no `Date.now()`, no `randomBytes`, no `Deno.*`. Side
-    effects come from injected ports (`Clock` / `IdGenerator` / `NonceGenerator`
-    in `packages/bounty/src/domain/ports.ts`).
-  - `application/` orchestrates use cases and defines ports. No `Deno.*` direct
-    calls.
-  - `infrastructure/` implements ports. The only layer allowed to call `Deno.*`
-    and external SDKs.
-- `packages/bounty/` may import primitive proof, settlement, storage, and
-  runtime packages, but not actor SDKs. Other packages may only depend on the
-  small allow-list in `scripts/arch-lint.ts`.
-- `bounty` (and any package) must not import from `@anchr/sdk` (the SDK is
-  downstream of the host).
-- Application vocabulary (`market`, `marketplace`, …) is forbidden inside
-  `packages/`. Concrete apps own their vocabulary in `apps/<app>/` or
-  `examples/<name>/`.
-- `apps/<app>/` and `examples/<name>/` reach Anchr through `@anchr/*` only —
-  relative paths into `packages/<pkg>/src/...` are an E023 violation. The
-  expo-worker-app and bounty-board mobile apps are excluded (they speak HTTP
-  only).
-
-## Attachment registry (Blossom)
-
-Photos, large TLSN presentations, and ProofMode bundles don't fit in Nostr
-events. Current adapters store them in **encrypted Blossom blobs** (AES-256-GCM,
-content-addressed by SHA-256 of ciphertext, key delivery via NIP-44
-`blossom_keys` field). The wire spec uses
-`storage_kind: "blossom" | "external"`, so an adapter can swap in S3 / IPFS /
-custom and stay protocol-compatible. Blossom itself is specified externally in
-[BUD-01–06](https://github.com/hzrd149/blossom).
-
-The thin Anchr integration (Provider upload + fetch helpers) lives in
-`packages/bounty/src/infrastructure/blossom/` because the helpers decode
-`AttachmentRef` / `BlossomKeyMaterial` domain types. The underlying
-encrypted-store primitive ships in `packages/blossom/`.
-
-## Specs and threat model
-
-- Universal protocol and wire-format specs (role-neutral lifecycle, Nostr DVM
-  messaging, conditional-swap primitive, oracle registry, and proof schema URL
-  identity) live under [`specs/`](../specs/), CC0. Anyone may implement them.
-- Per-package implementation guides are each package's `SPEC.md`.
-- Threat-model invariants and the attack tests pinning them are in
+- Universal protocol and wire-format specs live under [`specs/`](../specs/),
+  CC0. Anyone may implement them.
+- Threat-model invariants and attack tests are in
   [`docs/threat-model.md`](threat-model.md).
 - Cross-document placement rules for universal protocol contracts, security
   invariants, package contracts, adapters, examples, and agent harness rules are
@@ -311,51 +178,25 @@ encrypted-store primitive ships in `packages/blossom/`.
 
 ## Relation to NIP-90
 
-Anchr is, in one line: **NIP-90 (Nostr DVM) + Cashu HTLC settlement +
-Oracle-verified proofs**.
+Anchr can be summarized as:
 
-| Layer          | What NIP-90 provides                                                                                                                              | What Anchr adds                                                                                |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Transport      | Request/Result/Feedback events (kinds 5xxx/6xxx/7000), provider competition, encrypted parameters via NIP-44, capability advertisement via NIP-89 | (uses NIP-90 as is)                                                                            |
-| Settlement     | "money in, data out" loosely via Lightning zap — post-delivery, trust-based                                                                       | **Cashu HTLC pre-lock with locktime refund** — atomic, escrowed                                |
-| Verification   | None — the customer trusts the provider                                                                                                           | **Standardized proof types** (C2PA, GPS, ProofMode, TLSNotary)                                 |
-| Trust topology | Bilateral (customer ↔ provider)                                                                                                                   | **Oracle as a third role** that gates the HTLC release. t-of-n FROST for higher-stakes queries |
+```text
+Nostr DVM-style transport + payment lock + Oracle-verified proof.
+```
 
-Anchr is not strictly NIP-90-conformant: it overloads kind 5300 (which the
-public DVM kind registry assigns to "Nostr Content Discovery") with
-verifiable-data semantics. NIP-90 is a **transport choice** here, not a
-strict-compatibility claim — Anchr could in principle run over a different
-transport (HTTP, MQTT) and would still be Anchr.
+NIP-90 is a transport inspiration and possible compatibility layer, not the
+thing Anchr sells as a repository concept. The protocol contract must preserve
+Customer, Provider, Oracle, proof, payment, refund, and release semantics even
+if an implementation uses a different transport.
 
-## Composition patterns
+## Follow-On Work
 
-Three patterns are demonstrated in `apps/` and `examples/`. The first two
-share the same invariant — **the Cashu Mint is the only party that moves money;
-the Oracle only reveals secrets** — the third skips Cashu entirely.
+This design issue only decides the map.
 
-### Bounty (asymmetric: one Customer, competing Providers)
-
-A Customer locks payment in escrow; competing Providers race to fulfill the
-query; the Oracle verifies the submitted proof and reveals the preimage that
-lets the winning Provider redeem. If no proof verifies before the locktime, the
-Cashu mint refunds the Customer.
-
-Used by: query/data examples (C2PA, supply-chain, auto-claim, fiat-swap).
-
-### Market (symmetric: two counterparties, matched bilaterally)
-
-Two bettors take opposite sides of a binary outcome. A matchmaker pairs them but
-never touches funds. Each bettor performs a **bilateral cross-lock** at the
-Mint: their tokens are locked under the _counterparty's_ pubkey and the
-_opposite outcome's_ hash. The Oracle reveals one preimage (or FROST signature)
-— the winner uses it plus their own signature to redeem the loser's locked
-token.
-
-Used by: two-party-binary-bet. Imports `@anchr/cashu-conditional-swap` +
-`@anchr/frost-oracle` directly (no SDK).
-
-**Why the three-way distinction matters**: Bounty and Market are settlement
-compositions (payment is on-protocol via Cashu); Verification-only is a
-non-settlement composition (Anchr provides only the verification layer). Future
-use cases will be variations on these three shapes, mixing the same primitives
-differently.
+- `0047` owns collapsing public packages into `@anchr/sdk` and
+  `@anchr/protocol`.
+- `0049` deleted non-core app, tool, and example surfaces.
+- `0048` owns final workspace, lint, publish, README, and package README
+  enforcement.
+- `0043` closes only after the child issues make the repository read as one
+  SDK/protocol for verifiable paid requests.
