@@ -19,7 +19,7 @@ import {
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
 import { InvalidSchemaUriError } from "@anchr/protocol/schema";
-import type { OracleClient } from "@anchr/oracle-sdk/oracle";
+import type { OracleClient } from "./oracle.ts";
 import type {
   ActorStateStore,
   BindProviderParams,
@@ -34,7 +34,11 @@ import type {
   Subscription,
 } from "@anchr/protocol/adapters";
 import type { Event } from "@anchr/protocol/nostr";
-import type { CustomerOptions, CustomerOracle, Offer } from "./types.ts";
+import type {
+  CustomerOptions,
+  CustomerOracle,
+  Offer,
+} from "./customer-types.ts";
 
 const ORACLE_A = "a".repeat(64);
 const ORACLE_B = "b".repeat(64);

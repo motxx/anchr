@@ -25,8 +25,6 @@ export {
 import { Anchr } from "./client.ts";
 export default Anchr;
 
-// --- v0.0.1 Customer / Provider API ---
-
 export {
   createCustomer,
   type Customer,
@@ -42,7 +40,7 @@ export {
   SchemaVerificationError,
   selectCheapestOffer,
   validateCustomerOptions,
-} from "@anchr/customer-sdk/customer";
+} from "./customer.ts";
 
 export {
   type AdapterCapability,
@@ -82,7 +80,7 @@ export {
   type Provider,
   ProviderConfigError,
   validateProviderOptions,
-} from "@anchr/provider-sdk/provider";
+} from "./provider.ts";
 
 export {
   DEFINED_SCHEMAS,
@@ -116,9 +114,9 @@ export type {
   OfferSelector,
   OracleSelector,
   RequestOptions,
-} from "@anchr/customer-sdk/types";
+} from "./customer-types.ts";
 
-export type { ProviderOptions } from "@anchr/provider-sdk/types";
+export type { ProviderOptions } from "./provider-types.ts";
 
 export {
   createKeypairSigner,
@@ -165,7 +163,7 @@ export {
   OracleConfigError,
   OracleHttpError,
   OracleResponseError,
-} from "@anchr/oracle-sdk/oracle";
+} from "./oracle.ts";
 
 export {
   type BindProviderParams,

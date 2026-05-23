@@ -45,18 +45,15 @@ const aliases = new Map<string, string>([
   ["@anchr/protocol/nostr", "../protocol/src/nostr.ts"],
   ["@anchr/protocol/schema", "../protocol/src/schema.ts"],
   ["@anchr/protocol/types", "../protocol/src/types.ts"],
-  ["@anchr/oracle-sdk", "../oracle-sdk/src/mod.ts"],
-  ["@anchr/oracle-sdk/oracle", "../oracle-sdk/src/oracle.ts"],
-  ["@anchr/customer-sdk", "../customer-sdk/src/mod.ts"],
-  ["@anchr/customer-sdk/customer", "../customer-sdk/src/customer.ts"],
-  ["@anchr/customer-sdk/types", "../customer-sdk/src/types.ts"],
-  ["@anchr/provider-sdk", "../provider-sdk/src/mod.ts"],
-  ["@anchr/provider-sdk/provider", "../provider-sdk/src/provider.ts"],
-  ["@anchr/provider-sdk/types", "../provider-sdk/src/types.ts"],
 ]);
 
 const result = await Bun.build({
-  entrypoints: [resolve(packageDir, "src/index.ts")],
+  entrypoints: [
+    resolve(packageDir, "src/index.ts"),
+    resolve(packageDir, "src/customer.ts"),
+    resolve(packageDir, "src/provider.ts"),
+    resolve(packageDir, "src/oracle.ts"),
+  ],
   outdir: resolve(packageDir, "dist"),
   target: "node",
   plugins: [

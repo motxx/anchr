@@ -26,8 +26,8 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { createCustomer } from "@anchr/customer-sdk/customer";
-import { createProvider } from "@anchr/provider-sdk/provider";
+import { createCustomer } from "@anchr/sdk/customer";
+import { createProvider } from "@anchr/sdk/provider";
 import { createCashuClient } from "@anchr/adapters/cashu";
 import { createRelayClient } from "@anchr/adapters/nostr";
 import { generateKeypair } from "@anchr/protocol/nostr";
@@ -35,7 +35,7 @@ import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
 } from "@anchr/protocol/events";
-import type { OracleClient } from "@anchr/oracle-sdk/oracle";
+import type { OracleClient } from "@anchr/sdk/oracle";
 import { getDecodedToken, Wallet } from "@cashu/cashu-ts";
 
 import {

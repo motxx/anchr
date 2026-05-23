@@ -31,7 +31,7 @@ import type {
   ProviderOffer,
   ProviderOptions,
   ProviderRequestEvent,
-} from "./types.ts";
+} from "./provider-types.ts";
 import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */

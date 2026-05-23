@@ -1,4 +1,4 @@
-import type { OracleClient } from "@anchr/oracle-sdk";
+import type { OracleClient } from "./oracle.ts";
 import type {
   ActorStateStore,
   CashuClient,

@@ -10,6 +10,21 @@
       "types": "./dist/sdk/src/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./customer": {
+      "types": "./dist/sdk/src/customer.d.ts",
+      "import": "./dist/customer.js",
+      "default": "./dist/customer.js"
+    },
+    "./provider": {
+      "types": "./dist/sdk/src/provider.d.ts",
+      "import": "./dist/provider.js",
+      "default": "./dist/provider.js"
+    },
+    "./oracle": {
+      "types": "./dist/sdk/src/oracle.d.ts",
+      "import": "./dist/oracle.js",
+      "default": "./dist/oracle.js"
     }
   },
   "files": ["dist"],

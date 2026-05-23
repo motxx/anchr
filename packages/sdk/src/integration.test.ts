@@ -19,7 +19,7 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import { createCustomer } from "./customer.ts";
-import { createProvider } from "@anchr/provider-sdk/provider";
+import { createProvider } from "./provider.ts";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
@@ -35,7 +35,7 @@ import type {
   RelayClient,
   Subscription,
 } from "@anchr/protocol/adapters";
-import type { OracleClient } from "@anchr/oracle-sdk/oracle";
+import type { OracleClient } from "./oracle.ts";
 import { bytesToHex } from "./test-helpers.ts";
 
 // --- Mock relay ---

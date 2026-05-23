@@ -24,18 +24,17 @@
       "@anchr/adapters": ["../adapters/src/mod.ts"],
       "@anchr/adapters/cashu": ["../adapters/src/cashu.ts"],
       "@anchr/adapters/nostr": ["../adapters/src/nostr.ts"],
-      "@anchr/adapters/storage": ["../adapters/src/storage.ts"],
-      "@anchr/oracle-sdk": ["../oracle-sdk/src/mod.ts"],
-      "@anchr/oracle-sdk/oracle": ["../oracle-sdk/src/oracle.ts"],
-      "@anchr/customer-sdk": ["../customer-sdk/src/mod.ts"],
-      "@anchr/customer-sdk/customer": ["../customer-sdk/src/customer.ts"],
-      "@anchr/customer-sdk/types": ["../customer-sdk/src/types.ts"],
-      "@anchr/provider-sdk": ["../provider-sdk/src/mod.ts"],
-      "@anchr/provider-sdk/provider": ["../provider-sdk/src/provider.ts"],
-      "@anchr/provider-sdk/types": ["../provider-sdk/src/types.ts"]
+      "@anchr/adapters/storage": ["../adapters/src/storage.ts"]
     },
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/index.ts"]
+  "include": [
+    "src/index.ts",
+    "src/customer.ts",
+    "src/customer-types.ts",
+    "src/provider.ts",
+    "src/provider-types.ts",
+    "src/oracle.ts"
+  ]
 }

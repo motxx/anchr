@@ -18,7 +18,7 @@ import type {
   Offer,
   RequestOptions,
   RequestResult,
-} from "./types.ts";
+} from "./customer-types.ts";
 import {
   InvalidSchemaUriError,
   isSchemaUri,

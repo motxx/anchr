@@ -39,15 +39,11 @@ COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap
 COPY packages/blossom/deno.json ./packages/blossom/
 COPY packages/adapters/deno.json ./packages/adapters/
 COPY packages/protocol/deno.json ./packages/protocol/
-COPY packages/oracle-sdk/deno.json ./packages/oracle-sdk/
-COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
-COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
 COPY . .
-
 
 ENV NODE_ENV=production
 ENV HTTP_API_PORT=8080

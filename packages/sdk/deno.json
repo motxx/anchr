@@ -2,7 +2,10 @@
   "name": "@anchr/sdk",
   "version": "0.0.1",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./customer": "./src/customer.ts",
+    "./provider": "./src/provider.ts",
+    "./oracle": "./src/oracle.ts"
   },
   "imports": {
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
@@ -19,14 +22,6 @@
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",
     "@anchr/protocol/types": "../protocol/src/types.ts",
-    "@anchr/oracle-sdk": "../oracle-sdk/src/mod.ts",
-    "@anchr/oracle-sdk/oracle": "../oracle-sdk/src/oracle.ts",
-    "@anchr/customer-sdk": "../customer-sdk/src/mod.ts",
-    "@anchr/customer-sdk/customer": "../customer-sdk/src/customer.ts",
-    "@anchr/customer-sdk/types": "../customer-sdk/src/types.ts",
-    "@anchr/provider-sdk": "../provider-sdk/src/mod.ts",
-    "@anchr/provider-sdk/provider": "../provider-sdk/src/provider.ts",
-    "@anchr/provider-sdk/types": "../provider-sdk/src/types.ts",
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
     "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
@@ -35,6 +30,11 @@
   "publish": {
     "include": [
       "src/index.ts",
+      "src/customer.ts",
+      "src/customer-types.ts",
+      "src/provider.ts",
+      "src/provider-types.ts",
+      "src/oracle.ts",
       "src/client.ts",
       "src/client-types.ts",
       "src/errors.ts",

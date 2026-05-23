@@ -17,14 +17,6 @@ const aliases = new Map<string, string>([
   ["@anchr/protocol/nostr", "protocol/src/nostr.js"],
   ["@anchr/protocol/schema", "protocol/src/schema.js"],
   ["@anchr/protocol/types", "protocol/src/types.js"],
-  ["@anchr/oracle-sdk", "oracle-sdk/src/mod.js"],
-  ["@anchr/oracle-sdk/oracle", "oracle-sdk/src/oracle.js"],
-  ["@anchr/customer-sdk", "customer-sdk/src/mod.js"],
-  ["@anchr/customer-sdk/customer", "customer-sdk/src/customer.js"],
-  ["@anchr/customer-sdk/types", "customer-sdk/src/types.js"],
-  ["@anchr/provider-sdk", "provider-sdk/src/mod.js"],
-  ["@anchr/provider-sdk/provider", "provider-sdk/src/provider.js"],
-  ["@anchr/provider-sdk/types", "provider-sdk/src/types.js"],
 ]);
 
 async function dtsFiles(dir: string): Promise<string[]> {

@@ -33,7 +33,7 @@ import type {
   ActorStateStore,
   ProofGenerator,
   ProviderOptions,
-} from "./types.ts";
+} from "./provider-types.ts";
 
 // --- Test doubles ---
 
