@@ -15,6 +15,10 @@ Depends on:
 - 0051
 - 0052
 - 0053
+- 0057
+- 0058
+- 0059
+- 0060
 
 Blocks:
 - 0047
@@ -60,9 +64,11 @@ Relevant current surfaces:
 
 ## Plan
 
-- Map bounty domain, application, and infrastructure files to SDK role,
-  payment, proof, attachment, and adapter modules.
-- Move only reusable paid-request behavior; delete claim-gate and bounty-only
-  public nouns.
-- Rewrite package and e2e imports to SDK or protocol exports.
-- Delete `packages/bounty/` once no references remain.
+- Resolve #0057 to move paid-request lifecycle domain and service code into
+  SDK-owned request modules.
+- Resolve #0058 to move Nostr transport and Oracle adapter/service code into
+  SDK-owned adapter modules.
+- Resolve #0059 to move remaining attachment, escrow, proof, and runtime
+  helpers into SDK-owned modules while deleting claim-gate-only surfaces.
+- Resolve #0060 to rewrite remaining e2e imports and delete the
+  `packages/bounty/` package shell after reusable code has moved.
