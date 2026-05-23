@@ -114,11 +114,10 @@ Each top-level package group names the owner of a boundary:
 ```
 packages/
 ├── protocol/                  Wire events, schema ids, role-neutral types
-├── sdk/
-│   ├── customer/              Customer actor orchestration and ports
-│   ├── provider/              Provider actor orchestration and ports
-│   ├── oracle/                Oracle actor/client ports
-│   └── anchr/                 Aggregate developer entry point
+├── customer-sdk/              Customer actor orchestration and ports
+├── provider-sdk/              Provider actor orchestration and ports
+├── oracle-sdk/                Oracle actor/client ports
+├── sdk/                       Aggregate developer entry point
 ├── adapters/
 │   ├── nostr/                 Relay transport, NIP-44/NIP-90 bindings
 │   ├── cashu/                 Cashu HTLC wallet adapter over settlement primitives
@@ -151,17 +150,17 @@ maintainer explicitly accepts a temporary facade. The intended stable public
 families are:
 
 - `@anchr/protocol` for wire and schema helpers.
-- `@anchr/customer`, `@anchr/provider`, `@anchr/oracle`, and `@anchr/sdk` for
-  actor SDK entry points if public names are simplified.
+- `@anchr/customer-sdk`, `@anchr/provider-sdk`, `@anchr/oracle-sdk`, and
+  `@anchr/sdk` for actor SDK entry points and the aggregate SDK.
 - `@anchr/adapters-*` or equivalent adapter packages for Nostr, Cashu, Blossom,
   state, and Oracle HTTP bindings.
 - `@anchr/proofs-*` for proof engines.
 - `@anchr/settlement-*` for Cashu, conditional-swap, and FROST settlement
   primitives.
 
-If the package names stay as `@anchr/customer-sdk`, `@anchr/provider-sdk`, and
-similar, the same ownership rules still apply: actor SDK packages own actor
-orchestration, not concrete technology adapters.
+Actor SDK packages intentionally stay as flat top-level packages in the
+pre-1.0 tree. The ownership rule is still strict: actor SDK packages own actor
+orchestration and ports, not concrete technology adapters.
 
 ## Agnostic component boundaries
 
