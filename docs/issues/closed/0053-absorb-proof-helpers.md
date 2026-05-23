@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-23
 
 ## Priority
 
@@ -61,3 +62,44 @@ Relevant current surfaces:
 - Move retained helpers and tests into `packages/sdk/src/proofs/`.
 - Rewrite package and e2e imports to SDK proof exports or SDK internals.
 - Delete absorbed proof package manifests and directories.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/`
+- `packages/sdk/deno.json`
+- `packages/bounty/deno.json`
+- `packages/bounty/src/domain/types.ts`
+- `packages/bounty/src/infrastructure/attachment-store.ts`
+- `packages/bounty/src/infrastructure/attachment-store-helpers.ts`
+- `packages/bounty/src/infrastructure/claim-gate/`
+- `packages/bounty/src/infrastructure/verification/`
+- `deno.json`
+- `Dockerfile`
+- `scripts/arch-lint.ts`
+
+Verified with:
+
+- `rg -n "@anchr/(tlsn-toolkit|photo-verification)" packages e2e deno.json`
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `deno test packages/sdk/src/proofs/tlsn-validation.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
+- `deno task test:unit`
+- `TLSN_VERIFIER_HOST=127.0.0.1:7046 deno task test:e2e:tlsn`
+- `deno task lint:strict`
+- `check-silent-bypass` on changed load-bearing package TypeScript
+
+Harness update:
+
+- SDK proof tests moved with the retained helpers, `tlsn-validation.test.ts`
+  now locks missing verifier timestamps as freshness failures, and
+  `scripts/arch-lint.ts` allows only the SDK proof subpath needed during the
+  transitional bounty retirement.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { _setValidateTlsnForTest, verify } from "./verifier.ts";
-import {
-  clearIntegrityStore,
-  storeIntegrity,
-} from "@anchr/photo-verification/integrity-store";
+import { clearIntegrityStore, storeIntegrity } from "@anchr/sdk/proofs";
 import type {
   Query,
   QueryResult,
   TlsnAttestation,
   TlsnRequirement,
 } from "../../domain/types.ts";
-import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+import type { TlsnValidationResult } from "@anchr/sdk/proofs";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 function makeQuery(overrides: Partial<Query>): Query {

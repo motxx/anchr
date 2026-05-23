@@ -1,4 +1,4 @@
-import type { TlsnVerifiedData } from "@anchr/tlsn-toolkit/tlsn-types";
+import type { TlsnVerifiedData } from "@anchr/sdk/proofs";
 
 export type ProofGateStatus = "draft" | "live" | "paused" | "closed";
 export type ProofGateClaimStatus = "reserved" | "approved" | "rejected";

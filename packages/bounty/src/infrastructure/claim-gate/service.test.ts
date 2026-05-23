@@ -1,7 +1,7 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { TlsnRequirement } from "@anchr/tlsn-toolkit/tlsn-types";
-import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+import type { TlsnRequirement } from "@anchr/sdk/proofs";
+import type { TlsnValidationResult } from "@anchr/sdk/proofs";
 import { createProofGateService } from "./service.ts";
 import type { ProofGateSettlementProvider } from "./settlement.ts";
 import type {

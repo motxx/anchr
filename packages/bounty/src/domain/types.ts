@@ -48,7 +48,7 @@ export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
   "ai_check",
 ] as const;
 
-// TLSNotary types live in `@anchr/tlsn-toolkit/tlsn-types`. The host shared
+// TLSNotary types live in `@anchr/sdk/proofs`. The host shared
 // domain re-exports them so existing call sites keep the single import surface.
 import type {
   TlsnAttestation,
@@ -56,7 +56,7 @@ import type {
   TlsnEncryptedContext,
   TlsnRequirement,
   TlsnVerifiedData,
-} from "@anchr/tlsn-toolkit/tlsn-types";
+} from "@anchr/sdk/proofs";
 export type {
   TlsnAttestation,
   TlsnCondition,

@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer";
 import { isBlossomEnabled } from "./blossom/client.ts";
 import { workerUpload } from "./blossom/worker-upload.ts";
-import { validateC2pa } from "@anchr/photo-verification/c2pa-validation";
-import { validateExif } from "@anchr/photo-verification/exif-validation";
-import { storeIntegrity } from "@anchr/photo-verification/integrity-store";
-import type { ProofModeIntegrity } from "@anchr/photo-verification/integrity-store";
-import { parseProofModeZip } from "@anchr/photo-verification/proofmode-validation";
+import { validateC2pa } from "@anchr/sdk/proofs";
+import { validateExif } from "@anchr/sdk/proofs";
+import { storeIntegrity } from "@anchr/sdk/proofs";
+import type { ProofModeIntegrity } from "@anchr/sdk/proofs";
+import { parseProofModeZip } from "@anchr/sdk/proofs";
 import type {
   AttachmentRef,
   BlossomKeyMaterial,

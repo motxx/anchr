@@ -1,10 +1,9 @@
 /**
  * Integration tests: verify() orchestrator + TLSNotary path.
  *
- * These exercise the host-side verifier (which composes tlsn-toolkit's
- * validateTlsn with the rest of Anchr's verification pipeline). The pure
- * unit tests for tlsn-toolkit live in
- * packages/tlsn-toolkit/src/tlsn-validation.test.ts.
+ * These exercise the host-side verifier, which composes SDK proof validation
+ * with the rest of Anchr's verification pipeline. The pure TLSNotary unit tests
+ * live in packages/sdk/src/proofs/tlsn-validation.test.ts.
  */
 
 import { Buffer } from "node:buffer";
@@ -19,7 +18,7 @@ import { expect } from "@std/expect";
 import {
   _clearSeenPresentationsForTest,
   _setVerifierPathForTest,
-} from "@anchr/tlsn-toolkit/tlsn-validation";
+} from "@anchr/sdk/proofs";
 import { verify } from "./verifier.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../../domain/types.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";

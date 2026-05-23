@@ -6,13 +6,13 @@
 import {
   type AiContentChecker,
   createAiContentChecker,
-} from "@anchr/photo-verification/ai-content-check";
+} from "@anchr/sdk/proofs";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
 import type { AttachmentRef } from "../../domain/types.ts";
 
-export type { ContentCheckResult } from "@anchr/photo-verification/ai-content-check";
-export { createAiContentChecker } from "@anchr/photo-verification/ai-content-check";
+export type { ContentCheckResult } from "@anchr/sdk/proofs";
+export { createAiContentChecker } from "@anchr/sdk/proofs";
 
 const checker: AiContentChecker<AttachmentRef> = createAiContentChecker<
   AttachmentRef

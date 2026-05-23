@@ -9,7 +9,7 @@ import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./ports.ts";
-import { createIntegrityStore } from "@anchr/photo-verification/integrity-store";
+import { createIntegrityStore } from "@anchr/sdk/proofs";
 
 function makeFakeToken(amountSats: number): string {
   return getEncodedToken({

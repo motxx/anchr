@@ -243,6 +243,20 @@ describe("validateTlsn with mock binary", () => {
     expect(result.failures.some((f) => f.includes("too old"))).toBe(true);
   });
 
+  test("missing attestation timestamp fails freshness", async () => {
+    writeMockVerifier({
+      valid: true,
+      server_name: "api.coingecko.com",
+      revealed_body: "{}",
+    });
+    _setVerifierPathForTest(mockVerifierPath);
+
+    const result = await validateTlsn(makeAttestation(), makeRequirement());
+    expect(result.attestationFresh).toBe(false);
+    expect(result.failures.some((f) => f.includes("no timestamp in proof")))
+      .toBe(true);
+  });
+
   test("condition evaluation uses verified body", async () => {
     writeMockVerifier({
       valid: true,

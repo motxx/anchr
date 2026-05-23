@@ -77,11 +77,11 @@ function findTlsnVerifier(): string | null {
   const localPaths = [
     join(
       moduleDir(import.meta),
-      "../../../crates/tlsn-verifier/target/release/tlsn-verifier",
+      "../../../../crates/tlsn-verifier/target/release/tlsn-verifier",
     ),
     join(
       moduleDir(import.meta),
-      "../../../crates/tlsn-verifier/target/debug/tlsn-verifier",
+      "../../../../crates/tlsn-verifier/target/debug/tlsn-verifier",
     ),
   ];
   for (const p of localPaths) {
@@ -303,8 +303,9 @@ export async function validateTlsn(
       );
     }
   } else {
-    checks.push("TLSNotary: no timestamp in proof — freshness check skipped");
-    attestationFresh = true; // no timestamp to check
+    failures.push(
+      "TLSNotary: no timestamp in proof — cannot verify attestation freshness",
+    );
   }
 
   // --- Condition evaluation (using cryptographically verified body) ---

@@ -13,18 +13,18 @@ export {
   type ExifValidationResult,
   extractExifMetadata,
   validateExif,
-} from "@anchr/photo-verification/exif-validation";
+} from "@anchr/sdk/proofs";
 export {
   type C2paManifest,
   type C2paValidationResult,
   isC2paAvailable,
   validateC2pa,
-} from "@anchr/photo-verification/c2pa-validation";
+} from "@anchr/sdk/proofs";
 export {
   isTlsnVerifierAvailable,
   type TlsnValidationResult,
   validateTlsn,
-} from "@anchr/tlsn-toolkit/tlsn-validation";
+} from "@anchr/sdk/proofs";
 export {
   clearIntegrityStore,
   createIntegrityStore,
@@ -34,4 +34,4 @@ export {
   type IntegrityStore,
   purgeStaleIntegrity,
   storeIntegrity,
-} from "@anchr/photo-verification/integrity-store";
+} from "@anchr/sdk/proofs";

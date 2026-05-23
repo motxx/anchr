@@ -4,10 +4,7 @@ import { createQueryService } from "./query-service.ts";
 import type { QueryService } from "./query-service.ts";
 import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
 import { normalizeQueryResult } from "../infrastructure/attachments.ts";
-import {
-  clearIntegrityStore,
-  storeIntegrity,
-} from "@anchr/photo-verification/integrity-store";
+import { clearIntegrityStore, storeIntegrity } from "@anchr/sdk/proofs";
 
 let svc: QueryService;
 

@@ -30,8 +30,6 @@ COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /us
 # `deno install` can resolve workspace packages before the rest of the
 # source tree lands in the next COPY step.
 COPY deno.json deno.lock ./
-COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
-COPY packages/photo-verification/deno.json ./packages/photo-verification/
 COPY packages/protocol/deno.json ./packages/protocol/
 COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/

@@ -1,14 +1,8 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import {
-  type TlsnValidationResult,
-  validateTlsn,
-} from "@anchr/tlsn-toolkit/tlsn-validation";
-import type {
-  TlsnAttestation,
-  TlsnRequirement,
-} from "@anchr/tlsn-toolkit/tlsn-types";
+import { type TlsnValidationResult, validateTlsn } from "@anchr/sdk/proofs";
+import type { TlsnAttestation, TlsnRequirement } from "@anchr/sdk/proofs";
 import type {
   ClaimProof,
   ClaimVerificationResult,

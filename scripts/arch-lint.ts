@@ -16,7 +16,7 @@
  *   [E004] Banned packages: express, dotenv, ws
  *   [E005] application must not import from infrastructure
  *   [E009] only test files may import from packages/bounty/src/testing/
- *   [E018] bounty must not depend on @anchr/sdk (downstream-consumer SDK)
+ *   [E018] bounty must not depend on @anchr/sdk orchestration surfaces
  *   [W001] Prefer JSR over npm for packages that have JSR equivalents
  *
  * Rules (bounty layers —content):
@@ -315,7 +315,8 @@ function checkSrcFile(rel: string, source: string): Violation[] {
     // E018 — src/ must not depend on @anchr/sdk orchestration surfaces.
     if (
       (specifier === "@anchr/sdk" || specifier.startsWith("@anchr/sdk/")) &&
-      specifier !== "@anchr/sdk/payments"
+      specifier !== "@anchr/sdk/payments" &&
+      specifier !== "@anchr/sdk/proofs"
     ) {
       violations.push({
         file: `packages/bounty/src/${rel}`,

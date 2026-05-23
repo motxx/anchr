@@ -19,9 +19,8 @@ import {
 } from "./runtime/mod.ts";
 /**
  * Subset of the host server's Query needed to build the vision-LLM prompt.
- * photo-verification deliberately doesn't depend on the full host Query — callers
- * pass exactly the fields the prompt uses, decoupling the package from
- * core-domain.
+ * The checker deliberately does not depend on the full host Query. Callers pass
+ * exactly the fields the prompt uses.
  */
 export interface AiContentCheckQuery {
   description: string;

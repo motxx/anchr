@@ -15,17 +15,14 @@ import {
   verify,
   verifyProof,
 } from "./verifier.ts";
-import {
-  clearIntegrityStore,
-  storeIntegrity,
-} from "@anchr/photo-verification/integrity-store";
+import { clearIntegrityStore, storeIntegrity } from "@anchr/sdk/proofs";
 import type {
   TlsnAttestation,
   TlsnRequirement,
   VerificationInput,
   VerificationRequirement,
 } from "../../domain/types.ts";
-import type { TlsnValidationResult } from "@anchr/tlsn-toolkit/tlsn-validation";
+import type { TlsnValidationResult } from "@anchr/sdk/proofs";
 import { makeQuery } from "../../testing/factories.ts";
 
 const now = Math.floor(Date.now() / 1000);

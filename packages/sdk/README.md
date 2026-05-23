@@ -144,20 +144,20 @@ work and keep redeem decisions narrower than clean-settlement or audit
 decisions. The normative rules live in `specs/messaging.md` and
 `docs/threat-model.md`.
 
-## Proof Schema URLs
+## Proofs
 
-The SDK is verification-format-agnostic. Each request carries a `schema` URL;
-the provider's handler interprets it. URLs the SDK ships as constants:
+Each request carries a `schema` URL; the provider's handler interprets it. URLs
+the SDK ships as constants:
 
 | URL                                               | Meaning                                    |
 | ------------------------------------------------- | ------------------------------------------ |
 | `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response |
 | `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo / video                  |
 
-The SDK does not bundle producers or verifiers. Wire your own
-`produce(): Promise<{ data, proof }>` in the provider handler, and pass an
-optional `verifierAdapters` list on the customer if you want local verification
-of returned proofs.
+Wire your own `produce(): Promise<{ data, proof }>` in the provider handler.
+Standard verifier helpers for TLSNotary, C2PA, EXIF, ProofMode, AI-content, and
+GPS checks are exported from `@anchr/sdk/proofs` for Oracle and app-owned
+verification policies.
 
 ## Testing
 

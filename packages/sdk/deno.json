@@ -10,6 +10,7 @@
     "./attachments": "./src/attachments/mod.ts",
     "./attachments/blossom": "./src/attachments/blossom.ts",
     "./payments": "./src/payments/mod.ts",
+    "./proofs": "./src/proofs/mod.ts",
     "./customer": "./src/customer.ts",
     "./provider": "./src/provider.ts",
     "./oracle": "./src/oracle.ts"
@@ -38,6 +39,7 @@
       "src/adapters/**/*.ts",
       "src/attachments/**/*.ts",
       "src/payments/**/*.ts",
+      "src/proofs/**/*.ts",
       "src/internal/runtime/**/*.ts",
       "src/customer.ts",
       "src/customer-types.ts",
