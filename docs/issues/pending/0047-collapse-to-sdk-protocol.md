@@ -11,6 +11,13 @@ maintenance
 
 Depends on:
 - 0046
+- 0050
+- 0051
+- 0052
+- 0053
+- 0054
+- 0055
+- 0056
 
 Blocks:
 - 0043
@@ -84,22 +91,14 @@ Relevant files:
 
 ## Plan
 
-- Re-read #0046 and current package exports before moving code.
-- Move SDK-facing implementation into `packages/sdk/src/`, preserving only the
-  public `@anchr/sdk` exports and subpaths approved by #0046.
-- Keep only role-neutral wire events, schemas, validators, and protocol types in
-  `packages/protocol/src/`.
-- Move adapter capability metadata and checks into SDK unless #0046 records a
-  wire-compatibility reason to keep a protocol-owned type.
-- Absorb necessary `packages/bounty/` lifecycle code into paid-request,
-  Customer, Provider, Oracle, payment, proof, attachment, and adapter modules
-  without preserving `bounty` as a public module name.
-- Rewrite package and e2e imports to use `@anchr/sdk` or `@anchr/protocol`; do
-  not leave imports from deleted package names in the package surface.
-- Do not spend effort preserving apps/examples here. If a file under
-  `apps/` or `examples/` blocks package tests, make the smallest local update
-  and leave final pruning or shrinking to #0049.
-- Delete package directories and manifests that #0046 marks as absorbed or
-  non-core.
-- Run focused checks during migration, then leave final repository-wide
-  enforcement to #0048.
+- Resolve #0050 to absorb role SDKs into `@anchr/sdk`.
+- Resolve #0051 to absorb runtime, adapters, and attachment helpers into
+  `@anchr/sdk`.
+- Resolve #0052 to absorb payment and settlement helpers into `@anchr/sdk`.
+- Resolve #0053 to absorb proof helpers into `@anchr/sdk`.
+- Resolve #0054 to retire `@anchr/bounty` as a public package and move reusable
+  paid-request lifecycle code into SDK modules.
+- Resolve #0055 to keep `@anchr/protocol` wire-only.
+- Resolve #0056 to remove remaining absorbed package manifests, package imports,
+  and package/e2e references so only `@anchr/sdk` and `@anchr/protocol` remain.
+- Close this parent only after the child issues verify the package collapse.
