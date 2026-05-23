@@ -43,7 +43,7 @@ import type {
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
-} from "@anchr/protocol/adapters";
+} from "./types.ts";
 
 export type {
   BindProviderParams,
@@ -53,7 +53,7 @@ export type {
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
-} from "@anchr/protocol/adapters";
+} from "./types.ts";
 
 /**
  * Minimal cashu-ts surface used by the SDK.

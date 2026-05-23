@@ -26,14 +26,14 @@ import type {
   PublishResult,
   RelayClient,
   Subscription,
-} from "@anchr/protocol/adapters";
+} from "./types.ts";
 
 export type {
   Filter,
   PublishResult,
   RelayClient,
   Subscription,
-} from "@anchr/protocol/adapters";
+} from "./types.ts";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;

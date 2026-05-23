@@ -34,7 +34,7 @@ import type {
   RedeemResult,
   RelayClient,
   Subscription,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import type { OracleClient } from "./oracle.ts";
 import { bytesToHex } from "./test-helpers.ts";
 

@@ -26,9 +26,9 @@ import type {
   RedeemResult,
   RelayClient,
   Subscription,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import { bytesToHex } from "./test-helpers.ts";
-import { DEFINED_SCHEMAS } from "@anchr/protocol/schema";
+import { DEFINED_SCHEMAS } from "./schema.ts";
 import type {
   ActorStateStore,
   ProofGenerator,

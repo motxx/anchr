@@ -61,8 +61,8 @@ Adapter manifests, adapter capability checks, concrete payment clients, proof
 engines, attachment stores, runtime helpers, and application policies belong to
 `@anchr/sdk` or SDK internals. They do not belong in `@anchr/protocol` unless a
 concrete cross-implementation wire compatibility reason is recorded in `specs/`.
-The current `@anchr/protocol/capabilities` surface is therefore a deletion or
-absorption target for the package-collapse work.
+The former protocol capability surface has been absorbed into SDK-owned adapter
+contracts.
 
 ## Surface Policy
 

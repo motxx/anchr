@@ -1,6 +1,6 @@
-import type { ActorStateStore } from "@anchr/protocol/adapters";
+import type { ActorStateStore } from "./types.ts";
 
-export type { ActorStateStore } from "@anchr/protocol/adapters";
+export type { ActorStateStore } from "./types.ts";
 
 export interface MemoryStateStoreOptions {
   initialEntries?: readonly (readonly [string, string])[];

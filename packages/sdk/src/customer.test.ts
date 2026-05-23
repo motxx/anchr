@@ -18,7 +18,7 @@ import {
 } from "@anchr/protocol/events";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
-import { InvalidSchemaUriError } from "@anchr/protocol/schema";
+import { InvalidSchemaUriError } from "./schema.ts";
 import type { OracleClient } from "./oracle.ts";
 import type {
   ActorStateStore,
@@ -32,7 +32,7 @@ import type {
   RedeemResult,
   RelayClient,
   Subscription,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import type { Event } from "@anchr/protocol/nostr";
 import type {
   CustomerOptions,

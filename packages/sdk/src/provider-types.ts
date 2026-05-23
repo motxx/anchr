@@ -2,27 +2,39 @@ import type {
   ActorStateStore,
   CashuClient,
   RelayClient,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
+import type { Spec } from "@anchr/protocol/types";
 import type {
   ProofGenerator,
-  ProviderHandler,
-  ProviderOffer,
-  ProviderRequestEvent,
   SchemaProducer,
   SchemaProducerContext,
-} from "@anchr/protocol/types";
+} from "./schema.ts";
 
 export type {
   ActorStateStore,
   CashuClient,
   ProofGenerator,
-  ProviderHandler,
-  ProviderOffer,
-  ProviderRequestEvent,
   RelayClient,
   SchemaProducer,
   SchemaProducerContext,
 };
+
+export interface ProviderOffer {
+  amountSats: number;
+  produce: () => Promise<{ data: unknown; proof: Uint8Array | string }>;
+}
+
+export interface ProviderRequestEvent {
+  customerPubkey: string;
+  spec: Spec;
+  maxAmountSats: number;
+  oraclePubkey: string;
+  proofGenerator?: ProofGenerator;
+}
+
+export type ProviderHandler = (
+  request: ProviderRequestEvent,
+) => Promise<ProviderOffer | null>;
 
 /** Provider-side construction options. */
 export interface ProviderOptions {

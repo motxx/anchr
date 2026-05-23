@@ -4,14 +4,14 @@ import type {
   CashuClient,
   CashuProof,
   RelayClient,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import type {
   Offer,
   Payment,
   RequestResult,
   Spec,
-  VerifierAdapter,
 } from "@anchr/protocol/types";
+import type { VerifierAdapter } from "./schema.ts";
 
 export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
 export type {
@@ -19,7 +19,7 @@ export type {
   CashuClient,
   CashuProof,
   RelayClient,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 
 /** Strategy for picking an offer among the ones received within `offerWindowMs`. */
 export type OfferSelector = (offers: Offer[]) => Offer | null;

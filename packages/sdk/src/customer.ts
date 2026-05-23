@@ -11,7 +11,7 @@ import type {
   CashuToken,
   PublishResult,
   RelayClient,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import type {
   CustomerOptions,
   CustomerOracle,
@@ -23,7 +23,7 @@ import {
   InvalidSchemaUriError,
   isSchemaUri,
   resolveVerifierAdapter,
-} from "@anchr/protocol/schema";
+} from "./schema.ts";
 import {
   type Event as NostrEvent,
   generateKeypair,

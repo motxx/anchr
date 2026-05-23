@@ -50,7 +50,7 @@ export {
   checkCapabilities,
   missingCapabilities,
   type RuntimeTarget,
-} from "@anchr/protocol/capabilities";
+} from "./adapters/types.ts";
 
 export {
   buildOfferFeedbackEvent,
@@ -91,22 +91,28 @@ export {
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
-} from "@anchr/protocol/schema";
+} from "./schema.ts";
 
 export type {
   Offer,
   Payment,
-  ProofGenerator,
-  ProviderHandler,
-  ProviderOffer,
-  ProviderRequestEvent,
   RequestResult,
+  Spec,
+} from "@anchr/protocol/types";
+
+export type {
+  ProofGenerator,
   SchemaProducer,
   SchemaProducerContext,
   SchemaVerifier,
-  Spec,
   VerifierAdapter,
-} from "@anchr/protocol/types";
+} from "./schema.ts";
+
+export type {
+  ProviderHandler,
+  ProviderOffer,
+  ProviderRequestEvent,
+} from "./provider-types.ts";
 
 export type {
   CustomerOptions,

@@ -1,5 +1,49 @@
-import type { AdapterManifest } from "./capabilities.ts";
-import type { Event as NostrEvent } from "./nostr.ts";
+import type { Event as NostrEvent } from "@anchr/protocol/nostr";
+
+export type RuntimeTarget = "browser" | "deno" | "node" | "worker";
+
+export type AdapterCapability =
+  | "transport"
+  | "payment"
+  | "proof_producer"
+  | "proof_verifier"
+  | "attachment"
+  | "local_state"
+  | "signer";
+
+export interface AdapterManifest {
+  id: string;
+  technology: string;
+  capabilities: readonly AdapterCapability[];
+  runtimes: readonly RuntimeTarget[];
+  experimental: boolean;
+}
+
+export interface CapabilityAdapter {
+  readonly manifest?: AdapterManifest;
+}
+
+export interface CapabilityCheckResult {
+  ok: boolean;
+  missing: readonly AdapterCapability[];
+}
+
+export function missingCapabilities(
+  manifest: AdapterManifest,
+  required: readonly AdapterCapability[],
+): AdapterCapability[] {
+  return required.filter((capability) =>
+    !manifest.capabilities.includes(capability)
+  );
+}
+
+export function checkCapabilities(
+  manifest: AdapterManifest,
+  required: readonly AdapterCapability[],
+): CapabilityCheckResult {
+  const missing = missingCapabilities(manifest, required);
+  return { ok: missing.length === 0, missing };
+}
 
 export type CashuProof = unknown;
 

@@ -9,7 +9,7 @@ import {
   Nip07UnavailableError,
 } from "./nostr.ts";
 
-test("createKeypairSigner signs events with adapter metadata", async () => {
+test("createKeypairSigner signs events", async () => {
   const identity = generateKeypair();
   const signer = createKeypairSigner(identity);
   const event = await signer.signEvent({
@@ -22,13 +22,6 @@ test("createKeypairSigner signs events with adapter metadata", async () => {
   expect(await signer.getPublicKey()).toBe(identity.publicKey);
   expect(event.pubkey).toBe(identity.publicKey);
   expect(event.id).toMatch(/^[0-9a-f]{64}$/);
-  expect(signer.manifest).toEqual({
-    id: "nostr-keypair-signer",
-    technology: "nostr",
-    capabilities: ["signer"],
-    runtimes: ["browser", "deno", "node", "worker"],
-    experimental: false,
-  });
 });
 
 test("createNip07Signer delegates to an injected browser signer", async () => {
@@ -53,7 +46,6 @@ test("createNip07Signer delegates to an injected browser signer", async () => {
 
   expect(await signer.getPublicKey()).toBe("a".repeat(64));
   expect(event.id).toBe("b".repeat(64));
-  expect(signer.manifest?.id).toBe("nip07-signer");
 });
 
 test("createNip07Signer rejects runtimes without a NIP-07 provider", () => {

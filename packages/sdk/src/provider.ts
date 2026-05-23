@@ -17,7 +17,7 @@ import type {
   ActorStateStore,
   CashuClient,
   RelayClient,
-} from "@anchr/protocol/adapters";
+} from "./adapters/types.ts";
 import {
   type Event as NostrEvent,
   findTagValue,
@@ -32,7 +32,7 @@ import type {
   ProviderOptions,
   ProviderRequestEvent,
 } from "./provider-types.ts";
-import { isSchemaUri, resolveProofGenerator } from "@anchr/protocol/schema";
+import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;

@@ -20,7 +20,6 @@ import {
   getConversationKey,
 } from "nostr-tools/nip44";
 import { decode as nip19Decode } from "nostr-tools/nip19";
-import type { AdapterManifest } from "./capabilities.ts";
 
 /** Anchr Job Request (NIP-90 standard kind 5300). */
 export const KIND_QUERY_REQUEST = 5300;
@@ -38,7 +37,6 @@ export interface Keypair {
 }
 
 export interface NostrSigner {
-  readonly manifest?: AdapterManifest;
   getPublicKey(): Promise<string>;
   signEvent(template: EventTemplate | UnsignedEvent): Promise<Event>;
 }
@@ -63,13 +61,6 @@ export function generateKeypair(): Keypair {
 
 export function createKeypairSigner(identity: Keypair): NostrSigner {
   return {
-    manifest: {
-      id: "nostr-keypair-signer",
-      technology: "nostr",
-      capabilities: ["signer"],
-      runtimes: ["browser", "deno", "node", "worker"],
-      experimental: false,
-    },
     getPublicKey(): Promise<string> {
       return Promise.resolve(identity.publicKey);
     },
@@ -85,13 +76,6 @@ export function createNip07Signer(provider?: Nip07Provider): NostrSigner {
     throw new Nip07UnavailableError();
   }
   return {
-    manifest: {
-      id: "nip07-signer",
-      technology: "nostr-nip07",
-      capabilities: ["signer"],
-      runtimes: ["browser"],
-      experimental: false,
-    },
     getPublicKey(): Promise<string> {
       return resolved.getPublicKey();
     },

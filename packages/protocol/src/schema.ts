@@ -6,12 +6,7 @@
  * URLs:
  *   - https://anchr-spec.org/spec/proof/tlsn/v1 — TLSNotary attestation of an HTTPS response
  *   - https://anchr-spec.org/spec/proof/c2pa-image/v1 — C2PA-signed photo / video with optional GPS predicate
- *
- * Custom schemas plug in by registering a generator/verifier adapter with
- * canHandle(schema).
  */
-
-import type { ProofGenerator, VerifierAdapter } from "./types.ts";
 
 /** HTTPS proof schema URL form. The SDK validates shape and dispatches by URL. */
 export type SchemaUri = string;
@@ -39,20 +34,6 @@ export function isSchemaUri(value: unknown): value is SchemaUri {
   if (url.username !== "" || url.password !== "") return false;
   if (url.search !== "" || url.hash !== "") return false;
   return /^\/spec\/proof\/[a-z0-9-]+\/v\d+$/.test(url.pathname);
-}
-
-export function resolveProofGenerator(
-  generators: readonly ProofGenerator[],
-  uri: SchemaUri,
-): ProofGenerator | null {
-  return generators.find((generator) => generator.canHandle(uri)) ?? null;
-}
-
-export function resolveVerifierAdapter(
-  adapters: readonly VerifierAdapter[],
-  uri: SchemaUri,
-): VerifierAdapter | null {
-  return adapters.find((adapter) => adapter.canHandle(uri)) ?? null;
 }
 
 /** Thrown when a schema URL is required but not registered with the SDK. */
