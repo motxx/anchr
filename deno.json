@@ -13,10 +13,7 @@
     "./packages/customer-sdk",
     "./packages/provider-sdk",
     "./packages/bounty",
-    "./packages/sdk",
-    "./examples/c2pa-media-verification",
-    "./apps/airdrop-bot-shield",
-    "./examples/tlsn-fiat-swap-square"
+    "./packages/sdk"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
@@ -99,7 +96,7 @@
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'files=$(find packages -name \"*.integration.test.ts\" -type f); if [ -z \"$files\" ]; then echo \"No package integration tests\"; exit 0; fi; deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $files'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:examples": "deno test --allow-all examples/ apps/ --ignore=apps/expo-worker-app --ignore=apps/bounty-board",
+    "test:examples": "deno test --allow-all examples/",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
@@ -129,22 +126,11 @@
     "lint:proof-schema-pages": "deno run --allow-read scripts/check-proof-schema-pages.ts",
     "lint:dockerfile-workspace": "deno run --allow-read scripts/lint-dockerfile-workspace.ts",
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
-    "build:ui": "deno run --allow-all scripts/build-ui.ts",
-    "build:css": "deno run --allow-all scripts/build-css.ts",
-    "fiat-swap:buyer": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net --allow-read examples/tlsn-fiat-swap-square/buyer.ts",
-    "fiat-swap:seller": "deno run --node-modules-dir=false --no-lock --allow-env --allow-net examples/tlsn-fiat-swap-square/seller.ts",
-    "fiat-swap:check": "deno check --node-modules-dir=false --no-lock examples/tlsn-fiat-swap-square/buyer.ts examples/tlsn-fiat-swap-square/seller.ts examples/tlsn-fiat-swap-square/fiat-swap.ts examples/tlsn-fiat-swap-square/fiat-swap.test.ts",
-    "fiat-swap:test": "deno test --node-modules-dir=false --no-lock --allow-read examples/tlsn-fiat-swap-square/fiat-swap.test.ts",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
   "exclude": [
-    "apps/expo-worker-app",
     "node_modules",
-    "dist/",
-    "apps/two-party-binary-bet/src/demo.ts",
-    "apps/two-party-binary-bet/src/nostr-market.ts",
-    "apps/two-party-binary-bet/ui/main.js",
-    "apps/two-party-binary-bet/ui/main.js.map"
+    "dist/"
   ],
   "lint": {
     "rules": {
@@ -164,11 +150,6 @@
       ]
     },
     "exclude": [
-      "apps/expo-worker-app",
-      "apps/two-party-binary-bet/src/demo.ts",
-      "apps/two-party-binary-bet/src/nostr-market.ts",
-      "apps/two-party-binary-bet/ui/main.js",
-      "apps/two-party-binary-bet/ui/main.js.map",
       "dist/",
       "scripts/",
       "packages/bounty/src/infrastructure/log-stream.ts"
@@ -176,7 +157,6 @@
   },
   "fmt": {
     "exclude": [
-      "apps/expo-worker-app",
       "docs",
       "docs/issues",
       "*.md",

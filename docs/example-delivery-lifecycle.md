@@ -1,8 +1,8 @@
 # Example Delivery Lifecycle
 
-This document defines the repeatable path for taking an `apps/<name>/` or
-`examples/<name>/` surface from an idea to a README-listed repository entry. It
-is repository policy, not a protocol contract.
+This document defines the repeatable path for taking an `examples/<name>/`
+surface from an idea to a README-listed repository entry. It is repository
+policy, not a protocol contract.
 
 Use it when creating or resolving issues that add, promote, demote, or retire an
 example.
@@ -12,13 +12,7 @@ example.
 The top-level README is the advertised source for example status. Each listed
 example must keep its own README consistent with the advertised status.
 
-| Example | Advertised status | Required local owner |
-| --- | --- | --- |
-| `examples/c2pa-media-verification/` | `Testnet` | Example README plus `deno task smoke` |
-| `examples/tlsn-fiat-swap-square/` | `Testnet` | Example README, `RUNBOOK.md`, and `deno task smoke` |
-| `examples/auto-claim/` | `Concept` | Example README or issue text that states the non-runnable boundary |
-| `apps/two-party-binary-bet/` | `Implemented` | App README and repository tests covering the advertised flow |
-| `apps/airdrop-bot-shield/` | `Implemented` | App README and repository tests covering the advertised flow |
+There are no advertised examples at the moment.
 
 If an example is not listed in the top-level README, it may still exist as a
 sketch, fixture, or migration artifact, but it must not be described as a
@@ -62,7 +56,7 @@ Non-production boundary:
   custody safety, production credentials, or oracle decentralization.
 
 Out of scope:
-- Related product work or operational hardening that belongs in follow-up issues.
+- Related product work or operational hardening outside this repository.
 ```
 
 If this section cannot be filled in without design work, keep the issue at

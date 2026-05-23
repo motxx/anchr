@@ -2699,19 +2699,6 @@
       "npm:tailwindcss@^4.2.2"
     ],
     "members": {
-      "apps/airdrop-bot-shield": {
-        "dependencies": [
-          "jsr:@hono/hono@4",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "jsr:@zod/zod@4"
-        ]
-      },
-      "examples/tlsn-fiat-swap-square": {
-        "dependencies": [
-          "jsr:@std/expect@1"
-        ]
-      },
       "packages/adapters": {
         "dependencies": [
           "jsr:@noble/hashes@2",
@@ -2768,25 +2755,10 @@
           "jsr:@logtape/logtape@2"
         ]
       },
-      "packages/customer-sdk": {
-        "dependencies": [
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:@cashu/cashu-ts@3",
-          "npm:nostr-tools@2"
-        ]
-      },
       "packages/frost-oracle": {
         "dependencies": [
           "jsr:@hono/hono@4",
           "jsr:@logtape/logtape@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1"
-        ]
-      },
-      "packages/oracle-sdk": {
-        "dependencies": [
           "jsr:@std/expect@1",
           "jsr:@std/testing@1"
         ]
@@ -2804,15 +2776,6 @@
         "dependencies": [
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
-          "npm:nostr-tools@2"
-        ]
-      },
-      "packages/provider-sdk": {
-        "dependencies": [
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:@cashu/cashu-ts@3",
           "npm:nostr-tools@2"
         ]
       },

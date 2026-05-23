@@ -15,8 +15,8 @@ Use the narrowest class that can hold the decision.
 | Security invariant | A funds, proof, oracle-release, or privacy property that Anchr claims as a safety guarantee. | `docs/threat-model.md` plus tests or attack-class cross references |
 | Architecture boundary | A role, layer, package, dependency-direction, naming, or adapter boundary that keeps the implementation aligned with the three-actor model. | `docs/architecture.md` |
 | Package implementation contract | A package-owned API, algorithm, port shape, error model, or conformance expectation that other packages call but that is not itself a network wire contract. | The package `SPEC.md`, README, and colocated tests |
-| Adapter or runtime integration | A binding to a concrete runtime, protocol bridge, CLI, HTTP gateway, MCP server, mobile bridge, browser API, hosted service, or operator workflow. | Adapter package docs, `apps/<app>/`, or `examples/<name>/` |
-| Example policy | A product, demo, UX, deployment, mint/relay/oracle choice, moderation rule, pricing rule, or other concrete-app decision. | The owning `apps/<app>/` or `examples/<name>/` |
+| Adapter or runtime integration | A binding to a concrete runtime, protocol bridge, CLI, HTTP gateway, MCP server, mobile bridge, browser API, hosted service, or operator workflow. | Adapter package docs or `examples/<name>/` when the surface is a tiny SDK/protocol lesson |
+| Example policy | A demo, deployment, mint/relay/oracle choice, pricing rule, or other concrete-example decision. | The owning `examples/<name>/` |
 | Agent harness rule | A rule about how coding agents, review skills, lints, issue templates, or verification commands keep the repository healthy. | `CLAUDE.md`, `AGENTS.md`, `skills/`, `scripts/`, or `docs/issues/README.md` |
 
 If a decision fits more than one row, put the normative statement in the
@@ -38,10 +38,9 @@ Do not duplicate the same normative rule in several places.
 - Put adapter-specific choices outside `specs/` unless the adapter is defining a
   public interoperability profile. A profile may live in `specs/` only when it
   is intended for independent implementations, not just the reference code.
-- Put app- and example-specific decisions under `apps/<app>/` or
-  `examples/<name>/`. These surfaces may choose relays, mints, oracles,
-  schemas, UI flows, and operational policy, but those choices must not become
-  package defaults by accident.
+- Put example-specific decisions under `examples/<name>/`. These surfaces may
+  choose relays, mints, oracles, schemas, UI flows, and operational policy, but
+  those choices must not become package defaults by accident.
 - Put agent runtime integrations such as MCP in adapter or example docs. They
   are not protocol actors and must not be required by Customer, Provider, or
   Oracle SDKs.
