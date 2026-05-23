@@ -1,0 +1,84 @@
+# Apply Unix philosophy
+
+Created: 2026-05-20
+Model: GPT-5
+
+## Priority
+
+maintenance
+
+## Dependencies
+
+Depends on:
+- 0046
+- 0047
+- 0048
+- 0049
+
+Blocks:
+- None
+
+## Summary
+
+Reshape Anchr around a Unix-philosophy reading of the project: do one thing
+well, expose clear composable interfaces, and remove repository surfaces that
+make the project look like many unrelated products. The one thing is
+**verifiable paid requests**. The final public surface should be `@anchr/sdk`
+for application developers and `@anchr/protocol` for interoperable wire
+contracts.
+
+## Rationale
+
+Doug McIlroy's Unix philosophy is commonly summarized as: write programs that
+do one thing well, make them work together, and use a universal interface. Eric
+Raymond's later rules emphasize modularity, composition, clarity, and parsimony:
+simple parts, clean interfaces, clear behavior, and no large system unless the
+need is demonstrated.
+
+References:
+
+- <https://en.wikipedia.org/wiki/Unix_philosophy>
+- <https://en.wikiquote.org/wiki/Doug_McIlroy>
+- <https://www.catb.org/esr/writings/taoup/html/graphics/taoup.pdf>
+
+Anchr's one thing is:
+
+```text
+Anchr is an SDK for verifiable paid requests.
+
+Customer posts a paid request.
+Provider returns work with proof.
+Oracle verifies and releases payment.
+```
+
+Everything else is either implementation detail, optional teaching material, or
+outside this repository. `bounty`, marketplaces, bot shields, binary bets,
+mobile shells, MCP app surfaces, conditional-swap side quests, and broad
+example domains all make the project look like it is trying to do several
+things. They should not be public package names, architectural layers, required
+runtime components, or first-visit concepts.
+
+Relevant files:
+
+- `README.md`
+- `docs/architecture.md`
+- `docs/example-delivery-lifecycle.md`
+- `deno.json`
+- `packages/`
+- `apps/`
+- `examples/`
+- `e2e/`
+- `scripts/arch-lint.ts`
+- `scripts/arch-lint-candidates.ts`
+
+## Plan
+
+- Resolve #0046 to define Anchr's one thing and the minimal public contract.
+- Resolve #0047 to collapse package surfaces into `@anchr/sdk` and
+  `@anchr/protocol`.
+- Resolve #0049 to remove non-core repository surfaces, including `apps/` and
+  any proposed `tools/` category.
+- Resolve #0048 to enforce the final minimal surface through docs, workspace
+  config, lint rules, examples, and publish metadata.
+- Close this parent only when a new reader can understand from the repository
+  map that Anchr does one thing: verifiable paid requests.
