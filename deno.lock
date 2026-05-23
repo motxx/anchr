@@ -2712,34 +2712,6 @@
           "npm:nostr-tools@2"
         ]
       },
-      "packages/cashu-conditional-swap": {
-        "dependencies": [
-          "jsr:@logtape/logtape@2",
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:@cashu/cashu-ts@3",
-          "npm:@noble/curves@2",
-          "npm:nostr-tools@2"
-        ]
-      },
-      "packages/core-cashu": {
-        "dependencies": [
-          "jsr:@logtape/logtape@2",
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:@cashu/cashu-ts@3"
-        ]
-      },
-      "packages/frost-oracle": {
-        "dependencies": [
-          "jsr:@hono/hono@4",
-          "jsr:@logtape/logtape@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1"
-        ]
-      },
       "packages/photo-verification": {
         "dependencies": [
           "jsr:@logtape/logtape@2",
@@ -2758,6 +2730,7 @@
       },
       "packages/sdk": {
         "dependencies": [
+          "jsr:@noble/hashes@2",
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
           "npm:@cashu/cashu-ts@3",

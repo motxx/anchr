@@ -13,16 +13,7 @@
     "./verification": "./src/verification.ts"
   },
   "imports": {
-    "@anchr/core-cashu/escrow": "../core-cashu/src/escrow.ts",
-    "@anchr/core-cashu/escrow-helpers": "../core-cashu/src/escrow-helpers.ts",
-    "@anchr/core-cashu/preimage-port": "../core-cashu/src/preimage-port.ts",
-    "@anchr/core-cashu/preimage-store": "../core-cashu/src/preimage-store.ts",
-    "@anchr/core-cashu/wallet": "../core-cashu/src/wallet.ts",
-    "@anchr/frost-oracle/config": "../frost-oracle/src/config.ts",
-    "@anchr/frost-oracle/coordinator": "../frost-oracle/src/coordinator.ts",
-    "@anchr/frost-oracle/frost-cli": "../frost-oracle/src/frost-cli.ts",
-    "@anchr/frost-oracle/signing-coordinator": "../frost-oracle/src/signing-coordinator.ts",
-    "@anchr/frost-oracle/types": "../frost-oracle/src/types.ts",
+    "@anchr/sdk/payments": "../sdk/src/payments/mod.ts",
     "@anchr/photo-verification/ai-content-check": "../photo-verification/src/ai-content-check.ts",
     "@anchr/photo-verification/c2pa-validation": "../photo-verification/src/c2pa-validation.ts",
     "@anchr/photo-verification/exif-validation": "../photo-verification/src/exif-validation.ts",

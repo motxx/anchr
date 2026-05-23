@@ -1,5 +1,5 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuWallet } from "@anchr/core-cashu/wallet";
+import { getCashuWallet } from "@anchr/sdk/payments";
 
 import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "wallet"]);

@@ -16,10 +16,7 @@ import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
-import {
-  buildHtlcFinalOptions,
-  verifyHtlcProofs,
-} from "@anchr/core-cashu/escrow";
+import { buildHtlcFinalOptions, verifyHtlcProofs } from "@anchr/sdk/payments";
 
 function genKeypair() {
   const sk = generateSecretKey();

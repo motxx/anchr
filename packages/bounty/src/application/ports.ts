@@ -72,7 +72,7 @@ export interface OracleRegistry {
  * Used by the Query lifecycle when an escrow query is approved and the
  * escrow type is `p2pk_frost`. The port abstracts the round-1 / round-2
  * FROST coordinator handshake so the application layer doesn't pull in
- * `packages/frost-oracle` directly.
+ * `/sdk/payments` directly.
  *
  * Returns the aggregated signature as a hex string on success.
  * Returns `null` when the threshold cannot be met, the coordinator is

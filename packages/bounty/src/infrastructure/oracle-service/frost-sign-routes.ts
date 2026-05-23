@@ -1,6 +1,6 @@
 import type { Hono, MiddlewareHandler } from "hono";
-import type { FrostCoordinator } from "@anchr/frost-oracle/coordinator";
-import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
+import type { FrostCoordinator } from "@anchr/sdk/payments";
+import type { ThresholdOracleConfig } from "@anchr/sdk/payments";
 
 export interface FrostSignRouteDeps {
   authMiddleware: MiddlewareHandler;

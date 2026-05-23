@@ -20,7 +20,7 @@ import {
   Wallet,
 } from "@cashu/cashu-ts";
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "cashu"]);
 
 export interface CashuConfig {
@@ -33,16 +33,10 @@ export function getCashuConfig(): CashuConfig | null {
   return { mintUrl };
 }
 
-let _wallet: Wallet | null = null;
-
 export function getCashuWallet(): Wallet | null {
   const config = getCashuConfig();
   if (!config) return null;
-
-  if (!_wallet) {
-    _wallet = new Wallet(config.mintUrl, { unit: "sat" });
-  }
-  return _wallet;
+  return new Wallet(config.mintUrl, { unit: "sat" });
 }
 
 /** Options for {@link createBountyToken}. */

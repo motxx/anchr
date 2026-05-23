@@ -14,13 +14,13 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createPreimageStore } from "@anchr/sdk/payments";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import {
   buildEscrowP2PKOptions,
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
-} from "@anchr/core-cashu/escrow";
+} from "@anchr/sdk/payments";
 import {
   driveToProcessing,
   makeEscrowInfo,

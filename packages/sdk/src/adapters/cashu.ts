@@ -2,7 +2,7 @@
  * Cashu HTLC client — wraps `@cashu/cashu-ts` v3 for the SDK's
  * Customer / Provider wire flow.
  *
- * Two-phase HTLC pattern using the core-cashu preselection-transfer model:
+ * Two-phase HTLC pattern using the SDK payment preselection-transfer model:
  *
  *   Phase 1 (initial lock — provider unknown):
  *     `buildHtlcLock` swaps the source proofs into P2PK(customer) proofs.

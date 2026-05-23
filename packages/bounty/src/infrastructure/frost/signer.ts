@@ -25,7 +25,7 @@ import {
   dkgRound3,
   signRound1,
   signRound2,
-} from "@anchr/frost-oracle/frost-cli";
+} from "@anchr/sdk/payments";
 
 import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "frost-signer"]);

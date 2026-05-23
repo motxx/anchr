@@ -4,7 +4,11 @@
 
 import type { P2PKOptions, Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { type CashuConfig, getCashuConfig, getCashuWallet } from "./wallet.ts";
+import {
+  type CashuConfig,
+  getCashuConfig,
+  getCashuWallet,
+} from "./cashu-wallet.ts";
 
 export async function getWalletAndConfig(): Promise<
   {

@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
-} from "@anchr/core-cashu/escrow";
+} from "@anchr/sdk/payments";
 
 const WORKER_PUB =
   "0000000000000000000000000000000000000000000000000000000000000001";

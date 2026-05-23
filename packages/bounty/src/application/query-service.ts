@@ -1,7 +1,7 @@
 import { createQueryStore } from "../domain/query-store.ts";
 import { isOpenStatus } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
-import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
+import type { PreimageStore } from "@anchr/sdk/payments";
 import type {
   EscrowProvider,
   FrostSignaturePort,

@@ -1,7 +1,7 @@
 import type { Hono, MiddlewareHandler } from "hono";
 import { verifyProof } from "../verification/verifier.ts";
-import { signRound1, signRound2 } from "@anchr/frost-oracle/frost-cli";
-import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
+import { signRound1, signRound2 } from "@anchr/sdk/payments";
+import type { FrostNodeConfig } from "@anchr/sdk/payments";
 import type {
   BlossomKeyMap,
   VerificationInput,

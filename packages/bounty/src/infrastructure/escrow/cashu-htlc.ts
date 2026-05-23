@@ -3,8 +3,8 @@ import {
   createHtlcToken,
   type EscrowToken,
   swapHtlcBindWorker,
-} from "@anchr/core-cashu/escrow";
-import { verifyToken } from "@anchr/core-cashu/wallet";
+} from "@anchr/sdk/payments";
+import { verifyToken } from "@anchr/sdk/payments";
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
 
 export interface CashuEscrowProviderConfig {
@@ -161,7 +161,7 @@ export function createCashuEscrowProvider(
     settle(_escrow_ref, _preimage) {
       // Settlement at the mint requires the worker's private key, which
       // EscrowProvider does not carry. The worker calls
-      // `redeemHtlcToken(...)` from `@anchr/core-cashu/escrow` directly.
+      // `redeemHtlcToken(...)` from `@anchr/sdk/payments` directly.
       // Return a clear error rather than a silent {settled:true} so that
       // any caller depending on this port-level method sees the problem
       // immediately.

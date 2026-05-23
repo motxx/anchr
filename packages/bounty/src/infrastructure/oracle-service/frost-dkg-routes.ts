@@ -1,5 +1,5 @@
 import type { Hono, MiddlewareHandler } from "hono";
-import type { FrostCoordinator } from "@anchr/frost-oracle/coordinator";
+import type { FrostCoordinator } from "@anchr/sdk/payments";
 
 export interface FrostDkgRouteDeps {
   authMiddleware: MiddlewareHandler;

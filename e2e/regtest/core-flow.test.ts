@@ -33,7 +33,7 @@ import {
   createQueryService,
   createQueryStore,
 } from "../../packages/bounty/src/application/query-service.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createPreimageStore } from "@anchr/sdk/payments";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import type {
   Oracle,

@@ -30,7 +30,7 @@ import {
   signRound1,
   signRound2,
   verifySignature,
-} from "@anchr/frost-oracle/frost-cli";
+} from "@anchr/sdk/payments";
 import { buildOracleApp } from "../../packages/bounty/src/infrastructure/oracle-service/server.ts";
 
 // ---------------------------------------------------------------------------

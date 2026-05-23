@@ -6,7 +6,7 @@ import {
   dkgRound1,
   dkgRound2,
   dkgRound3,
-} from "@anchr/frost-oracle/frost-cli";
+} from "@anchr/sdk/payments";
 import type { AttachmentRef } from "../../domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";

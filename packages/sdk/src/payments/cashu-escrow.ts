@@ -22,7 +22,7 @@
  *     Requester reclaims after locktime expires.
  *
  * Also exposes a 2-of-2(Oracle, Worker) P2PK escrow primitive for the
- * pre-HTLC settlement path (the core-cashu SPEC → @anchr/core-cashu/SPEC.md).
+ * pre-HTLC settlement path used by SDK payment adapters.
  */
 
 import {
@@ -41,9 +41,9 @@ import {
   getWalletAndConfig,
   loadAndSend,
   sumProofAmounts,
-} from "./escrow-helpers.ts";
+} from "./cashu-escrow-helpers.ts";
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,
@@ -51,7 +51,7 @@ import {
   type HtlcInitialLockParams,
   type HtlcPreselectionLockParams,
   type HtlcWorkerBindParams,
-} from "./htlc-options.ts";
+} from "./cashu-htlc-options.ts";
 
 export {
   buildHtlcFinalOptions,

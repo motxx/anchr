@@ -1,10 +1,7 @@
 {
   "workspace": [
-    "./packages/core-cashu",
     "./packages/tlsn-toolkit",
     "./packages/photo-verification",
-    "./packages/frost-oracle",
-    "./packages/cashu-conditional-swap",
     "./packages/protocol",
     "./packages/bounty",
     "./packages/sdk"
@@ -36,7 +33,6 @@
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
     "@noble/curves/secp256k1": "npm:@noble/curves@^2/secp256k1.js",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
-    "@anchr/core-cashu/htlc-options": "./packages/core-cashu/src/htlc-options.ts",
     "@anchr/protocol": "./packages/protocol/src/mod.ts",
     "@anchr/protocol/adapters": "./packages/protocol/src/adapters.ts",
     "@anchr/protocol/capabilities": "./packages/protocol/src/capabilities.ts",
@@ -51,6 +47,7 @@
     "@anchr/sdk/adapters/storage": "./packages/sdk/src/adapters/storage.ts",
     "@anchr/sdk/attachments": "./packages/sdk/src/attachments/mod.ts",
     "@anchr/sdk/attachments/blossom": "./packages/sdk/src/attachments/blossom.ts",
+    "@anchr/sdk/payments": "./packages/sdk/src/payments/mod.ts",
     "@anchr/sdk/customer": "./packages/sdk/src/customer.ts",
     "@anchr/sdk/provider": "./packages/sdk/src/provider.ts",
     "@anchr/sdk/oracle": "./packages/sdk/src/oracle.ts",
@@ -81,7 +78,7 @@
   "tasks": {
     "check": "deno check packages/ e2e/ scripts/",
     "test": "deno task test:unit && deno task test:integration && deno task test:e2e:protocol && deno task test:scripts && deno task test:examples",
-    "publish:dry-run": "deno publish --dry-run --allow-dirty --config packages/core-cashu/deno.json && deno publish --dry-run --allow-dirty --config packages/tlsn-toolkit/deno.json && deno publish --dry-run --allow-dirty --config packages/photo-verification/deno.json && deno publish --dry-run --allow-dirty --config packages/frost-oracle/deno.json && deno publish --dry-run --allow-dirty --config packages/cashu-conditional-swap/deno.json && deno publish --dry-run --allow-dirty --config packages/protocol/deno.json && deno publish --dry-run --allow-dirty --config packages/bounty/deno.json && deno publish --dry-run --allow-dirty --config packages/sdk/deno.json",
+    "publish:dry-run": "deno publish --dry-run --allow-dirty --config packages/tlsn-toolkit/deno.json && deno publish --dry-run --allow-dirty --config packages/photo-verification/deno.json && deno publish --dry-run --allow-dirty --config packages/protocol/deno.json && deno publish --dry-run --allow-dirty --config packages/bounty/deno.json && deno publish --dry-run --allow-dirty --config packages/sdk/deno.json",
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'files=$(find packages -name \"*.integration.test.ts\" -type f); if [ -z \"$files\" ]; then echo \"No package integration tests\"; exit 0; fi; deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $files'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",

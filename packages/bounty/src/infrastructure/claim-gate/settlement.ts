@@ -1,5 +1,5 @@
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
-import { createHtlcToken, swapHtlcBindWorker } from "@anchr/core-cashu/escrow";
+import { createHtlcToken, swapHtlcBindWorker } from "@anchr/sdk/payments";
 import type {
   ProofGateCampaign,
   ProofGateClaim,

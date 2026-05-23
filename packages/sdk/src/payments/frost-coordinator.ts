@@ -12,7 +12,7 @@ import type {
   DkgSession,
   FrostSigningSession,
   ThresholdOracleConfig,
-} from "./types.ts";
+} from "./frost-types.ts";
 import { aggregateSignatures } from "./frost-cli.ts";
 
 export interface FrostCoordinator {

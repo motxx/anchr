@@ -15,8 +15,8 @@ import {
   getWalletAndConfig,
   loadAndSend,
   sumProofAmounts,
-} from "@anchr/core-cashu/escrow-helpers";
-import { verifyToken } from "@anchr/core-cashu/wallet";
+} from "@anchr/sdk/payments";
+import { verifyToken } from "@anchr/sdk/payments";
 
 import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "frost-escrow"]);

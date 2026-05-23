@@ -7,10 +7,10 @@ import {
 } from "./nostr-service.ts";
 import type { OracleNostrServiceConfig } from "./nostr-service.ts";
 import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createFrostCoordinator } from "@anchr/frost-oracle/coordinator";
-import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
-import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
+import { createPreimageStore } from "@anchr/sdk/payments";
+import { createFrostCoordinator } from "@anchr/sdk/payments";
+import type { ThresholdOracleConfig } from "@anchr/sdk/payments";
+import type { FrostNodeConfig } from "@anchr/sdk/payments";
 import type { AttachmentRef } from "../../domain/types.ts";
 import type { VerifiedEvent } from "nostr-tools";
 

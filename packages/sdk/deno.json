@@ -9,6 +9,7 @@
     "./adapters/storage": "./src/adapters/storage.ts",
     "./attachments": "./src/attachments/mod.ts",
     "./attachments/blossom": "./src/attachments/blossom.ts",
+    "./payments": "./src/payments/mod.ts",
     "./customer": "./src/customer.ts",
     "./provider": "./src/provider.ts",
     "./oracle": "./src/oracle.ts"
@@ -16,6 +17,8 @@
   "imports": {
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1",
+    "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
+    "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "@anchr/protocol": "../protocol/src/mod.ts",
     "@anchr/protocol/adapters": "../protocol/src/adapters.ts",
@@ -34,6 +37,7 @@
       "src/index.ts",
       "src/adapters/**/*.ts",
       "src/attachments/**/*.ts",
+      "src/payments/**/*.ts",
       "src/internal/runtime/**/*.ts",
       "src/customer.ts",
       "src/customer-types.ts",

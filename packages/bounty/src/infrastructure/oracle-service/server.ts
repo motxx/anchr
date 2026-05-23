@@ -17,13 +17,13 @@ import {
   createPersistentPreimageStore,
   createPreimageStore,
   type PreimageStore,
-} from "@anchr/core-cashu/preimage-store";
+} from "@anchr/sdk/payments";
 import {
   createFrostCoordinator,
   type FrostCoordinator,
-} from "@anchr/frost-oracle/coordinator";
-import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
-import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
+} from "@anchr/sdk/payments";
+import type { ThresholdOracleConfig } from "@anchr/sdk/payments";
+import type { FrostNodeConfig } from "@anchr/sdk/payments";
 import { buildAuthMiddleware } from "./auth.ts";
 import { registerHtlcRoutes } from "./htlc-routes.ts";
 import { registerFrostSignerRoutes } from "./frost-signer-routes.ts";
@@ -119,7 +119,7 @@ if (import.meta.main) {
   if (frostConfigPath) {
     try {
       const { loadFrostNodeConfig, toThresholdOracleConfig } = await import(
-        "@anchr/frost-oracle/config"
+        "@anchr/sdk/payments"
       ); // allow-dynamic-import: deferred to avoid loading FROST config parser when FROST_CONFIG_PATH is unset
       frostNodeConfig = loadFrostNodeConfig(frostConfigPath);
       frostConfig = toThresholdOracleConfig(frostNodeConfig);

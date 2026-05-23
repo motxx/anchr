@@ -105,12 +105,10 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
   "provider-sdk": new Set<string>(["protocol"]),
   "bounty": new Set<string>([
     "core-runtime",
-    "core-cashu",
     "tlsn-toolkit",
     "photo-verification",
-    "frost-oracle",
-    "cashu-conditional-swap",
     "blossom",
+    "sdk",
   ]),
   "sdk": new Set<string>([
     "core-runtime",
@@ -314,8 +312,11 @@ function checkSrcFile(rel: string, source: string): Violation[] {
       });
     }
 
-    // E018 — src/ must not depend on @anchr/sdk
-    if (specifier === "@anchr/sdk" || specifier.startsWith("@anchr/sdk/")) {
+    // E018 — src/ must not depend on @anchr/sdk orchestration surfaces.
+    if (
+      (specifier === "@anchr/sdk" || specifier.startsWith("@anchr/sdk/")) &&
+      specifier !== "@anchr/sdk/payments"
+    ) {
       violations.push({
         file: `packages/bounty/src/${rel}`,
         line,

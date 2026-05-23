@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-23
 
 ## Priority
 
@@ -66,3 +67,38 @@ Relevant current surfaces:
   requests.
 - Rewrite package and e2e imports, then delete absorbed package manifests and
   directories.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/payments/`
+- `packages/bounty/deno.json`
+- `packages/bounty/src/`
+- `e2e/`
+- `deno.json`
+- `Dockerfile`
+- `scripts/arch-lint.ts`
+
+Verified with:
+
+- `rg -n "@anchr/(core-cashu|frost-oracle|cashu-conditional-swap)" packages e2e deno.json`
+- `deno check packages/ e2e/protocol/ e2e/regtest/ e2e/frost/ scripts/arch-lint.ts`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+
+Harness update:
+
+- `scripts/arch-lint.ts` now permits the transitional Bounty package to import
+  only the SDK payment surface while the retired settlement packages are gone;
+  `lint:dockerfile-workspace` also covers the matching Dockerfile workspace
+  cleanup.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

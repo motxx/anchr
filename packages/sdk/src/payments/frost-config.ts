@@ -5,7 +5,7 @@
  * Each Oracle node loads its own config file at startup.
  */
 
-import type { ThresholdOracleConfig } from "./types.ts";
+import type { ThresholdOracleConfig } from "./frost-types.ts";
 
 export interface FrostNodeConfig {
   /** Signer index (1-based, matching DKG participant index). */

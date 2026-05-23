@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
+import { createPreimageStore } from "@anchr/sdk/payments";
 import {
   createQueryService,
   createQueryStore,

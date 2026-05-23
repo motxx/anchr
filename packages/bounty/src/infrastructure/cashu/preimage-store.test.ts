@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   createPersistentPreimageStore,
   createPreimageStore,
-} from "@anchr/core-cashu/preimage-store";
+} from "@anchr/sdk/payments";
 
 describe("PreimageStore", () => {
   test("create generates hash/preimage pair", () => {

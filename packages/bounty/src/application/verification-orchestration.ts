@@ -1,7 +1,7 @@
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type { ProofDelivery } from "./ports.ts";
-import type { PreimageStore } from "@anchr/core-cashu/preimage-port";
+import type { PreimageStore } from "@anchr/sdk/payments";
 import type {
   BlossomKeyMap,
   OracleAttestationRecord,

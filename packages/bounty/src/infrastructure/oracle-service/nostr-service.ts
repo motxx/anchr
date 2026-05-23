@@ -26,14 +26,11 @@ import {
   subscribeToFeedback,
   subscribeToResponses,
 } from "../nostr/transport/client.ts";
-import {
-  createPreimageStore,
-  type PreimageStore,
-} from "@anchr/core-cashu/preimage-store";
-import type { ThresholdOracleConfig } from "@anchr/frost-oracle/types";
-import type { FrostCoordinator } from "@anchr/frost-oracle/coordinator";
-import type { FrostNodeConfig } from "@anchr/frost-oracle/config";
-import { coordinateSigning } from "@anchr/frost-oracle/signing-coordinator";
+import { createPreimageStore, type PreimageStore } from "@anchr/sdk/payments";
+import type { ThresholdOracleConfig } from "@anchr/sdk/payments";
+import type { FrostCoordinator } from "@anchr/sdk/payments";
+import type { FrostNodeConfig } from "@anchr/sdk/payments";
+import { coordinateSigning } from "@anchr/sdk/payments";
 import {
   queryResultToInput,
   queryToRequirement,

@@ -5,11 +5,9 @@
  * TypeScript is glue only -- zero new crypto implementation.
  */
 
-import { statSync } from "node:fs";
 import { join } from "node:path";
-import { moduleDir, spawn, which } from "./runtime/mod.ts";
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost"]);
 
 let frostSignerPath: string | null | undefined;
@@ -25,19 +23,20 @@ export function _setFrostSignerPathForTest(
 export function findFrostSigner(): string | null {
   if (frostSignerPath !== undefined) return frostSignerPath;
 
+  const here = new URL(".", import.meta.url).pathname;
   const localPaths = [
     join(
-      moduleDir(import.meta),
-      "../../../crates/frost-signer/target/release/frost-signer",
+      here,
+      "../../../../crates/frost-signer/target/release/frost-signer",
     ),
     join(
-      moduleDir(import.meta),
-      "../../../crates/frost-signer/target/debug/frost-signer",
+      here,
+      "../../../../crates/frost-signer/target/debug/frost-signer",
     ),
   ];
   for (const p of localPaths) {
     try {
-      if (statSync(p).isFile()) {
+      if (Deno.statSync(p).isFile) {
         frostSignerPath = p;
         log.error(`Found frost-signer at ${p}`);
         return frostSignerPath;
@@ -45,7 +44,7 @@ export function findFrostSigner(): string | null {
     } catch { /* not found */ }
   }
 
-  frostSignerPath = which("frost-signer");
+  frostSignerPath = findOnPath("frost-signer");
   if (frostSignerPath) {
     log.error(`Found frost-signer at ${frostSignerPath}`);
   }
@@ -74,14 +73,16 @@ export async function runFrostCommand(
     return { ok: false, error: "frost-signer binary not available" };
   }
 
-  const proc = spawn([binPath, subcommand, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const proc = new Deno.Command(binPath, {
+    args: [subcommand, ...args],
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
 
   let timer: ReturnType<typeof setTimeout>;
+  const statusPromise = proc.status;
   const timedOut = await Promise.race([
-    proc.exited.then(() => false),
+    statusPromise.then(() => false),
     new Promise<boolean>((resolve) => {
       timer = setTimeout(() => resolve(true), FROST_TIMEOUT_MS);
     }),
@@ -99,7 +100,8 @@ export async function runFrostCommand(
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
 
-  if (proc.exitCode !== 0) {
+  const status = await statusPromise;
+  if (status.code !== 0) {
     return {
       ok: false,
       error: stderr.trim().slice(0, 500) || "frost-signer exited with error",
@@ -111,6 +113,21 @@ export async function runFrostCommand(
     return { ok: true, data };
   } catch {
     return { ok: false, error: "failed to parse frost-signer output" };
+  }
+}
+
+function findOnPath(name: string): string | null {
+  try {
+    const cmd = new Deno.Command("which", {
+      args: [name],
+      stdout: "piped",
+      stderr: "null",
+    });
+    const result = cmd.outputSync();
+    if (result.code !== 0) return null;
+    return new TextDecoder().decode(result.stdout).trim() || null;
+  } catch {
+    return null;
   }
 }
 

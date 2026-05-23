@@ -1,10 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
-import {
-  createPreimageStore,
-  type PreimageStore,
-} from "@anchr/core-cashu/preimage-store";
+import { createPreimageStore, type PreimageStore } from "@anchr/sdk/payments";
 import {
   createOracleRegistry,
 } from "../infrastructure/oracle-client/registry.ts";

@@ -5,10 +5,10 @@
  * Coordinates 2-round signing protocol via HTTP calls to peer signers.
  */
 
-import type { FrostNodeConfig, PeerConfig } from "./config.ts";
+import type { FrostNodeConfig, PeerConfig } from "./frost-config.ts";
 import { aggregateSignatures, signRound1, signRound2 } from "./frost-cli.ts";
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-coord"]);
 
 export interface SigningCoordinatorConfig {

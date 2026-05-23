@@ -1,5 +1,5 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuConfig } from "@anchr/core-cashu/wallet";
+import { getCashuConfig } from "@anchr/sdk/payments";
 import {
   computeBalance,
   makeKey,
