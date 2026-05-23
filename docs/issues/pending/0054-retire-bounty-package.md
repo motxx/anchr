@@ -19,6 +19,9 @@ Depends on:
 - 0058
 - 0059
 - 0060
+- 0061
+- 0062
+- 0063
 
 Blocks:
 - 0047
@@ -64,11 +67,14 @@ Relevant current surfaces:
 
 ## Plan
 
-- Resolve #0057 to move paid-request lifecycle domain and service code into
-  SDK-owned request modules.
-- Resolve #0058 to move Nostr transport and Oracle adapter/service code into
-  SDK-owned adapter modules.
-- Resolve #0059 to move remaining attachment, escrow, proof, and runtime
-  helpers into SDK-owned modules while deleting claim-gate-only surfaces.
-- Resolve #0060 to rewrite remaining e2e imports and delete the
-  `packages/bounty/` package shell after reusable code has moved.
+- #0057, #0058, #0059, and #0060 moved retained code and deleted the old
+  package shell.
+- Resolve #0061 to replace the root SDK HTTP convenience client query
+  vocabulary with paid-request vocabulary.
+- Resolve #0062 to rename the public Nostr adapter requester/worker/query
+  surface to Customer/Provider/request vocabulary.
+- Resolve #0063 to remove query-shaped helper names from public SDK
+  attachments, proof, and oracle adapter surfaces.
+- Close this parent after the child issues verify that no public
+  `@anchr/bounty`, `@anchr/sdk/bounty`, claim-gate, or query/bounty SDK surface
+  remains.
