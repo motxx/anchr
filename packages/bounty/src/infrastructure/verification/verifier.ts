@@ -16,7 +16,7 @@ import type {
   VerificationDetail,
   VerificationInput,
   VerificationRequirement,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 

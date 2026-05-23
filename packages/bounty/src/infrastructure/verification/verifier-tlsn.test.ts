@@ -20,7 +20,10 @@ import {
   _setVerifierPathForTest,
 } from "@anchr/sdk/proofs";
 import { verify } from "./verifier.ts";
-import type { TlsnAttestation, TlsnRequirement } from "../../domain/types.ts";
+import type {
+  TlsnAttestation,
+  TlsnRequirement,
+} from "../../../../sdk/src/requests/domain/types.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

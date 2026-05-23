@@ -7,9 +7,9 @@ import type {
   QueryResult,
   TlsnAttestation,
   TlsnRequirement,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 import type { TlsnValidationResult } from "@anchr/sdk/proofs";
-import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
+import { makeQuery as makeBaseQuery } from "../../../../sdk/src/requests/testing/factories.ts";
 
 function makeQuery(overrides: Partial<Query>): Query {
   return makeBaseQuery({

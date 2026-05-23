@@ -18,7 +18,7 @@ import type {
   BlossomKeyMap,
   VerificationInput,
   VerificationRequirement,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 import {
   dkgRound1,
   dkgRound2,

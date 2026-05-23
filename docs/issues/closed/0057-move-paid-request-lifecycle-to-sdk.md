@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-23
 
 ## Priority
 
@@ -68,3 +69,43 @@ Relevant current surfaces:
 - Move retained lifecycle code and tests into SDK request-oriented modules.
 - Rewrite package and e2e imports that depend only on lifecycle behavior.
 - Delete obsolete lifecycle source files after their tests pass from SDK.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/domain/`
+- `packages/sdk/src/requests/application/`
+- `packages/sdk/src/requests/testing/`
+- `packages/bounty/src/infrastructure/`
+- `packages/bounty/README.md`
+- `packages/bounty/deno.json`
+- `e2e/protocol/`
+- `e2e/regtest/`
+- `e2e/relay/`
+- `e2e/tlsn/`
+
+Verified with:
+
+- `deno test packages/sdk/src/requests --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+- `test ! -e packages/bounty/src/domain && test ! -e packages/bounty/src/application && test ! -e packages/bounty/src/flow.ts && test ! -e packages/bounty/src/mod.ts`
+- `rg -n "@anchr/bounty|@anchr/sdk/bounty|packages/bounty/src/(domain|application|flow|mod)" packages e2e deno.json` returned no matches
+- `check-silent-bypass` review: no new silent-bypass patterns detected in the moved lifecycle, verification, escrow, and settlement paths
+
+Harness update:
+
+- Lifecycle unit tests moved with the implementation into
+  `packages/sdk/src/requests/`; protocol e2e imports now exercise the SDK-owned
+  lifecycle modules.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- Existing pending issues #0058, #0059, and #0060 own the remaining transport,
+  helper, and package-shell cleanup.

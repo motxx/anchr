@@ -10,7 +10,7 @@ import type {
   AttachmentRef,
   BlossomKeyMaterial,
   GpsCoord,
-} from "../domain/types.ts";
+} from "../../../sdk/src/requests/domain/types.ts";
 import {
   detectZip,
   extractProofModeIntegrity,

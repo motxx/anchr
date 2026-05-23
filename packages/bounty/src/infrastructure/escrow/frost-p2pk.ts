@@ -8,7 +8,7 @@ import {
   type P2PKOptions,
   type Proof,
 } from "@cashu/cashu-ts";
-import type { EscrowProvider } from "../../application/ports.ts";
+import type { EscrowProvider } from "../../../../sdk/src/requests/application/ports.ts";
 import {
   computeNetAmount,
   encodeProofs,

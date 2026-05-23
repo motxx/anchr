@@ -2,12 +2,12 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { QueryService, QueryStore } from "./query-service.ts";
-import { createOracleRegistry } from "../infrastructure/oracle-client/index.ts";
+import { createOracleRegistry } from "../testing/oracle-registry.ts";
 import type {
   Oracle,
   OracleAttestation,
   OracleRegistry,
-} from "../infrastructure/oracle-client/index.ts";
+} from "../testing/oracle-registry.ts";
 import type {
   BlossomKeyMap,
   Query,

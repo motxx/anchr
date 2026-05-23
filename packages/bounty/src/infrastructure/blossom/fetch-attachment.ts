@@ -1,4 +1,7 @@
-import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types.ts";
+import type {
+  AttachmentRef,
+  BlossomKeyMaterial,
+} from "../../../../sdk/src/requests/domain/types.ts";
 import { downloadFromBlossom } from "./client.ts";
 
 // Ephemeral key material is required: keys are never stored in AttachmentRef.

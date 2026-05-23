@@ -5,14 +5,14 @@ import { createPreimageStore } from "@anchr/sdk/payments";
 import {
   createQueryService,
   createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import {
   driveToProcessing,
   makeEscrowInfo,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-} from "../../packages/bounty/src/testing/protocol-helpers.ts";
+} from "../../packages/sdk/src/requests/testing/protocol-helpers.ts";
 
 describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {

@@ -1,7 +1,10 @@
 import type { Hono, MiddlewareHandler } from "hono";
 import { verify } from "../verification/verifier.ts";
-import type { Query, QueryResult } from "../../domain/types.ts";
-import type { OracleAttestation } from "../../domain/oracle-types.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../../../sdk/src/requests/domain/types.ts";
+import type { OracleAttestation } from "../../../../sdk/src/requests/domain/oracle-types.ts";
 import type { PreimageStore } from "@anchr/sdk/payments";
 
 export interface HtlcRouteDeps {

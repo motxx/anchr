@@ -1,7 +1,10 @@
 import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
-import type { Oracle, OracleInfo } from "../../domain/oracle-types.ts";
-import type { OracleRegistry } from "../../application/ports.ts";
-export type { OracleRegistry } from "../../application/ports.ts";
+import type {
+  Oracle,
+  OracleInfo,
+} from "../../../../sdk/src/requests/domain/oracle-types.ts";
+import type { OracleRegistry } from "../../../../sdk/src/requests/application/ports.ts";
+export type { OracleRegistry } from "../../../../sdk/src/requests/application/ports.ts";
 
 export function createOracleRegistry(
   options?: { skipBuiltIn?: boolean },

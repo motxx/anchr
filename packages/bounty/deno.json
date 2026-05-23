@@ -1,17 +1,5 @@
 {
-  "name": "@anchr/bounty",
   "version": "0.1.0",
-  "exports": {
-    ".": "./src/mod.ts",
-    "./attachments": "./src/attachments.ts",
-    "./claim-gate": "./src/claim-gate.ts",
-    "./escrow": "./src/escrow.ts",
-    "./flow": "./src/flow.ts",
-    "./nostr": "./src/nostr.ts",
-    "./oracle-client": "./src/oracle-client.ts",
-    "./oracle-service": "./src/oracle-service.ts",
-    "./verification": "./src/verification.ts"
-  },
   "imports": {
     "@anchr/sdk/payments": "../sdk/src/payments/mod.ts",
     "@anchr/sdk/proofs": "../sdk/src/proofs/mod.ts",

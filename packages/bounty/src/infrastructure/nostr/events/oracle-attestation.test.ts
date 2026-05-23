@@ -7,7 +7,7 @@ import {
   parseOracleAttestationPayload,
   toOracleAttestation,
 } from "./oracle-attestation.ts";
-import type { OracleAttestation } from "../../../domain/oracle-types.ts";
+import type { OracleAttestation } from "../../../../../sdk/src/requests/domain/oracle-types.ts";
 
 const oracleIdentity = generateEphemeralIdentity();
 

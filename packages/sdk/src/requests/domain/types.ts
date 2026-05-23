@@ -48,7 +48,7 @@ export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
   "ai_check",
 ] as const;
 
-// TLSNotary types live in `@anchr/sdk/proofs`. The host shared
+// TLSNotary types live in `../../proofs/mod.ts`. The host shared
 // domain re-exports them so existing call sites keep the single import surface.
 import type {
   TlsnAttestation,
@@ -56,7 +56,7 @@ import type {
   TlsnEncryptedContext,
   TlsnRequirement,
   TlsnVerifiedData,
-} from "@anchr/sdk/proofs";
+} from "../../proofs/mod.ts";
 export type {
   TlsnAttestation,
   TlsnCondition,
@@ -210,7 +210,7 @@ export interface HtlcEscrow extends EscrowCommonFields {
 /**
  * NUT-11 pay-to-pubkey escrow signed by a FROST t-of-n Oracle group.
  * Settlement is a threshold Schnorr signature instead of a preimage reveal.
- * See `@anchr/sdk/payments` for the signing flow.
+ * See `../../payments/mod.ts` for the signing flow.
  */
 export interface P2pkFrostEscrow extends EscrowCommonFields {
   type: "p2pk_frost";

@@ -4,7 +4,7 @@
 import { Buffer } from "node:buffer";
 import { stripExif } from "../exif-strip.ts";
 import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
-import type { AttachmentRef } from "../../domain/types.ts";
+import type { AttachmentRef } from "../../../../sdk/src/requests/domain/types.ts";
 import {
   type BlossomUploadResult,
   getBlossomConfig,

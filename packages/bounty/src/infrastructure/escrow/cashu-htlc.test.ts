@@ -2,7 +2,7 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { createCashuEscrowProvider } from "./cashu-htlc.ts";
-import type { EscrowProvider } from "../../application/ports.ts";
+import type { EscrowProvider } from "../../../../sdk/src/requests/application/ports.ts";
 
 const WORKER_PUB =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

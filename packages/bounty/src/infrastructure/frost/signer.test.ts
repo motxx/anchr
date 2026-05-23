@@ -7,7 +7,7 @@ import {
   dkgRound2,
   dkgRound3,
 } from "@anchr/sdk/payments";
-import type { AttachmentRef } from "../../domain/types.ts";
+import type { AttachmentRef } from "../../../../sdk/src/requests/domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

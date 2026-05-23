@@ -24,12 +24,12 @@ import {
   type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
-import type { EscrowProvider } from "../../application/ports.ts";
+import type { EscrowProvider } from "../../../../sdk/src/requests/application/ports.ts";
 import type {
   EscrowInfo,
   OfferInfo,
   TlsnEncryptedContext,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 
 import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "requester"]);

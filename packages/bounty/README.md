@@ -1,31 +1,18 @@
-# @anchr/bounty
+# Transitional infrastructure
 
-`@anchr/bounty` is transitional flow scaffolding for the older bounty/query
-lifecycle. Its root export is intentionally limited to domain and application
-flow code. Concrete integrations live behind explicit subpath exports so apps
-can depend on the smallest surface they use.
+This directory is no longer a published Anchr package. Reusable request
+lifecycle code has moved to SDK-owned request modules. The remaining files are
+transitional infrastructure awaiting adapter/helper migration.
 
-## Install
+| Area             | Owns                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `attachments.ts` | Attachment normalization, access handles, previews, and attachment URI validation. |
+| `escrow.ts`      | Cashu and FROST escrow providers plus preimage-store helpers.                      |
+| `nostr.ts`       | Nostr event, DM, transport, requester-service, and worker-service adapters.        |
+| `oracle-client`  | Oracle registry and HTTP Oracle client adapter.                                    |
+| `oracle-service` | Oracle HTTP/Nostr service adapters.                                                |
+| `verification`   | Flow-level verification dispatch over proof engines.                               |
+| `claim-gate`     | Claim-gating flow pending deletion or a narrow paid-request SDK owner.             |
 
-```jsonc
-{
-  "imports": {
-    "@anchr/bounty": "jsr:@anchr/bounty@^0.1"
-  }
-}
-```
-
-| Import                                  | Owns                                                                               |
-| --------------------------------------- | ---------------------------------------------------------------------------------- |
-| `@anchr/bounty` or `@anchr/bounty/flow` | Query domain, aggregate, repository, service, and flow ports.                      |
-| `@anchr/bounty/attachments`             | Attachment normalization, access handles, previews, and attachment URI validation. |
-| `@anchr/bounty/escrow`                  | Cashu and FROST escrow providers plus preimage-store helpers.                      |
-| `@anchr/bounty/nostr`                   | Nostr event, DM, transport, requester-service, and worker-service adapters.        |
-| `@anchr/bounty/oracle-client`           | Oracle registry and HTTP Oracle client adapter.                                    |
-| `@anchr/bounty/oracle-service`          | Oracle HTTP/Nostr service adapters.                                                |
-| `@anchr/bounty/verification`            | Flow-level verification dispatch over proof engines.                               |
-| `@anchr/bounty/claim-gate`              | Reusable claim-gating flow while its final package ownership is unsettled.         |
-
-Do not add new concrete integrations to the root export. New app code should use
-the subpath that matches the boundary it needs, or the actor SDK/adapters when
-it does not need the transitional bounty lifecycle.
+Do not add new public exports here. New app code should use SDK and protocol
+surfaces while the remaining transitional files are moved or deleted.

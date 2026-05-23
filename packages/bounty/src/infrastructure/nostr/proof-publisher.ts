@@ -13,12 +13,12 @@
 import type {
   ProofDelivery,
   ProofPublishResult,
-} from "../../application/ports.ts";
+} from "../../../../sdk/src/requests/application/ports.ts";
 import type {
   OracleAttestationRecord,
   ProofVisibility,
   Query,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
 import { publishEvent } from "./transport/client.ts";

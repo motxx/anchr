@@ -20,7 +20,7 @@ import {
   parseOracleAnnouncementEvent,
 } from "../../packages/bounty/src/infrastructure/oracle-client/oracle-discovery.ts";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "../../packages/bounty/src/infrastructure/nostr/events/events.ts";
-import type { OracleInfo } from "../../packages/bounty/src/domain/oracle-types.ts";
+import type { OracleInfo } from "../../packages/sdk/src/requests/domain/oracle-types.ts";
 import { isRelayReachable } from "../helpers/regtest.ts";
 
 // ---------------------------------------------------------------------------

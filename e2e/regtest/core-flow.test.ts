@@ -32,17 +32,17 @@ import { getEncodedToken } from "@cashu/cashu-ts";
 import {
   createQueryService,
   createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import { createPreimageStore } from "@anchr/sdk/payments";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import type {
   Oracle,
   OracleAttestation,
-} from "../../packages/bounty/src/domain/oracle-types.ts";
+} from "../../packages/sdk/src/requests/domain/oracle-types.ts";
 import type {
   Query,
   QueryResult,
-} from "../../packages/bounty/src/domain/types.ts";
+} from "../../packages/sdk/src/requests/domain/types.ts";
 import {
   checkInfraReady,
   createWallet,

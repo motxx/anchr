@@ -12,8 +12,8 @@ import {
   type VerifiedEvent,
 } from "nostr-tools";
 import type { NostrIdentity } from "../crypto/identity.ts";
-import type { OracleAttestation } from "../../../domain/oracle-types.ts";
-import type { TlsnVerifiedData } from "../../../domain/types.ts";
+import type { OracleAttestation } from "../../../../../sdk/src/requests/domain/oracle-types.ts";
+import type { TlsnVerifiedData } from "../../../../../sdk/src/requests/domain/types.ts";
 
 export const ANCHR_ORACLE_ATTESTATION = 30103;
 

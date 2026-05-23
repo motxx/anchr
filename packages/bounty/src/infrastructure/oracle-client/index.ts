@@ -19,12 +19,12 @@ export {
   registerOracle,
   resolveOracle,
 } from "./registry.ts";
-export type { OracleRegistry } from "../../application/ports.ts";
+export type { OracleRegistry } from "../../../../sdk/src/requests/application/ports.ts";
 export type {
   Oracle,
   OracleAttestation,
   OracleInfo,
   OracleVerificationDetail,
-} from "../../domain/oracle-types.ts";
+} from "../../../../sdk/src/requests/domain/oracle-types.ts";
 export { loadOraclesFromEnv, parseOracleRegistry } from "./config-loader.ts";
 export type { OracleConfigEntry } from "./config-loader.ts";

@@ -17,7 +17,7 @@ import type {
   AttachmentStorageKind,
   BlossomKeyMaterial,
   QueryResult,
-} from "../domain/types.ts";
+} from "../../../sdk/src/requests/domain/types.ts";
 import {
   attachmentRefSource,
   extractBlossomFields,

@@ -11,7 +11,10 @@ import {
   parseFeedbackPayload,
   parseOracleResponsePayload,
 } from "../nostr/events/events.ts";
-import type { Query, QueryResult } from "../../domain/types.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../../../sdk/src/requests/domain/types.ts";
 
 export interface WatchedQuery {
   queryId: string;

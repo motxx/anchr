@@ -14,12 +14,12 @@ import { spawn } from "../helpers/process.ts";
 import {
   createQueryService,
   createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
 import type {
   QueryInput,
   QueryResult,
-} from "../../packages/bounty/src/domain/types.ts";
+} from "../../packages/sdk/src/requests/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";

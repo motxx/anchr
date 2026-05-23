@@ -9,7 +9,7 @@ import {
 } from "@anchr/sdk/proofs";
 import { getRuntimeConfig } from "../config.ts";
 import { readStoredAttachmentBuffer } from "../attachments.ts";
-import type { AttachmentRef } from "../../domain/types.ts";
+import type { AttachmentRef } from "../../../../sdk/src/requests/domain/types.ts";
 
 export type { ContentCheckResult } from "@anchr/sdk/proofs";
 export { createAiContentChecker } from "@anchr/sdk/proofs";

@@ -1,15 +1,13 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
-import { createPreimageStore, type PreimageStore } from "@anchr/sdk/payments";
-import {
-  createOracleRegistry,
-} from "../infrastructure/oracle-client/registry.ts";
+import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
+import { createOracleRegistry } from "../testing/oracle-registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./ports.ts";
-import { createIntegrityStore } from "@anchr/sdk/proofs";
+import { createIntegrityStore } from "../../proofs/mod.ts";
 
 function makeFakeToken(amountSats: number): string {
   return getEncodedToken({

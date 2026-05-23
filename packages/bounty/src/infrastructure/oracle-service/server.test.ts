@@ -2,8 +2,11 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildOracleApp } from "./server.ts";
 import { createPreimageStore } from "@anchr/sdk/payments";
-import type { Query, QueryResult } from "../../domain/types.ts";
-import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../../../sdk/src/requests/domain/types.ts";
+import { makeQuery as makeBaseQuery } from "../../../../sdk/src/requests/testing/factories.ts";
 
 const API_KEY = "oracle-test-key";
 

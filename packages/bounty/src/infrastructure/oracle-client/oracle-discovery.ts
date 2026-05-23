@@ -13,7 +13,7 @@ import {
   type EscrowType,
   VERIFICATION_FACTORS,
   type VerificationFactor,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 import {
   isRecord,
   optionalNumber,

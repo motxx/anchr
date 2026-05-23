@@ -1,7 +1,7 @@
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type { ProofDelivery } from "./ports.ts";
-import type { PreimageStore } from "@anchr/sdk/payments";
+import type { PreimageStore } from "../../payments/mod.ts";
 import type {
   BlossomKeyMap,
   OracleAttestationRecord,
@@ -10,7 +10,7 @@ import type {
   QueryResult,
   QueryStatus,
 } from "../domain/types.ts";
-import { getLogger } from "../runtime/logger.ts";
+import { getLogger } from "../../internal/runtime/logger.ts";
 
 const log = getLogger(["anchr", "query-service", "verification"]);
 

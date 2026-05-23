@@ -36,7 +36,10 @@ import {
   queryToRequirement,
   verify,
 } from "../verification/verifier.ts";
-import type { Query, QueryResult } from "../../domain/types.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../../../sdk/src/requests/domain/types.ts";
 import {
   buildQueryFromPayload,
   buildResultFromPayload,

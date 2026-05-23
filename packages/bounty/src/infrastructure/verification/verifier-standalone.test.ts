@@ -21,9 +21,9 @@ import type {
   TlsnRequirement,
   VerificationInput,
   VerificationRequirement,
-} from "../../domain/types.ts";
+} from "../../../../sdk/src/requests/domain/types.ts";
 import type { TlsnValidationResult } from "@anchr/sdk/proofs";
-import { makeQuery } from "../../testing/factories.ts";
+import { makeQuery } from "../../../../sdk/src/requests/testing/factories.ts";
 
 const now = Math.floor(Date.now() / 1000);
 

@@ -11,7 +11,7 @@ import { createPreimageStore } from "@anchr/sdk/payments";
 import { createFrostCoordinator } from "@anchr/sdk/payments";
 import type { ThresholdOracleConfig } from "@anchr/sdk/payments";
 import type { FrostNodeConfig } from "@anchr/sdk/payments";
-import type { AttachmentRef } from "../../domain/types.ts";
+import type { AttachmentRef } from "../../../../sdk/src/requests/domain/types.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---

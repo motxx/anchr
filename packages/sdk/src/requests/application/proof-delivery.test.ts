@@ -9,7 +9,7 @@ import type {
   QueryResult,
 } from "../domain/types.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import { createOracleRegistry } from "../infrastructure/oracle-client/registry.ts";
+import { createOracleRegistry } from "../testing/oracle-registry.ts";
 
 function createMockOracle(id: string, passResult: boolean): Oracle {
   return {

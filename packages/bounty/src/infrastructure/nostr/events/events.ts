@@ -18,7 +18,7 @@
 import type {
   TlsnEncryptedContext,
   VerificationFactor,
-} from "../../../domain/types.ts";
+} from "../../../../../sdk/src/requests/domain/types.ts";
 import { decryptNip44, deriveConversationKey } from "../crypto/encryption.ts";
 
 // NIP-90 DVM event kinds for Anchr.

@@ -5,7 +5,7 @@
  * injected into the application layer via QueryHooks.onCreated.
  */
 
-import type { Query } from "../../../domain/types.ts";
+import type { Query } from "../../../../../sdk/src/requests/domain/types.ts";
 import { isNostrEnabled, publishEvent } from "./client.ts";
 import { buildQueryRequestEvent } from "../events/event-builders.ts";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
