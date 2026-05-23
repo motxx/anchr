@@ -15,7 +15,7 @@ import {
   createQueryService,
   createQueryStore,
 } from "../../packages/sdk/src/requests/application/query-service.ts";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import type {
   QueryInput,
   QueryResult,

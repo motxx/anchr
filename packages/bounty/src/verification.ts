@@ -1,2 +1,2 @@
-export * from "./infrastructure/verification/index.ts";
-export { stripExif } from "./infrastructure/exif-strip.ts";
+export * from "../../sdk/src/proofs/verification/index.ts";
+export { stripExif } from "../../sdk/src/attachments/exif-strip.ts";

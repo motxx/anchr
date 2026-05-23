@@ -31,7 +31,7 @@ import {
   signRound2,
   verifySignature,
 } from "@anchr/sdk/payments";
-import { buildOracleApp } from "../../packages/bounty/src/infrastructure/oracle-service/server.ts";
+import { buildOracleApp } from "@anchr/sdk/adapters/oracle-service";
 
 // ---------------------------------------------------------------------------
 // Oracle operators — all independent, no Requester/Worker

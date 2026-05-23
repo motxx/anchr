@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
 import {
   createQueryService,

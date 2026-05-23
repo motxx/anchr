@@ -1,0 +1,278 @@
+/**
+ * Nostr event builder functions for Anchr NIP-90 DVM events.
+ */
+
+import {
+  type EventTemplate,
+  finalizeEvent,
+  type VerifiedEvent,
+} from "nostr-tools";
+import type { NostrIdentity } from "../crypto/identity.ts";
+import { deriveConversationKey, encryptNip44 } from "../crypto/encryption.ts";
+import {
+  ANCHR_ORACLE_ANNOUNCEMENT,
+  ANCHR_QUERY_FEEDBACK,
+  ANCHR_QUERY_REQUEST,
+  ANCHR_QUERY_RESPONSE,
+  type OfferFeedbackPayload,
+  type OracleResponsePayload,
+  type QueryRequestPayload,
+  type QueryResponsePayload,
+  type QuerySettlementPayload,
+  type SelectionFeedbackPayload,
+} from "./events.ts";
+import type { OracleInfo } from "../../../requests/domain/oracle-types.ts";
+
+function nowUnix(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+function encryptPayload(
+  identity: NostrIdentity,
+  recipientPubKey: string,
+  payload: unknown,
+): string {
+  const conversationKey = deriveConversationKey(
+    identity.secretKey,
+    recipientPubKey,
+  );
+  return encryptNip44(JSON.stringify(payload), conversationKey);
+}
+
+function buildRequestTags(
+  queryId: string,
+  payload: QueryRequestPayload,
+  regionCode?: string,
+): string[][] {
+  const tags: string[][] = [
+    ["i", payload.description, "text"],
+    ["output", "application/json"],
+    ["encrypted"],
+    ["d", queryId],
+    ["t", "anchr"],
+    ["expiration", String(Math.floor(payload.expires_at / 1000))],
+  ];
+
+  if (payload.nonce) {
+    tags.push(["param", "nonce", payload.nonce]);
+  }
+  if (payload.verification_requirements?.length) {
+    tags.push([
+      "param",
+      "verification",
+      payload.verification_requirements.join(","),
+    ]);
+  }
+  if (payload.bounty?.token) {
+    tags.push(["bid", payload.bounty.token]);
+  }
+  if (payload.oracle_pubkey) {
+    tags.push(["p", payload.oracle_pubkey, "", "oracle"]);
+  }
+  if (regionCode) {
+    tags.push(["region", regionCode.toUpperCase()]);
+  }
+
+  return tags;
+}
+
+function buildResponseTags(
+  identity: NostrIdentity,
+  queryEventId: string,
+  requesterPubKey: string,
+  payload: QueryResponsePayload,
+  oraclePubKey?: string,
+): string[][] {
+  const tags: string[][] = [
+    ["e", queryEventId],
+    ["p", requesterPubKey],
+  ];
+
+  if (oraclePubKey && payload.attachments?.length) {
+    appendOracleTags(tags, identity, payload, oraclePubKey);
+  }
+
+  return tags;
+}
+
+function appendOracleTags(
+  tags: string[][],
+  identity: NostrIdentity,
+  payload: QueryResponsePayload,
+  oraclePubKey: string,
+): void {
+  tags.push(["p", oraclePubKey, "", "oracle"]);
+
+  for (const att of payload.attachments!) {
+    tags.push(["x", att.blossom_hash]);
+    for (const url of att.blossom_urls) {
+      tags.push(["blossom", url]);
+    }
+  }
+
+  const oraclePayload: OracleResponsePayload = {
+    nonce_echo: payload.nonce_echo,
+    attachments: payload.attachments!
+      .filter((a) => a.decrypt_key_oracle)
+      .map((a) => ({
+        blossom_hash: a.blossom_hash,
+        blossom_urls: a.blossom_urls,
+        decrypt_key_oracle: a.decrypt_key_oracle!,
+        decrypt_iv: a.decrypt_iv,
+        mime: a.mime,
+      })),
+    notes: payload.notes,
+  };
+
+  const encrypted = encryptPayload(identity, oraclePubKey, oraclePayload);
+  tags.push(["oracle_payload", encrypted]);
+}
+
+export function buildQueryRequestEvent(
+  identity: NostrIdentity,
+  queryId: string,
+  payload: QueryRequestPayload,
+  regionCode?: string,
+): VerifiedEvent {
+  const template: EventTemplate = {
+    kind: ANCHR_QUERY_REQUEST,
+    created_at: nowUnix(),
+    tags: buildRequestTags(queryId, payload, regionCode),
+    content: JSON.stringify(payload),
+  };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+export function buildQueryResponseEvent(
+  identity: NostrIdentity,
+  queryEventId: string,
+  requesterPubKey: string,
+  payload: QueryResponsePayload,
+  oraclePubKey?: string,
+): VerifiedEvent {
+  const template: EventTemplate = {
+    kind: ANCHR_QUERY_RESPONSE,
+    created_at: nowUnix(),
+    tags: buildResponseTags(
+      identity,
+      queryEventId,
+      requesterPubKey,
+      payload,
+      oraclePubKey,
+    ),
+    content: encryptPayload(identity, requesterPubKey, payload),
+  };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+export function buildOfferFeedbackEvent(
+  identity: NostrIdentity,
+  queryEventId: string,
+  requesterPubKey: string,
+  payload: OfferFeedbackPayload,
+): VerifiedEvent {
+  const template: EventTemplate = {
+    kind: ANCHR_QUERY_FEEDBACK,
+    created_at: nowUnix(),
+    tags: [
+      ["e", queryEventId],
+      ["p", requesterPubKey],
+      ["status", "payment-required"],
+    ],
+    content: encryptPayload(identity, requesterPubKey, payload),
+  };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+export function buildSelectionFeedbackEvent(
+  identity: NostrIdentity,
+  queryEventId: string,
+  workerPubKey: string,
+  payload: SelectionFeedbackPayload,
+): VerifiedEvent {
+  const template: EventTemplate = {
+    kind: ANCHR_QUERY_FEEDBACK,
+    created_at: nowUnix(),
+    tags: [
+      ["e", queryEventId],
+      ["p", workerPubKey],
+      ["status", "processing"],
+    ],
+    content: encryptPayload(identity, workerPubKey, payload),
+  };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+export function buildQuerySettlementEvent(
+  identity: NostrIdentity,
+  queryEventId: string,
+  responseEventId: string,
+  workerPubKey: string,
+  payload: QuerySettlementPayload,
+): VerifiedEvent {
+  const template: EventTemplate = {
+    kind: ANCHR_QUERY_FEEDBACK,
+    created_at: nowUnix(),
+    tags: [
+      ["e", queryEventId],
+      ["e", responseEventId],
+      ["p", workerPubKey],
+    ],
+    content: encryptPayload(identity, workerPubKey, payload),
+  };
+  return finalizeEvent(template, identity.secretKey);
+}
+
+/**
+ * Build an Oracle Announcement event (kind 30088).
+ *
+ * Parametrized replaceable event per the oracle-registry spec — Oracles publish their
+ * capabilities, fees, and endpoints so Requesters can discover them.
+ */
+export function buildOracleAnnouncementEvent(
+  identity: NostrIdentity,
+  oracleInfo: OracleInfo,
+  relayUrls?: string[],
+): VerifiedEvent {
+  const tags: string[][] = [
+    ["d", oracleInfo.id],
+    ["t", "anchr-oracle"],
+  ];
+
+  // Add capability tags: anchr-oracle-<factor>
+  if (oracleInfo.supported_factors?.length) {
+    for (const factor of oracleInfo.supported_factors) {
+      tags.push(["t", `anchr-oracle-${factor}`]);
+    }
+  }
+
+  // Add relay hints
+  if (relayUrls?.length) {
+    for (const url of relayUrls) {
+      tags.push(["relay", url]);
+    }
+  }
+
+  const content = JSON.stringify({
+    name: oracleInfo.name,
+    ...(oracleInfo.endpoint !== undefined && { endpoint: oracleInfo.endpoint }),
+    fee_ppm: oracleInfo.fee_ppm,
+    supported_factors: oracleInfo.supported_factors ?? [],
+    supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
+    ...(oracleInfo.min_bounty_sats !== undefined &&
+      { min_bounty_sats: oracleInfo.min_bounty_sats }),
+    ...(oracleInfo.max_bounty_sats !== undefined &&
+      { max_bounty_sats: oracleInfo.max_bounty_sats }),
+    ...(oracleInfo.description !== undefined &&
+      { description: oracleInfo.description }),
+  });
+
+  const template: EventTemplate = {
+    kind: ANCHR_ORACLE_ANNOUNCEMENT,
+    created_at: nowUnix(),
+    tags,
+    content,
+  };
+
+  return finalizeEvent(template, identity.secretKey);
+}

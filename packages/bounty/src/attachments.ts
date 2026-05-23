@@ -21,4 +21,4 @@ export type {
   StoredAttachmentBuffer,
   StoredAttachmentStats,
 } from "./infrastructure/attachments.ts";
-export { validateAttachmentUri } from "./infrastructure/url-validation.ts";
+export { validateAttachmentUri } from "../../sdk/src/attachments/url-validation.ts";

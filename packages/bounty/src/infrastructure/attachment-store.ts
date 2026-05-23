@@ -1,6 +1,8 @@
 import { Buffer } from "node:buffer";
-import { isBlossomEnabled } from "./blossom/client.ts";
-import { workerUpload } from "./blossom/worker-upload.ts";
+import {
+  isBlossomEnabled,
+  workerUpload,
+} from "../../../sdk/src/attachments/mod.ts";
 import { validateC2pa } from "@anchr/sdk/proofs";
 import { validateExif } from "@anchr/sdk/proofs";
 import { storeIntegrity } from "@anchr/sdk/proofs";
@@ -122,7 +124,7 @@ function buildAttachmentRef(
     filename: result.attachment.filename,
     size_bytes: result.attachment.size_bytes,
     blossom_hash: result.blossom.hash,
-    blossom_servers: result.blossom.urls.map((u) =>
+    blossom_servers: result.blossom.urls.map((u: string) =>
       u.replace(`/${result.blossom.hash}`, "")
     ),
   };

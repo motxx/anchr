@@ -13,13 +13,13 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { generateEphemeralIdentity } from "../../packages/bounty/src/infrastructure/nostr/crypto/identity.ts";
-import { buildOracleAnnouncementEvent } from "../../packages/bounty/src/infrastructure/nostr/events/event-builders.ts";
+import { generateEphemeralIdentity } from "@anchr/sdk/adapters/nostr";
+import { buildOracleAnnouncementEvent } from "@anchr/sdk/adapters/nostr";
 import {
   discoverOracles,
   parseOracleAnnouncementEvent,
-} from "../../packages/bounty/src/infrastructure/oracle-client/oracle-discovery.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../../packages/bounty/src/infrastructure/nostr/events/events.ts";
+} from "@anchr/sdk/adapters/oracle-client";
+import { ANCHR_ORACLE_ANNOUNCEMENT } from "@anchr/sdk/adapters/nostr";
 import type { OracleInfo } from "../../packages/sdk/src/requests/domain/oracle-types.ts";
 import { isRelayReachable } from "../helpers/regtest.ts";
 

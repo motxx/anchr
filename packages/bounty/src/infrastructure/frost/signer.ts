@@ -13,7 +13,7 @@
  * directly.
  */
 
-import { verifyProof } from "../verification/verifier.ts";
+import { verifyProof } from "@anchr/sdk/proofs";
 import type {
   BlossomKeyMap,
   VerificationInput,

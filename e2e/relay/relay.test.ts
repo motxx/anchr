@@ -14,10 +14,10 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { createQueryService } from "../../packages/sdk/src/requests/application/query-service.ts";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { publishQueryToRelay } from "../../packages/bounty/src/infrastructure/nostr/transport/relay-publish.ts";
-import { closePool } from "../../packages/bounty/src/infrastructure/nostr/transport/client.ts";
-import { ANCHR_QUERY_REQUEST } from "../../packages/bounty/src/infrastructure/nostr/events/events.ts";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import { publishQueryToRelay } from "@anchr/sdk/adapters/nostr";
+import { closePool } from "@anchr/sdk/adapters/nostr";
+import { ANCHR_QUERY_REQUEST } from "@anchr/sdk/adapters/nostr";
 import { isRelayReachable } from "../helpers/regtest.ts";
 import process from "node:process";
 

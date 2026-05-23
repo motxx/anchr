@@ -7,3 +7,4 @@ export * from "./proof-redaction.ts";
 export * from "./proofmode-validation.ts";
 export * from "./tlsn-types.ts";
 export * from "./tlsn-validation.ts";
+export * from "./verification/index.ts";

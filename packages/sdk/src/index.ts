@@ -151,7 +151,7 @@ export {
   type PublishResult,
   type RelayClient,
   type Subscription,
-} from "./adapters/nostr.ts";
+} from "./adapters/nostr/mod.ts";
 
 export {
   type ActorStateStore,
