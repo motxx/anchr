@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -63,3 +64,35 @@ Relevant current surfaces:
 - Remove `packages/bounty` from workspace, publish dry-run, import maps, and
   lint exclusions.
 - Delete the empty package shell and verify the package/e2e test suite.
+
+## Resolution
+
+Implemented by updating:
+
+- `deno.json`
+- `Dockerfile`
+- `packages/bounty/README.md`
+- `packages/bounty/deno.json`
+
+Verified with:
+
+- `rg -n "@anchr/bounty|@anchr/sdk/bounty|packages/bounty/src|packages/bounty" packages e2e deno.json`
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `test ! -e packages/bounty`
+- `deno test scripts/lint-dockerfile-workspace.test.ts --allow-read`
+- `deno task test`
+- `deno task lint:strict`
+
+Harness update:
+
+- Existing `scripts/lint-dockerfile-workspace.ts` and
+  `scripts/lint-dockerfile-workspace.test.ts` caught the stale Dockerfile
+  workspace copy after `packages/bounty` left the workspace.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0054 can now be resolved when its remaining acceptance is verified.

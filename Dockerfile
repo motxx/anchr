@@ -31,7 +31,6 @@ COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /us
 # source tree lands in the next COPY step.
 COPY deno.json deno.lock ./
 COPY packages/protocol/deno.json ./packages/protocol/
-COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
 RUN deno install
 
