@@ -1,7 +1,7 @@
 import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getRuntimeConfig } from "./config.ts";
-import { withEnv } from "../testing/helpers.ts";
+import { withEnv } from "../../testing/helpers.ts";
 
 describe("getRuntimeConfig", () => {
   // Save and clear env vars that affect config

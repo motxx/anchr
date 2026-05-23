@@ -8,7 +8,7 @@ import {
   materializeQueryResult,
   normalizeQueryResult,
   resolveStoredAttachment,
-} from "./attachments.ts";
+} from "./access.ts";
 
 test("resolveStoredAttachment accepts absolute URLs", () => {
   const attachment = resolveStoredAttachment(

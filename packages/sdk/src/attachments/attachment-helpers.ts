@@ -7,9 +7,9 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   BlossomKeyMaterial,
-} from "../../../sdk/src/requests/domain/types.ts";
-import type { StoredAttachment } from "./attachments.ts";
-import { downloadFromBlossom } from "./blossom/client.ts";
+} from "../requests/domain/types.ts";
+import type { StoredAttachment } from "./access.ts";
+import { downloadFromBlossom } from "./blossom.ts";
 
 type AttachmentLike = AttachmentRef | string;
 

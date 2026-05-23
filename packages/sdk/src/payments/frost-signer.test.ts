@@ -1,13 +1,13 @@
 import { afterEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createFrostSigner } from "./signer.ts";
+import { createFrostSigner } from "./frost-signer.ts";
 import {
   _setFrostSignerPathForTest,
   dkgRound1,
   dkgRound2,
   dkgRound3,
-} from "@anchr/sdk/payments";
-import type { AttachmentRef } from "../../../../sdk/src/requests/domain/types.ts";
+} from "./mod.ts";
+import type { AttachmentRef } from "../requests/domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

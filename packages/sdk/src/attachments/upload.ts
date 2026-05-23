@@ -1,24 +1,24 @@
 import { Buffer } from "node:buffer";
+import { isBlossomEnabled } from "./blossom.ts";
+import { workerUpload } from "./worker-upload.ts";
 import {
-  isBlossomEnabled,
-  workerUpload,
-} from "../../../sdk/src/attachments/mod.ts";
-import { validateC2pa } from "@anchr/sdk/proofs";
-import { validateExif } from "@anchr/sdk/proofs";
-import { storeIntegrity } from "@anchr/sdk/proofs";
-import type { ProofModeIntegrity } from "@anchr/sdk/proofs";
-import { parseProofModeZip } from "@anchr/sdk/proofs";
+  parseProofModeZip,
+  type ProofModeIntegrity,
+  storeIntegrity,
+  validateC2pa,
+  validateExif,
+} from "../proofs/mod.ts";
 import type {
   AttachmentRef,
   BlossomKeyMaterial,
   GpsCoord,
-} from "../../../sdk/src/requests/domain/types.ts";
+} from "../requests/domain/types.ts";
 import {
   detectZip,
   extractProofModeIntegrity,
   inferMimeType,
   logIntegrity,
-} from "./attachment-store-helpers.ts";
+} from "./upload-helpers.ts";
 
 export interface UploadResult {
   attachment: AttachmentRef;

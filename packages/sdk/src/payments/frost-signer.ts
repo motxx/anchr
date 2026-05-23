@@ -13,21 +13,21 @@
  * directly.
  */
 
-import { verifyProof } from "@anchr/sdk/proofs";
+import { verifyProof } from "../proofs/mod.ts";
 import type {
   BlossomKeyMap,
   VerificationInput,
   VerificationRequirement,
-} from "../../../../sdk/src/requests/domain/types.ts";
+} from "../requests/domain/types.ts";
 import {
   dkgRound1,
   dkgRound2,
   dkgRound3,
   signRound1,
   signRound2,
-} from "@anchr/sdk/payments";
+} from "./frost-cli.ts";
 
-import { getLogger } from "../../runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-signer"]);
 
 export interface FrostSignerConfig {

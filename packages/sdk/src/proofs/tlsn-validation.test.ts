@@ -1,7 +1,7 @@
 /**
  * Unit tests for tlsn-validation: pure functions and validateTlsn against
  * a mock verifier binary. Integration tests that exercise the end-to-end
- * verifier orchestration flow live in packages/bounty/src/infrastructure/verification/
+ * verifier orchestration flow live in SDK proof verification modules.
  * verifier-tlsn.test.ts (that file imports the host's verifier wrapper
  * which is not part of the package).
  */

@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-23
 
 ## Priority
 
@@ -76,3 +77,40 @@ Relevant current surfaces:
 - Move retained helpers and tests to their SDK owners.
 - Delete claim-gate-only code unless it has a narrow SDK paid-request owner.
 - Rewrite imports and delete obsolete bounty helper barrels.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/attachments/`
+- `packages/sdk/src/payments/`
+- `packages/sdk/src/internal/runtime/`
+- `e2e/regtest/regtest-cashu.test.ts`
+- `deno.json`
+
+Deleted:
+
+- `packages/bounty/src/`
+
+Verified with:
+
+- `rg -n "packages/bounty/src/(infrastructure/(attachment|blossom|cashu|claim-gate|escrow|frost|verification)|runtime|attachments|claim-gate|escrow|verification)" packages e2e deno.json`
+- `rg -n "@anchr/bounty/(attachments|claim-gate|escrow|verification)|@anchr/sdk/bounty" packages e2e deno.json`
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/sdk/src/attachments/access.test.ts packages/sdk/src/attachments/upload.test.ts packages/sdk/src/internal/runtime/config.test.ts packages/sdk/src/payments/wallet-store.test.ts packages/sdk/src/payments/htlc-escrow.test.ts packages/sdk/src/payments/preimage-store.test.ts packages/sdk/src/payments/redeem-htlc.test.ts packages/sdk/src/payments/cashu-escrow-provider.test.ts packages/sdk/src/payments/frost-escrow-provider.test.ts packages/sdk/src/payments/frost-signer.test.ts`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+
+Harness update:
+
+- SDK unit tests moved with the retained helpers, and e2e/regtest now imports
+  attachment normalization from `@anchr/sdk/attachments`.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- #0060 deletes the remaining `packages/bounty/` package shell and workspace
+  manifest references.

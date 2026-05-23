@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { moduleDir } from "../runtime/mod.ts";
+import { moduleDir } from "./mod.ts";
 
 function readNumberEnv(name: string, fallback: number): number {
   const value = Deno.env.get(name);

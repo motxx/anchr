@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { uploadAttachment } from "./attachment-store.ts";
+import { uploadAttachment } from "./upload.ts";
 
 describe("uploadAttachment", () => {
   test("throws when Blossom is not configured", async () => {

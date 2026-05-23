@@ -3,10 +3,9 @@
  */
 
 import { Buffer } from "node:buffer";
-import type { ProofModeIntegrity } from "@anchr/sdk/proofs";
-import type { ProofModeData } from "@anchr/sdk/proofs";
+import type { ProofModeData, ProofModeIntegrity } from "../proofs/mod.ts";
 
-import { getLogger } from "../runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "integrity"]);
 
 export function detectZip(rawBuffer: Buffer, filename: string): boolean {

@@ -8,8 +8,8 @@ import {
   spawn,
   which,
   writeFile,
-} from "../runtime/mod.ts";
-import { getRuntimeConfig } from "./config.ts";
+} from "../internal/runtime/mod.ts";
+import { getRuntimeConfig } from "../internal/runtime/config.ts";
 import type {
   AttachmentAccess,
   AttachmentHandle,
@@ -17,7 +17,7 @@ import type {
   AttachmentStorageKind,
   BlossomKeyMaterial,
   QueryResult,
-} from "../../../sdk/src/requests/domain/types.ts";
+} from "../requests/domain/types.ts";
 import {
   attachmentRefSource,
   extractBlossomFields,

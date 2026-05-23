@@ -27,7 +27,7 @@ import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { createQueryService } from "../../packages/sdk/src/requests/application/query-service.ts";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
-import { normalizeQueryResult } from "../../packages/bounty/src/infrastructure/attachments.ts";
+import { normalizeQueryResult } from "@anchr/sdk/attachments";
 import {
   checkInfraReady,
   createWallet,
@@ -58,7 +58,7 @@ const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
 // Wire oracleRegistry + preimageStore so verification can actually succeed
-// (mirrors production composition in packages/bounty/src/infrastructure/runtime.ts).
+// Mirrors production composition through SDK request storage.
 const testOracleRegistry = createOracleRegistry();
 const testPreimageStore = createPreimageStore();
 const testService = createQueryService({
