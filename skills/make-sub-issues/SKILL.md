@@ -47,6 +47,15 @@ Do not add ad-hoc `Parent`, `Subtasks`, or custom metadata fields unless
    - Avoid creating a child that merely repeats the whole parent.
    - Do not split just to mirror every bullet in the parent plan; split only
      where each child can close with its own verification.
+   - Assign one owner responsibility to each child. Avoid siblings that own the
+     same broad change.
+   - If one child decides and another executes, make the executor depend on the
+     decision child.
+   - If one child performs concrete changes and another verifies or cleans up
+     the result, make cleanup depend on the concrete change children.
+   - If a child is meant for another agent/session, include enough local
+     context, acceptance, and verification for that agent to succeed without
+     reading chat history.
 5. Determine the next issue number:
    - Parse `SEQUENCE` as the last allocated number.
    - Parse existing issue filenames in `docs/issues/pending/` and
@@ -63,12 +72,20 @@ Do not add ad-hoc `Parent`, `Subtasks`, or custom metadata fields unless
    - Preserve existing dependency bullets.
    - If `Depends on` currently contains only `- None`, replace it.
    - Do not duplicate numbers that are already listed.
+   - If splitting makes the parent plan obsolete, replace detailed parent steps
+     with pointers to the child numbers and the parent close condition.
 9. Validate the result:
    - `docs/issues/SEQUENCE` equals the last child number.
    - Every child file is under `docs/issues/pending/`.
    - Every child filename starts with its allocated four-digit number.
    - Every child `Blocks` list includes the parent number.
    - The parent `Depends on` list includes all child numbers.
+   - Every child has `Acceptance` and `Verification`.
+   - The child dependency graph has no cycles.
+   - Sibling ownership does not conflict. If siblings touch the same area, their
+     responsibilities and sequencing are explicit.
+   - Negative verification commands state the expected outcome, for example
+     `No matches are expected: rg ...`.
    - No private keys, proofs, personal data, fund-bearing details, or
      unpatched vulnerability details were added.
 10. Report the parent path, created child paths, and relationship updates.
@@ -141,6 +158,12 @@ Priority must be one of:
 - If splitting the parent makes its original plan obsolete, update the parent
   plan minimally to point at the child issue numbers rather than duplicating
   all child details.
+- For broad architecture work, prefer separate decision, change,
+  migration/pruning, and final enforcement children when those units can close
+  independently. This keeps later agents from re-opening decisions or
+  duplicating sibling work.
+- Do not make children depend on the parent. The relationship is represented by
+  child `Blocks: NNNN` and parent `Depends on`.
 
 ## Parent Dependency Update
 
@@ -163,4 +186,6 @@ After editing, summarize:
 - Parent issue updated.
 - Child issue numbers and paths created.
 - Any dependencies or blockers that were inferred.
-- Whether validation passed.
+- Ownership boundaries for each child.
+- Whether validation passed, including dependency graph and negative-check
+  expectation validation.

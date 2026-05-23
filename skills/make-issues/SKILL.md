@@ -26,11 +26,21 @@ Create one or more file-based issues in `docs/issues/pending/` and update
    - For broad findings whose correct split depends on current code, create a
      tracking issue and state that the resolver should split it before
      implementation if one coherent change is too broad.
+   - For related issue queues, make each issue's owner responsibility explicit
+     enough that another session or agent can resolve it without reading chat
+     history.
+   - Avoid sibling issues that own the same broad change. Put shared follow-up
+     cleanup in one later issue that depends on the concrete owner issues.
+   - If a verification command is a negative check, state the expected outcome
+     explicitly, for example `No matches are expected: rg ...`.
    - Avoid baking in over-specific implementation plans during issue creation.
    - If the request is too vague to produce a useful issue, inspect relevant
      local context before asking a question.
-5. Write each issue as `docs/issues/pending/NNNN-short-title.md`.
-6. Report the created paths and numbers.
+5. Check the dependency graph before writing: no cycles, prerequisites listed in
+   `Depends on`, parent/tracking issues depend on required children, and final
+   cleanup issues depend on the concrete changes they verify.
+6. Write each issue as `docs/issues/pending/NNNN-short-title.md`.
+7. Report the created paths and numbers.
 
 ## Issue Format
 
@@ -109,6 +119,12 @@ Priority must be one of:
   issues where the correct verification depends on the root cause.
 - Use the `Plan` section for immediate orientation and acceptance cues, not a
   full implementation design when the resolver has not inspected current code.
+- For delegated queues, separate decision, change, migration/pruning, and final
+  enforcement work when those responsibilities can close independently.
+- In `Acceptance`, name observable end states. In `Verification`, include the
+  expected outcome of negative checks.
+- Avoid vague shared verbs like "align everything" in sibling issues. If work is
+  shared, choose one owner issue or defer it to a cleanup issue.
 - Do not include private keys, proofs, personal data, fund-bearing details, or
   unpatched vulnerability details.
 - For security-sensitive work, write a safe high-level tracking issue and say
@@ -123,4 +139,10 @@ After editing:
 1. Confirm `docs/issues/SEQUENCE` equals the last allocated number.
 2. Confirm every new file is under `docs/issues/pending/`.
 3. Confirm each new filename starts with its allocated four-digit number.
-4. Confirm no sensitive material was added.
+4. Confirm every issue has `Acceptance` and `Verification`.
+5. Confirm multi-issue dependencies are acyclic and blocked issues list
+   prerequisites under `Depends on`.
+6. Confirm sibling ownership does not overlap broadly; if siblings touch the
+   same files, their responsibilities and sequencing are explicit.
+7. Confirm negative verification commands say whether no matches are expected.
+8. Confirm no sensitive material was added.
