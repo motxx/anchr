@@ -1,0 +1,4 @@
+interface:
+  display_name: "UNIX Design"
+  short_description: "Gate designs against single-purpose boundaries"
+  default_prompt: "Use $unix-software-design to check this plan against Anchr's single-purpose design rule."

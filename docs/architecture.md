@@ -145,9 +145,9 @@ specs/                         Universal wire/protocol contracts
 Public import names do not need to mirror the target directory names one-to-one,
 but every published name must have one clear owner. During pre-1.0 migration,
 prefer direct rewrites over compatibility shims: move a surface, update all
-imports and docs in the same change, and delete the replaced path unless the
-maintainer explicitly accepts a temporary facade. The intended stable public
-families are:
+imports and docs in the same change, and delete the replaced path. Do not keep
+temporary facades or compatibility paths for replaced architecture. The intended
+stable public families are:
 
 - `@anchr/protocol` for wire and schema helpers.
 - `@anchr/customer-sdk`, `@anchr/provider-sdk`, `@anchr/oracle-sdk`, and

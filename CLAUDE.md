@@ -33,6 +33,18 @@ invariant, referenced workaround, surprising ordering). Never narrate
 history (`added for X` / `previously did Y`) — caught by
 `lint:no-history-comments`.
 
+## Single-purpose design
+Project architecture follows the UNIX rule: write components that do one thing
+and do it well. This is a design gate, not a file-size rule.
+
+Before accepting a proposed direction, check whether each changed function,
+module, package, adapter, SDK, app, or example has one clear owner
+responsibility that can be stated in a sentence. Stop and challenge proposals
+that bundle unrelated responsibilities, hide concrete adapters behind SDKs,
+make apps/examples own reusable package logic, or add "convenience" facades that
+become second owners for existing behavior. Offer a smaller composition of
+single-purpose parts instead.
+
 ## Verification bar
 "Done" = full local pass:
 - `deno task test:all` — lint:strict + test:unit + test:integration +
