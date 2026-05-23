@@ -21,7 +21,7 @@ import {
 } from "node:fs";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { spawn } from "@anchr/core-runtime";
+import { spawn } from "./runtime/mod.ts";
 
 export interface ProofModeData {
   /** The extracted photo buffer. */

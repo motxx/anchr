@@ -10,7 +10,7 @@
 import { createHttpOracle } from "./http-oracle.ts";
 import type { OracleRegistry } from "./registry.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-config"]);
 
 export interface OracleConfigEntry {

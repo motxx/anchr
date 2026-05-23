@@ -20,7 +20,7 @@ import {
   Wallet,
 } from "@cashu/cashu-ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "cashu"]);
 
 export interface CashuConfig {

@@ -8,7 +8,7 @@ import {
   spawn,
   which,
   writeFile,
-} from "@anchr/core-runtime/mod";
+} from "../runtime/mod.ts";
 import { getRuntimeConfig } from "./config.ts";
 import type {
   AttachmentAccess,

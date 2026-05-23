@@ -9,7 +9,7 @@ import {
   type BlossomUploadResult,
   getBlossomConfig,
   uploadToBlossom,
-} from "@anchr/blossom";
+} from "./client.ts";
 
 export interface WorkerUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */

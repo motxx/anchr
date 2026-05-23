@@ -11,7 +11,6 @@
     "./wallet": "./src/wallet.ts"
   },
   "imports": {
-    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",

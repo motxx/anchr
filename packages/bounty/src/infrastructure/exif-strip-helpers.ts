@@ -9,7 +9,7 @@ import {
   spawn,
   which,
   writeFile,
-} from "@anchr/core-runtime/mod";
+} from "../runtime/mod.ts";
 import process from "node:process";
 
 const JPEG_SOI = 0xffd8;

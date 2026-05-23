@@ -1,7 +1,7 @@
 import type { Proof } from "@cashu/cashu-ts";
 import { getCashuWallet } from "@anchr/core-cashu/wallet";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "wallet"]);
 
 export type WalletRole = "requester" | "worker";

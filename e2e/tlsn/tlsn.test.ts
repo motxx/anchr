@@ -10,7 +10,7 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "@anchr/core-runtime";
+import { spawn } from "../helpers/process.ts";
 import {
   createQueryService,
   createQueryStore,

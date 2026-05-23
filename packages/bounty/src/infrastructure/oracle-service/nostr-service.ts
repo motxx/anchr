@@ -48,7 +48,7 @@ import {
   type WatchedQuery,
 } from "./nostr-handlers.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-nostr"]);
 
 /** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */

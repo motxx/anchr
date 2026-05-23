@@ -19,7 +19,7 @@ import { configure, getConsoleSink } from "@logtape/logtape";
 import {
   getLogger as sharedGetLogger,
   type Logger,
-} from "@anchr/core-runtime/logger";
+} from "../runtime/logger.ts";
 
 let configured = false;
 

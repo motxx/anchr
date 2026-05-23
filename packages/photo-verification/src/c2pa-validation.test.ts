@@ -10,7 +10,7 @@ import {
   readFileAsArrayBuffer,
   spawn,
   writeFile,
-} from "@anchr/core-runtime";
+} from "./runtime/mod.ts";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).

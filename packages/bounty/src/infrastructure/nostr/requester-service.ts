@@ -31,7 +31,7 @@ import type {
   TlsnEncryptedContext,
 } from "../../domain/types.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "requester"]);
 
 export interface RequesterConfig {

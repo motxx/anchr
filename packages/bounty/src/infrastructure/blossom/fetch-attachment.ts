@@ -1,5 +1,5 @@
 import type { AttachmentRef, BlossomKeyMaterial } from "../../domain/types.ts";
-import { downloadFromBlossom } from "@anchr/blossom";
+import { downloadFromBlossom } from "./client.ts";
 
 // Ephemeral key material is required: keys are never stored in AttachmentRef.
 export async function fetchBlossomAttachment(

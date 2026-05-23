@@ -10,9 +10,9 @@ import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, which, writeFile } from "@anchr/core-runtime";
+import { spawn, which, writeFile } from "./runtime/mod.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "c2pa"]);
 
 export interface C2paManifest {
@@ -47,7 +47,7 @@ function findC2paTool(): string | null {
   if (c2paToolPath) {
     log.error(`Found c2patool at ${c2paToolPath}`);
   }
-  return c2paToolPath;
+  return c2paToolPath ?? null;
 }
 
 export function isC2paAvailable(): boolean {

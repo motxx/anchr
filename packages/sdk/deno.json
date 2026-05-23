@@ -3,6 +3,12 @@
   "version": "0.0.1",
   "exports": {
     ".": "./src/index.ts",
+    "./adapters": "./src/adapters/mod.ts",
+    "./adapters/cashu": "./src/adapters/cashu.ts",
+    "./adapters/nostr": "./src/adapters/nostr.ts",
+    "./adapters/storage": "./src/adapters/storage.ts",
+    "./attachments": "./src/attachments/mod.ts",
+    "./attachments/blossom": "./src/attachments/blossom.ts",
     "./customer": "./src/customer.ts",
     "./provider": "./src/provider.ts",
     "./oracle": "./src/oracle.ts"
@@ -11,10 +17,6 @@
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
     "@std/expect": "jsr:@std/expect@^1",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
-    "@anchr/adapters": "../adapters/src/mod.ts",
-    "@anchr/adapters/cashu": "../adapters/src/cashu.ts",
-    "@anchr/adapters/nostr": "../adapters/src/nostr.ts",
-    "@anchr/adapters/storage": "../adapters/src/storage.ts",
     "@anchr/protocol": "../protocol/src/mod.ts",
     "@anchr/protocol/adapters": "../protocol/src/adapters.ts",
     "@anchr/protocol/capabilities": "../protocol/src/capabilities.ts",
@@ -30,6 +32,9 @@
   "publish": {
     "include": [
       "src/index.ts",
+      "src/adapters/**/*.ts",
+      "src/attachments/**/*.ts",
+      "src/internal/runtime/**/*.ts",
       "src/customer.ts",
       "src/customer-types.ts",
       "src/provider.ts",

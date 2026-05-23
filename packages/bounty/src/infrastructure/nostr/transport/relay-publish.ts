@@ -10,7 +10,7 @@ import { isNostrEnabled, publishEvent } from "./client.ts";
 import { buildQueryRequestEvent } from "../events/event-builders.ts";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../../runtime/logger.ts";
 const log = getLogger(["anchr", "relay"]);
 
 /**

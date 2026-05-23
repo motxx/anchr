@@ -30,7 +30,7 @@ import { registerFrostSignerRoutes } from "./frost-signer-routes.ts";
 import { registerFrostDkgRoutes } from "./frost-dkg-routes.ts";
 import { registerFrostSignRoutes } from "./frost-sign-routes.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-server"]);
 
 const ORACLE_ID = Deno.env.get("ORACLE_ID") ?? "remote-oracle";

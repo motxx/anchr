@@ -34,10 +34,6 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const packageDir = resolve(scriptDir, "..");
 
 const aliases = new Map<string, string>([
-  ["@anchr/adapters", "../adapters/src/mod.ts"],
-  ["@anchr/adapters/cashu", "../adapters/src/cashu.ts"],
-  ["@anchr/adapters/nostr", "../adapters/src/nostr.ts"],
-  ["@anchr/adapters/storage", "../adapters/src/storage.ts"],
   ["@anchr/protocol", "../protocol/src/mod.ts"],
   ["@anchr/protocol/adapters", "../protocol/src/adapters.ts"],
   ["@anchr/protocol/capabilities", "../protocol/src/capabilities.ts"],

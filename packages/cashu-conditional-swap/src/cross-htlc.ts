@@ -17,7 +17,7 @@ import {
   loadAndSend,
 } from "@anchr/core-cashu/escrow-helpers";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "cross-htlc"]);
 
 /**

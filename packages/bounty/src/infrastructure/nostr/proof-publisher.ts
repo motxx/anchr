@@ -23,7 +23,7 @@ import type { NostrIdentity } from "./crypto/identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
 import { publishEvent } from "./transport/client.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "proof-publisher"]);
 
 export interface NostrProofPublisherConfig {

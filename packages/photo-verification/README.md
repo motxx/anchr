@@ -9,8 +9,7 @@ vision-LLM), GPS Haversine distance, and an in-memory integrity store.
 ```jsonc
 {
   "imports": {
-    "@anchr/photo-verification": "jsr:@anchr/photo-verification@^0.1",
-    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
+    "@anchr/photo-verification": "jsr:@anchr/photo-verification@^0.1"
   }
 }
 ```
@@ -75,7 +74,6 @@ not installed.
 
 ## Dependencies
 
-- `@anchr/core-runtime` — for `spawn`, file I/O, `which`, shared logger
 - `@anthropic-ai/sdk` — for vision-LLM AI check (only used if
   `AI_CONTENT_CHECK=true`)
 - `@noble/hashes` — for SHA-256 (ProofMode hash verification)

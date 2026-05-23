@@ -16,7 +16,7 @@ import {
   spawn,
   which,
   writeFile,
-} from "@anchr/core-runtime";
+} from "./runtime/mod.ts";
 /**
  * Subset of the host server's Query needed to build the vision-LLM prompt.
  * photo-verification deliberately doesn't depend on the full host Query — callers
@@ -58,7 +58,7 @@ export interface BlossomKeyMaterial {
 /** Map of attachment ID → key material. */
 export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "ai-content-check"]);
 
 export interface ContentCheckResult {

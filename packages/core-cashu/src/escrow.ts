@@ -43,7 +43,7 @@ import {
   sumProofAmounts,
 } from "./escrow-helpers.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 import {
   buildHtlcFinalOptions,
   buildHtlcInitialOptions,

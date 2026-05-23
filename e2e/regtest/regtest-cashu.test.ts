@@ -22,7 +22,7 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "@anchr/core-runtime";
+import { spawn } from "../helpers/process.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
 import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";

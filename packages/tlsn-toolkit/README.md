@@ -7,8 +7,7 @@ Application-layer TLSNotary toolkit: wraps the upstream `tlsn-verifier` Rust bin
 ```jsonc
 {
   "imports": {
-    "@anchr/tlsn-toolkit": "jsr:@anchr/tlsn-toolkit@^0.1",
-    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
+    "@anchr/tlsn-toolkit": "jsr:@anchr/tlsn-toolkit@^0.1"
   }
 }
 ```
@@ -53,7 +52,6 @@ Validation tests use a mock verifier binary so they run without the real Rust cr
 
 ## Dependencies
 
-- `@anchr/core-runtime` — for `spawn`, module-dir lookup, shared logger
 - `TlsnAttestation` / `TlsnRequirement` / `TlsnVerifiedData` are exposed
   from this package itself at `@anchr/tlsn-toolkit/tlsn-types`.
 

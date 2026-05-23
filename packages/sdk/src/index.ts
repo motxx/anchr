@@ -145,7 +145,7 @@ export {
   type PublishResult,
   type RelayClient,
   type Subscription,
-} from "@anchr/adapters/nostr";
+} from "./adapters/nostr.ts";
 
 export {
   type ActorStateStore,
@@ -154,7 +154,7 @@ export {
   IndexedDbStateStoreError,
   type IndexedDbStateStoreOptions,
   type MemoryStateStoreOptions,
-} from "@anchr/adapters/storage";
+} from "./adapters/storage.ts";
 
 export {
   createHttpOracleClient,
@@ -181,4 +181,4 @@ export {
   type RedeemResult,
   validateHashHex,
   validateLocktime,
-} from "@anchr/adapters/cashu";
+} from "./adapters/cashu.ts";

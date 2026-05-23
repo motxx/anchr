@@ -12,8 +12,7 @@ oracles.
 ```jsonc
 {
   "imports": {
-    "@anchr/frost-oracle": "jsr:@anchr/frost-oracle@^0.1",
-    "@anchr/core-runtime": "jsr:@anchr/core-runtime@^0.1"
+    "@anchr/frost-oracle": "jsr:@anchr/frost-oracle@^0.1"
   }
 }
 ```
@@ -79,8 +78,6 @@ Tests skip gracefully when the `frost-signer` Rust binary is not built.
 
 ## Dependencies
 
-- `@anchr/core-runtime` — for `spawn` to invoke the Rust binary, plus shared
-  logger
 - `hono` — for the HTTP signing-coordinator (RPC between cluster nodes)
 - `ThresholdOracleConfig` is defined locally at `@anchr/frost-oracle/types`.
 

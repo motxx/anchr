@@ -11,8 +11,6 @@
     "./integrity-store": "./src/integrity-store.ts"
   },
   "imports": {
-    "@anchr/core-runtime": "../core-runtime/src/mod.ts",
-    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
     "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",

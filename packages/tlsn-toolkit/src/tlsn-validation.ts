@@ -14,7 +14,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, spawn, which, writeFile } from "@anchr/core-runtime";
+import { moduleDir, spawn, which, writeFile } from "./runtime/mod.ts";
 import type {
   TlsnAttestation,
   TlsnCondition,
@@ -22,7 +22,7 @@ import type {
   TlsnVerifiedData,
 } from "./tlsn-types.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "tlsn"]);
 
 // --- Proof replay protection ---
@@ -99,7 +99,7 @@ function findTlsnVerifier(): string | null {
   if (tlsnVerifierPath) {
     log.error(`Found tlsn-verifier at ${tlsnVerifierPath}`);
   }
-  return tlsnVerifierPath;
+  return tlsnVerifierPath ?? null;
 }
 
 export function isTlsnVerifierAvailable(): boolean {

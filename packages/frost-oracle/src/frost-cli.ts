@@ -7,9 +7,9 @@
 
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { moduleDir, spawn, which } from "@anchr/core-runtime";
+import { moduleDir, spawn, which } from "./runtime/mod.ts";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "./runtime/logger.ts";
 const log = getLogger(["anchr", "frost"]);
 
 let frostSignerPath: string | null | undefined;
@@ -49,7 +49,7 @@ export function findFrostSigner(): string | null {
   if (frostSignerPath) {
     log.error(`Found frost-signer at ${frostSignerPath}`);
   }
-  return frostSignerPath;
+  return frostSignerPath ?? null;
 }
 
 export function isFrostSignerAvailable(): boolean {

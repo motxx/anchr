@@ -18,7 +18,7 @@ import {
 } from "@anchr/core-cashu/escrow-helpers";
 import { verifyToken } from "@anchr/core-cashu/wallet";
 
-import { getLogger } from "@anchr/core-runtime/logger";
+import { getLogger } from "../../runtime/logger.ts";
 const log = getLogger(["anchr", "frost-escrow"]);
 
 export interface FrostEscrowConfig {

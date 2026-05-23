@@ -20,11 +20,7 @@
       "@anchr/protocol/events": ["../protocol/src/events.ts"],
       "@anchr/protocol/nostr": ["../protocol/src/nostr.ts"],
       "@anchr/protocol/schema": ["../protocol/src/schema.ts"],
-      "@anchr/protocol/types": ["../protocol/src/types.ts"],
-      "@anchr/adapters": ["../adapters/src/mod.ts"],
-      "@anchr/adapters/cashu": ["../adapters/src/cashu.ts"],
-      "@anchr/adapters/nostr": ["../adapters/src/nostr.ts"],
-      "@anchr/adapters/storage": ["../adapters/src/storage.ts"]
+      "@anchr/protocol/types": ["../protocol/src/types.ts"]
     },
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true

@@ -13,7 +13,6 @@
     "@anchr/core-cashu/escrow": "../core-cashu/src/escrow.ts",
     "@anchr/core-cashu/escrow-helpers": "../core-cashu/src/escrow-helpers.ts",
     "@anchr/core-cashu/preimage-store": "../core-cashu/src/preimage-store.ts",
-    "@anchr/core-runtime/logger": "../core-runtime/src/logger.ts",
     "@anchr/frost-oracle/frost-cli": "../frost-oracle/src/frost-cli.ts",
     "@anchr/frost-oracle/dual-outcome-config": "../frost-oracle/src/dual-outcome-config.ts",
     "@anchr/frost-oracle/signing-coordinator": "../frost-oracle/src/signing-coordinator.ts",

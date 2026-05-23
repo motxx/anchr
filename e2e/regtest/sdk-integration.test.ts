@@ -28,8 +28,8 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createCustomer } from "@anchr/sdk/customer";
 import { createProvider } from "@anchr/sdk/provider";
-import { createCashuClient } from "@anchr/adapters/cashu";
-import { createRelayClient } from "@anchr/adapters/nostr";
+import { createCashuClient } from "@anchr/sdk/adapters/cashu";
+import { createRelayClient } from "@anchr/sdk/adapters/nostr";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import {
   buildPreimageDeliveryEvent,

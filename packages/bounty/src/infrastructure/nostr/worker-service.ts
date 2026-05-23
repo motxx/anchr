@@ -41,7 +41,7 @@ import {
   workerUpload,
   type WorkerUploadResult,
 } from "../blossom/worker-upload.ts";
-import type { BlossomUploadResult } from "@anchr/blossom";
+import type { BlossomUploadResult } from "../blossom/client.ts";
 
 export interface WorkerConfig {
   /** Trusted Oracle pubkeys. Queries from unknown Oracles are ignored. */

@@ -2699,24 +2699,6 @@
       "npm:tailwindcss@^4.2.2"
     ],
     "members": {
-      "packages/adapters": {
-        "dependencies": [
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:@cashu/cashu-ts@3",
-          "npm:nostr-tools@2"
-        ]
-      },
-      "packages/blossom": {
-        "dependencies": [
-          "jsr:@logtape/logtape@2",
-          "jsr:@noble/hashes@2",
-          "jsr:@std/expect@1",
-          "jsr:@std/testing@1",
-          "npm:nostr-tools@2"
-        ]
-      },
       "packages/bounty": {
         "dependencies": [
           "jsr:@db/sqlite@0.12",
@@ -2748,11 +2730,6 @@
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
           "npm:@cashu/cashu-ts@3"
-        ]
-      },
-      "packages/core-runtime": {
-        "dependencies": [
-          "jsr:@logtape/logtape@2"
         ]
       },
       "packages/frost-oracle": {

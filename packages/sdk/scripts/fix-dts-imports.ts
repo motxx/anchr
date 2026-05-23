@@ -6,10 +6,6 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const distDir = join(scriptDir, "..", "dist");
 
 const aliases = new Map<string, string>([
-  ["@anchr/adapters", "adapters/src/mod.js"],
-  ["@anchr/adapters/cashu", "adapters/src/cashu.js"],
-  ["@anchr/adapters/nostr", "adapters/src/nostr.js"],
-  ["@anchr/adapters/storage", "adapters/src/storage.js"],
   ["@anchr/protocol", "protocol/src/mod.js"],
   ["@anchr/protocol/adapters", "protocol/src/adapters.js"],
   ["@anchr/protocol/capabilities", "protocol/src/capabilities.js"],
