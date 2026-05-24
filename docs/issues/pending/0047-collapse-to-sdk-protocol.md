@@ -18,6 +18,7 @@ Depends on:
 - 0054
 - 0055
 - 0056
+- 0065
 
 Blocks:
 - 0043
@@ -101,4 +102,6 @@ Relevant files:
 - Resolve #0055 to keep `@anchr/protocol` wire-only.
 - Resolve #0056 to remove remaining absorbed package manifests, package imports,
   and package/e2e references so only `@anchr/sdk` and `@anchr/protocol` remain.
+- Resolve #0065 to finish the Nostr adapter ownership cleanup left after moving
+  Oracle integration into SDK modules.
 - Close this parent only after the child issues verify the package collapse.
