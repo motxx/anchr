@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -75,3 +76,34 @@ Relevant files:
   vocabulary.
 - Update imports and issue-specific negative checks so future cleanups do not
   reintroduce the old internal file names.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/customer-service.ts`
+- `packages/sdk/src/adapters/nostr/customer-service.test.ts`
+- `packages/sdk/src/adapters/nostr/provider-service.ts`
+- `packages/sdk/src/adapters/nostr/provider-service.test.ts`
+- `packages/sdk/src/adapters/nostr/mod.ts`
+
+Verified with:
+
+- `test ! -e packages/sdk/src/adapters/nostr/requester-service.ts && test ! -e packages/sdk/src/adapters/nostr/worker-service.ts`
+- `rg -n "\\./(requester|worker)-service|requester-service|worker-service" packages/sdk/src/adapters/nostr`
+- `deno task test:unit`
+- `deno task lint:strict`
+
+Harness update:
+
+- Existing unit tests were preserved under the renamed Customer and Provider
+  service filenames; the issue-specific negative filename/import checks lock
+  the internal actor-vocabulary cleanup.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

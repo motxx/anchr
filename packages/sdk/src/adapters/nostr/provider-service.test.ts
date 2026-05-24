@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import type {
   DiscoveredRequest,
   ProviderNostrConfig,
-} from "./worker-service.ts";
+} from "./provider-service.ts";
 import {
   parseQueryRequestPayload,
   type QueryRequestPayload,

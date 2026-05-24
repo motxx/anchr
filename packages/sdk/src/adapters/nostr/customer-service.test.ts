@@ -1,7 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
-import { requestOracleHash } from "./requester-service.ts";
+import { requestOracleHash } from "./customer-service.ts";
 
 const oracleApp = new Hono();
 const ORACLE_API_KEY = "test-oracle-key";

@@ -13,13 +13,13 @@ export {
   submitOffer,
   waitForPreimage,
   waitForSelection,
-} from "./worker-service.ts";
+} from "./provider-service.ts";
 export type {
   DiscoveredRequest,
   ProviderNostrConfig,
   ProviderRequestState,
   ProviderUploadResult,
-} from "./worker-service.ts";
+} from "./provider-service.ts";
 export {
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
@@ -33,9 +33,9 @@ export {
   requestOracleHash,
   selectProvider,
   subscribeToOffers,
-} from "./requester-service.ts";
+} from "./customer-service.ts";
 export type {
   CreatePaidRequestInput,
   CustomerNostrConfig,
   CustomerRequestState,
-} from "./requester-service.ts";
+} from "./customer-service.ts";
