@@ -10,15 +10,15 @@
 export { Anchr } from "./client.ts";
 export type {
   AnchrConfig,
-  PhotoQueryOptions,
+  HttpRequestOptions,
+  HttpRequestResult,
+  PhotoRequestOptions,
   PhotoResult,
-  QueryCondition,
-  QueryOptions,
-  QueryResult,
+  RequestCondition,
 } from "./client-types.ts";
 export {
   AnchrError,
-  QueryTimeoutError,
+  RequestTimeoutError,
   VerificationFailedError,
 } from "./errors.ts";
 

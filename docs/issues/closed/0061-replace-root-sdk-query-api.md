@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -64,3 +65,33 @@ query-shaped API names rather than preserving aliases.
 - Rename retained root client types, methods, errors, tests, and README
   examples to request vocabulary.
 - Keep external REST payload details isolated inside the client implementation.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/client.ts`
+- `packages/sdk/src/client-types.ts`
+- `packages/sdk/src/errors.ts`
+- `packages/sdk/src/index.ts`
+- `packages/sdk/src/index.test.ts`
+
+Verified with:
+
+- `rg -n "QueryOptions|QueryResult|QueryTimeoutError|PhotoQueryOptions|anchr\\.query|createTlsnQuery|getQueryStatus|listOpenQueries|\\bquery\\(" packages/sdk/src/index.ts packages/sdk/src/client.ts packages/sdk/src/client-types.ts packages/sdk/src/errors.ts packages/sdk/README.md README.md`
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/sdk/src/index.test.ts`
+- `deno task test:unit`
+- `deno task lint:strict`
+
+Harness update:
+
+- `packages/sdk/src/index.test.ts` now compiles against `RequestTimeoutError`
+  from the root SDK export surface.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
