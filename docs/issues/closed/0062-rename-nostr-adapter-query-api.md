@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -63,3 +64,32 @@ requests.
 - Update the Nostr adapter barrel and all package/e2e callers.
 - Leave protocol wire field names unchanged unless a separate protocol issue
   owns the migration.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/mod.ts`
+- `packages/sdk/src/adapters/nostr/requester-service.ts`
+- `packages/sdk/src/adapters/nostr/worker-service.ts`
+- `packages/sdk/src/adapters/nostr/worker-service.test.ts`
+
+Verified with:
+
+- `rg -n "discoverQueries|createHtlcQuery|CreateQueryRequest|RequesterQueryState|WorkerQueryState|DiscoveredQuery" packages/sdk/src/adapters/nostr/mod.ts packages/sdk/src/adapters/nostr/requester-service.ts packages/sdk/src/adapters/nostr/worker-service.ts e2e packages/sdk/src/*.test.ts`
+- `deno eval 'const text = await Deno.readTextFile("packages/sdk/src/adapters/nostr/mod.ts"); const bad = text.split("\n").map((line, i) => [i + 1, line]).filter((entry) => /export .*\\b(Requester|Worker)\\b/.test(String(entry[1]))); if (bad.length) { console.log(bad.map((entry) => entry[0] + ":" + entry[1]).join("\n")); Deno.exit(1); }'`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+
+Harness update:
+
+- `packages/sdk/src/adapters/nostr/worker-service.test.ts` now compiles against the Provider/request type names, and the issue-specific symbol checks lock the removed Nostr adapter API names.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

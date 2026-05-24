@@ -1,17 +1,17 @@
 /**
- * Worker service — orchestrates the Worker's side of the HTLC flow.
+ * Provider service — orchestrates the Provider's side of the HTLC flow.
  *
  * Per README:
- *   1. Subscribe to kind 5300 queries, verify Oracle pubkey against whitelist
+ *   1. Subscribe to kind 5300 requests, verify Oracle pubkey against whitelist
  *   2. Send offer (kind 7000 status=payment-required)
  *   3. Wait for selection (kind 7000 status=processing), verify own pubkey
  *   4. Verify own pubkey is in HTLC condition on Cashu Mint
  *   5. Photograph on-site, C2PA sign, EXIF strip
- *   6. Generate K, encrypt blob, encrypt K→K_R (Requester) + K→K_O (Oracle)
+ *   6. Generate K, encrypt blob, encrypt K→K_C (Customer) + K→K_O (Oracle)
  *   7. Upload encrypted blob to Blossom
  *   8. Publish DVM Job Result (kind 6300)
  *   9. Wait for preimage via NIP-44 DM (kind 4) from Oracle
- *  10. Redeem HTLC with preimage + Worker signature
+ *  10. Redeem HTLC with preimage + Provider signature
  */
 
 import type { Event } from "nostr-tools";
@@ -37,14 +37,12 @@ import {
   subscribeToQueries,
 } from "./transport/client.ts";
 import { deriveConversationKey, encryptNip44 } from "./crypto/encryption.ts";
-import {
-  workerUpload,
-  type WorkerUploadResult,
-} from "../../attachments/worker-upload.ts";
+import { workerUpload } from "../../attachments/worker-upload.ts";
 import type { BlossomUploadResult } from "../../attachments/blossom.ts";
+import type { AttachmentRef } from "../../requests/domain/types.ts";
 
-export interface WorkerConfig {
-  /** Trusted Oracle pubkeys. Queries from unknown Oracles are ignored. */
+export interface ProviderNostrConfig {
+  /** Trusted Oracle pubkeys. Requests from unknown Oracles are ignored. */
   trustedOraclePubkeys: string[];
   /** Relay URLs. */
   relayUrls?: string[];
@@ -52,28 +50,33 @@ export interface WorkerConfig {
   blossomServerUrls?: string[];
 }
 
-export interface DiscoveredQuery {
+export interface DiscoveredRequest {
   eventId: string;
   pubkey: string;
   payload: QueryRequestPayload;
   oraclePubkey?: string;
-  requesterPubkey?: string;
+  customerPubkey?: string;
 }
 
-export interface WorkerQueryState {
+export interface ProviderRequestState {
   identity: NostrIdentity;
-  query: DiscoveredQuery;
+  request: DiscoveredRequest;
   selected: boolean;
   escrowToken?: string;
   preimage?: string;
 }
 
+export interface ProviderUploadResult {
+  attachment: AttachmentRef;
+  blossom: BlossomUploadResult;
+}
+
 /**
- * Step 1: Discover queries from the relay, filtering by trusted Oracle pubkeys.
+ * Step 1: Discover requests from the relay, filtering by trusted Oracle pubkeys.
  */
-export function discoverQueries(
-  config: WorkerConfig,
-  onQuery: (query: DiscoveredQuery) => void,
+export function discoverRequests(
+  config: ProviderNostrConfig,
+  onRequest: (request: DiscoveredRequest) => void,
   regionCode?: string,
 ): SubCloser {
   return subscribeToQueries(
@@ -93,12 +96,12 @@ export function discoverQueries(
           t[0] === "p" && t[3] === "oracle"
         );
 
-        onQuery({
+        onRequest({
           eventId: event.id,
           pubkey: event.pubkey,
           payload,
           oraclePubkey: payload.oracle_pubkey ?? oracleTag?.[1],
-          requesterPubkey: payload.requester_pubkey ?? event.pubkey,
+          customerPubkey: payload.requester_pubkey ?? event.pubkey,
         });
       } catch {
         // Malformed event, ignore
@@ -109,11 +112,11 @@ export function discoverQueries(
 }
 
 /**
- * Step 2: Submit an offer for a discovered query.
+ * Step 2: Submit an offer for a discovered request.
  */
 export async function submitOffer(
   identity: NostrIdentity,
-  query: DiscoveredQuery,
+  request: DiscoveredRequest,
   amountSats?: number,
   relayUrls?: string[],
 ): Promise<string> {
@@ -125,8 +128,8 @@ export async function submitOffer(
 
   const event = buildOfferFeedbackEvent(
     identity,
-    query.eventId,
-    query.requesterPubkey ?? query.pubkey,
+    request.eventId,
+    request.customerPubkey ?? request.pubkey,
     payload,
   );
 
@@ -139,7 +142,7 @@ export async function submitOffer(
  */
 export function waitForSelection(
   identity: NostrIdentity,
-  query: DiscoveredQuery,
+  request: DiscoveredRequest,
   onSelected: (
     escrowToken?: string,
     encryptedContext?: TlsnEncryptedContext,
@@ -148,7 +151,7 @@ export function waitForSelection(
   relayUrls?: string[],
 ): SubCloser {
   return subscribeToFeedback(
-    query.eventId,
+    request.eventId,
     (event: Event) => {
       try {
         const payload = parseFeedbackPayload(
@@ -162,7 +165,7 @@ export function waitForSelection(
           if (selection.selected_worker_pubkey === identity.publicKey) {
             onSelected(selection.htlc_token, selection.encrypted_context);
           } else {
-            // Another Worker was selected
+            // Another Provider was selected
             onRejected();
           }
         }
@@ -178,7 +181,7 @@ export function waitForSelection(
  * Steps 6-7: Encrypt blob with dual keys and upload to Blossom.
  *
  * Generates symmetric key K, encrypts blob with K (AES-256-GCM),
- * then encrypts K with Requester pubkey (K_R) and Oracle pubkey (K_O)
+ * then encrypts K with Customer pubkey (K_C) and Oracle pubkey (K_O)
  * using NIP-44.
  */
 export async function encryptAndUpload(
@@ -186,13 +189,13 @@ export async function encryptAndUpload(
   data: Uint8Array,
   filename: string,
   mimeType: string,
-  requesterPubkey: string,
+  customerPubkey: string,
   oraclePubkey: string,
   blossomServerUrls?: string[],
 ): Promise<
   {
-    upload: WorkerUploadResult;
-    kR: string; // K encrypted to Requester (NIP-44)
+    upload: ProviderUploadResult;
+    kR: string; // K encrypted to Customer (NIP-44)
     kO: string; // K encrypted to Oracle (NIP-44)
   } | null
 > {
@@ -202,17 +205,17 @@ export async function encryptAndUpload(
   });
   if (!upload) return null;
 
-  // Encrypt the symmetric key K to Requester (K_R) and Oracle (K_O) using NIP-44
+  // Encrypt the symmetric key K to Customer (K_C) and Oracle (K_O) using NIP-44
   const keyMaterial = JSON.stringify({
     key: upload.blossom.encryptKey,
     iv: upload.blossom.encryptIv,
   });
 
-  const requesterConvKey = deriveConversationKey(
+  const customerConvKey = deriveConversationKey(
     identity.secretKey,
-    requesterPubkey,
+    customerPubkey,
   );
-  const kR = encryptNip44(keyMaterial, requesterConvKey);
+  const kR = encryptNip44(keyMaterial, customerConvKey);
 
   const oracleConvKey = deriveConversationKey(identity.secretKey, oraclePubkey);
   const kO = encryptNip44(keyMaterial, oracleConvKey);
@@ -225,8 +228,8 @@ export async function encryptAndUpload(
  */
 export async function publishResult(
   identity: NostrIdentity,
-  query: DiscoveredQuery,
-  upload: WorkerUploadResult,
+  request: DiscoveredRequest,
+  upload: ProviderUploadResult,
   kR: string,
   kO: string,
   nonce: string,
@@ -248,10 +251,10 @@ export async function publishResult(
 
   const event = buildQueryResponseEvent(
     identity,
-    query.eventId,
-    query.requesterPubkey ?? query.pubkey,
+    request.eventId,
+    request.customerPubkey ?? request.pubkey,
     payload,
-    query.oraclePubkey,
+    request.oraclePubkey,
   );
 
   await publishEvent(event, relayUrls);
@@ -264,7 +267,7 @@ export async function publishResult(
 export function waitForPreimage(
   identity: NostrIdentity,
   oraclePubkey: string,
-  queryId: string,
+  requestId: string,
   onPreimage: (preimage: string) => void,
   onRejection: (reason: string) => void,
   relayUrls?: string[],
@@ -282,7 +285,7 @@ export function waitForPreimage(
           event.pubkey,
         );
 
-        if (payload.query_id !== queryId) return;
+        if (payload.query_id !== requestId) return;
 
         if (payload.type === "preimage") {
           onPreimage(payload.preimage);
@@ -315,7 +318,7 @@ export interface SettlementResult {
 export function waitForSettlement(
   identity: NostrIdentity,
   oraclePubkey: string,
-  queryId: string,
+  requestId: string,
   onSettlement: (result: SettlementResult) => void,
   onRejection: (reason: string) => void,
   relayUrls?: string[],
@@ -332,7 +335,7 @@ export function waitForSettlement(
           event.pubkey,
         );
 
-        if (payload.query_id !== queryId) return;
+        if (payload.query_id !== requestId) return;
 
         if (payload.type === "preimage") {
           onSettlement({ type: "preimage", preimage: payload.preimage });

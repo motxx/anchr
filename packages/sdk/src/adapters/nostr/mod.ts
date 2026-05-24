@@ -7,7 +7,7 @@ export type {
 } from "../types.ts";
 export * from "./index.ts";
 export {
-  discoverQueries,
+  discoverRequests,
   encryptAndUpload,
   publishResult,
   submitOffer,
@@ -15,18 +15,19 @@ export {
   waitForSelection,
 } from "./worker-service.ts";
 export type {
-  DiscoveredQuery,
-  WorkerConfig,
-  WorkerQueryState,
+  DiscoveredRequest,
+  ProviderNostrConfig,
+  ProviderRequestState,
+  ProviderUploadResult,
 } from "./worker-service.ts";
 export {
-  createHtlcQuery,
+  createHtlcRequest,
   requestOracleHash,
-  selectWorker,
+  selectProvider,
   subscribeToOffers,
 } from "./requester-service.ts";
 export type {
-  CreateQueryRequest,
-  RequesterConfig,
-  RequesterQueryState,
+  CreatePaidRequestInput,
+  CustomerNostrConfig,
+  CustomerRequestState,
 } from "./requester-service.ts";

@@ -1,12 +1,12 @@
 /**
- * Requester service — orchestrates the Requester's side of the escrow flow.
+ * Customer service — orchestrates the Customer's side of the escrow flow.
  *
  * Per README:
  *   1. Request hash(preimage) from Oracle
- *   2. Lock escrow token (Worker TBD)
+ *   2. Lock escrow token (Provider TBD)
  *   3. Publish DVM Job Request (kind 5300) with Oracle pubkey
- *   4. Listen for Worker offers (kind 7000 status=payment-required)
- *   5. Select Worker, swap escrow to add Worker pubkey
+ *   4. Listen for Provider offers (kind 7000 status=payment-required)
+ *   5. Select Provider, swap escrow to add Provider pubkey
  *   6. Announce selection (kind 7000 status=processing)
  *   7. Receive result (kind 6300), download blob, decrypt K_R
  */
@@ -32,9 +32,9 @@ import type {
 } from "../../requests/domain/types.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
-const log = getLogger(["anchr", "requester"]);
+const log = getLogger(["anchr", "customer"]);
 
-export interface RequesterConfig {
+export interface CustomerNostrConfig {
   /** Oracle endpoint URL (for HTTP-based hash request). */
   oracleEndpoint?: string;
   /** Oracle API key. */
@@ -47,7 +47,7 @@ export interface RequesterConfig {
   escrowProvider: EscrowProvider;
 }
 
-export interface CreateQueryRequest {
+export interface CreatePaidRequestInput {
   description: string;
   locationHint?: string;
   ttlSeconds?: number;
@@ -61,14 +61,14 @@ type FetchFn = (
   init?: RequestInit,
 ) => Promise<Response>;
 
-export interface RequesterQueryState {
-  queryId: string;
+export interface CustomerRequestState {
+  requestId: string;
   identity: NostrIdentity;
   escrow: EscrowInfo;
   escrowRef: string;
   nostrEventId: string;
   offers: OfferInfo[];
-  selectedWorkerPubkey?: string;
+  selectedProviderPubkey?: string;
   finalEscrowRef?: string;
 }
 
@@ -76,7 +76,7 @@ export interface RequesterQueryState {
  * Step 1: Request hash(preimage) from Oracle via HTTP.
  */
 export async function requestOracleHash(
-  queryId: string,
+  requestId: string,
   oracleEndpoint: string,
   oracleApiKey?: string,
   fetchFn: FetchFn = fetch,
@@ -89,7 +89,7 @@ export async function requestOracleHash(
   const res = await fetchFn(`${oracleEndpoint}/hash`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ query_id: queryId }),
+    body: JSON.stringify({ query_id: requestId }),
   });
 
   if (!res.ok) {
@@ -101,13 +101,13 @@ export async function requestOracleHash(
 }
 
 /**
- * Steps 1-3: Create a query with escrow and publish to Nostr.
+ * Steps 1-3: Create a request with escrow and publish to Nostr.
  */
-export async function createHtlcQuery(
-  config: RequesterConfig,
-  request: CreateQueryRequest,
-): Promise<RequesterQueryState | null> {
-  const queryId = `query_${Date.now()}_${
+export async function createHtlcRequest(
+  config: CustomerNostrConfig,
+  request: CreatePaidRequestInput,
+): Promise<CustomerRequestState | null> {
+  const requestId = `query_${Date.now()}_${
     Math.random().toString(36).slice(2, 8)
   }`;
   const identity = generateEphemeralIdentity();
@@ -118,7 +118,7 @@ export async function createHtlcQuery(
   let hash: string;
   if (config.oracleEndpoint) {
     const result = await requestOracleHash(
-      queryId,
+      requestId,
       config.oracleEndpoint,
       config.oracleApiKey,
     );
@@ -151,14 +151,14 @@ export async function createHtlcQuery(
 
   const event = buildQueryRequestEvent(
     identity,
-    queryId,
+    requestId,
     payload,
     request.locationHint,
   );
 
   const publishResult = await publishEvent(event, config.relayUrls);
   if (publishResult.successes.length === 0) {
-    log.error("Failed to publish query to any relay");
+    log.error("Failed to publish request to any relay");
   }
 
   const escrow: EscrowInfo = {
@@ -171,7 +171,7 @@ export async function createHtlcQuery(
   };
 
   return {
-    queryId,
+    requestId,
     identity,
     escrow,
     escrowRef: hold.escrow_ref,
@@ -181,10 +181,10 @@ export async function createHtlcQuery(
 }
 
 /**
- * Step 4: Listen for Worker offers.
+ * Step 4: Listen for Provider offers.
  */
 export function subscribeToOffers(
-  state: RequesterQueryState,
+  state: CustomerRequestState,
   onOffer: (offer: OfferInfo) => void,
   relayUrls?: string[],
 ): SubCloser {
@@ -217,31 +217,31 @@ export function subscribeToOffers(
 }
 
 /**
- * Steps 5-6: Select a Worker and announce selection.
+ * Steps 5-6: Select a Provider and announce selection.
  */
-export async function selectWorker(
-  config: RequesterConfig,
-  state: RequesterQueryState,
-  workerPubkey: string,
+export async function selectProvider(
+  config: CustomerNostrConfig,
+  state: CustomerRequestState,
+  providerPubkey: string,
   relayUrls?: string[],
   encryptedContext?: TlsnEncryptedContext,
 ): Promise<string | null> {
-  // Step 5: Swap escrow to bind Worker via EscrowProvider
+  // Step 5: Swap escrow to bind Provider via EscrowProvider
   const bound = await config.escrowProvider.bindWorker(
     state.escrowRef,
-    workerPubkey,
+    providerPubkey,
   );
   if (!bound) return null;
 
-  state.selectedWorkerPubkey = workerPubkey;
+  state.selectedProviderPubkey = providerPubkey;
   state.finalEscrowRef = bound.escrow_ref;
-  state.escrow.worker_pubkey = workerPubkey;
+  state.escrow.worker_pubkey = providerPubkey;
   state.escrow.escrow_ref = bound.escrow_ref;
 
   // Step 6: Announce selection (kind 7000 status=processing)
   const selectionPayload: SelectionFeedbackPayload = {
     status: "processing",
-    selected_worker_pubkey: workerPubkey,
+    selected_worker_pubkey: providerPubkey,
     htlc_token: bound.escrow_ref,
     encrypted_context: encryptedContext,
   };
@@ -249,7 +249,7 @@ export async function selectWorker(
   const event = buildSelectionFeedbackEvent(
     state.identity,
     state.nostrEventId,
-    workerPubkey,
+    providerPubkey,
     selectionPayload,
   );
 

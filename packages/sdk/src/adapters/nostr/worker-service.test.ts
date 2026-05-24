@@ -1,16 +1,19 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { DiscoveredQuery, WorkerConfig } from "./worker-service.ts";
+import type {
+  DiscoveredRequest,
+  ProviderNostrConfig,
+} from "./worker-service.ts";
 import {
   parseQueryRequestPayload,
   type QueryRequestPayload,
 } from "./events/events.ts";
 
-describe("Worker service — payload parsing and filtering", () => {
+describe("Provider service — payload parsing and filtering", () => {
   const trustedOracle = "oracle_pubkey_abc";
   const untrustedOracle = "oracle_pubkey_evil";
 
-  const config: WorkerConfig = {
+  const config: ProviderNostrConfig = {
     trustedOraclePubkeys: [trustedOracle],
   };
 
@@ -60,19 +63,19 @@ describe("Worker service — payload parsing and filtering", () => {
     expect(passes).toBe(true);
   });
 
-  test("DiscoveredQuery captures event metadata", () => {
+  test("DiscoveredRequest captures event metadata", () => {
     const payload = makePayload();
-    const query: DiscoveredQuery = {
+    const request: DiscoveredRequest = {
       eventId: "event123",
       pubkey: "sender_pubkey",
       payload,
       oraclePubkey: payload.oracle_pubkey,
-      requesterPubkey: payload.requester_pubkey ?? "sender_pubkey",
+      customerPubkey: payload.requester_pubkey ?? "sender_pubkey",
     };
 
-    expect(query.eventId).toBe("event123");
-    expect(query.oraclePubkey).toBe(trustedOracle);
-    expect(query.requesterPubkey).toBe("requester_pub");
+    expect(request.eventId).toBe("event123");
+    expect(request.oraclePubkey).toBe(trustedOracle);
+    expect(request.customerPubkey).toBe("requester_pub");
   });
 
   test("parseQueryRequestPayload rejects invalid JSON", () => {
