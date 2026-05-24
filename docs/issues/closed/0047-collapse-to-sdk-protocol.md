@@ -2,6 +2,7 @@
 
 Created: 2026-05-21
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -105,3 +106,38 @@ Relevant files:
 - Resolve #0065 to finish the Nostr adapter ownership cleanup left after moving
   Oracle integration into SDK modules.
 - Close this parent only after the child issues verify the package collapse.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/issues/closed/0050-absorb-role-sdks.md`
+- `docs/issues/closed/0051-absorb-runtime-adapters-attachments.md`
+- `docs/issues/closed/0052-absorb-payment-settlement.md`
+- `docs/issues/closed/0053-absorb-proof-helpers.md`
+- `docs/issues/closed/0054-retire-bounty-package.md`
+- `docs/issues/closed/0055-trim-protocol-wire-only.md`
+- `docs/issues/closed/0056-finalize-package-collapse.md`
+- `docs/issues/closed/0065-move-oracle-nostr-binding.md`
+- `docs/issues/closed/0047-collapse-to-sdk-protocol.md`
+
+Verified with:
+
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `rg -n "@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters|bounty)" packages e2e deno.json`
+- `deno task test`
+
+Harness update:
+
+- None — this parent closes the package-collapse work already locked by its
+  child issue tests and package-surface verification; final drift enforcement
+  remains with #0048.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0048
+- #0066
