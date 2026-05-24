@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -68,3 +69,35 @@ Relevant current surfaces:
 - Rewrite stale package and e2e imports to SDK/protocol or delete tests that
   only covered removed non-core package surfaces.
 - Leave apps/examples and final publish/lint enforcement to #0049 and #0048.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/adapters/`
+- `packages/blossom/`
+- `packages/core-runtime/`
+- `packages/customer-sdk/`
+- `packages/oracle-sdk/`
+- `packages/provider-sdk/`
+- `docs/issues/closed/0056-finalize-package-collapse.md`
+
+Verified with:
+
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `rg -n "@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters|bounty)|packages/bounty/src" packages e2e deno.json`
+- `deno task test`
+
+Harness update:
+
+- None — this issue closes the package-collapse cleanup by verifying the
+  existing workspace, import, and test surfaces; final drift enforcement remains
+  with #0048.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0047
