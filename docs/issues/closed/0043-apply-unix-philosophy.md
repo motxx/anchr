@@ -2,6 +2,7 @@
 
 Created: 2026-05-20
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -98,3 +99,35 @@ Relevant files:
   config, lint rules, examples, and publish metadata.
 - Close this parent only when a new reader can understand from the repository
   map that Anchr does one thing: verifiable paid requests.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/issues/closed/0043-apply-unix-philosophy.md`
+- `docs/issues/closed/0046-define-one-thing.md`
+- `docs/issues/closed/0047-collapse-to-sdk-protocol.md`
+- `docs/issues/closed/0048-enforce-minimal-surface.md`
+- `docs/issues/closed/0049-prune-noncore-surfaces.md`
+
+Verified with:
+
+- `test ! -d apps`
+- `test ! -d tools`
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `rg -n "@anchr/(customer-sdk|provider-sdk|oracle-sdk|core-runtime|core-cashu|frost-oracle|tlsn-toolkit|photo-verification|cashu-conditional-swap|blossom|adapters|bounty)|@anchr/sdk/bounty|@anchr/bounty" README.md docs/architecture.md deno.json packages examples`
+- `rg -n '(^|[^[:alnum:]_-])(apps|tools)/' README.md docs/architecture.md deno.json packages examples`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — this parent closes the Unix-philosophy surface work already enforced
+  by #0048's architecture lint and repository-surface checks.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0064 remains as the separate post-#0048 Blossom attachment boundary audit.
