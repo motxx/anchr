@@ -19,7 +19,7 @@ beforeEach(() => {
 function injectValidC2pa(attachmentId: string, queryId: string) {
   storeIntegrity({
     attachmentId,
-    queryId,
+    requestId: queryId,
     capturedAt: Date.now(),
     exif: {
       hasExif: false,

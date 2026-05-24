@@ -13,7 +13,7 @@ import { expect } from "@std/expect";
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { createQueryService } from "../../packages/sdk/src/requests/application/query-service.ts";
+import { createQueryService } from "@anchr/sdk";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { publishQueryToRelay } from "@anchr/sdk/adapters/nostr";
 import { closePool } from "@anchr/sdk/adapters/nostr";

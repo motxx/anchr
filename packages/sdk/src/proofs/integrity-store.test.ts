@@ -5,7 +5,7 @@ import type { ExifValidationResult } from "./exif-validation.ts";
 import {
   clearIntegrityStore,
   getIntegrity,
-  getIntegrityForQuery,
+  getIntegrityForRequest,
   purgeStaleIntegrity,
   storeIntegrity,
 } from "./integrity-store.ts";
@@ -37,7 +37,7 @@ describe("integrity store", () => {
   test("stores and retrieves by attachment ID", () => {
     storeIntegrity({
       attachmentId: "photo1.jpg",
-      queryId: "q1",
+      requestId: "q1",
       capturedAt: Date.now(),
       exif: dummyExif,
       c2pa: dummyC2pa,
@@ -46,52 +46,52 @@ describe("integrity store", () => {
     const result = getIntegrity("photo1.jpg");
     expect(result).not.toBeNull();
     expect(result!.exif.hasCameraModel).toBe(true);
-    expect(result!.queryId).toBe("q1");
+    expect(result!.requestId).toBe("q1");
   });
 
   test("returns null for unknown attachment", () => {
     expect(getIntegrity("nonexistent")).toBeNull();
   });
 
-  test("retrieves by query ID", () => {
+  test("retrieves by request ID", () => {
     storeIntegrity({
       attachmentId: "a.jpg",
-      queryId: "q2",
+      requestId: "q2",
       capturedAt: Date.now(),
       exif: dummyExif,
       c2pa: dummyC2pa,
     });
     storeIntegrity({
       attachmentId: "b.jpg",
-      queryId: "q2",
+      requestId: "q2",
       capturedAt: Date.now(),
       exif: dummyExif,
       c2pa: dummyC2pa,
     });
     storeIntegrity({
       attachmentId: "c.jpg",
-      queryId: "q3",
+      requestId: "q3",
       capturedAt: Date.now(),
       exif: dummyExif,
       c2pa: dummyC2pa,
     });
 
-    expect(getIntegrityForQuery("q2")).toHaveLength(2);
-    expect(getIntegrityForQuery("q3")).toHaveLength(1);
-    expect(getIntegrityForQuery("q99")).toHaveLength(0);
+    expect(getIntegrityForRequest("q2")).toHaveLength(2);
+    expect(getIntegrityForRequest("q3")).toHaveLength(1);
+    expect(getIntegrityForRequest("q99")).toHaveLength(0);
   });
 
   test("purges stale entries", () => {
     storeIntegrity({
       attachmentId: "old.jpg",
-      queryId: "q1",
+      requestId: "q1",
       capturedAt: Date.now() - 10_000_000,
       exif: dummyExif,
       c2pa: dummyC2pa,
     });
     storeIntegrity({
       attachmentId: "new.jpg",
-      queryId: "q2",
+      requestId: "q2",
       capturedAt: Date.now(),
       exif: dummyExif,
       c2pa: dummyC2pa,

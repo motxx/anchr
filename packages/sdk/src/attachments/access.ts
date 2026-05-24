@@ -16,7 +16,7 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   BlossomKeyMaterial,
-  QueryResult,
+  QueryResult as RequestSubmissionResult,
 } from "../requests/domain/types.ts";
 import {
   attachmentRefSource,
@@ -61,7 +61,7 @@ export interface AttachmentPreview {
   maxDimension: number;
 }
 
-export interface QueryAttachmentUrls {
+export interface AttachmentDeliveryUrls {
   viewUrl: string;
   metaUrl: string;
   previewUrl: string;
@@ -195,10 +195,10 @@ export function materializeAttachmentRef(
   };
 }
 
-export function materializeQueryResult(
-  result: QueryResult,
+export function materializeResultAttachments(
+  result: RequestSubmissionResult,
   requestUrl?: string,
-): QueryResult {
+): RequestSubmissionResult {
   if (!result.attachments?.length) return result;
   return {
     ...result,
@@ -208,37 +208,37 @@ export function materializeQueryResult(
   };
 }
 
-export function buildQueryAttachmentUrls(
-  queryId: string,
+export function buildAttachmentDeliveryUrls(
+  requestId: string,
   attachmentIndex: number,
   requestUrl?: string,
-): QueryAttachmentUrls {
+): AttachmentDeliveryUrls {
   const baseUrl = attachmentPublicBaseUrl(requestUrl);
   return {
     viewUrl: new URL(
-      `/queries/${queryId}/attachments/${attachmentIndex}`,
+      `/queries/${requestId}/attachments/${attachmentIndex}`,
       `${baseUrl}/`,
     ).toString(),
     metaUrl: new URL(
-      `/queries/${queryId}/attachments/${attachmentIndex}/meta`,
+      `/queries/${requestId}/attachments/${attachmentIndex}/meta`,
       `${baseUrl}/`,
     ).toString(),
     previewUrl: new URL(
-      `/queries/${queryId}/attachments/${attachmentIndex}/preview`,
+      `/queries/${requestId}/attachments/${attachmentIndex}/preview`,
       `${baseUrl}/`,
     ).toString(),
   };
 }
 
 export function buildAttachmentAccess(
-  queryId: string,
+  requestId: string,
   attachmentIndex: number,
   ref: AttachmentLike,
   requestUrl?: string,
 ): AttachmentAccess {
   const originalUrl = buildAttachmentAbsoluteUrl(ref, requestUrl);
-  const { viewUrl, metaUrl, previewUrl } = buildQueryAttachmentUrls(
-    queryId,
+  const { viewUrl, metaUrl, previewUrl } = buildAttachmentDeliveryUrls(
+    requestId,
     attachmentIndex,
     requestUrl,
   );
@@ -252,21 +252,21 @@ export function buildAttachmentAccess(
 }
 
 export function buildAttachmentHandle(
-  queryId: string,
+  requestId: string,
   attachmentIndex: number,
   ref: AttachmentLike,
   requestUrl?: string,
 ): AttachmentHandle {
   return {
     attachment: materializeAttachmentRef(ref, requestUrl),
-    access: buildAttachmentAccess(queryId, attachmentIndex, ref, requestUrl),
+    access: buildAttachmentAccess(requestId, attachmentIndex, ref, requestUrl),
   };
 }
 
-export function normalizeQueryResult(
-  result: QueryResult,
+export function normalizeResultAttachments(
+  result: RequestSubmissionResult,
   requestUrl?: string,
-): QueryResult {
+): RequestSubmissionResult {
   if (!result.attachments?.length) return result;
   return {
     ...result,

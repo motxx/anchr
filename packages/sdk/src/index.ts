@@ -188,3 +188,27 @@ export {
   validateHashHex,
   validateLocktime,
 } from "./adapters/cashu.ts";
+
+export {
+  createQueryService,
+  createQueryStore,
+  type QueryService,
+  type QueryStore,
+} from "./requests/application/query-service.ts";
+export { MIN_ESCROW_LOCKTIME_SECS } from "./requests/application/query-escrow-validation.ts";
+export type {
+  Oracle,
+  OracleAttestation,
+  OracleInfo,
+} from "./requests/domain/oracle-types.ts";
+export type { Query, QueryResult } from "./requests/domain/types.ts";
+export {
+  createMockEscrowProvider,
+  driveQuorumToProcessing,
+  driveToProcessing,
+  makeEscrowInfo,
+  makeFakeToken,
+  makeMockOracle,
+  makeQuorumService,
+  makeServiceWithPreimage,
+} from "./requests/testing/protocol-helpers.ts";

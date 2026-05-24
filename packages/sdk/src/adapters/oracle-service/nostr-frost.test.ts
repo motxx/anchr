@@ -66,9 +66,9 @@ function makeQuery(id: string) {
 
 const makeResult = () => ({ attachments: [] as AttachmentRef[] });
 
-// --- verifyAndDeliverFrost ---
+// --- verifyAndDeliverWithFrost ---
 
-describe("verifyAndDeliverFrost", () => {
+describe("verifyAndDeliverWithFrost", () => {
   afterEach(() => {
     _setPublishEventForTest(null);
     _setVerifyForTest(null);
@@ -78,7 +78,7 @@ describe("verifyAndDeliverFrost", () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });
     const service = createOracleNostrService(config);
-    service.generateHash("q1");
+    service.generateRequestHash("q1");
 
     const published: VerifiedEvent[] = [];
     _setPublishEventForTest(async (event: VerifiedEvent) => {
@@ -91,7 +91,7 @@ describe("verifyAndDeliverFrost", () => {
       failures: [],
     }));
 
-    const passed = await service.verifyAndDeliverFrost(
+    const passed = await service.verifyAndDeliverWithFrost(
       "q1",
       makeQuery("q1"),
       makeResult(),
@@ -120,7 +120,7 @@ describe("verifyAndDeliverFrost", () => {
       failures: ["C2PA invalid"],
     }));
 
-    const passed = await service.verifyAndDeliverFrost(
+    const passed = await service.verifyAndDeliverWithFrost(
       "q-rej",
       makeQuery("q-rej"),
       makeResult(),
@@ -150,7 +150,7 @@ describe("verifyAndDeliverFrost", () => {
     }));
 
     // Verification passes but coordinateSigning will fail (no real key material, no peers running)
-    const passed = await service.verifyAndDeliverFrost(
+    const passed = await service.verifyAndDeliverWithFrost(
       "q-nopeer",
       makeQuery("q-nopeer"),
       makeResult(),

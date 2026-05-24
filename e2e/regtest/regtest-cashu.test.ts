@@ -24,10 +24,10 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
-import { createQueryService } from "../../packages/sdk/src/requests/application/query-service.ts";
+import { createQueryService } from "@anchr/sdk";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
-import { normalizeQueryResult } from "@anchr/sdk/attachments";
+import { normalizeResultAttachments } from "@anchr/sdk/attachments";
 import {
   checkInfraReady,
   createWallet,
@@ -64,7 +64,7 @@ const testPreimageStore = createPreimageStore();
 const testService = createQueryService({
   oracleRegistry: testOracleRegistry,
   preimageStore: testPreimageStore,
-  normalizeResult: normalizeQueryResult,
+  normalizeResult: normalizeResultAttachments,
   hooks: {},
 });
 

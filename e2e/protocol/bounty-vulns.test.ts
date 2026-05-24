@@ -3,16 +3,13 @@ import { expect } from "@std/expect";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
-import {
-  createQueryService,
-  createQueryStore,
-} from "../../packages/sdk/src/requests/application/query-service.ts";
-import { MIN_ESCROW_LOCKTIME_SECS } from "../../packages/sdk/src/requests/application/query-escrow-validation.ts";
+import { createQueryService, createQueryStore } from "@anchr/sdk";
+import { MIN_ESCROW_LOCKTIME_SECS } from "@anchr/sdk";
 import {
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage as makeExploitService,
-} from "../../packages/sdk/src/requests/testing/protocol-helpers.ts";
+} from "@anchr/sdk";
 
 describe("VULN-1: Preimage is returned on successful oracle verification", () => {
   test("preimage is returned when oracle verification passes", async () => {

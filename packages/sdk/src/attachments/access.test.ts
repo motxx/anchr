@@ -3,10 +3,10 @@ import { expect } from "@std/expect";
 import {
   buildAttachmentAbsoluteUrl,
   buildAttachmentAccess,
+  buildAttachmentDeliveryUrls,
   buildAttachmentHandle,
-  buildQueryAttachmentUrls,
-  materializeQueryResult,
-  normalizeQueryResult,
+  materializeResultAttachments,
+  normalizeResultAttachments,
   resolveStoredAttachment,
 } from "./access.ts";
 
@@ -33,8 +33,8 @@ test("buildAttachmentAbsoluteUrl keeps external URLs", () => {
     );
 });
 
-test("normalizeQueryResult preserves blossom attachment refs", () => {
-  const result = normalizeQueryResult({
+test("normalizeResultAttachments preserves blossom attachment refs", () => {
+  const result = normalizeResultAttachments({
     attachments: [{
       id: "abc123",
       uri: "https://blossom.example.com/abc123",
@@ -50,8 +50,8 @@ test("normalizeQueryResult preserves blossom attachment refs", () => {
   expect(result.attachments[0]?.blossom_hash).toBe("abc123");
 });
 
-test("materializeQueryResult expands blossom attachment refs", () => {
-  const result = materializeQueryResult({
+test("materializeResultAttachments expands blossom attachment refs", () => {
+  const result = materializeResultAttachments({
     attachments: [{
       id: "abc123",
       uri: "https://blossom.example.com/abc123",
@@ -65,8 +65,8 @@ test("materializeQueryResult expands blossom attachment refs", () => {
   expect(result.attachments[0]?.uri).toBe("https://blossom.example.com/abc123");
 });
 
-test("buildQueryAttachmentUrls returns stable query attachment endpoints", () => {
-  const urls = buildQueryAttachmentUrls(
+test("buildAttachmentDeliveryUrls returns stable attachment endpoints", () => {
+  const urls = buildAttachmentDeliveryUrls(
     "query_1",
     2,
     "http://localhost:3000/queries/query_1",

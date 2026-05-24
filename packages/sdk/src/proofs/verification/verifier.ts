@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { createAiContentChecker } from "../ai-content-check.ts";
 import { validateC2pa } from "../c2pa-validation.ts";
 import { haversineKm } from "../geo.ts";
-import { getIntegrity, getIntegrityForQuery } from "../integrity-store.ts";
+import { getIntegrity, getIntegrityForRequest } from "../integrity-store.ts";
 import { validateTlsn } from "../tlsn-validation.ts";
 import { fetchBlossomAttachment } from "../../attachments/fetch-attachment.ts";
 import { validateAttachmentUri } from "../../attachments/url-validation.ts";
@@ -10,8 +10,8 @@ import type {
   AttachmentRef,
   BlossomKeyMap,
   GpsCoord,
-  Query,
-  QueryResult,
+  Query as VerifiableRequest,
+  QueryResult as RequestSubmissionResult,
   TlsnVerifiedData,
   VerificationDetail,
   VerificationInput,
@@ -180,9 +180,8 @@ function applyAiContentResult(
 
 /**
  * Pure, transport-neutral verification. Takes an explicit policy (`requirement`)
- * and evidence (`input`) instead of a Query/QueryResult pair, so it can be
- * called directly from any host — NIP-90 reference runtime, a fixed-stakeholder
- * HTTP service, or a FROST signer node — without coupling to the Query domain.
+ * and evidence (`input`) instead of a request/result pair, so it can be
+ * called directly from any host.
  *
  * The host orchestrator is responsible for the *trust envelope* around this
  * call: who signed the requirement, replay protection, deadline enforcement.
@@ -247,21 +246,23 @@ export async function verifyProof(
   };
 }
 
-/** Lossless mapping from the NIP-90 Query envelope to the pure VerificationRequirement. */
-export function queryToRequirement(query: Query): VerificationRequirement {
+export function requestToRequirement(
+  request: VerifiableRequest,
+): VerificationRequirement {
   return {
-    id: query.id,
-    factors: query.verification_requirements,
-    description: query.description,
-    challenge_nonce: query.challenge_nonce,
-    expected_gps: query.expected_gps,
-    max_gps_distance_km: query.max_gps_distance_km,
-    tlsn_requirements: query.tlsn_requirements,
+    id: request.id,
+    factors: request.verification_requirements,
+    description: request.description,
+    challenge_nonce: request.challenge_nonce,
+    expected_gps: request.expected_gps,
+    max_gps_distance_km: request.max_gps_distance_km,
+    tlsn_requirements: request.tlsn_requirements,
   };
 }
 
-/** Lossless mapping from QueryResult to the pure VerificationInput. */
-export function queryResultToInput(result: QueryResult): VerificationInput {
+export function resultToVerificationInput(
+  result: RequestSubmissionResult,
+): VerificationInput {
   return {
     attachments: result.attachments,
     gps: result.gps,
@@ -271,19 +272,19 @@ export function queryResultToInput(result: QueryResult): VerificationInput {
 }
 
 /**
- * Query-aware verification — adapter over `verifyProof`.
- *
  * NIP-90 adapters can use this shape. Standalone callers should construct a
  * `VerificationRequirement` directly and call `verifyProof`.
  */
 export function verify(
-  query: Query,
-  result: QueryResult,
+  request: VerifiableRequest,
+  result: RequestSubmissionResult,
   blossomKeys?: BlossomKeyMap,
 ): Promise<VerificationDetail> {
-  return verifyProof(queryToRequirement(query), queryResultToInput(result), {
-    blossomKeys,
-  });
+  return verifyProof(
+    requestToRequirement(request),
+    resultToVerificationInput(result),
+    { blossomKeys },
+  );
 }
 
 function checkC2paSignature(
@@ -436,9 +437,9 @@ async function verifyPhotoIntegrity(
     .filter((m) => m !== null);
 
   if (integrityRecords.length === 0) {
-    const byQuery = getIntegrityForQuery(requirementId);
-    if (byQuery.length > 0) {
-      integrityRecords.push(...byQuery);
+    const byRequest = getIntegrityForRequest(requirementId);
+    if (byRequest.length > 0) {
+      integrityRecords.push(...byRequest);
     }
   }
 

@@ -3,12 +3,12 @@ import { expect } from "@std/expect";
 import { Buffer } from "node:buffer";
 import {
   type AiContentCheckDeps,
-  type AiContentCheckQuery,
+  type AiContentCheckRequest,
   type AiContentCheckResult,
   createAiContentChecker,
 } from "./ai-content-check.ts";
 
-const baseQuery: AiContentCheckQuery = {
+const baseRequest: AiContentCheckRequest = {
   description: "Photo of Tokyo Tower",
   challenge_nonce: "ABC123",
   verification_requirements: ["ai_check"],
@@ -27,7 +27,7 @@ describe("createAiContentChecker", () => {
       getConfig: () => ({ enabled: false }),
       readAttachment: noopReadAttachment,
     });
-    const result = await check(baseQuery, {
+    const result = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",
@@ -42,7 +42,7 @@ describe("createAiContentChecker", () => {
       getConfig: () => ({ enabled: true, anthropicApiKey: undefined }),
       readAttachment: noopReadAttachment,
     });
-    const result = await check(baseQuery, {
+    const result = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",
@@ -57,7 +57,7 @@ describe("createAiContentChecker", () => {
       getConfig: () => ({ enabled: true, anthropicApiKey: "sk-test" }),
       readAttachment: noopReadAttachment,
     });
-    const result = await check(baseQuery, { attachments: [] });
+    const result = await check(baseRequest, { attachments: [] });
     expect(result).toBeNull();
   });
 
@@ -66,7 +66,7 @@ describe("createAiContentChecker", () => {
       getConfig: () => ({ enabled: true, anthropicApiKey: "sk-test" }),
       readAttachment: noopReadAttachment,
     });
-    const result = await check(baseQuery, {
+    const result = await check(baseRequest, {
       attachments: [
         {
           id: "a1",
@@ -90,8 +90,7 @@ describe("createAiContentChecker", () => {
       readAttachment: noopReadAttachment,
     });
 
-    // First call: disabled
-    let r = await check(baseQuery, {
+    let r = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",
@@ -100,9 +99,8 @@ describe("createAiContentChecker", () => {
     });
     expect(r).toBeNull();
 
-    // Toggle: enabled but no API key → still null but for different reason
     enabledFlag = true;
-    r = await check(baseQuery, {
+    r = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",
@@ -125,7 +123,7 @@ describe("createAiContentChecker", () => {
       }),
     });
 
-    const result = await check(baseQuery, {
+    const result = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",
@@ -149,7 +147,7 @@ describe("createAiContentChecker", () => {
       }),
     });
 
-    const result = await check(baseQuery, {
+    const result = await check(baseRequest, {
       attachments: [{
         id: "a1",
         uri: "https://example.com/photo.jpg",

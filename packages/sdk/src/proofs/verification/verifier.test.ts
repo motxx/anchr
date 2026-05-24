@@ -26,11 +26,10 @@ beforeEach(() => {
   clearIntegrityStore();
 });
 
-/** Inject a valid C2PA integrity record for a given attachment + query. */
 function injectC2paIntegrity(attachmentId: string, queryId: string) {
   storeIntegrity({
     attachmentId,
-    queryId,
+    requestId: queryId,
     capturedAt: Date.now(),
     exif: {
       hasExif: false,
@@ -126,7 +125,7 @@ test("attachment without C2PA fails", async () => {
   // Inject integrity record with NO C2PA manifest
   storeIntegrity({
     attachmentId: "photo_no_c2pa",
-    queryId: query.id,
+    requestId: query.id,
     capturedAt: Date.now(),
     exif: {
       hasExif: false,

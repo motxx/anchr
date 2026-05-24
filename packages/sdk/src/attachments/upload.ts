@@ -74,7 +74,7 @@ export async function uploadAttachment(
 
   storeIntegrity({
     attachmentId: attachment.id,
-    queryId,
+    requestId: queryId,
     capturedAt: Date.now(),
     exif: exifResult,
     c2pa: c2paResult,

@@ -1,17 +1,17 @@
 /**
- * Standalone-API tests: verifyProof() called directly without a Query envelope.
+ * Standalone-API tests: verifyProof() called directly without a lifecycle envelope.
  *
  * Asserts that fixed-stakeholder use cases can drive verification by
  * constructing a VerificationRequirement instead of going through
- * Query/QueryResult.
+ * lifecycle request/result types.
  */
 
 import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
   _setValidateTlsnForTest,
-  queryResultToInput,
-  queryToRequirement,
+  requestToRequirement,
+  resultToVerificationInput,
   verify,
   verifyProof,
 } from "./verifier.ts";
@@ -30,7 +30,7 @@ const now = Math.floor(Date.now() / 1000);
 function injectC2paIntegrity(attachmentId: string, requirementId: string) {
   storeIntegrity({
     attachmentId,
-    queryId: requirementId,
+    requestId: requirementId,
     capturedAt: Date.now(),
     exif: {
       hasExif: false,
@@ -196,7 +196,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   });
 });
 
-describe("queryToRequirement / queryResultToInput — adapter parity", () => {
+describe("requestToRequirement / resultToVerificationInput adapter parity", () => {
   beforeEach(() => {
     clearIntegrityStore();
   });
@@ -220,8 +220,8 @@ describe("queryToRequirement / queryResultToInput — adapter parity", () => {
 
     const viaQuery = await verify(query, result);
     const viaStandalone = await verifyProof(
-      queryToRequirement(query),
-      queryResultToInput(result),
+      requestToRequirement(query),
+      resultToVerificationInput(result),
     );
 
     expect(viaStandalone.passed).toBe(viaQuery.passed);
@@ -231,7 +231,7 @@ describe("queryToRequirement / queryResultToInput — adapter parity", () => {
       .toBe(true);
   });
 
-  test("queryToRequirement carries every security-relevant field", () => {
+  test("requestToRequirement carries every security-relevant field", () => {
     const tlsnReq: TlsnRequirement = {
       target_url: "https://example.com/x",
       conditions: [{ type: "contains", expression: "x", description: "x" }],
@@ -246,7 +246,7 @@ describe("queryToRequirement / queryResultToInput — adapter parity", () => {
       tlsn_requirements: tlsnReq,
     });
 
-    const requirement = queryToRequirement(query);
+    const requirement = requestToRequirement(query);
 
     expect(requirement.id).toBe("query_carry");
     expect(requirement.description).toBe("describe the proof");

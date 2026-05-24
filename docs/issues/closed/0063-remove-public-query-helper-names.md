@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -66,3 +67,40 @@ refactor unless they leak through an exported SDK subpath.
   vocabulary and update callers.
 - Keep any remaining lifecycle internals out of package exports and e2e imports,
   or create a narrower follow-up if the internal migration is too large.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/attachments/access.ts`
+- `packages/sdk/src/proofs/ai-content-check.ts`
+- `packages/sdk/src/proofs/integrity-store.ts`
+- `packages/sdk/src/proofs/verification/verifier.ts`
+- `packages/sdk/src/adapters/oracle-service/nostr-service.ts`
+- `packages/sdk/src/adapters/mod.ts`
+- `packages/sdk/src/adapters/oracle-client/index.ts`
+- `packages/sdk/src/index.ts`
+- `e2e/`
+
+Verified with:
+
+- `rg -n "Query|query|Bounty|bounty|claim[-_]?gate|ClaimGate" packages/sdk/src/attachments/mod.ts packages/sdk/src/proofs/mod.ts packages/sdk/src/adapters/oracle-client/index.ts packages/sdk/src/adapters/oracle-service/index.ts packages/sdk/src/adapters/mod.ts packages/sdk/deno.json` returned no matches.
+- `rg -n "packages/sdk/src/requests" e2e` returned no matches.
+- `deno test --allow-all packages/sdk/src/attachments/access.test.ts packages/sdk/src/proofs/integrity-store.test.ts packages/sdk/src/proofs/ai-content-check.test.ts packages/sdk/src/proofs/verification/verifier-standalone.test.ts packages/sdk/src/proofs/verification/verifier.test.ts packages/sdk/src/adapters/oracle-service/nostr-service.test.ts packages/sdk/src/adapters/oracle-service/nostr-frost.test.ts`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+
+Harness update:
+
+- Existing public-surface grep checks in this issue now pass, and focused unit
+  plus protocol e2e tests cover the renamed helper exports and e2e import
+  routing.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

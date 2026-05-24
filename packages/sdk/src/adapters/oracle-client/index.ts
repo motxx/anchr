@@ -2,7 +2,7 @@
  * Oracle client — the host as a *customer* of oracle services.
  *
  * Pulls oracle definitions from config / Nostr discovery, exposes a
- * registry the QueryService can resolve against, and ships an HTTP
+ * registry the request service can resolve against, and ships an HTTP
  * adapter for talking to remote oracle nodes.
  *
  * The other half — running this host *as* an oracle node — lives in

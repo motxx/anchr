@@ -29,7 +29,7 @@ export interface ProofModeIntegrity {
 
 export interface IntegrityMetadata {
   attachmentId: string;
-  queryId: string;
+  requestId: string;
   capturedAt: number;
   exif: ExifValidationResult;
   c2pa: C2paValidationResult;
@@ -39,7 +39,7 @@ export interface IntegrityMetadata {
 export interface IntegrityStore {
   store(metadata: IntegrityMetadata): void;
   get(attachmentId: string): IntegrityMetadata | null;
-  getForQuery(queryId: string): IntegrityMetadata[];
+  getForRequest(requestId: string): IntegrityMetadata[];
   purgeStale(maxAgeMs?: number): number;
   clear(): void;
 }
@@ -54,8 +54,8 @@ export function createIntegrityStore(): IntegrityStore {
     get(attachmentId) {
       return map.get(attachmentId) ?? null;
     },
-    getForQuery(queryId) {
-      return [...map.values()].filter((m) => m.queryId === queryId);
+    getForRequest(requestId) {
+      return [...map.values()].filter((m) => m.requestId === requestId);
     },
     purgeStale(maxAgeMs = 7_200_000) {
       const cutoff = Date.now() - maxAgeMs;
@@ -86,8 +86,8 @@ export function getIntegrity(attachmentId: string): IntegrityMetadata | null {
   return defaultStore.get(attachmentId);
 }
 
-export function getIntegrityForQuery(queryId: string): IntegrityMetadata[] {
-  return defaultStore.getForQuery(queryId);
+export function getIntegrityForRequest(requestId: string): IntegrityMetadata[] {
+  return defaultStore.getForRequest(requestId);
 }
 
 export function purgeStaleIntegrity(maxAgeMs = 7_200_000): number {

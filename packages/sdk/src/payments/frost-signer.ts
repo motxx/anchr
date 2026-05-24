@@ -8,7 +8,7 @@
  *
  * The interface is `(requirement, input)` — the same shape the standalone
  * `verifyProof()` accepts — so this signer is reachable equally from a
- * NIP-90 host (which adapts via `queryToRequirement` / `queryResultToInput`)
+ * NIP-90 host (which adapts via `requestToRequirement` / `resultToVerificationInput`)
  * and from a fixed-stakeholder caller that constructs the requirement
  * directly.
  */

@@ -28,13 +28,13 @@ function makeConfig(
   };
 }
 
-// --- generateHash ---
+// --- generateRequestHash ---
 
-describe("generateHash", () => {
+describe("generateRequestHash", () => {
   test("returns a hash string", () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    const { hash } = service.generateHash("q1");
+    const { hash } = service.generateRequestHash("q1");
     expect(typeof hash).toBe("string");
     expect(hash.length).toBeGreaterThan(0);
   });
@@ -42,8 +42,8 @@ describe("generateHash", () => {
   test("returns unique hash per query", () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    const h1 = service.generateHash("q1").hash;
-    const h2 = service.generateHash("q2").hash;
+    const h1 = service.generateRequestHash("q1").hash;
+    const h2 = service.generateRequestHash("q2").hash;
     expect(h1).not.toBe(h2);
   });
 
@@ -52,7 +52,7 @@ describe("generateHash", () => {
     const service = createOracleNostrService(
       makeConfig({ preimageStore: store }),
     );
-    const { hash } = service.generateHash("q1");
+    const { hash } = service.generateRequestHash("q1");
     expect(store.has(hash)).toBe(true);
     expect(store.getPreimage(hash)).not.toBeNull();
   });
@@ -70,7 +70,7 @@ describe("verifyAndDeliver", () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateHash("q1");
+    const { hash } = service.generateRequestHash("q1");
 
     const published: VerifiedEvent[] = [];
     _setPublishEventForTest(async (event: VerifiedEvent) => {
@@ -109,7 +109,7 @@ describe("verifyAndDeliver", () => {
       preimageStore: store,
     });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateHash("q-delivery-fail");
+    const { hash } = service.generateRequestHash("q-delivery-fail");
 
     _setPublishEventForTest(async () => ({
       successes: [],
@@ -145,7 +145,7 @@ describe("verifyAndDeliver", () => {
     const store = createPreimageStore();
     const config = makeConfig({ preimageStore: store });
     const service = createOracleNostrService(config);
-    service.generateHash("q1");
+    service.generateRequestHash("q1");
 
     const published: VerifiedEvent[] = [];
     _setPublishEventForTest(async (event: VerifiedEvent) => {
@@ -178,7 +178,7 @@ describe("verifyAndDeliver", () => {
   test("returns false when hash not registered", async () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    // Do NOT call generateHash
+    // Do NOT call generateRequestHash
 
     _setPublishEventForTest(async () => ({ successes: [], failures: [] }));
     _setVerifyForTest(async () => ({
@@ -219,8 +219,8 @@ describe("recordSelectedWorker", () => {
   });
 
   test("records worker pubkey for watched query", () => {
-    // watchQuery requires relay subscriptions — but with empty relayUrls it still records the entry
-    service.watchQuery("q1", "evt1", "requester_pub");
+    // watchRequest requires relay subscriptions — but with empty relayUrls it still records the entry
+    service.watchRequest("q1", "evt1", "requester_pub");
     // Should not throw
     service.recordSelectedWorker("q1", workerPubkey);
   });
@@ -255,7 +255,7 @@ describe("stop", () => {
   test("completes without error after watching queries", () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    service.watchQuery("q1", "evt1", "requester_pub");
+    service.watchRequest("q1", "evt1", "requester_pub");
     // Should not throw
     service.stop();
   });

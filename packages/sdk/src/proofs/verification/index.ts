@@ -1,7 +1,7 @@
 export {
   checkAttachmentContent,
-  queryResultToInput,
-  queryToRequirement,
+  requestToRequirement,
+  resultToVerificationInput,
   verify,
   verifyProof,
 } from "./verifier.ts";
@@ -27,7 +27,7 @@ export {
   clearIntegrityStore,
   createIntegrityStore,
   getIntegrity,
-  getIntegrityForQuery,
+  getIntegrityForRequest,
   type IntegrityMetadata,
   type IntegrityStore,
   purgeStaleIntegrity,

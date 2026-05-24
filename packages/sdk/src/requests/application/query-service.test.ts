@@ -1074,7 +1074,7 @@ describe("createIntegrityStore isolation", () => {
     const store2 = createIntegrityStore();
     store1.store({
       attachmentId: "a.jpg",
-      queryId: "q1",
+      requestId: "q1",
       capturedAt: Date.now(),
       exif: {
         hasExif: false,

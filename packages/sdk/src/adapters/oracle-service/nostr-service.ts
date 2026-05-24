@@ -32,11 +32,14 @@ import type { FrostCoordinator } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
 import { coordinateSigning } from "../../payments/mod.ts";
 import {
-  queryResultToInput,
-  queryToRequirement,
+  requestToRequirement,
+  resultToVerificationInput,
   verify,
 } from "../../proofs/verification/verifier.ts";
-import type { Query, QueryResult } from "../../requests/domain/types.ts";
+import type {
+  Query as VerifiableRequest,
+  QueryResult as RequestSubmissionResult,
+} from "../../requests/domain/types.ts";
 import {
   buildQueryFromPayload,
   buildResultFromPayload,
@@ -77,13 +80,13 @@ export interface OracleNostrServiceConfig {
   frostNodeConfig?: FrostNodeConfig;
   /** Callback when a Worker submits an offer. */
   onOffer?: (
-    queryId: string,
+    requestId: string,
     workerPubkey: string,
     amountSats?: number,
   ) => void;
   /** Callback when verification completes. */
   onVerification?: (
-    queryId: string,
+    requestId: string,
     passed: boolean,
     workerPubkey: string,
   ) => void;
@@ -92,31 +95,31 @@ export interface OracleNostrServiceConfig {
 }
 
 export interface OracleNostrService {
-  /** Generate a preimage for a query and return the hash. */
-  generateHash(queryId: string): { hash: string };
-  /** Start watching a query for offers and results. */
-  watchQuery(
-    queryId: string,
-    queryEventId: string,
+  /** Generate a preimage for a request and return the hash. */
+  generateRequestHash(requestId: string): { hash: string };
+  /** Start watching a request for offers and results. */
+  watchRequest(
+    requestId: string,
+    requestEventId: string,
     requesterPubkey: string,
   ): void;
-  /** Record the selected Worker pubkey for a query. */
-  recordSelectedWorker(queryId: string, workerPubkey: string): void;
+  /** Record the selected Worker pubkey for a request. */
+  recordSelectedWorker(requestId: string, workerPubkey: string): void;
   /** Verify a result and deliver preimage or rejection. */
   verifyAndDeliver(
-    queryId: string,
-    query: Query,
-    result: QueryResult,
+    requestId: string,
+    request: VerifiableRequest,
+    result: RequestSubmissionResult,
     workerPubkey: string,
   ): Promise<boolean>;
   /** Verify and deliver using FROST signing (P2PK+FROST flow). */
-  verifyAndDeliverFrost(
-    queryId: string,
-    query: Query,
-    result: QueryResult,
+  verifyAndDeliverWithFrost(
+    requestId: string,
+    request: VerifiableRequest,
+    result: RequestSubmissionResult,
     workerPubkey: string,
   ): Promise<boolean>;
-  /** Stop watching all queries. */
+  /** Stop watching all requests. */
   stop(): void;
 }
 
@@ -161,8 +164,8 @@ export function createOracleNostrService(
 
   async function verifyAndDeliverInternal(
     queryId: string,
-    query: Query,
-    result: QueryResult,
+    query: VerifiableRequest,
+    result: RequestSubmissionResult,
     workerPubkey: string,
   ): Promise<boolean> {
     const detail = await _verifyFn(query, result);
@@ -223,13 +226,17 @@ export function createOracleNostrService(
   }
 
   return {
-    generateHash(queryId: string) {
+    generateRequestHash(queryId: string) {
       const entry = preimageStore.create();
       queryHashMap.set(queryId, entry.hash);
       return { hash: entry.hash };
     },
 
-    watchQuery(queryId: string, queryEventId: string, requesterPubkey: string) {
+    watchRequest(
+      queryId: string,
+      queryEventId: string,
+      requesterPubkey: string,
+    ) {
       const entry: WatchedQuery = {
         queryId,
         queryEventId,
@@ -270,20 +277,23 @@ export function createOracleNostrService(
     },
 
     async verifyAndDeliver(queryId, query, result, workerPubkey) {
-      // Auto-dispatch: quorum + FROST configured → threshold signing; otherwise → single Oracle HTLC
       if (query.quorum && config.frostCoordinator && config.frostConfig) {
-        return this.verifyAndDeliverFrost(queryId, query, result, workerPubkey);
+        return this.verifyAndDeliverWithFrost(
+          queryId,
+          query,
+          result,
+          workerPubkey,
+        );
       }
       return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
     },
 
-    async verifyAndDeliverFrost(queryId, query, result, workerPubkey) {
+    async verifyAndDeliverWithFrost(queryId, query, result, workerPubkey) {
       if (!config.frostNodeConfig) {
         log.error(`FROST node config not available, falling back to HTLC`);
         return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
       }
 
-      // Step 1: This node verifies independently
       const detail = await _verifyFn(query, result);
       if (!detail.passed) {
         const reason = detail.failures.join(", ") || "Verification failed";
@@ -308,8 +318,8 @@ export function createOracleNostrService(
       const sigResult = await coordinateSigning(
         {
           nodeConfig: config.frostNodeConfig,
-          requirement: queryToRequirement(query),
-          input: queryResultToInput(result),
+          requirement: requestToRequirement(query),
+          input: resultToVerificationInput(result),
         },
         messageHex,
       );

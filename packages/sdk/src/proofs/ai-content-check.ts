@@ -18,11 +18,11 @@ import {
   writeFile,
 } from "./runtime/mod.ts";
 /**
- * Subset of the host server's Query needed to build the vision-LLM prompt.
- * The checker deliberately does not depend on the full host Query. Callers pass
+ * Subset of a host request needed to build the vision-LLM prompt.
+ * The checker deliberately does not depend on the full host request. Callers pass
  * exactly the fields the prompt uses.
  */
-export interface AiContentCheckQuery {
+export interface AiContentCheckRequest {
   description: string;
   challenge_nonce?: string;
   verification_requirements: readonly string[];
@@ -41,7 +41,7 @@ export interface AttachmentRefBase {
   filename?: string;
 }
 
-/** Subset of the host server's QueryResult needed for image extraction. */
+/** Subset of a submitted result needed for image extraction. */
 export interface AiContentCheckResult<
   TRef extends AttachmentRefBase = AttachmentRefBase,
 > {
@@ -108,7 +108,7 @@ export interface AiContentCheckDeps<
 export type AiContentChecker<
   TRef extends AttachmentRefBase = AttachmentRefBase,
 > = (
-  query: AiContentCheckQuery,
+  request: AiContentCheckRequest,
   result: AiContentCheckResult<TRef>,
   blossomKeys?: BlossomKeyMap,
 ) => Promise<ContentCheckResult | null>;
@@ -188,31 +188,31 @@ async function extractVideoFrames(
   }
 }
 
-function buildPrompt(query: AiContentCheckQuery): string {
-  const nonce = query.challenge_nonce;
+function buildPrompt(request: AiContentCheckRequest): string {
+  const nonce = request.challenge_nonce;
   if (nonce) {
     return [
       `You are verifying a photo/video submission. Check TWO things:`,
-      `1. Does the image show content relevant to the query description below?`,
+      `1. Does the image show content relevant to the request description below?`,
       `2. Is the handwritten text "${nonce}" clearly visible on a piece of paper in the image?`,
       ``,
       `Both must be true to pass. Answer in the following JSON format only:`,
-      `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the query description"}`,
+      `{"relevant": true or false, "nonce_visible": true or false, "reason": "brief explanation in the language of the request description"}`,
       ``,
-      `<query_description>`,
-      query.description,
-      `</query_description>`,
+      `<request_description>`,
+      request.description,
+      `</request_description>`,
     ].join("\n");
   }
   return [
-    `You are verifying a photo/video submission. Check whether the image shows content relevant to the query description below.`,
+    `You are verifying a photo/video submission. Check whether the image shows content relevant to the request description below.`,
     ``,
     `Answer in the following JSON format only:`,
-    `{"relevant": true or false, "reason": "brief explanation in the language of the query description"}`,
+    `{"relevant": true or false, "reason": "brief explanation in the language of the request description"}`,
     ``,
-    `<query_description>`,
-    query.description,
-    `</query_description>`,
+    `<request_description>`,
+    request.description,
+    `</request_description>`,
   ].join("\n");
 }
 
@@ -258,7 +258,7 @@ async function loadImageContent<TRef extends AttachmentRefBase>(
  *   getConfig: () => ({ enabled: true, anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY") }),
  *   readAttachment: (ref, key) => readStoredAttachmentBuffer(ref, undefined, key),
  * });
- * const result = await check(query, result, blossomKeys);
+ * const result = await check(request, result, blossomKeys);
  */
 export function createAiContentChecker<
   TRef extends AttachmentRefBase = AttachmentRefBase,
@@ -266,7 +266,7 @@ export function createAiContentChecker<
   deps: AiContentCheckDeps<TRef>,
 ): AiContentChecker<TRef> {
   return async function checkAttachmentContent(
-    query: AiContentCheckQuery,
+    request: AiContentCheckRequest,
     result: AiContentCheckResult<TRef>,
     blossomKeys?: BlossomKeyMap,
   ): Promise<ContentCheckResult | null> {
@@ -286,7 +286,7 @@ export function createAiContentChecker<
     );
     if (images.length === 0) return null;
 
-    const prompt = buildPrompt(query);
+    const prompt = buildPrompt(request);
     const content: Anthropic.MessageCreateParams["messages"][0]["content"] =
       images.map((img) => ({
         type: "image" as const,
@@ -325,13 +325,13 @@ export function createAiContentChecker<
         nonce_visible?: boolean;
         reason: string;
       };
-      const nonceRequired = query.verification_requirements.includes("nonce");
+      const nonceRequired = request.verification_requirements.includes("nonce");
       const passed = Boolean(parsed.relevant) &&
         (!nonceRequired || Boolean(parsed.nonce_visible));
       return {
         passed,
         reason: parsed.reason ||
-          (passed ? "Content matches query" : "Content check failed"),
+          (passed ? "Content matches request" : "Content check failed"),
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
