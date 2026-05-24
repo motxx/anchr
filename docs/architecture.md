@@ -42,9 +42,11 @@ taxonomy.
 - `/customer`, `/provider`, and `/oracle` for role-specific orchestration.
 - `/payments` for payment-lock and redemption ports plus standard Cashu helpers.
 - `/proofs` for proof producer, verifier, schema dispatch, and policy ports.
-- `/attachments` for encrypted attachment references and transport helpers.
-- `/adapters` for standard Nostr, Cashu, Blossom, Oracle HTTP, local state, and
-  signer adapters.
+- `/attachments` for encrypted attachment references and the bundled Blossom
+  upload/download helpers that keep large proof material content-addressed,
+  encrypted, and portable across Blossom servers.
+- `/adapters` for standard Nostr, Cashu, Oracle HTTP, local state, and signer
+  adapters.
 - `/testing` for deterministic in-memory helpers used by examples and tests.
 
 `@anchr/protocol` may expose:
@@ -75,6 +77,12 @@ that belong in `@anchr/protocol`.
 
 Developer-only commands belong under `scripts/` only when required to build,
 test, lint, publish, or verify the SDK/protocol.
+
+Blossom remains under the SDK attachment surface because the bundled Blossom
+code owns attachment-specific behavior: encrypted blob upload and download,
+per-attachment key material, Blossom server selection, and BUD-02 upload
+authorization for attachment blobs. It is not exposed as a generic SDK adapter
+owner alongside actor transport, payment, Oracle HTTP, or local state adapters.
 
 ## Component Boundaries
 
@@ -111,7 +119,7 @@ rule derived from this table follows
 | Verification decision | Decide whether submitted evidence satisfies Customer constraints and whether release material may be produced. | SDK Oracle/proof modules and native helpers. |
 | Settlement lock | Hold Customer value so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and standard payment adapters. |
 | Release authority | Produce material that unlocks settlement only after verification succeeds and bind it to the selected work. | SDK Oracle/payment modules; protocol only for interoperable release messages. |
-| Attachment transport | Store and retrieve large or sensitive proof material without making storage a protocol actor. | SDK attachment ports and standard adapters; protocol only for attachment references. |
+| Attachment transport | Store and retrieve large or sensitive proof material without making storage a protocol actor. | SDK attachment helpers and bundled Blossom transport; protocol only for attachment references. |
 | Local actor state | Track one actor's private progress without making local implementation state part of the network contract. | SDK state ports and standard test/runtime stores. |
 | Runtime adapter | Bind an SDK role or standard adapter to a concrete process, UI, or operator policy. | Outside the public protocol; optional examples only when tiny. |
 

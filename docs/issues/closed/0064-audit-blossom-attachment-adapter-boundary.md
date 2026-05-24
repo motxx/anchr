@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -88,3 +89,28 @@ Relevant files:
 - Prefer the smallest coherent change: document the intentional boundary if the
   code is already correct, or move Blossom-specific behavior only if the final
   architecture requires an adapter owner.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+
+Verified with:
+
+- `rg -n "Blossom|attachments|adapters|@anchr/sdk/attachments|@anchr/sdk/adapters" docs/architecture.md packages/sdk/deno.json packages/sdk/src/attachments/mod.ts packages/sdk/src/adapters/mod.ts`
+- `deno task test:unit`
+- `deno task lint:strict`
+
+Harness update:
+
+- None - this is a one-time public-boundary documentation alignment after
+  #0048; SDK exports already expose Blossom through `@anchr/sdk/attachments`.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
