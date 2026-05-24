@@ -20,7 +20,7 @@ import {
   parseOracleAnnouncementEvent,
 } from "@anchr/sdk/adapters/oracle-client";
 import { ANCHR_ORACLE_ANNOUNCEMENT } from "@anchr/sdk/adapters/nostr";
-import type { OracleInfo } from "@anchr/sdk";
+import type { OracleInfo } from "@anchr/sdk/adapters/oracle-client";
 import { isRelayReachable } from "../helpers/regtest.ts";
 
 // ---------------------------------------------------------------------------

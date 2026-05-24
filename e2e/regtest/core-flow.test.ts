@@ -29,11 +29,20 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import { createQueryService, createQueryStore } from "@anchr/sdk";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import { createPreimageStore } from "@anchr/sdk/payments";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
-import type { Oracle, OracleAttestation } from "@anchr/sdk";
-import type { Query, QueryResult } from "@anchr/sdk";
+import type {
+  Oracle,
+  OracleAttestation,
+} from "../../packages/sdk/src/requests/domain/oracle-types.ts";
+import type {
+  Query,
+  QueryResult,
+} from "../../packages/sdk/src/requests/domain/types.ts";
 import {
   checkInfraReady,
   createWallet,

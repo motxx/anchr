@@ -11,9 +11,15 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
-import { createQueryService, createQueryStore } from "@anchr/sdk";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
-import type { QueryInput, QueryResult } from "@anchr/sdk";
+import type {
+  QueryInput,
+  QueryResult,
+} from "../../packages/sdk/src/requests/domain/types.ts";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";

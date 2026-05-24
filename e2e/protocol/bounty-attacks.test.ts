@@ -2,14 +2,17 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
-import { createQueryService, createQueryStore } from "@anchr/sdk";
+import {
+  createQueryService,
+  createQueryStore,
+} from "../../packages/sdk/src/requests/application/query-service.ts";
 import {
   driveToProcessing,
   makeEscrowInfo,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-} from "@anchr/sdk";
+} from "../../packages/sdk/src/requests/testing/protocol-helpers.ts";
 
 describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {

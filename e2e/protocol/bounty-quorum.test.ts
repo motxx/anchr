@@ -15,14 +15,17 @@
 
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import type { Query, QueryResult } from "@anchr/sdk";
+import type {
+  Query,
+  QueryResult,
+} from "../../packages/sdk/src/requests/domain/types.ts";
 import {
   driveQuorumToProcessing,
   driveToProcessing,
   makeMockOracle,
   makeQuorumService,
   makeServiceWithPreimage,
-} from "@anchr/sdk";
+} from "../../packages/sdk/src/requests/testing/protocol-helpers.ts";
 
 // =============================================================================
 // 1. Quorum threshold enforcement

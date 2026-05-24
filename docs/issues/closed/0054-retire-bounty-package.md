@@ -2,6 +2,7 @@
 
 Created: 2026-05-23
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -78,3 +79,42 @@ Relevant current surfaces:
 - Close this parent after the child issues verify that no public
   `@anchr/bounty`, `@anchr/sdk/bounty`, claim-gate, or query/bounty SDK surface
   remains.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/index.ts`
+- `e2e/protocol/bounty-attacks.test.ts`
+- `e2e/protocol/bounty-quorum.test.ts`
+- `e2e/protocol/bounty-trustless.test.ts`
+- `e2e/protocol/bounty-vulns.test.ts`
+- `e2e/regtest/core-flow.test.ts`
+- `e2e/regtest/regtest-cashu.test.ts`
+- `e2e/relay/oracle-discovery.test.ts`
+- `e2e/relay/relay.test.ts`
+- `e2e/tlsn/tlsn.test.ts`
+
+Verified with:
+
+- `rg -n "@anchr/bounty|@anchr/sdk/bounty|packages/bounty/src" packages e2e deno.json` returned no matches.
+- `rg -n "createQueryService|createQueryStore|type QueryService|type QueryStore|type Query\\b|type QueryResult\\b|makeFakeToken|makeMockOracle|makeServiceWithPreimage|driveToProcessing|driveQuorumToProcessing|makeQuorumService|makeEscrowInfo|MIN_ESCROW_LOCKTIME_SECS" packages/sdk/src/index.ts` returned no matches.
+- `find packages -maxdepth 2 -name deno.json -print | sort`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+- `check-silent-bypass` review found no in-scope silent-bypass patterns.
+
+Harness update:
+
+- Root SDK compilation plus the issue-specific grep checks now lock that the
+  internal query service and protocol test helpers are not exported from the
+  public SDK root surface.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
