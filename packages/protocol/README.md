@@ -1,7 +1,8 @@
 # @anchr/protocol
 
-Pure protocol helpers for Anchr wire formats: Nostr event builders/parsers,
-schema URL identifiers, shared role-neutral types, and NIP-44/signing helpers.
+Pure protocol helpers for Anchr verifiable paid requests: Nostr event
+builders/parsers, schema URL identifiers, shared role-neutral types, and
+NIP-44/signing helpers.
 
 ## Install
 

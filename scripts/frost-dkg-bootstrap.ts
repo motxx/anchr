@@ -19,9 +19,10 @@ import {
   dkgRound1,
   dkgRound2,
   dkgRound3,
+  type FrostNodeConfig,
   isFrostSignerAvailable,
-} from "@anchr/frost-oracle/frost-cli";
-import type { FrostNodeConfig, PeerConfig } from "@anchr/frost-oracle/config";
+  type PeerConfig,
+} from "@anchr/sdk/payments";
 
 // --- Parse CLI args ---
 interface ParsedArgs {
@@ -189,8 +190,7 @@ async function main() {
   }
 
   console.log(`\nDKG complete. Group pubkey: ${gps[0]}`);
-  console.log(`\nTo start the cluster:`);
-  console.log(`  deno run --allow-all scripts/frost-oracle-cluster.ts`);
+  console.log("\nUse these signer configs with an SDK-owned oracle service.");
 }
 
 main().catch((e) => {

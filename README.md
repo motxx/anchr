@@ -12,7 +12,7 @@ This repository makes that flow usable for implementers. Its primary public
 deliverables are `@anchr/sdk` for application developers and `@anchr/protocol`
 for interoperable wire contracts. Everything else is implementation detail,
 native helper code, specification material, test harness, documentation, or
-optional learning material. It is not an Anchr-operated marketplace, hosted
+optional learning material. It is not an Anchr-operated service, hosted
 server, wallet, oracle network, or production deployment.
 
 It combines:
@@ -62,7 +62,7 @@ surface classification and migration policy.
   TLSNotary attestation.
 - Pay someone to prove an account fact such as contribution count, karma, or
   account age without exposing the whole account.
-- Build a verified photo marketplace where C2PA provenance gates payment.
+- Build a verified photo workflow where C2PA provenance gates payment.
 
 ## How It Works
 

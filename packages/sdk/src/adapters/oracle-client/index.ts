@@ -28,3 +28,8 @@ export type {
 } from "../../requests/domain/oracle-types.ts";
 export { loadOraclesFromEnv, parseOracleRegistry } from "./config-loader.ts";
 export type { OracleConfigEntry } from "./config-loader.ts";
+export {
+  discoverOracles,
+  parseOracleAnnouncementEvent,
+} from "./oracle-discovery.ts";
+export type { OracleAnnouncement } from "./oracle-discovery.ts";

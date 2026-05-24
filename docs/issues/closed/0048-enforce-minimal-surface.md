@@ -2,6 +2,7 @@
 
 Created: 2026-05-21
 Model: GPT-5
+Completed: 2026-05-24
 
 ## Priority
 
@@ -98,3 +99,72 @@ Relevant files:
   issue for a concrete blocker.
 - Verify with `deno task lint:strict`, `deno task test`, affected e2e smoke
   commands, and `deno task publish:dry-run`.
+
+## Resolution
+
+Implemented by updating:
+
+- `deno.json`
+- `packages/sdk/deno.json`
+- `scripts/arch-lint.ts`
+- `scripts/arch-lint-candidates.ts`
+- `README.md`
+- `docs/architecture.md`
+- `docs/resilience-checklist.md`
+- `packages/sdk/README.md`
+- `packages/protocol/README.md`
+- `packages/sdk/src/testing/mod.ts`
+- `packages/sdk/src/adapters/nostr/index.ts`
+- `packages/sdk/src/adapters/oracle-client/index.ts`
+- `packages/sdk/src/proofs/verification/verifier.ts`
+- `packages/sdk/src/requests/testing/protocol-helpers.ts`
+- `e2e/protocol/*.test.ts`
+- `e2e/regtest/core-flow.test.ts`
+- `e2e/regtest/regtest-cashu.test.ts`
+- `e2e/tlsn/tlsn.test.ts`
+- `scripts/frost-dkg-bootstrap.ts`
+
+Removed obsolete product/demo surfaces:
+
+- `e2e/relay/relay.test.ts`
+- `scripts/create-bounty-query.ts`
+- `scripts/demo-htlc-server.ts`
+- `scripts/demo-htlc.ts`
+- `scripts/demo-payment-proof.html`
+- `scripts/demo-payment-proof.ts`
+- `scripts/e2e-browser-qa.ts`
+- `scripts/e2e-flow-ui.html`
+- `scripts/e2e-square-full.ts`
+- `scripts/e2e-square-payment-link.ts`
+- `scripts/e2e-stripe-full.ts`
+- `scripts/e2e-stripe-payment-link.ts`
+- `scripts/frost-oracle-cluster.ts`
+- `scripts/run-square-proof.ts`
+- `scripts/run-stripe-proof.ts`
+
+Verified with:
+
+- `deno task lint:arch`
+- `deno task check`
+- `deno task test:scripts`
+- `deno task lint:strict`
+- `deno task test`
+- `deno task publish:dry-run`
+
+Harness update:
+
+- `scripts/arch-lint.ts` now enforces the final SDK/protocol dependency graph
+  and requires examples, e2e tests, and scripts to use only public
+  `@anchr/sdk` or `@anchr/protocol` Anchr imports.
+
+Review residuals:
+
+- `deno task test:e2e:relay` still requires relay infrastructure and failed
+  locally because `NOSTR_RELAYS` was not set. The remaining relay-backed
+  oracle discovery test is covered when that Docker-backed task is run with its
+  required infrastructure.
+- #0064 remains as the post-#0048 Blossom attachment boundary audit.
+
+Follow-up:
+
+- #0064

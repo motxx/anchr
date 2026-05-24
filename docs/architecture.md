@@ -66,37 +66,15 @@ contracts.
 
 ## Surface Policy
 
-The current repository is transitional. These decisions define the target map
-for issues `0047`, `0049`, and `0048`; this document does not move code by
-itself.
+The current repository map is the target map. New public Anchr packages,
+top-level product shells, or catch-all command categories should not be added
+without first updating this document and the architecture lint. Reusable runtime
+helpers, proof engines, payment helpers, attachment transport, and standard
+adapters live inside `@anchr/sdk` unless they are role-neutral wire contracts
+that belong in `@anchr/protocol`.
 
-| Current surface | Target classification | Policy |
-| --- | --- | --- |
-| `@anchr/sdk` | Keep public | Make this the one developer entry point for building verifiable paid request flows. Absorb role SDKs, standard adapters, payment helpers, proof dispatch, attachment helpers, and testing helpers here. |
-| `@anchr/protocol` | Keep public | Keep only wire events, schemas, validators, Nostr wire encoding, and role-neutral protocol types here. It must not depend on any other Anchr package. |
-| `@anchr/customer-sdk` | Absorb into SDK | Move Customer orchestration and ports under `@anchr/sdk`; delete the standalone public package. |
-| `@anchr/provider-sdk` | Absorb into SDK | Move Provider orchestration and ports under `@anchr/sdk`; delete the standalone public package. |
-| `@anchr/oracle-sdk` | Absorb into SDK | Move Oracle verification client/server ports under `@anchr/sdk`; keep interoperable attestation shapes in protocol only when they are wire contracts. |
-| `@anchr/core-runtime` | Absorb into SDK internals or scripts | Runtime helpers may remain as internal code used by SDK, tests, or scripts, but not as a public Anchr package. |
-| `@anchr/core-cashu` | Absorb into SDK payments | Keep Cashu HTLC/P2PK behavior as the standard SDK payment adapter; delete the standalone public package. |
-| `@anchr/frost-oracle` | Absorb or move out | Keep threshold release authority only if it directly supports paid-request settlement through SDK ports; otherwise move it outside this repository. |
-| `@anchr/tlsn-toolkit` | Absorb into SDK proofs | Keep TLSNotary validation and replay safeguards as SDK proof internals or standard proof helpers. |
-| `@anchr/photo-verification` | Absorb into SDK proofs | Keep C2PA, EXIF, ProofMode, AI-content, and GPS checks as SDK proof internals or standard proof helpers. |
-| `@anchr/cashu-conditional-swap` | Delete or move out | Binary-outcome conditional swaps are not the core paid-request flow. Preserve only pieces needed by SDK payment locks. |
-| `@anchr/blossom` | Absorb into SDK attachments | Keep encrypted Blossom transport as a standard SDK attachment adapter, not as a public package. |
-| `@anchr/adapters` | Absorb into SDK adapters | Standard Nostr, Cashu, Blossom, local state, signer, and Oracle HTTP bindings belong under `@anchr/sdk/adapters`. |
-| `@anchr/bounty` | Delete as a concept | Absorb any reusable paid-request lifecycle pieces into SDK role modules. Do not preserve `bounty`, query lifecycle, claim-gate, or bounty subpaths as public nouns. |
-| Product and adapter applications | Deleted | MCP, marketplace, bot-shield, binary-bet, bounty-board, and mobile-shell surfaces are outside the core repository surface. |
-| `examples/c2pa-media-verification` | Deleted | It was not reduced to a tiny SDK/protocol lesson in this repository. |
-| `examples/tlsn-fiat-swap-square` | Deleted | It was not reduced to a tiny SDK/protocol lesson in this repository. |
-| `examples/auto-claim` | Deleted | Browser automation product code is outside the core paid-request SDK/protocol shape. |
-| `examples/royalty-distribution` | Deleted | Royalty distribution was non-core domain exploration. |
-| `examples/supply-chain-proof` | Deleted | Supply-chain proof was non-core domain exploration. |
-| `examples/tlsn-worker` | Deleted | The worker was not a minimal SDK/protocol proof lesson or test fixture. |
-
-No top-level tool category should be introduced to preserve deleted app or
-package surfaces. Developer-only commands belong under `scripts/` when required
-to build, test, lint, publish, or verify the SDK/protocol.
+Developer-only commands belong under `scripts/` only when required to build,
+test, lint, publish, or verify the SDK/protocol.
 
 ## Component Boundaries
 
@@ -191,12 +169,5 @@ if an implementation uses a different transport.
 
 ## Follow-On Work
 
-This design issue only decides the map.
-
-- `0047` owns collapsing public packages into `@anchr/sdk` and
-  `@anchr/protocol`.
-- `0049` deleted non-core app, tool, and example surfaces.
-- `0048` owns final workspace, lint, publish, README, and package README
-  enforcement.
-- `0043` closes only after the child issues make the repository read as one
-  SDK/protocol for verifiable paid requests.
+This map is enforced by `deno task lint:arch`, the root workspace in
+`deno.json`, and the package publish dry run.

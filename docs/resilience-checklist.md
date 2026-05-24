@@ -15,16 +15,16 @@ guidance.
   [`specs/messaging.md`](../specs/messaging.md)
 - Security invariants and required test pins:
   [`docs/threat-model.md`](threat-model.md)
-- Current `@anchr/bounty` state transitions:
-  `packages/bounty/src/domain/query-transitions.ts`
+- SDK paid-request state transitions:
+  `packages/sdk/src/requests/domain/query-transitions.ts`
 
 ## Review Checklist
 
 - Confirm new public docs use Customer, Provider, and Oracle vocabulary.
 - Confirm Provider response vocabulary uses offer terms such as `ProviderOffer`,
   `offer_event_id`, `offers`, and `awaiting_offers`.
-- Confirm docs and runbooks reference current `packages/bounty/src/...` paths,
-  not old top-level `src/...` locations.
+- Confirm docs and runbooks reference public `@anchr/sdk` or `@anchr/protocol`
+  surfaces unless they are documenting an internal maintenance task.
 - Confirm release-material delivery follows the Nostr-native retry and recovery
   rules in `specs/messaging.md`.
 - Confirm security-sensitive resilience claims map to
@@ -38,7 +38,7 @@ guidance.
 - `deno task lint:strict`
 - `deno task test:e2e:protocol`
 - `deno task test:e2e:relay` when relay-backed behavior changes.
-- `deno task test:e2e:regtest` when Cashu, Blossom, or full bounty lifecycle
-  behavior changes.
+- `deno task test:e2e:regtest` when Cashu, Blossom, or full paid-request
+  lifecycle behavior changes.
 - `deno task test:e2e:tlsn` when TLSNotary proof generation or verification
   changes.

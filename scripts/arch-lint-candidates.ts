@@ -2,15 +2,15 @@
 /**
  * Architecture-review candidate picker.
  *
- * Lists the largest non-test files per layer, package, app, and example so the
- * `arch-lint-llm` skill (semantic review) can focus on the files most
+ * Lists the largest non-test files per package, example, e2e bucket, and
+ * script group so the `arch-lint-llm` skill can focus on the files most
  * likely to harbour cohesion / locator / leak smells. Pure selection;
  * no analysis happens here.
  *
  * Usage:
- *   deno task lint:arch:candidates                 # top-N per layer
+ *   deno task lint:arch:candidates                 # top-N per group
  *   deno task lint:arch:candidates -- --full       # every non-test file in scope
- *   deno task lint:arch:candidates -- --layer infrastructure
+ *   deno task lint:arch:candidates -- --layer payments
  *
  * The static `deno task lint:arch` complements this: the candidate picker
  * selects, the structural lint enforces, and the LLM skill reads files
@@ -21,7 +21,6 @@ import { relative } from "jsr:@std/path@^1";
 
 const ROOT = new URL("../", import.meta.url).pathname;
 
-const SRC_LAYERS = ["domain", "application", "infrastructure"] as const;
 const TOP_PER_LAYER = 4;
 
 interface Candidate {
@@ -65,7 +64,8 @@ async function main() {
     try {
       for await (const entry of Deno.readDir(`${ROOT}${topDir}`)) {
         if (!entry.isDirectory) continue;
-        const label = `${topDir}/${entry.name}/${childDir}/`;
+        const suffix = childDir ? `${childDir}/` : "";
+        const label = `${topDir}/${entry.name}/${suffix}`;
         out.push({
           label,
           absDir: `${ROOT}${topDir}/${entry.name}/${childDir}`,
@@ -79,13 +79,10 @@ async function main() {
   }
 
   const groups: { label: string; absDir: string }[] = [
-    ...SRC_LAYERS.map((l) => ({
-      label: `src/${l}/`,
-      absDir: `${ROOT}src/${l}`,
-    })),
     ...(await workspaceGroups("packages")),
-    ...(await workspaceGroups("apps")),
     ...(await workspaceGroups("examples")),
+    ...(await workspaceGroups("e2e", "")),
+    { label: "scripts/", absDir: `${ROOT}scripts` },
   ];
 
   const filtered = layerArg

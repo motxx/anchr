@@ -24,7 +24,7 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
-import { createQueryService } from "../../packages/sdk/src/requests/application/query-service.ts";
+import { createQueryService } from "@anchr/sdk/testing";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
 import { normalizeResultAttachments } from "@anchr/sdk/attachments";

@@ -1,5 +1,8 @@
 import { Buffer } from "node:buffer";
-import { createAiContentChecker } from "../ai-content-check.ts";
+import {
+  type AiContentChecker,
+  createAiContentChecker,
+} from "../ai-content-check.ts";
 import { validateC2pa } from "../c2pa-validation.ts";
 import { haversineKm } from "../geo.ts";
 import { getIntegrity, getIntegrityForRequest } from "../integrity-store.ts";
@@ -20,25 +23,26 @@ import type {
 
 let _validateTlsnFn: typeof validateTlsn = validateTlsn;
 
-export const checkAttachmentContent = createAiContentChecker<AttachmentRef>({
-  getConfig: () => {
-    const enabled = Deno.env.get("AI_CONTENT_CHECK");
-    const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")?.trim();
-    return {
-      enabled: enabled === "true" || enabled === "1",
-      anthropicApiKey: anthropicApiKey === "" ? undefined : anthropicApiKey,
-    };
-  },
-  readAttachment: async (ref, blossomKey) => {
-    const data = await fetchAttachmentData(
-      ref,
-      [],
-      blossomKey ? { [ref.id]: blossomKey } : undefined,
-    );
-    if (!data) return null;
-    return { data: Buffer.from(data), mimeType: ref.mime_type };
-  },
-});
+export const checkAttachmentContent: AiContentChecker<AttachmentRef> =
+  createAiContentChecker<AttachmentRef>({
+    getConfig: () => {
+      const enabled = Deno.env.get("AI_CONTENT_CHECK");
+      const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY")?.trim();
+      return {
+        enabled: enabled === "true" || enabled === "1",
+        anthropicApiKey: anthropicApiKey === "" ? undefined : anthropicApiKey,
+      };
+    },
+    readAttachment: async (ref, blossomKey) => {
+      const data = await fetchAttachmentData(
+        ref,
+        [],
+        blossomKey ? { [ref.id]: blossomKey } : undefined,
+      );
+      if (!data) return null;
+      return { data: Buffer.from(data), mimeType: ref.mime_type };
+    },
+  });
 
 /** Allow tests to override the validateTlsn implementation. Pass null to reset. */
 export function _setValidateTlsnForTest(fn: typeof validateTlsn | null): void {

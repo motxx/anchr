@@ -16,7 +16,8 @@
     "./schema": "./src/schema.ts",
     "./customer": "./src/customer.ts",
     "./provider": "./src/provider.ts",
-    "./oracle": "./src/oracle.ts"
+    "./oracle": "./src/oracle.ts",
+    "./testing": "./src/testing/mod.ts"
   },
   "imports": {
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
@@ -29,7 +30,12 @@
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",
     "@anchr/protocol/types": "../protocol/src/types.ts",
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
+    "@logtape/logtape": "jsr:@logtape/logtape@^2",
+    "hono": "jsr:@hono/hono@^4",
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",
+    "nostr-tools/filter": "npm:nostr-tools@^2/filter",
+    "nostr-tools/core": "npm:nostr-tools@^2/core",
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
     "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
     "nostr-tools/nip44": "npm:nostr-tools@^2/nip44"
@@ -42,6 +48,8 @@
       "src/payments/**/*.ts",
       "src/proofs/**/*.ts",
       "src/internal/runtime/**/*.ts",
+      "src/requests/**/*.ts",
+      "src/testing/**/*.ts",
       "src/schema.ts",
       "src/customer.ts",
       "src/customer-types.ts",

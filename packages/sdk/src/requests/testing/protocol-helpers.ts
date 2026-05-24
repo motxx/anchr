@@ -6,14 +6,37 @@
 
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
 import { createOracleRegistry } from "./oracle-registry.ts";
-import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
+import {
+  createPreimageStore,
+  type PreimageEntry,
+  type PreimageStore,
+} from "../../payments/mod.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import type { EscrowProvider } from "../application/ports.ts";
+import type { EscrowProvider, OracleRegistry } from "../application/ports.ts";
 import {
   createQueryService,
   createQueryStore,
+  type QueryService,
+  type QueryStore,
 } from "../application/query-service.ts";
-import type { Query, QueryResult } from "../domain/types.ts";
+import type { EscrowInfo, Query, QueryResult } from "../domain/types.ts";
+
+export interface ServiceWithPreimage {
+  service: QueryService;
+  store: QueryStore;
+  registry: OracleRegistry;
+  preimageStore: PreimageStore;
+}
+
+export interface EscrowInfoFixture {
+  escrowInfo: EscrowInfo;
+  entry: PreimageEntry;
+}
+
+export interface ProcessingFixture extends EscrowInfoFixture {
+  query: Query;
+  workerPub: string;
+}
 
 /** Mock EscrowProvider that decodes Cashu tokens for amount verification in tests. */
 export function createMockEscrowProvider(): EscrowProvider {
@@ -128,7 +151,7 @@ export function makeMockOracle(
 /** Create a QueryService with a fresh store, registry, and preimage store. */
 export function makeServiceWithPreimage(
   opts?: { mockOracle?: Oracle; mockOracles?: Oracle[] },
-) {
+): ServiceWithPreimage {
   const store = createQueryStore();
   const registry = createOracleRegistry({ skipBuiltIn: true });
   if (opts?.mockOracles) {
@@ -153,7 +176,9 @@ export function makeServiceWithPreimage(
 }
 
 /** Generate an EscrowInfo (HTLC mode) and a corresponding preimage store entry. */
-export function makeEscrowInfo(preimageStore: PreimageStore) {
+export function makeEscrowInfo(
+  preimageStore: PreimageStore,
+): EscrowInfoFixture {
   const entry = preimageStore.create();
   return {
     escrowInfo: {
@@ -169,7 +194,7 @@ export function makeEscrowInfo(preimageStore: PreimageStore) {
 
 /** Drive query through: create -> offer -> select -> ready for result submission. */
 export async function driveToProcessing(
-  service: ReturnType<typeof createQueryService>,
+  service: QueryService,
   preimageStore: PreimageStore,
   opts?: {
     workerPubkey?: string;
@@ -177,7 +202,7 @@ export async function driveToProcessing(
     oracleIds?: string[];
     quorum?: { min_approvals: number };
   },
-) {
+): Promise<ProcessingFixture> {
   const workerPub = opts?.workerPubkey ?? "worker_pub";
   const bounty = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
@@ -209,7 +234,7 @@ export async function driveToProcessing(
 export function makeQuorumService(opts: {
   oracleIds: string[];
   passFns?: Record<string, (q: Query, r: QueryResult) => boolean>;
-}) {
+}): ServiceWithPreimage {
   const store = createQueryStore();
   const registry = createOracleRegistry({ skipBuiltIn: true });
   for (const id of opts.oracleIds) {
@@ -233,11 +258,11 @@ export function makeQuorumService(opts: {
 
 /** Drive a quorum query through to processing. */
 export async function driveQuorumToProcessing(
-  service: ReturnType<typeof createQueryService>,
+  service: QueryService,
   preimageStore: PreimageStore,
   oracleIds: string[],
   minApprovals: number,
-) {
+): Promise<ProcessingFixture> {
   const workerPub = "worker_pub";
   const bounty = 100;
   const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
