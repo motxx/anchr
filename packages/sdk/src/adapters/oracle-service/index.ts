@@ -1,20 +1,9 @@
 /**
  * Oracle service — the host running *as* an oracle node.
  *
- * Hono routes for HTLC + FROST DKG/sign coordination, plus a Nostr
- * listener that turns NIP-90 events into verification + preimage / FROST
- * signature delivery.
+ * Hono routes for HTLC + FROST DKG/sign coordination.
  *
- * The customer-side counterpart (registry, HTTP client, discovery) lives
- * in `src/infrastructure/oracle-client/`.
+ * The customer-side counterpart owns registry, HTTP client, and discovery.
  */
 
 export { buildOracleApp } from "./server.ts";
-export {
-  createOracleNostrService,
-  createOracleNostrServiceFromEnv,
-} from "./nostr-service.ts";
-export type {
-  OracleNostrService,
-  OracleNostrServiceConfig,
-} from "./nostr-service.ts";

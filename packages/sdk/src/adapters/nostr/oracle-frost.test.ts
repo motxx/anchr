@@ -4,9 +4,9 @@ import {
   _setPublishEventForTest,
   _setVerifyForTest,
   createOracleNostrService,
-} from "./nostr-service.ts";
-import type { OracleNostrServiceConfig } from "./nostr-service.ts";
-import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
+} from "./oracle-service.ts";
+import type { OracleNostrServiceConfig } from "./oracle-service.ts";
+import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
 import { createFrostCoordinator } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";

@@ -5,8 +5,8 @@
  * registry the request service can resolve against, and ships an HTTP
  * adapter for talking to remote oracle nodes.
  *
- * The other half — running this host *as* an oracle node — lives in
- * `src/infrastructure/oracle-service/`.
+ * The other half runs this host as an Oracle node through the Oracle service
+ * adapter.
  */
 
 export { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";

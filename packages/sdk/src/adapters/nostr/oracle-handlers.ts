@@ -1,16 +1,16 @@
 /**
- * Event handlers for the Oracle Nostr service.
+ * Event handlers for the Oracle actor Nostr workflow.
  */
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "../nostr/crypto/identity.ts";
+import type { NostrIdentity } from "./crypto/identity.ts";
 import {
   type OfferFeedbackPayload,
   type OracleResponsePayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
-} from "../nostr/events/events.ts";
+} from "./events/events.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 
 export interface WatchedQuery {

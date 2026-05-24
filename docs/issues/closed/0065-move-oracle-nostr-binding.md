@@ -2,6 +2,7 @@
 
 Created: 2026-05-24
 Model: GPT-5 Codex
+Completed: 2026-05-24
 
 ## Priority
 
@@ -92,3 +93,40 @@ Relevant files:
   owner path.
 - Delete the old `oracle-service/nostr-service.ts` path and avoid adding a
   compatibility re-export.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/oracle-service.ts`
+- `packages/sdk/src/adapters/nostr/oracle-handlers.ts`
+- `packages/sdk/src/adapters/nostr/oracle-service.test.ts`
+- `packages/sdk/src/adapters/nostr/oracle-frost.test.ts`
+- `packages/sdk/src/adapters/nostr/mod.ts`
+- `packages/sdk/src/adapters/oracle-service/index.ts`
+- `packages/sdk/src/adapters/oracle-client/index.ts`
+
+Verified with:
+
+- `test ! -e packages/sdk/src/adapters/oracle-service/nostr-service.ts`
+- `rg -n "oracle-service/nostr-service|\\.\\/nostr-service|from \"\\.\\/nostr-service\\.ts\"|from \"@anchr/sdk/adapters/oracle-service\".*Nostr" packages e2e deno.json` returned no matches
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/sdk/src/adapters/nostr/oracle-service.test.ts packages/sdk/src/adapters/nostr/oracle-frost.test.ts packages/sdk/src/adapters/oracle-service/server.test.ts packages/sdk/src/adapters/oracle-service/server-frost.test.ts`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+- `check-silent-bypass` review of the moved Oracle Nostr workflow files found
+  no silent-bypass patterns
+
+Harness update:
+
+- Oracle Nostr service tests moved with the Nostr adapter owner, and the
+  negative old-path check locks the deleted `oracle-service/nostr-service.ts`
+  import surface.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

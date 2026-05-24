@@ -1,5 +1,5 @@
 /**
- * Oracle Nostr service — Nostr-native Oracle for the HTLC flow.
+ * Oracle actor Nostr workflow binding.
  *
  * Responsibilities (per README):
  *   1. Generate preimage, return hash(preimage) to Requester
@@ -14,18 +14,18 @@
 import type { Event } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { NostrIdentity } from "../nostr/crypto/identity.ts";
-import { restoreIdentity } from "../nostr/crypto/identity.ts";
+import type { NostrIdentity } from "./crypto/identity.ts";
+import { restoreIdentity } from "./crypto/identity.ts";
 import {
   buildFrostSignatureDM,
   buildPreimageDM,
   buildRejectionDM,
-} from "../nostr/events/dm.ts";
+} from "./events/dm.ts";
 import {
   publishEvent,
   subscribeToFeedback,
   subscribeToResponses,
-} from "../nostr/transport/client.ts";
+} from "./transport/client.ts";
 import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostCoordinator } from "../../payments/mod.ts";
@@ -46,7 +46,7 @@ import {
   handleFeedbackEvent,
   parseResponsePayload,
   type WatchedQuery,
-} from "./nostr-handlers.ts";
+} from "./oracle-handlers.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-nostr"]);

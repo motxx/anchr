@@ -21,6 +21,14 @@ export type {
   ProviderUploadResult,
 } from "./worker-service.ts";
 export {
+  createOracleNostrService,
+  createOracleNostrServiceFromEnv,
+} from "./oracle-service.ts";
+export type {
+  OracleNostrService,
+  OracleNostrServiceConfig,
+} from "./oracle-service.ts";
+export {
   createHtlcRequest,
   requestOracleHash,
   selectProvider,

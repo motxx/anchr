@@ -6,9 +6,9 @@ import {
   _setVerifyForTest,
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
-} from "./nostr-service.ts";
-import type { OracleNostrServiceConfig } from "./nostr-service.ts";
-import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
+} from "./oracle-service.ts";
+import type { OracleNostrServiceConfig } from "./oracle-service.ts";
+import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
 import type { VerifiedEvent } from "nostr-tools";
 
