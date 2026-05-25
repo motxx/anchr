@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -76,3 +77,37 @@ Known current imports include:
 - Keep `packages/sdk/src/internal/runtime/` as the SDK's only runtime
   compatibility owner.
 - Run the focused directory/import checks before unit tests and strict lint.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/attachments/exif-strip-helpers.ts`
+- `packages/sdk/src/proofs/ai-content-check.ts`
+- `packages/sdk/src/proofs/c2pa-validation.ts`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts`
+- `packages/sdk/src/proofs/proofmode-validation.ts`
+- `packages/sdk/src/proofs/tlsn-validation.ts`
+- `packages/sdk/src/proofs/runtime/*`
+
+Verified with:
+
+- `test ! -d packages/sdk/src/proofs/runtime`
+- `find packages/sdk/src -type d -name runtime -print`
+- `rg -n "proofs/runtime|\\.\\/runtime\\/|\\.\\/runtime\\.ts|from \"\\.\\/runtime" packages/sdk/src/proofs packages/sdk/src/attachments`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `skills/check-silent-bypass/SKILL.md` review of the five changed non-test implementation files
+
+Harness update:
+
+- None — the issue's focused directory/import checks and `deno task lint:strict`
+  already cover this one-time duplicate-owner cleanup.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

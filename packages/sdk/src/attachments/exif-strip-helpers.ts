@@ -9,7 +9,7 @@ import {
   spawn,
   which,
   writeFile,
-} from "../proofs/runtime/mod.ts";
+} from "../internal/runtime/mod.ts";
 import process from "node:process";
 
 const JPEG_SOI = 0xffd8;

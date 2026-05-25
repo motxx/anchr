@@ -16,7 +16,7 @@ import {
   spawn,
   which,
   writeFile,
-} from "./runtime/mod.ts";
+} from "../internal/runtime/mod.ts";
 /**
  * Subset of a host request needed to build the vision-LLM prompt.
  * The checker deliberately does not depend on the full host request. Callers pass
@@ -57,7 +57,7 @@ export interface BlossomKeyMaterial {
 /** Map of attachment ID → key material. */
 export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "ai-content-check"]);
 
 export interface ContentCheckResult {

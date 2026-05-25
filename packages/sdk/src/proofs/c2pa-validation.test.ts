@@ -10,7 +10,7 @@ import {
   readFileAsArrayBuffer,
   spawn,
   writeFile,
-} from "./runtime/mod.ts";
+} from "../internal/runtime/mod.ts";
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).

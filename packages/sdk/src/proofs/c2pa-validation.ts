@@ -10,9 +10,9 @@ import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, which, writeFile } from "./runtime/mod.ts";
+import { spawn, which, writeFile } from "../internal/runtime/mod.ts";
 
-import { getLogger } from "./runtime/logger.ts";
+import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "c2pa"]);
 
 export interface C2paManifest {
