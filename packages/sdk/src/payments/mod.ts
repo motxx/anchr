@@ -1,4 +1,3 @@
-export * from "../adapters/cashu.ts";
 export * from "./cashu-escrow.ts";
 export * from "./cashu-escrow-helpers.ts";
 export * from "./cashu-escrow-provider.ts";

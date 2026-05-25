@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -80,3 +81,44 @@ helper, it should not live under `adapters/`.
   narrow documented split.
 - Implement the smallest owner-consistent change.
 - Update focused tests or imports so the chosen public surface is locked.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `packages/sdk/src/payments/mod.ts`
+- `packages/sdk/src/payments/public-surface.test.ts`
+
+The chosen owner is a documented split: `@anchr/sdk/adapters/cashu` owns the
+concrete Cashu HTLC mint client, while `@anchr/sdk/payments` owns
+payment-lock/redemption ports and payment-owned Cashu helpers. Root SDK exports
+continue to expose the Cashu client for the common setup path.
+
+Verified with:
+
+- `rg -n "export \\* from \"\\.\\./adapters/cashu\\.ts\"" packages/sdk/src/payments/mod.ts`
+- `rg -n "@anchr/sdk/(payments|adapters/cashu)|createCashuClient|CashuClientOptions|CashuClientError" README.md packages/sdk/README.md packages/sdk/src e2e deno.json packages/sdk/deno.json`
+- `deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys packages/sdk/src/payments/public-surface.test.ts`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task test:all`
+- `deno task test:all:docker` was attempted with Docker access. Relay,
+  Blossom, Cashu mint, regtest Lightning, relay e2e, regtest e2e, and SDK
+  integration passed; TLSNotary e2e failed because the prover could not resolve
+  `api.bitflyer.com`.
+- `check-silent-bypass`: no silent-bypass patterns detected in `packages/sdk/src/payments/mod.ts`
+
+Harness update:
+
+- `packages/sdk/src/payments/public-surface.test.ts` locks the public boundary
+  so `@anchr/sdk/payments` does not re-export the concrete Cashu client while
+  `@anchr/sdk/adapters/cashu` remains the adapter surface.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

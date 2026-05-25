@@ -40,13 +40,16 @@ taxonomy.
 
 - root exports for the common Customer, Provider, and Oracle setup path.
 - `/customer`, `/provider`, and `/oracle` for role-specific orchestration.
-- `/payments` for payment-lock and redemption ports plus standard Cashu helpers.
+- `/payments` for payment-lock and redemption ports plus payment-owned Cashu
+  helpers.
 - `/proofs` for proof producer, verifier, schema dispatch, and policy ports.
 - `/attachments` for encrypted attachment references and the bundled Blossom
   upload/download helpers that keep large proof material content-addressed,
   encrypted, and portable across Blossom servers.
 - `/adapters` for standard Nostr, Cashu, Oracle HTTP, local state, and signer
-  adapters.
+  adapters. The concrete Cashu HTLC mint client is the Cashu payment adapter
+  surface and is exported from `@anchr/sdk/adapters/cashu`, with root SDK
+  exports available for the common setup path.
 - `/testing` for deterministic in-memory helpers used by examples and tests.
 
 `@anchr/protocol` may expose:
