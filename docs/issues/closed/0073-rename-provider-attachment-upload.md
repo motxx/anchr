@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -56,3 +57,31 @@ wire field.
   terminology.
 - Update imports and inferred return types at direct callers.
 - Run the focused vocabulary checks before the broader unit and lint checks.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/attachments/provider-upload.ts`
+- `packages/sdk/src/attachments/upload.ts`
+- `packages/sdk/src/attachments/mod.ts`
+- `packages/sdk/src/adapters/nostr/provider-service.ts`
+
+Verified with:
+
+- `rg -n "workerUpload|WorkerUpload|worker-upload|Worker-side|worker's device" packages/sdk/src/attachments packages/sdk/src/adapters/nostr/provider-service.ts`
+- `rg --files packages/sdk/src/attachments | rg 'worker|Worker'`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- None - this was a one-time SDK vocabulary rename verified by focused negative grep checks plus the existing type, lint, and test suite.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

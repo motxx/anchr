@@ -37,7 +37,7 @@ import {
   subscribeToQueries,
 } from "./transport/client.ts";
 import { deriveConversationKey, encryptNip44 } from "./crypto/encryption.ts";
-import { workerUpload } from "../../attachments/worker-upload.ts";
+import { providerUpload } from "../../attachments/provider-upload.ts";
 import type { BlossomUploadResult } from "../../attachments/blossom.ts";
 import type { AttachmentRef } from "../../requests/domain/types.ts";
 
@@ -200,7 +200,7 @@ export async function encryptAndUpload(
   } | null
 > {
   // Upload to Blossom (EXIF strip + AES-256-GCM encrypt)
-  const upload = await workerUpload(data, filename, mimeType, {
+  const upload = await providerUpload(data, filename, mimeType, {
     serverUrls: blossomServerUrls,
   });
   if (!upload) return null;

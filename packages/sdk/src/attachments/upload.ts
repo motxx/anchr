@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { isBlossomEnabled } from "./blossom.ts";
-import { workerUpload } from "./worker-upload.ts";
+import { providerUpload } from "./provider-upload.ts";
 import {
   parseProofModeZip,
   type ProofModeIntegrity,
@@ -61,7 +61,7 @@ export async function uploadAttachment(
     validateC2pa(photoBuffer, photoFilename),
   ]);
 
-  const result = await workerUpload(
+  const result = await providerUpload(
     new Uint8Array(photoBuffer),
     photoFilename,
     inferMimeType(photoFilename),
@@ -114,7 +114,7 @@ async function extractPhotoData(
 }
 
 function buildAttachmentRef(
-  result: NonNullable<Awaited<ReturnType<typeof workerUpload>>>,
+  result: NonNullable<Awaited<ReturnType<typeof providerUpload>>>,
 ): AttachmentRef {
   return {
     id: result.attachment.id,

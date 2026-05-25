@@ -1,5 +1,5 @@
-// Worker-side: EXIF strip happens locally so GPS/device metadata never
-// leaves the worker's device.
+// Provider-side: EXIF strip happens locally so GPS/device metadata never
+// leaves the provider's device.
 
 import { Buffer } from "node:buffer";
 import { generateEphemeralIdentity } from "../adapters/nostr/crypto/identity.ts";
@@ -11,26 +11,26 @@ import {
   uploadToBlossom,
 } from "./blossom.ts";
 
-export interface WorkerUploadOptions {
+export interface ProviderUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */
   serverUrls?: string[];
   /** Skip EXIF stripping (e.g. if already stripped). */
   skipExifStrip?: boolean;
 }
 
-export interface WorkerUploadResult {
+export interface ProviderUploadResult {
   /** Attachment reference ready for submission. */
   attachment: AttachmentRef;
   /** Raw Blossom upload result. */
   blossom: BlossomUploadResult;
 }
 
-export async function workerUpload(
+export async function providerUpload(
   data: Uint8Array,
   filename: string,
   mimeType: string,
-  options?: WorkerUploadOptions,
-): Promise<WorkerUploadResult | null> {
+  options?: ProviderUploadOptions,
+): Promise<ProviderUploadResult | null> {
   const config = getBlossomConfig();
   const serverUrls = options?.serverUrls ?? config?.serverUrls;
   if (!serverUrls || serverUrls.length === 0) return null;
