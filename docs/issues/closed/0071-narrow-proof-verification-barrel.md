@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -66,3 +67,30 @@ verification orchestrator surface.
 - Keep `packages/sdk/src/proofs/mod.ts` as the single public barrel for proof
   primitives and verification functions.
 - Run the focused re-export check, then unit tests and strict lint.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/verification/index.ts`
+
+Verified with:
+
+- `rg -n "from \"\\.\\./(ai-content-check|exif-validation|c2pa-validation|tlsn-validation|integrity-store)\\.ts\"" packages/sdk/src/proofs/verification/index.ts` (no matches)
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task test:all`
+- `check-silent-bypass` on `packages/sdk/src/proofs/verification/index.ts`
+
+Harness update:
+
+- None - this was a one-time export-boundary cleanup verified by the focused
+  negative re-export check and existing SDK proof public-surface tests.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
