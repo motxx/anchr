@@ -82,6 +82,7 @@ Before reporting done for a run:
 - The selected issue is either closed with a valid resolution note, split into
   pending child issues, or left pending with a concrete blocker.
 - Required focused verification has been run, or the blocker is recorded.
+- For any non-docs-only code change, `deno task test:all` has been run.
 - `git status --short` has been checked.
 - The response names the processed issue and says whether the queue should stop
   because of the one-issue rule, a split, a blocker, or user-requested limit.

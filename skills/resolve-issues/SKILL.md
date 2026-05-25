@@ -39,9 +39,10 @@ only after the work is implemented and verified.
    typing, and test conventions from `CLAUDE.md`.
 8. Add or update tests when the change affects behavior. Use docs-only changes
    only when the issue is explicitly documentation/design work.
-9. Run focused checks during iteration, then run the repository verification
-   expected for the affected scope. Do not call the issue fully resolved if
-   required checks are failing or skipped without a clear blocker.
+9. Run focused checks during iteration. For any non-docs-only issue that changes
+   code, also run the full local suite from `CLAUDE.md` (`deno task test:all`)
+   before closing. Do not call the issue fully resolved if required checks are
+   failing or skipped without a clear blocker.
 10. Classify the finding using the maintenance loop in
    [`docs/review-harness.md`](../../docs/review-harness.md#maintenance-loop) and
    decide whether the change adds a test, lint, skill, threat-model entry,
