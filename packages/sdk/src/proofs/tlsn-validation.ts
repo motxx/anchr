@@ -89,7 +89,7 @@ function findTlsnVerifier(): string | null {
       if (statSync(p).isFile()) {
         tlsnVerifierPath = p;
         log.error(`Found tlsn-verifier at ${p}`);
-        return tlsnVerifierPath;
+        return p;
       }
     } catch { /* not found */ }
   }

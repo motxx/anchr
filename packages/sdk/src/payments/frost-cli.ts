@@ -39,7 +39,7 @@ export function findFrostSigner(): string | null {
       if (Deno.statSync(p).isFile) {
         frostSignerPath = p;
         log.error(`Found frost-signer at ${p}`);
-        return frostSignerPath;
+        return p;
       }
     } catch { /* not found */ }
   }

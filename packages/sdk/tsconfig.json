@@ -10,7 +10,7 @@
     "strict": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM"],
-    "types": ["../../tools/types/deno-for-tsc"],
+    "types": ["node", "../../tools/types/deno-for-tsc"],
     "baseUrl": ".",
     "paths": {
       "@anchr/protocol": ["../protocol/src/mod.ts"],
