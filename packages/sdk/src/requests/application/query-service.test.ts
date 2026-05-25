@@ -433,7 +433,7 @@ describe("HTLC lifecycle", () => {
     type: "htlc" as const,
     hash: "abcd1234",
     oracle_pubkeys: ["oracle_pub"],
-    customer_pubkey: "requester_pub",
+    customer_pubkey: "customer_pub",
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
 
@@ -457,7 +457,7 @@ describe("HTLC lifecycle", () => {
       escrow: escrowInfo,
     });
     const outcome = service.recordOffer(query.id, {
-      provider_pubkey: "worker_pub_1",
+      provider_pubkey: "provider_pub_1",
       amount_sats: 100,
       offer_event_id: "evt_1",
       received_at: Date.now(),
@@ -470,7 +470,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "Simple query" });
     const outcome = service.recordOffer(query.id, {
-      provider_pubkey: "worker_pub_1",
+      provider_pubkey: "provider_pub_1",
       amount_sats: 100,
       offer_event_id: "evt_1",
       received_at: Date.now(),
@@ -485,19 +485,19 @@ describe("HTLC lifecycle", () => {
       escrow: escrowInfo,
     });
     service.recordOffer(query.id, {
-      provider_pubkey: "worker_pub_1",
+      provider_pubkey: "provider_pub_1",
       offer_event_id: "evt_1",
       received_at: Date.now(),
     });
     const outcome = await service.selectProvider(
       query.id,
-      "worker_pub_1",
+      "provider_pub_1",
       "htlc_token_123",
     );
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
     expect(updated.status).toBe("provider_selected");
-    expect(updated.escrow?.provider_pubkey).toBe("worker_pub_1");
+    expect(updated.escrow?.provider_pubkey).toBe("provider_pub_1");
     expect(updated.payment_status).toBe("escrow_swapped");
   });
 
@@ -510,7 +510,7 @@ describe("HTLC lifecycle", () => {
     );
     const outcome = await service.selectProvider(
       query.id,
-      "worker_pub_1",
+      "provider_pub_1",
       validToken,
     );
     expect(outcome.ok).toBe(true);
@@ -527,7 +527,7 @@ describe("HTLC lifecycle", () => {
     );
     const outcome = await service.selectProvider(
       query.id,
-      "worker_pub_1",
+      "provider_pub_1",
       smallToken,
     );
     expect(outcome.ok).toBe(false);
@@ -544,7 +544,7 @@ describe("HTLC lifecycle", () => {
     );
     const outcome = await service.selectProvider(
       query.id,
-      "worker_pub_1",
+      "provider_pub_1",
       "not_a_valid_token",
     );
     expect(outcome.ok).toBe(false);
@@ -561,7 +561,7 @@ describe("HTLC lifecycle", () => {
     );
     const outcome = await service.selectProvider(
       query.id,
-      "worker_pub_1",
+      "provider_pub_1",
       bigToken,
     );
     expect(outcome.ok).toBe(true);
@@ -573,8 +573,8 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectProvider(query.id, "worker_pub_1");
-    const outcome = await service.selectProvider(query.id, "worker_pub_2");
+    await service.selectProvider(query.id, "provider_pub_1");
+    const outcome = await service.selectProvider(query.id, "provider_pub_2");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not awaiting_offers");
   });
@@ -584,12 +584,12 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectProvider(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "provider_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(query.id, {
       attachments: [],
       notes: "done",
-    }, "worker_pub_1");
+    }, "provider_pub_1");
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("verifying");
   });
@@ -599,12 +599,12 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectProvider(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "provider_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(
       query.id,
       { attachments: [] },
-      "wrong_worker",
+      "wrong_provider",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");
@@ -615,9 +615,9 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectProvider(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "provider_pub_1");
     service.beginWork(query.id);
-    service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
+    service.recordResult(query.id, { attachments: [] }, "provider_pub_1");
     const outcome = service.completeVerification(query.id, true, "test-oracle");
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
@@ -631,9 +631,9 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectProvider(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "provider_pub_1");
     service.beginWork(query.id);
-    service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
+    service.recordResult(query.id, { attachments: [] }, "provider_pub_1");
     const outcome = service.completeVerification(query.id, false);
     expect(outcome.ok).toBe(true);
     expect(service.getQuery(query.id)?.status).toBe("rejected");
@@ -717,7 +717,7 @@ describe("submitEscrowResult", () => {
         type: "htlc" as const,
         hash: entry.hash,
         oracle_pubkeys: ["oracle_pub"],
-        customer_pubkey: "requester_pub",
+        customer_pubkey: "customer_pub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
       entry,
@@ -792,7 +792,7 @@ describe("submitEscrowResult", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "wrong_worker",
+      "wrong_provider",
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);

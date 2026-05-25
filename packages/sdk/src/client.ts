@@ -47,7 +47,7 @@ export class Anchr {
 
   /**
    * Request verified web data via TLSNotary. Creates a paid request, waits for
-   * a Worker to fulfill it with a cryptographic proof, verifies the proof,
+   * a Provider to fulfill it with a cryptographic proof, verifies the proof,
    * and returns the verified data.
    */
   async request(options: HttpRequestOptions): Promise<HttpRequestResult> {
@@ -83,7 +83,7 @@ export class Anchr {
 
   /**
    * Request a verified photo via C2PA. Creates a photo request, waits for a
-   * Worker to photograph the location, verifies the C2PA signature and
+   * Provider to photograph the location, verifies the C2PA signature and
    * GPS proximity, and returns the result.
    */
   async photo(options: PhotoRequestOptions): Promise<PhotoResult> {
@@ -161,13 +161,13 @@ export class Anchr {
   async submitPresentation(
     requestId: string,
     presentationBase64: string,
-    workerPubkey = "sdk-worker",
+    providerPubkey = "sdk-provider",
   ): Promise<SubmitResponse> {
     const res = await this.fetch(`/queries/${requestId}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        worker_pubkey: workerPubkey,
+        provider_pubkey: providerPubkey,
         tlsn_presentation: presentationBase64,
       }),
     });
@@ -179,7 +179,7 @@ export class Anchr {
 
   private async createRequest(options: HttpRequestOptions): Promise<string> {
     // domainHint: full targetUrl (with credentials/session IDs) is delivered
-    // to the selected Worker via NIP-44 encrypted_context, never the public
+    // to the selected Provider via NIP-44 encrypted_context, never the public
     // request envelope.
     const publicTargetUrl = options.domainHint
       ? `https://${options.domainHint}/`

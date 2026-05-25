@@ -112,7 +112,7 @@ async function signWithC2pa(jpegBuf: Buffer): Promise<Buffer> {
             label: "stds.schema-org.CreativeWork",
             data: {
               "@type": "CreativeWork",
-              "author": [{ "@type": "Person", "name": "Anchr Test Worker" }],
+              "author": [{ "@type": "Person", "name": "Anchr Test Provider" }],
             },
           },
         ],

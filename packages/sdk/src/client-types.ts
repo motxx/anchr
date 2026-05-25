@@ -28,7 +28,7 @@ export interface HttpRequestOptions {
   /**
    * When set, the public request shows only the domain; the full targetUrl
    * (potentially carrying credentials or session IDs) is delivered to the
-   * selected Worker via NIP-44 encrypted_context.
+   * selected Provider via NIP-44 encrypted_context.
    */
   domainHint?: string;
 }

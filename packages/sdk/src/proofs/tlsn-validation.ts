@@ -3,7 +3,7 @@
  *
  * Delegates cryptographic verification to the `tlsn-verifier` sidecar binary.
  * All verified data (server_name, revealed_body, timestamp) comes from the
- * cryptographic proof — never from worker self-reports.
+ * cryptographic proof — never from provider self-reports.
  *
  * When the binary is not available, verification FAILS (no fake structural fallback).
  */

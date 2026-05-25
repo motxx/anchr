@@ -59,7 +59,7 @@ function makeHtlcOptions(
       type: "htlc",
       hash: "abc123hash",
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: nowSecs + 1200,
       ...overrides,
     },
@@ -74,7 +74,7 @@ function makeHtlcQuery(overrides?: Partial<Query>): Query {
       type: "htlc",
       hash: "abc123hash",
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
     offers: [],
@@ -501,13 +501,13 @@ describe("addOffer", () => {
   test("adds offer to awaiting_offers query", () => {
     const query = makeHtlcQuery();
     const offer: OfferInfo = {
-      provider_pubkey: "worker1",
+      provider_pubkey: "provider1",
       offer_event_id: "evt1",
       received_at: Date.now(),
     };
     const q = expectOk(addOffer(query, offer));
     expect(q.offers?.length).toBe(1);
-    expect(q.offers?.[0].provider_pubkey).toBe("worker1");
+    expect(q.offers?.[0].provider_pubkey).toBe("provider1");
   });
 
   test("appends to existing offers", () => {
@@ -577,15 +577,15 @@ describe("addOffer", () => {
 describe("selectProvider", () => {
   test("transitions awaiting_offers → provider_selected", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectProvider(query, "worker_pub", {}));
+    const q = expectOk(selectProvider(query, "provider_pub", {}));
     expect(q.status).toBe("provider_selected");
-    expect(q.escrow?.provider_pubkey).toBe("worker_pub");
+    expect(q.escrow?.provider_pubkey).toBe("provider_pub");
   });
 
   test("sets escrow_token and payment_status on swap", () => {
     const query = makeHtlcQuery();
     const q = expectOk(
-      selectProvider(query, "worker_pub", { escrow_token: "tok123" }),
+      selectProvider(query, "provider_pub", { escrow_token: "tok123" }),
     );
     expect(q.escrow?.escrow_token).toBe("tok123");
     expect(q.payment_status).toBe("escrow_swapped");
@@ -593,14 +593,14 @@ describe("selectProvider", () => {
 
   test("preserves payment_status without escrow_token", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectProvider(query, "worker_pub", {}));
+    const q = expectOk(selectProvider(query, "provider_pub", {}));
     expect(q.payment_status).toBe("escrow_locked");
   });
 
   test("sets verified_escrow_sats", () => {
     const query = makeHtlcQuery();
     const q = expectOk(
-      selectProvider(query, "worker_pub", { verified_escrow_sats: 100 }),
+      selectProvider(query, "provider_pub", { verified_escrow_sats: 100 }),
     );
     expect(q.escrow?.verified_escrow_sats).toBe(100);
   });
@@ -634,10 +634,10 @@ describe("recordResult", () => {
         oracle_pubkeys: ["o"],
         customer_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
-        provider_pubkey: "worker1",
+        provider_pubkey: "provider1",
       },
     });
-    const q = expectOk(recordResult(query, defaultResult, "worker1"));
+    const q = expectOk(recordResult(query, defaultResult, "provider1"));
     expect(q.status).toBe("verifying");
     expect(q.result).toEqual(defaultResult);
     expect(q.submitted_at).toBeDefined();
@@ -645,7 +645,7 @@ describe("recordResult", () => {
 
   test("allows submission when no provider_pubkey set", () => {
     const query = makeHtlcQuery({ status: "processing" });
-    expectOk(recordResult(query, defaultResult, "any_worker"));
+    expectOk(recordResult(query, defaultResult, "any_provider"));
   });
 
   test("rejects mismatched provider_pubkey", () => {
@@ -657,10 +657,10 @@ describe("recordResult", () => {
         oracle_pubkeys: ["o"],
         customer_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
-        provider_pubkey: "worker1",
+        provider_pubkey: "provider1",
       },
     });
-    const err = expectErr(recordResult(query, defaultResult, "wrong_worker"));
+    const err = expectErr(recordResult(query, defaultResult, "wrong_provider"));
     expect(err).toContain("does not match");
   });
 

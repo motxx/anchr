@@ -34,11 +34,11 @@ export interface RuntimeConfig {
   httpApiKeys: string[];
   anthropicApiKey?: string;
   aiContentCheckEnabled: boolean;
-  /** Trusted Oracle pubkeys for Worker whitelist (from TRUSTED_ORACLE_PUBKEYS env). */
+  /** Trusted Oracle pubkeys for Provider allowlist (from TRUSTED_ORACLE_PUBKEYS env). */
   trustedOraclePubkeys: string[];
-  /** TLSNotary Verifier Server URL (served to workers). */
+  /** TLSNotary Verifier Server URL (served to providers). */
   tlsnVerifierUrl?: string;
-  /** TLSNotary WebSocket proxy URL (served to workers). */
+  /** TLSNotary WebSocket proxy URL (served to providers). */
   tlsnProxyUrl?: string;
   /** Persistent preimage-store file (JSON). Survives restarts. */
   preimageStorePath: string;

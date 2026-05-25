@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -51,7 +52,7 @@ impossible blind grep.
 - Run and classify every match:
   `rg -n "requester|Requester|worker|Worker" README.md CLAUDE.md AGENTS.md docs packages examples e2e deno.json scripts --glob '!docs/issues/**' --glob '!docs/archive/**'`
 - No matching actor filenames are expected:
-  `rg --files README.md docs packages examples e2e scripts | rg 'requester|Requester|worker|Worker'`
+  `rg --files README.md docs packages examples e2e scripts | rg -v '^docs/issues/' | rg 'requester|Requester|worker|Worker'`
 - `deno task test:unit`
 - `deno task lint:strict`
 
@@ -61,3 +62,39 @@ impossible blind grep.
 - Run the parent active-surface searches and classify residuals.
 - Rename residual actor vocabulary directly, or update the parent issue with
   the exact non-actor platform exception before closing #0067.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/client.ts`
+- `packages/sdk/src/client-types.ts`
+- `packages/sdk/src/internal/runtime/config.ts`
+- `packages/sdk/src/proofs/tlsn-types.ts`
+- `packages/sdk/src/proofs/tlsn-validation.ts`
+- `packages/sdk/src/proofs/verification/verifier.ts`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts`
+- `packages/sdk/src/adapters/oracle-service/server.ts`
+- `packages/sdk/src/requests/application/query-service.test.ts`
+- `packages/sdk/src/requests/application/query-service-lifecycle.test.ts`
+- `packages/sdk/src/requests/domain/query-aggregate.test.ts`
+- `docs/issues/pending/0067-retire-requester-worker-vocabulary.md`
+
+Verified with:
+
+- `rg -n "requester|Requester|worker|Worker" README.md CLAUDE.md AGENTS.md docs packages examples e2e deno.json scripts --glob '!docs/issues/**' --glob '!docs/archive/**'`
+- `rg --files README.md docs packages examples e2e scripts | rg -v '^docs/issues/' | rg 'requester|Requester|worker|Worker'`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- `docs/issues/pending/0067-retire-requester-worker-vocabulary.md` now documents the allowed non-actor platform/API residuals for the final parent sweep.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0067 remains pending for the parent close after this child.

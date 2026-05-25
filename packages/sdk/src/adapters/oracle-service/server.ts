@@ -2,7 +2,7 @@
  * Standalone oracle HTTP server.
  *
  * Runs the same deterministic verification as the built-in oracle but as
- * an independent HTTP service that workers contact directly. Tor-friendly:
+ * an independent HTTP service that providers contact directly. Tor-friendly:
  * stateless, no cookies, no identity tracking.
  *
  * Usage:

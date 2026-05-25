@@ -211,13 +211,13 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
 
     const offerOutcome = svc.recordOffer(query.id, {
-      provider_pubkey: "worker1",
+      provider_pubkey: "provider1",
       offer_event_id: "evt1",
       received_at: Date.now(),
     });
     expect(offerOutcome.ok).toBe(true);
 
-    const selectOutcome = await svc.selectProvider(query.id, "worker1");
+    const selectOutcome = await svc.selectProvider(query.id, "provider1");
     svc.beginWork(query.id);
     expect(selectOutcome.ok).toBe(true);
     expect(svc.getQuery(query.id)?.status).toBe("processing");
@@ -225,7 +225,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const submitOutcome = await svc.submitEscrowResult(
       query.id,
       defaultResult,
-      "worker1",
+      "provider1",
     );
     expect(submitOutcome.ok).toBe(true);
     expect(submitOutcome.query?.status).toBe("approved");
@@ -331,7 +331,7 @@ describe("Application Service — HTLC lifecycle", () => {
     const outcome = await svc.submitEscrowResult(
       query.id,
       defaultResult,
-      "wrong_worker",
+      "wrong_provider",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("does not match");

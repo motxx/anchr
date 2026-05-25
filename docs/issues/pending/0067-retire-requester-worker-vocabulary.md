@@ -74,10 +74,16 @@ follow-up before claiming complete removal.
 
 ## Verification
 
-- No matches are expected in active surfaces:
+- No actor-vocabulary matches are expected in active surfaces. A residual
+  lowercase `worker` sweep may return only platform/API terms: browser service
+  workers in `scripts/launch-chrome-tlsn.ts`, runtime target strings in
+  `packages/sdk/src/internal/runtime/`, adapter runtime capability strings in
+  `packages/sdk/src/adapters/{storage.ts,storage.test.ts,types.ts}`, and the
+  Cloudflare Workers timing-attack documentation link in
+  `packages/sdk/src/adapters/oracle-service/auth.ts`.
   `rg -n "requester|Requester|worker|Worker" README.md CLAUDE.md AGENTS.md docs packages examples e2e deno.json scripts --glob '!docs/issues/**' --glob '!docs/archive/**'`
-- No matching filenames are expected in active surfaces:
-  `rg --files README.md docs packages examples e2e scripts | rg 'requester|Requester|worker|Worker'`
+- No matching actor filenames are expected in active surfaces:
+  `rg --files README.md docs packages examples e2e scripts | rg -v '^docs/issues/' | rg 'requester|Requester|worker|Worker'`
 - `deno task test:unit`
 - `deno task lint:strict`
 

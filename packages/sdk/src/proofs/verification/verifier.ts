@@ -393,7 +393,7 @@ function checkExifRecord(
   failures: string[],
 ): void {
   if (!exif.hasExif) {
-    checks.push("EXIF: no metadata (stripped by worker for privacy)");
+    checks.push("EXIF: no metadata (stripped by provider for privacy)");
     return;
   }
 

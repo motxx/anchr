@@ -6,7 +6,7 @@ export interface TlsnCondition {
   description?: string;
 }
 
-/** Requirements a Requester places on a TLSNotary-backed query. */
+/** Requirements a Customer places on a TLSNotary-backed query. */
 export interface TlsnRequirement {
   target_url: string;
   method?: "GET" | "POST";
@@ -17,7 +17,7 @@ export interface TlsnRequirement {
   domain_hint?: string;
 }
 
-/** Sensitive context encrypted to Worker — never stored publicly. */
+/** Sensitive context encrypted to Provider — never stored publicly. */
 export interface TlsnEncryptedContext {
   /** The actual target URL (may contain session IDs). */
   target_url: string;
@@ -29,7 +29,7 @@ export interface TlsnEncryptedContext {
   body?: string;
 }
 
-/** Worker-submitted TLSNotary presentation, base64-encoded. */
+/** Provider-submitted TLSNotary presentation, base64-encoded. */
 export interface TlsnAttestation {
   /** Base64-encoded TLSNotary presentation file (.presentation.tlsn). */
   presentation: string;
