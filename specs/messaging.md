@@ -19,11 +19,8 @@ URL in their `schema` field for execution.
 
 The protocol actors are defined in
 [`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr profile
-maps them to event authors and `p` tags. Some current field names still use
-`requester_*` or `worker_*`; those are compatibility identifiers for existing
-events and host-shaped code. New prose and SDK APIs use Customer and Provider.
-Once versioned replacements are available, requester/worker names should be
-removed rather than retained as aliases.
+maps them to event authors and `p` tags. Pre-1.0 payloads use direct
+Customer/Provider field names rather than compatibility aliases.
 
 ## Event Kinds
 
@@ -61,10 +58,12 @@ The Customer broadcasts a DVM Job Request:
 | `tlsn_requirements`         | Target URL, method, conditions      |
 | `expected_gps`              | GPS coordinates (for photo queries) |
 | `max_gps_distance_km`       | Max distance from expected GPS      |
+| `customer_pubkey`           | Customer Nostr pubkey               |
+| `oracle_pubkey`             | Oracle Nostr pubkey                 |
 | `bounty`                    | `{ amount_sats }`                   |
 | `oracle_ids`                | Acceptable Oracle IDs               |
 | `quorum`                    | `{ min_approvals }`                 |
-| `visibility`                | `public` or `requester_only`        |
+| `visibility`                | `public` or `customer_only`         |
 
 ## Provider Offer (kind 7000, status=payment-required)
 
@@ -103,10 +102,11 @@ The Customer selects a Provider and announces:
 
 The encrypted content includes:
 
-| Field               | Description                                                 |
-| ------------------- | ----------------------------------------------------------- |
-| `escrow_token`      | Cashu token with spending conditions                        |
-| `encrypted_context` | TLSNotary target URL, headers, etc. (encrypted to Provider) |
+| Field                      | Description                                                 |
+| -------------------------- | ----------------------------------------------------------- |
+| `selected_provider_pubkey` | Selected Provider Nostr pubkey                              |
+| `escrow_token`             | Cashu token with spending conditions                        |
+| `encrypted_context`        | TLSNotary target URL, headers, etc. (encrypted to Provider) |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly. The public query may include a `domain_hint` for display
@@ -140,14 +140,13 @@ The Provider submits the result:
 
 ### QueryResponsePayload
 
-| Field              | Description                                                                 |
-| ------------------ | --------------------------------------------------------------------------- |
-| `schema`           | Proof schema URL used to dispatch Oracle and Customer verification          |
-| `attachments`      | Blossom blob references                                                     |
-| `notes`            | Optional Provider notes                                                     |
-| `gps`              | GPS coordinates at submission time                                          |
-| `tlsn_attestation` | Base64-encoded `.presentation.tlsn`                                         |
-| `blossom_keys`     | Map of attachment ID -> AES-256-GCM key/IV (encrypted to Oracle + Customer) |
+| Field              | Description                                                              |
+| ------------------ | ------------------------------------------------------------------------ |
+| `schema`           | Proof schema URL used to dispatch Oracle and Customer verification       |
+| `attachments`      | Blob metadata, including `decrypt_key_customer` and `decrypt_key_oracle` |
+| `notes`            | Optional Provider notes                                                  |
+| `gps`              | GPS coordinates at submission time                                       |
+| `tlsn_attestation` | Base64-encoded `.presentation.tlsn`                                      |
 
 ## Completion (kind 7000, status=success or error)
 

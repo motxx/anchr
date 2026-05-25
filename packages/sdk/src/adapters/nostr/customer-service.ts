@@ -127,7 +127,7 @@ export async function createHtlcRequest(
     throw new Error("Oracle endpoint is required for HTLC flow");
   }
 
-  // Step 2: Lock escrow token (Worker TBD) via EscrowProvider
+  // Step 2: Lock escrow token (Provider TBD) via EscrowProvider
   const hold = await config.escrowProvider.createHold({
     amount_sats: request.amountSats,
     payment_hash: hash,
@@ -141,7 +141,7 @@ export async function createHtlcRequest(
     description: request.description,
     nonce: "", // Will be set by query-service
     oracle_pubkey: config.oraclePubkey,
-    requester_pubkey: identity.publicKey,
+    customer_pubkey: identity.publicKey,
     bounty: {
       mint: Deno.env.get("CASHU_MINT_URL") ?? "",
       token: hold.escrow_ref,
@@ -200,7 +200,7 @@ export function subscribeToOffers(
         if (payload.status === "payment-required") {
           const offer = payload as OfferFeedbackPayload;
           const info: OfferInfo = {
-            provider_pubkey: offer.worker_pubkey,
+            provider_pubkey: offer.provider_pubkey,
             amount_sats: offer.amount_sats,
             offer_event_id: event.id,
             received_at: Date.now(),
@@ -241,7 +241,7 @@ export async function selectProvider(
   // Step 6: Announce selection (kind 7000 status=processing)
   const selectionPayload: SelectionFeedbackPayload = {
     status: "processing",
-    selected_worker_pubkey: providerPubkey,
+    selected_provider_pubkey: providerPubkey,
     htlc_token: bound.escrow_ref,
     encrypted_context: encryptedContext,
   };

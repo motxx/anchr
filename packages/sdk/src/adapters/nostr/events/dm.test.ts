@@ -8,14 +8,14 @@ import {
   parseOracleDM,
 } from "./dm.ts";
 
-describe("NIP-44 DM (Oracle ↔ Worker)", () => {
+describe("NIP-44 DM (Oracle ↔ Provider)", () => {
   test("buildPreimageDM creates kind 4 encrypted DM", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const event = buildPreimageDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_1",
       "deadbeef".repeat(8),
     );
@@ -24,24 +24,24 @@ describe("NIP-44 DM (Oracle ↔ Worker)", () => {
     expect(event.pubkey).toBe(oracle.publicKey);
     expect(event.content).not.toContain("preimage");
     const pTag = event.tags.find((t) => t[0] === "p");
-    expect(pTag?.[1]).toBe(worker.publicKey);
+    expect(pTag?.[1]).toBe(provider.publicKey);
   });
 
   test("parseOracleDM decrypts preimage DM", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const preimage =
       "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     const event = buildPreimageDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_2",
       preimage,
     );
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     );
 
@@ -52,11 +52,11 @@ describe("NIP-44 DM (Oracle ↔ Worker)", () => {
 
   test("buildRejectionDM creates kind 4 rejection notice", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const event = buildRejectionDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_3",
       "C2PA signature invalid",
     );
@@ -67,17 +67,17 @@ describe("NIP-44 DM (Oracle ↔ Worker)", () => {
 
   test("parseOracleDM decrypts rejection DM", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const event = buildRejectionDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_4",
       "C2PA signature invalid",
     );
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     );
 
@@ -90,12 +90,12 @@ describe("NIP-44 DM (Oracle ↔ Worker)", () => {
 
   test("eavesdropper cannot decrypt DM", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const eavesdropper = generateEphemeralIdentity();
 
     const event = buildPreimageDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_5",
       "secret_preimage",
     );

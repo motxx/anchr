@@ -164,7 +164,7 @@ export function subscribeToFeedback(
   });
 }
 
-// NIP-44 DM (kind 4) — used to deliver Oracle preimages to Workers.
+// NIP-44 DM (kind 4) — used to deliver Oracle preimages to Providers.
 export function subscribeToDMs(
   recipientPubkey: string,
   onEvent: (event: Event) => void,

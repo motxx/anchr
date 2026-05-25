@@ -16,8 +16,8 @@ import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---
 
-const workerIdentity = generateEphemeralIdentity();
-const workerPubkey = workerIdentity.publicKey;
+const providerIdentity = generateEphemeralIdentity();
+const providerPubkey = providerIdentity.publicKey;
 
 const frostConfig: ThresholdOracleConfig = {
   threshold: 2,
@@ -95,7 +95,7 @@ describe("verifyAndDeliverWithFrost", () => {
       "q1",
       makeQuery("q1"),
       makeResult(),
-      workerPubkey,
+      providerPubkey,
     );
     expect(passed).toBe(true);
     expect(published.length).toBe(1); // Preimage DM (HTLC fallback)
@@ -124,7 +124,7 @@ describe("verifyAndDeliverWithFrost", () => {
       "q-rej",
       makeQuery("q-rej"),
       makeResult(),
-      workerPubkey,
+      providerPubkey,
     );
     expect(passed).toBe(false);
     expect(published.length).toBe(1); // Rejection DM
@@ -154,7 +154,7 @@ describe("verifyAndDeliverWithFrost", () => {
       "q-nopeer",
       makeQuery("q-nopeer"),
       makeResult(),
-      workerPubkey,
+      providerPubkey,
     );
     // Should return false because signing fails (peers unreachable, threshold not met)
     expect(passed).toBe(false);

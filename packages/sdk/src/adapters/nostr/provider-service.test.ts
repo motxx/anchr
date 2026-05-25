@@ -24,7 +24,7 @@ describe("Provider service — payload parsing and filtering", () => {
       description: "Photo of Tokyo Tower",
       nonce: "ABC123",
       oracle_pubkey: trustedOracle,
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       bounty: { mint: "https://mint.example.com", token: "cashuAey..." },
       expires_at: Date.now() + 600_000,
       ...overrides,
@@ -39,7 +39,7 @@ describe("Provider service — payload parsing and filtering", () => {
     expect(parsed.description).toBe(original.description);
     expect(parsed.nonce).toBe(original.nonce);
     expect(parsed.oracle_pubkey).toBe(original.oracle_pubkey);
-    expect(parsed.requester_pubkey).toBe(original.requester_pubkey);
+    expect(parsed.customer_pubkey).toBe(original.customer_pubkey);
   });
 
   test("trusted oracle pubkey passes filter", () => {
@@ -70,12 +70,12 @@ describe("Provider service — payload parsing and filtering", () => {
       pubkey: "sender_pubkey",
       payload,
       oraclePubkey: payload.oracle_pubkey,
-      customerPubkey: payload.requester_pubkey ?? "sender_pubkey",
+      customerPubkey: payload.customer_pubkey ?? "sender_pubkey",
     };
 
     expect(request.eventId).toBe("event123");
     expect(request.oraclePubkey).toBe(trustedOracle);
-    expect(request.customerPubkey).toBe("requester_pub");
+    expect(request.customerPubkey).toBe("customer_pub");
   });
 
   test("parseQueryRequestPayload rejects invalid JSON", () => {

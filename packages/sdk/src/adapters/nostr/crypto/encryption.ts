@@ -1,4 +1,4 @@
-// Two modes: region-derived shared key (any worker in the region can read,
+// Two modes: region-derived shared key (any provider in the region can read,
 // goal is hiding from relays not adversaries) and NIP-44 1-to-1 encryption.
 
 import { sha256 } from "@noble/hashes/sha2.js";

@@ -101,7 +101,7 @@ export function discoverRequests(
           pubkey: event.pubkey,
           payload,
           oraclePubkey: payload.oracle_pubkey ?? oracleTag?.[1],
-          customerPubkey: payload.requester_pubkey ?? event.pubkey,
+          customerPubkey: payload.customer_pubkey ?? event.pubkey,
         });
       } catch {
         // Malformed event, ignore
@@ -122,7 +122,7 @@ export async function submitOffer(
 ): Promise<string> {
   const payload: OfferFeedbackPayload = {
     status: "payment-required",
-    worker_pubkey: identity.publicKey,
+    provider_pubkey: identity.publicKey,
     amount_sats: amountSats,
   };
 
@@ -162,7 +162,7 @@ export function waitForSelection(
 
         if (payload.status === "processing") {
           const selection = payload as SelectionFeedbackPayload;
-          if (selection.selected_worker_pubkey === identity.publicKey) {
+          if (selection.selected_provider_pubkey === identity.publicKey) {
             onSelected(selection.htlc_token, selection.encrypted_context);
           } else {
             // Another Provider was selected
@@ -241,7 +241,7 @@ export async function publishResult(
     attachments: [{
       blossom_hash: upload.blossom.hash,
       blossom_urls: upload.blossom.urls,
-      decrypt_key_requester: kR,
+      decrypt_key_customer: kR,
       decrypt_key_oracle: kO,
       decrypt_iv: upload.blossom.encryptIv,
       mime: upload.attachment.mime_type,

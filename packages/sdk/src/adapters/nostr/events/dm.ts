@@ -1,4 +1,4 @@
-// NIP-44 DM (kind 4) for Oracle ↔ Worker preimage / rejection delivery.
+// NIP-44 DM (kind 4) for Oracle ↔ Provider preimage / rejection delivery.
 
 import {
   type EventTemplate,
@@ -23,7 +23,7 @@ export const DM_KIND = 4;
 
 export function buildPreimageDM(
   oracleIdentity: NostrIdentity,
-  workerPubKey: string,
+  providerPubKey: string,
   queryId: string,
   preimage: string,
 ): VerifiedEvent {
@@ -35,7 +35,7 @@ export function buildPreimageDM(
 
   const conversationKey = deriveConversationKey(
     oracleIdentity.secretKey,
-    workerPubKey,
+    providerPubKey,
   );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
@@ -43,7 +43,7 @@ export function buildPreimageDM(
     kind: DM_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ["p", workerPubKey],
+      ["p", providerPubKey],
     ],
     content: encrypted,
   };
@@ -53,7 +53,7 @@ export function buildPreimageDM(
 
 export function buildRejectionDM(
   oracleIdentity: NostrIdentity,
-  workerPubKey: string,
+  providerPubKey: string,
   queryId: string,
   reason: string,
 ): VerifiedEvent {
@@ -65,7 +65,7 @@ export function buildRejectionDM(
 
   const conversationKey = deriveConversationKey(
     oracleIdentity.secretKey,
-    workerPubKey,
+    providerPubKey,
   );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
@@ -73,7 +73,7 @@ export function buildRejectionDM(
     kind: DM_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ["p", workerPubKey],
+      ["p", providerPubKey],
     ],
     content: encrypted,
   };
@@ -85,7 +85,7 @@ export function buildRejectionDM(
 // second key in the 2-of-2 P2PK redemption.
 export function buildFrostSignatureDM(
   oracleIdentity: NostrIdentity,
-  workerPubKey: string,
+  providerPubKey: string,
   queryId: string,
   groupSignature: string,
   groupPubkey: string,
@@ -99,7 +99,7 @@ export function buildFrostSignatureDM(
 
   const conversationKey = deriveConversationKey(
     oracleIdentity.secretKey,
-    workerPubKey,
+    providerPubKey,
   );
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
@@ -107,7 +107,7 @@ export function buildFrostSignatureDM(
     kind: DM_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ["p", workerPubKey],
+      ["p", providerPubKey],
     ],
     content: encrypted,
   };

@@ -16,9 +16,9 @@ import type { Query, QueryResult } from "../../requests/domain/types.ts";
 export interface WatchedQuery {
   queryId: string;
   queryEventId: string;
-  requesterPubkey: string;
-  selectedWorkerPubkey?: string;
-  offeredWorkers: Set<string>;
+  customerPubkey: string;
+  selectedProviderPubkey?: string;
+  offeredProviders: Set<string>;
   subs: SubCloser[];
 }
 
@@ -62,7 +62,7 @@ export function handleFeedbackEvent(
   event: Event,
   onOffer?: (
     queryId: string,
-    workerPubkey: string,
+    providerPubkey: string,
     amountSats?: number,
   ) => void,
 ): void {
@@ -78,8 +78,8 @@ export function handleFeedbackEvent(
 
     if (payload.status === "payment-required") {
       const offer = payload as OfferFeedbackPayload;
-      entry.offeredWorkers.add(offer.worker_pubkey);
-      onOffer?.(queryId, offer.worker_pubkey, offer.amount_sats);
+      entry.offeredProviders.add(offer.provider_pubkey);
+      onOffer?.(queryId, offer.provider_pubkey, offer.amount_sats);
     }
   } catch {
     // Cannot decrypt — event not for us, ignore

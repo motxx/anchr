@@ -13,11 +13,11 @@ import type { FrostSignatureDMPayload } from "./events.ts";
 describe("FROST DM building and parsing", () => {
   test("buildFrostSignatureDM produces a valid Nostr event (kind 4)", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const event = buildFrostSignatureDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_frost_1",
       "sig_" + "ab".repeat(32),
       "gpk_" + "cd".repeat(16),
@@ -28,9 +28,9 @@ describe("FROST DM building and parsing", () => {
     // Content is encrypted, not plaintext
     expect(event.content).not.toContain("frost_signature");
     expect(event.content).not.toContain("query_frost_1");
-    // Has p tag for worker
+    // Has p tag for provider
     const pTag = event.tags.find((t) => t[0] === "p");
-    expect(pTag?.[1]).toBe(worker.publicKey);
+    expect(pTag?.[1]).toBe(provider.publicKey);
     // Event has valid signature (finalizeEvent sets sig)
     expect(typeof event.sig).toBe("string");
     expect(event.sig.length).toBeGreaterThan(0);
@@ -38,13 +38,13 @@ describe("FROST DM building and parsing", () => {
 
   test("buildFrostSignatureDM event can be decrypted by recipient with parseOracleDM", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const groupSig = "ab".repeat(32);
     const groupPubkey = "cd".repeat(16);
 
     const event = buildFrostSignatureDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_frost_2",
       groupSig,
       groupPubkey,
@@ -52,7 +52,7 @@ describe("FROST DM building and parsing", () => {
 
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     );
     expect(parsed.type).toBe("frost_signature");
@@ -60,13 +60,13 @@ describe("FROST DM building and parsing", () => {
 
   test("parsed payload has type frost_signature with correct fields", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const groupSig = "deadbeef".repeat(8);
     const groupPubkey = "cafebabe".repeat(4);
 
     const event = buildFrostSignatureDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_frost_3",
       groupSig,
       groupPubkey,
@@ -74,7 +74,7 @@ describe("FROST DM building and parsing", () => {
 
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     ) as FrostSignatureDMPayload;
 
@@ -86,7 +86,7 @@ describe("FROST DM building and parsing", () => {
 
   test("round-trip build/parse preserves query_id, group_signature, group_pubkey", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const queryId = "roundtrip_" + Date.now();
     const groupSig = "ff".repeat(32);
@@ -94,14 +94,14 @@ describe("FROST DM building and parsing", () => {
 
     const event = buildFrostSignatureDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       queryId,
       groupSig,
       groupPubkey,
     );
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     ) as FrostSignatureDMPayload;
 
@@ -112,18 +112,18 @@ describe("FROST DM building and parsing", () => {
 
   test("parseOracleDM handles preimage DM type", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const preimage = "abcdef0123456789".repeat(4);
 
     const event = buildPreimageDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_compat_1",
       preimage,
     );
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     );
 
@@ -134,17 +134,17 @@ describe("FROST DM building and parsing", () => {
 
   test("parseOracleDM handles rejection DM type", () => {
     const oracle = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const event = buildRejectionDM(
       oracle,
-      worker.publicKey,
+      provider.publicKey,
       "query_compat_2",
       "Invalid C2PA",
     );
     const parsed = parseOracleDM(
       event.content,
-      worker.secretKey,
+      provider.secretKey,
       oracle.publicKey,
     );
 

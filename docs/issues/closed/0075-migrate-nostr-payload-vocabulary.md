@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -62,3 +63,43 @@ pre-1.0 replacement shape instead of doing a blind text replacement.
 - Choose the direct pre-1.0 payload replacement or create a narrower versioned
   migration follow-up if interoperability requires staging.
 - Update Nostr adapter tests to lock the selected public payload shape.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/events/events.ts`
+- `packages/sdk/src/adapters/nostr/events/event-builders.ts`
+- `packages/sdk/src/adapters/nostr/events/dm.ts`
+- `packages/sdk/src/adapters/nostr/customer-service.ts`
+- `packages/sdk/src/adapters/nostr/provider-service.ts`
+- `packages/sdk/src/adapters/nostr/oracle-service.ts`
+- `packages/sdk/src/adapters/nostr/oracle-handlers.ts`
+- `packages/sdk/src/adapters/nostr/transport/client.ts`
+- `packages/sdk/src/adapters/nostr/crypto/encryption.ts`
+- `packages/sdk/src/adapters/nostr/proof-publisher.ts`
+- `packages/sdk/src/adapters/nostr/*test.ts`
+- `packages/sdk/src/adapters/nostr/events/*test.ts`
+- `specs/messaging.md`
+
+Verified with:
+
+- `rg -n "requester_pubkey|decrypt_key_requester|worker_pubkey|selected_worker_pubkey|requesterPubKey|workerPubKey|selectedWorker|offeredWorkers|Requester|Worker" packages/sdk/src/adapters/nostr` (no matches)
+- `rg -n "requester|worker|Requester|Worker" packages/sdk/src/adapters/nostr specs/messaging.md` (no matches)
+- `deno test -A packages/sdk/src/adapters/nostr/events/events.test.ts packages/sdk/src/adapters/nostr/events/dm.test.ts packages/sdk/src/adapters/nostr/events/frost-dm.test.ts packages/sdk/src/adapters/nostr/provider-service.test.ts packages/sdk/src/adapters/nostr/customer-service.test.ts packages/sdk/src/adapters/nostr/oracle-service.test.ts packages/sdk/src/adapters/nostr/oracle-frost.test.ts`
+- `deno task check`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task test:all` (rerun with approved escalation after sandboxed `cargo-audit` could not lock its advisory cache)
+
+Harness update:
+
+- Nostr adapter unit tests now lock the direct Customer/Provider payload fields, and `specs/messaging.md` records the pre-1.0 direct replacement instead of a compatibility alias plan.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

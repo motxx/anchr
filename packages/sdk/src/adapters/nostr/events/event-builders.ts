@@ -79,13 +79,13 @@ function buildRequestTags(
 function buildResponseTags(
   identity: NostrIdentity,
   queryEventId: string,
-  requesterPubKey: string,
+  customerPubKey: string,
   payload: QueryResponsePayload,
   oraclePubKey?: string,
 ): string[][] {
   const tags: string[][] = [
     ["e", queryEventId],
-    ["p", requesterPubKey],
+    ["p", customerPubKey],
   ];
 
   if (oraclePubKey && payload.attachments?.length) {
@@ -146,7 +146,7 @@ export function buildQueryRequestEvent(
 export function buildQueryResponseEvent(
   identity: NostrIdentity,
   queryEventId: string,
-  requesterPubKey: string,
+  customerPubKey: string,
   payload: QueryResponsePayload,
   oraclePubKey?: string,
 ): VerifiedEvent {
@@ -156,11 +156,11 @@ export function buildQueryResponseEvent(
     tags: buildResponseTags(
       identity,
       queryEventId,
-      requesterPubKey,
+      customerPubKey,
       payload,
       oraclePubKey,
     ),
-    content: encryptPayload(identity, requesterPubKey, payload),
+    content: encryptPayload(identity, customerPubKey, payload),
   };
   return finalizeEvent(template, identity.secretKey);
 }
@@ -168,7 +168,7 @@ export function buildQueryResponseEvent(
 export function buildOfferFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
-  requesterPubKey: string,
+  customerPubKey: string,
   payload: OfferFeedbackPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
@@ -176,10 +176,10 @@ export function buildOfferFeedbackEvent(
     created_at: nowUnix(),
     tags: [
       ["e", queryEventId],
-      ["p", requesterPubKey],
+      ["p", customerPubKey],
       ["status", "payment-required"],
     ],
-    content: encryptPayload(identity, requesterPubKey, payload),
+    content: encryptPayload(identity, customerPubKey, payload),
   };
   return finalizeEvent(template, identity.secretKey);
 }
@@ -187,7 +187,7 @@ export function buildOfferFeedbackEvent(
 export function buildSelectionFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
-  workerPubKey: string,
+  providerPubKey: string,
   payload: SelectionFeedbackPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
@@ -195,10 +195,10 @@ export function buildSelectionFeedbackEvent(
     created_at: nowUnix(),
     tags: [
       ["e", queryEventId],
-      ["p", workerPubKey],
+      ["p", providerPubKey],
       ["status", "processing"],
     ],
-    content: encryptPayload(identity, workerPubKey, payload),
+    content: encryptPayload(identity, providerPubKey, payload),
   };
   return finalizeEvent(template, identity.secretKey);
 }
@@ -207,7 +207,7 @@ export function buildQuerySettlementEvent(
   identity: NostrIdentity,
   queryEventId: string,
   responseEventId: string,
-  workerPubKey: string,
+  providerPubKey: string,
   payload: QuerySettlementPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
@@ -216,9 +216,9 @@ export function buildQuerySettlementEvent(
     tags: [
       ["e", queryEventId],
       ["e", responseEventId],
-      ["p", workerPubKey],
+      ["p", providerPubKey],
     ],
-    content: encryptPayload(identity, workerPubKey, payload),
+    content: encryptPayload(identity, providerPubKey, payload),
   };
   return finalizeEvent(template, identity.secretKey);
 }
@@ -227,7 +227,7 @@ export function buildQuerySettlementEvent(
  * Build an Oracle Announcement event (kind 30088).
  *
  * Parametrized replaceable event per the oracle-registry spec — Oracles publish their
- * capabilities, fees, and endpoints so Requesters can discover them.
+ * capabilities, fees, and endpoints so Customers can discover them.
  */
 export function buildOracleAnnouncementEvent(
   identity: NostrIdentity,

@@ -14,8 +14,8 @@ import type { VerifiedEvent } from "nostr-tools";
 
 // --- Helpers ---
 
-const workerIdentity = generateEphemeralIdentity();
-const workerPubkey = workerIdentity.publicKey;
+const providerIdentity = generateEphemeralIdentity();
+const providerPubkey = providerIdentity.publicKey;
 
 function makeConfig(
   overrides?: Partial<OracleNostrServiceConfig>,
@@ -95,7 +95,7 @@ describe("verifyAndDeliver", () => {
 
     const passed = await service.verifyAndDeliver("q1", query, {
       attachments: [],
-    }, workerPubkey);
+    }, providerPubkey);
     expect(passed).toBe(true);
     expect(published.length).toBe(1);
     // Preimage should be deleted from store after delivery
@@ -135,7 +135,7 @@ describe("verifyAndDeliver", () => {
       "q-delivery-fail",
       query,
       { attachments: [] },
-      workerPubkey,
+      providerPubkey,
     );
     expect(passed).toBe(false);
     expect(store.has(hash)).toBe(true);
@@ -170,7 +170,7 @@ describe("verifyAndDeliver", () => {
 
     const passed = await service.verifyAndDeliver("q1", query, {
       attachments: [],
-    }, workerPubkey);
+    }, providerPubkey);
     expect(passed).toBe(false);
     expect(published.length).toBe(1);
   });
@@ -200,14 +200,14 @@ describe("verifyAndDeliver", () => {
     // Verify passes but no preimage exists, so rejection DM is sent
     const passed = await service.verifyAndDeliver("q_unknown", query, {
       attachments: [],
-    }, workerPubkey);
+    }, providerPubkey);
     expect(passed).toBe(false);
   });
 });
 
-// --- recordSelectedWorker ---
+// --- recordSelectedProvider ---
 
-describe("recordSelectedWorker", () => {
+describe("recordSelectedProvider", () => {
   let service: ReturnType<typeof createOracleNostrService>;
 
   beforeEach(() => {
@@ -218,16 +218,16 @@ describe("recordSelectedWorker", () => {
     service.stop();
   });
 
-  test("records worker pubkey for watched query", () => {
+  test("records provider pubkey for watched query", () => {
     // watchRequest requires relay subscriptions — but with empty relayUrls it still records the entry
-    service.watchRequest("q1", "evt1", "requester_pub");
+    service.watchRequest("q1", "evt1", "customer_pub");
     // Should not throw
-    service.recordSelectedWorker("q1", workerPubkey);
+    service.recordSelectedProvider("q1", providerPubkey);
   });
 
   test("no-op for unknown query", () => {
     // Should not throw even for non-watched query
-    service.recordSelectedWorker("unknown", workerPubkey);
+    service.recordSelectedProvider("unknown", providerPubkey);
   });
 });
 
@@ -255,7 +255,7 @@ describe("stop", () => {
   test("completes without error after watching queries", () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    service.watchRequest("q1", "evt1", "requester_pub");
+    service.watchRequest("q1", "evt1", "customer_pub");
     // Should not throw
     service.stop();
   });

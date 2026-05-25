@@ -10,8 +10,8 @@
  *   ANCHR_QUERY_FEEDBACK  = 7000  (DVM Job Feedback — offers, selection, completion)
  *
  * Kind 7000 is used for multiple sub-types per NIP-90:
- *   status=payment-required  → Worker offer
- *   status=processing        → Worker selection announcement
+ *   status=payment-required  → Provider offer
+ *   status=processing        → Provider selection announcement
  *   status=success/error     → Completion feedback
  */
 
@@ -37,16 +37,16 @@ export const ANCHR_MARKETPLACE_LISTING = 38421;
 export interface QueryRequestPayload {
   description: string;
   nonce?: string;
-  /** Oracle's Nostr pubkey (hex) — Workers verify against whitelist. */
+  /** Oracle's Nostr pubkey (hex) — Providers verify against whitelist. */
   oracle_pubkey?: string;
-  /** Requester's Nostr pubkey (hex) — Workers encrypt K_R to this. */
-  requester_pubkey?: string;
+  /** Customer's Nostr pubkey (hex) — Providers encrypt K_R to this. */
+  customer_pubkey?: string;
   bounty?: {
     mint: string;
     token: string;
   };
   oracle_ids?: string[];
-  /** Verification factors requested by the Requester. */
+  /** Verification factors requested by the Customer. */
   verification_requirements?: readonly VerificationFactor[];
   expires_at: number;
 }
@@ -56,8 +56,8 @@ export interface QueryResponsePayload {
   attachments?: Array<{
     blossom_hash: string;
     blossom_urls: string[];
-    /** Symmetric key encrypted to Requester pubkey (NIP-44). */
-    decrypt_key_requester?: string;
+    /** Symmetric key encrypted to Customer pubkey (NIP-44). */
+    decrypt_key_customer?: string;
     /** Symmetric key encrypted to Oracle pubkey (NIP-44). */
     decrypt_key_oracle?: string;
     /** IV for AES-256-GCM decryption (hex). */
@@ -67,24 +67,24 @@ export interface QueryResponsePayload {
   notes?: string;
 }
 
-/** Worker offer: kind 7000 with status=payment-required. */
+/** Provider offer: kind 7000 with status=payment-required. */
 export interface OfferFeedbackPayload {
   status: "payment-required";
-  /** Worker's Nostr pubkey (hex). */
-  worker_pubkey: string;
+  /** Provider's Nostr pubkey (hex). */
+  provider_pubkey: string;
   /** Requested amount in sats. */
   amount_sats?: number;
 }
 
-/** Requester selection announcement: kind 7000 with status=processing. */
+/** Customer selection announcement: kind 7000 with status=processing. */
 export interface SelectionFeedbackPayload {
   status: "processing";
-  /** Selected Worker's Nostr pubkey (hex). */
-  selected_worker_pubkey: string;
-  /** HTLC token (swapped to include Worker pubkey). */
+  /** Selected Provider's Nostr pubkey (hex). */
+  selected_provider_pubkey: string;
+  /** HTLC token (swapped to include Provider pubkey). */
   htlc_token?: string;
   /** Sensitive TLSNotary context for proof generation (target_url, headers).
-   *  Delivered only to the selected Worker via NIP-44 encrypted kind 7000 event. */
+   *  Delivered only to the selected Provider via NIP-44 encrypted kind 7000 event. */
   encrypted_context?: TlsnEncryptedContext;
 }
 

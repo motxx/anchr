@@ -87,19 +87,19 @@ describe("Nostr events (NIP-90 DVM)", () => {
   });
 
   test("builds and decrypts QueryResponse event (DVM kind 6300)", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const response = buildQueryResponseEvent(
-      worker,
+      provider,
       "event_abc",
-      requester.publicKey,
+      customer.publicKey,
       {
         nonce_echo: "K7P4",
         attachments: [{
           blossom_hash: "sha256:deadbeef",
           blossom_urls: ["https://blossom.example/deadbeef"],
-          decrypt_key_requester: "0123456789abcdef",
+          decrypt_key_customer: "0123456789abcdef",
           decrypt_iv: "aabbccdd00112233",
           mime: "image/jpeg",
         }],
@@ -108,13 +108,13 @@ describe("Nostr events (NIP-90 DVM)", () => {
     );
 
     expect(response.kind).toBe(ANCHR_QUERY_RESPONSE);
-    expect(response.pubkey).toBe(worker.publicKey);
+    expect(response.pubkey).toBe(provider.publicKey);
 
-    // Requester can decrypt
+    // Customer can decrypt
     const parsed = parseQueryResponsePayload(
       response.content,
-      requester.secretKey,
-      worker.publicKey,
+      customer.secretKey,
+      provider.publicKey,
     );
     expect(parsed.nonce_echo).toBe("K7P4");
     expect(parsed.notes).toBe("街は平穏です");
@@ -123,14 +123,14 @@ describe("Nostr events (NIP-90 DVM)", () => {
   });
 
   test("builds and decrypts QuerySettlement event (DVM kind 7000)", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const settlement = buildQuerySettlementEvent(
-      requester,
+      customer,
       "event_abc",
       "event_xyz",
-      worker.publicKey,
+      provider.publicKey,
       {
         status: "accepted",
         escrow_token: "cashuAbc123...",
@@ -145,31 +145,31 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(eTags[0]?.[1]).toBe("event_abc");
     expect(eTags[1]?.[1]).toBe("event_xyz");
 
-    // Worker can decrypt
+    // Provider can decrypt
     const parsed = parseQuerySettlementPayload(
       settlement.content,
-      worker.secretKey,
-      requester.publicKey,
+      provider.secretKey,
+      customer.publicKey,
     );
     expect(parsed.status).toBe("accepted");
     expect(parsed.escrow_token).toBe("cashuAbc123...");
   });
 
   test("QueryResponse includes oracle_payload when oraclePubKey provided", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const oracle = generateEphemeralIdentity();
 
     const response = buildQueryResponseEvent(
-      worker,
+      provider,
       "event_oracle",
-      requester.publicKey,
+      customer.publicKey,
       {
         nonce_echo: "N1",
         attachments: [{
           blossom_hash: "sha256:aabbccdd",
           blossom_urls: ["https://blossom.example/aabbccdd"],
-          decrypt_key_requester: "key_for_requester",
+          decrypt_key_customer: "key_for_customer",
           decrypt_key_oracle: "key_for_oracle",
           decrypt_iv: "iv123",
           mime: "image/jpeg",
@@ -210,26 +210,26 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(oraclePayload!.attachments[0]!.decrypt_iv).toBe("iv123");
     expect(oraclePayload!.notes).toBe("oracle test");
 
-    // Requester can still decrypt main content
-    const requesterPayload = parseQueryResponsePayload(
+    // Customer can still decrypt main content
+    const customerPayload = parseQueryResponsePayload(
       response.content,
-      requester.secretKey,
-      worker.publicKey,
+      customer.secretKey,
+      provider.publicKey,
     );
-    expect(requesterPayload.nonce_echo).toBe("N1");
-    expect(requesterPayload.attachments?.[0]?.decrypt_key_requester).toBe(
-      "key_for_requester",
+    expect(customerPayload.nonce_echo).toBe("N1");
+    expect(customerPayload.attachments?.[0]?.decrypt_key_customer).toBe(
+      "key_for_customer",
     );
   });
 
   test("oracle_payload not present when oraclePubKey omitted", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const response = buildQueryResponseEvent(
-      worker,
+      provider,
       "event_no_oracle",
-      requester.publicKey,
+      customer.publicKey,
       { nonce_echo: "N2" },
     );
 
@@ -237,19 +237,19 @@ describe("Nostr events (NIP-90 DVM)", () => {
       t[0] === "oracle_payload"
     );
     expect(oraclePayloadTag).toBeUndefined();
-    expect(parseOracleResponsePayload(response, worker.secretKey)).toBeNull();
+    expect(parseOracleResponsePayload(response, provider.secretKey)).toBeNull();
   });
 
   test("eavesdropper cannot decrypt oracle_payload", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const oracle = generateEphemeralIdentity();
     const eavesdropper = generateEphemeralIdentity();
 
     const response = buildQueryResponseEvent(
-      worker,
+      provider,
       "event_eav",
-      requester.publicKey,
+      customer.publicKey,
       {
         nonce_echo: "N3",
         attachments: [{
@@ -268,19 +268,19 @@ describe("Nostr events (NIP-90 DVM)", () => {
   });
 
   test("builds and decrypts OfferFeedback event (kind 7000)", () => {
-    const worker = generateEphemeralIdentity();
-    const requester = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
 
     const payload: OfferFeedbackPayload = {
       status: "payment-required",
-      worker_pubkey: worker.publicKey,
+      provider_pubkey: provider.publicKey,
       amount_sats: 100,
     };
 
     const event = buildOfferFeedbackEvent(
-      worker,
+      provider,
       "event_q1",
-      requester.publicKey,
+      customer.publicKey,
       payload,
     );
 
@@ -288,33 +288,33 @@ describe("Nostr events (NIP-90 DVM)", () => {
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("payment-required");
 
-    // Requester can decrypt
+    // Customer can decrypt
     const parsed = parseFeedbackPayload(
       event.content,
-      requester.secretKey,
-      worker.publicKey,
+      customer.secretKey,
+      provider.publicKey,
     );
     expect(parsed.status).toBe("payment-required");
-    expect((parsed as OfferFeedbackPayload).worker_pubkey).toBe(
-      worker.publicKey,
+    expect((parsed as OfferFeedbackPayload).provider_pubkey).toBe(
+      provider.publicKey,
     );
     expect((parsed as OfferFeedbackPayload).amount_sats).toBe(100);
   });
 
   test("builds and decrypts SelectionFeedback event (kind 7000)", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
 
     const payload: SelectionFeedbackPayload = {
       status: "processing",
-      selected_worker_pubkey: worker.publicKey,
+      selected_provider_pubkey: provider.publicKey,
       htlc_token: "cashuToken123",
     };
 
     const event = buildSelectionFeedbackEvent(
-      requester,
+      customer,
       "event_s1",
-      worker.publicKey,
+      provider.publicKey,
       payload,
     );
 
@@ -322,15 +322,15 @@ describe("Nostr events (NIP-90 DVM)", () => {
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("processing");
 
-    // Worker can decrypt
+    // Provider can decrypt
     const parsed = parseFeedbackPayload(
       event.content,
-      worker.secretKey,
-      requester.publicKey,
+      provider.secretKey,
+      customer.publicKey,
     );
     expect(parsed.status).toBe("processing");
-    expect((parsed as SelectionFeedbackPayload).selected_worker_pubkey).toBe(
-      worker.publicKey,
+    expect((parsed as SelectionFeedbackPayload).selected_provider_pubkey).toBe(
+      provider.publicKey,
     );
     expect((parsed as SelectionFeedbackPayload).htlc_token).toBe(
       "cashuToken123",
@@ -338,14 +338,14 @@ describe("Nostr events (NIP-90 DVM)", () => {
   });
 
   test("third party cannot decrypt response", () => {
-    const requester = generateEphemeralIdentity();
-    const worker = generateEphemeralIdentity();
+    const customer = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
     const eavesdropper = generateEphemeralIdentity();
 
     const response = buildQueryResponseEvent(
-      worker,
+      provider,
       "event_abc",
-      requester.publicKey,
+      customer.publicKey,
       { nonce_echo: "TEST", notes: "secret" },
     );
 
@@ -354,7 +354,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       parseQueryResponsePayload(
         response.content,
         eavesdropper.secretKey,
-        worker.publicKey,
+        provider.publicKey,
       )
     ).toThrow();
   });

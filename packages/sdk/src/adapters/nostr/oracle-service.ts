@@ -2,10 +2,10 @@
  * Oracle actor Nostr workflow binding.
  *
  * Responsibilities (per README):
- *   1. Generate preimage, return hash(preimage) to Requester
- *   2. Listen for kind 7000 offers → record Worker pubkeys
- *   3. On selection announcement → verify HTLC condition, record selected Worker
- *   4. Listen for kind 6300 results → verify Worker pubkey, download blob,
+ *   1. Generate preimage, return hash(preimage) to Customer
+ *   2. Listen for kind 7000 offers → record Provider pubkeys
+ *   3. On selection announcement → verify HTLC condition, record selected Provider
+ *   4. Listen for kind 6300 results → verify Provider pubkey, download blob,
  *      verify blob hash, decrypt K_O, verify C2PA
  *   5. C2PA valid → deliver preimage via NIP-44 DM (kind 4)
  *   6. C2PA invalid → deliver rejection via NIP-44 DM (kind 4)
@@ -78,17 +78,17 @@ export interface OracleNostrServiceConfig {
   frostConfig?: ThresholdOracleConfig;
   /** Per-node FROST config with key material and peer endpoints. */
   frostNodeConfig?: FrostNodeConfig;
-  /** Callback when a Worker submits an offer. */
+  /** Callback when a Provider submits an offer. */
   onOffer?: (
     requestId: string,
-    workerPubkey: string,
+    providerPubkey: string,
     amountSats?: number,
   ) => void;
   /** Callback when verification completes. */
   onVerification?: (
     requestId: string,
     passed: boolean,
-    workerPubkey: string,
+    providerPubkey: string,
   ) => void;
   /** Delivery retry delays in milliseconds. Defaults to 2s, 4s, then final attempt. */
   deliveryRetryDelaysMs?: number[];
@@ -101,23 +101,23 @@ export interface OracleNostrService {
   watchRequest(
     requestId: string,
     requestEventId: string,
-    requesterPubkey: string,
+    customerPubkey: string,
   ): void;
-  /** Record the selected Worker pubkey for a request. */
-  recordSelectedWorker(requestId: string, workerPubkey: string): void;
+  /** Record the selected Provider pubkey for a request. */
+  recordSelectedProvider(requestId: string, providerPubkey: string): void;
   /** Verify a result and deliver preimage or rejection. */
   verifyAndDeliver(
     requestId: string,
     request: VerifiableRequest,
     result: RequestSubmissionResult,
-    workerPubkey: string,
+    providerPubkey: string,
   ): Promise<boolean>;
   /** Verify and deliver using FROST signing (P2PK+FROST flow). */
   verifyAndDeliverWithFrost(
     requestId: string,
     request: VerifiableRequest,
     result: RequestSubmissionResult,
-    workerPubkey: string,
+    providerPubkey: string,
   ): Promise<boolean>;
   /** Stop watching all requests. */
   stop(): void;
@@ -135,9 +135,10 @@ export function createOracleNostrService(
     if (!entry) return;
 
     if (
-      entry.selectedWorkerPubkey && event.pubkey !== entry.selectedWorkerPubkey
+      entry.selectedProviderPubkey &&
+      event.pubkey !== entry.selectedProviderPubkey
     ) {
-      log.error(`Ignoring result from non-selected Worker ${event.pubkey}`);
+      log.error(`Ignoring result from non-selected Provider ${event.pubkey}`);
       return;
     }
 
@@ -166,7 +167,7 @@ export function createOracleNostrService(
     queryId: string,
     query: VerifiableRequest,
     result: RequestSubmissionResult,
-    workerPubkey: string,
+    providerPubkey: string,
   ): Promise<boolean> {
     const detail = await _verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
@@ -175,7 +176,7 @@ export function createOracleNostrService(
     if (detail.passed && preimage && hash) {
       const dm = buildPreimageDM(
         config.identity,
-        workerPubkey,
+        providerPubkey,
         queryId,
         preimage,
       );
@@ -187,7 +188,7 @@ export function createOracleNostrService(
         const publishResult = await _publishEventFn(dm, config.relayUrls);
         if (publishResult.successes.length > 0) {
           log.error(
-            `Preimage delivered to Worker for ${queryId} (${publishResult.successes.length} relay(s))`,
+            `Preimage delivered to Provider for ${queryId} (${publishResult.successes.length} relay(s))`,
           );
           delivered = true;
           break;
@@ -215,12 +216,12 @@ export function createOracleNostrService(
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(
         config.identity,
-        workerPubkey,
+        providerPubkey,
         queryId,
         reason,
       );
       await _publishEventFn(dm, config.relayUrls);
-      log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
+      log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
       return false;
     }
   }
@@ -235,13 +236,13 @@ export function createOracleNostrService(
     watchRequest(
       queryId: string,
       queryEventId: string,
-      requesterPubkey: string,
+      customerPubkey: string,
     ) {
       const entry: WatchedQuery = {
         queryId,
         queryEventId,
-        requesterPubkey,
-        offeredWorkers: new Set(),
+        customerPubkey,
+        offeredProviders: new Set(),
         subs: [],
       };
 
@@ -269,29 +270,29 @@ export function createOracleNostrService(
       watched.set(queryId, entry);
     },
 
-    recordSelectedWorker(queryId: string, workerPubkey: string) {
+    recordSelectedProvider(queryId: string, providerPubkey: string) {
       const entry = watched.get(queryId);
       if (entry) {
-        entry.selectedWorkerPubkey = workerPubkey;
+        entry.selectedProviderPubkey = providerPubkey;
       }
     },
 
-    async verifyAndDeliver(queryId, query, result, workerPubkey) {
+    async verifyAndDeliver(queryId, query, result, providerPubkey) {
       if (query.quorum && config.frostCoordinator && config.frostConfig) {
         return this.verifyAndDeliverWithFrost(
           queryId,
           query,
           result,
-          workerPubkey,
+          providerPubkey,
         );
       }
-      return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+      return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
     },
 
-    async verifyAndDeliverWithFrost(queryId, query, result, workerPubkey) {
+    async verifyAndDeliverWithFrost(queryId, query, result, providerPubkey) {
       if (!config.frostNodeConfig) {
         log.error(`FROST node config not available, falling back to HTLC`);
-        return verifyAndDeliverInternal(queryId, query, result, workerPubkey);
+        return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
       }
 
       const detail = await _verifyFn(query, result);
@@ -299,12 +300,12 @@ export function createOracleNostrService(
         const reason = detail.failures.join(", ") || "Verification failed";
         const dm = buildRejectionDM(
           config.identity,
-          workerPubkey,
+          providerPubkey,
           queryId,
           reason,
         );
         await _publishEventFn(dm, config.relayUrls);
-        log.error(`Rejection sent to Worker for ${queryId}: ${reason}`);
+        log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
         return false;
       }
 
@@ -328,7 +329,7 @@ export function createOracleNostrService(
         log.error(`FROST signing failed for ${queryId} — threshold not met`);
         const dm = buildRejectionDM(
           config.identity,
-          workerPubkey,
+          providerPubkey,
           queryId,
           "FROST threshold not met — insufficient Oracle approvals",
         );
@@ -336,10 +337,10 @@ export function createOracleNostrService(
         return false;
       }
 
-      // Step 3: Deliver FROST group signature to Worker
+      // Step 3: Deliver FROST group signature to Provider
       const dm = buildFrostSignatureDM(
         config.identity,
-        workerPubkey,
+        providerPubkey,
         queryId,
         sigResult.signature,
         config.frostNodeConfig.group_pubkey,
@@ -347,7 +348,7 @@ export function createOracleNostrService(
       const publishResult = await _publishEventFn(dm, config.relayUrls);
       if (publishResult.successes.length > 0) {
         log.error(
-          `FROST signature delivered to Worker for ${queryId} (signers: ${
+          `FROST signature delivered to Provider for ${queryId} (signers: ${
             sigResult.signers_participated.join(",")
           })`,
         );

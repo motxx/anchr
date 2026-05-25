@@ -46,7 +46,7 @@ export function createNostrProofPublisher(
       // is prevented at the TLSNotary protocol level via selective disclosure
       // (--redact-sent-header). The revealed data here only contains the
       // *response* (revealed_body, revealed_headers) which doesn't contain
-      // the requester's credentials, so no credential check is needed.
+      // the customer's credentials, so no credential check is needed.
 
       // Build the attestation event with cryptographically verified data (as-is)
       const oracleAttestation = {
