@@ -11,6 +11,12 @@ maintenance
 
 Depends on:
 - 0068
+- 0073
+- 0074
+- 0075
+- 0076
+- 0077
+- 0078
 
 Blocks:
 - None
@@ -77,10 +83,11 @@ follow-up before claiming complete removal.
 
 ## Plan
 
-- Re-read the current matches and classify them as public API, internal
-  implementation, tests, docs, filenames, wire fields, or historical text.
-- Split this issue first if the public API migration, internal state migration,
-  filename cleanup, and protocol/wire-field decisions are not closeable in one
-  coherent verified change.
-- Prefer direct pre-1.0 replacement over compatibility aliases.
-- Add or update focused tests where behavior or public exports change.
+- Resolve the child issues that split the current active vocabulary matches:
+  #0073 SDK attachment upload surface, #0074 request lifecycle state and ports,
+  #0075 Nostr event payload vocabulary, #0076 payment and escrow vocabulary,
+  #0077 docs and e2e invariant vocabulary, and #0078 final vocabulary sweep.
+- Prefer direct pre-1.0 replacements over compatibility aliases in each child.
+- Close this parent only after the final sweep confirms no active actor
+  vocabulary remains, or documents any non-actor platform term that needs a
+  narrower verification rule.
