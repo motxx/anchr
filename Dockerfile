@@ -1,5 +1,5 @@
 # Build tlsn-verifier binary
-FROM rust:1-bookworm@sha256:503651ea31e66ecb74623beabde781059a5978df1595a9e8ed03974d5fec1bf0 AS rust-builder
+FROM rust:1-bookworm@sha256:6258907abe69656e41cd992e0b705cdcfabcbbe3db374f92ed2d47121282d4a1 AS rust-builder
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 COPY crates/tlsn-verifier/Cargo.toml ./crates/tlsn-verifier/
