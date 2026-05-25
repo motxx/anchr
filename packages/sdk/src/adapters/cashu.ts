@@ -171,14 +171,14 @@ function bytesToHexLocal(bytes: Uint8Array): string {
  * preimage (which only the oracle holds) to spend before locktime.
  */
 function buildPhase1P2PKOptions(customerPubkey: string): P2PKOptions {
-  return buildHtlcPreselectionOptions({ requesterPubkey: customerPubkey });
+  return buildHtlcPreselectionOptions({ customerPubkey });
 }
 
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
   return buildHtlcFinalOptions({
     hash: p.hashHex,
-    workerPubkey: p.providerPubkey,
-    requesterRefundPubkey: p.customerPubkey,
+    providerPubkey: p.providerPubkey,
+    customerRefundPubkey: p.customerPubkey,
     locktimeSeconds: p.locktimeSeconds,
   });
 }

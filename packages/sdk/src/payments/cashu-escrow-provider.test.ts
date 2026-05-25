@@ -4,7 +4,7 @@ import { getDecodedToken, getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { createCashuEscrowProvider } from "./cashu-escrow-provider.ts";
 import type { EscrowProvider } from "../requests/application/ports.ts";
 
-const WORKER_PUB =
+const PROVIDER_PUB =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OTHER_PUB =
   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -88,7 +88,7 @@ function createTestableProvider() {
       }
     },
 
-    async verifyLock(escrow_ref, payment_hash, worker_pubkey) {
+    async verifyLock(escrow_ref, payment_hash, provider_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
@@ -104,14 +104,18 @@ function createTestableProvider() {
           }`,
         };
       }
+      let checkedHtlcProof = false;
       for (const proof of decoded.proofs) {
         let secret: unknown;
         try {
           secret = JSON.parse(proof.secret);
         } catch {
-          continue;
+          return { ok: false, message: "Proof secret is not valid JSON" };
         }
-        if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+        if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+          return { ok: false, message: "Proof is not an HTLC proof" };
+        }
+        checkedHtlcProof = true;
 
         if (secret[1]?.data !== payment_hash) {
           return {
@@ -122,22 +126,26 @@ function createTestableProvider() {
 
         const tags: string[][] | undefined = secret[1]?.tags;
         const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
-        if (pubkeyTag) {
-          const lockedKeys = pubkeyTag.slice(1);
-          const workerHex =
-            worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-              ? worker_pubkey
-              : `02${worker_pubkey}`;
-          if (
-            !lockedKeys.includes(worker_pubkey) &&
-            !lockedKeys.includes(workerHex)
-          ) {
-            return {
-              ok: false,
-              message: "HTLC token not locked to selected worker",
-            };
-          }
+        if (!pubkeyTag) {
+          return { ok: false, message: "No pubkeys tag in HTLC proof" };
         }
+        const lockedKeys = pubkeyTag.slice(1);
+        const providerHex =
+          provider_pubkey.startsWith("02") || provider_pubkey.startsWith("03")
+            ? provider_pubkey
+            : `02${provider_pubkey}`;
+        if (
+          !lockedKeys.includes(provider_pubkey) &&
+          !lockedKeys.includes(providerHex)
+        ) {
+          return {
+            ok: false,
+            message: "HTLC token not locked to selected provider",
+          };
+        }
+      }
+      if (!checkedHtlcProof) {
+        return { ok: false, message: "Token has no HTLC proofs" };
       }
       return { ok: true };
     },
@@ -146,7 +154,7 @@ function createTestableProvider() {
       return {
         settled: false,
         error:
-          "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
+          "settle() is not wired through EscrowProvider; provider must call redeemHtlcToken() directly with its private key",
       };
     },
 
@@ -183,7 +191,7 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("decodes token and confirms sufficient amount", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB], 200);
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB], 200);
       provider._seed("ref_1", token);
 
       const result = await provider.verify("ref_1", 100);
@@ -192,7 +200,7 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("decodes token and confirms exact amount", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB], 100);
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB], 100);
       provider._seed("ref_2", token);
 
       const result = await provider.verify("ref_2", 100);
@@ -201,7 +209,7 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("returns invalid when amount is insufficient", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB], 30);
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB], 30);
       provider._seed("ref_3", token);
 
       const result = await provider.verify("ref_3", 100);
@@ -214,12 +222,12 @@ describe("Cashu HTLC EscrowProvider", () => {
       const secret1 = JSON.stringify(["HTLC", {
         data: PAYMENT_HASH,
         nonce: "n1",
-        tags: [["pubkeys", WORKER_PUB]],
+        tags: [["pubkeys", PROVIDER_PUB]],
       }]);
       const secret2 = JSON.stringify(["HTLC", {
         data: PAYMENT_HASH,
         nonce: "n2",
-        tags: [["pubkeys", WORKER_PUB]],
+        tags: [["pubkeys", PROVIDER_PUB]],
       }]);
       const token = getEncodedToken({
         mint: "https://mint.example.com",
@@ -251,72 +259,72 @@ describe("Cashu HTLC EscrowProvider", () => {
       const result = await provider.verifyLock(
         "nonexistent_ref",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("Unknown escrow reference");
     });
 
-    test("passes when hash matches and worker pubkey is in lock", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB]);
+    test("passes when hash matches and provider pubkey is in lock", async () => {
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB]);
       provider._seed("ref_ok", token);
 
       const result = await provider.verifyLock(
         "ref_ok",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(true);
     });
 
-    test("passes with 02-prefixed worker pubkey in lock", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [`02${WORKER_PUB}`]);
+    test("passes with 02-prefixed provider pubkey in lock", async () => {
+      const token = makeHTLCToken(PAYMENT_HASH, [`02${PROVIDER_PUB}`]);
       provider._seed("ref_prefix", token);
 
       const result = await provider.verifyLock(
         "ref_prefix",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(true);
     });
 
-    test("fails with 03-prefixed worker pubkey in lock (only 02 prefix matched)", async () => {
-      // The verifyLock logic only generates 02-prefixed workerHex for comparison.
-      // If the lock uses 03-prefix and worker sends x-only key, it won't match.
-      const token = makeHTLCToken(PAYMENT_HASH, [`03${WORKER_PUB}`]);
+    test("fails with 03-prefixed provider pubkey in lock (only 02 prefix matched)", async () => {
+      // The verifyLock logic only generates 02-prefixed providerHex for comparison.
+      // If the lock uses 03-prefix and provider sends x-only key, it won't match.
+      const token = makeHTLCToken(PAYMENT_HASH, [`03${PROVIDER_PUB}`]);
       provider._seed("ref_03", token);
 
       const result = await provider.verifyLock(
         "ref_03",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
-      expect(result.message).toBe("HTLC token not locked to selected worker");
+      expect(result.message).toBe("HTLC token not locked to selected provider");
     });
 
-    test("passes when worker provides already-prefixed 02 key", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [`02${WORKER_PUB}`]);
+    test("passes when provider provides already-prefixed 02 key", async () => {
+      const token = makeHTLCToken(PAYMENT_HASH, [`02${PROVIDER_PUB}`]);
       provider._seed("ref_02key", token);
 
       const result = await provider.verifyLock(
         "ref_02key",
         PAYMENT_HASH,
-        `02${WORKER_PUB}`,
+        `02${PROVIDER_PUB}`,
       );
       expect(result.ok).toBe(true);
     });
 
     test("fails when HTLC hash does not match query", async () => {
       const wrongHash = "ff".repeat(32);
-      const token = makeHTLCToken(wrongHash, [WORKER_PUB]);
+      const token = makeHTLCToken(wrongHash, [PROVIDER_PUB]);
       provider._seed("ref_hash", token);
 
       const result = await provider.verifyLock(
         "ref_hash",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toBe(
@@ -324,32 +332,33 @@ describe("Cashu HTLC EscrowProvider", () => {
       );
     });
 
-    test("fails when worker pubkey is not in the lock", async () => {
+    test("fails when provider pubkey is not in the lock", async () => {
       const token = makeHTLCToken(PAYMENT_HASH, [OTHER_PUB]);
-      provider._seed("ref_wrong_worker", token);
+      provider._seed("ref_wrong_provider", token);
 
       const result = await provider.verifyLock(
-        "ref_wrong_worker",
+        "ref_wrong_provider",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
-      expect(result.message).toBe("HTLC token not locked to selected worker");
+      expect(result.message).toBe("HTLC token not locked to selected provider");
     });
 
-    test("passes for plain (non-HTLC) proofs -- skipped gracefully", async () => {
+    test("fails closed for plain non-HTLC proofs", async () => {
       const plainToken = makePlainToken();
       provider._seed("ref_plain", plainToken);
 
       const result = await provider.verifyLock(
         "ref_plain",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
-      expect(result.ok).toBe(true);
+      expect(result.ok).toBe(false);
+      expect(result.message).toBe("Proof secret is not valid JSON");
     });
 
-    test("HTLC proof without pubkeys tag passes (no P2PK constraint)", async () => {
+    test("fails closed for HTLC proof without pubkeys tag", async () => {
       const secret = JSON.stringify([
         "HTLC",
         {
@@ -374,21 +383,22 @@ describe("Cashu HTLC EscrowProvider", () => {
       const result = await provider.verifyLock(
         "ref_no_pubkeys",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
-      expect(result.ok).toBe(true);
+      expect(result.ok).toBe(false);
+      expect(result.message).toBe("No pubkeys tag in HTLC proof");
     });
 
     test("multi-proof token: first valid HTLC, second with wrong hash", async () => {
       const validSecret = JSON.stringify(["HTLC", {
         data: PAYMENT_HASH,
         nonce: "n1",
-        tags: [["pubkeys", WORKER_PUB]],
+        tags: [["pubkeys", PROVIDER_PUB]],
       }]);
       const wrongSecret = JSON.stringify(["HTLC", {
         data: "ff".repeat(32),
         nonce: "n2",
-        tags: [["pubkeys", WORKER_PUB]],
+        tags: [["pubkeys", PROVIDER_PUB]],
       }]);
       const token = getEncodedToken({
         mint: "https://mint.example.com",
@@ -412,7 +422,7 @@ describe("Cashu HTLC EscrowProvider", () => {
       const result = await provider.verifyLock(
         "ref_multi_hash",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toContain("hash mismatch");
@@ -423,7 +433,7 @@ describe("Cashu HTLC EscrowProvider", () => {
       const result = await provider.verifyLock(
         "ref_undecodable",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toContain("Token failed to decode");
@@ -441,7 +451,7 @@ describe("Cashu HTLC EscrowProvider", () => {
 
   describe("cancel()", () => {
     test("deletes existing entry from token map", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB]);
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB]);
       provider._seed("ref_cancel", token);
 
       const result = await provider.cancel("ref_cancel");
@@ -457,7 +467,7 @@ describe("Cashu HTLC EscrowProvider", () => {
     });
 
     test("cancel then verifyLock fails with unknown reference", async () => {
-      const token = makeHTLCToken(PAYMENT_HASH, [WORKER_PUB]);
+      const token = makeHTLCToken(PAYMENT_HASH, [PROVIDER_PUB]);
       provider._seed("ref_cancel_lock", token);
 
       await provider.cancel("ref_cancel_lock");
@@ -465,7 +475,7 @@ describe("Cashu HTLC EscrowProvider", () => {
       const lockResult = await provider.verifyLock(
         "ref_cancel_lock",
         PAYMENT_HASH,
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(lockResult.ok).toBe(false);
       expect(lockResult.message).toBe("Unknown escrow reference");

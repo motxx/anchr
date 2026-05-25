@@ -1,6 +1,6 @@
-// NUT-11 P2PK 2-of-2 (Worker + group_pubkey). The FROST oracle group's
+// NUT-11 P2PK 2-of-2 (Provider + group_pubkey). The FROST oracle group's
 // BIP-340 signature serves as the second key — no Mint changes required.
-// Refund after locktime uses the requester's single key.
+// Refund after locktime uses the customer's single key.
 
 import {
   getDecodedToken,
@@ -29,16 +29,16 @@ export interface FrostEscrowConfig {
 }
 
 export function buildFrostP2PKOptions(
-  workerPubkey: string,
+  providerPubkey: string,
   groupPubkey: string,
-  requesterRefundPubkey: string,
+  customerRefundPubkey: string,
   locktimeSeconds: number,
 ): P2PKOptions {
   return new P2PKBuilder()
-    .addLockPubkey([workerPubkey, groupPubkey])
+    .addLockPubkey([providerPubkey, groupPubkey])
     .requireLockSignatures(2)
     .lockUntil(locktimeSeconds)
-    .addRefundPubkey(requesterRefundPubkey)
+    .addRefundPubkey(customerRefundPubkey)
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();
@@ -80,7 +80,7 @@ export function createFrostEscrowProvider(
       }
     },
 
-    async bindProvider(escrow_ref, worker_pubkey) {
+    async bindProvider(escrow_ref, provider_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return null;
 
@@ -90,7 +90,7 @@ export function createFrostEscrowProvider(
       const locktimeSeconds = Math.floor(Date.now() / 1000) + 3600;
 
       const p2pkOptions = buildFrostP2PKOptions(
-        worker_pubkey,
+        provider_pubkey,
         config.groupPubkey,
         "",
         locktimeSeconds,
@@ -113,7 +113,7 @@ export function createFrostEscrowProvider(
         return { escrow_ref: newRef };
       } catch (error) {
         log.error(
-          "Failed to bind worker:",
+          "Failed to bind provider:",
           error instanceof Error ? error.message : error,
         );
         return null;
@@ -132,7 +132,7 @@ export function createFrostEscrowProvider(
       };
     },
 
-    async verifyLock(escrow_ref, _payment_hash, worker_pubkey) {
+    async verifyLock(escrow_ref, _payment_hash, provider_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
@@ -148,16 +148,16 @@ export function createFrostEscrowProvider(
           if (!pubkeys) {
             return { ok: false, message: "No pubkeys tag in P2PK proof" };
           }
-          const hasWorker = pubkeys.slice(1).some((pk: string) =>
-            pk === worker_pubkey || pk === `02${worker_pubkey}` ||
-            pk === `03${worker_pubkey}`
+          const hasProvider = pubkeys.slice(1).some((pk: string) =>
+            pk === provider_pubkey || pk === `02${provider_pubkey}` ||
+            pk === `03${provider_pubkey}`
           );
           const hasGroup = pubkeys.slice(1).some((pk: string) =>
             pk === config.groupPubkey || pk === `02${config.groupPubkey}` ||
             pk === `03${config.groupPubkey}`
           );
-          if (!hasWorker) {
-            return { ok: false, message: "Worker pubkey not in P2PK lock" };
+          if (!hasProvider) {
+            return { ok: false, message: "Provider pubkey not in P2PK lock" };
           }
           if (!hasGroup) {
             return { ok: false, message: "Group pubkey not in P2PK lock" };
@@ -177,14 +177,14 @@ export function createFrostEscrowProvider(
     settle(_escrow_ref, _preimage) {
       // FROST settlement requires threshold signing across the oracle
       // cluster (NOT a single private key the EscrowProvider could
-      // hold). The worker drives redemption via the FROST coordinator
+      // hold). The provider drives redemption via the FROST coordinator
       // or release-authority path. Return a clear error rather
       // than a silent {settled:true} so any caller depending on this
       // port-level method sees the problem immediately.
       return Promise.resolve({
         settled: false,
         error:
-          "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+          "settle() is not wired through EscrowProvider for FROST mode; provider must coordinate threshold signing directly",
       });
     },
 

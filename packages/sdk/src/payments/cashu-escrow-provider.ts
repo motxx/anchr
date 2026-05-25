@@ -2,7 +2,7 @@ import type { EscrowProvider } from "../requests/application/ports.ts";
 import {
   createHtlcToken,
   type EscrowToken,
-  swapHtlcBindWorker,
+  swapHtlcBindProvider,
 } from "./cashu-escrow.ts";
 import { verifyToken } from "./cashu-wallet.ts";
 import { getDecodedToken, type Proof } from "@cashu/cashu-ts";
@@ -32,7 +32,7 @@ export function createCashuEscrowProvider(
       );
       const result = await createHtlcToken(params.amount_sats, {
         hash: params.payment_hash,
-        requesterPubkey: params.customer_pubkey,
+        customerPubkey: params.customer_pubkey,
         locktimeSeconds: params.expiry,
       }, sourceProofs);
 
@@ -43,18 +43,18 @@ export function createCashuEscrowProvider(
       return { escrow_ref: ref };
     },
 
-    async bindProvider(escrow_ref, worker_pubkey) {
+    async bindProvider(escrow_ref, provider_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return null;
 
       const decoded = getDecodedToken(entry.token);
       const firstProof = decoded.proofs[0];
-      let requesterPubkey = "";
+      let customerPubkey = "";
       try {
         const secret = JSON.parse(firstProof?.secret ?? "[]");
         const tags: string[][] = secret[1]?.tags ?? [];
         const refundTag = tags.find((t: string[]) => t[0] === "refund");
-        requesterPubkey = refundTag?.[1] ?? "";
+        customerPubkey = refundTag?.[1] ?? "";
       } catch { /* plain proof, no refund key */ }
 
       let locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -74,10 +74,10 @@ export function createCashuEscrowProvider(
         }
       })();
 
-      const result = await swapHtlcBindWorker(entry.escrowToken.proofs, {
+      const result = await swapHtlcBindProvider(entry.escrowToken.proofs, {
         hash,
-        workerPubkey: worker_pubkey,
-        requesterRefundPubkey: requesterPubkey,
+        providerPubkey: provider_pubkey,
+        customerRefundPubkey: customerPubkey,
         locktimeSeconds: locktime,
       });
 
@@ -101,7 +101,7 @@ export function createCashuEscrowProvider(
       };
     },
 
-    async verifyLock(escrow_ref, payment_hash, worker_pubkey) {
+    async verifyLock(escrow_ref, payment_hash, provider_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
@@ -120,14 +120,18 @@ export function createCashuEscrowProvider(
         };
       }
 
+      let checkedHtlcProof = false;
       for (const proof of decoded.proofs) {
         let secret: unknown;
         try {
           secret = JSON.parse(proof.secret);
         } catch {
-          continue;
+          return { ok: false, message: "Proof secret is not valid JSON" };
         }
-        if (!Array.isArray(secret) || secret[0] !== "HTLC") continue;
+        if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+          return { ok: false, message: "Proof is not an HTLC proof" };
+        }
+        checkedHtlcProof = true;
 
         if (secret[1]?.data !== payment_hash) {
           return {
@@ -138,29 +142,33 @@ export function createCashuEscrowProvider(
 
         const tags: string[][] | undefined = secret[1]?.tags;
         const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
-        if (pubkeyTag) {
-          const lockedKeys = pubkeyTag.slice(1);
-          const workerHex =
-            worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-              ? worker_pubkey
-              : `02${worker_pubkey}`;
-          if (
-            !lockedKeys.includes(worker_pubkey) &&
-            !lockedKeys.includes(workerHex)
-          ) {
-            return {
-              ok: false,
-              message: "HTLC token not locked to selected worker",
-            };
-          }
+        if (!pubkeyTag) {
+          return { ok: false, message: "No pubkeys tag in HTLC proof" };
         }
+        const lockedKeys = pubkeyTag.slice(1);
+        const providerHex =
+          provider_pubkey.startsWith("02") || provider_pubkey.startsWith("03")
+            ? provider_pubkey
+            : `02${provider_pubkey}`;
+        if (
+          !lockedKeys.includes(provider_pubkey) &&
+          !lockedKeys.includes(providerHex)
+        ) {
+          return {
+            ok: false,
+            message: "HTLC token not locked to selected provider",
+          };
+        }
+      }
+      if (!checkedHtlcProof) {
+        return { ok: false, message: "Token has no HTLC proofs" };
       }
       return { ok: true };
     },
 
     settle(_escrow_ref, _preimage) {
-      // Settlement at the mint requires the worker's private key, which
-      // EscrowProvider does not carry. The worker calls
+      // Settlement at the mint requires the provider's private key, which
+      // EscrowProvider does not carry. The provider calls
       // `redeemHtlcToken(...)` from `@anchr/sdk/payments` directly.
       // Return a clear error rather than a silent {settled:true} so that
       // any caller depending on this port-level method sees the problem
@@ -168,7 +176,7 @@ export function createCashuEscrowProvider(
       return Promise.resolve({
         settled: false,
         error:
-          "settle() is not wired through EscrowProvider; worker must call redeemHtlcToken() directly with its private key",
+          "settle() is not wired through EscrowProvider; provider must call redeemHtlcToken() directly with its private key",
       });
     },
 

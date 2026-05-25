@@ -5,9 +5,9 @@ import {
   buildHtlcInitialOptions,
 } from "@anchr/sdk/payments";
 
-const WORKER_PUB =
+const PROVIDER_PUB =
   "0000000000000000000000000000000000000000000000000000000000000001";
-const REQUESTER_PUB =
+const CUSTOMER_PUB =
   "0000000000000000000000000000000000000000000000000000000000000002";
 const HASH = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -15,18 +15,18 @@ describe("HTLC escrow (NUT-14)", () => {
   test("buildHtlcInitialOptions returns null (Phase 1 uses plain proofs)", () => {
     const opts = buildHtlcInitialOptions({
       hash: HASH,
-      requesterPubkey: REQUESTER_PUB,
+      customerPubkey: CUSTOMER_PUB,
       locktimeSeconds: 1700000000,
     });
 
     expect(opts).toBeNull();
   });
 
-  test("buildHtlcFinalOptions creates hashlock + P2PK(Worker) for Phase 2", () => {
+  test("buildHtlcFinalOptions creates hashlock + P2PK(Provider) for Phase 2", () => {
     const opts = buildHtlcFinalOptions({
       hash: HASH,
-      workerPubkey: WORKER_PUB,
-      requesterRefundPubkey: REQUESTER_PUB,
+      providerPubkey: PROVIDER_PUB,
+      customerRefundPubkey: CUSTOMER_PUB,
       locktimeSeconds: 1700000000,
     });
 
@@ -34,23 +34,23 @@ describe("HTLC escrow (NUT-14)", () => {
     expect(opts.locktime).toBe(1700000000);
     expect(opts.sigFlag).toBe("SIG_ALL");
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
-    expect(pubkeys).toContain(`02${WORKER_PUB}`);
+    expect(pubkeys).toContain(`02${PROVIDER_PUB}`);
     const refundKeys = Array.isArray(opts.refundKeys)
       ? opts.refundKeys
       : [opts.refundKeys];
-    expect(refundKeys).toContain(`02${REQUESTER_PUB}`);
+    expect(refundKeys).toContain(`02${CUSTOMER_PUB}`);
   });
 
   test("Phase 1 is plain, Phase 2 adds HTLC conditions", () => {
     const initial = buildHtlcInitialOptions({
       hash: HASH,
-      requesterPubkey: REQUESTER_PUB,
+      customerPubkey: CUSTOMER_PUB,
       locktimeSeconds: 1700000000,
     });
     const final = buildHtlcFinalOptions({
       hash: HASH,
-      workerPubkey: WORKER_PUB,
-      requesterRefundPubkey: REQUESTER_PUB,
+      providerPubkey: PROVIDER_PUB,
+      customerRefundPubkey: CUSTOMER_PUB,
       locktimeSeconds: 1700000000,
     });
 
@@ -60,6 +60,6 @@ describe("HTLC escrow (NUT-14)", () => {
     const finalPubkeys = Array.isArray(final.pubkey)
       ? final.pubkey
       : [final.pubkey];
-    expect(finalPubkeys).toContain(`02${WORKER_PUB}`);
+    expect(finalPubkeys).toContain(`02${PROVIDER_PUB}`);
   });
 });

@@ -3,25 +3,25 @@
  *
  * Canonical two-phase HTLC pattern:
  *
- *   Phase 1 (initial lock, Worker unknown):
- *     - Local-hold mode: plain proofs stay with the Requester and are
- *       never published before Worker selection.
- *     - Preselection-transfer mode: P2PK(Requester) proofs may be shown
+ *   Phase 1 (initial lock, Provider unknown):
+ *     - Local-hold mode: plain proofs stay with the Customer and are
+ *       never published before Provider selection.
+ *     - Preselection-transfer mode: P2PK(Customer) proofs may be shown
  *       in a request so providers can inspect the bounty amount, but relay
  *       observers cannot spend them.
  *
- *   Phase 2 (after Worker selected, swap to bind Worker):
- *     HTLC: hashlock(hash) + P2PK(Worker) + locktime + refund(Requester)
- *     → Worker can redeem with preimage + Worker signature.
- *     → Oracle cannot steal: knows preimage but not Worker's private key.
+ *   Phase 2 (after Provider selected, swap to bind Provider):
+ *     HTLC: hashlock(hash) + P2PK(Provider) + locktime + refund(Customer)
+ *     → Provider can redeem with preimage + Provider signature.
+ *     → Oracle cannot steal: knows preimage but not Provider's private key.
  *
  *   Redemption:
- *     Worker provides preimage (from Oracle NIP-44 DM) + Worker signature.
+ *     Provider provides preimage (from Oracle NIP-44 DM) + Provider signature.
  *
  *   Refund:
- *     Requester reclaims after locktime expires.
+ *     Customer reclaims after locktime expires.
  *
- * Also exposes a 2-of-2(Oracle, Worker) P2PK escrow primitive for the
+ * Also exposes a 2-of-2(Oracle, Provider) P2PK escrow primitive for the
  * pre-HTLC settlement path used by SDK payment adapters.
  */
 
@@ -50,7 +50,7 @@ import {
   buildHtlcPreselectionOptions,
   type HtlcInitialLockParams,
   type HtlcPreselectionLockParams,
-  type HtlcWorkerBindParams,
+  type HtlcProviderBindParams,
 } from "./cashu-htlc-options.ts";
 
 export {
@@ -61,7 +61,7 @@ export {
 export type {
   HtlcInitialLockParams,
   HtlcPreselectionLockParams,
-  HtlcWorkerBindParams,
+  HtlcProviderBindParams,
 };
 
 const log = getLogger(["anchr", "cashu-escrow"]);
@@ -71,11 +71,11 @@ const log = getLogger(["anchr", "cashu-escrow"]);
 export interface EscrowParams {
   /** Oracle's public key (hex). */
   oraclePubkey: string;
-  /** Worker's public key (hex). */
-  workerPubkey: string;
-  /** Requester's public key for timeout refund (hex). */
-  requesterRefundPubkey: string;
-  /** Locktime as unix timestamp (seconds). After this, requester can reclaim. */
+  /** Provider's public key (hex). */
+  providerPubkey: string;
+  /** Customer's public key for timeout refund (hex). */
+  customerRefundPubkey: string;
+  /** Locktime as unix timestamp (seconds). After this, customer can reclaim. */
   locktimeSeconds: number;
 }
 
@@ -91,33 +91,33 @@ export interface EscrowToken {
 }
 
 export interface SwapResult {
-  /** Token for the worker (bounty minus fee). */
-  workerToken: string;
+  /** Token for the provider (bounty minus fee). */
+  providerToken: string;
   /** Token for the oracle (fee). */
   oracleToken: string;
-  /** Worker amount in sats. */
-  workerAmountSats: number;
+  /** Provider amount in sats. */
+  providerAmountSats: number;
   /** Oracle fee in sats. */
   oracleFeeSats: number;
 }
 
 /**
- * Build P2PK options for the 2-of-2(Oracle, Worker) escrow with timeout
- * refund to Requester.
+ * Build P2PK options for the 2-of-2(Oracle, Provider) escrow with timeout
+ * refund to Customer.
  */
 export function buildEscrowP2PKOptions(params: EscrowParams): P2PKOptions {
   return new P2PKBuilder()
-    .addLockPubkey([params.oraclePubkey, params.workerPubkey])
+    .addLockPubkey([params.oraclePubkey, params.providerPubkey])
     .requireLockSignatures(2)
     .lockUntil(params.locktimeSeconds)
-    .addRefundPubkey(params.requesterRefundPubkey)
+    .addRefundPubkey(params.customerRefundPubkey)
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();
 }
 
 /**
- * Create a P2PK-locked escrow token (2-of-2 Oracle + Worker).
+ * Create a P2PK-locked escrow token (2-of-2 Oracle + Provider).
  */
 export async function createEscrowToken(
   amountSats: number,
@@ -152,11 +152,11 @@ export async function createEscrowToken(
 }
 
 /**
- * Execute the atomic swap: Oracle + Worker co-sign to split the escrowed token.
+ * Execute the atomic swap: Oracle + Provider co-sign to split the escrowed token.
  */
 export async function executeEscrowSwap(
   signedProofs: Proof[],
-  workerPubkey: string,
+  providerPubkey: string,
   oraclePubkey: string,
   feeSats: number,
 ): Promise<SwapResult | null> {
@@ -164,28 +164,28 @@ export async function executeEscrowSwap(
   if (!ctx) return null;
 
   const totalSats = sumProofAmounts(signedProofs);
-  const workerSats = totalSats - feeSats;
+  const providerSats = totalSats - feeSats;
 
-  if (workerSats <= 0) {
+  if (providerSats <= 0) {
     log.error("Fee exceeds total amount");
     return null;
   }
 
   try {
-    const workerP2PK = new P2PKBuilder().addLockPubkey(workerPubkey)
+    const providerP2PK = new P2PKBuilder().addLockPubkey(providerPubkey)
       .toOptions();
     const oracleP2PK = new P2PKBuilder().addLockPubkey(oraclePubkey)
       .toOptions();
 
-    const workerProofs = await loadAndSend(
+    const providerProofs = await loadAndSend(
       ctx.wallet,
-      workerSats,
+      providerSats,
       signedProofs,
-      workerP2PK,
+      providerP2PK,
     );
 
     const remainingProofs = signedProofs.filter(
-      (p) => !workerProofs.some((wp) => wp.C === p.C),
+      (p) => !providerProofs.some((providerProof) => providerProof.C === p.C),
     );
 
     let oracleProofs: Proof[];
@@ -201,11 +201,11 @@ export async function executeEscrowSwap(
     }
 
     return {
-      workerToken: encodeProofs(ctx.config.mintUrl, workerProofs),
+      providerToken: encodeProofs(ctx.config.mintUrl, providerProofs),
       oracleToken: oracleProofs.length > 0
         ? encodeProofs(ctx.config.mintUrl, oracleProofs)
         : "",
-      workerAmountSats: workerSats,
+      providerAmountSats: providerSats,
       oracleFeeSats: feeSats,
     };
   } catch (error) {
@@ -217,13 +217,13 @@ export async function executeEscrowSwap(
 // --- HTLC escrow (NUT-14, per README architecture) ---
 
 /**
- * Phase 1: Create hold token (Worker unknown).
+ * Phase 1: Create hold token (Provider unknown).
  *
- * The Requester holds plain proofs locally until a Worker is selected. These
+ * The Customer holds plain proofs locally until a Provider is selected. These
  * are bearer instruments and must not be published before Phase 2. Flows that
  * need to expose a preselection token should use
  * `buildHtlcPreselectionOptions()` with their own wallet adapter and require
- * the Requester's signature when binding the selected Worker.
+ * the Customer's signature when binding the selected Provider.
  */
 export async function createHtlcToken(
   amountSats: number,
@@ -251,14 +251,14 @@ export async function createHtlcToken(
 }
 
 /**
- * Phase 2: Swap HTLC token to bind a selected Worker.
+ * Phase 2: Swap HTLC token to bind a selected Provider.
  *
  * Takes the Phase 1 proofs and swaps them on the mint for new proofs
- * that require hashlock(preimage) + Worker signature to spend.
+ * that require hashlock(preimage) + Provider signature to spend.
  */
-export async function swapHtlcBindWorker(
+export async function swapHtlcBindProvider(
   initialProofs: Proof[],
-  params: HtlcWorkerBindParams,
+  params: HtlcProviderBindParams,
 ): Promise<EscrowToken | null> {
   const ctx = await getWalletAndConfig();
   if (!ctx) return null;
@@ -286,7 +286,7 @@ export async function swapHtlcBindWorker(
     };
   } catch (error) {
     log.error(
-      "Failed to swap HTLC for worker binding:",
+      "Failed to swap HTLC for provider binding:",
       error instanceof Error ? error.message : error,
     );
     return null;
@@ -294,15 +294,15 @@ export async function swapHtlcBindWorker(
 }
 
 /**
- * Redeem HTLC token: Worker provides preimage + Worker signature.
+ * Redeem HTLC token: Provider provides preimage + Provider signature.
  *
- * The Worker receives the preimage from the Oracle via NIP-44 DM after
- * C2PA verification passes. Combined with the Worker's signature, this
+ * The Provider receives the preimage from the Oracle via NIP-44 DM after
+ * C2PA verification passes. Combined with the Provider's signature, this
  * satisfies the HTLC spending conditions (NUT-14).
  *
  * Steps:
  *   1. Set preimage as HTLC witness on each proof
- *   2. Sign proofs with Worker's private key (P2PK witness)
+ *   2. Sign proofs with Provider's private key (P2PK witness)
  *   3. **Server-side verification** of HTLC conditions (hashlock + P2PK)
  *   4. Swap signed proofs for fresh, unlocked proofs on the mint
  *
@@ -313,7 +313,7 @@ export async function swapHtlcBindWorker(
 export async function redeemHtlcToken(
   htlcProofs: Proof[],
   preimage: string,
-  workerPrivateKey: string,
+  providerPrivateKey: string,
 ): Promise<{ token: string; proofs: Proof[]; amountSats: number } | null> {
   const ctx = await getWalletAndConfig();
   if (!ctx) return null;
@@ -322,7 +322,7 @@ export async function redeemHtlcToken(
     const signedProofs = prepareHtlcWitness(
       htlcProofs,
       preimage,
-      workerPrivateKey,
+      providerPrivateKey,
     );
     const verifyError = verifyHtlcSpendAuth(signedProofs);
     if (verifyError) return null;
@@ -338,7 +338,7 @@ export async function redeemHtlcToken(
       amountSats,
       signedProofs,
       undefined,
-      workerPrivateKey,
+      providerPrivateKey,
     );
     return {
       token: encodeProofs(ctx.config.mintUrl, send),
@@ -357,13 +357,13 @@ export async function redeemHtlcToken(
 function prepareHtlcWitness(
   proofs: Proof[],
   preimage: string,
-  workerPrivateKey: string,
+  providerPrivateKey: string,
 ): Proof[] {
   const proofsWithPreimage = proofs.map((p) => ({
     ...p,
     witness: JSON.stringify({ preimage, signatures: [] }),
   }));
-  return signP2PKProofs(proofsWithPreimage, workerPrivateKey);
+  return signP2PKProofs(proofsWithPreimage, providerPrivateKey);
 }
 
 function verifyHtlcSpendAuth(signedProofs: Proof[]): string | null {

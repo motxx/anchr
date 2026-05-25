@@ -4,7 +4,7 @@
  * Provides anonymous payment capabilities:
  * - Mint tokens from a Cashu mint (backed by Lightning sats)
  * - Lock tokens to queries (escrow)
- * - Release tokens to workers on verification success
+ * - Release tokens to providers on verification success
  * - Refund tokens on verification failure
  *
  * Privacy properties:
@@ -64,7 +64,7 @@ export interface CreateBountyTokenOptions {
  *
  * Returns `null` if no Cashu mint is configured (unset `CASHU_MINT_URL`),
  * if the invoice is not paid before `invoiceTimeoutMs`, or if any step
- * fails. The token can be redeemed by the worker after verification.
+ * fails. The token can be redeemed by the provider after verification.
  */
 export async function createBountyToken(
   amountSats: number,

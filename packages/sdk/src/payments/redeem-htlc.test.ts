@@ -38,12 +38,12 @@ function randomPreimage(): string {
 // NUT-14 secret format: ["HTLC", { data: <hash>, nonce, tags: [...] }]
 function makeHtlcProof(params: {
   hash: string;
-  workerPubkey: string;
+  providerPubkey: string;
   refundPubkey: string;
   locktime: number;
   amount?: number;
 }): Proof {
-  const { hash, workerPubkey, refundPubkey, locktime, amount = 64 } = params;
+  const { hash, providerPubkey, refundPubkey, locktime, amount = 64 } = params;
 
   const secret = JSON.stringify([
     "HTLC",
@@ -51,7 +51,7 @@ function makeHtlcProof(params: {
       data: hash,
       nonce: bytesToHex(crypto.getRandomValues(new Uint8Array(16))),
       tags: [
-        ["pubkeys", `02${workerPubkey}`],
+        ["pubkeys", `02${providerPubkey}`],
         ["locktime", String(locktime)],
         ["n_sigs", "1"],
         ["refund", `02${refundPubkey}`],
@@ -71,18 +71,18 @@ function makeHtlcProof(params: {
 function prepareHtlcWitness(
   proofs: Proof[],
   preimage: string,
-  workerPrivateKey: string,
+  providerPrivateKey: string,
 ): Proof[] {
   const proofsWithPreimage = proofs.map((p) => ({
     ...p,
     witness: JSON.stringify({ preimage, signatures: [] }),
   }));
-  return signP2PKProofs(proofsWithPreimage, workerPrivateKey);
+  return signP2PKProofs(proofsWithPreimage, providerPrivateKey);
 }
 
 describe("redeemHtlcToken — witness preparation", () => {
-  const worker = genKeypair();
-  const requester = genKeypair();
+  const provider = genKeypair();
+  const customer = genKeypair();
   const preimage = randomPreimage();
   const hash = sha256Hex(preimage);
   const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -90,12 +90,12 @@ describe("redeemHtlcToken — witness preparation", () => {
   test("prepareHtlcWitness attaches preimage to each proof", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
-    const signed = prepareHtlcWitness([proof], preimage, worker.secretKey);
+    const signed = prepareHtlcWitness([proof], preimage, provider.secretKey);
 
     expect(signed).toHaveLength(1);
     const witness = typeof signed[0]!.witness === "string"
@@ -104,15 +104,15 @@ describe("redeemHtlcToken — witness preparation", () => {
     expect(witness.preimage).toBe(preimage);
   });
 
-  test("prepareHtlcWitness adds P2PK signature from worker key", () => {
+  test("prepareHtlcWitness adds P2PK signature from provider key", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
-    const signed = prepareHtlcWitness([proof], preimage, worker.secretKey);
+    const signed = prepareHtlcWitness([proof], preimage, provider.secretKey);
 
     const witness = typeof signed[0]!.witness === "string"
       ? JSON.parse(signed[0]!.witness)
@@ -126,13 +126,13 @@ describe("redeemHtlcToken — witness preparation", () => {
   test("prepareHtlcWitness preserves proof amount and secret", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
       amount: 128,
     });
 
-    const signed = prepareHtlcWitness([proof], preimage, worker.secretKey);
+    const signed = prepareHtlcWitness([proof], preimage, provider.secretKey);
 
     expect(signed[0]!.amount).toBe(128);
     expect(signed[0]!.secret).toBe(proof.secret);
@@ -144,21 +144,21 @@ describe("redeemHtlcToken — witness preparation", () => {
     const proofs = [
       makeHtlcProof({
         hash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
         amount: 32,
       }),
       makeHtlcProof({
         hash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
         amount: 32,
       }),
     ];
 
-    const signed = prepareHtlcWitness(proofs, preimage, worker.secretKey);
+    const signed = prepareHtlcWitness(proofs, preimage, provider.secretKey);
 
     expect(signed).toHaveLength(2);
     for (const s of signed) {
@@ -173,20 +173,20 @@ describe("redeemHtlcToken — witness preparation", () => {
   test("signed proofs pass isHTLCSpendAuthorised", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
-    const signed = prepareHtlcWitness([proof], preimage, worker.secretKey);
+    const signed = prepareHtlcWitness([proof], preimage, provider.secretKey);
 
     expect(isHTLCSpendAuthorised(signed[0]!)).toBe(true);
   });
 });
 
 describe("redeemHtlcToken — invalid token handling", () => {
-  const worker = genKeypair();
-  const requester = genKeypair();
+  const provider = genKeypair();
+  const customer = genKeypair();
   const preimage = randomPreimage();
   const hash = sha256Hex(preimage);
   const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -194,22 +194,26 @@ describe("redeemHtlcToken — invalid token handling", () => {
   test("wrong preimage fails isHTLCSpendAuthorised", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
     const wrongPreimage = randomPreimage();
-    const signed = prepareHtlcWitness([proof], wrongPreimage, worker.secretKey);
+    const signed = prepareHtlcWitness(
+      [proof],
+      wrongPreimage,
+      provider.secretKey,
+    );
 
     expect(isHTLCSpendAuthorised(signed[0]!)).toBe(false);
   });
 
-  test("wrong worker key fails signP2PKProofs (key not in pubkeys list)", () => {
+  test("wrong provider key fails signP2PKProofs (key not in pubkeys list)", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
@@ -248,7 +252,7 @@ describe("redeemHtlcToken — invalid token handling", () => {
     const p2pkSecret = JSON.stringify([
       "P2PK",
       {
-        data: `02${worker.publicKey}`,
+        data: `02${provider.publicKey}`,
         nonce: "testnonce",
         tags: [],
       },
@@ -267,8 +271,8 @@ describe("redeemHtlcToken — invalid token handling", () => {
 });
 
 describe("redeemHtlcToken — missing preimage error", () => {
-  const worker = genKeypair();
-  const requester = genKeypair();
+  const provider = genKeypair();
+  const customer = genKeypair();
   const preimage = randomPreimage();
   const hash = sha256Hex(preimage);
   const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -276,12 +280,12 @@ describe("redeemHtlcToken — missing preimage error", () => {
   test("empty preimage string fails HTLC authorization", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
-    const signed = prepareHtlcWitness([proof], "", worker.secretKey);
+    const signed = prepareHtlcWitness([proof], "", provider.secretKey);
     expect(isHTLCSpendAuthorised(signed[0]!)).toBe(false);
   });
 
@@ -296,8 +300,8 @@ describe("redeemHtlcToken — missing preimage error", () => {
 });
 
 describe("verifyHtlcProofs — public verification function", () => {
-  const worker = genKeypair();
-  const requester = genKeypair();
+  const provider = genKeypair();
+  const customer = genKeypair();
   const preimage = randomPreimage();
   const hash = sha256Hex(preimage);
   const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -305,8 +309,8 @@ describe("verifyHtlcProofs — public verification function", () => {
   test("returns null for valid HTLC proof with correct hash", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
@@ -319,8 +323,8 @@ describe("verifyHtlcProofs — public verification function", () => {
     const otherHash = sha256Hex(otherPreimage);
     const proof = makeHtlcProof({
       hash: otherHash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
@@ -332,8 +336,8 @@ describe("verifyHtlcProofs — public verification function", () => {
   test("returns error when preimage does not match expected hash", () => {
     const proof = makeHtlcProof({
       hash,
-      workerPubkey: worker.publicKey,
-      refundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      refundPubkey: customer.publicKey,
       locktime,
     });
 
@@ -359,15 +363,15 @@ describe("verifyHtlcProofs — public verification function", () => {
     const proofs = [
       makeHtlcProof({
         hash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
         amount: 32,
       }),
       makeHtlcProof({
         hash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
         amount: 32,
       }),
@@ -382,14 +386,14 @@ describe("verifyHtlcProofs — public verification function", () => {
     const proofs = [
       makeHtlcProof({
         hash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
       }),
       makeHtlcProof({
         hash: otherHash,
-        workerPubkey: worker.publicKey,
-        refundPubkey: requester.publicKey,
+        providerPubkey: provider.publicKey,
+        refundPubkey: customer.publicKey,
         locktime,
       }),
     ];
@@ -401,39 +405,39 @@ describe("verifyHtlcProofs — public verification function", () => {
 });
 
 describe("buildHtlcFinalOptions — P2PK options for HTLC", () => {
-  const worker = genKeypair();
-  const requester = genKeypair();
+  const provider = genKeypair();
+  const customer = genKeypair();
   const hash = sha256Hex(randomPreimage());
   const locktime = Math.floor(Date.now() / 1000) + 3600;
 
   test("includes hashlock in options", () => {
     const opts = buildHtlcFinalOptions({
       hash,
-      workerPubkey: worker.publicKey,
-      requesterRefundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      customerRefundPubkey: customer.publicKey,
       locktimeSeconds: locktime,
     });
 
     expect(opts.hashlock).toBe(hash);
   });
 
-  test("includes worker pubkey with 02 prefix", () => {
+  test("includes provider pubkey with 02 prefix", () => {
     const opts = buildHtlcFinalOptions({
       hash,
-      workerPubkey: worker.publicKey,
-      requesterRefundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      customerRefundPubkey: customer.publicKey,
       locktimeSeconds: locktime,
     });
 
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
-    expect(pubkeys).toContain(`02${worker.publicKey}`);
+    expect(pubkeys).toContain(`02${provider.publicKey}`);
   });
 
   test("includes locktime and SIG_ALL flag", () => {
     const opts = buildHtlcFinalOptions({
       hash,
-      workerPubkey: worker.publicKey,
-      requesterRefundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      customerRefundPubkey: customer.publicKey,
       locktimeSeconds: locktime,
     });
 
@@ -441,17 +445,17 @@ describe("buildHtlcFinalOptions — P2PK options for HTLC", () => {
     expect(opts.sigFlag).toBe("SIG_ALL");
   });
 
-  test("includes requester as refund key", () => {
+  test("includes customer as refund key", () => {
     const opts = buildHtlcFinalOptions({
       hash,
-      workerPubkey: worker.publicKey,
-      requesterRefundPubkey: requester.publicKey,
+      providerPubkey: provider.publicKey,
+      customerRefundPubkey: customer.publicKey,
       locktimeSeconds: locktime,
     });
 
     const refundKeys = Array.isArray(opts.refundKeys)
       ? opts.refundKeys
       : [opts.refundKeys];
-    expect(refundKeys).toContain(`02${requester.publicKey}`);
+    expect(refundKeys).toContain(`02${customer.publicKey}`);
   });
 });

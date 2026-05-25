@@ -8,7 +8,7 @@ import {
 } from "./frost-escrow-provider.ts";
 import type { EscrowProvider } from "../requests/application/ports.ts";
 
-const WORKER_PUB =
+const PROVIDER_PUB =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const GROUP_PUB =
   "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -21,7 +21,7 @@ function makeP2PKToken(pubkeys: string[], amount = 100): string {
   const secret = JSON.stringify([
     "P2PK",
     {
-      data: WORKER_PUB,
+      data: PROVIDER_PUB,
       nonce: "testnonce",
       tags: [
         ["pubkeys", ...pubkeys],
@@ -92,7 +92,7 @@ function createTestableProvider(groupPubkey: string) {
         }
       },
 
-      async verifyLock(escrow_ref, _payment_hash, worker_pubkey) {
+      async verifyLock(escrow_ref, _payment_hash, provider_pubkey) {
         const entry = tokenMap.get(escrow_ref);
         if (!entry) return { ok: false, message: "Unknown escrow reference" };
 
@@ -108,16 +108,16 @@ function createTestableProvider(groupPubkey: string) {
             if (!pubkeys) {
               return { ok: false, message: "No pubkeys tag in P2PK proof" };
             }
-            const hasWorker = pubkeys.slice(1).some((pk: string) =>
-              pk === worker_pubkey || pk === `02${worker_pubkey}` ||
-              pk === `03${worker_pubkey}`
+            const hasProvider = pubkeys.slice(1).some((pk: string) =>
+              pk === provider_pubkey || pk === `02${provider_pubkey}` ||
+              pk === `03${provider_pubkey}`
             );
             const hasGroup = pubkeys.slice(1).some((pk: string) =>
               pk === groupPubkey || pk === `02${groupPubkey}` ||
               pk === `03${groupPubkey}`
             );
-            if (!hasWorker) {
-              return { ok: false, message: "Worker pubkey not in P2PK lock" };
+            if (!hasProvider) {
+              return { ok: false, message: "Provider pubkey not in P2PK lock" };
             }
             if (!hasGroup) {
               return { ok: false, message: "Group pubkey not in P2PK lock" };
@@ -138,7 +138,7 @@ function createTestableProvider(groupPubkey: string) {
         return {
           settled: false,
           error:
-            "settle() is not wired through EscrowProvider for FROST mode; worker must coordinate threshold signing directly",
+            "settle() is not wired through EscrowProvider for FROST mode; provider must coordinate threshold signing directly",
         };
       },
 
@@ -157,23 +157,23 @@ function createTestableProvider(groupPubkey: string) {
 }
 
 describe("buildFrostP2PKOptions", () => {
-  test("creates 2-of-2 P2PK lock with worker + group pubkey", () => {
+  test("creates 2-of-2 P2PK lock with provider + group pubkey", () => {
     const opts = buildFrostP2PKOptions(
-      WORKER_PUB,
+      PROVIDER_PUB,
       GROUP_PUB,
       REFUND_PUB,
       1700000000,
     );
 
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
-    expect(pubkeys).toContain(`02${WORKER_PUB}`);
+    expect(pubkeys).toContain(`02${PROVIDER_PUB}`);
     expect(pubkeys).toContain(`02${GROUP_PUB}`);
     expect(pubkeys.length).toBe(2);
   });
 
-  test("sets n_sigs = 2 (both worker and group must sign)", () => {
+  test("sets n_sigs = 2 (both provider and group must sign)", () => {
     const opts = buildFrostP2PKOptions(
-      WORKER_PUB,
+      PROVIDER_PUB,
       GROUP_PUB,
       REFUND_PUB,
       1700000000,
@@ -184,7 +184,7 @@ describe("buildFrostP2PKOptions", () => {
   test("sets locktime from parameter", () => {
     const locktime = 1800000000;
     const opts = buildFrostP2PKOptions(
-      WORKER_PUB,
+      PROVIDER_PUB,
       GROUP_PUB,
       REFUND_PUB,
       locktime,
@@ -192,9 +192,9 @@ describe("buildFrostP2PKOptions", () => {
     expect(opts.locktime).toBe(locktime);
   });
 
-  test("sets requester refund key", () => {
+  test("sets customer refund key", () => {
     const opts = buildFrostP2PKOptions(
-      WORKER_PUB,
+      PROVIDER_PUB,
       GROUP_PUB,
       REFUND_PUB,
       1700000000,
@@ -207,7 +207,7 @@ describe("buildFrostP2PKOptions", () => {
 
   test("sets SIG_ALL flag", () => {
     const opts = buildFrostP2PKOptions(
-      WORKER_PUB,
+      PROVIDER_PUB,
       GROUP_PUB,
       REFUND_PUB,
       1700000000,
@@ -231,7 +231,7 @@ describe("FROST EscrowProvider", () => {
     });
 
     test("decodes token and checks amount - sufficient", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB], 200);
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB], 200);
       provider._seed("ref_1", token);
 
       const result = await provider.verify("ref_1", 100);
@@ -240,7 +240,7 @@ describe("FROST EscrowProvider", () => {
     });
 
     test("decodes token and checks amount - exact match", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB], 100);
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB], 100);
       provider._seed("ref_2", token);
 
       const result = await provider.verify("ref_2", 100);
@@ -249,7 +249,7 @@ describe("FROST EscrowProvider", () => {
     });
 
     test("returns invalid when amount is insufficient", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB], 50);
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB], 50);
       provider._seed("ref_3", token);
 
       const result = await provider.verify("ref_3", 100);
@@ -263,42 +263,54 @@ describe("FROST EscrowProvider", () => {
       const result = await provider.verifyLock(
         "nonexistent_ref",
         "",
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("Unknown escrow reference");
     });
 
-    test("passes when both worker and group pubkeys are in P2PK lock", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB]);
+    test("passes when both provider and group pubkeys are in P2PK lock", async () => {
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB]);
       provider._seed("ref_lock", token);
 
-      const result = await provider.verifyLock("ref_lock", "", WORKER_PUB);
+      const result = await provider.verifyLock("ref_lock", "", PROVIDER_PUB);
       expect(result.ok).toBe(true);
     });
 
     test("passes with 02-prefixed pubkeys in the lock", async () => {
-      const token = makeP2PKToken([`02${WORKER_PUB}`, `02${GROUP_PUB}`]);
+      const token = makeP2PKToken([`02${PROVIDER_PUB}`, `02${GROUP_PUB}`]);
       provider._seed("ref_prefixed", token);
 
-      const result = await provider.verifyLock("ref_prefixed", "", WORKER_PUB);
+      const result = await provider.verifyLock(
+        "ref_prefixed",
+        "",
+        PROVIDER_PUB,
+      );
       expect(result.ok).toBe(true);
     });
 
-    test("fails when worker pubkey is missing from lock", async () => {
+    test("fails when provider pubkey is missing from lock", async () => {
       const token = makeP2PKToken([OTHER_PUB, GROUP_PUB]);
-      provider._seed("ref_no_worker", token);
+      provider._seed("ref_no_provider", token);
 
-      const result = await provider.verifyLock("ref_no_worker", "", WORKER_PUB);
+      const result = await provider.verifyLock(
+        "ref_no_provider",
+        "",
+        PROVIDER_PUB,
+      );
       expect(result.ok).toBe(false);
-      expect(result.message).toBe("Worker pubkey not in P2PK lock");
+      expect(result.message).toBe("Provider pubkey not in P2PK lock");
     });
 
     test("fails when group pubkey is missing from lock", async () => {
-      const token = makeP2PKToken([WORKER_PUB, OTHER_PUB]);
+      const token = makeP2PKToken([PROVIDER_PUB, OTHER_PUB]);
       provider._seed("ref_no_group", token);
 
-      const result = await provider.verifyLock("ref_no_group", "", WORKER_PUB);
+      const result = await provider.verifyLock(
+        "ref_no_group",
+        "",
+        PROVIDER_PUB,
+      );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("Group pubkey not in P2PK lock");
     });
@@ -307,7 +319,7 @@ describe("FROST EscrowProvider", () => {
       const plainToken = makePlainToken();
       provider._seed("ref_plain", plainToken);
 
-      const result = await provider.verifyLock("ref_plain", "", WORKER_PUB);
+      const result = await provider.verifyLock("ref_plain", "", PROVIDER_PUB);
       expect(result.ok).toBe(false);
     });
 
@@ -315,7 +327,7 @@ describe("FROST EscrowProvider", () => {
       const secret = JSON.stringify([
         "P2PK",
         {
-          data: WORKER_PUB,
+          data: PROVIDER_PUB,
           nonce: "testnonce",
           tags: [
             ["n_sigs", "2"],
@@ -337,7 +349,7 @@ describe("FROST EscrowProvider", () => {
       const result = await provider.verifyLock(
         "ref_no_pubkeys",
         "",
-        WORKER_PUB,
+        PROVIDER_PUB,
       );
       expect(result.ok).toBe(false);
       expect(result.message).toBe("No pubkeys tag in P2PK proof");
@@ -347,9 +359,9 @@ describe("FROST EscrowProvider", () => {
       const validSecret = JSON.stringify([
         "P2PK",
         {
-          data: WORKER_PUB,
+          data: PROVIDER_PUB,
           nonce: "n1",
-          tags: [["pubkeys", WORKER_PUB, GROUP_PUB]],
+          tags: [["pubkeys", PROVIDER_PUB, GROUP_PUB]],
         },
       ]);
       const invalidSecret = JSON.stringify([
@@ -379,15 +391,15 @@ describe("FROST EscrowProvider", () => {
       });
       provider._seed("ref_multi", token);
 
-      const result = await provider.verifyLock("ref_multi", "", WORKER_PUB);
+      const result = await provider.verifyLock("ref_multi", "", PROVIDER_PUB);
       expect(result.ok).toBe(false);
-      expect(result.message).toBe("Worker pubkey not in P2PK lock");
+      expect(result.message).toBe("Provider pubkey not in P2PK lock");
     });
   });
 
   describe("cancel()", () => {
     test("deletes existing entry from token map", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB]);
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB]);
       provider._seed("ref_cancel", token);
 
       const result = await provider.cancel("ref_cancel");
@@ -404,7 +416,7 @@ describe("FROST EscrowProvider", () => {
     });
 
     test("cancel is idempotent (second cancel returns false)", async () => {
-      const token = makeP2PKToken([WORKER_PUB, GROUP_PUB]);
+      const token = makeP2PKToken([PROVIDER_PUB, GROUP_PUB]);
       provider._seed("ref_idem", token);
 
       const first = await provider.cancel("ref_idem");

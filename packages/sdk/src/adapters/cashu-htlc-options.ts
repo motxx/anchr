@@ -1,13 +1,13 @@
 import { P2PKBuilder, type P2PKOptions } from "@cashu/cashu-ts";
 
 interface HtlcPreselectionLockParams {
-  requesterPubkey: string;
+  customerPubkey: string;
 }
 
-interface HtlcWorkerBindParams {
+interface HtlcProviderBindParams {
   hash: string;
-  workerPubkey: string;
-  requesterRefundPubkey: string;
+  providerPubkey: string;
+  customerRefundPubkey: string;
   locktimeSeconds: number;
 }
 
@@ -15,21 +15,21 @@ export function buildHtlcPreselectionOptions(
   params: HtlcPreselectionLockParams,
 ): P2PKOptions {
   return new P2PKBuilder()
-    .addLockPubkey(params.requesterPubkey)
+    .addLockPubkey(params.customerPubkey)
     .requireLockSignatures(1)
     .sigAll()
     .toOptions();
 }
 
 export function buildHtlcFinalOptions(
-  params: HtlcWorkerBindParams,
+  params: HtlcProviderBindParams,
 ): P2PKOptions {
   return new P2PKBuilder()
     .addHashlock(params.hash)
-    .addLockPubkey(params.workerPubkey)
+    .addLockPubkey(params.providerPubkey)
     .requireLockSignatures(1)
     .lockUntil(params.locktimeSeconds)
-    .addRefundPubkey(params.requesterRefundPubkey)
+    .addRefundPubkey(params.customerRefundPubkey)
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();

@@ -4,7 +4,7 @@ import { getCashuWallet } from "./cashu-wallet.ts";
 import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "wallet"]);
 
-export type WalletRole = "requester" | "worker";
+export type WalletRole = "customer" | "provider";
 
 export interface WalletData {
   confirmed: Proof[];
