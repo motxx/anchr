@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -68,3 +69,33 @@ issues will be easier and safer to close after CI has a known-good baseline.
   editing code or workflow files.
 - Fix the root cause with the smallest coherent change.
 - Run `deno task test:all`, then verify the affected CI job path.
+
+## Resolution
+
+Implemented by updating:
+
+- No new implementation changes were needed in this queue run.
+- Current local `main` already contains the cleanup commits after failing CI
+  head `0440a94`, including stale script removals and relay/e2e import updates.
+
+Verified with:
+
+- `gh run view 26337481760 --json jobs,conclusion,status,url,headSha,createdAt`
+- `gh run view 26337481760 --log-failed`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- None - this was a baseline investigation; existing `deno task check` and
+  `deno task test:all` are the harnesses that caught and verify the class of
+  failure.
+
+Review residuals:
+
+- GitHub Actions has not run for local `ffdfc6b` because this branch is ahead of
+  `origin/main`; the old red CI run is for `0440a94`.
+
+Follow-up:
+
+- None
