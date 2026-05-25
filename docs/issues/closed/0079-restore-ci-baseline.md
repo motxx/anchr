@@ -74,27 +74,36 @@ issues will be easier and safer to close after CI has a known-good baseline.
 
 Implemented by updating:
 
-- No new implementation changes were needed in this queue run.
-- Current local `main` already contains the cleanup commits after failing CI
-  head `0440a94`, including stale script removals and relay/e2e import updates.
+- `.gitleaks.toml` to allowlist only the fixed Nostr event test fixture value
+  that triggered `generic-api-key`.
+- `.github/workflows/ci.yml` so Docker-backed E2E phases do not keep running
+  after an earlier failed setup or security step.
+- `.github/workflows/deploy.yml` to remove stale market deploy comments.
+- Removed stale two-party binary bet Fly workflows and `fly.market.toml`; the
+  referenced app paths no longer exist in this repository.
 
 Verified with:
 
-- `gh run view 26337481760 --json jobs,conclusion,status,url,headSha,createdAt`
-- `gh run view 26337481760 --log-failed`
+- `gh run view 26387949460 --json jobs,conclusion,status,url,headSha,createdAt,event,workflowName`
+- `gh run view 26387949460 --log-failed`
+- `gh run view 26387949459 --json jobs,conclusion,status,url,headSha,createdAt,event,workflowName`
+- `deno check example/two-party-binary-bet/server.ts example/two-party-binary-bet/src/server-routes.ts example/two-party-binary-bet/src/exchange-protocol.ts example/two-party-binary-bet/src/nip60.ts example/two-party-binary-bet/src/nip61.ts`
+- `gitleaks detect --redact -v --exit-code=2 --log-level=debug --log-opts "--no-merges --first-parent e2bd14485a4bd47eada89a0407a20293edba84fa^..1418cdec00ec10487adef4105cd54630efe289b7"`
 - `deno task check`
-- `deno task test:all`
+- `deno task lint:strict`
 
 Harness update:
 
-- None - this was a baseline investigation; existing `deno task check` and
-  `deno task test:all` are the harnesses that caught and verify the class of
-  failure.
+- `.gitleaks.toml` records the narrow false-positive exception for the fixed
+  test fixture.
+- `.github/workflows/ci.yml` now stops dependent Docker phases after earlier
+  setup/security failures, making future CI failures report the root cause
+  instead of secondary `deno: command not found` noise.
 
 Review residuals:
 
-- GitHub Actions has not run for local `ffdfc6b` because this branch is ahead of
-  `origin/main`; the old red CI run is for `0440a94`.
+- GitHub Actions has not run for this local fix yet. Push is required to verify
+  the remote main workflow result.
 
 Follow-up:
 
