@@ -46,8 +46,8 @@ export async function verifyWithQuorum(
   blossomKeys?: BlossomKeyMap,
   oracleId?: string,
 ): Promise<QuorumVerificationResult> {
-  // CTF-1: When query has no acceptable oracle list, ignore worker-supplied oracleId.
-  // Otherwise a worker can register a malicious oracle and force its use.
+  // CTF-1: When query has no acceptable oracle list, ignore provider-supplied oracleId.
+  // Otherwise a provider can register a malicious oracle and force its use.
   const effectiveOracleId = query.oracle_ids?.length ? oracleId : undefined;
 
   if (!query.quorum) {

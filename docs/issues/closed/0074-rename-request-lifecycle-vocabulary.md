@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -67,3 +68,44 @@ whether #0075 must first change wire payload names.
 - Rename the SDK-owned lifecycle names directly.
 - If a field cannot be safely renamed until #0075 changes the wire payload,
   update this issue or create a narrower dependency before implementation.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/domain/types.ts`
+- `packages/sdk/src/requests/domain/query-aggregate.ts`
+- `packages/sdk/src/requests/domain/query-transitions.ts`
+- `packages/sdk/src/requests/domain/query-repository.ts`
+- `packages/sdk/src/requests/domain/value-objects.ts`
+- `packages/sdk/src/requests/application/query-service.ts`
+- `packages/sdk/src/requests/application/escrow-flow-methods.ts`
+- `packages/sdk/src/requests/application/ports.ts`
+- `packages/sdk/src/requests/application/query-escrow-validation.ts`
+- `packages/sdk/src/requests/application/query-lifecycle-methods.ts`
+- `packages/sdk/src/requests/application/query-verification.ts`
+- Request lifecycle, payment adapter, SDK helper, and protocol e2e tests
+
+Verified with:
+
+- `rg -n "RequesterMeta|RequesterType|requester_meta|requester_type|requester_id|requester_only|selectWorker|doSelectWorker|bindWorker|worker_selected|workerPubkey|worker_pubkey|Worker pubkey|selected worker" packages/sdk/src/requests` (no matches)
+- `deno task check`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task test:e2e:protocol`
+- `deno task test:all`
+- `check-silent-bypass` review of changed escrow/payment/verification files
+
+Harness update:
+
+- Existing request lifecycle, payment adapter, and protocol e2e tests now assert
+  the Customer/Provider lifecycle names.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- #0075 owns Nostr wire payload vocabulary that intentionally still carries
+  old field names outside the request lifecycle surface.

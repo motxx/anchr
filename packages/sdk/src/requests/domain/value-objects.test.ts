@@ -179,7 +179,7 @@ describe("validateQueryInput", () => {
     expect(validateQueryInput({
       description: "Photo",
       tlsn_requirements: { target_url: "https://api.example.com/data" },
-      visibility: "requester_only",
+      visibility: "customer_only",
     })).toBeNull();
   });
   test("tlsn_requirements without visibility", () => {
@@ -193,35 +193,35 @@ describe("validateQueryInput", () => {
 describe("validateOfferInfo", () => {
   test("valid offer", () => {
     expect(validateOfferInfo({
-      worker_pubkey: "abc123",
+      provider_pubkey: "abc123",
       offer_event_id: "evt_1",
       received_at: Date.now(),
     })).toBeNull();
   });
-  test("empty worker_pubkey", () => {
+  test("empty provider_pubkey", () => {
     expect(validateOfferInfo({
-      worker_pubkey: "",
+      provider_pubkey: "",
       offer_event_id: "evt_1",
       received_at: Date.now(),
-    })).toContain("worker_pubkey");
+    })).toContain("provider_pubkey");
   });
-  test("whitespace worker_pubkey", () => {
+  test("whitespace provider_pubkey", () => {
     expect(validateOfferInfo({
-      worker_pubkey: "  ",
+      provider_pubkey: "  ",
       offer_event_id: "evt_1",
       received_at: Date.now(),
-    })).toContain("worker_pubkey");
+    })).toContain("provider_pubkey");
   });
   test("empty offer_event_id", () => {
     expect(validateOfferInfo({
-      worker_pubkey: "abc",
+      provider_pubkey: "abc",
       offer_event_id: "",
       received_at: Date.now(),
     })).toContain("offer_event_id");
   });
   test("whitespace offer_event_id", () => {
     expect(validateOfferInfo({
-      worker_pubkey: "abc",
+      provider_pubkey: "abc",
       offer_event_id: "  ",
       received_at: Date.now(),
     })).toContain("offer_event_id");

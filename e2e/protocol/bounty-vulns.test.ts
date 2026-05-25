@@ -19,7 +19,7 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -32,11 +32,11 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -64,7 +64,7 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "requester_pub",
+          customer_pubkey: "requester_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
@@ -72,11 +72,11 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -116,7 +116,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
@@ -125,11 +125,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     expect(query.oracle_ids).toBeUndefined();
 
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -165,7 +165,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
@@ -175,11 +175,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
 
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -212,7 +212,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
@@ -221,11 +221,11 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     );
 
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -275,14 +275,14 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02worker_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -294,7 +294,7 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       "02requester_hex_pubkey",
     );
 
-    const result = await service.selectWorker(
+    const result = await service.selectProvider(
       query.id,
       "02worker_hex_pubkey",
       selfLockedToken,
@@ -314,14 +314,14 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02worker_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -332,13 +332,13 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       "02worker_hex_pubkey",
     );
 
-    const result = await service.selectWorker(
+    const result = await service.selectProvider(
       query.id,
       "02worker_hex_pubkey",
       workerLockedToken,
     );
     expect(result.ok).toBe(true);
-    expect(result.message).toBe("Worker selected");
+    expect(result.message).toBe("Provider selected");
   });
 
   test("BLOCKED: token with wrong hashlock is rejected", async () => {
@@ -352,14 +352,14 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02worker_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -370,7 +370,7 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       "02worker_hex_pubkey",
     );
 
-    const result = await service.selectWorker(
+    const result = await service.selectProvider(
       query.id,
       "02worker_hex_pubkey",
       wrongHashToken,
@@ -390,21 +390,21 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
     // Plain token (no HTLC secret) — Phase 1 hold tokens are plain and must pass verifyLock
     const plainToken = makeFakeToken(100);
-    const result = await service.selectWorker(query.id, "w1", plainToken);
+    const result = await service.selectProvider(query.id, "w1", plainToken);
     expect(result.ok).toBe(true);
   });
 });
@@ -422,7 +422,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             type: "htlc",
             hash: "somehash",
             oracle_pubkeys: ["oracle_pub"],
-            requester_pubkey: "req_pub",
+            customer_pubkey: "req_pub",
             locktime: now + 1, // Only 1 second!
           },
         },
@@ -442,7 +442,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             type: "htlc",
             hash: "somehash",
             oracle_pubkeys: ["oracle_pub"],
-            requester_pubkey: "req_pub",
+            customer_pubkey: "req_pub",
             locktime: now - 100, // In the past
           },
         },
@@ -463,7 +463,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
             type: "htlc",
             hash: "somehash",
             oracle_pubkeys: ["oracle_pub"],
-            requester_pubkey: "req_pub",
+            customer_pubkey: "req_pub",
             locktime: now + MIN_ESCROW_LOCKTIME_SECS - 1,
           },
         },
@@ -482,7 +482,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
           type: "htlc",
           hash: "somehash",
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: now + MIN_ESCROW_LOCKTIME_SECS + 1, // Safely above minimum
         },
       },
@@ -501,7 +501,7 @@ describe("CTF-3: Minimum locktime enforcement", () => {
           type: "htlc",
           hash: "somehash",
           oracle_pubkeys: ["oracle_pub"],
-          requester_pubkey: "req_pub",
+          customer_pubkey: "req_pub",
           locktime: now + 3600,
         },
       },

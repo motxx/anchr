@@ -7,24 +7,24 @@ export interface EscrowTokenLockResult {
 }
 
 /**
- * CTF-2: Without this check, a requester could submit a token locked to
- * their own key instead of the worker's, then redeem after preimage is
+ * CTF-2: Without this check, a customer could submit a token locked to
+ * their own key instead of the provider's, then redeem after preimage is
  * revealed.
  */
 export async function verifyEscrowLock(
   escrowProvider: EscrowProvider,
   escrowRef: string,
   paymentHash: string,
-  workerPubkey: string,
+  providerPubkey: string,
 ): Promise<EscrowTokenLockResult> {
-  return escrowProvider.verifyLock(escrowRef, paymentHash, workerPubkey);
+  return escrowProvider.verifyLock(escrowRef, paymentHash, providerPubkey);
 }
 
 export { MIN_ESCROW_LOCKTIME_SECS } from "../domain/value-objects.ts";
 
 export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_offers: ["worker_selected"],
-  worker_selected: ["processing"],
+  awaiting_offers: ["provider_selected"],
+  provider_selected: ["processing"],
   processing: ["verifying"],
   verifying: ["approved", "rejected"],
 };

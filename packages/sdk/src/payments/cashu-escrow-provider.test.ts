@@ -61,7 +61,7 @@ function createTestableProvider() {
     async createHold() {
       return null;
     },
-    async bindWorker() {
+    async bindProvider() {
       return null;
     },
 
@@ -479,7 +479,7 @@ describe("Cashu HTLC EscrowProvider", () => {
         amount_sats: 100,
         payment_hash: PAYMENT_HASH,
         expiry: 3600,
-        requester_pubkey: REFUND_PUB,
+        customer_pubkey: REFUND_PUB,
       });
       expect(result).toBe(null);
     });
@@ -490,7 +490,7 @@ describe("Cashu HTLC EscrowProvider", () => {
         amount_sats: 100,
         payment_hash: PAYMENT_HASH,
         expiry: 3600,
-        requester_pubkey: REFUND_PUB,
+        customer_pubkey: REFUND_PUB,
       });
       expect(result).toBe(null);
     });

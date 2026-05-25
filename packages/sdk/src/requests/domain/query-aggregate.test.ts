@@ -10,7 +10,7 @@ import {
   expireQuery,
   MIN_ESCROW_LOCKTIME_SECS,
   recordResult,
-  selectWorker,
+  selectProvider,
   submitResult,
 } from "./query-aggregate.ts";
 import type {
@@ -59,7 +59,7 @@ function makeHtlcOptions(
       type: "htlc",
       hash: "abc123hash",
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: nowSecs + 1200,
       ...overrides,
     },
@@ -74,7 +74,7 @@ function makeHtlcQuery(overrides?: Partial<Query>): Query {
       type: "htlc",
       hash: "abc123hash",
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
     offers: [],
@@ -130,12 +130,12 @@ describe("createQueryAggregate", () => {
     expect(q.expires_at).toBeGreaterThanOrEqual(before + 120_000);
   });
 
-  test("sets requester_meta", () => {
+  test("sets customer_meta", () => {
     const q = expectOk(createQueryAggregate(defaultInput, {
       ttlMs: 600_000,
-      requesterMeta: { requester_type: "agent", requester_id: "bot1" },
+      customerMeta: { customer_type: "agent", customer_id: "bot1" },
     }));
-    expect(q.requester_meta?.requester_type).toBe("agent");
+    expect(q.customer_meta?.customer_type).toBe("agent");
   });
 
   test("sets bounty", () => {
@@ -228,7 +228,7 @@ describe("createQueryAggregate", () => {
         type: "htlc",
         hash: "h",
         oracle_pubkeys: ["o"],
-        requester_pubkey: "r",
+        customer_pubkey: "r",
         locktime: nowSecs + 100, // too short
       },
     }));
@@ -243,7 +243,7 @@ describe("createQueryAggregate", () => {
         type: "htlc",
         hash: "h",
         oracle_pubkeys: ["o"],
-        requester_pubkey: "r",
+        customer_pubkey: "r",
         locktime: nowSecs + MIN_ESCROW_LOCKTIME_SECS,
       },
     });
@@ -414,8 +414,8 @@ describe("expireQuery", () => {
     expectOk(expireQuery(query, 2000));
   });
 
-  test("expires worker_selected query past deadline", () => {
-    const query = makeQuery({ status: "worker_selected", expires_at: 1000 });
+  test("expires provider_selected query past deadline", () => {
+    const query = makeQuery({ status: "provider_selected", expires_at: 1000 });
     expectOk(expireQuery(query, 2000));
   });
 
@@ -463,8 +463,8 @@ describe("cancelQuery", () => {
     expect(q.status).toBe("rejected");
   });
 
-  test("cancels worker_selected query", () => {
-    const query = makeQuery({ status: "worker_selected" });
+  test("cancels provider_selected query", () => {
+    const query = makeQuery({ status: "provider_selected" });
     expectOk(cancelQuery(query));
   });
 
@@ -501,25 +501,25 @@ describe("addOffer", () => {
   test("adds offer to awaiting_offers query", () => {
     const query = makeHtlcQuery();
     const offer: OfferInfo = {
-      worker_pubkey: "worker1",
+      provider_pubkey: "worker1",
       offer_event_id: "evt1",
       received_at: Date.now(),
     };
     const q = expectOk(addOffer(query, offer));
     expect(q.offers?.length).toBe(1);
-    expect(q.offers?.[0].worker_pubkey).toBe("worker1");
+    expect(q.offers?.[0].provider_pubkey).toBe("worker1");
   });
 
   test("appends to existing offers", () => {
     const query = makeHtlcQuery({
       offers: [{
-        worker_pubkey: "w1",
+        provider_pubkey: "w1",
         offer_event_id: "e1",
         received_at: Date.now(),
       }],
     });
     const offer: OfferInfo = {
-      worker_pubkey: "w2",
+      provider_pubkey: "w2",
       offer_event_id: "e2",
       received_at: Date.now(),
     };
@@ -530,7 +530,7 @@ describe("addOffer", () => {
   test("rejects non-HTLC query", () => {
     const query = makeQuery();
     const offer: OfferInfo = {
-      worker_pubkey: "w",
+      provider_pubkey: "w",
       offer_event_id: "e",
       received_at: Date.now(),
     };
@@ -541,7 +541,7 @@ describe("addOffer", () => {
   test("rejects when not awaiting_offers", () => {
     const query = makeHtlcQuery({ status: "processing" });
     const offer: OfferInfo = {
-      worker_pubkey: "w",
+      provider_pubkey: "w",
       offer_event_id: "e",
       received_at: Date.now(),
     };
@@ -549,21 +549,21 @@ describe("addOffer", () => {
     expect(err).toContain("processing");
   });
 
-  test("rejects offer with empty worker_pubkey", () => {
+  test("rejects offer with empty provider_pubkey", () => {
     const query = makeHtlcQuery();
     const offer: OfferInfo = {
-      worker_pubkey: "",
+      provider_pubkey: "",
       offer_event_id: "e",
       received_at: Date.now(),
     };
     const err = expectErr(addOffer(query, offer));
-    expect(err).toContain("worker_pubkey");
+    expect(err).toContain("provider_pubkey");
   });
 
   test("rejects offer with empty offer_event_id", () => {
     const query = makeHtlcQuery();
     const offer: OfferInfo = {
-      worker_pubkey: "w",
+      provider_pubkey: "w",
       offer_event_id: "",
       received_at: Date.now(),
     };
@@ -572,20 +572,20 @@ describe("addOffer", () => {
   });
 });
 
-// --- HTLC: selectWorker ---
+// --- HTLC: selectProvider ---
 
-describe("selectWorker", () => {
-  test("transitions awaiting_offers → worker_selected", () => {
+describe("selectProvider", () => {
+  test("transitions awaiting_offers → provider_selected", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectWorker(query, "worker_pub", {}));
-    expect(q.status).toBe("worker_selected");
-    expect(q.escrow?.worker_pubkey).toBe("worker_pub");
+    const q = expectOk(selectProvider(query, "worker_pub", {}));
+    expect(q.status).toBe("provider_selected");
+    expect(q.escrow?.provider_pubkey).toBe("worker_pub");
   });
 
   test("sets escrow_token and payment_status on swap", () => {
     const query = makeHtlcQuery();
     const q = expectOk(
-      selectWorker(query, "worker_pub", { escrow_token: "tok123" }),
+      selectProvider(query, "worker_pub", { escrow_token: "tok123" }),
     );
     expect(q.escrow?.escrow_token).toBe("tok123");
     expect(q.payment_status).toBe("escrow_swapped");
@@ -593,32 +593,32 @@ describe("selectWorker", () => {
 
   test("preserves payment_status without escrow_token", () => {
     const query = makeHtlcQuery();
-    const q = expectOk(selectWorker(query, "worker_pub", {}));
+    const q = expectOk(selectProvider(query, "worker_pub", {}));
     expect(q.payment_status).toBe("escrow_locked");
   });
 
   test("sets verified_escrow_sats", () => {
     const query = makeHtlcQuery();
     const q = expectOk(
-      selectWorker(query, "worker_pub", { verified_escrow_sats: 100 }),
+      selectProvider(query, "worker_pub", { verified_escrow_sats: 100 }),
     );
     expect(q.escrow?.verified_escrow_sats).toBe(100);
   });
 
   test("rejects non-HTLC query", () => {
     const query = makeQuery();
-    const err = expectErr(selectWorker(query, "w", {}));
+    const err = expectErr(selectProvider(query, "w", {}));
     expect(err).toContain("escrow");
   });
 
   test("rejects wrong state (processing)", () => {
     const query = makeHtlcQuery({ status: "processing" });
-    expect(selectWorker(query, "w", {}).ok).toBe(false);
+    expect(selectProvider(query, "w", {}).ok).toBe(false);
   });
 
   test("rejects wrong state (verifying)", () => {
     const query = makeHtlcQuery({ status: "verifying" });
-    expect(selectWorker(query, "w", {}).ok).toBe(false);
+    expect(selectProvider(query, "w", {}).ok).toBe(false);
   });
 });
 
@@ -632,9 +632,9 @@ describe("recordResult", () => {
         type: "htlc",
         hash: "h",
         oracle_pubkeys: ["o"],
-        requester_pubkey: "r",
+        customer_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
-        worker_pubkey: "worker1",
+        provider_pubkey: "worker1",
       },
     });
     const q = expectOk(recordResult(query, defaultResult, "worker1"));
@@ -643,21 +643,21 @@ describe("recordResult", () => {
     expect(q.submitted_at).toBeDefined();
   });
 
-  test("allows submission when no worker_pubkey set", () => {
+  test("allows submission when no provider_pubkey set", () => {
     const query = makeHtlcQuery({ status: "processing" });
     expectOk(recordResult(query, defaultResult, "any_worker"));
   });
 
-  test("rejects mismatched worker_pubkey", () => {
+  test("rejects mismatched provider_pubkey", () => {
     const query = makeHtlcQuery({
       status: "processing",
       escrow: {
         type: "htlc",
         hash: "h",
         oracle_pubkeys: ["o"],
-        requester_pubkey: "r",
+        customer_pubkey: "r",
         locktime: Math.floor(Date.now() / 1000) + 1200,
-        worker_pubkey: "worker1",
+        provider_pubkey: "worker1",
       },
     });
     const err = expectErr(recordResult(query, defaultResult, "wrong_worker"));
@@ -789,18 +789,18 @@ describe("completeVerification", () => {
 // --- Full HTLC lifecycle ---
 
 describe("HTLC full lifecycle", () => {
-  test("awaiting_offers → worker_selected → processing → verifying → approved", () => {
+  test("awaiting_offers → provider_selected → processing → verifying → approved", () => {
     const q0 = makeHtlcQuery();
     expect(q0.status).toBe("awaiting_offers");
 
     const q1 = expectOk(addOffer(q0, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     }));
 
-    const q2 = expectOk(selectWorker(q1, "w1", {}));
-    expect(q2.status).toBe("worker_selected");
+    const q2 = expectOk(selectProvider(q1, "w1", {}));
+    expect(q2.status).toBe("provider_selected");
 
     const q2b = expectOk(beginWork(q2));
     expect(q2b.status).toBe("processing");
@@ -815,16 +815,16 @@ describe("HTLC full lifecycle", () => {
     expect(q4.payment_status).toBe("released");
   });
 
-  test("awaiting_offers → worker_selected → processing → verifying → rejected", () => {
+  test("awaiting_offers → provider_selected → processing → verifying → rejected", () => {
     const q0 = makeHtlcQuery();
     const q1 = expectOk(
       addOffer(q0, {
-        worker_pubkey: "w1",
+        provider_pubkey: "w1",
         offer_event_id: "e1",
         received_at: Date.now(),
       }),
     );
-    const q2 = expectOk(selectWorker(q1, "w1", {}));
+    const q2 = expectOk(selectProvider(q1, "w1", {}));
     const q2b = expectOk(beginWork(q2));
     const q3 = expectOk(recordResult(q2b, defaultResult, "w1"));
     const q4 = expectOk(completeVerification(q3, false, failedVerification));

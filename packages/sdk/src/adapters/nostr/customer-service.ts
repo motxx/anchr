@@ -132,7 +132,7 @@ export async function createHtlcRequest(
     amount_sats: request.amountSats,
     payment_hash: hash,
     expiry: locktime,
-    requester_pubkey: identity.publicKey,
+    customer_pubkey: identity.publicKey,
   });
   if (!hold) return null;
 
@@ -165,7 +165,7 @@ export async function createHtlcRequest(
     type: "htlc",
     hash,
     oracle_pubkeys: [config.oraclePubkey],
-    requester_pubkey: identity.publicKey,
+    customer_pubkey: identity.publicKey,
     locktime,
     escrow_ref: hold.escrow_ref,
   };
@@ -200,7 +200,7 @@ export function subscribeToOffers(
         if (payload.status === "payment-required") {
           const offer = payload as OfferFeedbackPayload;
           const info: OfferInfo = {
-            worker_pubkey: offer.worker_pubkey,
+            provider_pubkey: offer.worker_pubkey,
             amount_sats: offer.amount_sats,
             offer_event_id: event.id,
             received_at: Date.now(),
@@ -227,7 +227,7 @@ export async function selectProvider(
   encryptedContext?: TlsnEncryptedContext,
 ): Promise<string | null> {
   // Step 5: Swap escrow to bind Provider via EscrowProvider
-  const bound = await config.escrowProvider.bindWorker(
+  const bound = await config.escrowProvider.bindProvider(
     state.escrowRef,
     providerPubkey,
   );
@@ -235,7 +235,7 @@ export async function selectProvider(
 
   state.selectedProviderPubkey = providerPubkey;
   state.finalEscrowRef = bound.escrow_ref;
-  state.escrow.worker_pubkey = providerPubkey;
+  state.escrow.provider_pubkey = providerPubkey;
   state.escrow.escrow_ref = bound.escrow_ref;
 
   // Step 6: Announce selection (kind 7000 status=processing)

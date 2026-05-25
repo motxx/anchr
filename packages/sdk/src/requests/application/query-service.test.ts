@@ -143,14 +143,14 @@ describe("createQueryService", () => {
     expect(query.expires_at - query.created_at).toBe(120_000);
   });
 
-  test("createQuery stores requester_meta", async () => {
+  test("createQuery stores customer_meta", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
       { description: "Test query" },
-      { requesterMeta: { requester_type: "app", requester_id: "test-app" } },
+      { customerMeta: { customer_type: "app", customer_id: "test-app" } },
     );
-    expect(query.requester_meta?.requester_type).toBe("app");
-    expect(query.requester_meta?.requester_id).toBe("test-app");
+    expect(query.customer_meta?.customer_type).toBe("app");
+    expect(query.customer_meta?.customer_id).toBe("test-app");
   });
 
   test("createQuery stores oracle_ids", async () => {
@@ -370,7 +370,7 @@ describe("HTLC lifecycle", () => {
       async createHold() {
         return { escrow_ref: "mock_ref" };
       },
-      async bindWorker(_ref, _wp) {
+      async bindProvider(_ref, _wp) {
         return { escrow_ref: "mock_ref_bound" };
       },
       async verify(_ref, expected_sats) {
@@ -433,7 +433,7 @@ describe("HTLC lifecycle", () => {
     type: "htlc" as const,
     hash: "abcd1234",
     oracle_pubkeys: ["oracle_pub"],
-    requester_pubkey: "requester_pub",
+    customer_pubkey: "requester_pub",
     locktime: Math.floor(Date.now() / 1000) + 3600,
   };
 
@@ -457,7 +457,7 @@ describe("HTLC lifecycle", () => {
       escrow: escrowInfo,
     });
     const outcome = service.recordOffer(query.id, {
-      worker_pubkey: "worker_pub_1",
+      provider_pubkey: "worker_pub_1",
       amount_sats: 100,
       offer_event_id: "evt_1",
       received_at: Date.now(),
@@ -470,7 +470,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "Simple query" });
     const outcome = service.recordOffer(query.id, {
-      worker_pubkey: "worker_pub_1",
+      provider_pubkey: "worker_pub_1",
       amount_sats: 100,
       offer_event_id: "evt_1",
       received_at: Date.now(),
@@ -479,36 +479,36 @@ describe("HTLC lifecycle", () => {
     expect(outcome.message).toContain("Not an escrow query");
   });
 
-  test("selectWorker transitions awaiting_offers → worker_selected", async () => {
+  test("selectProvider transitions awaiting_offers → provider_selected", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
     service.recordOffer(query.id, {
-      worker_pubkey: "worker_pub_1",
+      provider_pubkey: "worker_pub_1",
       offer_event_id: "evt_1",
       received_at: Date.now(),
     });
-    const outcome = await service.selectWorker(
+    const outcome = await service.selectProvider(
       query.id,
       "worker_pub_1",
       "htlc_token_123",
     );
     expect(outcome.ok).toBe(true);
     const updated = service.getQuery(query.id)!;
-    expect(updated.status).toBe("worker_selected");
-    expect(updated.escrow?.worker_pubkey).toBe("worker_pub_1");
+    expect(updated.status).toBe("provider_selected");
+    expect(updated.escrow?.provider_pubkey).toBe("worker_pub_1");
     expect(updated.payment_status).toBe("escrow_swapped");
   });
 
-  test("selectWorker verifies escrow token amount matches bounty", async () => {
+  test("selectProvider verifies escrow token amount matches bounty", async () => {
     const { service } = makeIsolatedService();
     const validToken = makeFakeToken(100);
     const query = service.createQuery(
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(
+    const outcome = await service.selectProvider(
       query.id,
       "worker_pub_1",
       validToken,
@@ -518,14 +518,14 @@ describe("HTLC lifecycle", () => {
     expect(updated.escrow?.verified_escrow_sats).toBe(100);
   });
 
-  test("selectWorker rejects escrow token with insufficient amount", async () => {
+  test("selectProvider rejects escrow token with insufficient amount", async () => {
     const { service } = makeIsolatedService();
     const smallToken = makeFakeToken(50);
     const query = service.createQuery(
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(
+    const outcome = await service.selectProvider(
       query.id,
       "worker_pub_1",
       smallToken,
@@ -536,13 +536,13 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
-  test("selectWorker rejects invalid escrow token", async () => {
+  test("selectProvider rejects invalid escrow token", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(
+    const outcome = await service.selectProvider(
       query.id,
       "worker_pub_1",
       "not_a_valid_token",
@@ -552,14 +552,14 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
-  test("selectWorker accepts token with more than bounty amount", async () => {
+  test("selectProvider accepts token with more than bounty amount", async () => {
     const { service } = makeIsolatedService();
     const bigToken = makeFakeToken(200);
     const query = service.createQuery(
       { description: "HTLC test" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    const outcome = await service.selectWorker(
+    const outcome = await service.selectProvider(
       query.id,
       "worker_pub_1",
       bigToken,
@@ -568,13 +568,13 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.escrow?.verified_escrow_sats).toBe(200);
   });
 
-  test("selectWorker fails on wrong state", async () => {
+  test("selectProvider fails on wrong state", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "worker_pub_1");
-    const outcome = await service.selectWorker(query.id, "worker_pub_2");
+    await service.selectProvider(query.id, "worker_pub_1");
+    const outcome = await service.selectProvider(query.id, "worker_pub_2");
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not awaiting_offers");
   });
@@ -584,7 +584,7 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "worker_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(query.id, {
       attachments: [],
@@ -594,12 +594,12 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.status).toBe("verifying");
   });
 
-  test("recordResult fails for wrong worker", async () => {
+  test("recordResult fails for wrong provider", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "worker_pub_1");
     service.beginWork(query.id);
     const outcome = service.recordResult(
       query.id,
@@ -615,7 +615,7 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
     const outcome = service.completeVerification(query.id, true, "test-oracle");
@@ -631,7 +631,7 @@ describe("HTLC lifecycle", () => {
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "worker_pub_1");
+    await service.selectProvider(query.id, "worker_pub_1");
     service.beginWork(query.id);
     service.recordResult(query.id, { attachments: [] }, "worker_pub_1");
     const outcome = service.completeVerification(query.id, false);
@@ -659,20 +659,20 @@ describe("HTLC lifecycle", () => {
     expect(query.status).toBe("awaiting_offers");
 
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
     service.recordOffer(query.id, {
-      worker_pubkey: "w2",
+      provider_pubkey: "w2",
       amount_sats: 50,
       offer_event_id: "e2",
       received_at: Date.now(),
     });
     expect(service.getQuery(query.id)?.offers).toHaveLength(2);
 
-    await service.selectWorker(query.id, "w1", "final_htlc_token");
-    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
+    await service.selectProvider(query.id, "w1", "final_htlc_token");
+    expect(service.getQuery(query.id)?.status).toBe("provider_selected");
 
     service.beginWork(query.id);
     service.recordResult(
@@ -717,7 +717,7 @@ describe("submitEscrowResult", () => {
         type: "htlc" as const,
         hash: entry.hash,
         oracle_pubkeys: ["oracle_pub"],
-        requester_pubkey: "requester_pub",
+        customer_pubkey: "requester_pub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
       entry,
@@ -731,7 +731,7 @@ describe("submitEscrowResult", () => {
       escrow: escrowInfo,
       oracleIds: ["test-oracle"],
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -754,7 +754,7 @@ describe("submitEscrowResult", () => {
       escrow: escrowInfo,
       oracleIds: ["strict-oracle"],
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -781,13 +781,13 @@ describe("submitEscrowResult", () => {
     expect(outcome.message).toContain("Not an escrow query");
   });
 
-  test("submitEscrowResult fails for wrong worker", async () => {
+  test("submitEscrowResult fails for wrong provider", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
     const { escrowInfo } = makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -841,12 +841,12 @@ describe("submitEscrowResult", () => {
         type: "p2pk_frost" as const,
         group_pubkey: "f".repeat(64),
         oracle_pubkeys: ["s1", "s2", "s3"],
-        requester_pubkey: "rpub",
+        customer_pubkey: "rpub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
       oracleIds: ["test-oracle"],
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -883,12 +883,12 @@ describe("submitEscrowResult", () => {
         type: "p2pk_frost" as const,
         group_pubkey: "f".repeat(64),
         oracle_pubkeys: ["s1"],
-        requester_pubkey: "rpub",
+        customer_pubkey: "rpub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
       oracleIds: ["strict-oracle"],
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -921,12 +921,12 @@ describe("submitEscrowResult", () => {
         type: "p2pk_frost" as const,
         group_pubkey: "f".repeat(64),
         oracle_pubkeys: ["s1"],
-        requester_pubkey: "rpub",
+        customer_pubkey: "rpub",
         locktime: Math.floor(Date.now() / 1000) + 3600,
       },
       oracleIds: ["test-oracle"],
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -1043,7 +1043,7 @@ describe("verifyWithQuorum", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "req_pub",
+      customer_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
     const query = service.createQuery(
@@ -1054,7 +1054,7 @@ describe("verifyWithQuorum", () => {
         quorum: { min_approvals: 2 },
       },
     );
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(

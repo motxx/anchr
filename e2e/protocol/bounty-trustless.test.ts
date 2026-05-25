@@ -167,22 +167,22 @@ describe("NUT-07: Requester cannot revoke payment", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
     // Insufficient token rejected
     const smallToken = makeFakeToken(50);
-    const rejected = await service.selectWorker(query.id, "w1", smallToken);
+    const rejected = await service.selectProvider(query.id, "w1", smallToken);
     expect(rejected.ok).toBe(false);
     expect(rejected.message).toContain("Insufficient");
 
     // Sufficient token accepted
     const validToken = makeFakeToken(100);
-    const accepted = await service.selectWorker(query.id, "w1", validToken);
+    const accepted = await service.selectProvider(query.id, "w1", validToken);
     expect(accepted.ok).toBe(true);
-    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
+    expect(service.getQuery(query.id)?.status).toBe("provider_selected");
   });
 
   test("invalid escrow token is rejected at worker selection", async () => {
@@ -194,12 +194,16 @@ describe("NUT-07: Requester cannot revoke payment", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
-    const outcome = await service.selectWorker(query.id, "w1", "garbage_token");
+    const outcome = await service.selectProvider(
+      query.id,
+      "w1",
+      "garbage_token",
+    );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("Escrow token verification failed");
     expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
@@ -263,11 +267,11 @@ describe("NUT-11: Timeout refund", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     // Submit invalid proof → rejected
@@ -317,7 +321,7 @@ describe("Worker impersonation prevention", () => {
       { escrow: escrowInfo },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "legit_worker",
+      provider_pubkey: "legit_worker",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -325,11 +329,11 @@ describe("Worker impersonation prevention", () => {
     // Select a worker who never offered — should still succeed at protocol level
     // (worker selection is Requester's choice from available offers)
     // The real protection is P2PK: only the selected Worker's key can redeem
-    const outcome = await service.selectWorker(query.id, "other_worker");
+    const outcome = await service.selectProvider(query.id, "other_worker");
     expect(outcome.ok).toBe(true);
     // But HTLC token is now locked to other_worker ��� legit_worker can't redeem
-    expect(service.getQuery(query.id)?.status).toBe("worker_selected");
-    expect(service.getQuery(query.id)?.escrow?.worker_pubkey).toBe(
+    expect(service.getQuery(query.id)?.status).toBe("provider_selected");
+    expect(service.getQuery(query.id)?.escrow?.provider_pubkey).toBe(
       "other_worker",
     );
   });
@@ -380,11 +384,11 @@ describe("Oracle + Requester collusion limits", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
     service.beginWork(query.id);
 
@@ -416,11 +420,11 @@ describe("Oracle + Requester collusion limits", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
     service.beginWork(query.id);
 
@@ -525,14 +529,14 @@ describe("HTLC state machine — invalid transitions blocked", () => {
       { escrow: escrowInfo },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
-    await service.selectWorker(query.id, "w1");
-    // second selectWorker should fail on worker_selected state
-    const second = await service.selectWorker(query.id, "w2");
+    await service.selectProvider(query.id, "w1");
+    // second selectProvider should fail on provider_selected state
+    const second = await service.selectProvider(query.id, "w2");
 
     expect(second.ok).toBe(false);
     expect(second.message).toContain("not awaiting_offers");
@@ -569,7 +573,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
 
     // recordOffer fails
     const offerResult = service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });

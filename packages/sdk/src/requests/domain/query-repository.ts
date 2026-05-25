@@ -34,7 +34,7 @@ export function createInMemoryQueryRepository(): QueryRepository {
       const openStatuses: QueryStatus[] = [
         "pending",
         "awaiting_offers",
-        "worker_selected",
+        "provider_selected",
         "processing",
       ];
       return Array.from(queries.values()).filter(
@@ -75,7 +75,7 @@ export function toRepository(store: QueryStore): QueryRepository {
       const openStatuses: QueryStatus[] = [
         "pending",
         "awaiting_offers",
-        "worker_selected",
+        "provider_selected",
         "processing",
       ];
       return store.values().filter((q) =>

@@ -78,8 +78,8 @@ export function validateQueryInput(input: QueryInput): string | null {
 
 /** Validate offer info. Returns error string or null if valid. */
 export function validateOfferInfo(offer: OfferInfo): string | null {
-  if (!offer.worker_pubkey || offer.worker_pubkey.trim().length === 0) {
-    return "worker_pubkey must not be empty";
+  if (!offer.provider_pubkey || offer.provider_pubkey.trim().length === 0) {
+    return "provider_pubkey must not be empty";
   }
   if (!offer.offer_event_id || offer.offer_event_id.trim().length === 0) {
     return "offer_event_id must not be empty";

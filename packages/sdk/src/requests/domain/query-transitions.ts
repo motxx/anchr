@@ -7,8 +7,8 @@ const SIMPLE_TRANSITIONS: Record<string, QueryStatus[]> = {
 
 /** Valid state transitions for HTLC queries. */
 const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_offers: ["worker_selected", "expired"],
-  worker_selected: ["processing", "expired"],
+  awaiting_offers: ["provider_selected", "expired"],
+  provider_selected: ["processing", "expired"],
   processing: ["verifying", "expired"],
   verifying: ["approved", "rejected", "expired"],
 };
@@ -19,14 +19,14 @@ const TERMINAL_STATUSES: QueryStatus[] = ["approved", "rejected", "expired"];
 const CANCELLABLE_STATUSES: QueryStatus[] = [
   "pending",
   "awaiting_offers",
-  "worker_selected",
+  "provider_selected",
   "processing",
 ];
 
 const EXPIRABLE_STATUSES: QueryStatus[] = [
   "pending",
   "awaiting_offers",
-  "worker_selected",
+  "provider_selected",
   "processing",
   "verifying",
 ];

@@ -208,8 +208,8 @@ describe("verifyWithQuorum (single oracle)", () => {
   });
 });
 
-describe("CTF-1: oracle_id from worker sanitization", () => {
-  test("ignores worker-supplied oracleId when query has no oracle_ids", async () => {
+describe("CTF-1: oracle_id from provider sanitization", () => {
+  test("ignores provider-supplied oracleId when query has no oracle_ids", async () => {
     const maliciousOracle = makeMockOracle("malicious-oracle", () => true);
     const defaultOracle = makeMockOracle("default-oracle");
 
@@ -232,7 +232,7 @@ describe("CTF-1: oracle_id from worker sanitization", () => {
     expect(result.attestations.length).toBe(1);
   });
 
-  test("uses worker-supplied oracleId when query has explicit oracle_ids", async () => {
+  test("uses provider-supplied oracleId when query has explicit oracle_ids", async () => {
     const oracleA = makeMockOracle("oracle-a");
     const oracleB = makeMockOracle("oracle-b");
 

@@ -20,7 +20,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -33,11 +33,11 @@ describe("Attack: Preimage Isolation", () => {
       },
     );
     service.recordOffer(q1.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    await service.selectProvider(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
     const outcome1 = await service.submitEscrowResult(
@@ -55,7 +55,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash, // REUSED hash
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -68,11 +68,11 @@ describe("Attack: Preimage Isolation", () => {
       },
     );
     service.recordOffer(q2.id, {
-      worker_pubkey: "w2",
+      provider_pubkey: "w2",
       offer_event_id: "e2",
       received_at: Date.now(),
     });
-    await service.selectWorker(q2.id, "w2", makeFakeToken(100));
+    await service.selectProvider(q2.id, "w2", makeFakeToken(100));
     service.beginWork(q2.id);
 
     const outcome2 = await service.submitEscrowResult(
@@ -148,11 +148,11 @@ describe("Attack: Race Conditions & Timing", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const cancel = service.cancelQuery(query.id);
@@ -168,7 +168,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -177,11 +177,11 @@ describe("Attack: Race Conditions & Timing", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     // Wait past the 1ms ttl so the expiry sweep observes it as expired
@@ -201,7 +201,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -210,11 +210,11 @@ describe("Attack: Race Conditions & Timing", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     await new Promise((r) => setTimeout(r, 5));
@@ -296,11 +296,11 @@ describe("Attack: Oracle Manipulation", () => {
       },
     );
     service.recordOffer(q1.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    await service.selectProvider(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
     const outcome1 = await service.submitEscrowResult(
@@ -324,11 +324,11 @@ describe("Attack: Oracle Manipulation", () => {
       },
     );
     service2.recordOffer(q2.id, {
-      worker_pubkey: "w2",
+      provider_pubkey: "w2",
       offer_event_id: "e2",
       received_at: Date.now(),
     });
-    await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
+    await service2.selectProvider(q2.id, "w2", makeFakeToken(100));
     service2.beginWork(q2.id);
 
     const outcome2 = await service2.submitEscrowResult(
@@ -363,11 +363,11 @@ describe("Attack: Oracle Manipulation", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -396,7 +396,7 @@ describe("Attack: Oracle Manipulation", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -405,11 +405,11 @@ describe("Attack: Oracle Manipulation", () => {
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -476,7 +476,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     const { query } = await driveToProcessing(service, preimageStore);
 
     const offerResult = service.recordOffer(query.id, {
-      worker_pubkey: "w2",
+      provider_pubkey: "w2",
       offer_event_id: "e2",
       received_at: Date.now(),
     });
@@ -511,11 +511,11 @@ describe("Attack: Cross-Query", () => {
       },
     );
     service.recordOffer(qA.id, {
-      worker_pubkey: "worker_a",
+      provider_pubkey: "worker_a",
       offer_event_id: "eA",
       received_at: Date.now(),
     });
-    await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
+    await service.selectProvider(qA.id, "worker_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
     const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(
@@ -530,11 +530,11 @@ describe("Attack: Cross-Query", () => {
       },
     );
     service.recordOffer(qB.id, {
-      worker_pubkey: "worker_b",
+      provider_pubkey: "worker_b",
       offer_event_id: "eB",
       received_at: Date.now(),
     });
-    await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));
+    await service.selectProvider(qB.id, "worker_b", makeFakeToken(100));
     service.beginWork(qB.id);
 
     const outcome = await service.submitEscrowResult(

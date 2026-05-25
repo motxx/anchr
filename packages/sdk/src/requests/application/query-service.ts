@@ -21,13 +21,14 @@ import {
   doCompleteVerification,
   doRecordOffer,
   doRecordResult,
-  doSelectWorker,
+  doSelectProvider,
   doSubmitEscrowResult,
 } from "./escrow-flow-methods.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type {
   BlossomKeyMap,
   BountyInfo,
+  CustomerMeta,
   EscrowInfo,
   EscrowSubmitOutcome,
   ExecutorType,
@@ -36,7 +37,6 @@ import type {
   QueryInput,
   QueryResult,
   QuorumConfig,
-  RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
   VerificationFactor,
@@ -45,12 +45,12 @@ import type {
 export type {
   AttachmentRef,
   AttachmentStorageKind,
+  CustomerMeta,
+  CustomerType,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
-  RequesterMeta,
-  RequesterType,
   VerificationFactor,
 } from "../domain/types.ts";
 export type QueryVerification = VerificationDetail;
@@ -60,7 +60,7 @@ export type QuerySubmissionMeta = SubmissionMeta;
 export interface CreateQueryOptions {
   ttlMs?: number;
   ttlSeconds?: number;
-  requesterMeta?: RequesterMeta;
+  customerMeta?: CustomerMeta;
   bounty?: BountyInfo;
   /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
   oracleIds?: string[];
@@ -125,16 +125,16 @@ export interface QueryService {
   clearQueryStore(): void;
 
   recordOffer(queryId: string, offer: OfferInfo): HtlcOutcome;
-  selectWorker(
+  selectProvider(
     queryId: string,
-    workerPubkey: string,
+    providerPubkey: string,
     escrowToken?: string,
   ): Promise<HtlcOutcome>;
   beginWork(queryId: string): HtlcOutcome;
   recordResult(
     queryId: string,
     result: QueryResult,
-    workerPubkey: string,
+    providerPubkey: string,
     blossomKeys?: BlossomKeyMap,
   ): HtlcOutcome;
   completeVerification(
@@ -146,7 +146,7 @@ export interface QueryService {
   submitEscrowResult(
     queryId: string,
     result: QueryResult,
-    workerPubkey: string,
+    providerPubkey: string,
     oracleId?: string,
     blossomKeys?: BlossomKeyMap,
   ): Promise<EscrowSubmitOutcome>;
@@ -198,7 +198,8 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     purgeExpiredFromStore: () => doPurgeExpired(store),
     clearQueryStore: () => store.clear(),
     recordOffer: (queryId, offer) => doRecordOffer(store, queryId, offer),
-    selectWorker: (queryId, wp, ht) => doSelectWorker(svcDeps, queryId, wp, ht),
+    selectProvider: (queryId, wp, ht) =>
+      doSelectProvider(svcDeps, queryId, wp, ht),
     beginWork: (queryId) => doBeginWork(store, queryId),
     recordResult: (queryId, result, wp, bk) =>
       doRecordResult(svcDeps, queryId, result, wp, bk),

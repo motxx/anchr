@@ -54,7 +54,7 @@ export function createMockEscrowProvider(): EscrowProvider {
     async createHold() {
       return { escrow_ref: "mock_ref" };
     },
-    async bindWorker() {
+    async bindProvider() {
       return { escrow_ref: "mock_ref_bound" };
     },
     async verify(ref, expected_sats) {
@@ -74,7 +74,7 @@ export function createMockEscrowProvider(): EscrowProvider {
         return { valid: false, error: "Invalid token" };
       }
     },
-    async verifyLock(ref, payment_hash, worker_pubkey) {
+    async verifyLock(ref, payment_hash, provider_pubkey) {
       try {
         const decoded = getDecodedToken(ref);
         for (const proof of decoded.proofs) {
@@ -97,12 +97,12 @@ export function createMockEscrowProvider(): EscrowProvider {
           const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
           if (pubkeyTag) {
             const lockedKeys = pubkeyTag.slice(1);
-            const workerHex =
-              worker_pubkey.startsWith("02") || worker_pubkey.startsWith("03")
-                ? worker_pubkey
-                : `02${worker_pubkey}`;
+            const workerHex = provider_pubkey.startsWith("02") ||
+                provider_pubkey.startsWith("03")
+              ? provider_pubkey
+              : `02${provider_pubkey}`;
             if (
-              !lockedKeys.includes(worker_pubkey) &&
+              !lockedKeys.includes(provider_pubkey) &&
               !lockedKeys.includes(workerHex)
             ) {
               return {
@@ -195,7 +195,7 @@ export function makeEscrowInfo(
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     },
     entry,
@@ -227,12 +227,12 @@ export async function driveToProcessing(
     },
   );
   service.recordOffer(query.id, {
-    worker_pubkey: workerPub,
+    provider_pubkey: workerPub,
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
   const token = makeFakeToken(bounty);
-  await service.selectWorker(query.id, workerPub, token);
+  await service.selectProvider(query.id, workerPub, token);
   service.beginWork(query.id);
   return { query, entry, workerPub, escrowInfo };
 }
@@ -286,11 +286,11 @@ export async function driveQuorumToProcessing(
     },
   );
   service.recordOffer(query.id, {
-    worker_pubkey: workerPub,
+    provider_pubkey: workerPub,
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
-  await service.selectWorker(query.id, workerPub, makeFakeToken(bounty));
+  await service.selectProvider(query.id, workerPub, makeFakeToken(bounty));
   service.beginWork(query.id);
   return { query, entry, workerPub, escrowInfo };
 }

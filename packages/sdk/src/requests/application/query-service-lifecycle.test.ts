@@ -192,7 +192,7 @@ describe("Application Service — HTLC lifecycle", () => {
       type: "htlc" as const,
       hash: "abc123",
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "req_pub",
+      customer_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
     bounty: { amount_sats: 100 },
@@ -211,13 +211,13 @@ describe("Application Service — HTLC lifecycle", () => {
     const query = svc.createQuery(defaultInput, htlcOptions());
 
     const offerOutcome = svc.recordOffer(query.id, {
-      worker_pubkey: "worker1",
+      provider_pubkey: "worker1",
       offer_event_id: "evt1",
       received_at: Date.now(),
     });
     expect(offerOutcome.ok).toBe(true);
 
-    const selectOutcome = await svc.selectWorker(query.id, "worker1");
+    const selectOutcome = await svc.selectProvider(query.id, "worker1");
     svc.beginWork(query.id);
     expect(selectOutcome.ok).toBe(true);
     expect(svc.getQuery(query.id)?.status).toBe("processing");
@@ -235,11 +235,11 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup({ pass: false });
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await svc.selectWorker(query.id, "w1");
+    await svc.selectProvider(query.id, "w1");
     svc.beginWork(query.id);
 
     const outcome = await svc.submitEscrowResult(query.id, defaultResult, "w1");
@@ -251,11 +251,11 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup({ pass: true });
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await svc.selectWorker(query.id, "w1");
+    await svc.selectProvider(query.id, "w1");
     svc.beginWork(query.id);
 
     const recordOutcome = svc.recordResult(query.id, defaultResult, "w1");
@@ -271,11 +271,11 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await svc.selectWorker(query.id, "w1");
+    await svc.selectProvider(query.id, "w1");
     svc.beginWork(query.id);
     svc.recordResult(query.id, defaultResult, "w1");
 
@@ -296,11 +296,11 @@ describe("Application Service — HTLC lifecycle", () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, { ...htlcOptions(), ttlMs: 1 });
     svc.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await svc.selectWorker(query.id, "w1");
+    await svc.selectProvider(query.id, "w1");
     svc.beginWork(query.id);
 
     await new Promise((r) => setTimeout(r, 5));
@@ -317,15 +317,15 @@ describe("Application Service — HTLC lifecycle", () => {
     expect(outcome.message).toContain("escrow");
   });
 
-  test("HTLC: worker pubkey mismatch", async () => {
+  test("HTLC: provider pubkey mismatch", async () => {
     const { svc } = setup();
     const query = svc.createQuery(defaultInput, htlcOptions());
     svc.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await svc.selectWorker(query.id, "w1");
+    await svc.selectProvider(query.id, "w1");
     svc.beginWork(query.id);
 
     const outcome = await svc.submitEscrowResult(
@@ -400,7 +400,7 @@ describe("Application Service — Aggregate error propagation", () => {
           type: "htlc",
           hash: "h",
           oracle_pubkeys: ["o"],
-          requester_pubkey: "r",
+          customer_pubkey: "r",
           locktime: nowSecs + 100,
         },
       })

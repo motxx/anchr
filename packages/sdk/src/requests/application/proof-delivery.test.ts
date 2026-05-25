@@ -103,7 +103,7 @@ describe("proof-delivery integration", () => {
     expect(updatedQuery!.published_proofs!.length).toBe(1);
   });
 
-  test("visibility: requester_only does NOT publish", async () => {
+  test("visibility: customer_only does NOT publish", async () => {
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const oracle = createMockOracle("test-oracle", true);
     registry.register(oracle);
@@ -118,7 +118,7 @@ describe("proof-delivery integration", () => {
     const query = svc.createQuery({
       description: "Test TLSNotary private",
       tlsn_requirements: { target_url: "https://example.com/api" },
-      visibility: "requester_only",
+      visibility: "customer_only",
     }, { oracleIds: ["test-oracle"] });
 
     const result: QueryResult = { attachments: [] };

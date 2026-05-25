@@ -32,7 +32,7 @@ export function createCashuEscrowProvider(
       );
       const result = await createHtlcToken(params.amount_sats, {
         hash: params.payment_hash,
-        requesterPubkey: params.requester_pubkey,
+        requesterPubkey: params.customer_pubkey,
         locktimeSeconds: params.expiry,
       }, sourceProofs);
 
@@ -43,7 +43,7 @@ export function createCashuEscrowProvider(
       return { escrow_ref: ref };
     },
 
-    async bindWorker(escrow_ref, worker_pubkey) {
+    async bindProvider(escrow_ref, worker_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return null;
 

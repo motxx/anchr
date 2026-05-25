@@ -21,12 +21,12 @@ export interface EscrowProvider {
     amount_sats: number;
     payment_hash: string;
     expiry: number;
-    requester_pubkey: string;
+    customer_pubkey: string;
   }): Promise<{ escrow_ref: string } | null>;
 
-  bindWorker(
+  bindProvider(
     escrow_ref: string,
-    worker_pubkey: string,
+    provider_pubkey: string,
   ): Promise<{ escrow_ref: string } | null>;
 
   verify(
@@ -37,7 +37,7 @@ export interface EscrowProvider {
   verifyLock(
     escrow_ref: string,
     payment_hash: string,
-    worker_pubkey: string,
+    provider_pubkey: string,
   ): Promise<{ ok: boolean; message?: string }>;
 
   settle(
@@ -86,7 +86,7 @@ export interface FrostSignaturePort {
   ): Promise<string | null>;
 }
 
-// ── Proof delivery (Nostr publish or requester-only DM) ───────────
+// ── Proof delivery (Nostr publish or customer-only DM) ───────────
 
 export interface ProofPublishResult {
   event_id: string;
@@ -95,7 +95,7 @@ export interface ProofPublishResult {
 
 export interface ProofDelivery {
   /**
-   * Returns null if visibility is "requester_only" or if publishing is skipped.
+   * Returns null if visibility is "customer_only" or if publishing is skipped.
    */
   publish(
     query: Query,

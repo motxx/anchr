@@ -1,7 +1,7 @@
 export type QueryStatus =
   | "pending"
   | "awaiting_offers"
-  | "worker_selected"
+  | "provider_selected"
   | "processing"
   | "verifying"
   | "submitted"
@@ -16,13 +16,13 @@ export type PaymentStatus =
   | "locked"
   | "released"
   | "cancelled";
-export type RequesterType = "agent" | "human" | "app";
+export type CustomerType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "adapter";
 export type AttachmentStorageKind = "blossom" | "external";
 
 /** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
-export type ProofVisibility = "public" | "requester_only";
+export type ProofVisibility = "public" | "customer_only";
 
 export interface GpsCoord {
   lat: number;
@@ -30,7 +30,7 @@ export interface GpsCoord {
 }
 
 /**
- * Verification factors that a Requester can request.
+ * Verification factors that a Customer can request.
  * When omitted, defaults to ["gps", "ai_check"].
  */
 export const VERIFICATION_FACTORS = [
@@ -114,9 +114,9 @@ export interface AttachmentHandle {
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
-  /** GPS coordinates reported by the worker's device at submission time. */
+  /** GPS coordinates reported by the provider's device at submission time. */
   gps?: GpsCoord;
-  /** TLSNotary attestation submitted by the worker. */
+  /** TLSNotary attestation submitted by the provider. */
   tlsn_attestation?: TlsnAttestation;
   /** TLSNotary browser extension result (results[] from MPC-TLS session). */
   tlsn_extension_result?: unknown;
@@ -159,9 +159,9 @@ export interface VerificationDetail {
   tlsn_verified?: TlsnVerifiedData;
 }
 
-export interface RequesterMeta {
-  requester_type: RequesterType;
-  requester_id?: string;
+export interface CustomerMeta {
+  customer_type: CustomerType;
+  customer_id?: string;
   client_name?: string;
 }
 
@@ -182,13 +182,13 @@ export type EscrowType = "htlc" | "p2pk_frost";
 interface EscrowCommonFields {
   /** Oracle pubkeys (singleton for HTLC, FROST signers for threshold). */
   oracle_pubkeys: string[];
-  /** Requester's Nostr pubkey (hex) — used for refund. */
-  requester_pubkey: string;
-  /** Worker's Nostr pubkey (hex) — set after worker selection. */
-  worker_pubkey?: string;
+  /** Customer's Nostr pubkey (hex) — used for refund. */
+  customer_pubkey: string;
+  /** Provider's Nostr pubkey (hex) — set after provider selection. */
+  provider_pubkey?: string;
   /** Locktime as unix timestamp (seconds). */
   locktime: number;
-  /** Encoded escrow token (held by Requester until swap). */
+  /** Encoded escrow token (held by Customer until swap). */
   escrow_token?: string;
   /** Server-verified escrow amount in sats. */
   verified_escrow_sats?: number;
@@ -198,7 +198,7 @@ interface EscrowCommonFields {
 
 /**
  * NUT-14 hashlocked timelock contract — Oracle reveals a preimage to settle.
- * The escrow token is locked to `worker_pubkey` AND the hash; both must be
+ * The escrow token is locked to `provider_pubkey` AND the hash; both must be
  * satisfied to redeem.
  */
 export interface HtlcEscrow extends EscrowCommonFields {
@@ -221,10 +221,10 @@ export interface P2pkFrostEscrow extends EscrowCommonFields {
 /** Escrow information for an in-flight Query. Discriminated by `type`. */
 export type EscrowInfo = HtlcEscrow | P2pkFrostEscrow;
 
-/** An offer from a Worker offering to fulfill a query. */
+/** An offer from a Provider offering to fulfill a query. */
 export interface OfferInfo {
-  /** Worker's Nostr pubkey (hex). */
-  worker_pubkey: string;
+  /** Provider's Nostr pubkey (hex). */
+  provider_pubkey: string;
   /** Requested amount in sats (optional; may match bounty). */
   amount_sats?: number;
   /** Nostr event ID of the kind 7000 offer event. */
@@ -234,7 +234,7 @@ export interface OfferInfo {
 }
 
 /**
- * Outcome of submitEscrowResult. On verification success the worker receives
+ * Outcome of submitEscrowResult. On verification success the provider receives
  * a settlement artifact whose shape depends on the escrow type:
  *   - HTLC (`escrow.type === "htlc"`):       `preimage` (SHA-256 preimage hex)
  *   - P2PK+FROST (`escrow.type === "p2pk_frost"`): `frost_signature` (BIP-340 hex)
@@ -251,7 +251,7 @@ export interface EscrowSubmitOutcome {
   ok: boolean;
   query: Query | null;
   message: string;
-  /** Preimage revealed on HTLC verification success (Worker redeems the HTLC token with this). */
+  /** Preimage revealed on HTLC verification success (Provider redeems the HTLC token with this). */
   preimage?: string;
   /** Aggregated FROST Schnorr signature delivered on P2PK+FROST verification success. */
   frost_signature?: string;
@@ -279,15 +279,15 @@ export interface Query {
   location_hint?: string;
   challenge_nonce?: string;
   challenge_rule?: string;
-  /** Verification factors requested by the Requester. */
+  /** Verification factors requested by the Customer. */
   verification_requirements: readonly VerificationFactor[];
   created_at: number;
   expires_at: number;
-  requester_meta?: RequesterMeta;
+  customer_meta?: CustomerMeta;
   bounty?: BountyInfo;
-  /** Acceptable oracle IDs set by requester. Empty/undefined = any (defaults to built-in). */
+  /** Acceptable oracle IDs set by customer. Empty/undefined = any (defaults to built-in). */
   oracle_ids?: string[];
-  /** Oracle selected by worker at submission time. */
+  /** Oracle selected by provider at submission time. */
   assigned_oracle_id?: string;
   submitted_at?: number;
   result?: QueryResult;
@@ -296,11 +296,11 @@ export interface Query {
   payment_status: PaymentStatus;
   /** Escrow details (present when payment escrow is used). */
   escrow?: EscrowInfo;
-  /** Worker offers received for this query. */
+  /** Provider offers received for this query. */
   offers?: OfferInfo[];
   /** Nostr event ID of the kind 5300 Job Request. */
   nostr_event_id?: string;
-  /** Ephemeral Blossom encryption keys — stored for requester download via HTTP API. */
+  /** Ephemeral Blossom encryption keys — stored for customer download via HTTP API. */
   blossom_keys?: BlossomKeyMap;
   /** Expected GPS coordinates for proximity check. */
   expected_gps?: GpsCoord;

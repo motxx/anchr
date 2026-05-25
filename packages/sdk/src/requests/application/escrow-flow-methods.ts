@@ -47,10 +47,10 @@ export function doRecordOffer(
   return { ok: true, message: "Offer recorded" };
 }
 
-export async function doSelectWorker(
+export async function doSelectProvider(
   deps: ServiceDeps,
   queryId: string,
-  workerPubkey: string,
+  providerPubkey: string,
   escrowToken?: string,
 ): Promise<HtlcOutcome> {
   const { store } = deps;
@@ -59,7 +59,7 @@ export async function doSelectWorker(
   if (!isEscrowQuery(query)) {
     return { ok: false, message: "Not an escrow query" };
   }
-  if (!validateEscrowTransition(query.status, "worker_selected")) {
+  if (!validateEscrowTransition(query.status, "provider_selected")) {
     return {
       ok: false,
       message: `Query is ${query.status}, not awaiting_offers`,
@@ -95,7 +95,7 @@ export async function doSelectWorker(
       deps.escrowProvider,
       escrowRef,
       paymentHash,
-      workerPubkey,
+      providerPubkey,
     );
     if (!lockCheck.ok) {
       return { ok: false, message: lockCheck.message! };
@@ -104,18 +104,18 @@ export async function doSelectWorker(
 
   const escrow: EscrowInfo = {
     ...query.escrow!,
-    worker_pubkey: workerPubkey,
+    provider_pubkey: providerPubkey,
     escrow_token: escrowToken ?? query.escrow?.escrow_token,
     verified_escrow_sats: verifiedEscrowSats,
   };
 
   store.set(queryId, {
     ...query,
-    status: "worker_selected",
+    status: "provider_selected",
     escrow,
     payment_status: escrowToken ? "escrow_swapped" : query.payment_status,
   });
-  return { ok: true, message: "Worker selected" };
+  return { ok: true, message: "Provider selected" };
 }
 
 export function doBeginWork(
@@ -130,7 +130,7 @@ export function doBeginWork(
   if (!validateEscrowTransition(query.status, "processing")) {
     return {
       ok: false,
-      message: `Query is ${query.status}, not worker_selected`,
+      message: `Query is ${query.status}, not provider_selected`,
     };
   }
   store.set(queryId, { ...query, status: "processing" });
@@ -141,7 +141,7 @@ export function doRecordResult(
   deps: ServiceDeps,
   queryId: string,
   result: QueryResult,
-  workerPubkey: string,
+  providerPubkey: string,
   blossomKeys?: BlossomKeyMap,
 ): HtlcOutcome {
   const { store } = deps;
@@ -154,11 +154,12 @@ export function doRecordResult(
     return { ok: false, message: `Query is ${query.status}, not processing` };
   }
   if (
-    query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey
+    query.escrow?.provider_pubkey &&
+    query.escrow.provider_pubkey !== providerPubkey
   ) {
     return {
       ok: false,
-      message: "Worker pubkey does not match selected worker",
+      message: "Provider pubkey does not match selected provider",
     };
   }
 
@@ -208,7 +209,7 @@ export async function doSubmitEscrowResult(
   deps: ServiceDeps,
   queryId: string,
   result: QueryResult,
-  workerPubkey: string,
+  providerPubkey: string,
   oracleId?: string,
   blossomKeys?: BlossomKeyMap,
 ): Promise<EscrowSubmitOutcome> {
@@ -226,12 +227,13 @@ export async function doSubmitEscrowResult(
     };
   }
   if (
-    query.escrow?.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey
+    query.escrow?.provider_pubkey &&
+    query.escrow.provider_pubkey !== providerPubkey
   ) {
     return {
       ok: false,
       query,
-      message: "Worker pubkey does not match selected worker",
+      message: "Provider pubkey does not match selected provider",
     };
   }
 

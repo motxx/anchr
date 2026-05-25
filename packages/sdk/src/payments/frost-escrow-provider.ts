@@ -80,7 +80,7 @@ export function createFrostEscrowProvider(
       }
     },
 
-    async bindWorker(escrow_ref, worker_pubkey) {
+    async bindProvider(escrow_ref, worker_pubkey) {
       const entry = tokenMap.get(escrow_ref);
       if (!entry) return null;
 

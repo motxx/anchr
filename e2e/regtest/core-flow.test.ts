@@ -108,7 +108,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       type: "htlc" as const,
       hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600, // 1 hour
     };
 
@@ -140,7 +140,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
 
     // 2b. Worker submits offer
     const offerOutcome = service.recordOffer(queryId, {
-      worker_pubkey: "e2e_worker_pub",
+      provider_pubkey: "e2e_worker_pub",
       amount_sats: BOUNTY_SATS,
       offer_event_id: "e2e_offer_1",
       received_at: Date.now(),
@@ -148,11 +148,14 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     expect(offerOutcome.ok).toBe(true);
 
     // 2c. Requester selects Worker
-    const selectOutcome = await service.selectWorker(queryId, "e2e_worker_pub");
+    const selectOutcome = await service.selectProvider(
+      queryId,
+      "e2e_worker_pub",
+    );
     expect(selectOutcome.ok).toBe(true);
-    expect(service.getQuery(queryId)!.status).toBe("worker_selected");
+    expect(service.getQuery(queryId)!.status).toBe("provider_selected");
 
-    // 2d. Worker acknowledges selection (worker_selected → processing)
+    // 2d. Worker acknowledges selection (provider_selected → processing)
     const beginOutcome = service.beginWork(queryId);
     expect(beginOutcome.ok).toBe(true);
     expect(service.getQuery(queryId)!.status).toBe("processing");
@@ -217,7 +220,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -234,11 +237,11 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       },
     );
     service.recordOffer(query.id, {
-      worker_pubkey: "w1",
+      provider_pubkey: "w1",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
 
     // Submit result — oracle rejects
@@ -264,7 +267,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_requester_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 

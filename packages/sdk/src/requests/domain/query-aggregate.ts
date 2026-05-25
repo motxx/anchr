@@ -1,6 +1,7 @@
 import type {
   BlossomKeyMap,
   BountyInfo,
+  CustomerMeta,
   EscrowInfo,
   OfferInfo,
   OracleAttestationRecord,
@@ -10,7 +11,6 @@ import type {
   QueryResult,
   QueryStatus,
   QuorumConfig,
-  RequesterMeta,
   SubmissionMeta,
   VerificationDetail,
 } from "./types.ts";
@@ -38,7 +38,7 @@ export type TransitionResult =
 
 export interface CreateQueryAggregateOptions {
   ttlMs: number;
-  requesterMeta?: RequesterMeta;
+  customerMeta?: CustomerMeta;
   bounty?: BountyInfo;
   oracleIds?: string[];
   escrow?: EscrowInfo;
@@ -86,7 +86,7 @@ export function createQueryAggregate(
     verification_requirements: requirements,
     created_at: now,
     expires_at: now + options.ttlMs,
-    requester_meta: options.requesterMeta,
+    customer_meta: options.customerMeta,
     bounty: options.bounty,
     oracle_ids: options.oracleIds,
     payment_status: isEscrow ? "escrow_locked" : "locked",
@@ -181,7 +181,7 @@ export function cancelQuery(query: Query): TransitionResult {
 
 // --- Escrow path ---
 
-/** Record a worker offer for an escrow query. */
+/** Record a provider offer for an escrow query. */
 export function addOffer(query: Query, offer: OfferInfo): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
@@ -200,27 +200,27 @@ export function addOffer(query: Query, offer: OfferInfo): TransitionResult {
 }
 
 /**
- * Fields that worker selection can mutate. Constrained to runtime-only
+ * Fields that provider selection can mutate. Constrained to runtime-only
  * fields (token, verified amount, opaque ref) so callers can't switch the
  * escrow type or hashlock mid-flight.
  */
 export type EscrowSelectionUpdates = Partial<
   Pick<
     EscrowInfo,
-    "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "worker_pubkey"
+    "escrow_token" | "verified_escrow_sats" | "escrow_ref" | "provider_pubkey"
   >
 >;
 
-/** Select a worker and transition awaiting_offers → worker_selected. */
-export function selectWorker(
+/** Select a provider and transition awaiting_offers → provider_selected. */
+export function selectProvider(
   query: Query,
-  workerPubkey: string,
+  providerPubkey: string,
   escrowUpdates: EscrowSelectionUpdates,
 ): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
   }
-  if (!isValidTransition(query.status, "worker_selected", true)) {
+  if (!isValidTransition(query.status, "provider_selected", true)) {
     return {
       ok: false,
       error: `Query is ${query.status}, not awaiting_offers`,
@@ -229,7 +229,7 @@ export function selectWorker(
 
   const escrow: EscrowInfo = {
     ...query.escrow,
-    worker_pubkey: workerPubkey,
+    provider_pubkey: providerPubkey,
     ...escrowUpdates,
   };
 
@@ -237,7 +237,7 @@ export function selectWorker(
     ok: true,
     query: {
       ...query,
-      status: "worker_selected",
+      status: "provider_selected",
       escrow,
       payment_status: escrowUpdates.escrow_token
         ? "escrow_swapped"
@@ -246,7 +246,7 @@ export function selectWorker(
   };
 }
 
-/** Worker acknowledges selection and begins work (worker_selected → processing). */
+/** Provider acknowledges selection and begins work (provider_selected → processing). */
 export function beginWork(query: Query): TransitionResult {
   if (query.escrow === undefined) {
     return { ok: false, error: "Not an escrow query" };
@@ -254,7 +254,7 @@ export function beginWork(query: Query): TransitionResult {
   if (!isValidTransition(query.status, "processing", true)) {
     return {
       ok: false,
-      error: `Query is ${query.status}, not worker_selected`,
+      error: `Query is ${query.status}, not provider_selected`,
     };
   }
   return {
@@ -263,11 +263,11 @@ export function beginWork(query: Query): TransitionResult {
   };
 }
 
-/** Record a worker's result submission (processing → verifying). */
+/** Record a provider's result submission (processing → verifying). */
 export function recordResult(
   query: Query,
   result: QueryResult,
-  workerPubkey: string,
+  providerPubkey: string,
   blossomKeys?: BlossomKeyMap,
   clock: Clock = realDomainServices.clock,
 ): TransitionResult {
@@ -278,9 +278,13 @@ export function recordResult(
     return { ok: false, error: `Query is ${query.status}, not processing` };
   }
   if (
-    query.escrow.worker_pubkey && query.escrow.worker_pubkey !== workerPubkey
+    query.escrow.provider_pubkey &&
+    query.escrow.provider_pubkey !== providerPubkey
   ) {
-    return { ok: false, error: "Worker pubkey does not match selected worker" };
+    return {
+      ok: false,
+      error: "Provider pubkey does not match selected provider",
+    };
   }
 
   return {
