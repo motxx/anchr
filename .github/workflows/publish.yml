@@ -45,6 +45,9 @@ jobs:
       - name: Package dry-run
         run: deno task publish:dry-run
 
+      - name: Install SDK npm dependencies
+        run: cd packages/sdk && bun install --frozen-lockfile
+
       - name: SDK npm build
         run: cd packages/sdk && bun run build
 
@@ -97,6 +100,9 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+
+      - name: Install SDK npm dependencies
+        run: cd packages/sdk && bun install --frozen-lockfile
 
       - name: Build SDK
         run: cd packages/sdk && bun run build

@@ -16,10 +16,14 @@
     "jsr:@std/yaml@*": "1.1.0",
     "npm:@anthropic-ai/sdk@0.78": "0.78.0",
     "npm:@cashu/cashu-ts@3": "3.6.2",
+    "npm:@logtape/logtape@^2.1.1": "2.1.1",
     "npm:@noble/curves@2": "2.0.1",
+    "npm:@noble/hashes@^2.2.0": "2.2.0",
     "npm:@tailwindcss/cli@*": "4.2.2",
     "npm:@tailwindcss/cli@4.2.2": "4.2.2",
-    "npm:nostr-tools@2": "2.23.3_typescript@5.9.3",
+    "npm:hono@^4.12.23": "4.12.23",
+    "npm:nostr-tools@2": "2.23.5_typescript@5.9.3",
+    "npm:nostr-tools@^2.23.5": "2.23.5_typescript@5.9.3",
     "npm:playwright@^1.58.0": "1.59.1",
     "npm:puppeteer@24": "24.40.0_typescript@5.9.3",
     "npm:typescript@^5.9.3": "5.9.3"
@@ -100,7 +104,7 @@
       "integrity": "sha512-wdlX1rIFC+cdr+qVnVl2ko6ShKeNSJCGnQFQ1NyeS+EwZ8e0t6BQXF5uLgGnA8DB44RkfCgiH2Iw5RHTDkb6YQ==",
       "dependencies": [
         "@noble/curves",
-        "@noble/hashes",
+        "@noble/hashes@2.2.0",
         "@scure/base",
         "@scure/bip32"
       ]
@@ -132,17 +136,23 @@
         "@jridgewell/sourcemap-codec"
       ]
     },
+    "@logtape/logtape@2.1.1": {
+      "integrity": "sha512-aULbCqUQGerfOsZ3CMvcKtueKzmdchluXYUd3bIHKmOIS93fx1ko0+hyRQ4flloGZ8EiyRPydZXiy8n1J/eAQA=="
+    },
     "@noble/ciphers@2.1.1": {
       "integrity": "sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw=="
     },
     "@noble/curves@2.0.1": {
       "integrity": "sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==",
       "dependencies": [
-        "@noble/hashes"
+        "@noble/hashes@2.0.1"
       ]
     },
     "@noble/hashes@2.0.1": {
       "integrity": "sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw=="
+    },
+    "@noble/hashes@2.2.0": {
+      "integrity": "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="
     },
     "@parcel/watcher-android-arm64@2.5.6": {
       "integrity": "sha512-YQxSS34tPF/6ZG7r/Ih9xy+kP/WwediEUsqmtf0cuCV5TPPKw/PQHRhueUo6JdeFJaqV3pyjm0GdYjZotbRt/A==",
@@ -254,14 +264,14 @@
       "integrity": "sha512-4Md1NI5BzoVP+bhyJaY3K6yMesEFzNS1sE/cP+9nuvE7p/b0kx9XbpDHHFl8dHtufcbdHRUUQdRqLIPHN/s7yA==",
       "dependencies": [
         "@noble/curves",
-        "@noble/hashes",
+        "@noble/hashes@2.0.1",
         "@scure/base"
       ]
     },
     "@scure/bip39@2.0.1": {
       "integrity": "sha512-PsxdFj/d2AcJcZDX1FXN3dDgitDDTmwf78rKZq1a6c1P1Nan1X/Sxc7667zU3U+AN60g7SxxP0YCVw2H/hBycg==",
       "dependencies": [
-        "@noble/hashes",
+        "@noble/hashes@2.0.1",
         "@scure/base"
       ]
     },
@@ -445,7 +455,8 @@
       ]
     },
     "basic-ftp@5.2.0": {
-      "integrity": "sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw=="
+      "integrity": "sha512-VoMINM2rqJwJgfdHq6RiUudKt2BV+FY5ZFezP/ypmwayk68+NzzAQy4XXLlqsGD4MCzq3DrmNFD/uUmBJuGoXw==",
+      "deprecated": true
     },
     "buffer-crc32@0.2.13": {
       "integrity": "sha512-VO9Ht/+p3SN7SKWqcrgEzjGbRSJYTx+Q1pTQC0wrWqHx0vpJraQ6GtHx8tvcg1rlK1byhU5gccxgOgj7B0TDkQ=="
@@ -616,6 +627,9 @@
     "graceful-fs@4.2.11": {
       "integrity": "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="
     },
+    "hono@4.12.23": {
+      "integrity": "sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA=="
+    },
     "http-proxy-agent@7.0.2": {
       "integrity": "sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==",
       "dependencies": [
@@ -780,12 +794,12 @@
     "node-addon-api@7.1.1": {
       "integrity": "sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ=="
     },
-    "nostr-tools@2.23.3_typescript@5.9.3": {
-      "integrity": "sha512-AALyt9k8xPdF4UV2mlLJ2mgCn4kpTB0DZ8t2r6wjdUh6anfx2cTVBsHUlo9U0EY/cKC5wcNyiMAmRJV5OVEalA==",
+    "nostr-tools@2.23.5_typescript@5.9.3": {
+      "integrity": "sha512-Fa7ZlUdjfUW1P4E7H3yBexhOHYi18XNyvd2n7eNHkYR085xADX6Y8V8Vm7nT/XQajaFOBrptXmVIGkJ2E4vfVw==",
       "dependencies": [
         "@noble/ciphers",
         "@noble/curves",
-        "@noble/hashes",
+        "@noble/hashes@2.0.1",
         "@scure/base",
         "@scure/bip32",
         "@scure/bip39",
@@ -1105,6 +1119,12 @@
         ],
         "packageJson": {
           "dependencies": [
+            "npm:@anthropic-ai/sdk@0.78",
+            "npm:@cashu/cashu-ts@3",
+            "npm:@logtape/logtape@^2.1.1",
+            "npm:@noble/hashes@^2.2.0",
+            "npm:hono@^4.12.23",
+            "npm:nostr-tools@^2.23.5",
             "npm:typescript@^5.9.3"
           ]
         }

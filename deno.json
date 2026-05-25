@@ -96,7 +96,8 @@
   },
   "exclude": [
     "node_modules",
-    "dist/"
+    "dist/",
+    "packages/sdk/dist/"
   ],
   "lint": {
     "rules": {
@@ -117,6 +118,7 @@
     },
     "exclude": [
       "dist/",
+      "packages/sdk/dist/",
       "scripts/"
     ]
   },
