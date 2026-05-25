@@ -1,6 +1,6 @@
 #!/bin/bash
 # Deploy all Anchr services to fly.io
-# Usage: ./scripts/deploy.sh [all|app|verifier|worker]
+# Usage: ./scripts/deploy.sh [all|app|verifier|provider]
 
 set -e
 TARGET=${1:-all}
@@ -19,22 +19,22 @@ deploy_app() {
   fly deploy --config fly.toml
 }
 
-deploy_worker() {
-  echo "=== Deploying Auto-Worker ==="
-  fly deploy --config fly.worker.toml
+deploy_provider() {
+  echo "=== Deploying Auto-Provider ==="
+  fly deploy --config fly.provider.toml
 }
 
 case "$TARGET" in
   all)
     deploy_verifier
     deploy_app
-    deploy_worker
+    deploy_provider
     ;;
   verifier)  deploy_verifier ;;
   app)       deploy_app ;;
-  worker)    deploy_worker ;;
+  provider)  deploy_provider ;;
   *)
-    echo "Usage: $0 [all|app|verifier|worker]"
+    echo "Usage: $0 [all|app|verifier|provider]"
     exit 1
     ;;
 esac
@@ -42,4 +42,4 @@ esac
 echo "=== Deploy complete ==="
 echo "Anchr App:      https://anchr-app.fly.dev"
 echo "Verifier:       https://anchr-tlsn-verifier.fly.dev"
-echo "Worker:         anchr-tlsn-worker (background process)"
+echo "Provider:       anchr-tlsn-provider (background process)"

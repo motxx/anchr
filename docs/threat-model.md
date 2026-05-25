@@ -26,12 +26,12 @@ can't silently weaken an invariant without a PR reviewer seeing the hash bump.
 
 ## Invariants
 
-### INV-01: Worker can't forge TLSN proofs
+### INV-01: Provider can't forge TLSN proofs
 
 **Status:** `enforced`
 
 **Claim:** The Oracle's TLSN verifier rejects any presentation whose transcript,
-notary signature, or MPC-TLS MAC chain is invalid. A Worker cannot produce a
+notary signature, or MPC-TLS MAC chain is invalid. A Provider cannot produce a
 presentation for an HTTPS response they did not actually observe.
 
 **Attack:** Generate a valid TLSN presentation, mutate a byte in the transcript
@@ -70,15 +70,15 @@ the Oracle's preimage store is not decremented.
 - `e2e/protocol/bounty-attacks.test.ts` — `preimage not leaked on rejected
   verification`.
 
-### INV-03: Requester can't unlock escrow before timeout
+### INV-03: Customer can't unlock escrow before timeout
 
 **Status:** `cross-referenced`
 
 **Claim:** Cashu HTLC proofs locked with `locktime > now` cannot be redeemed via
-the Requester's refund key. Only the Worker's key + valid preimage can redeem
+the Customer's refund key. Only the Provider's key + valid preimage can redeem
 before locktime. The Mint enforces this, not the application layer.
 
-**Attack:** Requester attempts to swap HTLC proofs back to themselves before
+**Attack:** Customer attempts to swap HTLC proofs back to themselves before
 `locktime` has elapsed, presenting only their refund key.
 
 **Expected:** Cashu Mint rejects the swap (returns `null` from `attemptRedeem`).
@@ -88,14 +88,14 @@ Funds remain locked until locktime expires.
 `// INV-03` comments:
 
 - `e2e/regtest-htlc-trustless.test.ts` —
-  `ATTACK: Requester refund key
+  `ATTACK: Customer refund key
   before locktime → Mint REJECTS`
 - `e2e/regtest-htlc-attacks.test.ts` —
-  `ATTACK: Requester redeems own
+  `ATTACK: Customer redeems own
   HTLC proofs before locktime — fails`
 
 Related (not INV-03 but same surface, kept for context):
-`LEGIT: Requester refund key after locktime → Mint ACCEPTS` demonstrates the
+`LEGIT: Customer refund key after locktime → Mint ACCEPTS` demonstrates the
 refund path works once locktime elapses.
 
 ### INV-04: Stolen preimage alone cannot redeem bound escrow
@@ -118,7 +118,7 @@ Provider signature, or for the Customer refund path after locktime.
 `// INV-04` comments:
 
 - `e2e/regtest/regtest-htlc-attacks.test.ts` —
-  `ATTACK: Requester redeems own HTLC proofs before locktime — fails`
+  `ATTACK: Customer redeems own HTLC proofs before locktime — fails`
 
 ## Settlement Decision Rules
 

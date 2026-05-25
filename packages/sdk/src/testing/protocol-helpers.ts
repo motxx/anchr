@@ -45,7 +45,7 @@ export interface EscrowInfoFixture {
 
 export interface ProcessingFixture extends EscrowInfoFixture {
   query: Query;
-  workerPub: string;
+  providerPub: string;
 }
 
 /** Mock EscrowProvider that decodes Cashu tokens for amount verification in tests. */
@@ -97,17 +97,17 @@ export function createMockEscrowProvider(): EscrowProvider {
           const pubkeyTag = tags?.find((t: string[]) => t[0] === "pubkeys");
           if (pubkeyTag) {
             const lockedKeys = pubkeyTag.slice(1);
-            const workerHex = provider_pubkey.startsWith("02") ||
+            const providerHex = provider_pubkey.startsWith("02") ||
                 provider_pubkey.startsWith("03")
               ? provider_pubkey
               : `02${provider_pubkey}`;
             if (
               !lockedKeys.includes(provider_pubkey) &&
-              !lockedKeys.includes(workerHex)
+              !lockedKeys.includes(providerHex)
             ) {
               return {
                 ok: false,
-                message: "HTLC token not locked to selected worker",
+                message: "HTLC token not locked to selected provider",
               };
             }
           }
@@ -195,7 +195,7 @@ export function makeEscrowInfo(
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     },
     entry,
@@ -207,13 +207,13 @@ export async function driveToProcessing(
   service: QueryService,
   preimageStore: PreimageStore,
   opts?: {
-    workerPubkey?: string;
+    providerPubkey?: string;
     bountyAmount?: number;
     oracleIds?: string[];
     quorum?: { min_approvals: number };
   },
 ): Promise<ProcessingFixture> {
-  const workerPub = opts?.workerPubkey ?? "worker_pub";
+  const providerPub = opts?.providerPubkey ?? "provider_pub";
   const bounty = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
   const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
@@ -227,14 +227,14 @@ export async function driveToProcessing(
     },
   );
   service.recordOffer(query.id, {
-    provider_pubkey: workerPub,
+    provider_pubkey: providerPub,
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
   const token = makeFakeToken(bounty);
-  await service.selectProvider(query.id, workerPub, token);
+  await service.selectProvider(query.id, providerPub, token);
   service.beginWork(query.id);
-  return { query, entry, workerPub, escrowInfo };
+  return { query, entry, providerPub, escrowInfo };
 }
 
 /**
@@ -273,7 +273,7 @@ export async function driveQuorumToProcessing(
   oracleIds: string[],
   minApprovals: number,
 ): Promise<ProcessingFixture> {
-  const workerPub = "worker_pub";
+  const providerPub = "provider_pub";
   const bounty = 100;
   const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
   const query = service.createQuery(
@@ -286,11 +286,11 @@ export async function driveQuorumToProcessing(
     },
   );
   service.recordOffer(query.id, {
-    provider_pubkey: workerPub,
+    provider_pubkey: providerPub,
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
-  await service.selectProvider(query.id, workerPub, makeFakeToken(bounty));
+  await service.selectProvider(query.id, providerPub, makeFakeToken(bounty));
   service.beginWork(query.id);
-  return { query, entry, workerPub, escrowInfo };
+  return { query, entry, providerPub, escrowInfo };
 }

@@ -18,7 +18,7 @@ import * as mod from "./lint-invariants.ts";
 
 test("INV-NN heading regex matches only proper declarations", () => {
   const cases: Array<[string, boolean]> = [
-    ["### INV-01: Worker can't forge", true],
+    ["### INV-01: Provider can't forge", true],
     ["### INV-99: Some future invariant", true],
     ["## INV-01: wrong heading level", false],
     ["#### INV-01: too deep", false],
@@ -55,7 +55,7 @@ test("test() string regex finds INV-NN test annotations", () => {
 test("// INV-NN metadata comment regex matches line comments only", () => {
   const re = /\/\/\s*(INV-\d+)\b/g;
   const samples = [
-    `  // INV-03: Requester refund key before locktime`,
+    `  // INV-03: Customer refund key before locktime`,
     `//INV-02`,
     `/* INV-01 */`, // block comment — still matches /* then // fails; documented behavior
     `const s = "http://INV-99/url";`, // false positive guard: \b ensures INV-99 is a word boundary

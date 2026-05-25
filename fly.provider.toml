@@ -1,4 +1,4 @@
-app = "anchr-tlsn-worker"
+app = "anchr-tlsn-provider"
 primary_region = "nrt"
 
 [build]
@@ -11,9 +11,9 @@ primary_region = "nrt"
   TLSN_SOCKS_PROXY = "socks5://127.0.0.1:9050"
 
 [processes]
-  worker = "bun run packages/sdk/src/cli.ts"
+  provider = "bun run packages/sdk/src/cli.ts"
 
-# Worker is a background process — no HTTP service needed
+# Provider is a background process — no HTTP service needed
 # Uses fly.io private network (.internal) to reach verifier
 
 [[vm]]

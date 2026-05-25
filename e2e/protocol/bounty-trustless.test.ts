@@ -37,15 +37,15 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
   test("HTLC P2PK options require Provider's signature, not Oracle's", () => {
     const opts = buildHtlcFinalOptions({
       hash: "a".repeat(64),
-      providerPubkey: "worker_key_" + "0".repeat(53),
-      customerRefundPubkey: "requester_key_" + "0".repeat(50),
+      providerPubkey: "provider_key_" + "0".repeat(51),
+      customerRefundPubkey: "customer_key_" + "0".repeat(51),
       locktimeSeconds: 1700000000,
     });
 
     // P2PK lock is on Provider's pubkey — Oracle pubkey is NOT in the lock set
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys.length).toBe(1);
-    expect(pubkeys[0]).toContain("worker_key_");
+    expect(pubkeys[0]).toContain("provider_key_");
     // No oracle pubkey in lock keys
     for (const pk of pubkeys) {
       expect(pk).not.toContain("oracle");
@@ -70,7 +70,7 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
 
   test("preimage is NOT returned to Oracle — only to Provider via submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -79,7 +79,7 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "valid proof" },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
 
@@ -102,7 +102,7 @@ describe("NUT-14: Provider cannot redeem without valid proof", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
       { oracleIds: ["strict-oracle"] },
@@ -111,7 +111,7 @@ describe("NUT-14: Provider cannot redeem without valid proof", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "bad proof" },
-      workerPub,
+      providerPub,
       "strict-oracle",
     );
 
@@ -294,7 +294,7 @@ describe("NUT-11: Timeout refund", () => {
 describe("Provider impersonation prevention", () => {
   test("wrong Provider cannot submit result for selected Provider", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(
+    const { query, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -302,7 +302,7 @@ describe("Provider impersonation prevention", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "impostor" },
-      "impostor_worker",
+      "impostor_provider",
       "test-oracle",
     );
 
@@ -321,7 +321,7 @@ describe("Provider impersonation prevention", () => {
       { escrow: escrowInfo },
     );
     service.recordOffer(query.id, {
-      provider_pubkey: "legit_worker",
+      provider_pubkey: "legit_provider",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -329,12 +329,12 @@ describe("Provider impersonation prevention", () => {
     // Select a provider who never offered — should still succeed at protocol level
     // (provider selection is Customer's choice from available offers)
     // The real protection is P2PK: only the selected Provider's key can redeem
-    const outcome = await service.selectProvider(query.id, "other_worker");
+    const outcome = await service.selectProvider(query.id, "other_provider");
     expect(outcome.ok).toBe(true);
-    // But HTLC token is now locked to other_worker ��� legit_worker can't redeem
+    // But HTLC token is now locked to other_provider; legit_provider cannot redeem
     expect(service.getQuery(query.id)?.status).toBe("provider_selected");
     expect(service.getQuery(query.id)?.escrow?.provider_pubkey).toBe(
-      "other_worker",
+      "other_provider",
     );
   });
 });
@@ -347,7 +347,7 @@ describe("Oracle + Customer collusion limits", () => {
   test("Oracle withholding preimage: Provider loses but Oracle cannot profit", async () => {
     // Simulate: Oracle verifies valid proof but preimage store has been cleared
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -358,7 +358,7 @@ describe("Oracle + Customer collusion limits", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "valid proof" },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
 
@@ -454,7 +454,7 @@ describe("Preimage reveal conditions", () => {
     const passOutcome = await pass.service.submitEscrowResult(
       passCtx.query.id,
       { attachments: [] },
-      passCtx.workerPub,
+      passCtx.providerPub,
       "test-oracle",
     );
     expect(passOutcome.preimage).toBe(passCtx.entry.preimage);
@@ -469,7 +469,7 @@ describe("Preimage reveal conditions", () => {
     const failOutcome = await fail.service.submitEscrowResult(
       failCtx.query.id,
       { attachments: [] },
-      failCtx.workerPub,
+      failCtx.providerPub,
       "fail-oracle",
     );
     expect(failOutcome.preimage).toBeUndefined();
@@ -544,7 +544,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
 
   test("cannot submit result twice", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(
+    const { query, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -552,7 +552,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(first.ok).toBe(true);
@@ -560,7 +560,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -608,14 +608,14 @@ describe("Two-phase HTLC: Phase 1 (plain) vs Phase 2 (locked)", () => {
 
   test("Phase 2 includes all HTLC conditions", () => {
     const HASH = "e".repeat(64);
-    const WORKER = "w" + "0".repeat(63);
-    const REQUESTER = "r" + "0".repeat(63);
+    const PROVIDER = "w" + "0".repeat(63);
+    const CUSTOMER = "r" + "0".repeat(63);
     const LOCKTIME = 1700000000;
 
     const opts = buildHtlcFinalOptions({
       hash: HASH,
-      providerPubkey: WORKER,
-      customerRefundPubkey: REQUESTER,
+      providerPubkey: PROVIDER,
+      customerRefundPubkey: CUSTOMER,
       locktimeSeconds: LOCKTIME,
     });
 
@@ -624,12 +624,12 @@ describe("Two-phase HTLC: Phase 1 (plain) vs Phase 2 (locked)", () => {
     expect(opts.sigFlag).toBe("SIG_ALL");
 
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
-    expect(pubkeys).toContain(`02${WORKER}`);
+    expect(pubkeys).toContain(`02${PROVIDER}`);
 
     const refundKeys = Array.isArray(opts.refundKeys)
       ? opts.refundKeys
       : [opts.refundKeys];
-    expect(refundKeys).toContain(`02${REQUESTER}`);
+    expect(refundKeys).toContain(`02${CUSTOMER}`);
   });
 
   test("P2PK 2-of-2 escrow is distinct from HTLC (requires both Oracle + Provider signatures)", () => {

@@ -50,16 +50,16 @@ async function createHtlcProofs(
   sourceProofs: Proof[],
   amountSats: number,
   hash: string,
-  workerPubkey: string,
-  requesterPubkey: string,
+  providerPubkey: string,
+  customerPubkey: string,
   locktimeSeconds: number,
 ): Promise<Proof[]> {
   const p2pkOptions = new P2PKBuilder()
     .addHashlock(hash)
-    .addLockPubkey(workerPubkey)
+    .addLockPubkey(providerPubkey)
     .requireLockSignatures(1)
     .lockUntil(locktimeSeconds)
-    .addRefundPubkey(requesterPubkey)
+    .addRefundPubkey(customerPubkey)
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();
@@ -251,8 +251,8 @@ suite("e2e: Proof Manipulation Attacks", () => {
   const wallet = sharedWallet!;
 
   test("ATTACK: Modified proof amount — Mint rejects (blind sig mismatch)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -262,8 +262,8 @@ suite("e2e: Proof Manipulation Attacks", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -277,14 +277,14 @@ suite("e2e: Proof Manipulation Attacks", () => {
       wallet,
       tamperedProofs,
       preimage,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for modified amount
   });
 
   test("ATTACK: Swapped proof secrets between proof sets — Mint rejects", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
     // Create two separate HTLC proof sets
@@ -295,8 +295,8 @@ suite("e2e: Proof Manipulation Attacks", () => {
       source1,
       AMOUNT_SATS,
       hash1,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -307,8 +307,8 @@ suite("e2e: Proof Manipulation Attacks", () => {
       source2,
       AMOUNT_SATS,
       hash2,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -323,14 +323,14 @@ suite("e2e: Proof Manipulation Attacks", () => {
       wallet,
       swappedProofs,
       preimage1,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(result).toBeNull(); // Mint MUST reject — secret/C mismatch
   });
 
   test("ATTACK: Proof with empty secret — Mint rejects", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -340,8 +340,8 @@ suite("e2e: Proof Manipulation Attacks", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -355,7 +355,7 @@ suite("e2e: Proof Manipulation Attacks", () => {
       wallet,
       tamperedProofs,
       preimage,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(result).toBeNull(); // Mint MUST reject — empty secret is invalid
   });
@@ -369,8 +369,8 @@ suite("e2e: Redemption Timing Attacks", () => {
   const wallet = sharedWallet!;
 
   test("ATTACK: Redeem with both preimage AND refund key simultaneously", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -380,12 +380,12 @@ suite("e2e: Redemption Timing Attacks", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Send witness with BOTH preimage and signatures for the worker key
+    // Send witness with BOTH preimage and signatures for the provider key
     // The Mint should process this using the hashlock path (preimage present)
     // This tests that the Mint correctly handles combined witness fields
     const result = await attemptRedeemWithCustomWitness(
@@ -394,15 +394,15 @@ suite("e2e: Redemption Timing Attacks", () => {
       { preimage, signatures: [] },
     );
 
-    // The Mint should either accept (using preimage path, which needs worker sig)
+    // The Mint should either accept (using preimage path, which needs provider sig)
     // or reject. Either way, no double-spend should be possible.
-    // Since this has the preimage but no valid worker signature, it should reject.
+    // Since this has the preimage but no valid provider signature, it should reject.
     expect(result).toBeNull();
   });
 
-  test("Worker redeems with expired locktime — succeeds (locktime only affects refund path)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("Provider redeems with expired locktime — succeeds (locktime only affects refund path)", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     // Locktime in the past: already expired
     const locktime = Math.floor(Date.now() / 1000) - 60;
@@ -413,12 +413,12 @@ suite("e2e: Redemption Timing Attacks", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker redeems with preimage + correct key after locktime expired
+    // Provider redeems with preimage + correct key after locktime expired
     // Per NUT-14: locktime expiry opens the REFUND path, but the PREIMAGE
     // path should remain valid regardless of locktime.
     const proofsWithPreimage = htlcProofs.map((p) => ({
@@ -430,11 +430,11 @@ suite("e2e: Redemption Timing Attacks", () => {
     await throttleMintOp();
     const { send: result } = await retryOnRateLimit(() =>
       wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
-        worker.secretKey,
+        provider.secretKey,
       ).run()
     );
 
-    // Worker SHOULD succeed — preimage path is independent of locktime
+    // Provider SHOULD succeed — preimage path is independent of locktime
     expect(result).not.toBeNull();
     expect(result.length).toBeGreaterThan(0);
   });
@@ -447,26 +447,26 @@ suite("e2e: Redemption Timing Attacks", () => {
 suite("e2e: Multi-Party Attacks", () => {
   const wallet = sharedWallet!;
 
-  test("ATTACK: Two workers race to redeem same proofs — second fails (double-spend)", async () => {
-    const worker1 = generateKeypair();
-    const worker2 = generateKeypair();
-    const requester = generateKeypair();
+  test("ATTACK: Two providers race to redeem same proofs — second fails (double-spend)", async () => {
+    const provider1 = generateKeypair();
+    const provider2 = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
-    // Lock proofs to worker1's key
+    // Lock proofs to provider1's key
     const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
     const htlcProofs = await createHtlcProofs(
       wallet,
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker1.publicKey,
-      requester.publicKey,
+      provider1.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker 1 redeems successfully
+    // Provider 1 redeems successfully
     const proofsWithPreimage = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify({ preimage, signatures: [] }),
@@ -476,28 +476,28 @@ suite("e2e: Multi-Party Attacks", () => {
     await throttleMintOp();
     const { send: first } = await retryOnRateLimit(() =>
       wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
-        worker1.secretKey,
+        provider1.secretKey,
       ).run()
     );
     expect(first).not.toBeNull();
     expect(first.length).toBeGreaterThan(0);
 
-    // Worker 2 tries to redeem the same proofs with preimage (different key)
-    // Even if Worker 2 had the preimage, proofs are already spent
+    // Provider 2 tries to redeem the same proofs with preimage (different key)
+    // Even if Provider 2 had the preimage, proofs are already spent
     const second = await attemptRedeem(
       wallet,
       htlcProofs,
       preimage,
-      worker2.secretKey,
+      provider2.secretKey,
     );
     expect(second).toBeNull(); // Mint MUST reject — proofs already spent
   });
 
-  // INV-03: Requester can't unlock escrow before timeout
+  // INV-03: Customer can't unlock escrow before timeout
   // INV-04: Stolen preimage alone cannot redeem bound escrow
-  test("ATTACK: Requester redeems own HTLC proofs before locktime — fails", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("ATTACK: Customer redeems own HTLC proofs before locktime — fails", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     // Locktime 1 hour in the future — refund path is NOT available
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -508,20 +508,20 @@ suite("e2e: Multi-Party Attacks", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Requester has the refund key AND the preimage.
-    // Tries to redeem with requester key + preimage (NOT the worker key).
-    // The hashlock path requires the WORKER's key, not the requester's.
+    // Customer has the refund key AND the preimage.
+    // Tries to redeem with customer key + preimage (NOT the provider key).
+    // The hashlock path requires the Provider's key, not the Customer's.
     const result = await attemptRedeem(
       wallet,
       htlcProofs,
       preimage,
-      requester.secretKey,
+      customer.secretKey,
     );
-    expect(result).toBeNull(); // Mint MUST reject — requester key is not the lock key
+    expect(result).toBeNull(); // Mint MUST reject — customer key is not the lock key
   });
 });

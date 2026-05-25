@@ -2,7 +2,7 @@
  * Protocol-level tests for quorum (t-of-n) independent Oracle verification.
  *
  * Tests the security properties of the threshold Oracle model where only
- * neutral, independent Oracle operators are verifiers. Requester and Worker
+ * neutral, independent Oracle operators are verifiers. Customer and Provider
  * are NOT signers — they are transaction parties only.
  *
  * Test categories:
@@ -42,7 +42,7 @@ describe("Quorum: threshold enforcement", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -64,7 +64,7 @@ describe("Quorum: threshold enforcement", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -89,7 +89,7 @@ describe("Quorum: threshold enforcement", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -114,7 +114,7 @@ describe("Quorum: threshold enforcement", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
   });
@@ -139,7 +139,7 @@ describe("Quorum: threshold enforcement", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -170,7 +170,7 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
@@ -196,7 +196,7 @@ describe("Quorum: single malicious Oracle cannot decide alone", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -230,7 +230,7 @@ describe("Quorum: collusion resistance", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     // 2 colluders meet threshold — this is expected.
     // Security depends on independent Oracle operation, not protocol alone.
@@ -259,7 +259,7 @@ describe("Quorum: collusion resistance", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -284,7 +284,7 @@ describe("Quorum: Oracle availability", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
   });
@@ -302,7 +302,7 @@ describe("Quorum: Oracle availability", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(false);
   });
@@ -320,7 +320,7 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     expect(outcome.ok).toBe(true);
     expect(outcome.preimage).toBeDefined();
@@ -344,7 +344,7 @@ describe("Quorum: no quorum config → single Oracle path", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      "worker_pub",
+      "provider_pub",
     );
     // 2-of-3 pass (anchr + oracle-a) → approved
     expect(outcome.ok).toBe(true);

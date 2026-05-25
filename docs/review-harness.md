@@ -62,7 +62,7 @@ completion bar:
 - A non-secret environment section or template. Placeholders are fine; private
   keys, source ecash proofs, bearer tokens, or production credentials are not.
 - A command sequence for both sides of the demonstrated flow, using the
-  example's actual Customer/Provider or requester/worker vocabulary.
+  example's actual Customer/Provider or customer/provider vocabulary.
 - `deno task smoke` from the example directory. The smoke task must be
   deterministic and safe for local review: it can type-check scripts, run
   fixture-backed tests, and parse config, but it must not require funded tokens,

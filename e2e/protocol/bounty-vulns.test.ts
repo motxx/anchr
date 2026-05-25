@@ -19,7 +19,7 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -64,7 +64,7 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
           type: "htlc",
           hash: entry.hash,
           oracle_pubkeys: ["oracle_pub"],
-          customer_pubkey: "requester_pub",
+          customer_pubkey: "customer_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
         bounty: { amount_sats: 100 },
@@ -92,10 +92,10 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
   });
 });
 
-describe("CTF-1: Worker forces dishonest oracle selection", () => {
-  test("BLOCKED: worker-supplied oracle_id is ignored when query has no oracle_ids", async () => {
+describe("CTF-1: Provider forces dishonest oracle selection", () => {
+  test("BLOCKED: provider-supplied oracle_id is ignored when query has no oracle_ids", async () => {
     // Registry contains built-in (rejects) AND evil oracle (always passes); the
-    // attack is to see whether worker-supplied oracle_id can override built-in selection
+    // attack is to see whether provider-supplied oracle_id can override built-in selection
     const store = createQueryStore();
     const registry = createOracleRegistry();
     const evilOracle = makeMockOracle("evil-oracle", () => true);
@@ -142,7 +142,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     expect(outcome.query?.assigned_oracle_id).toBe("built-in");
   });
 
-  test("ALLOWED: worker-supplied oracle_id is used when query explicitly allows it", async () => {
+  test("ALLOWED: provider-supplied oracle_id is used when query explicitly allows it", async () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     const oracle1 = makeMockOracle("oracle-a", () => true);
@@ -192,7 +192,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
     expect(outcome.query?.assigned_oracle_id).toBe("oracle-b");
   });
 
-  test("BLOCKED: worker cannot use unregistered oracle even via oracle_id param", async () => {
+  test("BLOCKED: provider cannot use unregistered oracle even via oracle_id param", async () => {
     const store = createQueryStore();
     const registry = createOracleRegistry({ skipBuiltIn: true });
     registry.register(makeMockOracle("legit-oracle"));
@@ -239,7 +239,7 @@ describe("CTF-1: Worker forces dishonest oracle selection", () => {
   });
 });
 
-describe("CTF-2: Requester submits self-locked HTLC token", () => {
+describe("CTF-2: Customer submits self-locked HTLC token", () => {
   function makeHtlcToken(
     amountSats: number,
     hash: string,
@@ -264,7 +264,7 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
     });
   }
 
-  test("BLOCKED: token locked to requester (not worker) is rejected", async () => {
+  test("BLOCKED: token locked to customer (not provider) is rejected", async () => {
     const { service, preimageStore } = makeExploitService();
     const entry = preimageStore.create();
 
@@ -282,28 +282,28 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       },
     );
     service.recordOffer(query.id, {
-      provider_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02provider_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
-    // Self-locked HTLC: token locked to requester pubkey, not the selected worker
+    // Self-locked HTLC: token locked to customer pubkey, not the selected provider
     const selfLockedToken = makeHtlcToken(
       100,
       entry.hash,
-      "02requester_hex_pubkey",
+      "02customer_hex_pubkey",
     );
 
     const result = await service.selectProvider(
       query.id,
-      "02worker_hex_pubkey",
+      "02provider_hex_pubkey",
       selfLockedToken,
     );
     expect(result.ok).toBe(false);
-    expect(result.message).toContain("not locked to selected worker");
+    expect(result.message).toContain("not locked to selected provider");
   });
 
-  test("ALLOWED: token locked to worker passes verification", async () => {
+  test("ALLOWED: token locked to provider passes verification", async () => {
     const { service, preimageStore } = makeExploitService();
     const entry = preimageStore.create();
 
@@ -321,21 +321,21 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       },
     );
     service.recordOffer(query.id, {
-      provider_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02provider_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
 
-    const workerLockedToken = makeHtlcToken(
+    const providerLockedToken = makeHtlcToken(
       100,
       entry.hash,
-      "02worker_hex_pubkey",
+      "02provider_hex_pubkey",
     );
 
     const result = await service.selectProvider(
       query.id,
-      "02worker_hex_pubkey",
-      workerLockedToken,
+      "02provider_hex_pubkey",
+      providerLockedToken,
     );
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Provider selected");
@@ -359,7 +359,7 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
       },
     );
     service.recordOffer(query.id, {
-      provider_pubkey: "02worker_hex_pubkey",
+      provider_pubkey: "02provider_hex_pubkey",
       offer_event_id: "e1",
       received_at: Date.now(),
     });
@@ -367,12 +367,12 @@ describe("CTF-2: Requester submits self-locked HTLC token", () => {
     const wrongHashToken = makeHtlcToken(
       100,
       "deadbeef_wrong_hash",
-      "02worker_hex_pubkey",
+      "02provider_hex_pubkey",
     );
 
     const result = await service.selectProvider(
       query.id,
-      "02worker_hex_pubkey",
+      "02provider_hex_pubkey",
       wrongHashToken,
     );
     expect(result.ok).toBe(false);

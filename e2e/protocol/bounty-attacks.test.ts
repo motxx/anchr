@@ -20,7 +20,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -55,7 +55,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash, // REUSED hash
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -91,7 +91,7 @@ describe("Attack: Preimage Isolation", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
       { oracleIds: ["strict-oracle"] },
@@ -100,7 +100,7 @@ describe("Attack: Preimage Isolation", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "garbage" },
-      workerPub,
+      providerPub,
       "strict-oracle",
     );
 
@@ -112,7 +112,7 @@ describe("Attack: Preimage Isolation", () => {
 
   test("deleted preimage cannot be re-requested via second submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -120,7 +120,7 @@ describe("Attack: Preimage Isolation", () => {
     const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(first.ok).toBe(true);
@@ -130,7 +130,7 @@ describe("Attack: Preimage Isolation", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -168,7 +168,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -201,7 +201,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -230,9 +230,9 @@ describe("Attack: Race Conditions & Timing", () => {
     expect(outcome.preimage).toBeUndefined();
   });
 
-  test("double-submit by worker — second attempt fails, first preimage valid", async () => {
+  test("double-submit by provider — second attempt fails, first preimage valid", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -240,7 +240,7 @@ describe("Attack: Race Conditions & Timing", () => {
     const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(first.ok).toBe(true);
@@ -249,7 +249,7 @@ describe("Attack: Race Conditions & Timing", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -263,7 +263,7 @@ describe("Attack: Oracle Manipulation", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("rubber-stamp", () => true),
     });
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
       { oracleIds: ["rubber-stamp"] },
@@ -272,7 +272,7 @@ describe("Attack: Oracle Manipulation", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "" },
-      workerPub,
+      providerPub,
       "rubber-stamp",
     );
 
@@ -396,7 +396,7 @@ describe("Attack: Oracle Manipulation", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      customer_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -446,7 +446,7 @@ describe("Attack: State Machine — illegal transitions", () => {
 
   test("revert approved to processing: submit another result after approval", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(
+    const { query, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -454,7 +454,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     const approval = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(approval.ok).toBe(true);
@@ -463,7 +463,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -496,7 +496,7 @@ describe("Attack: State Machine — illegal transitions", () => {
 });
 
 describe("Attack: Cross-Query", () => {
-  test("worker accepted on query A tries to submit on query B — fails", async () => {
+  test("provider accepted on query A tries to submit on query B — fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
     const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(
@@ -511,11 +511,11 @@ describe("Attack: Cross-Query", () => {
       },
     );
     service.recordOffer(qA.id, {
-      provider_pubkey: "worker_a",
+      provider_pubkey: "provider_a",
       offer_event_id: "eA",
       received_at: Date.now(),
     });
-    await service.selectProvider(qA.id, "worker_a", makeFakeToken(100));
+    await service.selectProvider(qA.id, "provider_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
     const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(
@@ -530,17 +530,17 @@ describe("Attack: Cross-Query", () => {
       },
     );
     service.recordOffer(qB.id, {
-      provider_pubkey: "worker_b",
+      provider_pubkey: "provider_b",
       offer_event_id: "eB",
       received_at: Date.now(),
     });
-    await service.selectProvider(qB.id, "worker_b", makeFakeToken(100));
+    await service.selectProvider(qB.id, "provider_b", makeFakeToken(100));
     service.beginWork(qB.id);
 
     const outcome = await service.submitEscrowResult(
       qB.id,
       { attachments: [] },
-      "worker_a",
+      "provider_a",
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);

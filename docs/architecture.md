@@ -131,7 +131,7 @@ rule derived from this table follows
 Public protocol, docs, SDKs, and examples should use **Customer**,
 **Provider**, and **Oracle**.
 
-Older requester/worker terms may remain only where a current wire field already
+Older customer/provider terms may remain only where a current wire field already
 uses that spelling. Versioned protocol replacements should remove those names
 instead of retaining aliases. New SDK APIs, docs, and examples should not copy
 the old vocabulary.

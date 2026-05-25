@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -59,3 +60,51 @@ file with a clear justification when invariant wording changes.
   Customer/Provider terminology.
 - Regenerate or update threat-model lock hashes with a justification for the
   vocabulary-only invariant wording changes.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `docs/review-harness.md`
+- `docs/threat-model.md`
+- `docs/threat-model.lock.json`
+- `e2e/frost/frost-threshold.test.ts`
+- `e2e/protocol/bounty-attacks.test.ts`
+- `e2e/protocol/bounty-quorum.test.ts`
+- `e2e/protocol/bounty-trustless.test.ts`
+- `e2e/protocol/bounty-vulns.test.ts`
+- `e2e/regtest/core-flow.test.ts`
+- `e2e/regtest/regtest-htlc-attacks.test.ts`
+- `e2e/regtest/regtest-htlc-trustless.test.ts`
+- `packages/sdk/src/testing/protocol-helpers.ts`
+- `scripts/deploy.sh`
+- `scripts/lint-invariants.test.ts`
+- `fly.worker.toml` renamed to `fly.provider.toml`
+
+Verified with:
+
+- `rg -n "requester|Requester|worker|Worker" docs e2e scripts --glob '!docs/issues/**' --glob '!docs/archive/**'`
+- `rg --files README.md docs packages examples e2e scripts | rg 'requester|Requester|worker|Worker'`
+- `deno task check`
+- `deno task lint:invariants`
+- `deno task test:e2e:protocol`
+- `deno task test:unit`
+- `deno task lint:strict`
+- `deno task test:all`
+
+Harness update:
+
+- Updated `docs/threat-model.lock.json` for vocabulary-only invariant wording
+  changes and updated `scripts/lint-invariants.test.ts` fixtures to match the
+  new Customer/Provider wording.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- #0078 final active vocabulary sweep owns remaining active-surface
+  classification, including non-actor platform terms such as browser service
+  workers.
