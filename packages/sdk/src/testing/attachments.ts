@@ -1,4 +1,4 @@
-import type { AttachmentRef, QueryResult } from "../domain/types.ts";
+import type { AttachmentRef, QueryResult } from "../requests/domain/types.ts";
 
 type AttachmentLike = AttachmentRef | string;
 

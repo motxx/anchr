@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import { buildOracleApp } from "./server.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
-import { makeQuery as makeBaseQuery } from "../../requests/testing/factories.ts";
+import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 const API_KEY = "oracle-test-key";
 

@@ -23,7 +23,7 @@ import type {
   VerificationRequirement,
 } from "../../requests/domain/types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
-import { makeQuery } from "../../requests/testing/factories.ts";
+import { makeQuery } from "../../testing/factories.ts";
 
 const now = Math.floor(Date.now() / 1000);
 

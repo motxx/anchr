@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-25
 
 ## Priority
 
@@ -81,3 +82,45 @@ Relevant files:
 - Keep `packages/sdk/src/testing/mod.ts` as the public barrel for
   `@anchr/sdk/testing`.
 - Run focused grep checks before the standard unit and lint verification.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/testing/attachments.ts`
+- `packages/sdk/src/testing/factories.ts`
+- `packages/sdk/src/testing/oracle-registry.ts`
+- `packages/sdk/src/testing/protocol-helpers.ts`
+- `packages/sdk/src/testing/mod.ts`
+- `packages/sdk/src/requests/application/proof-delivery.test.ts`
+- `packages/sdk/src/requests/application/query-service-defaults.test.ts`
+- `packages/sdk/src/requests/application/query-service-lifecycle.test.ts`
+- `packages/sdk/src/requests/application/query-service.test.ts`
+- `packages/sdk/src/requests/domain/query-aggregate.test.ts`
+- `packages/sdk/src/requests/domain/query-repository.test.ts`
+- `packages/sdk/src/adapters/oracle-client/http-oracle.test.ts`
+- `packages/sdk/src/adapters/oracle-service/server.test.ts`
+- `packages/sdk/src/proofs/verification/verifier-standalone.test.ts`
+- `packages/sdk/src/proofs/verification/verifier.test.ts`
+
+Verified with:
+
+- `test ! -d packages/sdk/src/requests/testing`
+- `rg -n "requests/testing|requests\\/testing" packages/sdk/src e2e examples`
+- `rg --files packages/sdk/src | rg '/testing/'`
+- `deno task test:unit`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — this was a one-time SDK testing layout cleanup; the focused path
+  checks verify the removed nested directory and existing unit/lint coverage
+  locks the moved imports.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

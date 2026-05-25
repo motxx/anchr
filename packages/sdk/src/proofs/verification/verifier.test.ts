@@ -9,7 +9,7 @@ import type {
   TlsnRequirement,
 } from "../../requests/domain/types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
-import { makeQuery as makeBaseQuery } from "../../requests/testing/factories.ts";
+import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 
 function makeQuery(overrides: Partial<Query>): Query {
   return makeBaseQuery({

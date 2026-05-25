@@ -1,4 +1,4 @@
-import type { Query } from "../domain/types.ts";
+import type { Query } from "../requests/domain/types.ts";
 
 let queryCounter = 0;
 

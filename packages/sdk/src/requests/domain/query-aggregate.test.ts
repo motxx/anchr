@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { makeQuery } from "../testing/factories.ts";
+import { makeQuery } from "../../testing/factories.ts";
 import {
   addOffer,
   beginWork,

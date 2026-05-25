@@ -17,4 +17,7 @@ export type {
   QueryInput,
   QueryResult,
 } from "../requests/domain/types.ts";
-export * from "../requests/testing/protocol-helpers.ts";
+export * from "./attachments.ts";
+export * from "./factories.ts";
+export * from "./oracle-registry.ts";
+export * from "./protocol-helpers.ts";

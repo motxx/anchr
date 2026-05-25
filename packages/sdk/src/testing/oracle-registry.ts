@@ -2,9 +2,9 @@ import type {
   Oracle,
   OracleAttestation,
   OracleInfo,
-} from "../domain/oracle-types.ts";
-import type { OracleRegistry } from "../application/ports.ts";
-import type { Query, QueryResult } from "../domain/types.ts";
+} from "../requests/domain/oracle-types.ts";
+import type { OracleRegistry } from "../requests/application/ports.ts";
+import type { Query, QueryResult } from "../requests/domain/types.ts";
 
 const BUILT_IN_ORACLE_ID = "built-in";
 

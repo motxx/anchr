@@ -2,8 +2,8 @@ import { beforeEach, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createQueryService } from "./query-service.ts";
 import type { QueryService } from "./query-service.ts";
-import { createOracleRegistry } from "../testing/oracle-registry.ts";
-import { normalizeQueryResult } from "../testing/attachments.ts";
+import { createOracleRegistry } from "../../testing/oracle-registry.ts";
+import { normalizeQueryResult } from "../../testing/attachments.ts";
 import { clearIntegrityStore, storeIntegrity } from "../../proofs/mod.ts";
 
 let svc: QueryService;

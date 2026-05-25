@@ -10,16 +10,26 @@ import {
   createPreimageStore,
   type PreimageEntry,
   type PreimageStore,
-} from "../../payments/mod.ts";
-import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
-import type { EscrowProvider, OracleRegistry } from "../application/ports.ts";
+} from "../payments/mod.ts";
+import type {
+  Oracle,
+  OracleAttestation,
+} from "../requests/domain/oracle-types.ts";
+import type {
+  EscrowProvider,
+  OracleRegistry,
+} from "../requests/application/ports.ts";
 import {
   createQueryService,
   createQueryStore,
   type QueryService,
   type QueryStore,
-} from "../application/query-service.ts";
-import type { EscrowInfo, Query, QueryResult } from "../domain/types.ts";
+} from "../requests/application/query-service.ts";
+import type {
+  EscrowInfo,
+  Query,
+  QueryResult,
+} from "../requests/domain/types.ts";
 
 export interface ServiceWithPreimage {
   service: QueryService;

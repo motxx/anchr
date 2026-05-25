@@ -7,7 +7,7 @@ import {
 import { createQueryStore } from "./query-store.ts";
 import type { Query } from "./types.ts";
 import type { QueryRepository } from "./query-repository.ts";
-import { makeQuery } from "../testing/factories.ts";
+import { makeQuery } from "../../testing/factories.ts";
 
 function runRepositoryTests(name: string, factory: () => QueryRepository) {
   describe(name, () => {
