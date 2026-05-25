@@ -40,9 +40,12 @@ only after the work is implemented and verified.
 8. Add or update tests when the change affects behavior. Use docs-only changes
    only when the issue is explicitly documentation/design work.
 9. Run focused checks during iteration. For any non-docs-only issue that changes
-   code, also run the full local suite from `CLAUDE.md` (`deno task test:all`)
-   before closing. Do not call the issue fully resolved if required checks are
-   failing or skipped without a clear blocker.
+   code, run `deno task check` before closing so unresolved imports, stale export
+   names, missing moved files, and TypeScript errors are caught even when a
+   focused test path does not load the affected module. Also run the full local
+   suite from `CLAUDE.md` (`deno task test:all`) before closing. Do not call the
+   issue fully resolved if required checks are failing or skipped without a
+   clear blocker.
 10. Classify the finding using the maintenance loop in
    [`docs/review-harness.md`](../../docs/review-harness.md#maintenance-loop) and
    decide whether the change adds a test, lint, skill, threat-model entry,
@@ -74,6 +77,8 @@ only after the work is implemented and verified.
 - If the issue is too broad, split it before implementation. A parent issue's
   detailed plan is advisory; the resolver's current repository read determines
   the actual child issue shape.
+- Treat `deno task check` failures as code blockers, not residual cleanup.
+  Fix and rerun before moving the issue to `docs/issues/closed/`.
 - If the issue touches verification, validation, settlement, redemption,
   authentication, authorization, escrow, payment, signing, or quorum logic, run
   the repository's silent-bypass review skill before closing.

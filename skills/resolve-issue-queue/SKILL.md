@@ -58,6 +58,18 @@ diff, runs verification, and reports the outcome.
 If fresh execution is unavailable or not explicitly requested, run the same
 one-issue workflow locally and be strict about stopping after the unit.
 
+## Import and Type Sanity Gate
+
+Before closing a code-changing issue or moving to the next queue item, run
+`deno task check` from the repository root. This is a required fast sanity gate
+for unresolved imports, stale export names, missing files after moves, and
+TypeScript errors that may not be exercised by a focused test path.
+
+If `deno task check` fails, fix the code and rerun it. Do not close the issue,
+delegate the next issue, or report the queue unit as done while import or type
+errors remain. If the failure is environmental rather than code-related, leave
+the issue pending with the exact blocker recorded.
+
 ## Worker Prompt
 
 Use this shape for a short-lived worker:
@@ -73,6 +85,9 @@ and stop. Do not implement the parent and children together.
 Do not use conversation history as truth. Re-read current repo files. Preserve
 unrelated changes. List changed files and verification commands in the final
 answer.
+
+For any code change, run `deno task check` before closing the issue. Treat
+unresolved imports, stale exports, or TypeScript errors as blockers until fixed.
 ```
 
 ## Completion Gate
@@ -82,6 +97,7 @@ Before reporting done for a run:
 - The selected issue is either closed with a valid resolution note, split into
   pending child issues, or left pending with a concrete blocker.
 - Required focused verification has been run, or the blocker is recorded.
+- For any non-docs-only code change, `deno task check` has been run and passes.
 - For any non-docs-only code change, `deno task test:all` has been run.
 - `git status --short` has been checked.
 - The response names the processed issue and says whether the queue should stop
