@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-27
 
 ## Priority
 
@@ -97,3 +98,38 @@ follow-up before claiming complete removal.
 - Close this parent only after the final sweep confirms no active actor
   vocabulary remains, or documents any non-actor platform term that needs a
   narrower verification rule.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/issues/closed/0067-retire-requester-worker-vocabulary.md`
+
+Resolved through closed child issues:
+
+- #0068 consolidate SDK testing directory
+- #0073 rename provider attachment upload
+- #0074 rename request lifecycle vocabulary
+- #0075 migrate Nostr payload vocabulary
+- #0076 rename payment escrow vocabulary
+- #0077 update docs/e2e vocabulary
+- #0078 final active vocabulary sweep
+
+Verified with:
+
+- `rg -n "requester|Requester|worker|Worker" README.md CLAUDE.md AGENTS.md docs packages examples e2e deno.json scripts --glob '!docs/issues/**' --glob '!docs/archive/**'`
+- `rg --files README.md docs packages examples e2e scripts | rg -v '^docs/issues/' | rg 'requester|Requester|worker|Worker'`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- `docs/issues/closed/0078-final-active-vocabulary-sweep.md` documents the allowed non-actor platform/API residuals for the final parent sweep.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- #0070 remains pending and is now dependency-ready.
