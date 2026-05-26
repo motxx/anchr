@@ -28,6 +28,15 @@ Numbers are never reused, even when an issue is closed or abandoned.
 5. If later work should wait for this issue, record those issue numbers under
    `Blocks`.
 
+Initial issue creation is problem capture, not final implementation planning.
+Record the problem, known constraints, important references, and obvious
+dependencies. Do not force a detailed child-issue split before a resolver has
+re-read the current repository state.
+
+When a finding is broad but the correct implementation split depends on current
+code, create a tracking issue with enough context for the future resolver. The
+resolver decides whether to close it directly or split it first.
+
 Use this structure:
 
 ```text
@@ -56,11 +65,24 @@ What needs to change, and why.
 
 Links, code references, logs, threat-model notes, or compatibility constraints.
 
+## Acceptance
+
+- Observable completion condition
+
+## Verification
+
+- Command or manual check to run
+
 ## Plan
 
 - Concrete next step
 - Another concrete next step
 ```
+
+`Acceptance` should state observable completion conditions, not implementation
+steps. `Verification` should state focused commands or manual checks that prove
+the issue is resolved. Use `- Unknown until investigation` for investigation
+issues where the correct verification depends on the root cause.
 
 ## Closing an Issue
 
@@ -105,6 +127,39 @@ If the issue has unresolved `Depends on` entries, do not close it unless the
 maintainer explicitly accepts the remaining dependency risk. When closing an
 issue, update other pending issues whose `Depends on` or `Blocks` lists should
 change as a result.
+
+## Resolver-Led Splitting
+
+Resolution starts by re-reading the current repository state. If the target
+issue is too broad for one coherent, verifiable change, split it before editing
+implementation code:
+
+1. Use `skills/make-sub-issues/SKILL.md` to create independently closeable
+   child issues.
+2. Set each child issue's `Blocks` list to the parent issue number.
+3. Add each child issue number to the parent issue's `Depends on` list.
+4. Leave the parent pending until the required children close, unless the
+   parent is purely a tracking issue whose resolution is the split itself.
+5. Resolve child issues one at a time with their own verification and
+   resolution notes.
+
+Do not implement a broad parent and all of its children in one change just
+because the parent contains a detailed plan. The resolver's current context and
+verification scope decide the split.
+
+## Example Issues
+
+Issues that create, promote, demote, or retire an advertised example must follow
+[`docs/example-delivery-lifecycle.md`](../example-delivery-lifecycle.md).
+Include the `Example requirements` section from that document before changing
+example code when the target status, actors, real dependencies, simulated
+dependencies, or non-production boundary is not already clear.
+
+If the example work spans requirements, package boundaries, user-facing code,
+runbook, smoke harness, and README promotion, split the issue before
+implementation. The parent issue should lock the accepted requirements and the
+child issues should own the concrete implementation, docs/runbook, and
+verification work.
 
 The harness-update field follows the maintenance loop in
 [`docs/review-harness.md`](../review-harness.md#maintenance-loop). "Out of

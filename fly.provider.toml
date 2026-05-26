@@ -1,0 +1,22 @@
+app = "anchr-tlsn-provider"
+primary_region = "nrt"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ANCHR_SERVER_URL = "https://anchr-app.fly.dev"
+  TLSN_VERIFIER_HOST = "wss://anchr-tlsn-verifier.fly.dev"
+  TLSN_PROVER_BIN = "/usr/local/bin/tlsn-prove"
+  TLSN_SOCKS_PROXY = "socks5://127.0.0.1:9050"
+
+[processes]
+  provider = "bun run packages/sdk/src/cli.ts"
+
+# Provider is a background process — no HTTP service needed
+# Uses fly.io private network (.internal) to reach verifier
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

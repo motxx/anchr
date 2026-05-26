@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TLSNotary Proof Schema v1</title>
+    <style>
+      body {
+        color: #171717;
+        font-family: system-ui, sans-serif;
+        line-height: 1.55;
+        margin: 3rem auto;
+        max-width: 880px;
+        padding: 0 1.25rem;
+      }
+      code, pre {
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+      code {
+        padding: 0.1rem 0.25rem;
+      }
+      pre {
+        overflow: auto;
+        padding: 1rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td, th {
+        border: 1px solid #d4d4d4;
+        padding: 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TLSNotary Proof Schema v1</h1>
+    <p>
+      Canonical schema URL:
+      <code>https://anchr-spec.org/spec/proof/tlsn/v1</code>
+    </p>
+    <p>
+      This schema identifies a TLSNotary proof for an HTTPS response and the
+      predicate that an Anchr Oracle evaluates before releasing settlement
+      material.
+    </p>
+
+    <h2>Predicate Shape</h2>
+    <p>
+      The predicate describes the HTTPS target and deterministic response
+      conditions. Implementations may add schema-specific fields, but the
+      following fields are the stable v1 shape:
+    </p>
+    <pre><code>{
+  "target_url": "https://api.example.com/resource",
+  "domain_hint": "api.example.com",
+  "conditions": [
+    {
+      "type": "contains | regex | jsonpath",
+      "expression": "$.status",
+      "expected": "COMPLETED",
+      "description": "response status is completed"
+    }
+  ],
+  "max_attestation_age_seconds": 300
+}</code></pre>
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>target_url</code></td>
+          <td>HTTPS URL that the TLSNotary presentation must bind to.</td>
+        </tr>
+        <tr>
+          <td><code>domain_hint</code></td>
+          <td>Expected TLS server name. It must match the target URL host.</td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Deterministic predicates over the revealed response body.</td>
+        </tr>
+        <tr>
+          <td><code>max_attestation_age_seconds</code></td>
+          <td>Maximum accepted age for the TLSNotary presentation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Proof Payload Shape</h2>
+    <p>
+      The proof payload contains a TLSNotary presentation or an encrypted
+      attachment reference to one. The presentation must reveal only the headers
+      and body fields needed for condition evaluation.
+    </p>
+    <pre><code>{
+  "presentation": "&lt;bytes or attachment reference&gt;",
+  "revealed_headers": { "content-type": "application/json" },
+  "revealed_body": "{...}",
+  "session_timestamp": 1770000000
+}</code></pre>
+
+    <h2>Response Data Shape</h2>
+    <p>
+      On success, verifiers expose the server identity and revealed response
+      data used for the verdict:
+    </p>
+    <pre><code>{
+  "server_name": "api.example.com",
+  "revealed_headers": { "content-type": "application/json" },
+  "revealed_body": "{...}",
+  "session_timestamp": 1770000000
+}</code></pre>
+
+    <h2>Verification Requirements</h2>
+    <ul>
+      <li>Verify the TLSNotary presentation cryptographically.</li>
+      <li>
+        Require the presentation server name to match the predicate target host.
+      </li>
+      <li>Reject stale presentations outside the accepted freshness window.</li>
+      <li>
+        Evaluate <code>contains</code>, <code>regex</code>, and
+        <code>jsonpath</code> conditions deterministically over revealed data.
+      </li>
+      <li>Reject unsafe regex conditions that risk catastrophic backtracking.</li>
+      <li>
+        Reject proof payloads that reveal credentials such as Authorization,
+        Cookie, X-API-Key, or Proxy-Authorization values.
+      </li>
+      <li>Deduplicate accepted presentations to prevent replay.</li>
+    </ul>
+  </body>
+</html>

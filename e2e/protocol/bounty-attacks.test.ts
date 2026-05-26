@@ -1,18 +1,15 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import {
-  createQueryService,
-  createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import { createPreimageStore } from "@anchr/sdk/payments";
+import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
 import {
   driveToProcessing,
   makeEscrowInfo,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage,
-} from "../../packages/bounty/src/testing/protocol-helpers.ts";
+} from "@anchr/sdk/testing";
 
 describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {
@@ -23,7 +20,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -35,12 +32,12 @@ describe("Attack: Preimage Isolation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(q1.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(q1.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    await service.selectProvider(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
     const outcome1 = await service.submitEscrowResult(
@@ -58,7 +55,7 @@ describe("Attack: Preimage Isolation", () => {
       type: "htlc" as const,
       hash: entry1.hash, // REUSED hash
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -70,12 +67,12 @@ describe("Attack: Preimage Isolation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(q2.id, {
-      worker_pubkey: "w2",
-      quote_event_id: "e2",
+    service.recordOffer(q2.id, {
+      provider_pubkey: "w2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
-    await service.selectWorker(q2.id, "w2", makeFakeToken(100));
+    await service.selectProvider(q2.id, "w2", makeFakeToken(100));
     service.beginWork(q2.id);
 
     const outcome2 = await service.submitEscrowResult(
@@ -94,7 +91,7 @@ describe("Attack: Preimage Isolation", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
       { oracleIds: ["strict-oracle"] },
@@ -103,7 +100,7 @@ describe("Attack: Preimage Isolation", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "garbage" },
-      workerPub,
+      providerPub,
       "strict-oracle",
     );
 
@@ -115,7 +112,7 @@ describe("Attack: Preimage Isolation", () => {
 
   test("deleted preimage cannot be re-requested via second submitEscrowResult", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -123,7 +120,7 @@ describe("Attack: Preimage Isolation", () => {
     const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(first.ok).toBe(true);
@@ -133,7 +130,7 @@ describe("Attack: Preimage Isolation", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -150,12 +147,12 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Cancel attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const cancel = service.cancelQuery(query.id);
@@ -171,7 +168,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -179,12 +176,12 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expiry attack" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     // Wait past the 1ms ttl so the expiry sweep observes it as expired
@@ -204,7 +201,7 @@ describe("Attack: Race Conditions & Timing", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -212,12 +209,12 @@ describe("Attack: Race Conditions & Timing", () => {
       { description: "Expired submit" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     await new Promise((r) => setTimeout(r, 5));
@@ -233,9 +230,9 @@ describe("Attack: Race Conditions & Timing", () => {
     expect(outcome.preimage).toBeUndefined();
   });
 
-  test("double-submit by worker — second attempt fails, first preimage valid", async () => {
+  test("double-submit by provider — second attempt fails, first preimage valid", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -243,7 +240,7 @@ describe("Attack: Race Conditions & Timing", () => {
     const first = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(first.ok).toBe(true);
@@ -252,7 +249,7 @@ describe("Attack: Race Conditions & Timing", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -266,7 +263,7 @@ describe("Attack: Oracle Manipulation", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("rubber-stamp", () => true),
     });
-    const { query, entry, workerPub } = await driveToProcessing(
+    const { query, entry, providerPub } = await driveToProcessing(
       service,
       preimageStore,
       { oracleIds: ["rubber-stamp"] },
@@ -275,7 +272,7 @@ describe("Attack: Oracle Manipulation", () => {
     const outcome = await service.submitEscrowResult(
       query.id,
       { attachments: [], notes: "" },
-      workerPub,
+      providerPub,
       "rubber-stamp",
     );
 
@@ -298,12 +295,12 @@ describe("Attack: Oracle Manipulation", () => {
         oracleIds: ["flip-oracle"],
       },
     );
-    service.recordQuote(q1.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(q1.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(q1.id, "w1", makeFakeToken(100));
+    await service.selectProvider(q1.id, "w1", makeFakeToken(100));
     service.beginWork(q1.id);
 
     const outcome1 = await service.submitEscrowResult(
@@ -326,12 +323,12 @@ describe("Attack: Oracle Manipulation", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service2.recordQuote(q2.id, {
-      worker_pubkey: "w2",
-      quote_event_id: "e2",
+    service2.recordOffer(q2.id, {
+      provider_pubkey: "w2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
-    await service2.selectWorker(q2.id, "w2", makeFakeToken(100));
+    await service2.selectProvider(q2.id, "w2", makeFakeToken(100));
     service2.beginWork(q2.id);
 
     const outcome2 = await service2.submitEscrowResult(
@@ -365,12 +362,12 @@ describe("Attack: Oracle Manipulation", () => {
         quorum: { min_approvals: 2 },
       },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -399,7 +396,7 @@ describe("Attack: Oracle Manipulation", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["oracle_pub"],
-      requester_pubkey: "requester_pub",
+      customer_pubkey: "customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -407,12 +404,12 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "No oracle" },
       { escrow: escrowInfo, bounty: { amount_sats: 100 } },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1", makeFakeToken(100));
+    await service.selectProvider(query.id, "w1", makeFakeToken(100));
     service.beginWork(query.id);
 
     const outcome = await service.submitEscrowResult(
@@ -427,7 +424,7 @@ describe("Attack: Oracle Manipulation", () => {
 });
 
 describe("Attack: State Machine — illegal transitions", () => {
-  test("skip awaiting_quotes -> verifying: submit result directly", async () => {
+  test("skip awaiting_offers -> verifying: submit result directly", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { escrowInfo } = makeEscrowInfo(preimageStore);
 
@@ -444,12 +441,12 @@ describe("Attack: State Machine — illegal transitions", () => {
     );
     expect(outcome.ok).toBe(false);
     expect(outcome.message).toContain("not processing");
-    expect(service.getQuery(query.id)?.status).toBe("awaiting_quotes");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
   test("revert approved to processing: submit another result after approval", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { query, workerPub } = await driveToProcessing(
+    const { query, providerPub } = await driveToProcessing(
       service,
       preimageStore,
     );
@@ -457,7 +454,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     const approval = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(approval.ok).toBe(true);
@@ -466,7 +463,7 @@ describe("Attack: State Machine — illegal transitions", () => {
     const second = await service.submitEscrowResult(
       query.id,
       { attachments: [] },
-      workerPub,
+      providerPub,
       "test-oracle",
     );
     expect(second.ok).toBe(false);
@@ -474,18 +471,18 @@ describe("Attack: State Machine — illegal transitions", () => {
     expect(service.getQuery(query.id)?.status).toBe("approved");
   });
 
-  test("record quote on processing query fails", async () => {
+  test("record offer on processing query fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
     const { query } = await driveToProcessing(service, preimageStore);
 
-    const quoteResult = service.recordQuote(query.id, {
-      worker_pubkey: "w2",
-      quote_event_id: "e2",
+    const offerResult = service.recordOffer(query.id, {
+      provider_pubkey: "w2",
+      offer_event_id: "e2",
       received_at: Date.now(),
     });
 
-    expect(quoteResult.ok).toBe(false);
-    expect(quoteResult.message).toContain("not awaiting_quotes");
+    expect(offerResult.ok).toBe(false);
+    expect(offerResult.message).toContain("not awaiting_offers");
   });
 
   test("complete verification on non-verifying query fails", async () => {
@@ -499,7 +496,7 @@ describe("Attack: State Machine — illegal transitions", () => {
 });
 
 describe("Attack: Cross-Query", () => {
-  test("worker accepted on query A tries to submit on query B — fails", async () => {
+  test("provider accepted on query A tries to submit on query B — fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
     const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(
@@ -513,12 +510,12 @@ describe("Attack: Cross-Query", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(qA.id, {
-      worker_pubkey: "worker_a",
-      quote_event_id: "eA",
+    service.recordOffer(qA.id, {
+      provider_pubkey: "provider_a",
+      offer_event_id: "eA",
       received_at: Date.now(),
     });
-    await service.selectWorker(qA.id, "worker_a", makeFakeToken(100));
+    await service.selectProvider(qA.id, "provider_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
     const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(
@@ -532,18 +529,18 @@ describe("Attack: Cross-Query", () => {
         oracleIds: ["test-oracle"],
       },
     );
-    service.recordQuote(qB.id, {
-      worker_pubkey: "worker_b",
-      quote_event_id: "eB",
+    service.recordOffer(qB.id, {
+      provider_pubkey: "provider_b",
+      offer_event_id: "eB",
       received_at: Date.now(),
     });
-    await service.selectWorker(qB.id, "worker_b", makeFakeToken(100));
+    await service.selectProvider(qB.id, "provider_b", makeFakeToken(100));
     service.beginWork(qB.id);
 
     const outcome = await service.submitEscrowResult(
       qB.id,
       { attachments: [] },
-      "worker_a",
+      "provider_a",
       "test-oracle",
     );
     expect(outcome.ok).toBe(false);

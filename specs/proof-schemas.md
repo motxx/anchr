@@ -35,6 +35,11 @@ Rules:
 | `https://anchr-spec.org/spec/proof/tlsn/v1` | TLSNotary proof for an HTTPS response and schema-specific predicate. |
 | `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA image or media proof with optional location and content predicates. |
 
+The public `anchr-spec.org` documents are generated from `spec-site/` and
+published by `.github/workflows/deploy-proof-schema-site.yml`. Run
+`deno task lint:proof-schema-pages` before advertising a new built-in schema
+URL.
+
 ## Dispatch
 
 Providers dispatch proof generation through adapters with this shape:

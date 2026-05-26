@@ -1,9 +1,0 @@
-{
-  "imports": {
-    "anchr-sdk": "../../packages/sdk/src/index.ts"
-  },
-  "tasks": {
-    "requester": "deno run --allow-all requester.ts",
-    "worker": "deno run --allow-all worker.ts"
-  }
-}

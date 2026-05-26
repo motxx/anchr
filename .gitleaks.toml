@@ -1,0 +1,14 @@
+minVersion = "8.21.0"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Nostr event test fixture uses a fixed customer decrypt key"
+  condition = "AND"
+  regexTarget = "line"
+  paths = ['''packages/sdk/src/adapters/nostr/events/events\.test\.ts''']
+  regexes = ['''decrypt_key_customer:\s*"0123456789abcdef"''']

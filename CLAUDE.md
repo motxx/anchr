@@ -33,6 +33,18 @@ invariant, referenced workaround, surprising ordering). Never narrate
 history (`added for X` / `previously did Y`) — caught by
 `lint:no-history-comments`.
 
+## Single-purpose design
+Project architecture follows the UNIX rule: write components that do one thing
+and do it well. This is a design gate, not a file-size rule.
+
+Before accepting a proposed direction, check whether each changed function,
+module, package, adapter, SDK, app, or example has one clear owner
+responsibility that can be stated in a sentence. Stop and challenge proposals
+that bundle unrelated responsibilities, hide concrete adapters behind SDKs,
+make apps/examples own reusable package logic, or add "convenience" facades that
+become second owners for existing behavior. Offer a smaller composition of
+single-purpose parts instead.
+
 ## Verification bar
 "Done" = full local pass:
 - `deno task test:all` — lint:strict + test:unit + test:integration +
@@ -43,6 +55,10 @@ history (`added for X` / `previously did Y`) — caught by
 
 Use `docs/review-harness.md` to route recurring review findings to automated
 checks, semantic skills, universal docs, or follow-up issues.
+
+Issue creation captures the problem and constraints. Issue resolution re-reads
+the current repository state and splits broad work with `make-sub-issues`
+before implementation when one coherent verified change would be too large.
 
 Failed test → fix the implementation. Never skip, weaken, or
 `--no-check`.
@@ -71,20 +87,24 @@ pre-commit hook.
 ## Layout
 - `packages/` — independently-published primitives
   (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
-  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `bounty`,
-  `sdk`). Migration scaffolding (Query lifecycle, escrow,
-  oracle-client/service, verification adapters) lives in
-  `packages/bounty/src/{domain,application,infrastructure}/`.
-- `example/<app>/` — concrete apps; their own deno.json + design
-  system. **Must reach Anchr through `@anchr/*` only** — relative
-  paths into `packages/<pkg>/src/...` are an E023 violation.
+  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `adapters`,
+  `protocol`, `oracle-sdk`, `customer-sdk`, `provider-sdk`, `bounty`,
+  `sdk`). Transitional Query lifecycle scaffolding lives in
+  `packages/bounty/src/{domain,application,infrastructure}/`; new protocol,
+  adapter, proof, settlement, and actor SDK surfaces belong in their named
+  packages.
+- `apps/<app>/` — maintained runnable product or adapter surfaces with their
+  own runtime/config/ops policy. **Must reach Anchr through `@anchr/*` only** —
+  relative paths into `packages/<pkg>/src/...` are an E023 violation.
+- `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
+  Same E023 public-surface rule as `apps/`.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
 
 Application vocabulary (`market`, `marketplace`, …) is forbidden in
 `packages/` (E022). Concrete apps own their vocabulary in
-`example/<app>/`.
+`apps/<app>/` or `examples/<name>/`.
 
 ## Skill routing
 When a request matches an available skill, invoke it via `Skill` as the

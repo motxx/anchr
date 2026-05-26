@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   Anchr,
   AnchrError,
-  QueryTimeoutError,
+  RequestTimeoutError,
   VerificationFailedError,
 } from "./index.ts";
 
@@ -23,7 +23,7 @@ describe("Anchr SDK", () => {
     expect(err.code).toBe("TEST_CODE");
     expect(err.name).toBe("AnchrError");
 
-    const timeout = new QueryTimeoutError("q1", 60);
+    const timeout = new RequestTimeoutError("r1", 60);
     expect(timeout.code).toBe("TIMEOUT");
 
     const fail = new VerificationFailedError("q1", ["bad sig"]);

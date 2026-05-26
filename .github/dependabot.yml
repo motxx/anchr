@@ -24,9 +24,9 @@ updates:
       semver-minor-days: 7
       semver-patch-days: 5
 
-  # npm (deno.lock / package.json) — bundle minor+patch; majors stay individual.
+  # SDK npm package — bundle minor+patch; majors stay individual.
   - package-ecosystem: "npm"
-    directory: "/"
+    directory: "/packages/sdk"
     schedule:
       interval: "weekly"
     commit-message:

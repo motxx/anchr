@@ -35,13 +35,13 @@ export interface QueryRequestPayload {
   oracle_pubkey: string;
   /** Cashu mint URL. */
   mint_url: string;
-  /** The Phase-1 HTLC bounty token (provider unbound until quote selection). */
+  /** The Phase-1 HTLC bounty token (provider unbound until offer selection). */
   bounty_token: string;
   /** Maximum amount the customer will pay (sats). */
   max_amount_sats: number;
   /** Locktime as Unix timestamp (seconds). */
   locktime_seconds: number;
-  /** Unix timestamp (ms) after which the customer no longer accepts quotes. */
+  /** Unix timestamp (ms) after which the customer no longer accepts offers. */
   expires_at: number;
 }
 
@@ -126,8 +126,8 @@ export function parseQueryRequestEvent(
   };
 }
 
-/** Plaintext payload published by a provider quoting on a request (NIP-90 kind 7000, status=payment-required). */
-export interface QuoteFeedbackPayload {
+/** Plaintext payload published by a provider offering on a request (NIP-90 kind 7000, status=payment-required). */
+export interface OfferFeedbackPayload {
   status: "payment-required";
   /** Provider's hex pubkey (must match the event's pubkey). */
   provider_pubkey: string;
@@ -135,12 +135,12 @@ export interface QuoteFeedbackPayload {
   amount_sats: number;
 }
 
-/** Build a signed kind 7000 quote event referencing the request event. */
-export function buildQuoteFeedbackEvent(
+/** Build a signed kind 7000 offer event referencing the request event. */
+export function buildOfferFeedbackEvent(
   identity: Keypair,
   requestEventId: string,
   customerPubkey: string,
-  payload: QuoteFeedbackPayload,
+  payload: OfferFeedbackPayload,
 ): Event {
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
@@ -158,10 +158,10 @@ export function buildQuoteFeedbackEvent(
   );
 }
 
-/** Parse a kind 7000 quote payload. Returns null if the event is not a quote. */
-export function parseQuoteFeedbackEvent(
+/** Parse a kind 7000 offer payload. Returns null if the event is not an offer. */
+export function parseOfferFeedbackEvent(
   event: Event,
-): QuoteFeedbackPayload | null {
+): OfferFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
   let parsed: unknown;
   try {

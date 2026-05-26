@@ -39,10 +39,6 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
 
 import {
-  buildFrostSwapForPartyA,
-  buildFrostSwapForPartyB,
-} from "@anchr/cashu-conditional-swap/frost-conditional-swap";
-import {
   checkInfraReady,
   createWallet,
   retryOnRateLimit,
@@ -70,6 +66,38 @@ function genKeypair() {
   const sk = generateSecretKey();
   const pk = getPublicKey(sk);
   return { secretKey: bytesToHex(sk), publicKey: pk };
+}
+
+function buildFrostSwapForPartyA(params: {
+  group_pubkey_b: string;
+  counterpartyPubkey: string;
+  refundPubkey: string;
+  locktime: number;
+}): P2PKOptions {
+  return new P2PKBuilder()
+    .addLockPubkey([params.group_pubkey_b, params.counterpartyPubkey])
+    .requireLockSignatures(2)
+    .lockUntil(params.locktime)
+    .addRefundPubkey(params.refundPubkey)
+    .requireRefundSignatures(1)
+    .sigAll()
+    .toOptions();
+}
+
+function buildFrostSwapForPartyB(params: {
+  group_pubkey_a: string;
+  counterpartyPubkey: string;
+  refundPubkey: string;
+  locktime: number;
+}): P2PKOptions {
+  return new P2PKBuilder()
+    .addLockPubkey([params.group_pubkey_a, params.counterpartyPubkey])
+    .requireLockSignatures(2)
+    .lockUntil(params.locktime)
+    .addRefundPubkey(params.refundPubkey)
+    .requireRefundSignatures(1)
+    .sigAll()
+    .toOptions();
 }
 
 // ---------------------------------------------------------------------------

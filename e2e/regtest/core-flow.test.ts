@@ -2,14 +2,14 @@
  * Core Flow E2E: Full HTLC lifecycle with real Cashu escrow.
  *
  * Tests the complete Anchr protocol flow in one pass:
- *   1. Requester mints Cashu tokens via regtest Lightning
- *   2. Requester creates HTLC query (Oracle generates preimage → hash)
- *   3. Worker submits quote
- *   4. Requester selects Worker (escrow locked with HTLC)
- *   5. Worker acknowledges (beginWork)
- *   6. Worker submits result
+ *   1. Customer mints Cashu tokens via regtest Lightning
+ *   2. Customer creates HTLC query (Oracle generates preimage → hash)
+ *   3. Provider submits offer
+ *   4. Customer selects Provider (escrow locked with HTLC)
+ *   5. Provider acknowledges (beginWork)
+ *   6. Provider submits result
  *   7. Oracle verifies and reveals preimage
- *   8. Worker redeems escrow token with preimage
+ *   8. Provider redeems escrow token with preimage
  *
  * This is the single most important test: it proves Specs 00-06 work
  * end-to-end with real cryptographic escrow.
@@ -29,20 +29,11 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { getEncodedToken } from "@cashu/cashu-ts";
-import {
-  createQueryService,
-  createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import type {
-  Oracle,
-  OracleAttestation,
-} from "../../packages/bounty/src/domain/oracle-types.ts";
-import type {
-  Query,
-  QueryResult,
-} from "../../packages/bounty/src/domain/types.ts";
+import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
+import { createPreimageStore } from "@anchr/sdk/payments";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import type { Oracle, OracleAttestation } from "@anchr/sdk/testing";
+import type { Query, QueryResult } from "@anchr/sdk/testing";
 import {
   checkInfraReady,
   createWallet,
@@ -97,7 +88,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     store.clear();
   });
 
-  test("full core flow: mint → HTLC lock → quote → select → begin → verify → preimage → redeem", async () => {
+  test("full core flow: mint → HTLC lock → offer → select → begin → verify → preimage → redeem", async () => {
     // === Phase 1: Setup ===
 
     // 1a. Oracle generates preimage/hash pair
@@ -105,19 +96,19 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     const hash = preimageEntry.hash;
     const preimage = preimageEntry.preimage;
 
-    // 1b. Requester mints Cashu tokens
+    // 1b. Customer mints Cashu tokens
     const proofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
     const totalMinted = proofs.reduce((sum, p) => sum + p.amount, 0);
     expect(totalMinted).toBe(BOUNTY_SATS);
 
-    // 1c. Requester creates HTLC-locked escrow token
-    //     Condition: SHA-256(preimage) + Worker's pubkey
+    // 1c. Customer creates HTLC-locked escrow token
+    //     Condition: SHA-256(preimage) + Provider's pubkey
     //     For this test, we use the preimage hash directly as the HTLC condition
     const escrowInfo = {
       type: "htlc" as const,
       hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600, // 1 hour
     };
 
@@ -144,35 +135,38 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
 
     // Verify initial state
     const q0 = service.getQuery(queryId)!;
-    expect(q0.status).toBe("awaiting_quotes");
+    expect(q0.status).toBe("awaiting_offers");
     expect(q0.payment_status).toBe("escrow_locked");
 
-    // 2b. Worker submits quote
-    const quoteOutcome = service.recordQuote(queryId, {
-      worker_pubkey: "e2e_worker_pub",
+    // 2b. Provider submits offer
+    const offerOutcome = service.recordOffer(queryId, {
+      provider_pubkey: "e2e_provider_pub",
       amount_sats: BOUNTY_SATS,
-      quote_event_id: "e2e_quote_1",
+      offer_event_id: "e2e_offer_1",
       received_at: Date.now(),
     });
-    expect(quoteOutcome.ok).toBe(true);
+    expect(offerOutcome.ok).toBe(true);
 
-    // 2c. Requester selects Worker
-    const selectOutcome = await service.selectWorker(queryId, "e2e_worker_pub");
+    // 2c. Customer selects Provider
+    const selectOutcome = await service.selectProvider(
+      queryId,
+      "e2e_provider_pub",
+    );
     expect(selectOutcome.ok).toBe(true);
-    expect(service.getQuery(queryId)!.status).toBe("worker_selected");
+    expect(service.getQuery(queryId)!.status).toBe("provider_selected");
 
-    // 2d. Worker acknowledges selection (worker_selected → processing)
+    // 2d. Provider acknowledges selection (provider_selected → processing)
     const beginOutcome = service.beginWork(queryId);
     expect(beginOutcome.ok).toBe(true);
     expect(service.getQuery(queryId)!.status).toBe("processing");
 
     // === Phase 3: Verification + Settlement ===
 
-    // 3a. Worker submits result (inline verification)
+    // 3a. Provider submits result (inline verification)
     const resultOutcome = await service.submitEscrowResult(
       queryId,
       { attachments: [], notes: "E2E core flow result" },
-      "e2e_worker_pub",
+      "e2e_provider_pub",
       "e2e-oracle",
     );
 
@@ -182,7 +176,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     expect(resultOutcome.query?.assigned_oracle_id).toBe("e2e-oracle");
     expect(resultOutcome.query?.payment_status).toBe("released");
 
-    // 3c. Preimage is revealed to Worker
+    // 3c. Preimage is revealed to Provider
     expect(resultOutcome.preimage).toBe(preimage);
 
     // 3d. Verify preimage → hash relationship
@@ -226,14 +220,14 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
     const proofs = await throttledMintProofs(sharedWallet!, BOUNTY_SATS);
     const token = getEncodedToken({ mint: MINT_URL, proofs });
 
-    // Create query, quote, select, begin
+    // Create query, offer, select, begin
     const query = service.createQuery(
       { description: "E2E rejection test" },
       {
@@ -242,12 +236,12 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
         oracleIds: ["strict-oracle"],
       },
     );
-    service.recordQuote(query.id, {
-      worker_pubkey: "w1",
-      quote_event_id: "e1",
+    service.recordOffer(query.id, {
+      provider_pubkey: "w1",
+      offer_event_id: "e1",
       received_at: Date.now(),
     });
-    await service.selectWorker(query.id, "w1");
+    await service.selectProvider(query.id, "w1");
     service.beginWork(query.id);
 
     // Submit result — oracle rejects
@@ -273,7 +267,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       type: "htlc" as const,
       hash: entry.hash,
       oracle_pubkeys: ["e2e_oracle_pub"],
-      requester_pubkey: "e2e_requester_pub",
+      customer_pubkey: "e2e_customer_pub",
       locktime: Math.floor(Date.now() / 1000) + 3600,
     };
 
@@ -281,7 +275,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       { description: "E2E expiry test" },
       { escrow: escrowInfo, ttlMs: 1 }, // Expires immediately
     );
-    expect(query.status).toBe("awaiting_quotes");
+    expect(query.status).toBe("awaiting_offers");
 
     // Wait for expiry
     await new Promise((r) => setTimeout(r, 10));

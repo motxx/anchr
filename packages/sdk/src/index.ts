@@ -10,70 +10,77 @@
 export { Anchr } from "./client.ts";
 export type {
   AnchrConfig,
-  PhotoQueryOptions,
+  HttpRequestOptions,
+  HttpRequestResult,
+  PhotoRequestOptions,
   PhotoResult,
-  QueryCondition,
-  QueryOptions,
-  QueryResult,
+  RequestCondition,
 } from "./client-types.ts";
 export {
   AnchrError,
-  QueryTimeoutError,
+  RequestTimeoutError,
   VerificationFailedError,
 } from "./errors.ts";
 
 import { Anchr } from "./client.ts";
 export default Anchr;
 
-// --- v0.0.1 Customer / Provider API ---
-
 export {
   createCustomer,
   type Customer,
   CustomerConfigError,
   DEFAULT_LOCKTIME_SECONDS,
-  DEFAULT_QUOTE_WINDOW_MS,
+  DEFAULT_OFFER_WINDOW_MS,
   DEFAULT_RESULT_TIMEOUT_MS,
   generateQueryId,
-  NoQuotesReceivedError,
-  OracleWhitelistMismatchError,
+  NoOffersReceivedError,
   pickOracleForRequest,
   RelayPublishError,
   ResultTimeoutError,
   SchemaVerificationError,
-  selectCheapestQuote,
+  selectCheapestOffer,
   validateCustomerOptions,
-} from "@anchr/customer-sdk/customer";
+} from "./customer.ts";
 
 export {
+  type AdapterCapability,
+  type AdapterManifest,
+  type CapabilityAdapter,
+  type CapabilityCheckResult,
+  checkCapabilities,
+  missingCapabilities,
+  type RuntimeTarget,
+} from "./adapters/types.ts";
+
+export {
+  buildOfferFeedbackEvent,
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
-  buildQuoteFeedbackEvent,
   buildSelectionFeedbackEvent,
+  type OfferFeedbackPayload,
   type OracleQueryResponsePayload,
+  parseOfferFeedbackEvent,
   parseOracleQueryResponseEvent,
   parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
   parseQueryResponseEvent,
-  parseQuoteFeedbackEvent,
   parseSelectionFeedbackEvent,
   type PreimageDeliveryPayload,
   type QueryRequestPayload,
   type QueryResponsePayload,
-  type QuoteFeedbackPayload,
   type SelectionFeedbackPayload,
 } from "@anchr/protocol/events";
 
 export {
+  canOfferForRequest,
   createProvider,
   DEFAULT_PREIMAGE_TIMEOUT_MS,
   DEFAULT_SELECTION_TIMEOUT_MS,
   type Provider,
   ProviderConfigError,
-  shouldQuote,
   validateProviderOptions,
-} from "@anchr/provider-sdk/provider";
+} from "./provider.ts";
 
 export {
   DEFINED_SCHEMAS,
@@ -84,32 +91,42 @@ export {
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
-} from "@anchr/protocol/schema";
+} from "./schema.ts";
 
 export type {
+  Offer,
   Payment,
-  ProofGenerator,
-  ProviderHandler,
-  ProviderQuote,
-  ProviderRequestEvent,
-  Quote,
   RequestResult,
-  SchemaProducer,
-  SchemaProducerContext,
-  SchemaVerifier,
   Spec,
-  VerifierAdapter,
 } from "@anchr/protocol/types";
 
 export type {
-  CustomerOptions,
-  QuoteSelector,
-  RequestOptions,
-} from "@anchr/customer-sdk/types";
+  ProofGenerator,
+  SchemaProducer,
+  SchemaProducerContext,
+  SchemaVerifier,
+  VerifierAdapter,
+} from "./schema.ts";
 
-export type { ProviderOptions } from "@anchr/provider-sdk/types";
+export type {
+  ProviderHandler,
+  ProviderOffer,
+  ProviderRequestEvent,
+} from "./provider-types.ts";
+
+export type {
+  CustomerOptions,
+  CustomerOracle,
+  OfferSelector,
+  OracleSelector,
+  RequestOptions,
+} from "./customer-types.ts";
+
+export type { ProviderOptions } from "./provider-types.ts";
 
 export {
+  createKeypairSigner,
+  createNip07Signer,
   decryptNip44,
   encryptNip44,
   findAllTagValues,
@@ -120,8 +137,11 @@ export {
   KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
+  type Nip07Provider,
+  Nip07UnavailableError,
   normalizePubkey,
   normalizeSecretKey,
+  type NostrSigner,
   signEvent,
 } from "@anchr/protocol/nostr";
 
@@ -131,15 +151,25 @@ export {
   type PublishResult,
   type RelayClient,
   type Subscription,
-} from "@anchr/customer-sdk/nostr";
+} from "./adapters/nostr/mod.ts";
+
+export {
+  type ActorStateStore,
+  createIndexedDbStateStore,
+  createMemoryStateStore,
+  IndexedDbStateStoreError,
+  type IndexedDbStateStoreOptions,
+  type MemoryStateStoreOptions,
+} from "./adapters/storage.ts";
 
 export {
   createHttpOracleClient,
   type HttpOracleOptions,
   type OracleClient,
+  OracleConfigError,
   OracleHttpError,
   OracleResponseError,
-} from "@anchr/oracle-sdk/oracle";
+} from "./oracle.ts";
 
 export {
   type BindProviderParams,
@@ -157,4 +187,4 @@ export {
   type RedeemResult,
   validateHashHex,
   validateLocktime,
-} from "@anchr/customer-sdk/cashu";
+} from "./adapters/cashu.ts";

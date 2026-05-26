@@ -1,7 +1,11 @@
 # @anchr/sdk
 
-Customer + Provider orchestration for the Anchr verified-data exchange: Nostr
-DVM events (NIP-90) over Cashu HTLC settlement.
+Customer, Provider, and Oracle orchestration for verifiable paid requests: Nostr
+transport over Cashu HTLC settlement with proof verification.
+
+The actor SDK APIs below are the primary integration path. Anchr has no default
+hosted server or mandatory REST API; any HTTP client surface exposed by this
+package is for concrete app-owned adapters.
 
 ## Install
 
@@ -11,24 +15,43 @@ deno add @anchr/sdk
 npm i @anchr/sdk
 ```
 
+Workspace consumers can also pin the Deno import map directly:
+
+```jsonc
+{
+  "imports": {
+    "@anchr/sdk": "jsr:@anchr/sdk@^0.0.1"
+  }
+}
+```
+
 ## Customer
 
 ```ts
 import {
+  type CashuProof,
   createCashuClient,
   createCustomer,
   createHttpOracleClient,
+  createRelayClient,
 } from "@anchr/sdk";
 
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
+const cashuProofsFromYourWallet: CashuProof[] = [];
+
 const customer = createCustomer({
-  oracles: ["npub1oracle1..."],
-  relays: ["wss://relay.example.org"],
-  mint: "https://mint.example.org",
-  oracleClient: createHttpOracleClient({
-    endpoint: "https://oracle.example.org",
-    oraclePubkey: "npub1oracle1...",
-  }),
-  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: "https://oracle.test.example",
+    }),
+  }],
+  relays: relayUrls,
+  mint: mintUrl,
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 
 const result = await customer.request({
@@ -43,26 +66,74 @@ const result = await customer.request({
 console.log(result.data, result.proof, result.providerPubkey);
 ```
 
+For a multi-oracle whitelist, keep `oracles` as the trust policy and make the
+selected transport explicit:
+
+```ts
+import {
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oracleA = "npub1exampleoraclea";
+const oracleB = "npub1exampleoracleb";
+
+const multiOracleCustomer = createCustomer({
+  oracles: [
+    {
+      pubkey: oracleA,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-a.test.example",
+      }),
+    },
+    {
+      pubkey: oracleB,
+      client: createHttpOracleClient({
+        endpoint: "https://oracle-b.test.example",
+      }),
+    },
+  ],
+  relays: relayUrls,
+  mint: mintUrl,
+  oracleSelector: (oracles: readonly string[]) => oracles[1] ?? oracles[0],
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
+});
+```
+
 ## Provider
 
 ```ts
-import { createProvider, createCashuClient } from "@anchr/sdk";
+import {
+  createCashuClient,
+  createProvider,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
 
 const provider = createProvider({
-  oracles: ["npub1oracle1..."],
-  relays:  ["wss://relay.example.org"],
-  mint:    "https://mint.example.org",
-  privKey: "nsec1...",
-  cashuClient: createCashuClient({ mintUrl: "https://mint.example.org" }),
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
+  privKey: "provider-secret-key-placeholder",
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
 });
 
 await provider.serve(async (request) => {
-  // Decide whether to quote and at what price; return null to decline.
+  // Decide whether to offer and at what price; return null to decline.
   return {
     amountSats: 100,
     produce: async () => ({
-      data: { /* schema-specific payload */ },
-      proof: /* schema-specific proof bytes/string */,
+      data: {/* schema-specific payload */},
+      proof: "schema-specific-proof-placeholder",
     }),
   };
 });
@@ -73,20 +144,20 @@ work and keep redeem decisions narrower than clean-settlement or audit
 decisions. The normative rules live in `specs/messaging.md` and
 `docs/threat-model.md`.
 
-## Proof Schema URLs
+## Proofs
 
-The SDK is verification-format-agnostic. Each request carries a `schema` URL;
-the provider's handler interprets it. URLs the SDK ships as constants:
+Each request carries a `schema` URL; the provider's handler interprets it. URLs
+the SDK ships as constants:
 
 | URL                                               | Meaning                                    |
 | ------------------------------------------------- | ------------------------------------------ |
 | `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response |
 | `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo / video                  |
 
-The SDK does not bundle producers or verifiers. Wire your own
-`produce(): Promise<{ data, proof }>` in the provider handler, and pass an
-optional `verifierAdapters` list on the customer if you want local verification
-of returned proofs.
+Wire your own `produce(): Promise<{ data, proof }>` in the provider handler.
+Standard verifier helpers for TLSNotary, C2PA, EXIF, ProofMode, AI-content, and
+GPS checks are exported from `@anchr/sdk/proofs` for Oracle and app-owned
+verification policies.
 
 ## Testing
 
@@ -94,11 +165,50 @@ The default `cashuClient` and `relayClient` open live connections. For unit
 tests, inject your own:
 
 ```ts
-import type { CashuWalletAdapter, RelayClient } from "@anchr/sdk";
+import {
+  type CashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  type RelayClient,
+} from "@anchr/sdk";
+
+const mintUrl = "https://mint.test.example";
+const relayUrls = ["wss://relay.test.example"];
+const oraclePubkey = "npub1exampleoraclepubkey";
+
+const fakeCashuClient: CashuClient = {
+  mintUrl,
+  async buildHtlcLock() {
+    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
+  },
+  async bindProvider() {
+    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
+  },
+  async redeemHtlc() {
+    return { amountSats: 1000, proofs: [] };
+  },
+};
+
+const fakeRelayClient: RelayClient = {
+  async publish() {
+    return { successes: relayUrls, failures: [] };
+  },
+  subscribe() {
+    return { close() {} };
+  },
+  close() {},
+};
 
 const customer = createCustomer({
-  /* ... */,
-  cashuClient: createCashuClient({ mintUrl, wallet: fakeWalletAdapter }),
+  oracles: [{
+    pubkey: oraclePubkey,
+    client: createHttpOracleClient({
+      endpoint: "https://oracle.test.example",
+    }),
+  }],
+  relays: relayUrls,
+  mint: mintUrl,
+  cashuClient: fakeCashuClient,
   relayClient: fakeRelayClient,
 });
 ```

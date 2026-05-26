@@ -30,28 +30,11 @@ COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /us
 # `deno install` can resolve workspace packages before the rest of the
 # source tree lands in the next COPY step.
 COPY deno.json deno.lock ./
-COPY packages/core-runtime/deno.json ./packages/core-runtime/
-COPY packages/core-cashu/deno.json ./packages/core-cashu/
-COPY packages/tlsn-toolkit/deno.json ./packages/tlsn-toolkit/
-COPY packages/photo-verification/deno.json ./packages/photo-verification/
-COPY packages/frost-oracle/deno.json ./packages/frost-oracle/
-COPY packages/cashu-conditional-swap/deno.json ./packages/cashu-conditional-swap/
-COPY packages/blossom/deno.json ./packages/blossom/
 COPY packages/protocol/deno.json ./packages/protocol/
-COPY packages/oracle-sdk/deno.json ./packages/oracle-sdk/
-COPY packages/customer-sdk/deno.json ./packages/customer-sdk/
-COPY packages/provider-sdk/deno.json ./packages/provider-sdk/
-COPY packages/bounty/deno.json ./packages/bounty/
 COPY packages/sdk/deno.json ./packages/sdk/
-COPY example/airdrop-bot-shield/deno.json ./example/airdrop-bot-shield/
-COPY example/tlsn-fiat-swap-square/deno.json ./example/tlsn-fiat-swap-square/
 RUN deno install
 
 COPY . .
-
-# Build frontend
-RUN deno task build:ui
-RUN deno task build:css
 
 ENV NODE_ENV=production
 ENV HTTP_API_PORT=8080

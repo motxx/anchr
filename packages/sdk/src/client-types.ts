@@ -1,6 +1,6 @@
 /**
  * Public types for the convenience `Anchr` HTTP client surface
- * (`anchr.query()` / `anchr.photo()`). The Customer / Provider API
+ * (`anchr.request()` / `anchr.photo()`). The Customer / Provider API
  * lives in the sibling files.
  */
 
@@ -9,16 +9,16 @@ export interface AnchrConfig {
   serverUrl: string;
   /** API key for write endpoints (optional if server has no auth) */
   apiKey?: string;
-  /** Default timeout for queries in seconds (default: 300) */
+  /** Default timeout for requests in seconds (default: 300) */
   defaultTimeoutSeconds?: number;
   /** Polling interval in milliseconds (default: 3000) */
   pollIntervalMs?: number;
 }
 
-export interface QueryOptions {
+export interface HttpRequestOptions {
   description: string;
   targetUrl: string;
-  conditions?: QueryCondition[];
+  conditions?: RequestCondition[];
   maxSats?: number;
   /** Server-side TTL in seconds (minimum 60, default 300) */
   timeoutSeconds?: number;
@@ -26,14 +26,14 @@ export interface QueryOptions {
   pollTimeoutSeconds?: number;
   maxAttestationAgeSeconds?: number;
   /**
-   * When set, the public query shows only the domain; the full targetUrl
+   * When set, the public request shows only the domain; the full targetUrl
    * (potentially carrying credentials or session IDs) is delivered to the
-   * selected Worker via NIP-44 encrypted_context.
+   * selected Provider via NIP-44 encrypted_context.
    */
   domainHint?: string;
 }
 
-export interface QueryCondition {
+export interface RequestCondition {
   type: "contains" | "regex" | "jsonpath";
   expression: string;
   /** Expected value (for jsonpath comparison) */
@@ -41,7 +41,7 @@ export interface QueryCondition {
   description?: string;
 }
 
-export interface QueryResult {
+export interface HttpRequestResult {
   verified: boolean;
   /** Server name from the TLS certificate (cryptographically verified) */
   serverName: string;
@@ -53,10 +53,10 @@ export interface QueryResult {
   timestamp: number;
   checks: string[];
   satsPaid: number;
-  queryId: string;
+  requestId: string;
 }
 
-export interface PhotoQueryOptions {
+export interface PhotoRequestOptions {
   description: string;
   locationHint?: string;
   expectedGps?: { lat: number; lon: number };
@@ -71,13 +71,13 @@ export interface PhotoResult {
   attachments: Array<{ uri: string; mimeType: string }>;
   notes?: string;
   gps?: { lat: number; lon: number };
-  queryId: string;
+  requestId: string;
   satsPaid: number;
 }
 
 // --- Internal types — used by the client implementation ---
 
-export interface QueryStatusResponse {
+export interface RequestStatusResponse {
   id: string;
   status: string;
   description: string;
@@ -100,7 +100,7 @@ export interface QueryStatusResponse {
   [key: string]: unknown;
 }
 
-export interface QuerySummary {
+export interface RequestSummary {
   id: string;
   status: string;
   description: string;

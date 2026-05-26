@@ -1,0 +1,60 @@
+import type {
+  ActorStateStore,
+  CashuClient,
+  RelayClient,
+} from "./adapters/types.ts";
+import type { Spec } from "@anchr/protocol/types";
+import type {
+  ProofGenerator,
+  SchemaProducer,
+  SchemaProducerContext,
+} from "./schema.ts";
+
+export type {
+  ActorStateStore,
+  CashuClient,
+  ProofGenerator,
+  RelayClient,
+  SchemaProducer,
+  SchemaProducerContext,
+};
+
+export interface ProviderOffer {
+  amountSats: number;
+  produce: () => Promise<{ data: unknown; proof: Uint8Array | string }>;
+}
+
+export interface ProviderRequestEvent {
+  customerPubkey: string;
+  spec: Spec;
+  maxAmountSats: number;
+  oraclePubkey: string;
+  proofGenerator?: ProofGenerator;
+}
+
+export type ProviderHandler = (
+  request: ProviderRequestEvent,
+) => Promise<ProviderOffer | null>;
+
+/** Provider-side construction options. */
+export interface ProviderOptions {
+  /** Whitelist of accepted oracle pubkeys (npub or hex). */
+  oracles: string[];
+  /** Nostr relay URLs to subscribe and publish on. */
+  relays: string[];
+  /** Cashu mint URL. */
+  mint: string;
+  /** Provider's secret key (nsec or hex). */
+  privKey: string;
+  /** Payment adapter. The bundled Cashu HTLC adapter is one implementation. */
+  cashuClient: CashuClient;
+  /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
+  relayClient: RelayClient;
+  /** Optional local state adapter for browser, Node, Deno, or test persistence. */
+  stateStore?: ActorStateStore;
+  /** Optional: TLSN notary URL. */
+  notary?: string;
+  selectionTimeoutMs?: number;
+  preimageTimeoutMs?: number;
+  proofGenerators?: readonly ProofGenerator[];
+}

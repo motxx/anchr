@@ -1,0 +1,105 @@
+import { afterEach, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import type { C2paValidationResult } from "./c2pa-validation.ts";
+import type { ExifValidationResult } from "./exif-validation.ts";
+import {
+  clearIntegrityStore,
+  getIntegrity,
+  getIntegrityForRequest,
+  purgeStaleIntegrity,
+  storeIntegrity,
+} from "./integrity-store.ts";
+
+const dummyExif: ExifValidationResult = {
+  hasExif: true,
+  hasCameraModel: true,
+  hasTimestamp: true,
+  hasGps: false,
+  timestampRecent: true,
+  gpsNearHint: null,
+  metadata: { make: "Test", model: "Camera" },
+  checks: ["EXIF present"],
+  failures: [],
+};
+
+const dummyC2pa: C2paValidationResult = {
+  available: false,
+  hasManifest: false,
+  signatureValid: false,
+  manifest: null,
+  checks: ["c2patool not installed"],
+  failures: [],
+};
+
+afterEach(() => clearIntegrityStore());
+
+describe("integrity store", () => {
+  test("stores and retrieves by attachment ID", () => {
+    storeIntegrity({
+      attachmentId: "photo1.jpg",
+      requestId: "q1",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+
+    const result = getIntegrity("photo1.jpg");
+    expect(result).not.toBeNull();
+    expect(result!.exif.hasCameraModel).toBe(true);
+    expect(result!.requestId).toBe("q1");
+  });
+
+  test("returns null for unknown attachment", () => {
+    expect(getIntegrity("nonexistent")).toBeNull();
+  });
+
+  test("retrieves by request ID", () => {
+    storeIntegrity({
+      attachmentId: "a.jpg",
+      requestId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "b.jpg",
+      requestId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "c.jpg",
+      requestId: "q3",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+
+    expect(getIntegrityForRequest("q2")).toHaveLength(2);
+    expect(getIntegrityForRequest("q3")).toHaveLength(1);
+    expect(getIntegrityForRequest("q99")).toHaveLength(0);
+  });
+
+  test("purges stale entries", () => {
+    storeIntegrity({
+      attachmentId: "old.jpg",
+      requestId: "q1",
+      capturedAt: Date.now() - 10_000_000,
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+    storeIntegrity({
+      attachmentId: "new.jpg",
+      requestId: "q2",
+      capturedAt: Date.now(),
+      exif: dummyExif,
+      c2pa: dummyC2pa,
+    });
+
+    const purged = purgeStaleIntegrity(7_200_000);
+    expect(purged).toBe(1);
+    expect(getIntegrity("old.jpg")).toBeNull();
+    expect(getIntegrity("new.jpg")).not.toBeNull();
+  });
+});

@@ -4,11 +4,15 @@ description: >-
   Review TypeScript architecture for semantic violations that `deno task
   lint:arch` cannot catch: god modules, hidden service locators, duplicated
   logic/state machines, inappropriate intimacy, oversized functions, and domain
-  leakage of time, I/O, randomness, or config without injected ports. Invoke
-  after structural refactors, new ports/packages, large layer-file changes, or
-  before PRs touching `src/domain/`, `src/application/`, ports, or large
+  leakage of time, I/O, randomness, or config without injected ports. Also
+  checks Anchr's single-purpose design rule in reviewed TypeScript: each
+  changed function, module, package, adapter, or SDK surface should do one
+  thing well. Invoke after structural refactors, new ports/packages, large
+  layer-file changes, or before PRs touching `src/domain/`, `src/application/`,
+  ports, or large
   `src/infrastructure/` files. Also invoke for "arch review", "architecture
-  review", "semantic arch lint", "/arch-lint-llm", "アーキテクチャレビュー", or
+  review", "semantic arch lint", "/arch-lint-llm", "single-purpose review",
+  "UNIX design review", "アーキテクチャレビュー", or
   "アーキテクチャ違反チェック". Runs inside the existing Claude Code session; no
   API key required.
 disable-model-invocation: false
@@ -22,7 +26,7 @@ Read the relevant `.ts` / `.tsx` files, apply the rubric below, and report findi
 ## Scope
 
 - **Include:** `src/**/*.ts(x)`, `packages/**/*.ts(x)`
-- **Exclude:** `*.test.ts(x)`, `src/testing/`, `e2e/`, `scripts/`, `example/`, `mobile/`, `dist/`, `node_modules/`
+- **Exclude:** `*.test.ts(x)`, `src/testing/`, `e2e/`, `scripts/`, `apps/`, `examples/`, `mobile/`, `dist/`, `node_modules/`
 
 If the user supplies file paths or globs as arguments, scan exactly those (still respecting the exclude list). Otherwise, default behavior:
 
@@ -32,6 +36,17 @@ If the user supplies file paths or globs as arguments, scan exactly those (still
 4. For a single-layer drill-down, `deno task lint:arch:candidates -- --layer <name>`.
 
 If no files are in scope, say so and exit — do NOT scan the whole repo unless the user explicitly asks.
+
+## Project design principle
+
+Apply the UNIX-style project rule from `CLAUDE.md`: changed components should
+do one thing and do it well. This is not a line-count or file-count rule. It is
+an ownership rule: a function, module, package, adapter, or SDK surface should
+have one responsibility that can be stated in one sentence.
+
+For code review, enforce this rule only when the violation is visible in the
+changed TypeScript architecture. Use `unix-software-design` before
+implementation or while reviewing a proposal; use this skill after code exists.
 
 ## Auto-trigger
 
@@ -72,7 +87,7 @@ For each file in scope:
 
 Lines that end with `// allow-arch: <reason>` are author-acknowledged — drop those candidates.
 
-## Rubric — six categories
+## Rubric — seven categories
 
 ### L001 — Cohesion / god module
 
@@ -134,7 +149,7 @@ Detect by **reading** both files, not by file-name matching. Quote the duplicate
 A module reaches into another module's internals.
 
 **Flag this:**
-- Imports from a deep subpath like `@anchr/cashu-frost-oracle/internal/signing-coordinator` when a public port exists.
+- Imports from a deep subpath like `@anchr/frost-oracle/internal/signing-coordinator` when a public port exists.
 - Imports a test-only export (`_setFooForTest`) from non-test code.
 - A package depending on three concrete sub-files of another package instead of one stable interface.
 
@@ -170,6 +185,33 @@ For anchr specifically, ports are defined in `src/domain/ports.ts` (`Clock`, `Id
 - Application-layer code using `Date.now()` (allowed — application is platform-aware).
 - Domain functions that already accept the relevant port via `options` / `services`.
 
+### L007 — Single-purpose boundary violation
+
+A changed boundary becomes a second owner for behavior that belongs somewhere
+else, or combines responsibilities that should remain independently
+replaceable.
+
+**Flag this:**
+- An actor SDK constructs concrete Nostr, Cashu, Blossom, TLSNotary, photo, or
+  HTTP clients instead of consuming injected ports.
+- A convenience package or facade re-implements behavior owned by a lower-level
+  package rather than re-exporting or delegating to it.
+- A package mixes actor orchestration with adapter implementation, proof engine
+  policy, and runtime config in one public surface.
+- A migration change adds the new owner while leaving the old owner active as a
+  temporary facade or compatibility path.
+
+**Do NOT flag:**
+- App-owned composition that wires SDKs, adapters, config, and product policy
+  together without owning reusable semantics.
+- Thin package entry points that only re-export owned public surfaces.
+- A cohesive adapter that contains several helpers needed to bind one concrete
+  technology to one port.
+
+Evidence required: name the boundary, state its intended one-sentence
+responsibility, identify the extra responsibility it took on, and name the
+existing or proposed owner that should receive that behavior.
+
 ## Explicit non-goals
 
 You **must not** emit findings about:
@@ -188,6 +230,9 @@ When in doubt, **don't** flag. False positives erode trust in this guard.
 - **LOW** — suppress entirely. If the only argument for "smell" is style or aesthetic, do not report.
 
 A cohesion finding (L001) is usually MEDIUM unless the file is unambiguously a god module. Service-locator (L002) and domain-leak (L006) are usually HIGH because they block testability. Duplication (L003) is HIGH when the bodies actually drift; MEDIUM if they're identical and harmless today.
+Single-purpose boundary violations (L007) are usually HIGH when they create a
+second semantic owner or make a concrete adapter hard to replace; MEDIUM when
+the ownership risk is real but still local.
 
 ## Reporting format
 

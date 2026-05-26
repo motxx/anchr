@@ -2,15 +2,15 @@
 /**
  * Architecture-review candidate picker.
  *
- * Lists the largest non-test files per layer / package so the
- * `arch-lint-llm` skill (semantic review) can focus on the files most
+ * Lists the largest non-test files per package, example, e2e bucket, and
+ * script group so the `arch-lint-llm` skill can focus on the files most
  * likely to harbour cohesion / locator / leak smells. Pure selection;
  * no analysis happens here.
  *
  * Usage:
- *   deno task lint:arch:candidates                 # top-N per layer
+ *   deno task lint:arch:candidates                 # top-N per group
  *   deno task lint:arch:candidates -- --full       # every non-test file in scope
- *   deno task lint:arch:candidates -- --layer infrastructure
+ *   deno task lint:arch:candidates -- --layer payments
  *
  * The static `deno task lint:arch` complements this: the candidate picker
  * selects, the structural lint enforces, and the LLM skill reads files
@@ -20,17 +20,6 @@ import { walk } from "jsr:@std/fs@^1/walk";
 import { relative } from "jsr:@std/path@^1";
 
 const ROOT = new URL("../", import.meta.url).pathname;
-
-const SRC_LAYERS = ["domain", "application", "infrastructure"] as const;
-const PKG_NAMES = [
-  "core-runtime",
-  "core-cashu",
-  "tlsn-toolkit",
-  "photo-bounty",
-  "cashu-frost-oracle",
-  "cashu-conditional-swap",
-  "sdk",
-] as const;
 
 const TOP_PER_LAYER = 4;
 
@@ -67,15 +56,33 @@ async function main() {
   const full = args.includes("--full");
   const layerArg = args.find((a, i, all) => all[i - 1] === "--layer");
 
+  async function workspaceGroups(
+    topDir: string,
+    childDir = "src",
+  ): Promise<{ label: string; absDir: string }[]> {
+    const out: { label: string; absDir: string }[] = [];
+    try {
+      for await (const entry of Deno.readDir(`${ROOT}${topDir}`)) {
+        if (!entry.isDirectory) continue;
+        const suffix = childDir ? `${childDir}/` : "";
+        const label = `${topDir}/${entry.name}/${suffix}`;
+        out.push({
+          label,
+          absDir: `${ROOT}${topDir}/${entry.name}/${childDir}`,
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    return out;
+  }
+
   const groups: { label: string; absDir: string }[] = [
-    ...SRC_LAYERS.map((l) => ({
-      label: `src/${l}/`,
-      absDir: `${ROOT}src/${l}`,
-    })),
-    ...PKG_NAMES.map((p) => ({
-      label: `packages/${p}/src/`,
-      absDir: `${ROOT}packages/${p}/src`,
-    })),
+    ...(await workspaceGroups("packages")),
+    ...(await workspaceGroups("examples")),
+    ...(await workspaceGroups("e2e", "")),
+    { label: "scripts/", absDir: `${ROOT}scripts` },
   ];
 
   const filtered = layerArg

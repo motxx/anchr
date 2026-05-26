@@ -14,7 +14,6 @@ const EXCLUDED_PREFIXES = [
   ".claude/skills/",
   ".codex/skills/",
   "docs/",
-  "example/expo-worker-app/",
   "node_modules/",
   "skills/",
 ];

@@ -40,13 +40,47 @@ from ad hoc review into one of these homes.
 | `deno task test:all:docker` | `automated` | Docker-backed verification bar from `CLAUDE.md`. |
 | `skills/arch-lint-llm/SKILL.md` | `semantic skill` | God modules, hidden service locators, duplicated state machines, inappropriate intimacy, oversized functions, and domain leakage that deterministic architecture lint cannot prove. |
 | `skills/check-silent-bypass/SKILL.md` | `semantic skill` | Plausible-looking branches that skip verification, validation, settlement, redemption, auth, signing, or quorum checks. |
-| `skills/resolve-issues/SKILL.md` | `semantic skill` | Issue closure discipline: dependency checks, focused implementation, verification, resolution notes, and moving issues only after checks pass. |
-| `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues. |
+| `skills/resolve-issues/SKILL.md` | `semantic skill` | Issue closure discipline: dependency checks, resolver-led splitting, focused implementation, verification, resolution notes, and moving issues only after checks pass. |
+| `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues without overfitting the implementation split. |
+| `skills/make-sub-issues/SKILL.md` | `semantic skill` | Creating resolver-led child issues and parent/child dependency links when one issue is too broad for a coherent verified change. |
 | `skills/test-regtest/SKILL.md` | `semantic skill` | Manual and automated regtest runbook selection. |
 | `skills/test-tlsn/SKILL.md` | `semantic skill` | Manual and automated TLSNotary verification runbook selection. |
+| `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
+| `docs/example-delivery-lifecycle.md` | `automated` process input | Requirements, promotion checklist, verification routing, and closure notes for README-listed examples. |
 | `docs/issues/README.md` | `automated` process input | Issue structure, dependency recording, closure format, review residual recording, and security-sensitive issue limits. |
+
+## Example Testnet Smoke Convention
+
+Every README-listed `Testnet` example must provide a consistent local
+completion bar:
+
+- A README status line and runbook that name the local services the example
+  assumes, such as relay, mint, Oracle, notary, verifier, sandbox API, or media
+  fixture.
+- A non-secret environment section or template. Placeholders are fine; private
+  keys, source ecash proofs, bearer tokens, or production credentials are not.
+- A command sequence for both sides of the demonstrated flow, using the
+  example's actual Customer/Provider or customer/provider vocabulary.
+- `deno task smoke` from the example directory. The smoke task must be
+  deterministic and safe for local review: it can type-check scripts, run
+  fixture-backed tests, and parse config, but it must not require funded tokens,
+  production credentials, or live external accounts.
+- A runbook section for live or Docker-backed validation when the smoke task
+  cannot cover relays, mints, notaries, or third-party sandboxes.
+
+Task naming is intentionally narrow:
+
+- `check` means compile/type/API-drift coverage.
+- `test` means local fixture-backed behavior coverage.
+- `smoke` is the maintained pre-advertising command and should call `check`,
+  `test`, or both.
+
+Before marking or keeping an example as `Testnet`, maintainers should run its
+`deno task smoke`, then follow the runbook's live-service path when the README
+claims a reproducible end-to-end flow. If the smoke task only compiles scripts,
+the runbook must state which live dependencies remain outside the smoke check.
 
 ## Review Concern Map
 
@@ -67,6 +101,7 @@ from ad hoc review into one of these homes.
 | Developer-local path, secret-shaped data, or private operational detail in docs or issue text | `automated` for local paths; `human universal decision` for sensitive disclosure | `deno task lint:paths`, `docs/issues/README.md` | Add a redaction rule or a pending issue when the leak pattern is not local-path-shaped. |
 | Human disagreement about risk acceptance | `human universal decision` | `docs/threat-model.md`, `docs/universality-boundaries.md`, pending issue resolution notes | Record the accepted risk and the harness follow-up, or leave the issue pending. |
 | Review residuals after all required checks pass | `human universal decision` | This document, `docs/issues/README.md`, and pending issue resolution notes | Record only the residual decision, its owning document, or the pending issue that will resolve it. |
+| Broad issue requires implementation-aware decomposition | `semantic skill` | `skills/resolve-issues/SKILL.md`, `skills/make-sub-issues/SKILL.md`, `docs/issues/README.md` | Split the parent before implementation and resolve children as independently verified units. |
 
 ## Not Yet Covered
 
@@ -146,7 +181,7 @@ class higher in the table.
 | `boundary drift` | A layer, package, vocabulary, dependency-direction, or runtime-placement rule is violated. The shape of the violation is structural, not semantic. | Extend `scripts/arch-lint.ts` (or another `scripts/lint-*.ts`) plus its test fixture. Use `skills/arch-lint-llm/SKILL.md` only when the rule cannot be expressed deterministically. |
 | `semantic bypass` | A plausible-looking branch skips a verification, validation, settlement, redemption, auth, signing, or quorum check. The pattern requires reading intent across files. | Add the concrete shape to `skills/check-silent-bypass/SKILL.md`. Add a deterministic lint or test if the pattern can be reduced to a syntactic check. |
 | `missing invariant` | A security, fund-flow, oracle-release, privacy, or replay property is implicit and not locked. Weakening it would invalidate a `README.md` or threat-model claim. | Add or update an invariant in `docs/threat-model.md`, record it in `docs/threat-model.lock.json` via `deno task lint:invariants`, and reference the pinning test or attack class. |
-| `unclear universal decision` | A rule is presented as protocol-universal but might really be reference-implementation or adapter policy, or vice versa. The disagreement is about which class in `docs/universality-boundaries.md` owns the rule. | Decide the class in `docs/universality-boundaries.md`, move the normative statement to the owning home (`specs/`, `docs/threat-model.md`, `docs/architecture.md`, package `SPEC.md`, or `example/<app>/`), and link from any lower-level document. |
+| `unclear universal decision` | A rule is presented as protocol-universal but might really be reference-implementation or adapter policy, or vice versa. The disagreement is about which class in `docs/universality-boundaries.md` owns the rule. | Decide the class in `docs/universality-boundaries.md`, move the normative statement to the owning home (`specs/`, `docs/threat-model.md`, `docs/architecture.md`, package `SPEC.md`, or `examples/<name>/`), and link from any lower-level document. |
 
 ### Routing rules
 

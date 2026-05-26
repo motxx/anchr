@@ -22,12 +22,12 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "@anchr/core-runtime";
+import { spawn } from "../helpers/process.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
-import { createQueryService } from "../../packages/bounty/src/application/query-service.ts";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import { createPreimageStore } from "@anchr/core-cashu/preimage-store";
-import { normalizeQueryResult } from "../../packages/bounty/src/infrastructure/attachments.ts";
+import { createQueryService } from "@anchr/sdk/testing";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import { createPreimageStore } from "@anchr/sdk/payments";
+import { normalizeResultAttachments } from "@anchr/sdk/attachments";
 import {
   checkInfraReady,
   createWallet,
@@ -58,13 +58,13 @@ const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
 // Wire oracleRegistry + preimageStore so verification can actually succeed
-// (mirrors production composition in packages/bounty/src/infrastructure/runtime.ts).
+// Mirrors production composition through SDK request storage.
 const testOracleRegistry = createOracleRegistry();
 const testPreimageStore = createPreimageStore();
 const testService = createQueryService({
   oracleRegistry: testOracleRegistry,
   preimageStore: testPreimageStore,
-  normalizeResult: normalizeQueryResult,
+  normalizeResult: normalizeResultAttachments,
   hooks: {},
 });
 
@@ -142,12 +142,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     const submitOutcome = await testService.submitQueryResult(
       created.id,
       {
-        attachments: [{
-          id: "e2e_test_hash_deadbeef",
-          uri: "http://localhost:3333/e2e-test.jpg",
-          mime_type: "image/jpeg",
-          storage_kind: "blossom",
-        }],
+        attachments: [],
         gps: { lat: 35.6595, lon: 139.7004 },
       },
       { executor_type: "human", channel: "adapter" },

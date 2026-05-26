@@ -12,7 +12,7 @@ Read the in-scope `.ts` / `.tsx` files, apply the rubric below, and report findi
 ## Scope
 
 - **Include:** `src/(domain|application|infrastructure)/**/*.ts(x)`, `packages/<pkg>/src/**/*.ts(x)`
-- **Exclude:** `*.test.ts(x)`, `*.d.ts`, `src/testing/`, `src/ui/`, `e2e/`, `scripts/`, `example/`, `mobile/`, `dist/`, `node_modules/`
+- **Exclude:** `*.test.ts(x)`, `*.d.ts`, `src/testing/`, `src/ui/`, `e2e/`, `scripts/`, `apps/`, `examples/`, `mobile/`, `dist/`, `node_modules/`
 
 `src/ui/` is intentionally out of scope: silent bypass is a server-side trust enforcement concern, and the browser cannot enforce trust. Form validation in UI is a UX hint, not a security control.
 

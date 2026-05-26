@@ -26,16 +26,16 @@ import { expect } from "@std/expect";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import { createCustomer } from "@anchr/customer-sdk/customer";
-import { createProvider } from "@anchr/provider-sdk/provider";
-import { createCashuClient } from "@anchr/customer-sdk/cashu";
-import { createRelayClient } from "@anchr/customer-sdk/nostr";
+import { createCustomer } from "@anchr/sdk/customer";
+import { createProvider } from "@anchr/sdk/provider";
+import { createCashuClient } from "@anchr/sdk/adapters/cashu";
+import { createRelayClient } from "@anchr/sdk/adapters/nostr";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
 } from "@anchr/protocol/events";
-import type { OracleClient } from "@anchr/oracle-sdk/oracle";
+import type { OracleClient } from "@anchr/sdk/oracle";
 import { getDecodedToken, Wallet } from "@cashu/cashu-ts";
 
 import {
@@ -81,11 +81,7 @@ suite(
 
       // The OracleClient that the customer uses for the pre-flight hash.
       const oracleClient: OracleClient = {
-        requestHash: () =>
-          Promise.resolve({
-            hash: hashHex,
-            oraclePubkey: oracleKey.publicKey,
-          }),
+        requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
       };
 
       // The simulated oracle subscribes to kind 6300 result events. When
@@ -149,13 +145,15 @@ suite(
       await new Promise((r) => setTimeout(r, 500));
 
       const customer = createCustomer({
-        oracles: [oracleKey.publicKey],
+        oracles: [{
+          pubkey: oracleKey.publicKey,
+          client: oracleClient,
+        }],
         relays: [RELAY_URL],
         mint: MINT_URL,
-        oracleClient,
         cashuClient: customerCashu,
         relayClient: customerRelay,
-        quoteWindowMs: 3_000,
+        offerWindowMs: 3_000,
         resultTimeoutMs: 30_000,
       });
 

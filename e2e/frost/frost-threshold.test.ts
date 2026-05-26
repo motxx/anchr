@@ -2,7 +2,7 @@
  * E2E tests: FROST t-of-n threshold oracle signing with independent Oracles.
  *
  * Three INDEPENDENT Oracle operators (Anchr, CommunityOracle-A, CommunityOracle-B)
- * run a full FROST DKG + signing lifecycle. Requester and Worker are NOT signers —
+ * run a full FROST DKG + signing lifecycle. Customer and Provider are NOT signers —
  * only neutral verifiers participate in threshold signing.
  *
  * Test matrix:
@@ -30,11 +30,11 @@ import {
   signRound1,
   signRound2,
   verifySignature,
-} from "@anchr/frost-oracle/frost-cli";
-import { buildOracleApp } from "../../packages/bounty/src/infrastructure/oracle-service/server.ts";
+} from "@anchr/sdk/payments";
+import { buildOracleApp } from "@anchr/sdk/adapters/oracle-service";
 
 // ---------------------------------------------------------------------------
-// Oracle operators — all independent, no Requester/Worker
+// Oracle operators — all independent, no Customer/Provider
 // ---------------------------------------------------------------------------
 const ORACLES = ["Anchr", "CommunityOracle-A", "CommunityOracle-B"] as const;
 const THRESHOLD = 2;

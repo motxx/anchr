@@ -5,13 +5,29 @@
     "moduleResolution": "bundler",
     "declaration": true,
     "emitDeclarationOnly": true,
-    "rootDir": "src",
+    "rootDir": "..",
     "outDir": "dist",
     "strict": true,
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM"],
+    "types": ["node", "../../tools/types/deno-for-tsc"],
+    "baseUrl": ".",
+    "paths": {
+      "@anchr/protocol": ["../protocol/src/mod.ts"],
+      "@anchr/protocol/events": ["../protocol/src/events.ts"],
+      "@anchr/protocol/nostr": ["../protocol/src/nostr.ts"],
+      "@anchr/protocol/schema": ["../protocol/src/schema.ts"],
+      "@anchr/protocol/types": ["../protocol/src/types.ts"]
+    },
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/index.ts"]
+  "include": [
+    "src/index.ts",
+    "src/customer.ts",
+    "src/customer-types.ts",
+    "src/provider.ts",
+    "src/provider-types.ts",
+    "src/oracle.ts"
+  ]
 }

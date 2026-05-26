@@ -1,5 +1,0 @@
-{
-  "tasks": {
-    "demo": "deno run --allow-all src/demo-stream.ts"
-  }
-}

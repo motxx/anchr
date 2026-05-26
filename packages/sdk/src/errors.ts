@@ -5,21 +5,25 @@ export class AnchrError extends Error {
   }
 }
 
-export class QueryTimeoutError extends AnchrError {
-  constructor(queryId: string, timeoutSeconds: number) {
-    super(`Query ${queryId} timed out after ${timeoutSeconds}s`, "TIMEOUT", {
-      queryId,
-      timeoutSeconds,
-    });
+export class RequestTimeoutError extends AnchrError {
+  constructor(requestId: string, timeoutSeconds: number) {
+    super(
+      `Request ${requestId} timed out after ${timeoutSeconds}s`,
+      "TIMEOUT",
+      {
+        requestId,
+        timeoutSeconds,
+      },
+    );
   }
 }
 
 export class VerificationFailedError extends AnchrError {
-  constructor(queryId: string, failures: string[]) {
+  constructor(requestId: string, failures: string[]) {
     super(
       `Verification failed: ${failures.join(", ")}`,
       "VERIFICATION_FAILED",
-      { queryId, failures },
+      { requestId, failures },
     );
   }
 }

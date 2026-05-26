@@ -1,19 +1,20 @@
 import {
   AnchrError,
-  QueryTimeoutError,
+  RequestTimeoutError,
   VerificationFailedError,
 } from "./errors.ts";
 import {
   type AnchrConfig,
-  type PhotoQueryOptions,
+  type HttpRequestOptions,
+  type HttpRequestResult,
+  type PhotoRequestOptions,
   type PhotoResult,
-  type QueryOptions,
-  type QueryResult,
-  type QueryStatusResponse,
-  type QuerySummary,
+  type RequestStatusResponse,
+  type RequestSummary,
   sleep,
   type SubmitResponse,
 } from "./client-types.ts";
+import { isRecord, isString } from "./internal/runtime/types.ts";
 
 /**
  * Anchr — buy cryptographically verified data with sats.
@@ -24,7 +25,7 @@ import {
  *
  * const anchr = new Anchr({ serverUrl: "https://anchr.example.com" });
  *
- * const result = await anchr.query({
+ * const result = await anchr.request({
  *   description: "BTC price from CoinGecko",
  *   targetUrl: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
  *   conditions: [{ type: "jsonpath", expression: "bitcoin.usd" }],
@@ -45,54 +46,54 @@ export class Anchr {
   }
 
   /**
-   * Query verified web data via TLSNotary. Creates a query, waits for a
-   * Worker to fulfill it with a cryptographic proof, verifies the proof,
+   * Request verified web data via TLSNotary. Creates a paid request, waits for
+   * a Provider to fulfill it with a cryptographic proof, verifies the proof,
    * and returns the verified data.
    */
-  async query(options: QueryOptions): Promise<QueryResult> {
-    const queryId = await this.createQuery(options);
+  async request(options: HttpRequestOptions): Promise<HttpRequestResult> {
+    const requestId = await this.createRequest(options);
 
     const pollTimeout = options.pollTimeoutSeconds ?? options.timeoutSeconds ??
       this.config.defaultTimeoutSeconds;
     const deadline = Date.now() + pollTimeout * 1000;
 
     while (Date.now() < deadline) {
-      const status = await this.getQueryStatus(queryId);
+      const status = await this.getRequestStatus(requestId);
 
       if (status.status === "approved") {
-        return this.buildQueryResult(status, options);
+        return this.buildRequestResult(status, options);
       }
 
       if (status.status === "rejected") {
         throw new VerificationFailedError(
-          queryId,
+          requestId,
           status.verification?.failures ?? ["Unknown verification failure"],
         );
       }
 
       if (status.status === "expired") {
-        throw new AnchrError(`Query ${queryId} expired`, "EXPIRED");
+        throw new AnchrError(`Request ${requestId} expired`, "EXPIRED");
       }
 
       await sleep(this.config.pollIntervalMs);
     }
 
-    throw new QueryTimeoutError(queryId, pollTimeout);
+    throw new RequestTimeoutError(requestId, pollTimeout);
   }
 
   /**
-   * Query a verified photo via C2PA. Creates a photo query, waits for a
-   * Worker to photograph the location, verifies the C2PA signature and
+   * Request a verified photo via C2PA. Creates a photo request, waits for a
+   * Provider to photograph the location, verifies the C2PA signature and
    * GPS proximity, and returns the result.
    */
-  async photo(options: PhotoQueryOptions): Promise<PhotoResult> {
-    const queryId = await this.createPhotoQuery(options);
+  async photo(options: PhotoRequestOptions): Promise<PhotoResult> {
+    const requestId = await this.createPhotoRequest(options);
     const photoTimeout = options.timeoutSeconds ??
       this.config.defaultTimeoutSeconds;
     const deadline = Date.now() + photoTimeout * 1000;
 
     while (Date.now() < deadline) {
-      const status = await this.getQueryStatus(queryId);
+      const status = await this.getRequestStatus(requestId);
 
       if (status.status === "approved") {
         return {
@@ -106,45 +107,45 @@ export class Anchr {
           })),
           notes: status.result?.notes,
           gps: status.result?.gps,
-          queryId,
+          requestId,
           satsPaid: options.maxSats ?? 0,
         };
       }
 
       if (status.status === "rejected") {
         throw new VerificationFailedError(
-          queryId,
+          requestId,
           status.verification?.failures ?? [],
         );
       }
 
       if (status.status === "expired") {
-        throw new AnchrError(`Query ${queryId} expired`, "EXPIRED");
+        throw new AnchrError(`Request ${requestId} expired`, "EXPIRED");
       }
 
       await sleep(this.config.pollIntervalMs);
     }
 
-    throw new QueryTimeoutError(queryId, photoTimeout);
+    throw new RequestTimeoutError(requestId, photoTimeout);
   }
 
-  async createTlsnQuery(options: QueryOptions): Promise<string> {
-    return this.createQuery(options);
+  async createTlsnRequest(options: HttpRequestOptions): Promise<string> {
+    return this.createRequest(options);
   }
 
-  async getQueryStatus(queryId: string): Promise<QueryStatusResponse> {
-    const res = await this.fetch(`/queries/${queryId}`);
+  async getRequestStatus(requestId: string): Promise<RequestStatusResponse> {
+    const res = await this.fetch(`/queries/${requestId}`);
     if (!res.ok) {
-      throw new AnchrError(`Failed to get query ${queryId}`, "API_ERROR", {
+      throw new AnchrError(`Failed to get request ${requestId}`, "API_ERROR", {
         status: res.status,
       });
     }
     return res.json();
   }
 
-  async listOpenQueries(
+  async listOpenRequests(
     options?: { lat?: number; lon?: number; maxDistanceKm?: number },
-  ): Promise<QuerySummary[]> {
+  ): Promise<RequestSummary[]> {
     const params = new URLSearchParams();
     if (options?.lat != null) params.set("lat", String(options.lat));
     if (options?.lon != null) params.set("lon", String(options.lon));
@@ -153,20 +154,20 @@ export class Anchr {
     }
     const qs = params.toString();
     const res = await this.fetch(`/queries${qs ? `?${qs}` : ""}`);
-    if (!res.ok) throw new AnchrError("Failed to list queries", "API_ERROR");
+    if (!res.ok) throw new AnchrError("Failed to list requests", "API_ERROR");
     return res.json();
   }
 
   async submitPresentation(
-    queryId: string,
+    requestId: string,
     presentationBase64: string,
-    workerPubkey = "sdk-worker",
+    providerPubkey = "sdk-provider",
   ): Promise<SubmitResponse> {
-    const res = await this.fetch(`/queries/${queryId}/result`, {
+    const res = await this.fetch(`/queries/${requestId}/result`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        worker_pubkey: workerPubkey,
+        provider_pubkey: providerPubkey,
         tlsn_presentation: presentationBase64,
       }),
     });
@@ -176,10 +177,10 @@ export class Anchr {
     return res.json();
   }
 
-  private async createQuery(options: QueryOptions): Promise<string> {
+  private async createRequest(options: HttpRequestOptions): Promise<string> {
     // domainHint: full targetUrl (with credentials/session IDs) is delivered
-    // to the selected Worker via NIP-44 encrypted_context, never the public
-    // query envelope.
+    // to the selected Provider via NIP-44 encrypted_context, never the public
+    // request envelope.
     const publicTargetUrl = options.domainHint
       ? `https://${options.domainHint}/`
       : options.targetUrl;
@@ -216,20 +217,23 @@ export class Anchr {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err: unknown = await res.json().catch(() => ({}));
+      const message = isRecord(err) && isString(err.error)
+        ? err.error
+        : `Failed to create request (${res.status})`;
       throw new AnchrError(
-        (err as Record<string, string>).error ??
-          `Failed to create query (${res.status})`,
+        message,
         "API_ERROR",
         err,
       );
     }
 
-    const data = (await res.json()) as { query_id: string };
-    return data.query_id;
+    return await this.readCreatedRequestId(res, "request");
   }
 
-  private async createPhotoQuery(options: PhotoQueryOptions): Promise<string> {
+  private async createPhotoRequest(
+    options: PhotoRequestOptions,
+  ): Promise<string> {
     const body: Record<string, unknown> = {
       description: options.description,
       location_hint: options.locationHint,
@@ -249,16 +253,15 @@ export class Anchr {
     });
 
     if (!res.ok) {
-      throw new AnchrError("Failed to create photo query", "API_ERROR");
+      throw new AnchrError("Failed to create photo request", "API_ERROR");
     }
-    const data = (await res.json()) as { query_id: string };
-    return data.query_id;
+    return await this.readCreatedRequestId(res, "photo request");
   }
 
-  private buildQueryResult(
-    status: QueryStatusResponse,
-    options: QueryOptions,
-  ): QueryResult {
+  private buildRequestResult(
+    status: RequestStatusResponse,
+    options: HttpRequestOptions,
+  ): HttpRequestResult {
     const verified = status.verification?.tlsn_verified;
     const rawBody = verified?.revealed_body ?? "";
 
@@ -278,20 +281,31 @@ export class Anchr {
       timestamp: verified?.session_timestamp ?? 0,
       checks: status.verification?.checks ?? [],
       satsPaid: options.maxSats ?? 0,
-      queryId: status.id,
+      requestId: status.id,
     };
   }
 
   private async fetch(path: string, init?: RequestInit): Promise<Response> {
-    const headers: Record<string, string> = {
-      ...(init?.headers as Record<string, string>),
-    };
+    const headers = new Headers(init?.headers);
     if (this.config.apiKey) {
-      headers["Authorization"] = `Bearer ${this.config.apiKey}`;
+      headers.set("Authorization", `Bearer ${this.config.apiKey}`);
     }
     return globalThis.fetch(`${this.config.serverUrl}${path}`, {
       ...init,
       headers,
+    });
+  }
+
+  private async readCreatedRequestId(
+    res: Response,
+    label: string,
+  ): Promise<string> {
+    const payload: unknown = await res.json();
+    if (isRecord(payload) && isString(payload.query_id)) {
+      return payload.query_id;
+    }
+    throw new AnchrError(`Malformed create ${label} response`, "API_ERROR", {
+      payload,
     });
   }
 }

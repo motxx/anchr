@@ -1,52 +1,15 @@
 #!/usr/bin/env -S deno run --allow-read
 /**
- * Architecture Lint — enforces Clean Architecture layer dependency rules
- * inside `packages/bounty/` AND inter-package dependency rules across
- * `packages/`.
+ * Architecture lint for the final Anchr public surface.
  *
- * Layer rules apply inside `packages/bounty/src/` (the host's
- * domain/application/infrastructure tree). Other packages are checked
- * by the package-dep allow-list below.
+ * The public package graph is intentionally small:
+ *   [E025] protocol must not depend on another @anchr/* package.
+ *   [E017] sdk may depend on protocol and no other @anchr/* package.
+ *   [E023] examples, e2e tests, and top-level scripts must reach Anchr
+ *          through @anchr/sdk or @anchr/protocol public subpaths only.
+ *   [E022] application vocabulary must not leak into package code.
  *
- * Layers (inner → outer):
- *   domain  →  application  →  infrastructure
- *
- * Rules (bounty layers —import / dependency):
- *   [E001] domain must not import from application or infrastructure
- *   [E004] Banned packages: express, dotenv, ws
- *   [E005] application must not import from infrastructure
- *   [E009] only test files may import from packages/bounty/src/testing/
- *   [E018] bounty must not depend on @anchr/sdk (downstream-consumer SDK)
- *   [W001] Prefer JSR over npm for packages that have JSR equivalents
- *
- * Rules (bounty layers —content):
- *   [E007] Deno.* not allowed in domain/ (must be wrapped behind a port)
- *   [E008] Deno.* not allowed in application/ (use injected ports)
- *   [E021] console.* not allowed in application/ or infrastructure/
- *          (use @anchr/core-runtime/logger; log-stream.ts is exempt as
- *          the sanctioned tee target)
- *
- * Rules (packages/):
- *   [E010] core-runtime must not depend on any other @anchr/* package
- *   [E012] core-cashu may only depend on core-runtime
- *   [E013] tlsn-toolkit may only depend on core-runtime
- *   [E014] photo-verification may only depend on core-runtime
- *   [E015] frost-oracle may only depend on core-runtime
- *   [E016] cashu-conditional-swap may only depend on
- *          core-runtime, core-cashu, frost-oracle
- *   [E019] blossom may only depend on core-runtime
- *   [E025] protocol may not depend on other @anchr/* packages
- *   [E026] actor SDKs may depend on protocol and their explicit peer SDKs
- *   [E024] bounty may depend on every primitive package except actor SDKs
- *   [E017] sdk may only aggregate protocol and actor SDK packages
- *
- * Rules (example/):
- *   [E023] example/<app>/ must reach Anchr only through `@anchr/*`
- *          (or external npm/jsr). Reaching into `packages/<pkg>/src/...`
- *          via relative path is a violation — that bypasses the
- *          package's public surface.
- *
- * Per-line opt-out (same line):
+ * Per-line opt-out:
  *   // allow-arch: <reason>
  */
 
@@ -54,9 +17,8 @@ import { walk } from "jsr:@std/fs@^1/walk";
 import { relative } from "jsr:@std/path@^1";
 
 const ROOT = new URL("../", import.meta.url).pathname;
-const RUNTIME_SRC = `${ROOT}packages/bounty/src/`;
 const PKG_DIR = `${ROOT}packages/`;
-const EXAMPLE_DIR = `${ROOT}example/`;
+const PUBLIC_SURFACE_DIRS = ["examples", "e2e", "scripts"] as const;
 
 interface Violation {
   file: string;
@@ -66,84 +28,14 @@ interface Violation {
   message: string;
 }
 
-// ── src/ layer rules ───────────────────────────────────────────────
-
-const SRC_LAYERS = ["domain", "application", "infrastructure"] as const;
-type SrcLayer = (typeof SRC_LAYERS)[number];
-
-const SRC_FORBIDDEN: Record<SrcLayer, SrcLayer[]> = {
-  domain: ["application", "infrastructure"],
-  application: ["infrastructure"],
-  infrastructure: [],
-};
-
-function srcLayerOf(rel: string): SrcLayer | null {
-  const first = rel.split("/")[0];
-  return SRC_LAYERS.includes(first as SrcLayer) ? (first as SrcLayer) : null;
-}
-
-// ── packages/ rules ────────────────────────────────────────────────
-
 const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
-  "core-runtime": new Set<string>(),
-  "core-cashu": new Set<string>(["core-runtime"]),
-  "tlsn-toolkit": new Set<string>(["core-runtime"]),
-  "photo-verification": new Set<string>(["core-runtime"]),
-  "frost-oracle": new Set<string>(["core-runtime"]),
-  "cashu-conditional-swap": new Set<string>([
-    "core-runtime",
-    "core-cashu",
-    "frost-oracle",
-  ]),
-  "blossom": new Set<string>(["core-runtime"]),
   "protocol": new Set<string>(),
-  "oracle-sdk": new Set<string>(["protocol"]),
-  "customer-sdk": new Set<string>(["protocol", "oracle-sdk"]),
-  "provider-sdk": new Set<string>(["protocol"]),
-  "bounty": new Set<string>([
-    "core-runtime",
-    "core-cashu",
-    "tlsn-toolkit",
-    "photo-verification",
-    "frost-oracle",
-    "cashu-conditional-swap",
-    "blossom",
-  ]),
-  "sdk": new Set<string>([
-    "core-runtime",
-    "protocol",
-    "oracle-sdk",
-    "customer-sdk",
-    "provider-sdk",
-  ]),
+  "sdk": new Set<string>(["protocol"]),
 };
-
-const BANNED_PACKAGES = new Set(["express", "dotenv", "ws"]);
-
-const JSR_PREFERRED: Record<string, string> = {
-  "npm:hono": "jsr:@hono/hono",
-  "npm:zod": "jsr:@zod/zod",
-  "npm:@noble/hashes": "jsr:@noble/hashes",
-};
-
-// Files that are sanctioned exceptions to a content rule. Keep this set
-// small and named — every entry is a load-bearing exception, not a TODO.
-const E021_CONSOLE_EXEMPT = new Set<string>([
-  // The sanctioned console tee. Intercepts and re-emits — the only spot
-  // where `console.*` is the API, not an accidental logger.
-  "packages/bounty/src/infrastructure/log-stream.ts",
-]);
-
-// Test fixture files that legitimately contain references to
-// otherwise-banned content (used by other tests).
-function isTestSupport(rel: string): boolean {
-  return rel.endsWith(".test.ts") || rel.endsWith(".test.tsx") ||
-    rel.startsWith("testing/");
-}
 
 const OPT_OUT = /\/\/\s*allow-arch:/;
-
-// ── Parsing ────────────────────────────────────────────────────────
+const APP_VOCAB =
+  /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces)\b/;
 
 const IMPORT_RE =
   /(?:^|\n)\s*(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']/g;
@@ -151,12 +43,11 @@ const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
 function extractImports(source: string): { specifier: string; line: number }[] {
   const results: { specifier: string; line: number }[] = [];
-
   const stripped = source
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
     .replace(
       /(^|\n)([^\n]*?)\/\/[^\n]*/g,
-      (_m, p1, p2) => `${p1}${p2}${" ".repeat(0)}`,
+      (_m, p1, p2) => `${p1}${p2}`,
     );
 
   function lineOf(offset: number): number {
@@ -175,21 +66,6 @@ function extractImports(source: string): { specifier: string; line: number }[] {
     }
   }
   return results;
-}
-
-function resolveRelativeSrcLayer(
-  specifier: string,
-  fileRelDir: string,
-): SrcLayer | null {
-  if (!specifier.startsWith(".")) return null;
-  const parts = fileRelDir.split("/").concat(specifier.split("/"));
-  const resolved: string[] = [];
-  for (const p of parts) {
-    if (p === "." || p === "") continue;
-    if (p === "..") resolved.pop();
-    else resolved.push(p);
-  }
-  return srcLayerOf(resolved.join("/"));
 }
 
 function resolvePackageDep(specifier: string, fileRel: string): string | null {
@@ -214,14 +90,11 @@ function resolvePackageDep(specifier: string, fileRel: string): string | null {
   return null;
 }
 
-/**
- * Detect when a packages/ file imports from src/ via a relative path.
- * Workspace JSR specs and `@anchr/*` are package-to-package; only the
- * relative `../../src/...` form is the violation we're after.
- */
-function relativeTargetsHostSrc(specifier: string, fileRel: string): boolean {
+function relativeTargetsPackageSrc(
+  specifier: string,
+  fileRel: string,
+): boolean {
   if (!specifier.startsWith(".")) return false;
-  if (!fileRel.startsWith("packages/")) return false;
   const fileParts = fileRel.split("/").slice(0, -1);
   const specParts = specifier.split("/");
   const merged: string[] = [...fileParts];
@@ -230,22 +103,8 @@ function relativeTargetsHostSrc(specifier: string, fileRel: string): boolean {
     if (p === "..") merged.pop();
     else merged.push(p);
   }
-  return merged[0] === "src";
+  return merged[0] === "packages" && merged.includes("src");
 }
-
-// ── Content scanners ────────────────────────────────────────────────
-
-const DENO_CALL = /\bDeno\.[a-zA-Z]/;
-const CONSOLE_CALL = /\bconsole\.(log|error|warn|info|debug|trace)\b/;
-/**
- * Application-layer vocabulary that must not leak into core primitives.
- * The lint catches naming drift before it spreads — e.g. a fresh contributor
- * adding a `marketX` field to a `domain/` type would be reminded that the
- * SDK is application-agnostic. Concrete usage of these terms lives in
- * `example/<app>/` and is fine there.
- */
-const APP_VOCAB =
-  /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces)\b/;
 
 interface ContentHit {
   line: number;
@@ -256,220 +115,21 @@ function scanContentLines(source: string, pattern: RegExp): ContentHit[] {
   const hits: ContentHit[] = [];
   const lines = source.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    const ln = lines[i];
-    const trimmed = ln.trimStart();
+    const line = lines[i];
+    const trimmed = line.trimStart();
     if (trimmed.startsWith("//") || trimmed.startsWith("*")) continue;
-    if (OPT_OUT.test(ln)) continue;
-    const m = ln.match(pattern);
+    if (OPT_OUT.test(line)) continue;
+    const m = line.match(pattern);
     if (m) hits.push({ line: i + 1, match: m[0] });
   }
   return hits;
 }
 
-// ── Checker ────────────────────────────────────────────────────────
-
-function checkSrcFile(rel: string, source: string): Violation[] {
-  const violations: Violation[] = [];
-  const layer = srcLayerOf(rel);
-  const isTest = isTestSupport(rel);
-  if (!layer) return violations;
-
-  const forbidden: SrcLayer[] = SRC_FORBIDDEN[layer];
-  const imports = extractImports(source);
-  const relDir = rel.split("/").slice(0, -1).join("/");
-
-  for (const { specifier, line } of imports) {
-    const targetLayer = resolveRelativeSrcLayer(specifier, relDir);
-    if (targetLayer && forbidden.includes(targetLayer)) {
-      const code = layer === "domain"
-        ? "E001"
-        : layer === "application"
-        ? "E005"
-        : "E001";
-      violations.push({
-        file: `packages/bounty/src/${rel}`,
-        line,
-        code,
-        severity: "error",
-        message:
-          `${layer}/ must not import from ${targetLayer}/ (found "${specifier}")`,
-      });
-    }
-
-    const bare = specifier.replace(/^npm:/, "");
-    const pkgName = bare.startsWith("@")
-      ? bare.split("/").slice(0, 2).join("/")
-      : bare.split("/")[0];
-    if (BANNED_PACKAGES.has(pkgName)) {
-      violations.push({
-        file: `packages/bounty/src/${rel}`,
-        line,
-        code: "E004",
-        severity: "error",
-        message: `Banned package "${pkgName}" — use the Deno/Hono equivalent`,
-      });
-    }
-
-    // E018 — src/ must not depend on @anchr/sdk
-    if (specifier === "@anchr/sdk" || specifier.startsWith("@anchr/sdk/")) {
-      violations.push({
-        file: `packages/bounty/src/${rel}`,
-        line,
-        code: "E018",
-        severity: "error",
-        message:
-          `src/ must not import from "@anchr/sdk" (the SDK is downstream of the host)`,
-      });
-    }
-
-    // E009 — only test files may import from packages/bounty/src/testing/
-    if (!isTest) {
-      const targetIsTesting = (specifier.startsWith(".") &&
-        (() => {
-          const parts = relDir.split("/").concat(specifier.split("/"));
-          const resolved: string[] = [];
-          for (const p of parts) {
-            if (p === "." || p === "") continue;
-            if (p === "..") resolved.pop();
-            else resolved.push(p);
-          }
-          return resolved[0] === "testing";
-        })()) ||
-        specifier.includes("/packages/bounty/src/testing/");
-      if (targetIsTesting) {
-        violations.push({
-          file: `packages/bounty/src/${rel}`,
-          line,
-          code: "E009",
-          severity: "error",
-          message:
-            `non-test code must not import from packages/bounty/src/testing/ (found "${specifier}")`,
-        });
-      }
-    }
-
-    for (const [npmPrefix, jsrAlt] of Object.entries(JSR_PREFERRED)) {
-      if (specifier.startsWith(npmPrefix)) {
-        violations.push({
-          file: `packages/bounty/src/${rel}`,
-          line,
-          code: "W001",
-          severity: "warn",
-          message:
-            `Prefer "${jsrAlt}" over "${specifier}" (supply-chain safety)`,
-        });
-      }
-    }
-  }
-
-  // Content rules — skip test-support files, they're allowed to mock anything.
-  if (!isTest) {
-    if (layer === "domain") {
-      for (const h of scanContentLines(source, DENO_CALL)) {
-        violations.push({
-          file: `packages/bounty/src/${rel}`,
-          line: h.line,
-          code: "E007",
-          severity: "error",
-          message:
-            `Deno.* not allowed in domain/ (found "${h.match}") — wrap behind a port`,
-        });
-      }
-    }
-    if (layer === "application") {
-      for (const h of scanContentLines(source, DENO_CALL)) {
-        violations.push({
-          file: `packages/bounty/src/${rel}`,
-          line: h.line,
-          code: "E008",
-          severity: "error",
-          message:
-            `Deno.* not allowed in application/ (found "${h.match}") — inject a port`,
-        });
-      }
-    }
-    if (
-      (layer === "application" || layer === "infrastructure") &&
-      !E021_CONSOLE_EXEMPT.has(`packages/bounty/src/${rel}`)
-    ) {
-      for (const h of scanContentLines(source, CONSOLE_CALL)) {
-        violations.push({
-          file: `packages/bounty/src/${rel}`,
-          line: h.line,
-          code: "E021",
-          severity: "error",
-          message:
-            `console.${h.match} not allowed in ${layer}/ — use @anchr/core-runtime/logger`,
-        });
-      }
-    }
-    for (const h of scanContentLines(source, APP_VOCAB)) {
-      violations.push({
-        file: `packages/bounty/src/${rel}`,
-        line: h.line,
-        code: "E022",
-        severity: "error",
-        message:
-          `application vocabulary "${h.match}" not allowed in packages/bounty — concrete apps belong in example/`,
-      });
-    }
-  }
-
-  return violations;
-}
-
-// ── example/ rule ──────────────────────────────────────────────────
-
-/**
- * Returns the example app name (`example/<app>/...`) if the file lives
- * inside one, else null. Used to scope per-example checks.
- */
-function exampleNameOf(fileRel: string): string | null {
-  if (!fileRel.startsWith("example/")) return null;
-  return fileRel.split("/")[1] ?? null;
-}
-
-/**
- * Detect when an example file imports from `packages/<pkg>/src/...` via
- * a relative path. Examples must reach Anchr only through `@anchr/*`.
- */
-function exampleReachesIntoPackageSrc(
-  specifier: string,
-  fileRel: string,
-): boolean {
-  if (!specifier.startsWith(".")) return false;
-  if (!fileRel.startsWith("example/")) return false;
-  const fileParts = fileRel.split("/").slice(0, -1);
-  const specParts = specifier.split("/");
-  const merged: string[] = [...fileParts];
-  for (const p of specParts) {
-    if (p === "." || p === "") continue;
-    if (p === "..") merged.pop();
-    else merged.push(p);
-  }
-  return merged[0] === "packages";
-}
-
-function checkExampleFile(fileRel: string, source: string): Violation[] {
-  const violations: Violation[] = [];
-  const example = exampleNameOf(fileRel);
-  if (!example) return violations;
-
-  const imports = extractImports(source);
-  for (const { specifier, line } of imports) {
-    if (exampleReachesIntoPackageSrc(specifier, fileRel)) {
-      violations.push({
-        file: fileRel,
-        line,
-        code: "E023",
-        severity: "error",
-        message:
-          `example/${example}/ must reach Anchr through "@anchr/*" only ` +
-          `(found relative path "${specifier}" pointing into packages/)`,
-      });
-    }
-  }
-  return violations;
+function isPublicAnchrSpecifier(specifier: string): boolean {
+  return specifier === "@anchr/sdk" ||
+    specifier.startsWith("@anchr/sdk/") ||
+    specifier === "@anchr/protocol" ||
+    specifier.startsWith("@anchr/protocol/");
 }
 
 function checkPackageFile(
@@ -479,61 +139,27 @@ function checkPackageFile(
 ): Violation[] {
   const violations: Violation[] = [];
 
-  for (const h of scanContentLines(source, APP_VOCAB)) {
+  for (const hit of scanContentLines(source, APP_VOCAB)) {
     violations.push({
       file: fileRel,
-      line: h.line,
+      line: hit.line,
       code: "E022",
       severity: "error",
-      message:
-        `application vocabulary "${h.match}" not allowed in packages/ — concrete apps belong in example/`,
+      message: `application vocabulary "${hit.match}" not allowed in packages/`,
     });
   }
 
   const allowed = ALLOWED_PACKAGE_DEPS[pkg];
   if (!allowed) return violations;
 
-  const imports = extractImports(source);
-  for (const { specifier, line } of imports) {
-    if (relativeTargetsHostSrc(specifier, fileRel)) {
-      violations.push({
-        file: fileRel,
-        line,
-        code: "E020",
-        severity: "error",
-        message:
-          `package "${pkg}" must not import from src/ (one-way: src → packages, never the reverse)`,
-      });
-      continue;
-    }
-
+  for (const { specifier, line } of extractImports(source)) {
     const dep = resolvePackageDep(specifier, fileRel);
     if (!dep || dep === pkg) continue;
-
     if (!allowed.has(dep)) {
-      const code = pkg === "core-runtime"
-        ? "E010"
-        : pkg === "core-cashu"
-        ? "E012"
-        : pkg === "tlsn-toolkit"
-        ? "E013"
-        : pkg === "photo-verification"
-        ? "E014"
-        : pkg === "frost-oracle"
-        ? "E015"
-        : pkg === "cashu-conditional-swap"
-        ? "E016"
-        : pkg === "sdk"
-        ? "E017"
-        : pkg === "protocol"
-        ? "E025"
-        : pkg.endsWith("-sdk")
-        ? "E026"
-        : "E010";
       violations.push({
         file: fileRel,
         line,
-        code,
+        code: pkg === "protocol" ? "E025" : "E017",
         severity: "error",
         message: `Package "${pkg}" must not depend on "${dep}" (allowed: ${
           [...allowed].join(", ") || "none"
@@ -545,31 +171,55 @@ function checkPackageFile(
   return violations;
 }
 
-// ── Main ───────────────────────────────────────────────────────────
+function checkPublicSurfaceFile(fileRel: string, source: string): Violation[] {
+  const violations: Violation[] = [];
+
+  for (const { specifier, line } of extractImports(source)) {
+    if (specifier.startsWith("@anchr/") && !isPublicAnchrSpecifier(specifier)) {
+      violations.push({
+        file: fileRel,
+        line,
+        code: "E023",
+        severity: "error",
+        message:
+          `public repository surfaces may import only @anchr/sdk or @anchr/protocol (found "${specifier}")`,
+      });
+    }
+    if (relativeTargetsPackageSrc(specifier, fileRel)) {
+      violations.push({
+        file: fileRel,
+        line,
+        code: "E023",
+        severity: "error",
+        message:
+          `public repository surfaces must use @anchr/* public subpaths, not "${specifier}"`,
+      });
+    }
+  }
+
+  return violations;
+}
 
 async function main() {
   const onlyErrors = Deno.args.includes("--errors-only");
   const jsonOutput = Deno.args.includes("--json");
-  const fileArgs = Deno.args.filter((a) => !a.startsWith("--"));
-
+  const fileArgs = Deno.args.filter((arg) => !arg.startsWith("--"));
   const violations: Violation[] = [];
 
   async function checkPath(abs: string) {
     if (!abs.endsWith(".ts") && !abs.endsWith(".tsx")) return;
-    if (abs.endsWith(".test.ts") || abs.endsWith(".test.tsx")) return;
     const source = await Deno.readTextFile(abs);
-    if (abs.startsWith(RUNTIME_SRC)) {
-      const rel = relative(RUNTIME_SRC, abs);
-      violations.push(...checkSrcFile(rel, source));
-    }
+    const rel = relative(ROOT, abs);
+
     if (abs.startsWith(PKG_DIR)) {
-      const rel = relative(ROOT, abs);
-      const pkgPath = relative(PKG_DIR, abs);
-      const pkg = pkgPath.split("/")[0];
+      if (abs.endsWith(".test.ts") || abs.endsWith(".test.tsx")) return;
+      const pkg = relative(PKG_DIR, abs).split("/")[0];
       violations.push(...checkPackageFile(pkg, rel, source));
-    } else if (abs.startsWith(EXAMPLE_DIR)) {
-      const rel = relative(ROOT, abs);
-      violations.push(...checkExampleFile(rel, source));
+      return;
+    }
+
+    if (PUBLIC_SURFACE_DIRS.some((dir) => rel.startsWith(`${dir}/`))) {
+      violations.push(...checkPublicSurfaceFile(rel, source));
     }
   }
 
@@ -582,52 +232,56 @@ async function main() {
     for await (
       const entry of walk(PKG_DIR, {
         exts: [".ts", ".tsx"],
-        skip: [/\.test\.tsx?$/, /node_modules/],
+        skip: [/\.test\.tsx?$/, /node_modules/, /dist\//],
       })
     ) {
       await checkPath(entry.path);
     }
-    for await (
-      const entry of walk(EXAMPLE_DIR, {
-        exts: [".ts", ".tsx"],
-        skip: [
-          /\.test\.tsx?$/,
-          /node_modules/,
-          /expo-worker-app/,
-          /bounty-board/,
-        ],
-      })
-    ) {
-      await checkPath(entry.path);
+    for (const dir of PUBLIC_SURFACE_DIRS) {
+      try {
+        for await (
+          const entry of walk(`${ROOT}${dir}`, {
+            exts: [".ts", ".tsx"],
+            skip: [/node_modules/, /dist\//],
+          })
+        ) {
+          await checkPath(entry.path);
+        }
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+      }
     }
   }
 
-  const filtered = onlyErrors
+  const printable = onlyErrors
     ? violations.filter((v) => v.severity === "error")
     : violations;
 
   if (jsonOutput) {
-    console.log(JSON.stringify(filtered, null, 2));
-    Deno.exit(filtered.some((v) => v.severity === "error") ? 1 : 0);
+    console.log(JSON.stringify(printable, null, 2));
+  } else {
+    for (const v of printable) {
+      console.error(
+        `${v.severity.toUpperCase()} [${v.code}] ${v.file}:${v.line} — ${v.message}`,
+      );
+    }
   }
 
-  if (filtered.length === 0) {
+  const errors = violations.filter((v) => v.severity === "error");
+  const warns = violations.filter((v) => v.severity === "warn");
+
+  if (errors.length > 0) {
+    console.error(
+      `\n✗ ${errors.length} architecture error(s), ${warns.length} warning(s)`,
+    );
+    Deno.exit(1);
+  }
+
+  if (!jsonOutput) {
     console.log("✓ No architecture violations found.");
-    Deno.exit(0);
   }
-
-  const errors = filtered.filter((v) => v.severity === "error");
-  const warns = filtered.filter((v) => v.severity === "warn");
-
-  for (const v of errors) {
-    console.error(`ERROR [${v.code}] ${v.file}:${v.line} — ${v.message}`);
-  }
-  for (const v of warns) {
-    console.warn(`WARN  [${v.code}] ${v.file}:${v.line} — ${v.message}`);
-  }
-
-  console.log(`\n${errors.length} error(s), ${warns.length} warning(s)`);
-  Deno.exit(errors.length > 0 ? 1 : 0);
 }
 
-main();
+if (import.meta.main) {
+  await main();
+}

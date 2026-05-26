@@ -4,10 +4,10 @@
  * These tests attempt ACTUAL fraud against the Cashu Mint
  * and verify that NUT-11 P2PK + NUT-14 HTLC reject every attack.
  *
- *   1. Oracle tries to redeem with preimage only (no Worker sig) → REJECTED
- *   2. Worker tries to redeem without preimage → REJECTED
- *   3. Wrong Worker tries to redeem with correct preimage → REJECTED
- *   4. Worker redeems with correct preimage + correct sig → SUCCESS
+ *   1. Oracle tries to redeem with preimage only (no Provider sig) → REJECTED
+ *   2. Provider tries to redeem without preimage → REJECTED
+ *   3. Wrong Provider tries to redeem with correct preimage → REJECTED
+ *   4. Provider redeems with correct preimage + correct sig → SUCCESS
  *   5. Double-spend: same proofs redeemed twice → REJECTED
  *
  * Prerequisites:
@@ -34,7 +34,7 @@ import {
 } from "@cashu/cashu-ts";
 import { createHTLCHash } from "@cashu/cashu-ts";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { redeemHtlcToken, verifyHtlcProofs } from "@anchr/core-cashu/escrow";
+import { redeemHtlcToken, verifyHtlcProofs } from "@anchr/sdk/payments";
 import {
   checkInfraReady,
   createWallet as createRegtestWallet,
@@ -51,24 +51,24 @@ const AMOUNT_SATS = 64;
 /**
  * Create HTLC-locked proofs on the real Cashu Mint.
  *
- * Condition: hash(preimage) AND Worker signature
- * Refund: Requester after locktime
+ * Condition: hash(preimage) AND Provider signature
+ * Refund: Customer after locktime
  */
 async function createHtlcProofs(
   wallet: Wallet,
   sourceProofs: Proof[],
   amountSats: number,
   hash: string,
-  workerPubkey: string,
-  requesterPubkey: string,
+  providerPubkey: string,
+  customerPubkey: string,
   locktimeSeconds: number,
 ): Promise<Proof[]> {
   const p2pkOptions = new P2PKBuilder()
     .addHashlock(hash)
-    .addLockPubkey(workerPubkey)
+    .addLockPubkey(providerPubkey)
     .requireLockSignatures(1)
     .lockUntil(locktimeSeconds)
-    .addRefundPubkey(requesterPubkey)
+    .addRefundPubkey(customerPubkey)
     .requireRefundSignatures(1)
     .sigAll()
     .toOptions();
@@ -212,13 +212,13 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   const wallet = sharedWallet!;
 
   // ---------------------------------------------------------------------------
-  // 1. Oracle tries to redeem with preimage only (no Worker sig)
+  // 1. Oracle tries to redeem with preimage only (no Provider sig)
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Oracle has preimage but no Worker key → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
-    const oracle = generateKeypair(); // Oracle's own key (NOT the Worker's)
+  test("ATTACK: Oracle has preimage but no Provider key → Mint REJECTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
+    const oracle = generateKeypair(); // Oracle's own key (NOT the Provider's)
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -229,12 +229,12 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Oracle attempts redemption: has preimage, uses Oracle's key (not Worker's)
+    // Oracle attempts redemption: has preimage, uses Oracle's key (not Provider's)
     const result = await attemptRedeem(
       wallet,
       htlcProofs,
@@ -242,16 +242,16 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       oracle.secretKey,
     );
 
-    expect(result).toBeNull(); // Mint MUST reject — Oracle's key ≠ Worker's key
+    expect(result).toBeNull(); // Mint MUST reject — Oracle's key ≠ Provider's key
   });
 
   // ---------------------------------------------------------------------------
-  // 2. Worker tries to redeem without preimage
+  // 2. Provider tries to redeem without preimage
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Worker has correct key but no preimage → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("ATTACK: Provider has correct key but no preimage → Mint REJECTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -261,30 +261,30 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker attempts redemption: correct key, but no preimage
+    // Provider attempts redemption: correct key, but no preimage
     const result = await attemptRedeem(
       wallet,
       htlcProofs,
       undefined,
-      worker.secretKey,
+      provider.secretKey,
     );
 
     expect(result).toBeNull(); // Mint MUST reject — no preimage
   });
 
   // ---------------------------------------------------------------------------
-  // 3. Wrong Worker tries to redeem with correct preimage
+  // 3. Wrong Provider tries to redeem with correct preimage
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Wrong Worker has preimage but wrong key → Mint REJECTS", async () => {
-    const worker = generateKeypair();
+  test("ATTACK: Wrong Provider has preimage but wrong key → Mint REJECTS", async () => {
+    const provider = generateKeypair();
     const impostor = generateKeypair(); // different keypair
-    const requester = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -294,8 +294,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -307,16 +307,16 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       impostor.secretKey,
     );
 
-    expect(result).toBeNull(); // Mint MUST reject — impostor's key ≠ Worker's key
+    expect(result).toBeNull(); // Mint MUST reject — impostor's key ≠ Provider's key
   });
 
   // ---------------------------------------------------------------------------
-  // 4. Worker redeems with correct preimage + correct sig → SUCCESS
+  // 4. Provider redeems with correct preimage + correct sig → SUCCESS
   // ---------------------------------------------------------------------------
 
-  test("LEGIT: Worker has preimage + correct key → Mint ACCEPTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("LEGIT: Provider has preimage + correct key → Mint ACCEPTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -326,12 +326,12 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker redeems via cashu-ts (which handles SIG_ALL signing + Mint swap)
+    // Provider redeems via cashu-ts (which handles SIG_ALL signing + Mint swap)
     const proofsWithPreimage = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify({ preimage, signatures: [] }),
@@ -341,7 +341,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     await throttleMintOp();
     const { send: result } = await retryOnRateLimit(() =>
       wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
-        worker.secretKey,
+        provider.secretKey,
       ).run()
     );
 
@@ -354,8 +354,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // ---------------------------------------------------------------------------
 
   test("ATTACK: Reuse spent HTLC proofs → Mint REJECTS (double-spend)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -365,8 +365,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -380,7 +380,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     await throttleMintOp();
     const { send: first } = await retryOnRateLimit(() =>
       wallet.ops.send(totalSats - fee, proofsWithPreimage).privkey(
-        worker.secretKey,
+        provider.secretKey,
       ).run()
     );
     expect(first).not.toBeNull();
@@ -390,18 +390,18 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       wallet,
       htlcProofs,
       preimage,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(second).toBeNull();
   });
 
   // ---------------------------------------------------------------------------
-  // 6. Wrong preimage with correct Worker key
+  // 6. Wrong preimage with correct Provider key
   // ---------------------------------------------------------------------------
 
-  test("ATTACK: Worker has correct key but wrong preimage → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("ATTACK: Provider has correct key but wrong preimage → Mint REJECTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash } = createHTLCHash();
     const { preimage: wrongPreimage } = createHTLCHash(); // different preimage
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -412,17 +412,17 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker attempts with wrong preimage (doesn't match hash)
+    // Provider attempts with wrong preimage (doesn't match hash)
     const result = await attemptRedeem(
       wallet,
       htlcProofs,
       wrongPreimage,
-      worker.secretKey,
+      provider.secretKey,
     );
 
     expect(result).toBeNull(); // Mint MUST reject — wrong preimage
@@ -433,8 +433,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // ---------------------------------------------------------------------------
 
   test("ATTACK: No witness at all → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -444,8 +444,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -461,13 +461,13 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // 8. Refund path BEFORE locktime (Requester tries early refund)
+  // 8. Refund path BEFORE locktime (Customer tries early refund)
   // ---------------------------------------------------------------------------
 
-  // INV-03: Requester can't unlock escrow before timeout
-  test("ATTACK: Requester refund key before locktime → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  // INV-03: Customer can't unlock escrow before timeout
+  test("ATTACK: Customer refund key before locktime → Mint REJECTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     // Locktime 1 hour from now — lock is ACTIVE
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -478,17 +478,17 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Requester tries to reclaim with refund key (no preimage) before locktime
+    // Customer tries to reclaim with refund key (no preimage) before locktime
     const result = await attemptRedeem(
       wallet,
       htlcProofs,
       undefined,
-      requester.secretKey,
+      customer.secretKey,
     );
 
     expect(result).toBeNull(); // Mint MUST reject — locktime not expired
@@ -498,9 +498,9 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 9. Refund path AFTER locktime (legitimate timeout refund)
   // ---------------------------------------------------------------------------
 
-  test("LEGIT: Requester refund key after locktime → Mint ACCEPTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("LEGIT: Customer refund key after locktime → Mint ACCEPTS", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     // Locktime clearly expired (60 seconds in the past)
     const locktime = Math.floor(Date.now() / 1000) - 60;
@@ -511,12 +511,12 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Requester reclaims via cashu-ts (handles SIG_ALL signing correctly)
+    // Customer reclaims via cashu-ts (handles SIG_ALL signing correctly)
     const proofsForRefund = htlcProofs.map((p) => ({
       ...p,
       witness: JSON.stringify({ signatures: [] }),
@@ -526,7 +526,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     await throttleMintOp();
     const { send: result } = await retryOnRateLimit(() =>
       wallet.ops.send(totalSats - fee, proofsForRefund).privkey(
-        requester.secretKey,
+        customer.secretKey,
       ).run()
     );
 
@@ -539,8 +539,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // ---------------------------------------------------------------------------
 
   test("ATTACK: Tampered proof secret → Mint REJECTS", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -550,8 +550,8 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -567,7 +567,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
       wallet,
       tamperedProofs,
       preimage,
-      worker.secretKey,
+      provider.secretKey,
     );
 
     expect(result).toBeNull(); // Mint MUST reject — blind signature won't verify for tampered secret
@@ -582,8 +582,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
   const wallet = sharedWallet!;
 
   test("verifyHtlcProofs rejects wrong preimage", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash } = createHTLCHash();
     const { preimage: wrongPreimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -594,8 +594,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -605,8 +605,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
   });
 
   test("verifyHtlcProofs rejects mismatched hash in proofs", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const { hash: differentHash } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -617,8 +617,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -629,8 +629,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
   });
 
   test("verifyHtlcProofs accepts correct preimage + matching proofs", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -640,8 +640,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -650,8 +650,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
   });
 
   test("redeemHtlcToken rejects Oracle's key (server-side P2PK check)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const oracle = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -664,8 +664,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -678,10 +678,10 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   });
 
-  test("redeemHtlcToken rejects wrong Worker's key (server-side P2PK check)", async () => {
-    const worker = generateKeypair();
+  test("redeemHtlcToken rejects wrong Provider's key (server-side P2PK check)", async () => {
+    const provider = generateKeypair();
     const impostor = generateKeypair();
-    const requester = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -693,8 +693,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
@@ -708,8 +708,8 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
   });
 
   test("redeemHtlcToken rejects missing preimage (server-side hashlock check)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -721,19 +721,19 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker has correct key but no preimage — empty string as preimage
-    const result = await redeemHtlcToken(htlcProofs, "", worker.secretKey);
+    // Provider has correct key but no preimage — empty string as preimage
+    const result = await redeemHtlcToken(htlcProofs, "", provider.secretKey);
     expect(result).toBeNull();
   });
 
   test("redeemHtlcToken rejects wrong preimage (server-side hashlock check)", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash } = createHTLCHash();
     const { preimage: wrongPreimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
@@ -746,23 +746,23 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Worker has correct key but wrong preimage
+    // Provider has correct key but wrong preimage
     const result = await redeemHtlcToken(
       htlcProofs,
       wrongPreimage,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(result).toBeNull();
   });
 
-  test("redeemHtlcToken accepts correct Worker key + preimage", async () => {
-    const worker = generateKeypair();
-    const requester = generateKeypair();
+  test("redeemHtlcToken accepts correct Provider key + preimage", async () => {
+    const provider = generateKeypair();
+    const customer = generateKeypair();
     const { hash, preimage } = createHTLCHash();
     const locktime = Math.floor(Date.now() / 1000) + 3600;
 
@@ -774,16 +774,16 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
       sourceProofs,
       AMOUNT_SATS,
       hash,
-      worker.publicKey,
-      requester.publicKey,
+      provider.publicKey,
+      customer.publicKey,
       locktime,
     );
 
-    // Correct Worker redeems — should succeed
+    // Correct Provider redeems — should succeed
     const result = await redeemHtlcToken(
       htlcProofs,
       preimage,
-      worker.secretKey,
+      provider.secretKey,
     );
     expect(result).not.toBeNull();
     expect(result!.amountSats).toBeGreaterThan(0);

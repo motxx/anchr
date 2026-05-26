@@ -10,16 +10,10 @@
 
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { spawn } from "@anchr/core-runtime";
-import {
-  createQueryService,
-  createQueryStore,
-} from "../../packages/bounty/src/application/query-service.ts";
-import { createOracleRegistry } from "../../packages/bounty/src/infrastructure/oracle-client/registry.ts";
-import type {
-  QueryInput,
-  QueryResult,
-} from "../../packages/bounty/src/domain/types.ts";
+import { spawn } from "../helpers/process.ts";
+import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
+import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import type { QueryInput, QueryResult } from "@anchr/sdk/testing";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";
@@ -198,7 +192,7 @@ describe("TLSNotary E2E", () => {
     const input: QueryInput = {
       description: "E2E: Verify BTC/JPY price",
       verification_requirements: ["tlsn"],
-      visibility: "requester_only",
+      visibility: "customer_only",
       tlsn_requirements: {
         target_url: TARGET_URL,
         conditions: [{
@@ -258,7 +252,7 @@ describe("TLSNotary E2E", () => {
       description: "E2E: no attestation",
       verification_requirements: ["tlsn"],
       tlsn_requirements: { target_url: "https://example.com" },
-      visibility: "requester_only",
+      visibility: "customer_only",
     }, { ttlSeconds: 120 });
 
     const outcome = await svc.submitQueryResult(
@@ -291,7 +285,7 @@ describe("TLSNotary E2E", () => {
         {
           description: "E2E: extension result test",
           verification_requirements: ["tlsn"],
-          visibility: "requester_only",
+          visibility: "customer_only",
           tlsn_requirements: {
             target_url: TARGET_URL,
             conditions: [{
@@ -339,7 +333,7 @@ describe("TLSNotary E2E", () => {
       {
         description: "E2E: HTTP API test",
         verification_requirements: ["tlsn"],
-        visibility: "requester_only",
+        visibility: "customer_only",
         tlsn_requirements: {
           target_url: TARGET_URL,
           conditions: [{

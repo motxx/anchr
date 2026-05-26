@@ -1,0 +1,262 @@
+import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { withEnv } from "../../testing/helpers.ts";
+import {
+  _setPublishEventForTest,
+  _setVerifyForTest,
+  createOracleNostrService,
+  createOracleNostrServiceFromEnv,
+} from "./oracle-service.ts";
+import type { OracleNostrServiceConfig } from "./oracle-service.ts";
+import { generateEphemeralIdentity } from "./crypto/identity.ts";
+import { createPreimageStore } from "../../payments/mod.ts";
+import type { VerifiedEvent } from "nostr-tools";
+
+// --- Helpers ---
+
+const providerIdentity = generateEphemeralIdentity();
+const providerPubkey = providerIdentity.publicKey;
+
+function makeConfig(
+  overrides?: Partial<OracleNostrServiceConfig>,
+): OracleNostrServiceConfig {
+  return {
+    identity: generateEphemeralIdentity(),
+    preimageStore: createPreimageStore(),
+    relayUrls: [],
+    ...overrides,
+  };
+}
+
+// --- generateRequestHash ---
+
+describe("generateRequestHash", () => {
+  test("returns a hash string", () => {
+    const config = makeConfig();
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateRequestHash("q1");
+    expect(typeof hash).toBe("string");
+    expect(hash.length).toBeGreaterThan(0);
+  });
+
+  test("returns unique hash per query", () => {
+    const config = makeConfig();
+    const service = createOracleNostrService(config);
+    const h1 = service.generateRequestHash("q1").hash;
+    const h2 = service.generateRequestHash("q2").hash;
+    expect(h1).not.toBe(h2);
+  });
+
+  test("stores preimage in preimage store", () => {
+    const store = createPreimageStore();
+    const service = createOracleNostrService(
+      makeConfig({ preimageStore: store }),
+    );
+    const { hash } = service.generateRequestHash("q1");
+    expect(store.has(hash)).toBe(true);
+    expect(store.getPreimage(hash)).not.toBeNull();
+  });
+});
+
+// --- verifyAndDeliver ---
+
+describe("verifyAndDeliver", () => {
+  afterEach(() => {
+    _setPublishEventForTest(null);
+    _setVerifyForTest(null);
+  });
+
+  test("publishes preimage DM on verification pass", async () => {
+    const store = createPreimageStore();
+    const config = makeConfig({ preimageStore: store });
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateRequestHash("q1");
+
+    const published: VerifiedEvent[] = [];
+    _setPublishEventForTest(async (event: VerifiedEvent) => {
+      published.push(event);
+      return { successes: ["relay1"], failures: [] };
+    });
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    const query = {
+      id: "q1",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    const passed = await service.verifyAndDeliver("q1", query, {
+      attachments: [],
+    }, providerPubkey);
+    expect(passed).toBe(true);
+    expect(published.length).toBe(1);
+    // Preimage should be deleted from store after delivery
+    expect(store.has(hash)).toBe(false);
+  });
+
+  test("returns false and retains preimage when delivery fails", async () => {
+    const store = createPreimageStore();
+    const config = makeConfig({
+      deliveryRetryDelaysMs: [0, 0],
+      preimageStore: store,
+    });
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateRequestHash("q-delivery-fail");
+
+    _setPublishEventForTest(async () => ({
+      successes: [],
+      failures: ["relay1"],
+    }));
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    const query = {
+      id: "q-delivery-fail",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    const passed = await service.verifyAndDeliver(
+      "q-delivery-fail",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    );
+    expect(passed).toBe(false);
+    expect(store.has(hash)).toBe(true);
+  });
+
+  test("publishes rejection DM on verification fail", async () => {
+    const store = createPreimageStore();
+    const config = makeConfig({ preimageStore: store });
+    const service = createOracleNostrService(config);
+    service.generateRequestHash("q1");
+
+    const published: VerifiedEvent[] = [];
+    _setPublishEventForTest(async (event: VerifiedEvent) => {
+      published.push(event);
+      return { successes: ["relay1"], failures: [] };
+    });
+    _setVerifyForTest(async () => ({
+      passed: false,
+      checks: [],
+      failures: ["C2PA invalid"],
+    }));
+
+    const query = {
+      id: "q1",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    const passed = await service.verifyAndDeliver("q1", query, {
+      attachments: [],
+    }, providerPubkey);
+    expect(passed).toBe(false);
+    expect(published.length).toBe(1);
+  });
+
+  test("returns false when hash not registered", async () => {
+    const config = makeConfig();
+    const service = createOracleNostrService(config);
+    // Do NOT call generateRequestHash
+
+    _setPublishEventForTest(async () => ({ successes: [], failures: [] }));
+    _setVerifyForTest(async () => ({
+      passed: true,
+      checks: ["all good"],
+      failures: [],
+    }));
+
+    const query = {
+      id: "q_unknown",
+      status: "processing" as const,
+      description: "test",
+      verification_requirements: ["gps" as const],
+      created_at: Date.now(),
+      expires_at: Date.now() + 600_000,
+      payment_status: "escrow_swapped" as const,
+    };
+
+    // Verify passes but no preimage exists, so rejection DM is sent
+    const passed = await service.verifyAndDeliver("q_unknown", query, {
+      attachments: [],
+    }, providerPubkey);
+    expect(passed).toBe(false);
+  });
+});
+
+// --- recordSelectedProvider ---
+
+describe("recordSelectedProvider", () => {
+  let service: ReturnType<typeof createOracleNostrService>;
+
+  beforeEach(() => {
+    service = createOracleNostrService(makeConfig());
+  });
+
+  afterEach(() => {
+    service.stop();
+  });
+
+  test("records provider pubkey for watched query", () => {
+    // watchRequest requires relay subscriptions — but with empty relayUrls it still records the entry
+    service.watchRequest("q1", "evt1", "customer_pub");
+    // Should not throw
+    service.recordSelectedProvider("q1", providerPubkey);
+  });
+
+  test("no-op for unknown query", () => {
+    // Should not throw even for non-watched query
+    service.recordSelectedProvider("unknown", providerPubkey);
+  });
+});
+
+// --- createOracleNostrServiceFromEnv ---
+
+describe("createOracleNostrServiceFromEnv", () => {
+  test("returns null when env var is not set", () => {
+    withEnv({ ORACLE_NOSTR_SECRET_KEY: undefined }, () => {
+      const service = createOracleNostrServiceFromEnv();
+      expect(service).toBeNull();
+    });
+  });
+});
+
+// --- stop ---
+
+describe("stop", () => {
+  test("completes without error", () => {
+    const config = makeConfig();
+    const service = createOracleNostrService(config);
+    // Should not throw
+    service.stop();
+  });
+
+  test("completes without error after watching queries", () => {
+    const config = makeConfig();
+    const service = createOracleNostrService(config);
+    service.watchRequest("q1", "evt1", "customer_pub");
+    // Should not throw
+    service.stop();
+  });
+});

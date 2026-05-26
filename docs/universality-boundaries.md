@@ -15,8 +15,8 @@ Use the narrowest class that can hold the decision.
 | Security invariant | A funds, proof, oracle-release, or privacy property that Anchr claims as a safety guarantee. | `docs/threat-model.md` plus tests or attack-class cross references |
 | Architecture boundary | A role, layer, package, dependency-direction, naming, or adapter boundary that keeps the implementation aligned with the three-actor model. | `docs/architecture.md` |
 | Package implementation contract | A package-owned API, algorithm, port shape, error model, or conformance expectation that other packages call but that is not itself a network wire contract. | The package `SPEC.md`, README, and colocated tests |
-| Adapter or runtime integration | A binding to a concrete runtime, protocol bridge, CLI, HTTP gateway, MCP server, mobile bridge, browser API, hosted service, or operator workflow. | Adapter package docs or `example/<app>/` |
-| Example policy | A product, demo, UX, deployment, mint/relay/oracle choice, moderation rule, pricing rule, or other concrete-app decision. | The owning `example/<app>/` |
+| Adapter or runtime integration | A binding to a concrete runtime, protocol bridge, CLI, HTTP gateway, MCP server, mobile bridge, browser API, hosted service, or operator workflow. | Adapter package docs or `examples/<name>/` when the surface is a tiny SDK/protocol lesson |
+| Example policy | A demo, deployment, mint/relay/oracle choice, pricing rule, or other concrete-example decision. | The owning `examples/<name>/` |
 | Agent harness rule | A rule about how coding agents, review skills, lints, issue templates, or verification commands keep the repository healthy. | `CLAUDE.md`, `AGENTS.md`, `skills/`, `scripts/`, or `docs/issues/README.md` |
 
 If a decision fits more than one row, put the normative statement in the
@@ -38,12 +38,35 @@ Do not duplicate the same normative rule in several places.
 - Put adapter-specific choices outside `specs/` unless the adapter is defining a
   public interoperability profile. A profile may live in `specs/` only when it
   is intended for independent implementations, not just the reference code.
-- Put example-specific decisions under `example/<app>/`. Examples may choose
-  relays, mints, oracles, schemas, UI flows, and operational policy, but those
-  choices must not become package defaults by accident.
+- Put example-specific decisions under `examples/<name>/`. These surfaces may
+  choose relays, mints, oracles, schemas, UI flows, and operational policy, but
+  those choices must not become package defaults by accident.
 - Put agent runtime integrations such as MCP in adapter or example docs. They
   are not protocol actors and must not be required by Customer, Provider, or
   Oracle SDKs.
+
+## Example status vocabulary
+
+The top-level `README.md` Reference Implementations table uses these labels for
+example maturity. The labels are repository documentation policy, not protocol
+status, and belong to the owning example plus this boundary document.
+
+| Status | Meaning | Minimum bar |
+| --- | --- | --- |
+| `Concept` | A design sketch or UX target that may contain runnable fragments, but is not maintained as an end-to-end example. | README states the intentional non-runnable boundary, names the target architecture, and avoids promising deployable behavior. |
+| `Simulation` | A runnable or partially runnable flow with mocked, in-process, fixture, or non-fund-bearing dependencies. | README names the simulated pieces, provides the command or test that exercises the simulation, and states what must change before testnet or mainnet use. |
+| `Testnet` | A reproducible reference flow for non-production relays, mints, notaries, or external sandboxes. | README lists required services and non-secret env vars, provides a runbook or command sequence for both sides of the flow, and has a smoke check or documented verification command that catches SDK/API drift. |
+| `Implemented` | A maintained implementation whose advertised behavior is covered by repository tests or an equivalent example-specific harness. | README links the relevant commands, tests, or deployment runbook and states any remaining non-production limitation. |
+
+Do not promote a status label to `specs/`: it does not change the universal
+Customer, Provider, Oracle, proof, or settlement contracts. If an example needs
+stricter requirements, record them in that example's README. If several
+examples need the same repeatable smoke harness, route the convention through
+`docs/review-harness.md` or a repository script.
+
+For the checklist that takes an example from initial requirements to an
+advertised README status, see
+[`docs/example-delivery-lifecycle.md`](example-delivery-lifecycle.md).
 
 ## Human review scope
 

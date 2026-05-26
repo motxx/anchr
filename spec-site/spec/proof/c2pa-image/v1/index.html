@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>C2PA Image Proof Schema v1</title>
+    <style>
+      body {
+        color: #171717;
+        font-family: system-ui, sans-serif;
+        line-height: 1.55;
+        margin: 3rem auto;
+        max-width: 880px;
+        padding: 0 1.25rem;
+      }
+      code, pre {
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+      code {
+        padding: 0.1rem 0.25rem;
+      }
+      pre {
+        overflow: auto;
+        padding: 1rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td, th {
+        border: 1px solid #d4d4d4;
+        padding: 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>C2PA Image Proof Schema v1</h1>
+    <p>
+      Canonical schema URL:
+      <code>https://anchr-spec.org/spec/proof/c2pa-image/v1</code>
+    </p>
+    <p>
+      This schema identifies C2PA image or media evidence with optional GPS,
+      timestamp, nonce, ProofMode, and advisory content-relevance checks.
+    </p>
+
+    <h2>Predicate Shape</h2>
+    <p>
+      The predicate describes the requested media evidence and deterministic
+      constraints an Oracle must apply to signed metadata.
+    </p>
+    <pre><code>{
+  "locationHint": "Shibuya, Tokyo",
+  "expectedGps": { "lat": 35.6595, "lon": 139.7004 },
+  "maxGpsDistanceKm": 0.5,
+  "freshnessSeconds": 600,
+  "challengeNonce": "optional visible nonce",
+  "requiredFactors": ["c2pa", "gps", "timestamp"]
+}</code></pre>
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>locationHint</code></td>
+          <td>Human-readable target location or scene description.</td>
+        </tr>
+        <tr>
+          <td><code>expectedGps</code></td>
+          <td>Expected latitude and longitude for signed media metadata.</td>
+        </tr>
+        <tr>
+          <td><code>maxGpsDistanceKm</code></td>
+          <td>Maximum Haversine distance from expected GPS coordinates.</td>
+        </tr>
+        <tr>
+          <td><code>freshnessSeconds</code></td>
+          <td>Maximum accepted age for signed capture metadata.</td>
+        </tr>
+        <tr>
+          <td><code>challengeNonce</code></td>
+          <td>Optional nonce that should be visible in the media.</td>
+        </tr>
+        <tr>
+          <td><code>requiredFactors</code></td>
+          <td>Required deterministic checks, such as c2pa, gps, and timestamp.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Proof Payload Shape</h2>
+    <p>
+      The proof payload contains the media bytes or encrypted attachment
+      references, plus optional ProofMode sidecar material.
+    </p>
+    <pre><code>{
+  "media": "&lt;bytes or encrypted attachment reference&gt;",
+  "filename": "signed-photo.jpg",
+  "proofmode": "&lt;optional ProofMode archive reference&gt;",
+  "notes": "optional Provider notes"
+}</code></pre>
+
+    <h2>Response Data Shape</h2>
+    <p>
+      On success, verifiers expose only the facts needed to explain the verdict:
+    </p>
+    <pre><code>{
+  "c2pa": {
+    "available": true,
+    "hasManifest": true,
+    "signatureValid": true,
+    "gps": { "lat": 35.6595, "lon": 139.7004 },
+    "timestamp": 1770000000
+  },
+  "proofmode": {
+    "signatureValid": true,
+    "gps": { "lat": 35.6595, "lon": 139.7004 }
+  },
+  "warnings": []
+}</code></pre>
+
+    <h2>Verification Requirements</h2>
+    <ul>
+      <li>Verify the C2PA manifest signature chain for the submitted media.</li>
+      <li>Require the manifest asset hash to match the submitted media bytes.</li>
+      <li>
+        Compare signed GPS coordinates to <code>expectedGps</code> using
+        Haversine distance and <code>maxGpsDistanceKm</code>.
+      </li>
+      <li>Reject stale signed timestamps when freshness is required.</li>
+      <li>
+        Verify ProofMode signatures when ProofMode evidence is submitted or
+        required.
+      </li>
+      <li>
+        Treat AI content relevance as advisory unless a future schema version
+        makes that factor deterministic.
+      </li>
+      <li>
+        Fail closed when a required verifier or companion binary is unavailable.
+      </li>
+    </ul>
+  </body>
+</html>

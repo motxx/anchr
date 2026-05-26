@@ -1,18 +1,18 @@
 {
   "INV-01": {
-    "hash": "sha256:ae499e700a9e8d9067a65bcb61dd5c34e48f814fd96f111a835602ec1b87ccfc",
-    "justification": "INV-01 is now backed by a TLSN mutation e2e test instead of a pending-test exception"
+    "hash": "sha256:7d4ea42cd463db5f987b72af6972fd454d1771178c4b134554966d978076111a",
+    "justification": "rename actor wording to Provider without changing the TLSN proof-forgery invariant"
   },
   "INV-02": {
     "hash": "sha256:c203e198c8d4d9238abc93fa5a5316d8ca963e38a14c3b0d22e4e6e155169ed4",
     "justification": "update INV-02 from the removed HTTP gateway wording to the query-service result path while preserving the no-preimage-on-failure invariant"
   },
   "INV-03": {
-    "hash": "sha256:6c3e2a0b6598f865a8a07882a1cfce1bf2d2d6e30b540e764ff8bbcfb421a72a",
-    "justification": "markdown formatter normalized line wrapping without changing the invariant"
+    "hash": "sha256:225194382fb37491ac6530b39ee1c2fb9372c087791a774b365345ce591ed08a",
+    "justification": "rename actor wording to Customer/Provider without changing the escrow-timeout invariant"
   },
   "INV-04": {
-    "hash": "sha256:88937d759dda709ac5af561e5a99d266e0d5b872a0513ebc12210eb6bd5492d8",
-    "justification": "document the two-condition Provider-bound escrow invariant before SDK and transport refactors"
+    "hash": "sha256:5f5700c5bb3856fdf6748f1a0c4fa52efd024ed769d4e4c7e4f1e4d2d63cec4d",
+    "justification": "rename remaining Customer/Provider test wording in the existing two-condition Provider-bound escrow invariant"
   }
 }
