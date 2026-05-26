@@ -105,6 +105,33 @@ The SDK may own concrete standard adapters because the SDK is the developer
 composition surface. Protocol must stay narrower: it owns compatibility, not
 runtime convenience.
 
+## SDK Request Internals
+
+`packages/sdk/src/requests/` remains an SDK-internal paid-request lifecycle
+core. It is not a public `@anchr/sdk/requests` subpath. Its responsibility is
+to model and orchestrate one local request from creation through offers,
+provider selection, proof submission, verification, release, completion, expiry,
+and purge.
+
+The request internals own request-bound state and lifecycle ports:
+
+| Concept | Owner |
+| --- | --- |
+| Request lifecycle state | `requests/domain/` owns the `Query` aggregate, statuses, transitions, query store, offer/selection/result state, expiry, and request-scoped quorum and attestation records. |
+| Attachment references in submitted work | `requests/domain/` owns the request-scoped `AttachmentRef` and attachment key records persisted on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. |
+| Payment escrow hooks used by the lifecycle | `requests/application/` owns the `EscrowProvider` port because the query lifecycle calls it at hold, provider binding, lock verification, settlement, and cancellation points; `payments/` and `adapters/cashu` own payment implementations and reusable payment-lock or redemption helpers. |
+| Verification inputs and decisions used by release logic | `requests/domain/` owns the request-bound `VerificationRequirement`, `VerificationInput`, and `VerificationDetail` records used to decide whether a query can release payment; `proofs/` owns proof engines, schema dispatch, redaction, and proof-specific verifier adapters. |
+| Oracle lifecycle records and registry lookup | `requests/domain/` owns `OracleAttestation` records that are stored against a query, and `requests/application/` owns the `OracleRegistry` lookup port consumed by the lifecycle; `adapters/oracle-client`, `adapters/oracle-service`, and Nostr adapter modules own concrete Oracle discovery, HTTP, service, and event bindings. |
+| Deterministic lifecycle test helpers | `@anchr/sdk/testing` is the only public testing entry point. It may re-export request service helpers for tests and examples while the underlying lifecycle semantics remain owned by `requests/`. |
+
+Feature directories should not import from `requests/` to get a generic
+attachment, payment, proof, Oracle, or adapter abstraction. Cross-directory
+imports from `requests/` are acceptable only when the imported shape is
+request-scoped lifecycle state or a port consumed by the request lifecycle. If a
+type becomes useful without a `Query` or lifecycle transition, move it directly
+to the owning feature directory and update callers instead of adding a second
+barrel or compatibility facade.
+
 ## Agnostic Component Boundaries
 
 Component names describe protocol responsibilities, not today's bindings. A

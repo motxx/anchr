@@ -2,6 +2,7 @@
 
 Created: 2026-05-25
 Model: GPT-5 Codex
+Completed: 2026-05-27
 
 ## Priority
 
@@ -85,3 +86,37 @@ shared types and ports should move to the feature owners that use them.
   adapter/testing support.
 - Split into child issues if the correct change spans multiple independent
   owners.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+
+The chosen owner is documented as an SDK-internal paid-request lifecycle core:
+`packages/sdk/src/requests/` remains private to the SDK and owns request-bound
+`Query` state, lifecycle transitions, request service/store behavior, and the
+ports consumed by lifecycle orchestration. Attachment, payment, proof, Oracle,
+adapter, and testing directories own their concrete feature behavior and public
+surfaces, but may consume request-scoped lifecycle records where those records
+are persisted on or used to advance a `Query`.
+
+Verified with:
+
+- `rg -n "requests/(domain|application)|from \"\\.\\/requests|from \"\\.\\.\\/requests|@anchr/sdk/requests" packages/sdk/src packages/sdk/deno.json deno.json docs/architecture.md`
+- `deno task lint:arch`
+- `deno task test:unit`
+- `deno task lint:strict`
+
+Harness update:
+
+- `docs/architecture.md` now records the ownership decision and the rule for
+  when future cross-directory imports from `requests/` are acceptable.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
