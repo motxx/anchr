@@ -11,6 +11,7 @@ design
 
 Depends on:
 - 0086
+- 0095
 
 Blocks:
 - 0080
@@ -39,11 +40,14 @@ including:
 - `packages/protocol/src/events.ts` uses `bounty_token`.
 - `packages/sdk/src/requests/domain/types.ts` exposes `BountyInfo` and
   `Query.bounty`.
-- `packages/sdk/src/client.ts` writes `body.bounty`.
 - `packages/sdk/src/adapters/nostr/events/events.ts` still references a
   marketplace listing.
 - Oracle registry and payment code still use `min_bounty_sats`,
   `max_bounty_sats`, or bounty comments.
+
+Issue #0095 owns deleting the obsolete `Anchr` HTTP client surface. Do not
+spend this issue renaming `packages/sdk/src/client.ts`; if #0095 closes first,
+that file should already be gone.
 
 Some wire fields may need a versioned migration or explicit spec rationale.
 The issue is not to preserve old names for hypothetical users. It is to make
