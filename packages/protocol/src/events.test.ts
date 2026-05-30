@@ -2,16 +2,24 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
+  buildOfferFeedbackEvent,
+  buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
+  buildSelectionFeedbackEvent,
+  parseOfferFeedbackEvent,
   parseOracleQueryResponseEvent,
+  parsePreimageDeliveryEvent,
   parseQueryRequestEvent,
+  parseQueryResponseEvent,
+  parseSelectionFeedbackEvent,
   type QueryRequestPayload,
 } from "./events.ts";
 import {
   findAllTagValues,
   findTagValue,
   generateKeypair,
+  KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
 } from "./nostr.ts";
@@ -69,6 +77,15 @@ test("parseQueryRequestEvent recovers a payload from the built event (round-trip
   expect(parsed?.oracle_pubkey).toBe(payload.oracle_pubkey);
   expect(parsed?.bounty_token).toBe(payload.bounty_token);
   expect(parsed?.max_amount_sats).toBe(payload.max_amount_sats);
+});
+
+test("buildQueryRequestEvent publishes JSON request content without an encryption marker", () => {
+  const identity = generateKeypair();
+  const payload = samplePayload();
+  const event = buildQueryRequestEvent(identity, payload);
+
+  expect(JSON.parse(event.content)).toEqual(payload);
+  expect(event.tags.some((tag) => tag[0] === "encrypted")).toBe(false);
 });
 
 test("parseQueryRequestEvent returns null for a non-kind-5300 event", () => {
@@ -146,4 +163,77 @@ test("buildQueryResponseEvent can include an oracle-readable encrypted payload",
   expect(parsed?.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(parsed?.proof).toBe("proof-base64");
   expect(parsed?.data).toEqual({ ok: true });
+
+  const customerParsed = parseQueryResponseEvent(
+    event,
+    customer.secretKey,
+    provider.publicKey,
+  );
+  expect(customerParsed?.schema).toBe(
+    "https://anchr-spec.org/spec/proof/tlsn/v1",
+  );
+  expect(customerParsed?.proof).toBe("proof-base64");
+  expect(customerParsed?.data).toEqual({ ok: true });
+});
+
+test("feedback events expose causal tags and JSON payloads", () => {
+  const provider = generateKeypair();
+  const customer = generateKeypair();
+  const offer = buildOfferFeedbackEvent(
+    provider,
+    "req123",
+    customer.publicKey,
+    {
+      status: "payment-required",
+      provider_pubkey: provider.publicKey,
+      amount_sats: 42,
+    },
+  );
+
+  expect(offer.kind).toBe(KIND_QUERY_FEEDBACK);
+  expect(offer.tags).toContainEqual(["e", "req123", "", "request"]);
+  expect(offer.tags).toContainEqual(["p", customer.publicKey]);
+  expect(offer.tags).toContainEqual(["status", "payment-required"]);
+  expect(JSON.parse(offer.content)).toEqual({
+    status: "payment-required",
+    provider_pubkey: provider.publicKey,
+    amount_sats: 42,
+  });
+  expect(parseOfferFeedbackEvent(offer)?.amount_sats).toBe(42);
+
+  const selection = buildSelectionFeedbackEvent(customer, "req123", {
+    status: "processing",
+    selected_provider_pubkey: provider.publicKey,
+    bound_token: "cashuBbound",
+  });
+
+  expect(selection.kind).toBe(KIND_QUERY_FEEDBACK);
+  expect(selection.tags).toContainEqual(["e", "req123", "", "request"]);
+  expect(selection.tags).toContainEqual(["p", provider.publicKey]);
+  expect(selection.tags).toContainEqual(["status", "processing"]);
+  expect(parseSelectionFeedbackEvent(selection)?.bound_token).toBe(
+    "cashuBbound",
+  );
+});
+
+test("preimage delivery DMs bind release material to the request event", () => {
+  const oracle = generateKeypair();
+  const provider = generateKeypair();
+  const event = buildPreimageDeliveryEvent(oracle, provider.publicKey, {
+    query_id: "query_123",
+    request_event_id: "req123",
+    preimage: "aa".repeat(32),
+  });
+
+  expect(event.tags).toContainEqual(["p", provider.publicKey]);
+  const parsed = parsePreimageDeliveryEvent(
+    event,
+    provider.secretKey,
+    oracle.publicKey,
+  );
+  expect(parsed).toEqual({
+    query_id: "query_123",
+    request_event_id: "req123",
+    preimage: "aa".repeat(32),
+  });
 });

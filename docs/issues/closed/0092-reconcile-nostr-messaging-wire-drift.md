@@ -2,6 +2,7 @@
 
 Created: 2026-05-30
 Model: GPT-5 Codex
+Completed: 2026-05-30
 
 ## Priority
 
@@ -60,7 +61,10 @@ or release cleanup presents the wire format externally.
 - `deno task check`
 - `deno task test:unit`
 - `deno task test:e2e:protocol`
-- `deno task test:e2e:relay`
+- `NOSTR_RELAYS=ws://127.0.0.1:7777 deno task test:e2e:relay`
+- `deno task test:all`
+- `check-silent-bypass` review: no findings in
+  `packages/sdk/src/adapters/nostr/index.ts`
 - Manual check: `docs/protocol-conformance-audit.md` still maps the final
   messaging implementation and test owner.
 
@@ -70,3 +74,37 @@ or release cleanup presents the wire format externally.
   `packages/sdk/src/adapters/nostr/`.
 - Decide whether to change code, spec prose, or both.
 - Add or update focused tests for any public wire behavior that changes.
+
+## Resolution
+
+Implemented by updating:
+
+- `specs/messaging.md`
+- `docs/protocol-conformance-audit.md`
+- `packages/sdk/src/adapters/nostr/index.ts`
+- `packages/protocol/src/events.test.ts`
+- `docs/issues/pending/0080-prepare-public-release-cleanup.md`
+- `docs/issues/pending/0094-standardize-nostr-completion-release-retry.md`
+
+Verified with:
+
+- `deno task check`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task test:e2e:relay`
+
+Harness update:
+
+- `packages/protocol/src/events.test.ts` now locks the canonical request,
+  feedback, Oracle-readable result, and preimage delivery wire behavior; #0094
+  tracks completion feedback and release retry-store semantics.
+
+Review residuals:
+
+- #0094 must decide whether completion feedback, FROST release messages, and
+  retry-store deletion policy are universal Nostr wire contract or SDK adapter
+  policy before public release.
+
+Follow-up:
+
+- #0094
