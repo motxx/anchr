@@ -47,7 +47,7 @@ export interface ProviderNostrConfig {
   /** Relay URLs. */
   relayUrls?: string[];
   /** Blossom server URLs. */
-  blossomServerUrls?: string[];
+  blossomServers?: string[];
 }
 
 export interface DiscoveredRequest {
@@ -191,7 +191,7 @@ export async function encryptAndUpload(
   mimeType: string,
   customerPubkey: string,
   oraclePubkey: string,
-  blossomServerUrls?: string[],
+  blossomServers?: string[],
 ): Promise<
   {
     upload: ProviderUploadResult;
@@ -201,7 +201,7 @@ export async function encryptAndUpload(
 > {
   // Upload to Blossom (EXIF strip + AES-256-GCM encrypt)
   const upload = await providerUpload(data, filename, mimeType, {
-    serverUrls: blossomServerUrls,
+    servers: blossomServers,
   });
   if (!upload) return null;
 

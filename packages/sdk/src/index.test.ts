@@ -1,32 +1,25 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  Anchr,
-  AnchrError,
-  RequestTimeoutError,
-  VerificationFailedError,
+  createCashuClient,
+  createCustomer,
+  createHttpOracleClient,
+  createProvider,
+  createRelayClient,
 } from "./index.ts";
+import * as sdk from "./index.ts";
 
 describe("Anchr SDK", () => {
-  test("constructor accepts config", () => {
-    const anchr = new Anchr({ serverUrl: "http://localhost:3000" });
-    expect(anchr).toBeInstanceOf(Anchr);
+  test("root surface exposes actor setup helpers", () => {
+    expect(createCustomer).toBeInstanceOf(Function);
+    expect(createProvider).toBeInstanceOf(Function);
+    expect(createHttpOracleClient).toBeInstanceOf(Function);
+    expect(createRelayClient).toBeInstanceOf(Function);
+    expect(createCashuClient).toBeInstanceOf(Function);
   });
 
-  test("constructor trims trailing slash", () => {
-    const anchr = new Anchr({ serverUrl: "http://localhost:3000/" });
-    expect(anchr).toBeInstanceOf(Anchr);
-  });
-
-  test("error types", () => {
-    const err = new AnchrError("test", "TEST_CODE");
-    expect(err.code).toBe("TEST_CODE");
-    expect(err.name).toBe("AnchrError");
-
-    const timeout = new RequestTimeoutError("r1", 60);
-    expect(timeout.code).toBe("TIMEOUT");
-
-    const fail = new VerificationFailedError("q1", ["bad sig"]);
-    expect(fail.code).toBe("VERIFICATION_FAILED");
+  test("root surface does not expose a hosted HTTP client", () => {
+    expect(Object.hasOwn(sdk, "Anchr")).toBe(false);
+    expect(Object.hasOwn(sdk, "default")).toBe(false);
   });
 });

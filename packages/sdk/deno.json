@@ -56,9 +56,6 @@
       "src/provider.ts",
       "src/provider-types.ts",
       "src/oracle.ts",
-      "src/client.ts",
-      "src/client-types.ts",
-      "src/errors.ts",
       "README.md",
       "deno.json"
     ],

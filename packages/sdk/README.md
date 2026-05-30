@@ -4,8 +4,8 @@ Customer, Provider, and Oracle orchestration for verifiable paid requests: Nostr
 transport over Cashu HTLC settlement with proof verification.
 
 The actor SDK APIs below are the primary integration path. Anchr has no default
-hosted server or mandatory REST API; any HTTP client surface exposed by this
-package is for concrete app-owned adapters.
+hosted server, mandatory REST API, or root hosted-server client. App-owned HTTP
+gateways should use explicit adapters outside the root SDK contract.
 
 ## Install
 

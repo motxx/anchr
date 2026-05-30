@@ -99,18 +99,6 @@ export interface BlossomKeyMaterial {
 /** Map of attachment ID → key material, used for one-time oracle verification. */
 export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
 
-export interface AttachmentAccess {
-  original_url: string;
-  preview_url?: string;
-  view_url?: string;
-  meta_url?: string;
-}
-
-export interface AttachmentHandle {
-  attachment: AttachmentRef;
-  access: AttachmentAccess;
-}
-
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;

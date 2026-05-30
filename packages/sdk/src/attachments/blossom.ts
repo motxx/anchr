@@ -21,7 +21,7 @@ import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "blossom"]);
 
 export interface BlossomConfig {
-  serverUrls: string[];
+  servers: string[];
 }
 
 /**
@@ -38,7 +38,7 @@ export function getBlossomConfig(): BlossomConfig | null {
     .filter(Boolean);
 
   if (!urls || urls.length === 0) return null;
-  return { serverUrls: urls };
+  return { servers: urls };
 }
 
 export function isBlossomEnabled(): boolean {
@@ -100,7 +100,7 @@ export async function decryptBlob(
 function buildAuthEvent(
   identity: BlossomUploadIdentity,
   hash: string,
-  serverUrl: string,
+  serverEndpoint: string,
 ): string {
   const template: EventTemplate = {
     kind: 24242,
@@ -110,7 +110,7 @@ function buildAuthEvent(
       ["x", hash],
       ["expiration", String(Math.floor(Date.now() / 1000) + 300)],
     ],
-    content: `Upload ${hash} to ${serverUrl}`,
+    content: `Upload ${hash} to ${serverEndpoint}`,
   };
 
   const event = finalizeEvent(template, identity.secretKey);
@@ -128,10 +128,10 @@ export interface BlossomUploadResult {
 export async function uploadToBlossom(
   data: Uint8Array,
   identity: BlossomUploadIdentity,
-  serverUrls?: string[],
+  servers?: string[],
 ): Promise<BlossomUploadResult | null> {
   const config = getBlossomConfig();
-  const urls = serverUrls ?? config?.serverUrls;
+  const urls = servers ?? config?.servers;
   if (!urls || urls.length === 0) return null;
 
   const { encrypted, key, iv } = await encryptBlob(data);
@@ -141,10 +141,10 @@ export async function uploadToBlossom(
   const successUrls: string[] = [];
 
   await Promise.allSettled(
-    urls.map(async (serverUrl) => {
-      const authToken = buildAuthEvent(identity, hash, serverUrl);
+    urls.map(async (serverEndpoint) => {
+      const authToken = buildAuthEvent(identity, hash, serverEndpoint);
 
-      const response = await fetch(`${serverUrl}/upload`, {
+      const response = await fetch(`${serverEndpoint}/upload`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/octet-stream",
@@ -155,9 +155,9 @@ export async function uploadToBlossom(
 
       await response.body?.cancel();
       if (response.ok) {
-        successUrls.push(`${serverUrl}/${hash}`);
+        successUrls.push(`${serverEndpoint}/${hash}`);
       } else {
-        log.error(`Upload to ${serverUrl} failed: ${response.status}`);
+        log.error(`Upload to ${serverEndpoint} failed: ${response.status}`);
       }
     }),
   );
@@ -177,20 +177,20 @@ export async function downloadFromBlossom(
   hash: string,
   encryptKey: string,
   encryptIv: string,
-  serverUrls?: string[],
+  servers?: string[],
   options?: { maxRetries?: number; retryDelayMs?: number },
 ): Promise<Uint8Array | null> {
   const config = getBlossomConfig();
-  const urls = serverUrls ?? config?.serverUrls;
+  const urls = servers ?? config?.servers;
   if (!urls || urls.length === 0) return null;
 
   const maxRetries = options?.maxRetries ?? 3;
   const retryDelayMs = options?.retryDelayMs ?? 5000;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    for (const serverUrl of urls) {
+    for (const serverEndpoint of urls) {
       try {
-        const response = await fetch(`${serverUrl}/${hash}`);
+        const response = await fetch(`${serverEndpoint}/${hash}`);
         if (!response.ok) continue;
 
         const encrypted = new Uint8Array(await response.arrayBuffer());

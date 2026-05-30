@@ -2,6 +2,7 @@
 
 Created: 2026-05-30
 Model: GPT-5 Codex
+Completed: 2026-05-30
 
 ## Priority
 
@@ -70,3 +71,49 @@ renaming it or keeping a shim.
   `createRelayClient`, and `createCashuClient`.
 - Leave app-owned HTTP gateway work out of this issue unless the resolver files
   a separate follow-up with a current owner and examples.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/index.ts`
+- `packages/sdk/src/index.test.ts`
+- `packages/sdk/deno.json`
+- `packages/sdk/README.md`
+- `packages/sdk/src/attachments/access.ts`
+- `packages/sdk/src/attachments/blossom.ts`
+- `packages/sdk/src/attachments/provider-upload.ts`
+- `packages/sdk/src/adapters/nostr/provider-service.ts`
+- `packages/sdk/src/requests/domain/types.ts`
+- `docs/issues/pending/0080-prepare-public-release-cleanup.md`
+- `docs/issues/pending/0083-remove-dead-code-entrypoints.md`
+- `docs/issues/pending/0085-finalize-public-repository-layout.md`
+- `docs/issues/pending/0090-finish-active-vocabulary-cleanup.md`
+
+Deleted:
+
+- `packages/sdk/src/client.ts`
+- `packages/sdk/src/client-types.ts`
+- `packages/sdk/src/errors.ts`
+
+Verified with:
+
+- `rg -n "new Anchr|export default Anchr|createTlsnRequest|submitPresentation|serverUrl|client-types|src/client\\.ts|/queries" README.md packages/sdk docs/architecture.md examples`
+- `deno task check`
+- `deno task test:unit`
+- `deno task test:examples`
+- `deno task publish:dry-run`
+- `deno task test:all`
+
+Harness update:
+
+- `packages/sdk/src/index.test.ts` now locks the root SDK surface to actor setup
+  helpers and asserts that no root hosted HTTP client/default export is exposed.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None.

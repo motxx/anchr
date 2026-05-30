@@ -72,7 +72,7 @@ describe("Blossom client", () => {
 
     const config = getBlossomConfig();
     expect(config).not.toBe(null);
-    expect(config!.serverUrls).toEqual([
+    expect(config!.servers).toEqual([
       "https://blossom1.example",
       "https://blossom2.example",
     ]);

@@ -1,29 +1,10 @@
 /**
  * Anchr SDK — buy cryptographically verified data with sats.
  *
- * Public surface composes the convenience `Anchr` HTTP client (in
- * `./client.ts`) with the Customer / Provider API plus the supporting
- * Nostr / Cashu / Oracle helpers. Each domain lives in its own sibling
- * file; this barrel is intentionally a re-export only.
+ * Public surface composes the Customer / Provider / Oracle API with the
+ * supporting Nostr / Cashu / proof helpers. Each domain lives in its own
+ * sibling file; this barrel is intentionally a re-export only.
  */
-
-export { Anchr } from "./client.ts";
-export type {
-  AnchrConfig,
-  HttpRequestOptions,
-  HttpRequestResult,
-  PhotoRequestOptions,
-  PhotoResult,
-  RequestCondition,
-} from "./client-types.ts";
-export {
-  AnchrError,
-  RequestTimeoutError,
-  VerificationFailedError,
-} from "./errors.ts";
-
-import { Anchr } from "./client.ts";
-export default Anchr;
 
 export {
   createCustomer,

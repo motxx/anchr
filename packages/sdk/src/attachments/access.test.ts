@@ -2,9 +2,6 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
   buildAttachmentAbsoluteUrl,
-  buildAttachmentAccess,
-  buildAttachmentDeliveryUrls,
-  buildAttachmentHandle,
   materializeResultAttachments,
   normalizeResultAttachments,
   resolveStoredAttachment,
@@ -60,75 +57,7 @@ test("materializeResultAttachments expands blossom attachment refs", () => {
       blossom_hash: "abc123",
     }],
     notes: "ok",
-  }, "http://localhost:3000/queries/query_1");
+  }, "http://localhost:3000/requests/query_1");
 
   expect(result.attachments[0]?.uri).toBe("https://blossom.example.com/abc123");
-});
-
-test("buildAttachmentDeliveryUrls returns stable attachment endpoints", () => {
-  const urls = buildAttachmentDeliveryUrls(
-    "query_1",
-    2,
-    "http://localhost:3000/queries/query_1",
-  );
-
-  expect(urls.viewUrl).toBe(
-    "http://localhost:3000/queries/query_1/attachments/2",
-  );
-  expect(urls.metaUrl).toBe(
-    "http://localhost:3000/queries/query_1/attachments/2/meta",
-  );
-  expect(urls.previewUrl).toBe(
-    "http://localhost:3000/queries/query_1/attachments/2/preview",
-  );
-});
-
-test("buildAttachmentAccess builds delivery URLs for blossom attachment", () => {
-  const access = buildAttachmentAccess(
-    "query_1",
-    0,
-    {
-      id: "abc123",
-      uri: "https://blossom.example.com/abc123",
-      mime_type: "image/png",
-      storage_kind: "blossom",
-      blossom_hash: "abc123",
-    },
-    "http://localhost:3000/queries/query_1",
-  );
-
-  expect(access.original_url).toBe("https://blossom.example.com/abc123");
-  expect(access.preview_url).toBe(
-    "http://localhost:3000/queries/query_1/attachments/0/preview",
-  );
-  expect(access.view_url).toBe(
-    "http://localhost:3000/queries/query_1/attachments/0",
-  );
-  expect(access.meta_url).toBe(
-    "http://localhost:3000/queries/query_1/attachments/0/meta",
-  );
-});
-
-test("buildAttachmentHandle returns attachment plus derived access info", () => {
-  const handle = buildAttachmentHandle(
-    "query_1",
-    0,
-    {
-      id: "abc123",
-      uri: "https://blossom.example.com/abc123",
-      mime_type: "image/png",
-      storage_kind: "blossom",
-      blossom_hash: "abc123",
-    },
-    "http://localhost:3000/queries/query_1",
-  );
-
-  expect(handle.attachment.uri).toBe("https://blossom.example.com/abc123");
-  expect(handle.access.original_url).toBe("https://blossom.example.com/abc123");
-  expect(handle.access.preview_url).toBe(
-    "http://localhost:3000/queries/query_1/attachments/0/preview",
-  );
-  expect(handle.access.view_url).toBe(
-    "http://localhost:3000/queries/query_1/attachments/0",
-  );
 });

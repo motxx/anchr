@@ -11,8 +11,6 @@ import {
 } from "../internal/runtime/mod.ts";
 import { getRuntimeConfig } from "../internal/runtime/config.ts";
 import type {
-  AttachmentAccess,
-  AttachmentHandle,
   AttachmentRef,
   AttachmentStorageKind,
   BlossomKeyMaterial,
@@ -59,12 +57,6 @@ export interface AttachmentPreview {
   filename: string;
   size: number;
   maxDimension: number;
-}
-
-export interface AttachmentDeliveryUrls {
-  viewUrl: string;
-  metaUrl: string;
-  previewUrl: string;
 }
 
 export interface StoredAttachmentStats extends StoredAttachment {
@@ -205,61 +197,6 @@ export function materializeResultAttachments(
     attachments: result.attachments.map((attachment) =>
       materializeAttachmentRef(attachment, requestUrl)
     ),
-  };
-}
-
-export function buildAttachmentDeliveryUrls(
-  requestId: string,
-  attachmentIndex: number,
-  requestUrl?: string,
-): AttachmentDeliveryUrls {
-  const baseUrl = attachmentPublicBaseUrl(requestUrl);
-  return {
-    viewUrl: new URL(
-      `/queries/${requestId}/attachments/${attachmentIndex}`,
-      `${baseUrl}/`,
-    ).toString(),
-    metaUrl: new URL(
-      `/queries/${requestId}/attachments/${attachmentIndex}/meta`,
-      `${baseUrl}/`,
-    ).toString(),
-    previewUrl: new URL(
-      `/queries/${requestId}/attachments/${attachmentIndex}/preview`,
-      `${baseUrl}/`,
-    ).toString(),
-  };
-}
-
-export function buildAttachmentAccess(
-  requestId: string,
-  attachmentIndex: number,
-  ref: AttachmentLike,
-  requestUrl?: string,
-): AttachmentAccess {
-  const originalUrl = buildAttachmentAbsoluteUrl(ref, requestUrl);
-  const { viewUrl, metaUrl, previewUrl } = buildAttachmentDeliveryUrls(
-    requestId,
-    attachmentIndex,
-    requestUrl,
-  );
-
-  return {
-    original_url: originalUrl,
-    preview_url: previewUrl,
-    view_url: viewUrl,
-    meta_url: metaUrl,
-  };
-}
-
-export function buildAttachmentHandle(
-  requestId: string,
-  attachmentIndex: number,
-  ref: AttachmentLike,
-  requestUrl?: string,
-): AttachmentHandle {
-  return {
-    attachment: materializeAttachmentRef(ref, requestUrl),
-    access: buildAttachmentAccess(requestId, attachmentIndex, ref, requestUrl),
   };
 }
 

@@ -13,7 +13,7 @@ import {
 
 export interface ProviderUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */
-  serverUrls?: string[];
+  servers?: string[];
   /** Skip EXIF stripping (e.g. if already stripped). */
   skipExifStrip?: boolean;
 }
@@ -32,8 +32,8 @@ export async function providerUpload(
   options?: ProviderUploadOptions,
 ): Promise<ProviderUploadResult | null> {
   const config = getBlossomConfig();
-  const serverUrls = options?.serverUrls ?? config?.serverUrls;
-  if (!serverUrls || serverUrls.length === 0) return null;
+  const servers = options?.servers ?? config?.servers;
+  if (!servers || servers.length === 0) return null;
 
   let processed: Uint8Array;
   if (options?.skipExifStrip) {
@@ -44,7 +44,7 @@ export async function providerUpload(
   }
 
   const identity = generateEphemeralIdentity();
-  const result = await uploadToBlossom(processed, identity, serverUrls);
+  const result = await uploadToBlossom(processed, identity, servers);
   if (!result) return null;
 
   // E2E: no encryption keys stored in the AttachmentRef.
@@ -56,7 +56,7 @@ export async function providerUpload(
     filename,
     size_bytes: processed.length,
     blossom_hash: result.hash,
-    blossom_servers: serverUrls,
+    blossom_servers: servers,
   };
 
   return { attachment, blossom: result };
