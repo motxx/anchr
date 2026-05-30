@@ -2,6 +2,7 @@
 
 Created: 2026-05-27
 Model: GPT-5 Codex
+Completed: 2026-05-30
 
 ## Priority
 
@@ -58,3 +59,28 @@ before examples are revived or stale files are deleted.
 - Start from the public README and package README setup path.
 - Build the smallest realistic local flow that uses public imports only.
 - Turn any public API gap into a direct fix or a follow-up issue.
+
+## Resolution
+
+Implemented by updating:
+
+- `examples/sdk-public-api-dogfood.test.ts`
+
+Verified with:
+
+- `deno test --allow-all examples/sdk-public-api-dogfood.test.ts`
+- `rg -n "packages/sdk/src|\\.\\./packages/sdk" examples/sdk-public-api-dogfood.test.ts` returned no matches.
+- `deno task check`
+- `deno task test:all` outside the sandbox after the sandboxed run could not lock the cargo advisory database; the rerun passed and includes `deno task test:unit`.
+
+Harness update:
+
+- Added a retained example smoke test that dogfoods the public SDK imports for Customer, Provider, Oracle, payment, proof, attachment, and adapter composition.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
