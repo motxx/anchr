@@ -2,6 +2,7 @@
 
 Created: 2026-05-27
 Model: GPT-5 Codex
+Completed: 2026-05-30
 
 ## Priority
 
@@ -70,3 +71,39 @@ drift, create narrower follow-up issues and stop.
   coverage.
 - Compare protocol helpers and SDK adapters against that map.
 - Fix only narrow, obvious drift; otherwise create focused follow-up issues.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/protocol-conformance-audit.md`
+- `specs/protocol-contract.md`
+- `specs/README.md`
+- `docs/issues/pending/0092-reconcile-nostr-messaging-wire-drift.md`
+- `docs/issues/pending/0093-reconcile-conditional-swap-spec-ownership.md`
+- `docs/issues/pending/0080-prepare-public-release-cleanup.md`
+- `docs/issues/pending/0087-dogfood-sdk-public-api.md`
+- `docs/issues/SEQUENCE`
+
+Verified with:
+
+- `deno task test:e2e:protocol`
+- `deno task test:unit`
+- Manual check: `docs/protocol-conformance-audit.md` maps every active
+  protocol spec to implementation/test owners and tracks drift in #0092/#0093.
+
+Harness update:
+
+- `docs/protocol-conformance-audit.md` records the spec-to-code/test mapping
+  and turns found drift into tracked issues #0092 and #0093.
+
+Review residuals:
+
+- Maintainer must resolve #0092 before #0087 can close.
+- Maintainer must resolve #0092 and #0093, or explicitly decide they are not
+  public-release blocking, before #0080 can close.
+
+Follow-up:
+
+- #0092
+- #0093

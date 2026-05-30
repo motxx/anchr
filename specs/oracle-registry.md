@@ -113,6 +113,5 @@ Customers SHOULD:
 - Verify Oracle pubkeys against a trusted whitelist for high-value queries.
 - Choose explicit Oracle pubkeys and endpoints; there is no protocol default
   hosted Oracle.
-- Use a threshold Oracle group (see
-  [`packages/frost-oracle/SPEC.md`](../packages/frost-oracle/SPEC.md)) to
-  distribute trust across multiple independent Oracles.
+- Use a threshold Oracle group backed by the SDK FROST signing and P2PK escrow
+  helpers to distribute trust across multiple independent Oracles.

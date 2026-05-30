@@ -11,6 +11,7 @@ maintenance
 
 Depends on:
 - 0086
+- 0092
 
 Blocks:
 - 0080

@@ -125,8 +125,8 @@ Current repository bindings and package placement live in
 [`docs/architecture.md`](../docs/architecture.md).
 
 Reference implementations may expose machine-readable adapter manifests using
-the package-level `AdapterManifest` contract in `@anchr/protocol/capabilities`.
-Those manifests are not wire data; they are local conformance metadata for apps,
+the package-level `AdapterManifest` contract in `@anchr/sdk/adapters`. Those
+manifests are not wire data; they are local conformance metadata for apps,
 tests, and SDK composition.
 
 ## Provider Preflight
@@ -203,8 +203,9 @@ invariant and its tests before relying on it from this spec.
 Reference implementations should make their relationship to this spec explicit
 without copying normative text into lower-level docs:
 
-- Package `SPEC.md` files should include a short "Implements" section naming the
-  spec section and the package API or adapter that implements it.
+- Package READMEs or focused implementation docs should include a short
+  "Implements" section naming the spec section and the package API or adapter
+  that implements it.
 - Tests that pin a universal protocol behavior should include the spec section
   or threat-model invariant in the test name or nearby assertion message.
 - Adapter profiles should link to this document and then define only the
@@ -225,8 +226,8 @@ profiles belong in separate specs or package docs:
 | Nostr event kinds, tags, NIP-44 payloads, and relay behavior      | [`messaging.md`](messaging.md)                                          |
 | Proof schema URL identity and dispatch                            | [`proof-schemas.md`](proof-schemas.md)                                  |
 | Oracle discovery announcements                                    | [`oracle-registry.md`](oracle-registry.md)                              |
-| Cashu HTLC / P2PK implementation details                          | `packages/core-cashu/SPEC.md` and package tests                         |
-| TLSNotary, C2PA, GPS, ProofMode verifier behavior                 | Owning package `SPEC.md` and tests                                      |
+| Cashu HTLC / P2PK implementation details                          | `@anchr/sdk/payments`, `@anchr/sdk/adapters/cashu`, and package tests    |
+| TLSNotary, C2PA, GPS, ProofMode verifier behavior                 | `@anchr/sdk/proofs` and package tests                                   |
 | Blossom or other attachment backend details                       | Adapter or package docs; only interoperable profiles belong in `specs/` |
 | MCP, HTTP gateway, CLI, mobile, web, Discord, or hosted endpoints | Adapter package docs, `apps/<app>/`, or `examples/<name>/`              |
 
