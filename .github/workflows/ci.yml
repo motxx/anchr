@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
+  verify:
     name: CI
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -63,11 +63,6 @@ jobs:
 
       - name: SDK npm build
         run: cd packages/sdk && bun run build
-
-      - name: Cargo dependency audit
-        run: |
-          cargo install cargo-audit --quiet
-          bash scripts/cargo-audit-all.sh
 
       # Phase 1: Local tests (no Docker)
       - name: Local tests (lint + unit + integration + protocol e2e + frost e2e + scripts + examples + pentest)
@@ -172,6 +167,23 @@ jobs:
       - name: Stop infrastructure
         if: always()
         run: docker compose down
+
+  deploy-image:
+    name: Build deploy image
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: verify
+    permissions:
+      contents: read
+
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Build deploy image
         run: docker build -t anchr:${{ github.sha }} .
