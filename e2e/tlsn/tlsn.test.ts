@@ -34,6 +34,11 @@ const VERIFIER_BIN = join(
 const TARGET_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
 const TARGET_SERVER = "api.bitflyer.com";
 const TARGET_BODY_MARKER = "BTC_JPY";
+const PRESENTATION_PATH = "/tmp/e2e-tlsn.presentation.tlsn";
+const MUTATED_PRESENTATION_PATH = "/tmp/e2e-tlsn-mutated.presentation.tlsn";
+const PROVER_ATTEMPTS = 3;
+
+let filePresentationPromise: Promise<string> | undefined;
 
 async function isVerifierReachable(): Promise<boolean> {
   try {
@@ -56,14 +61,30 @@ function hasVerifierBin(): boolean {
   return existsSync(VERIFIER_BIN);
 }
 
-async function generatePresentation(targetUrl: string): Promise<string> {
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableProverFailure(stderr: string): boolean {
+  return [
+    "failed to lookup address information",
+    "temporary failure in name resolution",
+    "could not resolve",
+    "network is unreachable",
+    "connection reset",
+    "connection refused",
+    "timed out",
+  ].some((marker) => stderr.toLowerCase().includes(marker));
+}
+
+async function runProverOnce(targetUrl: string): Promise<string> {
   const proc = spawn([
     PROVER_BIN,
     "--verifier",
     VERIFIER_HOST,
     targetUrl,
     "-o",
-    "/tmp/e2e-tlsn.presentation.tlsn",
+    PRESENTATION_PATH,
   ], {
     stdout: "pipe",
     stderr: "pipe",
@@ -76,6 +97,32 @@ async function generatePresentation(targetUrl: string): Promise<string> {
   // stdout contains base64
   const stdout = await new Response(proc.stdout).text();
   return stdout.trim();
+}
+
+async function generatePresentation(targetUrl: string): Promise<string> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= PROVER_ATTEMPTS; attempt++) {
+    try {
+      return await runProverOnce(targetUrl);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (
+        attempt === PROVER_ATTEMPTS ||
+        !isRetryableProverFailure(lastError.message)
+      ) {
+        throw lastError;
+      }
+      await delay(500 * attempt);
+    }
+  }
+
+  throw lastError ?? new Error("Prover failed without an error");
+}
+
+function getFilePresentation(): Promise<string> {
+  filePresentationPromise ??= generatePresentation(TARGET_URL);
+  return filePresentationPromise;
 }
 
 async function verifyPresentation(
@@ -141,12 +188,11 @@ describe("TLSNotary E2E", () => {
       return;
     }
 
-    // Generate real presentation via MPC-TLS
-    const presentationB64 = await generatePresentation(TARGET_URL);
+    const presentationB64 = await getFilePresentation();
     expect(presentationB64.length).toBeGreaterThan(100);
 
     // Verify with tlsn-verifier binary
-    const result = await verifyPresentation("/tmp/e2e-tlsn.presentation.tlsn");
+    const result = await verifyPresentation(PRESENTATION_PATH);
     expect(result.valid).toBe(true);
     expect(result.server_name).toBe(TARGET_SERVER);
     expect(typeof result.revealed_body).toBe("string");
@@ -160,14 +206,14 @@ describe("TLSNotary E2E", () => {
       return;
     }
 
-    await generatePresentation(TARGET_URL);
+    await getFilePresentation();
     await mutatePresentation(
-      "/tmp/e2e-tlsn.presentation.tlsn",
-      "/tmp/e2e-tlsn-mutated.presentation.tlsn",
+      PRESENTATION_PATH,
+      MUTATED_PRESENTATION_PATH,
     );
 
     const result = await verifyPresentation(
-      "/tmp/e2e-tlsn-mutated.presentation.tlsn",
+      MUTATED_PRESENTATION_PATH,
     );
     expect(result.valid).toBe(false);
     expect(typeof result.error).toBe("string");
@@ -179,7 +225,6 @@ describe("TLSNotary E2E", () => {
       return;
     }
 
-    // Generate presentation
     const presentationB64 = await generatePresentation(TARGET_URL);
 
     // Create query service
@@ -298,7 +343,6 @@ describe("TLSNotary E2E", () => {
         { ttlSeconds: 600 },
       );
 
-      // Generate real presentation via CLI prover
       const presentationB64 = await generatePresentation(TARGET_URL);
 
       const submitOutcome = await testService.submitQueryResult(
@@ -346,7 +390,6 @@ describe("TLSNotary E2E", () => {
       { ttlSeconds: 600 },
     );
 
-    // Generate and submit real presentation
     const presentationB64 = await generatePresentation(TARGET_URL);
 
     const submitOutcome = await testService.submitQueryResult(
