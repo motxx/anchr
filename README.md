@@ -122,6 +122,7 @@ import {
   createCustomer,
   createHttpOracleClient,
   createRelayClient,
+  ProofSchema,
   type CashuProof,
 } from "@anchr/sdk";
 
@@ -145,7 +146,7 @@ const customer = createCustomer({
 
 const { data, proof, providerPubkey } = await customer.request({
   spec: {
-    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    schema: ProofSchema.TlsnV1,
     predicate: {
       target: "https://api.github.com/users/alice",
       conditions: [{ path: "$.public_repos", op: ">", value: 10 }],

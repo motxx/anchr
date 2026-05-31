@@ -34,6 +34,7 @@ import {
   createCustomer,
   createHttpOracleClient,
   createRelayClient,
+  ProofSchema,
 } from "@anchr/sdk";
 
 const mintUrl = "https://mint.test.example";
@@ -56,7 +57,7 @@ const customer = createCustomer({
 
 const result = await customer.request({
   spec: {
-    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    schema: ProofSchema.TlsnV1,
     predicate: { target: "https://api.github.com/users/alice" },
   },
   payment: { maxAmount: 1000 },

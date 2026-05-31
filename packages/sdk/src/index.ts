@@ -64,10 +64,9 @@ export {
 } from "./provider.ts";
 
 export {
-  DEFINED_SCHEMAS,
-  type DefinedSchemaUri,
   InvalidSchemaUriError,
   isSchemaUri,
+  ProofSchema,
   resolveProofGenerator,
   resolveVerifierAdapter,
   type SchemaUri,

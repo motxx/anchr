@@ -1,10 +1,9 @@
 import type { SchemaUri } from "@anchr/protocol/schema";
 
 export {
-  DEFINED_SCHEMAS,
-  type DefinedSchemaUri,
   InvalidSchemaUriError,
   isSchemaUri,
+  ProofSchema,
   type SchemaUri,
   UnknownSchemaError,
 } from "@anchr/protocol/schema";

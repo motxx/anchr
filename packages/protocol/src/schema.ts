@@ -11,15 +11,14 @@
 /** HTTPS proof schema URL form. The SDK validates shape and dispatches by URL. */
 export type SchemaUri = string;
 
-/** Defined schema URLs that this SDK version commits to as stable identifiers. */
-export const DEFINED_SCHEMAS = {
-  TLSN_HTTPS_V1: "https://anchr-spec.org/spec/proof/tlsn/v1",
-  C2PA_IMAGE_V1: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
+/** Canonical proof schema URLs that this SDK version commits to as stable identifiers. */
+export const ProofSchema = {
+  TlsnV1: "https://anchr-spec.org/spec/proof/tlsn/v1",
+  C2paImageV1: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
 } as const;
 
-/** Type-level enumeration of defined schema URLs. */
-export type DefinedSchemaUri =
-  typeof DEFINED_SCHEMAS[keyof typeof DEFINED_SCHEMAS];
+/** Type-level enumeration of canonical proof schema URLs. */
+export type ProofSchema = typeof ProofSchema[keyof typeof ProofSchema];
 
 /** Returns true when the value is a syntactically plausible HTTPS proof schema URL. */
 export function isSchemaUri(value: unknown): value is SchemaUri {

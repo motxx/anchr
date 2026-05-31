@@ -2,8 +2,8 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
-  DEFINED_SCHEMAS,
   type ProofGenerator,
+  ProofSchema,
   resolveProofGenerator,
   resolveVerifierAdapter,
   type VerifierAdapter,
@@ -15,10 +15,10 @@ test("resolveProofGenerator dispatches with canHandle", () => {
     produce: async () => ({ data: "first", proof: "first" }),
   };
   const second: ProofGenerator = {
-    canHandle: (schema) => schema === DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    canHandle: (schema) => schema === ProofSchema.TlsnV1,
     produce: async () => ({ data: "second", proof: "second" }),
   };
-  expect(resolveProofGenerator([first, second], DEFINED_SCHEMAS.TLSN_HTTPS_V1))
+  expect(resolveProofGenerator([first, second], ProofSchema.TlsnV1))
     .toBe(second);
 });
 
@@ -27,7 +27,7 @@ test("resolveProofGenerator returns null for unhandled schema", () => {
     canHandle: () => false,
     produce: async () => ({ data: "unused", proof: "unused" }),
   };
-  expect(resolveProofGenerator([generator], DEFINED_SCHEMAS.TLSN_HTTPS_V1))
+  expect(resolveProofGenerator([generator], ProofSchema.TlsnV1))
     .toBe(null);
 });
 
@@ -37,11 +37,11 @@ test("resolveVerifierAdapter dispatches with canHandle", () => {
     verify: () => false,
   };
   const second: VerifierAdapter = {
-    canHandle: (schema) => schema === DEFINED_SCHEMAS.C2PA_IMAGE_V1,
+    canHandle: (schema) => schema === ProofSchema.C2paImageV1,
     verify: () => true,
   };
   expect(
-    resolveVerifierAdapter([first, second], DEFINED_SCHEMAS.C2PA_IMAGE_V1),
+    resolveVerifierAdapter([first, second], ProofSchema.C2paImageV1),
   ).toBe(second);
 });
 
@@ -50,6 +50,6 @@ test("resolveVerifierAdapter returns null for unhandled schema", () => {
     canHandle: () => false,
     verify: () => true,
   };
-  expect(resolveVerifierAdapter([verifier], DEFINED_SCHEMAS.C2PA_IMAGE_V1))
+  expect(resolveVerifierAdapter([verifier], ProofSchema.C2paImageV1))
     .toBe(null);
 });

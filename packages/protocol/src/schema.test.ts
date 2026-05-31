@@ -2,24 +2,24 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
-  DEFINED_SCHEMAS,
   InvalidSchemaUriError,
   isSchemaUri,
+  ProofSchema,
   UnknownSchemaError,
 } from "./schema.ts";
 
-test("DEFINED_SCHEMAS exposes the v0.0.1 proof schema URLs", () => {
-  expect(DEFINED_SCHEMAS.TLSN_HTTPS_V1).toBe(
+test("ProofSchema exposes the v0.0.1 proof schema URLs", () => {
+  expect(ProofSchema.TlsnV1).toBe(
     "https://anchr-spec.org/spec/proof/tlsn/v1",
   );
-  expect(DEFINED_SCHEMAS.C2PA_IMAGE_V1).toBe(
+  expect(ProofSchema.C2paImageV1).toBe(
     "https://anchr-spec.org/spec/proof/c2pa-image/v1",
   );
 });
 
 test("isSchemaUri accepts the defined schemas", () => {
-  expect(isSchemaUri(DEFINED_SCHEMAS.TLSN_HTTPS_V1)).toBe(true);
-  expect(isSchemaUri(DEFINED_SCHEMAS.C2PA_IMAGE_V1)).toBe(true);
+  expect(isSchemaUri(ProofSchema.TlsnV1)).toBe(true);
+  expect(isSchemaUri(ProofSchema.C2paImageV1)).toBe(true);
 });
 
 test("isSchemaUri accepts third-party HTTPS proof schema URLs", () => {

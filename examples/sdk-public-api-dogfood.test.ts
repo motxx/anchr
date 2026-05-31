@@ -13,6 +13,7 @@ import {
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
   parseQueryRequestEvent,
+  ProofSchema,
   type PublishResult,
   type RedeemHtlcParams,
   type RedeemResult,
@@ -265,7 +266,7 @@ test("public SDK API dogfood: customer, provider, oracle, payment, proof, attach
   try {
     const result = await customer.request({
       spec: {
-        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        schema: ProofSchema.TlsnV1,
         predicate: { target: "https://api.example.org/account" },
       },
       payment: { maxAmount: 1000 },
@@ -275,7 +276,7 @@ test("public SDK API dogfood: customer, provider, oracle, payment, proof, attach
     expect(result.providerPubkey).toBe(providerKey.publicKey);
     expect(result.proof).toBe("dogfood-proof-bytes");
     expect(result.data).toEqual({
-      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      schema: ProofSchema.TlsnV1,
       attachment,
     });
     expect(customerCashu.locks).toEqual([{

@@ -28,7 +28,7 @@ import type {
   Subscription,
 } from "./adapters/types.ts";
 import { bytesToHex } from "./test-helpers.ts";
-import { DEFINED_SCHEMAS } from "./schema.ts";
+import { ProofSchema } from "./schema.ts";
 import type {
   ActorStateStore,
   ProofGenerator,
@@ -295,7 +295,7 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
   const handlerSchemas: string[] = [];
   let onEventRef: ((e: Event) => void) | null = null;
   const generator: ProofGenerator = {
-    canHandle: (schema) => schema === DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    canHandle: (schema) => schema === ProofSchema.TlsnV1,
     produce: async () => ({ data: { ok: true }, proof: "p1" }),
   };
 
@@ -322,7 +322,7 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
 
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
-    schema: DEFINED_SCHEMAS.TLSN_HTTPS_V1,
+    schema: ProofSchema.TlsnV1,
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -334,7 +334,7 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
   }));
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q2",
-    schema: DEFINED_SCHEMAS.C2PA_IMAGE_V1,
+    schema: ProofSchema.C2paImageV1,
     predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
@@ -348,7 +348,7 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
   await provider.stop();
   await servePromise;
 
-  expect(handlerSchemas).toEqual([DEFINED_SCHEMAS.TLSN_HTTPS_V1]);
+  expect(handlerSchemas).toEqual([ProofSchema.TlsnV1]);
 });
 
 function requireOnEvent(
