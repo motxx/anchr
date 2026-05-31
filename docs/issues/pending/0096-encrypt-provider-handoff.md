@@ -13,6 +13,7 @@ Depends on:
 - None
 
 Blocks:
+- 0080
 - 0097
 - 0098
 - 0099
@@ -37,15 +38,16 @@ Relevant files:
 - `packages/protocol/src/events.test.ts`
 - `packages/sdk/src/customer.ts`
 - `packages/sdk/src/provider.ts`
-- `specs/messaging.md`
 
 ## Acceptance
 
 - Customer selection feedback encrypts Provider-only handoff content to the
   selected Provider by default.
 - Provider-side parsing/decryption accepts the canonical encrypted handoff.
-- Public selection event tags still expose only routing and status data needed
-  for relay subscription and lifecycle tracking.
+- Public selection event tags are explicitly limited to the request reference,
+  selected Provider pubkey, and lifecycle status.
+- Public selection event content and tags do not contain Provider-only handoff,
+  payment, proof, credential, or execution material.
 - Tests fail if Provider-only handoff content is serialized as public event
   content by the canonical builder.
 
@@ -54,7 +56,11 @@ Relevant files:
 - `deno task check`
 - `deno task test:unit`
 - `deno task test:e2e:protocol`
-- Manual check: `rg -n "bound_token|Plaintext payload published by a customer" packages/protocol/src packages/sdk/src specs/messaging.md` only finds encrypted handoff definitions, tests, or historical notes, not public selection content serialization.
+- Unit test check: the canonical selection builder produces encrypted content
+  for the selected Provider and no public event field serializes the handoff
+  token.
+- Manual check: inspect selection event tags and confirm only request
+  reference, selected Provider pubkey, and lifecycle status remain public.
 
 ## Plan
 

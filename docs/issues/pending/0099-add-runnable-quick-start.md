@@ -30,9 +30,9 @@ explicit until a production-safe setup is available.
 The current README discussion exposed a DX problem: a copy-paste code block
 that cannot run teaches the API shape but does not prove the project works.
 Fake-only success is also misleading. A useful Quick Start should exercise the
-actual SDK and relay path, require only minimal Nostr knowledge, and avoid
-presenting public relay plaintext as the normal way to pass private execution
-or payment material.
+actual SDK and relay path, produce an externally observable relay round trip,
+require only minimal Nostr knowledge, and avoid presenting public relay
+plaintext as the normal way to pass private execution or payment material.
 
 This should build on #0088 instead of creating a separate examples track.
 
@@ -49,18 +49,21 @@ Relevant files:
   runnable from a clean checkout after documented prerequisites are installed.
 - The flow uses a user-configurable Nostr relay list rather than requiring a
   local relay container for the first result.
-- The flow does not claim production payment when it is using a dry-run,
-  simulation, or test-only payment boundary.
+- The flow produces a real relay round trip with SDK-built events.
+- Any dry-run, simulation, or test-only payment boundary is narrower than the
+  whole example and is named in the body text.
 - The first README code path avoids non-public data in public relay content.
-- A smoke test or documented verification command detects SDK/API drift for
-  the Quick Start.
+- A deterministic smoke test detects SDK/API drift for the Quick Start without
+  depending on a third-party public relay.
 
 ## Verification
 
 - `deno task test:examples`
 - `deno task test:all`
-- Manual check: run the README Quick Start from a clean checkout using a relay
-  URL supplied by the user or environment.
+- Manual check: run the README Quick Start from a clean checkout using a
+  user-supplied relay URL.
+- Manual check: the smoke test uses a deterministic relay target and does not
+  publish CI events to third-party public relays.
 - Manual check: the section title is concise and does not pack explanatory
   qualifiers into the heading.
 

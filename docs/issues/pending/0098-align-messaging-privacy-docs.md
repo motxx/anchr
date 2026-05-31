@@ -37,9 +37,6 @@ Relevant files:
 
 - `specs/messaging.md`
 - `docs/protocol-conformance-audit.md`
-- `README.md`
-- `packages/protocol/src/events.ts`
-- `packages/protocol/src/events.test.ts`
 
 ## Acceptance
 
@@ -48,14 +45,14 @@ Relevant files:
 - Public docs state that relay-visible fields are public by design and that
   Provider-only handoff content is encrypted by default.
 - Protocol conformance notes name the test owner for each privacy boundary.
-- The README does not teach users to place non-public execution or payment
-  material in public relay content.
+- README privacy edits are limited to references needed to avoid contradicting
+  the messaging spec; the runnable Quick Start rewrite remains owned by #0099.
 
 ## Verification
 
 - `deno task check`
 - `deno task test:unit`
-- Manual check: `rg -n "not encrypted|encrypted content includes|must not contain private|Plaintext payload" specs/messaging.md README.md docs/protocol-conformance-audit.md` finds only wording that matches the final implemented privacy model.
+- Manual check: `rg -n "not encrypted|encrypted content includes|must not contain private|Plaintext payload" specs/messaging.md docs/protocol-conformance-audit.md` finds only wording that matches the final implemented privacy model.
 - Manual check: request, offer, selection, result, Oracle payload, and release
   sections each state whether their content is public or encrypted.
 

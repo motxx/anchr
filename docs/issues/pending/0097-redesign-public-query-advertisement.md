@@ -13,16 +13,17 @@ Depends on:
 - 0096
 
 Blocks:
+- 0080
 - 0098
 - 0099
 
 ## Summary
 
 Redesign the public kind `5300` request so it is an advertisement, not the
-execution payload. Public relay content should only include fields that are
-safe and useful for discovery. Provider-specific execution and payment material
-should move to an encrypted handoff after Provider selection, or to another
-explicitly encrypted flow.
+execution payload. This is a breaking pre-1.0 wire-shape change. Public relay
+content should only include fields that are safe and useful for discovery.
+Provider-specific execution and payment material should move to an encrypted
+handoff after Provider selection, or to another explicitly encrypted flow.
 
 ## Rationale
 
@@ -38,14 +39,12 @@ Relevant files:
 - `packages/protocol/src/events.test.ts`
 - `packages/sdk/src/customer.ts`
 - `packages/sdk/src/provider.ts`
-- `specs/messaging.md`
-- `README.md`
 
 ## Acceptance
 
-- The stable kind `5300` request shape is documented as a public advertisement
-  with an explicit allowlist of public fields.
-- Sensitive execution context and payment-bearing material are not required in
+- The kind `5300` request shape is changed to a public advertisement with an
+  explicit allowlist of public fields.
+- Sensitive execution context and payment-bearing material must not appear in
   public request content.
 - The Provider flow still supports public relay discovery without requiring an
   Anchr-operated registry or server.
@@ -56,7 +55,9 @@ Relevant files:
 - `deno task check`
 - `deno task test:unit`
 - `deno task test:e2e:protocol`
-- Manual check: `rg -n "bounty_token|mint_url" specs/messaging.md packages/protocol/src/events.ts` only finds encrypted execution or payment payload definitions, not public advertisement fields.
+- Unit test check: public request content contains only the advertisement
+  allowlist, while execution and payment fields are absent from relay-visible
+  content.
 - Manual check: a Provider can still discover eligible work from public tags
   and public advertisement fields.
 
