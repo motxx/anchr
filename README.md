@@ -135,6 +135,20 @@ schema identifiers, use `@anchr/protocol` and [`specs/`](specs/).
 See [`docs/architecture.md`](docs/architecture.md) for package boundaries and
 public-surface policy.
 
+## Examples
+
+Status labels are defined in
+[`docs/universality-boundaries.md`](docs/universality-boundaries.md#example-status-vocabulary).
+The checklist for promoting or maintaining an advertised example lives in
+[`docs/example-delivery-lifecycle.md`](docs/example-delivery-lifecycle.md).
+
+| Example | Status | Lesson |
+| --- | --- | --- |
+| [`paid-request-simulation`](examples/paid-request-simulation/) | Simulation | Compose Customer, Provider, Oracle, payment, proof, attachment, and adapter boundaries through public SDK imports. |
+
+New examples must be tiny lessons for verifiable paid requests and must use
+only `@anchr/sdk` or `@anchr/protocol` for Anchr imports.
+
 ## More Detail
 
 - [Architecture](docs/architecture.md) - layer boundaries and design notes

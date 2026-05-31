@@ -1,7 +1,8 @@
 {
   "workspace": [
     "./packages/protocol",
-    "./packages/sdk"
+    "./packages/sdk",
+    "./examples/paid-request-simulation"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],

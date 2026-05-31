@@ -2,6 +2,7 @@
 
 Created: 2026-05-27
 Model: GPT-5 Codex
+Completed: 2026-06-01
 
 ## Priority
 
@@ -56,3 +57,48 @@ domains.
   candidates.
 - Restore or create examples one at a time with smoke coverage.
 - Keep example count low until each one earns its maintenance cost.
+
+## Resolution
+
+Implemented by updating:
+
+- `README.md`
+- `Dockerfile`
+- `deno.json`
+- `examples/README.md`
+- `examples/sdk-public-api-dogfood.test.ts`
+- `examples/paid-request-simulation/README.md`
+- `examples/paid-request-simulation/deno.json`
+- `examples/paid-request-simulation/mod.ts`
+- `examples/paid-request-simulation/mod.test.ts`
+
+Final example status:
+
+- `Simulation`, advertised in `README.md` and `examples/README.md`.
+
+Verified with:
+
+- `deno check examples/paid-request-simulation/mod.ts examples/paid-request-simulation/mod.test.ts examples/sdk-public-api-dogfood.test.ts`
+- `deno task smoke` from `examples/paid-request-simulation/`
+- `deno task test:examples`
+- `rg -n "packages/sdk/src|packages/protocol/src|@anchr/bounty|@anchr/sdk/bounty" examples` returned no matches.
+- `deno task lint:dockerfile-workspace`
+- `deno test scripts/lint-dockerfile-workspace.test.ts --allow-read`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- Added `examples/paid-request-simulation/mod.test.ts` and kept
+  `examples/sdk-public-api-dogfood.test.ts` so `deno task test:examples`
+  exercises the advertised public SDK Simulation example.
+- Added the example as a workspace member and updated the Dockerfile workspace
+  manifest copy, keeping `scripts/lint-dockerfile-workspace.ts` green.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

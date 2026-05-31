@@ -1,0 +1,7 @@
+{
+  "tasks": {
+    "check": "deno check mod.ts mod.test.ts",
+    "test": "deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys mod.test.ts",
+    "smoke": "deno task check && deno task test"
+  }
+}

@@ -32,6 +32,7 @@ COPY --from=rust-builder /build/crates/tlsn-prover/target/release/tlsn-prove /us
 COPY deno.json deno.lock ./
 COPY packages/protocol/deno.json ./packages/protocol/
 COPY packages/sdk/deno.json ./packages/sdk/
+COPY examples/paid-request-simulation/deno.json ./examples/paid-request-simulation/
 RUN deno install
 
 COPY . .
