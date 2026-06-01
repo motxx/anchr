@@ -383,7 +383,7 @@ export function createCustomer(options: CustomerOptions): Customer {
       const selectionPayload: SelectionFeedbackPayload = {
         status: "processing",
         selected_provider_pubkey: selected.providerPubkey,
-        bound_token: boundLock.token,
+        provider_redemption_token: boundLock.token,
       };
       const selectionEvent = buildSelectionFeedbackEvent(
         identity,

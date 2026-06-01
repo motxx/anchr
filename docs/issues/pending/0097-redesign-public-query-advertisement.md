@@ -10,7 +10,7 @@ design
 ## Dependencies
 
 Depends on:
-- 0096
+- None
 
 Blocks:
 - 0080
@@ -22,8 +22,9 @@ Blocks:
 Redesign the public kind `5300` request so it is an advertisement, not the
 execution payload. This is a breaking pre-1.0 wire-shape change. Public relay
 content should only include fields that are safe and useful for discovery.
-Provider-specific execution and payment material should move to an encrypted
-handoff after Provider selection, or to another explicitly encrypted flow.
+Provider-specific execution and payment material should move to encrypted
+selection content after Provider selection, or to another explicitly encrypted
+flow.
 
 ## Rationale
 

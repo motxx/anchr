@@ -11,7 +11,6 @@ feature
 
 Depends on:
 - 0088
-- 0096
 - 0097
 - 0098
 

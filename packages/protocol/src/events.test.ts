@@ -204,16 +204,26 @@ test("feedback events expose causal tags and JSON payloads", () => {
   const selection = buildSelectionFeedbackEvent(customer, "req123", {
     status: "processing",
     selected_provider_pubkey: provider.publicKey,
-    bound_token: "cashuBbound",
+    provider_redemption_token: "cashuBbound",
   });
 
   expect(selection.kind).toBe(KIND_QUERY_FEEDBACK);
   expect(selection.tags).toContainEqual(["e", "req123", "", "request"]);
   expect(selection.tags).toContainEqual(["p", provider.publicKey]);
   expect(selection.tags).toContainEqual(["status", "processing"]);
-  expect(parseSelectionFeedbackEvent(selection)?.bound_token).toBe(
-    "cashuBbound",
+  expect(selection.content.includes("cashuBbound")).toBe(false);
+
+  const parsedSelection = parseSelectionFeedbackEvent(
+    selection,
+    provider.secretKey,
+    customer.publicKey,
   );
+  expect(parsedSelection?.provider_redemption_token).toBe("cashuBbound");
+  expect(parseSelectionFeedbackEvent(
+    selection,
+    generateKeypair().secretKey,
+    customer.publicKey,
+  )).toBe(null);
 });
 
 test("preimage delivery DMs bind release material to the request event", () => {

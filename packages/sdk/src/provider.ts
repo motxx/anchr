@@ -365,7 +365,7 @@ async function handleJob(
 
   try {
     await ctx.cashuClient.redeemHtlc({
-      token: selection.bound_token,
+      token: selection.provider_redemption_token,
       preimageHex: preimage,
       providerSecretKey: ctx.identity.secretKey,
     });
@@ -470,7 +470,7 @@ function waitForSelection(
   ctx: JobContext,
   requestEventId: string,
   customerPubkey: string,
-): Promise<{ bound_token: string } | null> {
+): Promise<{ provider_redemption_token: string } | null> {
   return new Promise((resolve) => {
     const handles: {
       sub?: { close(): void };
@@ -485,11 +485,17 @@ function waitForSelection(
       (event) => {
         const selectedPubkey = findTagValue(event, "p");
         if (selectedPubkey !== ctx.identity.publicKey) return;
-        const parsed = parseSelectionFeedbackEvent(event);
+        const parsed = parseSelectionFeedbackEvent(
+          event,
+          ctx.identity.secretKey,
+          customerPubkey,
+        );
         if (parsed === null) return;
         handles.sub?.close();
         if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
-        resolve({ bound_token: parsed.bound_token });
+        resolve({
+          provider_redemption_token: parsed.provider_redemption_token,
+        });
       },
     );
     handles.timeoutId = setTimeout(() => {

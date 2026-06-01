@@ -24,9 +24,9 @@ Customer/Provider field names rather than compatibility aliases.
 
 ## Canonical Implementation Owners
 
-`@anchr/protocol/events` is the canonical role-neutral Nostr wire helper
-surface for kind `5300`, `6300`, `7000`, and Oracle-to-Provider release DMs.
-Compatible implementations should match the event shapes documented here.
+`@anchr/protocol/events` is the canonical role-neutral Nostr wire helper surface
+for kind `5300`, `6300`, `7000`, and Oracle-to-Provider release DMs. Compatible
+implementations should match the event shapes documented here.
 
 `@anchr/sdk/adapters/nostr` owns SDK relay transport, subscriptions, actor
 service wiring, Oracle announcement publishing, and adapter-private encryption
@@ -34,13 +34,13 @@ helpers. It may contain internal builders used by the SDK services, but it is
 not a second public wire contract for query, result, feedback, or release
 messages.
 
-| Message class | Canonical owner | SDK adapter responsibility |
-| --- | --- | --- |
-| Job request `5300` | `@anchr/protocol/events` | Relay discovery and service orchestration |
-| Job result `6300` | `@anchr/protocol/events` | Publishing/subscription flow and attachment transport composition |
-| Job feedback `7000` | `@anchr/protocol/events` | Offer and selection service flow |
-| Release DM kind `4` | `@anchr/protocol/events` | Waiting for Oracle settlement messages |
-| Oracle announcement `30088` | `@anchr/sdk/adapters/nostr` | Oracle registry publication and relay E2E coverage |
+| Message class               | Canonical owner             | SDK adapter responsibility                                        |
+| --------------------------- | --------------------------- | ----------------------------------------------------------------- |
+| Job request `5300`          | `@anchr/protocol/events`    | Relay discovery and service orchestration                         |
+| Job result `6300`           | `@anchr/protocol/events`    | Publishing/subscription flow and attachment transport composition |
+| Job feedback `7000`         | `@anchr/protocol/events`    | Offer and selection service flow                                  |
+| Release DM kind `4`         | `@anchr/protocol/events`    | Waiting for Oracle settlement messages                            |
+| Oracle announcement `30088` | `@anchr/sdk/adapters/nostr` | Oracle registry publication and relay E2E coverage                |
 
 ## Event Kinds
 
@@ -74,19 +74,19 @@ the signed content fields, not a NIP-90 `bid` tag in the canonical helper.
 
 ### QueryRequestPayload
 
-| Field                       | Description                         |
-| --------------------------- | ----------------------------------- |
-| `query_id`                  | Caller-chosen query id; SHOULD match the `d` tag |
-| `description`               | Human-readable query description    |
-| `schema`                    | Proof schema URL                    |
-| `predicate`                 | Schema-specific predicate interpreted by the proof profile |
-| `customer_pubkey`           | Customer Nostr pubkey               |
-| `oracle_pubkey`             | Oracle Nostr pubkey                 |
-| `mint_url`                  | Cashu mint URL                      |
-| `bounty_token`              | Phase-1 HTLC bounty token           |
-| `max_amount_sats`           | Maximum Customer payment in sats    |
-| `locktime_seconds`          | Refund locktime as Unix seconds     |
-| `expires_at`                | Offer cutoff as Unix milliseconds   |
+| Field              | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `query_id`         | Caller-chosen query id; SHOULD match the `d` tag           |
+| `description`      | Human-readable query description                           |
+| `schema`           | Proof schema URL                                           |
+| `predicate`        | Schema-specific predicate interpreted by the proof profile |
+| `customer_pubkey`  | Customer Nostr pubkey                                      |
+| `oracle_pubkey`    | Oracle Nostr pubkey                                        |
+| `mint_url`         | Cashu mint URL                                             |
+| `bounty_token`     | Phase-1 HTLC bounty token                                  |
+| `max_amount_sats`  | Maximum Customer payment in sats                           |
+| `locktime_seconds` | Refund locktime as Unix seconds                            |
+| `expires_at`       | Offer cutoff as Unix milliseconds                          |
 
 ## Provider Offer (kind 7000, status=payment-required)
 
@@ -109,12 +109,12 @@ The offer content is signed JSON with `status`, `provider_pubkey`, and
 
 ## Provider Selection (kind 7000, status=processing)
 
-The Customer selects a Provider and announces:
+The Customer selects a Provider and publishes a routing-visible selection event:
 
 ```json
 {
   "kind": 7000,
-  "content": "{\"status\":\"processing\", ...}",
+  "content": "<encrypted Provider-only payload>",
   "tags": [
     ["e", "<job_request_event_id>", "", "request"],
     ["p", "<provider_pubkey>"],
@@ -127,10 +127,10 @@ The Customer selects a Provider and announces:
 
 The encrypted content includes:
 
-| Field                      | Description                                                 |
-| -------------------------- | ----------------------------------------------------------- |
-| `selected_provider_pubkey` | Selected Provider Nostr pubkey                              |
-| `bound_token`              | Phase-2 HTLC token bound to the selected Provider           |
+| Field                       | Description                                             |
+| --------------------------- | ------------------------------------------------------- |
+| `selected_provider_pubkey`  | Selected Provider Nostr pubkey                          |
+| `provider_redemption_token` | Token the selected Provider redeems after valid release |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly. The public query may include a `domain_hint` for display
@@ -165,16 +165,16 @@ The Provider submits the result:
 
 ### QueryResponsePayload
 
-| Field              | Description                                                              |
-| ------------------ | ------------------------------------------------------------------------ |
-| `schema`           | Proof schema URL used to dispatch Oracle and Customer verification       |
-| `data`             | Verified response payload, shaped by the schema                          |
-| `proof`            | Proof bytes encoded by the schema, usually base64 or hex                  |
+| Field    | Description                                                        |
+| -------- | ------------------------------------------------------------------ |
+| `schema` | Proof schema URL used to dispatch Oracle and Customer verification |
+| `data`   | Verified response payload, shaped by the schema                    |
+| `proof`  | Proof bytes encoded by the schema, usually base64 or hex           |
 
-When an Oracle pubkey is provided, the result also carries an
-`oracle_payload` tag encrypted to the Oracle. The Oracle-readable payload adds
-`query_id` and `request_event_id` to the same `schema`, `data`, and `proof`
-fields so the Oracle can verify without an Anchr-operated result server.
+When an Oracle pubkey is provided, the result also carries an `oracle_payload`
+tag encrypted to the Oracle. The Oracle-readable payload adds `query_id` and
+`request_event_id` to the same `schema`, `data`, and `proof` fields so the
+Oracle can verify without an Anchr-operated result server.
 
 ## Completion (kind 7000, status=success or error)
 
@@ -196,13 +196,13 @@ Dedicated completion feedback coverage is tracked by issue #0094.
 
 ## Encryption
 
-All sensitive payloads are encrypted using NIP-44 (versioned encryption).
-Kind `6300` result content and `oracle_payload` tags are NIP-44 encrypted to
-their recipients. Kind `5300` request content and the implemented kind `7000`
-offer and selection payloads are signed JSON; they must not contain private
-session headers, bearer credentials, proof secrets, or spendable release
-material. Point-to-point messages such as preimage delivery use NIP-44 direct
-messages between specific pubkeys.
+All sensitive payloads are encrypted using NIP-44 (versioned encryption). Kind
+`6300` result content, `oracle_payload` tags, and kind `7000` selection content
+are NIP-44 encrypted to their recipients. Kind `5300` request content and kind
+`7000` offer content are signed JSON; they must not contain private session
+headers, bearer credentials, proof secrets, or spendable release material.
+Point-to-point messages such as preimage delivery use NIP-44 direct messages
+between specific pubkeys.
 
 ## Release Material and Redeem Gate
 
@@ -210,11 +210,11 @@ Oracle release material follows
 [`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
 For this Nostr profile, a release message binds:
 
-| Field                 | Description                                                  |
-| --------------------- | ------------------------------------------------------------ |
-| `query_id`            | Query identifier from the Customer request                   |
-| `request_event_id`    | Original kind 5300 event id                                  |
-| `preimage`            | HTLC preimage, when the payment profile uses NUT-14 hashlock |
+| Field              | Description                                                  |
+| ------------------ | ------------------------------------------------------------ |
+| `query_id`         | Query identifier from the Customer request                   |
+| `request_event_id` | Original kind 5300 event id                                  |
+| `preimage`         | HTLC preimage, when the payment profile uses NUT-14 hashlock |
 
 Correlation mismatches are audit inputs, not redeem hard failures by themselves;
 the redeem decision remains the universal rule in

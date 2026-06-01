@@ -528,7 +528,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     {
       status: "processing",
       selected_provider_pubkey: providerKey.publicKey,
-      bound_token: "cashuBbound",
+      provider_redemption_token: "cashuBbound",
     },
   );
   fireSelection(selectionEvent);
@@ -691,7 +691,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     {
       status: "processing",
       selected_provider_pubkey: providerKey.publicKey,
-      bound_token: "cashuBbound",
+      provider_redemption_token: "cashuBbound",
     },
   ));
 

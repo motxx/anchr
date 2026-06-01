@@ -837,6 +837,12 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
   expect(publishedEvents[1].kind).toBe(7000);
+  expect(publishedEvents[1].content.includes("cashuBbound")).toBe(false);
+  expect(publishedEvents[1].tags).toContainEqual([
+    "p",
+    providerB.publicKey,
+  ]);
+  expect(publishedEvents[1].tags).toContainEqual(["status", "processing"]);
 });
 
 test("Customer.request rejects offers above the maxAmount budget", async () => {

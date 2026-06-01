@@ -7,8 +7,12 @@
  */
 
 import {
+  decryptNip44,
+  encryptNip44,
   type Event,
+  findTagValue,
   type Keypair,
+  KIND_DIRECT_MESSAGE,
   KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
@@ -186,13 +190,13 @@ export function parseOfferFeedbackEvent(
   };
 }
 
-/** Plaintext payload published by a customer announcing the selected provider (NIP-90 kind 7000, status=processing). */
+/** Provider-only payload encrypted by a customer after selecting a provider. */
 export interface SelectionFeedbackPayload {
   status: "processing";
   /** Hex pubkey of the selected provider. */
   selected_provider_pubkey: string;
-  /** Phase-2 HTLC token now bound to the selected provider. */
-  bound_token: string;
+  /** Token the selected provider redeems after valid oracle release. */
+  provider_redemption_token: string;
 }
 
 /** Build a signed kind 7000 selection event addressed to the chosen provider. */
@@ -201,6 +205,11 @@ export function buildSelectionFeedbackEvent(
   requestEventId: string,
   payload: SelectionFeedbackPayload,
 ): Event {
+  const ciphertext = encryptNip44(
+    JSON.stringify(payload),
+    identity.secretKey,
+    payload.selected_provider_pubkey,
+  );
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
     ["p", payload.selected_provider_pubkey],
@@ -210,21 +219,29 @@ export function buildSelectionFeedbackEvent(
     {
       kind: KIND_QUERY_FEEDBACK,
       created_at: Math.floor(Date.now() / 1000),
-      content: JSON.stringify(payload),
+      content: ciphertext,
       tags,
     },
     identity.secretKey,
   );
 }
 
-/** Parse a kind 7000 selection payload. Returns null on malformed input. */
+/** Decrypt and parse a kind 7000 selection payload. Returns null on malformed input. */
 export function parseSelectionFeedbackEvent(
   event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
 ): SelectionFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
+  let plaintext: string;
+  try {
+    plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
+  } catch {
+    return null;
+  }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(event.content);
+    parsed = JSON.parse(plaintext);
   } catch {
     return null;
   }
@@ -233,18 +250,17 @@ export function parseSelectionFeedbackEvent(
   if (
     p.status !== "processing" ||
     typeof p.selected_provider_pubkey !== "string" ||
-    typeof p.bound_token !== "string"
+    typeof p.provider_redemption_token !== "string"
   ) {
     return null;
   }
+  if (findTagValue(event, "p") !== p.selected_provider_pubkey) return null;
   return {
     status: "processing",
     selected_provider_pubkey: p.selected_provider_pubkey,
-    bound_token: p.bound_token,
+    provider_redemption_token: p.provider_redemption_token,
   };
 }
-
-import { decryptNip44, encryptNip44 } from "./nostr.ts";
 
 /** Plaintext payload that travels NIP-44-encrypted in the NIP-90 kind 6300 result content. */
 export interface QueryResponsePayload {
@@ -412,8 +428,6 @@ function base64Encode(bytes: Uint8Array): string {
   for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
   return btoa(s);
 }
-
-import { KIND_DIRECT_MESSAGE } from "./nostr.ts";
 
 /** Plaintext payload that travels NIP-44-encrypted in the NIP-04 kind 4 DM content. */
 export interface PreimageDeliveryPayload {

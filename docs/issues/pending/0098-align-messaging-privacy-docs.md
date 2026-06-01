@@ -10,7 +10,6 @@ maintenance
 ## Dependencies
 
 Depends on:
-- 0096
 - 0097
 
 Blocks:
@@ -43,7 +42,7 @@ Relevant files:
 - `specs/messaging.md` has one consistent privacy model for each Nostr message
   class.
 - Public docs state that relay-visible fields are public by design and that
-  Provider-only handoff content is encrypted by default.
+  Provider-only selection content is encrypted by default.
 - Protocol conformance notes name the test owner for each privacy boundary.
 - README privacy edits are limited to references needed to avoid contradicting
   the messaging spec; the runnable Quick Start rewrite remains owned by #0099.
