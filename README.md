@@ -139,8 +139,6 @@ public-surface policy.
 
 Status labels are defined in
 [`docs/universality-boundaries.md`](docs/universality-boundaries.md#example-status-vocabulary).
-The checklist for promoting or maintaining an advertised example lives in
-[`docs/example-delivery-lifecycle.md`](docs/example-delivery-lifecycle.md).
 
 | Example | Status | Lesson |
 | --- | --- | --- |
@@ -151,6 +149,7 @@ only `@anchr/sdk` or `@anchr/protocol` for Anchr imports.
 
 ## More Detail
 
+- [Documentation index](docs/README.md) - public docs and maintainer workflow
 - [Architecture](docs/architecture.md) - layer boundaries and design notes
 - [Threat model](docs/threat-model.md) - trust assumptions and mitigations
 - [Wire spec](specs/) - protocol shapes, event kinds, and payloads

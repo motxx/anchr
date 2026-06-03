@@ -45,8 +45,8 @@ an ownership rule: a function, module, package, adapter, or SDK surface should
 have one responsibility that can be stated in one sentence.
 
 For code review, enforce this rule only when the violation is visible in the
-changed TypeScript architecture. Use `unix-software-design` before
-implementation or while reviewing a proposal; use this skill after code exists.
+changed TypeScript architecture. For proposals before code exists, apply the
+same rule from `CLAUDE.md` directly.
 
 ## Auto-trigger
 

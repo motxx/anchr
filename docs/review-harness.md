@@ -43,8 +43,6 @@ from ad hoc review into one of these homes.
 | `skills/resolve-issues/SKILL.md` | `semantic skill` | Issue closure discipline: dependency checks, resolver-led splitting, focused implementation, verification, resolution notes, and moving issues only after checks pass. |
 | `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues without overfitting the implementation split. |
 | `skills/make-sub-issues/SKILL.md` | `semantic skill` | Creating resolver-led child issues and parent/child dependency links when one issue is too broad for a coherent verified change. |
-| `skills/test-regtest/SKILL.md` | `semantic skill` | Manual and automated regtest runbook selection. |
-| `skills/test-tlsn/SKILL.md` | `semantic skill` | Manual and automated TLSNotary verification runbook selection. |
 | `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
@@ -110,7 +108,7 @@ These review concerns are not fully owned by the current harness:
 | Concern | Current handling | Convert to |
 | --- | --- | --- |
 | Repeated natural-language ambiguity in issue plans or resolution notes | Human review during `resolve-issues` | Issue-template guidance in `docs/issues/README.md` or a repository skill rubric update. |
-| Coverage quality inside manual runbooks | Human review plus runbook skills | Add focused script tests when a runbook command can be parsed or simulated. |
+| Coverage quality inside manual infrastructure instructions | Human review plus `CONTRIBUTING.md`, `deno.json`, and scripts | Add focused script tests when a command can be parsed or simulated. |
 
 ## Updating This Map
 

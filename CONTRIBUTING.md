@@ -86,6 +86,7 @@ docker compose up -d && sleep 25 && ./scripts/init-regtest.sh
 deno task test:e2e:regtest
 ```
 
-The [`/test-regtest`](.claude/skills/test-regtest/SKILL.md) and
-[`/test-tlsn`](.claude/skills/test-tlsn/SKILL.md) runbooks document the
-deep flow.
+Use `deno task test:e2e:regtest`, `deno task test:e2e:tlsn`, or
+`deno task test:all:docker` for the maintained deep flows. Keep any new
+infrastructure instructions in this file, `deno.json`, or `scripts/` unless
+they need a cross-file review rubric.

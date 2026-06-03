@@ -1,10 +1,8 @@
 # Resilience Checklist
 
-Use this checklist as the current entry point for Anchr resilience review. The
-older
-[`docs/archive/chaos-engineering-report-2026-04-06.md`](archive/chaos-engineering-report-2026-04-06.md)
-is a historical 2026-04-06 snapshot and should not be used as current code
-guidance.
+Use this checklist as the current entry point for Anchr resilience review.
+Historical chaos-report snapshots are intentionally not kept in the live docs
+tree; current resilience claims must point at the references below.
 
 ## Current References
 
