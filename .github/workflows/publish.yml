@@ -70,14 +70,7 @@ jobs:
 
       - name: Publish packages
         run: |
-          deno publish --config packages/core-runtime/deno.json
-          deno publish --config packages/core-cashu/deno.json
-          deno publish --config packages/tlsn-toolkit/deno.json
-          deno publish --config packages/photo-verification/deno.json
-          deno publish --config packages/frost-oracle/deno.json
-          deno publish --config packages/cashu-conditional-swap/deno.json
-          deno publish --config packages/blossom/deno.json
-          deno publish --config packages/bounty/deno.json
+          deno publish --config packages/protocol/deno.json
           deno publish --config packages/sdk/deno.json
 
   publish-npm:

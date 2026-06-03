@@ -37,7 +37,7 @@ updates:
         update-types: ["minor", "patch"]
     cooldown: *cooldown
 
-  # Docker — root + tlsn-server, grouped per Dockerfile location.
+  # Docker — root Blossom image + tlsn-server, grouped per Dockerfile location.
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

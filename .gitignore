@@ -51,18 +51,6 @@ kannagi.db*
 uploads/*
 .local/uploads/*
 
-# ui
-generated.css
-
-# bundled UI outputs (rebuilt by `deno task build:ui`)
-apps/two-party-binary-bet/ui/main.js
-apps/two-party-binary-bet/ui/main.js.map
-
-# mobile (expo)
-mobile/.expo/
-mobile/ios/
-mobile/android/
-mobile/node_modules/
 .gstack/
 
 # frost DKG key material
@@ -85,8 +73,3 @@ test-results
 docs/chaos-*.md
 
 # deno
-
-# example apps
-example/bounty-board/node_modules/
-example/bounty-board/.expo/
-.frost-market/

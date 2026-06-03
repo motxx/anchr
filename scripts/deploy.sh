@@ -1,11 +1,21 @@
 #!/bin/bash
-# Deploy all Anchr services to fly.io
-# Usage: ./scripts/deploy.sh [all|app|verifier|provider]
+# Deploy Anchr infrastructure services to Fly.io.
+# Usage: ./scripts/deploy.sh [all|relay|blossom|verifier]
 
 set -e
 TARGET=${1:-all}
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
+
+deploy_relay() {
+  echo "=== Deploying Nostr Relay ==="
+  fly deploy --config fly.relay.toml
+}
+
+deploy_blossom() {
+  echo "=== Deploying Blossom Server ==="
+  fly deploy --config fly.blossom.toml
+}
 
 deploy_verifier() {
   echo "=== Deploying TLSNotary Verifier Server ==="
@@ -14,32 +24,22 @@ deploy_verifier() {
   cd "$ROOT"
 }
 
-deploy_app() {
-  echo "=== Deploying Anchr App ==="
-  fly deploy --config fly.toml
-}
-
-deploy_provider() {
-  echo "=== Deploying Auto-Provider ==="
-  fly deploy --config fly.provider.toml
-}
-
 case "$TARGET" in
   all)
+    deploy_relay
+    deploy_blossom
     deploy_verifier
-    deploy_app
-    deploy_provider
     ;;
+  relay)     deploy_relay ;;
+  blossom)   deploy_blossom ;;
   verifier)  deploy_verifier ;;
-  app)       deploy_app ;;
-  provider)  deploy_provider ;;
   *)
-    echo "Usage: $0 [all|app|verifier|provider]"
+    echo "Usage: $0 [all|relay|blossom|verifier]"
     exit 1
     ;;
 esac
 
 echo "=== Deploy complete ==="
-echo "Anchr App:      https://anchr-app.fly.dev"
+echo "Relay:          https://anchr-relay.fly.dev"
+echo "Blossom:        https://anchr-blossom.fly.dev"
 echo "Verifier:       https://anchr-tlsn-verifier.fly.dev"
-echo "Provider:       anchr-tlsn-provider (background process)"

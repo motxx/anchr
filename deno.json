@@ -76,7 +76,7 @@
     "test:all:full": "./scripts/test-all.sh full",
 
     "lint": "deno lint",
-    "lint:strict": "deno lint && deno task lint:fmt && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import && deno task lint:no-test-sanitizer-bypass && deno task lint:no-unit-network-listener && deno task lint:proof-schema-pages && deno task lint:dockerfile-workspace",
+    "lint:strict": "deno lint && deno task lint:fmt && deno task lint:arch && deno task lint:invariants && deno task lint:paths && deno task lint:types && deno task lint:deprecation && deno task lint:no-history-comments && deno task lint:no-dynamic-import && deno task lint:no-test-sanitizer-bypass && deno task lint:no-unit-network-listener && deno task lint:proof-schema-pages",
     "lint:deps": "bash scripts/cargo-audit-all.sh",
     "lint:fmt": "deno run --allow-read --allow-run scripts/lint-fmt.ts",
     "lint:arch": "deno run --allow-read scripts/arch-lint.ts",
@@ -91,7 +91,6 @@
     "lint:no-test-sanitizer-bypass": "deno run --allow-read --allow-run scripts/lint-no-test-sanitizer-bypass.ts",
     "lint:no-unit-network-listener": "deno run --allow-read --allow-run scripts/lint-no-unit-network-listener.ts",
     "lint:proof-schema-pages": "deno run --allow-read scripts/check-proof-schema-pages.ts",
-    "lint:dockerfile-workspace": "deno run --allow-read scripts/lint-dockerfile-workspace.ts",
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
     "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
   },
