@@ -2,6 +2,7 @@
 
 Created: 2026-05-30
 Model: GPT-5 Codex
+Completed: 2026-06-03
 
 ## Priority
 
@@ -91,3 +92,33 @@ preserve stale SDK/internal API compatibility.
 - Add deterministic lint coverage when the rule is syntactic; otherwise update
   the semantic architecture review skill and create child issues for concrete
   moves.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `scripts/arch-lint.ts`
+- `scripts/arch-lint.test.ts`
+
+Verified with:
+
+- `deno task lint:arch`
+- `deno task test:scripts`
+- `deno task check`
+- `deno task test:all`
+- `deno task test:all:docker`
+
+Harness update:
+
+- `scripts/arch-lint.ts` now enforces E026 for SDK request-internal ownership
+  exceptions, with `scripts/arch-lint.test.ts` covering allowed lifecycle
+  imports and rejected arbitrary cross-feature imports.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

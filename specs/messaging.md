@@ -6,9 +6,9 @@ Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending
 Machine (DVM) pattern. This spec defines the event kinds, payloads, and
 lifecycle for Customer, Provider, and Oracle actors.
 
-The role-neutral lifecycle, state transitions, preflight ticket, and redeem
-rules are defined in [`protocol-contract.md`](protocol-contract.md). This
-document specifies their Nostr event encoding.
+The lifecycle, state transitions, preflight ticket, and redeem rules are defined
+in [`protocol-contract.md`](protocol-contract.md). This document specifies their
+Nostr event encoding.
 
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
@@ -24,8 +24,8 @@ Customer/Provider field names rather than compatibility aliases.
 
 ## Canonical Implementation Owners
 
-`@anchr/protocol/events` is the canonical role-neutral Nostr wire helper surface
-for kind `5300`, `6300`, `7000`, and Oracle-to-Provider release DMs. Compatible
+`@anchr/protocol/events` is the canonical Nostr wire helper surface for kind
+`5300`, `6300`, `7000`, and Oracle-to-Provider release DMs. Compatible
 implementations should match the event shapes documented here.
 
 `@anchr/sdk/adapters/nostr` owns SDK relay transport, subscriptions, actor
@@ -262,9 +262,8 @@ The public Nostr profile does not currently specify Oracle retry-store deletion
 rules. Implementations must not represent a stricter retention guarantee as
 interoperable behavior until issue #0094 standardizes and tests it.
 
-## Transport Agnosticism
+## Transport Scope
 
-Nostr is the current protocol transport. The protocol design permits alternative
-transports by implementing the same message lifecycle over a different medium,
-but Anchr does not define a default hosted HTTP relay or reference-host
-endpoint.
+Nostr is the Anchr protocol transport for this repository. Compatible
+implementations use the Nostr event kinds, tags, payloads, signing rules, and
+NIP-44 encryption boundaries defined in this spec.

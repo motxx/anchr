@@ -22,7 +22,7 @@ The stable public Anchr package surface is intentionally small:
 
 - `@anchr/sdk`: the developer-facing SDK for building verifiable paid request
   flows.
-- `@anchr/protocol`: the role-neutral wire contract for compatible
+- `@anchr/protocol`: the Nostr/NIP-90 wire contract for compatible
   implementations.
 
 Everything else in this repository is implementation detail, native helper code,
@@ -57,17 +57,16 @@ taxonomy.
 - root exports for the common interoperable contract.
 - `/events` for wire event builders and parsers.
 - `/schemas` for proof schema identifiers and schema metadata.
-- `/validators` for role-neutral validation helpers.
-- `/types` for role-neutral protocol types.
-- `/nostr` only for Nostr event encoding details that are part of wire
-  compatibility.
+- `/validators` for validation helpers that protect the Nostr wire contract.
+- `/types` for protocol types used by the Nostr wire contract.
+- `/nostr` for Nostr event signing, encryption, identity, tag, and kind helpers
+  that are part of wire compatibility.
 
 Adapter manifests, adapter capability checks, concrete payment clients, proof
-engines, attachment stores, runtime helpers, and application policies belong to
-`@anchr/sdk` or SDK internals. They do not belong in `@anchr/protocol` unless a
-concrete cross-implementation wire compatibility reason is recorded in `specs/`.
-The former protocol capability surface has been absorbed into SDK-owned adapter
-contracts.
+engines, attachment stores, runtime helpers, relay clients, and application
+policies belong to `@anchr/sdk` or SDK internals. They do not belong in
+`@anchr/protocol` unless they define the Nostr wire contract recorded in
+`specs/`.
 
 ## Surface Policy
 
@@ -105,6 +104,12 @@ The SDK may own concrete standard adapters because the SDK is the developer
 composition surface. Protocol must stay narrower: it owns compatibility, not
 runtime convenience.
 
+Nostr adapter role helpers exposed from `@anchr/sdk/adapters/nostr` are
+adapter responsibilities only when their behavior is inseparable from relay
+subscription, event publication, NIP-44 encryption, or Nostr event parsing.
+Role-neutral Customer, Provider, Oracle, payment, proof, and request lifecycle
+semantics remain owned by the SDK role modules and request internals.
+
 ## SDK Request Internals
 
 `packages/sdk/src/requests/` remains an SDK-internal paid-request lifecycle
@@ -131,6 +136,7 @@ request-scoped lifecycle state or a port consumed by the request lifecycle. If a
 type becomes useful without a `Query` or lifecycle transition, move it directly
 to the owning feature directory and update callers instead of adding a second
 barrel or compatibility facade.
+`deno task lint:arch` enforces the current request-internal import exceptions.
 
 ## Agnostic Component Boundaries
 
@@ -144,7 +150,7 @@ rule derived from this table follows
 
 | Component | Stable responsibility | Target owner |
 | --- | --- | --- |
-| Actor coordination | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Protocol for wire shapes; SDK for orchestration and relay adapters. |
+| Actor coordination | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Protocol for Nostr wire shapes; SDK for orchestration and relay adapters. |
 | Evidence contract | Identify what evidence a request requires and how verifiers dispatch it without embedding verifier implementation in the protocol. | Protocol for schema identifiers; SDK for dispatch and verifier ports. |
 | Verification decision | Decide whether submitted evidence satisfies Customer constraints and whether release material may be produced. | SDK Oracle/proof modules and native helpers. |
 | Settlement lock | Hold Customer value so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and standard payment adapters. |
@@ -164,8 +170,7 @@ instead of retaining aliases. New SDK APIs, docs, and examples should not copy
 the old vocabulary.
 
 Application vocabulary such as market, marketplace, bounty, bot shield, binary
-bet, royalty, and supply chain is not core Anchr vocabulary. It may appear in
-historical issue text or in explicitly non-core migration notes, but not as the
+bet, royalty, and supply chain is not core Anchr vocabulary and must not be the
 default repository theme or public package surface.
 
 ## Dependency Rules
@@ -192,7 +197,7 @@ The target package graph is one-directional:
   invariants, package contracts, adapters, examples, and agent harness rules are
   in [`docs/universality-boundaries.md`](universality-boundaries.md).
 
-## Relation to NIP-90
+## Nostr Wire Contract
 
 Anchr can be summarized as:
 
@@ -200,10 +205,11 @@ Anchr can be summarized as:
 Nostr DVM-style transport + payment lock + Oracle-verified proof.
 ```
 
-NIP-90 is a transport inspiration and possible compatibility layer, not the
-thing Anchr sells as a repository concept. The protocol contract must preserve
-Customer, Provider, Oracle, proof, payment, refund, and release semantics even
-if an implementation uses a different transport.
+NIP-90 is the Anchr wire contract. The SDK Nostr adapter owns relay
+connections, subscriptions, runtime wiring, and service orchestration;
+`@anchr/protocol` owns the event kinds, tags, payloads, NIP-44 encryption
+boundaries, and signing helpers that independent Anchr actors must share to
+interoperate.
 
 ## Follow-On Work
 

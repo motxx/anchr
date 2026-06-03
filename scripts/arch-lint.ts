@@ -8,6 +8,8 @@
  *   [E023] examples, e2e tests, and top-level scripts must reach Anchr
  *          through @anchr/sdk or @anchr/protocol public subpaths only.
  *   [E022] application vocabulary must not leak into package code.
+ *   [E026] sdk feature folders may touch request internals only through
+ *          documented request-scoped lifecycle state or lifecycle ports.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -90,6 +92,22 @@ function resolvePackageDep(specifier: string, fileRel: string): string | null {
   return null;
 }
 
+function resolveRelativeImportTarget(
+  specifier: string,
+  fileRel: string,
+): string | null {
+  if (!specifier.startsWith(".")) return null;
+  const fileParts = fileRel.split("/").slice(0, -1);
+  const specParts = specifier.split("/");
+  const merged: string[] = [...fileParts];
+  for (const p of specParts) {
+    if (p === "." || p === "") continue;
+    if (p === "..") merged.pop();
+    else merged.push(p);
+  }
+  return merged.join("/");
+}
+
 function relativeTargetsPackageSrc(
   specifier: string,
   fileRel: string,
@@ -132,6 +150,108 @@ function isPublicAnchrSpecifier(specifier: string): boolean {
     specifier.startsWith("@anchr/protocol/");
 }
 
+function isAllowedSdkRequestImport(
+  fileRel: string,
+  targetRel: string,
+): boolean {
+  if (!fileRel.startsWith("packages/sdk/src/")) return true;
+  if (fileRel.startsWith("packages/sdk/src/requests/")) return true;
+  if (!targetRel.startsWith("packages/sdk/src/requests/")) return true;
+
+  const allowedByImporter: Array<{
+    importer: string;
+    targets: readonly string[];
+  }> = [
+    {
+      importer: "packages/sdk/src/attachments/",
+      targets: ["packages/sdk/src/requests/domain/types.ts"],
+    },
+    {
+      importer: "packages/sdk/src/payments/",
+      targets: [
+        "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/domain/types.ts",
+      ],
+    },
+    {
+      importer: "packages/sdk/src/proofs/",
+      targets: ["packages/sdk/src/requests/domain/types.ts"],
+    },
+    {
+      importer: "packages/sdk/src/adapters/nostr/",
+      targets: [
+        "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/domain/oracle-types.ts",
+        "packages/sdk/src/requests/domain/types.ts",
+      ],
+    },
+    {
+      importer: "packages/sdk/src/adapters/oracle-client/",
+      targets: [
+        "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/domain/oracle-types.ts",
+        "packages/sdk/src/requests/domain/types.ts",
+      ],
+    },
+    {
+      importer: "packages/sdk/src/adapters/oracle-service/",
+      targets: [
+        "packages/sdk/src/requests/domain/oracle-types.ts",
+        "packages/sdk/src/requests/domain/types.ts",
+      ],
+    },
+    {
+      importer: "packages/sdk/src/testing/",
+      targets: [
+        "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/application/query-escrow-validation.ts",
+        "packages/sdk/src/requests/application/query-service.ts",
+        "packages/sdk/src/requests/domain/oracle-types.ts",
+        "packages/sdk/src/requests/domain/types.ts",
+      ],
+    },
+  ];
+
+  return allowedByImporter.some((rule) =>
+    fileRel.startsWith(rule.importer) && rule.targets.includes(targetRel)
+  );
+}
+
+function isAllowedRequestFeatureImport(
+  fileRel: string,
+  targetRel: string,
+): boolean {
+  if (!fileRel.startsWith("packages/sdk/src/requests/")) return true;
+  if (!targetRel.startsWith("packages/sdk/src/")) return true;
+  if (targetRel.startsWith("packages/sdk/src/requests/")) return true;
+
+  const featureTargets = [
+    "packages/sdk/src/adapters/",
+    "packages/sdk/src/attachments/",
+    "packages/sdk/src/payments/",
+    "packages/sdk/src/proofs/",
+  ];
+  if (!featureTargets.some((prefix) => targetRel.startsWith(prefix))) {
+    return true;
+  }
+
+  if (
+    fileRel.startsWith("packages/sdk/src/requests/domain/") &&
+    targetRel === "packages/sdk/src/proofs/mod.ts"
+  ) {
+    return true;
+  }
+
+  if (
+    fileRel.startsWith("packages/sdk/src/requests/application/") &&
+    targetRel === "packages/sdk/src/payments/mod.ts"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function checkPackageFile(
   pkg: string,
   fileRel: string,
@@ -168,8 +288,35 @@ function checkPackageFile(
     }
   }
 
+  if (pkg === "sdk") {
+    for (const { specifier, line } of extractImports(source)) {
+      const target = resolveRelativeImportTarget(specifier, fileRel);
+      if (!target) continue;
+      if (
+        !isAllowedSdkRequestImport(fileRel, target) ||
+        !isAllowedRequestFeatureImport(fileRel, target)
+      ) {
+        violations.push({
+          file: fileRel,
+          line,
+          code: "E026",
+          severity: "error",
+          message:
+            `SDK request internals may be imported only through documented request-scoped state or lifecycle ports (found "${specifier}")`,
+        });
+      }
+    }
+  }
+
   return violations;
 }
+
+export {
+  checkPackageFile,
+  isAllowedRequestFeatureImport,
+  isAllowedSdkRequestImport,
+  resolveRelativeImportTarget,
+};
 
 function checkPublicSurfaceFile(fileRel: string, source: string): Violation[] {
   const violations: Violation[] = [];

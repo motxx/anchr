@@ -33,6 +33,13 @@ invariant, referenced workaround, surprising ordering). Never narrate
 history (`added for X` / `previously did Y`) — caught by
 `lint:no-history-comments`.
 
+## Documentation prose
+Live docs, specs, README files, and architecture notes describe the current
+target contract only. Do not include meta-commentary about removed designs,
+discarded alternatives, or repository history when that history has no runtime
+surface in the current code. Record durable trade-offs in ADRs only when they
+meet the ADR bar; otherwise delete the historical explanation.
+
 ## Single-purpose design
 Project architecture follows the UNIX rule: write components that do one thing
 and do it well. This is a design gate, not a file-size rule.
