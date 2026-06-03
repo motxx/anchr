@@ -12,7 +12,7 @@ COPY crates/tlsn-prover/src/ ./crates/tlsn-prover/src/
 RUN cd crates/tlsn-prover && cargo build --release
 
 # Main app
-FROM denoland/deno@sha256:564e989f4a93371e70fd8720e5dbe3e027fd4a0daad71a2b008008596ffa6492 AS app
+FROM denoland/deno@sha256:ddaad47cbbbbd856d73bd0d50074a0e308c51671d83442eebb15f1039dd4a822 AS app
 
 WORKDIR /app
 
