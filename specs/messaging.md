@@ -12,8 +12,9 @@ specifies their Nostr event encoding.
 
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
-schema URL in an `s` tag for discovery, and encrypted payloads carry the same
-URL in their `schema` field for execution.
+schema URL in an `s` tag and a public advertisement body for discovery.
+Encrypted Provider Selection payloads carry the same URL in their `schema` field
+plus execution details for the selected Provider.
 
 ## Actor Naming
 
@@ -52,7 +53,7 @@ messages.
 
 ## Query Posting (kind 5300)
 
-The Customer broadcasts a DVM Job Request:
+The Customer broadcasts a DVM Job Request as a public request advertisement:
 
 ```json
 {
@@ -67,26 +68,25 @@ The Customer broadcasts a DVM Job Request:
 }
 ```
 
-The request content is signed JSON, not encrypted NIP-44 content. Sensitive
-execution context must travel in later Provider selection messages or
-attachments rather than the public request body. Payment data is represented by
-the signed content fields, not a NIP-90 `bid` tag in the canonical helper.
+The request content is signed JSON, not encrypted NIP-44 content. Its content is
+an explicit public allowlist for open Provider discovery. Sensitive execution
+context and payment-bearing material must travel in later Provider Selection
+messages or attachments rather than the public request body. The canonical
+helper does not use a NIP-90 `bid` tag for payment material.
 
 ### QueryRequestPayload
 
-| Field              | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `query_id`         | Caller-chosen query id; SHOULD match the `d` tag           |
-| `description`      | Human-readable query description                           |
-| `schema`           | Proof schema URL                                           |
-| `predicate`        | Schema-specific predicate interpreted by the proof profile |
-| `customer_pubkey`  | Customer Nostr pubkey                                      |
-| `oracle_pubkey`    | Oracle Nostr pubkey                                        |
-| `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
-| `bounty_token`     | Phase-1 Cashu token before Provider Selection              |
-| `max_amount_sats`  | Maximum Customer payment in sats                           |
-| `locktime_seconds` | Cashu refund locktime as Unix seconds                      |
-| `expires_at`       | Offer cutoff as Unix milliseconds                          |
+| Field             | Description                                      |
+| ----------------- | ------------------------------------------------ |
+| `query_id`        | Caller-chosen query id; SHOULD match the `d` tag |
+| `schema`          | Proof schema URL                                 |
+| `customer_pubkey` | Customer Nostr pubkey                            |
+| `oracle_pubkey`   | Oracle Nostr pubkey                              |
+| `max_amount_sats` | Maximum Customer payment in sats                 |
+| `expires_at`      | Offer cutoff as Unix milliseconds                |
+
+The public content MUST NOT include `predicate`, `context`, `mint_url`,
+`bounty_token`, `provider_redemption_token`, or `locktime_seconds`.
 
 ## Provider Offer (kind 7000, status=payment-required)
 
@@ -131,10 +131,22 @@ The encrypted content includes:
 | --------------------------- | ------------------------------------------------------- |
 | `selected_provider_pubkey`  | Selected Provider Nostr pubkey                          |
 | `provider_redemption_token` | Token the selected Provider redeems after valid release |
+| `execution`                 | Provider-only execution payload and payment-lock terms  |
+
+The `execution` object includes:
+
+| Field              | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| `schema`           | Proof schema URL                                           |
+| `predicate`        | Schema-specific predicate interpreted by the proof profile |
+| `description`      | Optional human-readable request detail                     |
+| `context`          | Optional schema-agnostic context                           |
+| `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
+| `max_amount_sats`  | Maximum Customer payment in sats                           |
+| `locktime_seconds` | Cashu refund locktime as Unix seconds                      |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
-never stored publicly. The public query may include a `domain_hint` for display
-purposes.
+never stored publicly.
 
 ## Provider Work Gate
 
@@ -178,12 +190,12 @@ Oracle can verify without an Anchr-operated result server.
 Kind `7000` status `success` and `error` completion feedback is explicitly
 excluded from the stable Anchr v0 Nostr profile. Implementations may emit or
 consume completion events as SDK-local or adapter-local policy, but compatible
-Anchr actors must not require them for offer selection, proof submission,
-Oracle verification, release delivery, or Cashu redemption.
+Anchr actors must not require them for offer selection, proof submission, Oracle
+verification, release delivery, or Cashu redemption.
 
-If a future version promotes completion feedback into the interoperable
-profile, that version must define payload fields, causal tags, parser behavior,
-and tests in `@anchr/protocol/events`.
+If a future version promotes completion feedback into the interoperable profile,
+that version must define payload fields, causal tags, parser behavior, and tests
+in `@anchr/protocol/events`.
 
 Example SDK-local draft shape:
 
@@ -204,9 +216,9 @@ All sensitive payloads are encrypted using NIP-44 (versioned encryption). Kind
 `6300` result content, `oracle_payload` tags, and kind `7000` selection content
 are NIP-44 encrypted to their recipients. Kind `5300` request content and kind
 `7000` offer content are signed JSON; they must not contain private session
-headers, bearer credentials, proof secrets, or spendable release material.
-Point-to-point messages such as preimage delivery use NIP-44 direct messages
-between specific pubkeys.
+headers, bearer credentials, proof predicates, proof secrets, Provider
+Redemption Tokens, or spendable release material. Point-to-point messages such
+as preimage delivery use NIP-44 direct messages between specific pubkeys.
 
 ## Release Material and Redeem Gate
 
@@ -255,8 +267,8 @@ signature, they cannot redeem escrow. The Nostr delivery strategy is:
    an authenticated Nostr retry request that references the original kind 5300
    request, selected offer, and proof submission. The Oracle answers with a new
    NIP-44 DM to the selected Provider pubkey. Implementations may choose their
-   own retry event kind or tag set unless a future profile standardizes one,
-   but the recovery path remains Nostr-native and is not a hosted Anchr HTTP
+   own retry event kind or tag set unless a future profile standardizes one, but
+   the recovery path remains Nostr-native and is not a hosted Anchr HTTP
    endpoint.
 
 ### Provider-Side Behavior

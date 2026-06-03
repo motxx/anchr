@@ -2,6 +2,7 @@
 
 Created: 2026-06-01
 Model: GPT-5 Codex
+Completed: 2026-06-03
 
 ## Priority
 
@@ -68,3 +69,50 @@ Relevant files:
 - Decide where encrypted execution and payment details travel after discovery.
 - Update canonical protocol helpers, SDK orchestration, and focused tests for
   the chosen boundary.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/protocol/src/events.ts`
+- `packages/sdk/src/customer.ts`
+- `packages/sdk/src/provider.ts`
+- `packages/sdk/src/provider-types.ts`
+- `packages/protocol/src/events.test.ts`
+- `packages/sdk/src/customer.test.ts`
+- `packages/sdk/src/provider.test.ts`
+- `e2e/regtest/sdk-integration.test.ts`
+- `CONTEXT.md`
+- `specs/messaging.md`
+- `specs/paid-request-exchange.md`
+- `docs/adr/0002-split-public-request-advertisement.md`
+
+Verified with:
+
+- `deno task check`
+- `deno test --allow-all packages/protocol/src/events.test.ts packages/sdk/src/provider.test.ts packages/sdk/src/customer.test.ts packages/sdk/src/integration.test.ts`
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:arch`
+- `deno fmt --check packages/protocol/src/events.ts packages/protocol/src/events.test.ts packages/sdk/src/customer.ts packages/sdk/src/customer.test.ts packages/sdk/src/provider.ts packages/sdk/src/provider-types.ts packages/sdk/src/provider.test.ts packages/sdk/src/integration.test.ts e2e/regtest/sdk-integration.test.ts CONTEXT.md specs/messaging.md specs/paid-request-exchange.md docs/adr/0002-split-public-request-advertisement.md`
+- `deno task test:all`
+
+Harness update:
+
+- Added unit coverage for the kind `5300` public advertisement allowlist,
+  rejection of public execution/payment fields, encrypted selection execution
+  delivery, and Provider rejection when encrypted selection execution conflicts
+  with the public advertisement.
+- Added spec and ADR coverage for the public discovery versus Provider-only
+  execution/payment boundary.
+- Ran `check-silent-bypass` review on the changed package files; no
+  silent-bypass patterns remained after adding the Provider-side selection
+  consistency checks.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- `0102` still owns the broader SDK Nostr adapter boundary cleanup.

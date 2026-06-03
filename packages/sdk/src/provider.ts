@@ -272,8 +272,7 @@ async function handleJob(
     customerPubkey: payload.customer_pubkey,
     spec: {
       schema: payload.schema,
-      predicate: payload.predicate,
-      description: payload.description,
+      predicate: undefined,
     },
     maxAmountSats: payload.max_amount_sats,
     oraclePubkey: payload.oracle_pubkey,
@@ -320,10 +319,23 @@ async function handleJob(
     payload.customer_pubkey,
   );
   if (selection === null) return;
+  if (selection.execution.schema !== payload.schema) return;
+  if (selection.execution.max_amount_sats !== payload.max_amount_sats) return;
+  if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
 
   let result: { data: unknown; proof: Uint8Array | string };
   try {
-    result = await offer.produce();
+    result = await offer.produce({
+      spec: {
+        schema: selection.execution.schema,
+        predicate: selection.execution.predicate,
+        description: selection.execution.description,
+        context: selection.execution.context,
+      },
+      mint: selection.execution.mint_url,
+      maxAmountSats: selection.execution.max_amount_sats,
+      locktimeSeconds: selection.execution.locktime_seconds,
+    });
   } catch {
     return;
   }
@@ -470,7 +482,20 @@ function waitForSelection(
   ctx: JobContext,
   requestEventId: string,
   customerPubkey: string,
-): Promise<{ provider_redemption_token: string } | null> {
+): Promise<
+  {
+    provider_redemption_token: string;
+    execution: {
+      schema: string;
+      predicate: unknown;
+      description?: string;
+      context?: Record<string, unknown>;
+      mint_url: string;
+      max_amount_sats: number;
+      locktime_seconds: number;
+    };
+  } | null
+> {
   return new Promise((resolve) => {
     const handles: {
       sub?: { close(): void };
@@ -495,6 +520,7 @@ function waitForSelection(
         if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
         resolve({
           provider_redemption_token: parsed.provider_redemption_token,
+          execution: parsed.execution,
         });
       },
     );

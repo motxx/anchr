@@ -15,6 +15,7 @@ import {
   buildOfferFeedbackEvent,
   buildQueryResponseEvent,
   parseQueryRequestEvent,
+  parseSelectionFeedbackEvent,
 } from "@anchr/protocol/events";
 import { generateKeypair } from "@anchr/protocol/nostr";
 import { ResultTimeoutError, SchemaVerificationError } from "./customer.ts";
@@ -470,6 +471,17 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
   if (recorder.event === null) throw new Error("unreachable");
   expect(recorder.event.kind).toBe(5300);
   expect(recorder.event.id).toMatch(/^[0-9a-f]{64}$/);
+  const content = JSON.parse(recorder.event.content) as Record<
+    string,
+    unknown
+  >;
+  expect(content.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
+  expect(content.max_amount_sats).toBe(500);
+  expect(content).not.toHaveProperty("predicate");
+  expect(content).not.toHaveProperty("mint_url");
+  expect(content).not.toHaveProperty("bounty_token");
+  expect(content).not.toHaveProperty("provider_redemption_token");
+  expect(content).not.toHaveProperty("locktime_seconds");
 });
 
 test("Customer.request happy path: returns the verified data + proof from a provider", async () => {
@@ -843,6 +855,21 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
     providerB.publicKey,
   ]);
   expect(publishedEvents[1].tags).toContainEqual(["status", "processing"]);
+  const selection = parseSelectionFeedbackEvent(
+    publishedEvents[1],
+    providerB.secretKey,
+    publishedEvents[1].pubkey,
+  );
+  expect(selection?.provider_redemption_token).toBe("cashuBbound");
+  expect(selection?.execution.schema).toBe(
+    "https://anchr-spec.org/spec/proof/tlsn/v1",
+  );
+  expect(selection?.execution.predicate).toEqual({});
+  expect(selection?.execution.mint_url).toBe("https://mint.example.org");
+  expect(selection?.execution.max_amount_sats).toBe(1000);
+  expect(selection?.execution.locktime_seconds).toBeGreaterThan(
+    Math.floor(Date.now() / 1000),
+  );
 });
 
 test("Customer.request rejects offers above the maxAmount budget", async () => {

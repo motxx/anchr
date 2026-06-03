@@ -30,13 +30,12 @@ import { createCustomer } from "@anchr/sdk/customer";
 import { createProvider } from "@anchr/sdk/provider";
 import { createCashuClient } from "@anchr/sdk/adapters/cashu";
 import { createRelayClient } from "@anchr/sdk/adapters/nostr";
-import { generateKeypair } from "@anchr/protocol/nostr";
+import { type Event, generateKeypair } from "@anchr/protocol/nostr";
 import {
   buildPreimageDeliveryEvent,
   parseQueryRequestEvent,
 } from "@anchr/protocol/events";
 import type { OracleClient } from "@anchr/sdk/oracle";
-import { getDecodedToken, Wallet } from "@cashu/cashu-ts";
 
 import {
   checkInfraReady,
@@ -191,12 +190,7 @@ suite(
       }
     });
 
-    test("Phase-1 bounty_token broadcast in kind 5300 is NOT spendable as a bearer instrument", async () => {
-      // Regression test for the bearer-leak issue: an attacker who
-      // subscribes to the relay sees the bounty_token in the kind 5300
-      // event content. The token MUST NOT be spendable by anyone except
-      // the customer (or, after Phase 2, by the chosen provider with
-      // the preimage). Phase 1 locks proofs to P2PK(customerPubkey).
+    test("kind 5300 public advertisement does not broadcast payment-bearing material", async () => {
       const preimageBytes = new Uint8Array(32);
       crypto.getRandomValues(preimageBytes);
       const hashHex = bytesToHex(sha256(preimageBytes));
@@ -206,85 +200,51 @@ suite(
         BOUNTY_SATS,
       );
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
-      const customerKey = generateKeypair();
+      const oracleKey = generateKeypair();
+      const published: Event[] = [];
+      const oracleClient: OracleClient = {
+        requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
+      };
+      const customer = createCustomer({
+        oracles: [{ pubkey: oracleKey.publicKey, client: oracleClient }],
+        relays: ["recording://relay"],
+        mint: MINT_URL,
+        cashuClient: customerCashu,
+        relayClient: {
+          publish: (event) => {
+            published.push(event);
+            return Promise.resolve({
+              successes: ["recording://relay"],
+              failures: [],
+            });
+          },
+          subscribe: () => ({ close: () => {} }),
+          close: () => {},
+        },
+        offerWindowMs: 10,
+      });
 
-      const phase1 = await customerCashu.buildHtlcLock({
-        amountSats: BOUNTY_SATS,
-        hashHex,
-        customerPubkey: customerKey.publicKey,
-        locktimeSeconds: Math.floor(Date.now() / 1000) + 3600,
+      await expect(customer.request({
+        spec: {
+          schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+          predicate: { target: "https://api.example.org" },
+        },
+        payment: { maxAmount: BOUNTY_SATS },
         sourceProofs: customerProofs,
-      });
+      })).rejects.toThrow();
 
-      // Attacker wallet — loaded from the same mint so its keychain
-      // can map the V4-truncated short keyset IDs in the broadcast
-      // token back to full IDs.
-      const attackerWallet = new Wallet(MINT_URL, { unit: "sat" });
-      await attackerWallet.loadMint();
-
-      // The token decodes to real cashuB proofs (proves it isn't an
-      // opaque blob). Pass the wallet's keysets so V4 short IDs can be
-      // resolved.
-      const decoded = getDecodedToken(
-        phase1.token,
-        attackerWallet.keyChain.getAllKeysetIds(),
-      );
-      expect(decoded.proofs.length).toBeGreaterThan(0);
-      // Each proof secret carries a P2PK lock to the customer pubkey.
-      for (const proof of decoded.proofs) {
-        const secret = JSON.parse(proof.secret) as [string, { data: string }];
-        expect(secret[0]).toBe("P2PK");
-        expect(secret[1].data).toContain(customerKey.publicKey);
-      }
-
-      // Attacker scenario A (cashu-ts client path): a passive relay
-      // subscriber decodes the bounty_token and tries to spend it via
-      // a fresh wallet that never knew the customer's privkey. The
-      // wallet's send() refuses to even build a swap request because
-      // the input proofs are P2PK-locked and no privkey was supplied.
-      let clientPathError: unknown = null;
-      try {
-        await attackerWallet.ops.send(BOUNTY_SATS, decoded.proofs).run();
-      } catch (err) {
-        clientPathError = err;
-      }
-      expect(clientPathError).not.toBeNull();
-
-      // Attacker scenario B (direct mint POST): a more determined
-      // attacker bypasses cashu-ts and POSTs directly to the mint's
-      // /v1/swap endpoint. The mint MUST reject. (The balance and
-      // NUT-11 witness checks both reject; we just need _any_ rejection
-      // to confirm the proofs cannot be spent without the customer's
-      // signature.)
-      const inputAmount = decoded.proofs.reduce((s, p) => s + p.amount, 0);
-      const directPostRes = await fetch(`${MINT_URL}/v1/swap`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          inputs: decoded.proofs,
-          outputs: [
-            {
-              amount: inputAmount,
-              id: decoded.proofs[0]?.id ?? "00",
-              B_: "02" + "ff".repeat(32),
-            },
-          ],
-        }),
-      });
-      expect(directPostRes.ok).toBe(false);
-      const directPostBody = await directPostRes.text();
-      // Mint can reject for several reasons — fee imbalance, malformed
-      // outputs, or NUT-11 witness missing. All confirm the proofs
-      // cannot be spent without further signing.
-      expect(directPostBody.length).toBeGreaterThan(0);
-
-      // After both attack attempts, the proofs MUST still be UNSPENT
-      // at the mint (i.e., the legitimate customer can still claim
-      // them via Phase 2). This is the load-bearing property.
-      const stateRes = await attackerWallet.checkProofsStates(decoded.proofs);
-      for (const s of stateRes) {
-        expect(s.state).toBe("UNSPENT");
-      }
+      const requestEvent = published.find((event) => event.kind === 5300);
+      expect(requestEvent).toBeDefined();
+      if (requestEvent === undefined) throw new Error("request not published");
+      const content = JSON.parse(requestEvent.content) as Record<
+        string,
+        unknown
+      >;
+      expect(content).not.toHaveProperty("predicate");
+      expect(content).not.toHaveProperty("mint_url");
+      expect(content).not.toHaveProperty("bounty_token");
+      expect(content).not.toHaveProperty("provider_redemption_token");
+      expect(content).not.toHaveProperty("locktime_seconds");
     });
   },
 );

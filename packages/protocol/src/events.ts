@@ -20,33 +20,41 @@ import {
 } from "./nostr.ts";
 
 /**
- * Plaintext payload published in the content of a kind 5300 Job
- * Request event. Schema-specific predicates ride along under
- * `spec.predicate` — the SDK does not interpret them.
+ * Public advertisement published in the content of a kind 5300 Job Request
+ * event. Provider-specific execution and payment material is delivered after
+ * Provider Selection.
  */
 export interface QueryRequestPayload {
   /** Caller-chosen unique query id (SHOULD match the `d` tag). */
   query_id: string;
   /** Schema URL identifying the proof format. */
   schema: string;
-  /** Schema-specific predicate. */
-  predicate: unknown;
-  /** Optional human-readable description of intent. */
-  description?: string;
   /** Hex pubkey of the customer (ephemeral; refund recipient). */
   customer_pubkey: string;
   /** Hex pubkey of the oracle the customer designated for this query. */
   oracle_pubkey: string;
-  /** Cashu mint URL. */
+  /** Maximum amount the customer will pay (sats). */
+  max_amount_sats: number;
+  /** Unix timestamp (ms) after which the customer no longer accepts offers. */
+  expires_at: number;
+}
+
+/** Provider-only execution and payment context delivered after selection. */
+export interface SelectionExecutionPayload {
+  /** Schema URL identifying the proof format. */
+  schema: string;
+  /** Schema-specific predicate interpreted by the selected Provider. */
+  predicate: unknown;
+  /** Optional human-readable description of intent. */
+  description?: string;
+  /** Optional schema-agnostic context. */
+  context?: Record<string, unknown>;
+  /** Cashu mint URL for the selected Provider Redemption Token. */
   mint_url: string;
-  /** The Phase-1 HTLC bounty token (provider unbound until offer selection). */
-  bounty_token: string;
   /** Maximum amount the customer will pay (sats). */
   max_amount_sats: number;
   /** Locktime as Unix timestamp (seconds). */
   locktime_seconds: number;
-  /** Unix timestamp (ms) after which the customer no longer accepts offers. */
-  expires_at: number;
 }
 
 /**
@@ -58,7 +66,7 @@ export interface QueryRequestPayload {
  *   - p:        oracle pubkey (NIP-90 marker "oracle")
  *   - s:        proof schema URL (custom tag, indexable as #s)
  *
- * The content carries the JSON payload above.
+ * The content carries only the public advertisement payload above.
  */
 export function buildQueryRequestEvent(
   identity: Keypair,
@@ -103,14 +111,21 @@ export function parseQueryRequestEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    "predicate" in p ||
+    "context" in p ||
+    "mint_url" in p ||
+    "bounty_token" in p ||
+    "provider_redemption_token" in p ||
+    "locktime_seconds" in p
+  ) {
+    return null;
+  }
+  if (
     typeof p.query_id !== "string" ||
     typeof p.schema !== "string" ||
     typeof p.customer_pubkey !== "string" ||
     typeof p.oracle_pubkey !== "string" ||
-    typeof p.mint_url !== "string" ||
-    typeof p.bounty_token !== "string" ||
     typeof p.max_amount_sats !== "number" ||
-    typeof p.locktime_seconds !== "number" ||
     typeof p.expires_at !== "number"
   ) {
     return null;
@@ -118,14 +133,9 @@ export function parseQueryRequestEvent(
   return {
     query_id: p.query_id,
     schema: p.schema,
-    predicate: p.predicate,
-    description: typeof p.description === "string" ? p.description : undefined,
     customer_pubkey: p.customer_pubkey,
     oracle_pubkey: p.oracle_pubkey,
-    mint_url: p.mint_url,
-    bounty_token: p.bounty_token,
     max_amount_sats: p.max_amount_sats,
-    locktime_seconds: p.locktime_seconds,
     expires_at: p.expires_at,
   };
 }
@@ -197,6 +207,8 @@ export interface SelectionFeedbackPayload {
   selected_provider_pubkey: string;
   /** Token the selected provider redeems after valid oracle release. */
   provider_redemption_token: string;
+  /** Provider-only execution and payment context for the selected work. */
+  execution: SelectionExecutionPayload;
 }
 
 /** Build a signed kind 7000 selection event addressed to the chosen provider. */
@@ -250,7 +262,19 @@ export function parseSelectionFeedbackEvent(
   if (
     p.status !== "processing" ||
     typeof p.selected_provider_pubkey !== "string" ||
-    typeof p.provider_redemption_token !== "string"
+    typeof p.provider_redemption_token !== "string" ||
+    typeof p.execution !== "object" ||
+    p.execution === null
+  ) {
+    return null;
+  }
+  const execution = p.execution as Record<string, unknown>;
+  if (
+    typeof execution.schema !== "string" ||
+    !("predicate" in execution) ||
+    typeof execution.max_amount_sats !== "number" ||
+    typeof execution.mint_url !== "string" ||
+    typeof execution.locktime_seconds !== "number"
   ) {
     return null;
   }
@@ -259,6 +283,20 @@ export function parseSelectionFeedbackEvent(
     status: "processing",
     selected_provider_pubkey: p.selected_provider_pubkey,
     provider_redemption_token: p.provider_redemption_token,
+    execution: {
+      schema: execution.schema,
+      predicate: execution.predicate,
+      description: typeof execution.description === "string"
+        ? execution.description
+        : undefined,
+      context: typeof execution.context === "object" &&
+          execution.context !== null
+        ? execution.context as Record<string, unknown>
+        : undefined,
+      mint_url: execution.mint_url,
+      max_amount_sats: execution.max_amount_sats,
+      locktime_seconds: execution.locktime_seconds,
+    },
   };
 }
 

@@ -304,14 +304,9 @@ export function createCustomer(options: CustomerOptions): Customer {
       const requestPayload: QueryRequestPayload = {
         query_id: queryId,
         schema: req.spec.schema,
-        predicate: req.spec.predicate,
-        description: req.spec.description,
         customer_pubkey: identity.publicKey,
         oracle_pubkey: expectedOracle,
-        mint_url: mint,
-        bounty_token: initialLock.token,
         max_amount_sats: req.payment.maxAmount,
-        locktime_seconds: locktimeSeconds,
         expires_at: Date.now() + offerWindowMs,
       };
       const requestEvent = buildQueryRequestEvent(identity, requestPayload);
@@ -384,6 +379,15 @@ export function createCustomer(options: CustomerOptions): Customer {
         status: "processing",
         selected_provider_pubkey: selected.providerPubkey,
         provider_redemption_token: boundLock.token,
+        execution: {
+          schema: req.spec.schema,
+          predicate: req.spec.predicate,
+          description: req.spec.description,
+          context: req.spec.context,
+          mint_url: mint,
+          max_amount_sats: req.payment.maxAmount,
+          locktime_seconds: locktimeSeconds,
+        },
       };
       const selectionEvent = buildSelectionFeedbackEvent(
         identity,

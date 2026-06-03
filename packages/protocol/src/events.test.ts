@@ -30,14 +30,9 @@ function samplePayload(
   return {
     query_id: "query_abc",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: { target: "https://api.example.org" },
-    description: "test",
     customer_pubkey: "11".repeat(32),
     oracle_pubkey: "22".repeat(32),
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuBfake",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 600_000,
     ...overrides,
   };
@@ -75,17 +70,50 @@ test("parseQueryRequestEvent recovers a payload from the built event (round-trip
   expect(parsed?.schema).toBe(payload.schema);
   expect(parsed?.customer_pubkey).toBe(payload.customer_pubkey);
   expect(parsed?.oracle_pubkey).toBe(payload.oracle_pubkey);
-  expect(parsed?.bounty_token).toBe(payload.bounty_token);
   expect(parsed?.max_amount_sats).toBe(payload.max_amount_sats);
 });
 
-test("buildQueryRequestEvent publishes JSON request content without an encryption marker", () => {
+test("buildQueryRequestEvent publishes only the public advertisement allowlist", () => {
   const identity = generateKeypair();
   const payload = samplePayload();
   const event = buildQueryRequestEvent(identity, payload);
+  const content = JSON.parse(event.content);
 
-  expect(JSON.parse(event.content)).toEqual(payload);
+  expect(content).toEqual(payload);
+  expect(Object.keys(content).sort()).toEqual([
+    "customer_pubkey",
+    "expires_at",
+    "max_amount_sats",
+    "oracle_pubkey",
+    "query_id",
+    "schema",
+  ]);
+  expect(content).not.toHaveProperty("predicate");
+  expect(content).not.toHaveProperty("context");
+  expect(content).not.toHaveProperty("mint_url");
+  expect(content).not.toHaveProperty("bounty_token");
+  expect(content).not.toHaveProperty("provider_redemption_token");
+  expect(content).not.toHaveProperty("locktime_seconds");
   expect(event.tags.some((tag) => tag[0] === "encrypted")).toBe(false);
+});
+
+test("parseQueryRequestEvent rejects public content carrying execution or payment material", () => {
+  const event = {
+    kind: KIND_QUERY_REQUEST,
+    pubkey: "00".repeat(32),
+    id: "00".repeat(32),
+    sig: "00".repeat(64),
+    created_at: 0,
+    content: JSON.stringify({
+      ...samplePayload(),
+      predicate: { target: "https://api.example.org" },
+      mint_url: "https://mint.example.org",
+      bounty_token: "cashuBfake",
+      locktime_seconds: 123,
+    }),
+    tags: [],
+  };
+  expect(parseQueryRequestEvent(event)).toBe(null);
 });
 
 test("parseQueryRequestEvent returns null for a non-kind-5300 event", () => {
@@ -205,6 +233,14 @@ test("feedback events expose causal tags and JSON payloads", () => {
     status: "processing",
     selected_provider_pubkey: provider.publicKey,
     provider_redemption_token: "cashuBbound",
+    execution: {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      predicate: { target: "https://api.example.org" },
+      description: "private execution detail",
+      mint_url: "https://mint.example.org",
+      max_amount_sats: 42,
+      locktime_seconds: 123456,
+    },
   });
 
   expect(selection.kind).toBe(KIND_QUERY_FEEDBACK);
@@ -219,6 +255,9 @@ test("feedback events expose causal tags and JSON payloads", () => {
     customer.publicKey,
   );
   expect(parsedSelection?.provider_redemption_token).toBe("cashuBbound");
+  expect(parsedSelection?.execution.predicate).toEqual({
+    target: "https://api.example.org",
+  });
   expect(parseSelectionFeedbackEvent(
     selection,
     generateKeypair().secretKey,

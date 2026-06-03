@@ -8,6 +8,18 @@ A conditional payment held for a request. A Payment Lock can be redeemed by the
 selected Provider after valid release, or refunded by the Customer through the
 timeout path.
 
+### Public Request Advertisement
+
+Relay-visible request information that lets Providers discover eligible work.
+A Public Request Advertisement does not include execution predicates,
+Provider-only payment data, or other sensitive context.
+
+### Execution Payload
+
+Provider-only request details delivered after Provider Selection. An Execution
+Payload includes the proof predicate and payment-lock terms the selected
+Provider needs before doing the work.
+
 ### Provider Selection
 
 The Customer's lifecycle decision to choose exactly one Provider for a request.

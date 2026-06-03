@@ -106,6 +106,23 @@ const validOptions = (): ProviderOptions => ({
   relayClient: makeRelayClient(),
 });
 
+function selectionExecution(
+  overrides?: Partial<ReturnType<typeof baseSelectionExecution>>,
+) {
+  return { ...baseSelectionExecution(), ...overrides };
+}
+
+function baseSelectionExecution() {
+  return {
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    predicate: { target: "https://api.example.org/private" },
+    description: "private execution detail",
+    mint_url: "https://mint.example.org",
+    max_amount_sats: 1000,
+    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
+  };
+}
+
 // --- Validation ---
 
 test("validateProviderOptions accepts a well-formed options object", () => {
@@ -260,26 +277,18 @@ test("Provider.serve calls handler only for events whose oracle is in the whitel
   const goodEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   });
   // Event whose oracle is NOT in our whitelist → handler skipped.
   const badEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q2",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: "z".repeat(64),
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 2000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   });
   onEvent(goodEvent);
@@ -323,25 +332,17 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: ProofSchema.TlsnV1,
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q2",
     schema: ProofSchema.C2paImageV1,
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
   await new Promise((r) => setTimeout(r, 10));
@@ -392,13 +393,9 @@ test("Provider.serve publishes a kind 7000 offer when handler returns a Provider
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
   // Wait long enough for the per-job selection timeout (30ms) to fire,
@@ -437,13 +434,9 @@ test("Provider.serve declines requests where handler returns null (no publish)",
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
   await new Promise((r) => setTimeout(r, 10));
@@ -458,6 +451,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   let onRequestEvent: ((e: Event) => void) | null = null;
   let onSelectionEvent: ((e: Event) => void) | null = null;
   let producerCalled = false;
+  let producerPredicate: unknown = null;
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
@@ -486,8 +480,9 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   });
   const servePromise = provider.serve(async () => ({
     amountSats: 200,
-    produce: async () => {
+    produce: async (selection) => {
       producerCalled = true;
+      producerPredicate = selection.spec.predicate;
       return { data: { hello: "world" }, proof: "pf-bytes" };
     },
   }));
@@ -502,13 +497,9 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   const requestEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: { foo: "bar" },
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   });
   fireRequest(requestEvent);
@@ -529,6 +520,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
       status: "processing",
       selected_provider_pubkey: providerKey.publicKey,
       provider_redemption_token: "cashuBbound",
+      execution: selectionExecution(),
     },
   );
   fireSelection(selectionEvent);
@@ -540,6 +532,9 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   await servePromise;
 
   expect(producerCalled).toBe(true);
+  expect(producerPredicate).toEqual({
+    target: "https://api.example.org/private",
+  });
   // Two publishes from the provider: kind 7000 offer + kind 6300 result.
   expect(published).toHaveLength(2);
   expect(published[0].kind).toBe(7000);
@@ -596,13 +591,9 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   (onRequestEvent as (e: Event) => void)(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
 
@@ -613,6 +604,77 @@ test("Provider.serve never runs the producer when no selection event arrives wit
 
   expect(producerCalled).toBe(false);
   // Only the kind 7000 offer was published; no kind 6300 result.
+  expect(published).toHaveLength(1);
+  expect(published[0].kind).toBe(7000);
+});
+
+test("Provider.serve ignores selection whose execution payload mismatches the public advertisement", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      } else if (kinds.includes(7000)) {
+        onSelectionEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    selectionTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 100,
+    produce: async () => {
+      producerCalled = true;
+      return { data: null, proof: "x" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  const fireRequest = requireOnEvent(onRequestEvent);
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    max_amount_sats: 1000,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  const fireSelection = requireOnEvent(onSelectionEvent);
+  fireSelection(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      provider_redemption_token: "cashuBbound",
+      execution: selectionExecution({
+        schema: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
+      }),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(false);
   expect(published).toHaveLength(1);
   expect(published[0].kind).toBe(7000);
 });
@@ -670,13 +732,9 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   const requestEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q-redeem",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: { foo: "bar" },
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: oracleKey.publicKey,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuBinit",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   });
   fireRequest(requestEvent);
@@ -692,6 +750,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
       status: "processing",
       selected_provider_pubkey: providerKey.publicKey,
       provider_redemption_token: "cashuBbound",
+      execution: selectionExecution(),
     },
   ));
 
@@ -758,13 +817,9 @@ test("Provider.serve does not publish an offer that exceeds the request's maxAmo
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-    predicate: {},
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
-    mint_url: "https://mint.example.org",
-    bounty_token: "cashuB",
     max_amount_sats: 1000,
-    locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
     expires_at: Date.now() + 60_000,
   }));
   await new Promise((r) => setTimeout(r, 10));

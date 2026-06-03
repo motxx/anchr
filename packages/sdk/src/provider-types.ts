@@ -21,7 +21,9 @@ export type {
 
 export interface ProviderOffer {
   amountSats: number;
-  produce: () => Promise<{ data: unknown; proof: Uint8Array | string }>;
+  produce: (
+    selection: ProviderSelectionContext,
+  ) => Promise<{ data: unknown; proof: Uint8Array | string }>;
 }
 
 export interface ProviderRequestEvent {
@@ -30,6 +32,13 @@ export interface ProviderRequestEvent {
   maxAmountSats: number;
   oraclePubkey: string;
   proofGenerator?: ProofGenerator;
+}
+
+export interface ProviderSelectionContext {
+  spec: Spec;
+  mint: string;
+  maxAmountSats: number;
+  locktimeSeconds: number;
 }
 
 export type ProviderHandler = (
