@@ -2,6 +2,7 @@
 
 Created: 2026-05-30
 Model: GPT-5 Codex
+Completed: 2026-06-03
 
 ## Priority
 
@@ -78,3 +79,29 @@ surfaces.
   semantics.
 - Keep historical issue and archive text intact unless a live index presents it
   as current guidance.
+
+## Resolution
+
+Implemented by updating:
+
+- `CLAUDE.md`
+- `docs/review-harness.md`
+
+Verified with:
+
+- `rg -n "@anchr/(core-runtime|core-cashu|customer-sdk|provider-sdk|oracle-sdk|bounty)|packages/(bounty|core-runtime)" CLAUDE.md AGENTS.md README.md specs docs/architecture.md docs/review-harness.md docs/universality-boundaries.md`
+- `deno task lint:strict`
+- `deno task test:all`
+
+Harness update:
+
+- None — the stale live-doc pointers were one-time package-collapse drift, and
+  the issue verification query now confirms the targeted active docs are clean.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

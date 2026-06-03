@@ -9,18 +9,17 @@ the code and `docs/`.
 - `.env` is loaded via `--env` in task definitions — never `dotenv`.
 - HTTP: `Deno.serve()` + Hono. WebSocket: built-in. Env: `Deno.env.get/set/delete`.
   Never `express`, `ws`, `process.env`.
-- Cross-runtime helpers (spawn, fs, which, env, logger) live in
-  `@anchr/core-runtime`.
+- Runtime helpers belong in `packages/sdk/src/` unless they define the
+  interoperable Nostr/Cashu contract owned by `@anchr/protocol`.
 
 ## Logging
-`getLogger(["anchr", "<name>"])` from `@anchr/core-runtime/logger`.
-**No `console.*`** in `packages/bounty/src/(application|infrastructure)/`
-or any `packages/` (E021). Level read from `ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
+**No `console.*`** in `packages/` (E021). Level read from
+`ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
 
 ## Type bar
 `as` and `any` forbidden everywhere in `packages/`. Narrow with type
-predicates or `packages/bounty/src/infrastructure/lib/runtime-types.ts`.
-`unknown` only at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
+predicates. `unknown` only at boundaries (HTTP body, `JSON.parse`,
+`catch (err)`).
 
 ## Versioning (pre-1.0)
 Delete replaced paths outright. No `@deprecated`, "legacy", or
@@ -92,14 +91,11 @@ every Edit/Write via PostToolUse hook and on every `git push` via
 pre-commit hook.
 
 ## Layout
-- `packages/` — independently-published primitives
-  (`core-runtime`, `core-cashu`, `tlsn-toolkit`, `photo-verification`,
-  `frost-oracle`, `cashu-conditional-swap`, `blossom`, `adapters`,
-  `protocol`, `oracle-sdk`, `customer-sdk`, `provider-sdk`, `bounty`,
-  `sdk`). Transitional Query lifecycle scaffolding lives in
-  `packages/bounty/src/{domain,application,infrastructure}/`; new protocol,
-  adapter, proof, settlement, and actor SDK surfaces belong in their named
-  packages.
+- `packages/protocol/` — Nostr/Cashu v0 wire contract, event helpers,
+  protocol types, schema identifiers, and Nostr compatibility helpers.
+- `packages/sdk/` — Customer, Provider, Oracle orchestration, payment helpers,
+  proof helpers, attachments, adapters, request internals, testing helpers, and
+  the developer-facing SDK surface.
 - `apps/<app>/` — maintained runnable product or adapter surfaces with their
   own runtime/config/ops policy. **Must reach Anchr through `@anchr/*` only** —
   relative paths into `packages/<pkg>/src/...` are an E023 violation.

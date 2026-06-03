@@ -18,7 +18,7 @@ from ad hoc review into one of these homes.
 | Harness | Class | Owns |
 | --- | --- | --- |
 | `deno task lint:strict` | `automated` | Baseline lint, formatting, architecture, invariant locks, path leaks, type bar, pre-1.0 replacement policy, history comments, dynamic imports, test sanitizer bypasses, and unit-test network listeners. |
-| `deno task lint:arch` | `automated` | Layer direction inside `packages/bounty`, inter-package dependency rules, banned runtime packages, package vocabulary leakage, `Deno.*` placement, `console.*` placement, and example-to-package public-surface use. |
+| `deno task lint:arch` | `automated` | Protocol/SDK package dependency direction, public-surface imports from examples, e2e tests, and scripts, package vocabulary leakage, SDK request-internal import boundaries, `Deno.*` placement, and `console.*` placement. |
 | `deno task lint:invariants` | `automated` | Bidirectional drift detection between `docs/threat-model.md`, tests, and `docs/threat-model.lock.json`. |
 | `deno task lint:types` | `automated` | `any`, broad casts, double casts, and unexplained `unknown` at non-boundary sites. |
 | `deno task lint:paths` | `automated` | Developer-local absolute paths in tracked text. |
@@ -33,7 +33,7 @@ from ad hoc review into one of these homes.
 | `deno task test:examples` | `automated` | Example-level compile and behavior checks. |
 | `deno task test:e2e:protocol` | `automated` | Protocol attack, trust, and quorum flows that do not require external infrastructure. |
 | `deno task test:e2e:relay` | `automated` | Nostr relay-backed flows. |
-| `deno task test:e2e:regtest` | `automated` | Cashu, Lightning regtest, Blossom, and full bounty lifecycle flows. |
+| `deno task test:e2e:regtest` | `automated` | Cashu, Lightning regtest, Blossom, and full paid-request lifecycle flows. |
 | `deno task test:e2e:frost` | `automated` | FROST threshold behavior. |
 | `deno task test:e2e:tlsn` | `automated` | TLSNotary proof generation and verification. |
 | `deno task test:all` | `automated` | Local verification bar from `CLAUDE.md`. |
