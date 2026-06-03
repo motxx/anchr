@@ -173,12 +173,19 @@ tag encrypted to the Oracle. The Oracle-readable payload adds `query_id` and
 `request_event_id` to the same `schema`, `data`, and `proof` fields so the
 Oracle can verify without an Anchr-operated result server.
 
-## Completion (kind 7000, status=success or error)
+## Completion Feedback Boundary
 
-Completion feedback is not yet a public `@anchr/protocol/events` helper. Until
-it is standardized, implementations should treat status `success` and `error`
-events as draft adapter behavior, not part of the stable Nostr profile.
-Dedicated completion feedback coverage is tracked by issue #0094.
+Kind `7000` status `success` and `error` completion feedback is explicitly
+excluded from the stable Anchr v0 Nostr profile. Implementations may emit or
+consume completion events as SDK-local or adapter-local policy, but compatible
+Anchr actors must not require them for offer selection, proof submission,
+Oracle verification, release delivery, or Cashu redemption.
+
+If a future version promotes completion feedback into the interoperable
+profile, that version must define payload fields, causal tags, parser behavior,
+and tests in `@anchr/protocol/events`.
+
+Example SDK-local draft shape:
 
 ```json
 {
@@ -205,7 +212,9 @@ between specific pubkeys.
 
 Oracle release material follows
 [`paid-request-exchange.md#release-and-redeem`](paid-request-exchange.md#release-and-redeem).
-For v0, a release message binds:
+For the stable v0 Nostr profile, release delivery is an Oracle-to-Provider
+NIP-44 DM (kind `4`) carrying HTLC preimage material. The canonical release
+payload binds:
 
 | Field              | Description                                       |
 | ------------------ | ------------------------------------------------- |
@@ -217,10 +226,13 @@ Correlation mismatches are audit inputs, not redeem hard failures by themselves;
 the redeem decision remains the rule in
 [`paid-request-exchange.md#release-and-redeem`](paid-request-exchange.md#release-and-redeem).
 
-FROST group-signature delivery exists in the SDK adapter as an implementation
-path, but it is not yet part of the canonical `@anchr/protocol/events` helper
-surface. Standardizing completion and threshold-release delivery is tracked by
-issue #0094.
+FROST group-signature delivery remains SDK-local release policy in v0. The SDK
+adapter currently uses encrypted kind `4` DMs with a `frost_signature` payload
+for P2PK+FROST flows, and tests that adapter behavior under
+`packages/sdk/src/adapters/nostr/events/frost-dm.test.ts` and
+`packages/sdk/src/adapters/nostr/oracle-frost.test.ts`. Those messages are not
+part of the stable `@anchr/protocol/events` helper surface and are not required
+for compatible paid-request implementations.
 
 ## Release Delivery Reliability
 
@@ -233,16 +245,17 @@ signature, they cannot redeem escrow. The Nostr delivery strategy is:
 1. **Primary**: Oracle sends release material via NIP-44 DM to the Provider,
    published to configured relays.
 
-2. **Retry**: Confirmed retry-store semantics are not standardized in this
-   contract yet. Future work must define whether retry success is measured by
-   relay acknowledgement, authenticated retry delivery, or redeem observation.
-   That work is tracked by issue #0094.
+2. **Retry**: Confirmed retry-store semantics are SDK-local policy in v0.
+   Implementations may retry on relay publish failure and may retain release
+   material for later delivery, but the stable Nostr profile does not define a
+   retry request event kind, retry success criterion, or interoperable retry
+   store.
 
 3. **Recovery**: If direct relay delivery keeps failing, the Provider may send
    an authenticated Nostr retry request that references the original kind 5300
    request, selected offer, and proof submission. The Oracle answers with a new
    NIP-44 DM to the selected Provider pubkey. Implementations may choose their
-   own retry event kind or tag set until a dedicated profile is standardized,
+   own retry event kind or tag set unless a future profile standardizes one,
    but the recovery path remains Nostr-native and is not a hosted Anchr HTTP
    endpoint.
 
@@ -255,9 +268,9 @@ relays.
 
 ### Deletion Policy
 
-The public Nostr contract does not currently specify Oracle retry-store deletion
-rules. Implementations must not represent a stricter retention guarantee as
-interoperable behavior until issue #0094 standardizes and tests it.
+The public Nostr contract does not specify Oracle retry-store deletion rules.
+Implementations must not represent a stricter retention guarantee as
+interoperable behavior unless a future profile standardizes and tests it.
 
 ## Transport Scope
 

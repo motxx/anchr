@@ -10,7 +10,6 @@ design
 ## Dependencies
 
 Depends on:
-- 0094
 - 0097
 
 Blocks:
@@ -48,9 +47,8 @@ Code review found these boundary risks:
   replacement metadata unless they are removed or reframed as diagnostic
   runtime metadata.
 
-This issue intentionally depends on #0097 and #0094 because some adapter event
-cleanup overlaps with the final public request advertisement and completion /
-release retry decisions.
+This issue intentionally depends on #0097 because some adapter event cleanup
+overlaps with the final public request advertisement decision.
 
 ## Acceptance
 
@@ -86,7 +84,7 @@ release retry decisions.
 ## Plan
 
 - Re-read the current protocol event helpers, SDK Nostr adapter, Cashu adapter,
-  payment helpers, and public exports after #0094 and #0097 close.
+  payment helpers, and public exports after #0097 closes.
 - Decide whether `AdapterManifest` / `AdapterCapability` still serve an SDK
   runtime diagnostic purpose.
 - Move or rewire duplicated protocol primitives and event payload definitions
