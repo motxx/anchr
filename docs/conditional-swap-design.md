@@ -1,20 +1,27 @@
-# Conditional Swap
+# Conditional Swap Design Note
+
+This document is retained design material for future N:M conditional
+settlement. It is not an active Anchr v0 protocol spec, not part of the current
+public `@anchr/protocol` wire contract, and not a public SDK surface.
+
+The active v0 exchange is the Nostr-native, Cashu-settled paid-request flow in
+[`../specs/paid-request-exchange.md`](../specs/paid-request-exchange.md) and
+[`../specs/messaging.md`](../specs/messaging.md).
 
 ## Abstract
 
-The conditional swap is an N:M primitive that extends Anchr's 1:1 atomic swap to
-support binary-outcome markets. Matched pairs lock tokens in opposite
-directions. The Oracle reveals the winning preimage; the winner redeems the
-loser's tokens.
+The conditional swap is an N:M primitive for binary-outcome settlement.
+Matched pairs lock tokens in opposite directions. The Oracle reveals the
+winning preimage; the winner redeems the loser's tokens.
 
 ## Motivation
 
-Anchr's core protocol is a 1:1 atomic swap: one Customer pays one Provider for
-one proof. The conditional swap generalizes this to N:M: multiple parties bet
-against each other on a binary outcome, with the Oracle resolving which side
-wins.
+The current Anchr v0 paid-request exchange is 1:1: one Customer pays one
+Provider for verified work. Conditional swap design explores an N:M extension:
+multiple parties take opposite sides of a binary outcome, with the Oracle
+resolving which side wins.
 
-Use cases: two-party binary bets, insurance, group bounties, auctions.
+Use cases: two-party binary outcomes, insurance, group rewards, auctions.
 
 ## Cross-HTLC Dual-Preimage Pattern
 
@@ -250,18 +257,20 @@ FROST implementations must not expose a synchronous `sign()` path that returns
 placeholder success or hides threshold failure. `null` means the threshold was
 not met, the release was rejected, or the swap was already released.
 
-## Relationship to Core Protocol
+## Relationship to Anchr v0
 
-The 1:1 bounty query (Specs 00-06) is the special case where N=1, M=1. The
-conditional swap extends this to N:M by:
+The current v0 paid-request exchange is a 1:1 Customer-to-Provider payment for
+verified work. Conditional swap design generalizes that shape to N:M by:
 
 1. Replacing the single preimage with a dual-preimage scheme (or FROST P2PK
    dual-key).
 2. Introducing a matching layer that pairs participants.
-3. Using the same `EscrowProvider`, `verify()`, and messaging infrastructure.
+3. Reusing the same verification and release-authority concepts.
 
-The Oracle's role is identical: verify data, produce an attestation, release the
-appropriate preimage or signature.
+The Oracle's conceptual role is similar: verify data, produce an attestation,
+and release the appropriate preimage or signature. The matching layer, dual
+outcome state, N:M participant coordination, and conditional settlement fields
+are not defined by the active v0 specs.
 
 ## Settlement Limitations
 

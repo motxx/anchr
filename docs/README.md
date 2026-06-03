@@ -15,6 +15,11 @@ Anchr's SDK, protocol, security, verification, or issue workflow.
   entry point.
 - [Specs](../specs/) - CC0 wire-format and proof-schema contracts.
 
+## Design Notes
+
+- [Conditional swap design](conditional-swap-design.md) - retained N:M
+  conditional settlement design material; not an active v0 protocol spec.
+
 ## Maintainer Workflow
 
 These documents are kept because they make AI-assisted maintenance immediately

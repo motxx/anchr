@@ -2,6 +2,7 @@
 
 Created: 2026-05-30
 Model: GPT-5 Codex
+Completed: 2026-06-03
 
 ## Priority
 
@@ -64,3 +65,37 @@ roadmap note, or an active public contract.
 - Make the smallest status decision that removes public-release ambiguity under
   the v0 Nostr/Cashu substrate decision.
 - Update docs/specs and tests or file narrower implementation issues as needed.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/conditional-swap-design.md`
+- `docs/README.md`
+- `docs/protocol-conformance-audit.md`
+- `specs/README.md`
+- `docs/issues/pending/0080-prepare-public-release-cleanup.md`
+
+Verified with:
+
+- `deno task check`
+- `deno task test:unit`
+- `deno task test:e2e:frost`
+- `deno task lint:strict`
+- `deno task test:e2e:regtest` was skipped at maintainer direction because
+  this was a docs-only ownership change. The attempted run failed only because
+  regtest infrastructure was not ready.
+
+Harness update:
+
+- None — this is a one-time design placement decision now locked in
+  `specs/README.md`, `docs/README.md`, and
+  `docs/protocol-conformance-audit.md`.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

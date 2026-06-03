@@ -16,13 +16,11 @@ The current implementation is centered on two public packages:
   payments, proof dispatch, attachments, local state, and test helpers.
 
 The audit found no missing package import or type owner for the collapsed
-layout. It did find two conformance gaps that should remain tracked before the
+layout. It did find one conformance gap that should remain tracked before the
 public-release parent closes:
 
 - #0094: standardize completion feedback and release retry semantics that are
   intentionally left out of the current Nostr messaging profile.
-- #0093: decide whether the conditional-swap spec is active public protocol or
-  retained design material, then update implementation/docs accordingly.
 
 ## Spec Mapping
 
@@ -32,7 +30,6 @@ public-release parent closes:
 | `specs/messaging.md` | `packages/protocol/src/events.ts`, `packages/protocol/src/nostr.ts` for canonical query/result/feedback/release wire helpers; `packages/sdk/src/adapters/nostr/` for SDK relay services and Oracle announcements | `packages/protocol/src/events.test.ts`, `packages/protocol/src/nostr.test.ts`, `packages/sdk/src/adapters/nostr/*.test.ts`, `e2e/relay/oracle-discovery.test.ts` | Event kind constants, request/result/feedback builders, NIP-44 payload helpers, Oracle-readable result payloads, and discovery events are implemented and tested. Completion feedback and release retry-store semantics remain tracked by #0094. |
 | `specs/oracle-registry.md` | `packages/sdk/src/adapters/oracle-client/oracle-discovery.ts`, `packages/sdk/src/adapters/nostr/events/event-builders.ts` | `packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts`, `e2e/relay/oracle-discovery.test.ts` | Kind `30088`, `d` tag, `anchr-oracle` and capability `t` tags, announcement content fields, capability filtering, and recency filtering are implemented and tested. |
 | `specs/proof-schemas.md` | `packages/protocol/src/schema.ts`, `packages/sdk/src/schema.ts`, `packages/sdk/src/proofs/` | `packages/protocol/src/schema.test.ts`, `packages/sdk/src/schema.test.ts`, proof adapter tests under `packages/sdk/src/proofs/` | HTTPS schema URL shape, exact dispatch, built-in TLSN and C2PA URLs, and adapter `canHandle` dispatch are implemented and tested. |
-| `specs/conditional-swap.md` | `packages/sdk/src/payments/frost-*`, `packages/sdk/src/requests/application/escrow-flow-methods.ts`, `e2e/regtest/frost-p2pk-cashu.test.ts` | `packages/sdk/src/payments/frost-*.test.ts`, `e2e/frost/frost-threshold.test.ts`, `e2e/regtest/frost-p2pk-cashu.test.ts` | FROST/P2PK settlement pieces and regtest coverage exist, but the spec still names removed package surfaces and broader N:M swap concepts that are not a current public package. Tracked by #0093. |
 
 ## Wire Behavior Notes
 
@@ -52,6 +49,13 @@ helpers and by SDK Provider wait loops. Completion feedback, FROST release
 standardization, and retry-store/deletion rules remain deliberate follow-up
 work in #0094.
 
+## Conditional Swap Status
+
+`docs/conditional-swap-design.md` is retained N:M conditional settlement design
+material. It is not an active Anchr v0 protocol spec, not part of the current
+`@anchr/protocol` wire contract, and not a conformance target for compatible
+paid-request implementations.
+
 ## Security And Settlement Coverage
 
 The security-sensitive surfaces map to existing tests:
@@ -68,5 +72,5 @@ The security-sensitive surfaces map to existing tests:
 ## Follow-Up Gate
 
 Before `docs/issues/pending/0080-prepare-public-release-cleanup.md` closes,
-the repository should either close #0093 and #0094 or explicitly decide that
-one of them is not public-release blocking.
+the repository should either close #0094 or explicitly decide that it is not
+public-release blocking.
