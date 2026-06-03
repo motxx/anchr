@@ -11,6 +11,7 @@ design
 
 Depends on:
 - 0086
+- 0097
 
 Blocks:
 - 0080
@@ -47,6 +48,12 @@ including:
 Issue #0095 deleted the obsolete `Anchr` HTTP client surface. Treat any
 remaining vocabulary cleanup as separate from that removed hosted-client path.
 
+Commit `151f068` fixed Anchr v0 to the Nostr/Cashu substrate and replaced the
+old protocol contract with `specs/paid-request-exchange.md`. The `bounty_token`
+wire field is part of the current public request payload, so its final rename or
+removal should happen with #0097's public request advertisement redesign rather
+than as an isolated vocabulary edit.
+
 Some wire fields may need a versioned migration or explicit spec rationale.
 The issue is not to preserve old names for hypothetical users. It is to make
 every active use current Anchr vocabulary unless changing it would alter
@@ -82,6 +89,8 @@ compatibility alias.
 - Use #0086's protocol conformance map to classify each remaining term as
   active public API, protocol semantic, implementation detail, or historical
   text.
+- Use #0097's final public request advertisement shape before deciding the
+  replacement for `bounty_token` or other relay-visible payment field names.
 - Rename active implementation and docs vocabulary where the owner is clear.
 - Delete obsolete aliases and duplicate fields instead of keeping compatibility
   shims.

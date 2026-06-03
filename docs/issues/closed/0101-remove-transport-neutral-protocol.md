@@ -2,6 +2,7 @@
 
 Created: 2026-06-03
 Model: GPT-5 Codex
+Completed: 2026-06-03
 
 ## Priority
 
@@ -86,3 +87,43 @@ non-target design explanations to live docs.
   directly.
 - Add or update focused verification only if the cleanup reveals a repeatable
   drift pattern that should be enforced mechanically.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/adr/0001-fix-v0-substrate-to-nostr-and-cashu.md`
+- `specs/paid-request-exchange.md`
+- `specs/messaging.md`
+- `specs/README.md`
+- `docs/architecture.md`
+- `docs/protocol-conformance-audit.md`
+- `docs/resilience-checklist.md`
+- `docs/threat-model.md`
+- `docs/universality-boundaries.md`
+- `README.md`
+- `packages/sdk/README.md`
+- `packages/sdk/src/proofs/verification/verifier.ts`
+- `packages/sdk/src/requests/domain/types.ts`
+
+Verified with:
+
+- `rg -n "protocol-contract|Universal Protocol|role-neutral|transport-neutral|transport neutral|universal lifecycle|Transport profiles|Adapter Profiles|profile-specific|alternative transports|different transport|role-neutral wire|role-neutral protocol" README.md docs specs packages/protocol/src packages/sdk/src -g '*.md' -g '*.ts' -g '!docs/issues/**'`
+- `rg -n "specs/protocol-contract|protocol-contract\\.md" README.md docs specs packages -g '*.md' -g '*.ts' -g '!docs/issues/**'`
+- `deno task lint:strict`
+
+Harness update:
+
+- Added `docs/adr/0001-fix-v0-substrate-to-nostr-and-cashu.md` and replaced
+  `specs/protocol-contract.md` with `specs/paid-request-exchange.md`, so the
+  live spec boundary now records the v0 Nostr/Cashu substrate decision.
+
+Review residuals:
+
+- #0093 still decides whether `specs/conditional-swap.md` remains design
+  material in `specs/`, moves elsewhere, or splits out an active public
+  contract.
+
+Follow-up:
+
+- #0093
