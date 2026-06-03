@@ -4,11 +4,11 @@
 
 Anchr uses Nostr as its messaging transport, following the NIP-90 Data Vending
 Machine (DVM) pattern. This spec defines the event kinds, payloads, and
-lifecycle for Customer, Provider, and Oracle actors.
+lifecycle encoding for Customer, Provider, and Oracle actors.
 
-The lifecycle, state transitions, preflight ticket, and redeem rules are defined
-in [`protocol-contract.md`](protocol-contract.md). This document specifies their
-Nostr event encoding.
+The v0 paid-request exchange, Cashu Payment Lock, and redeem/refund rules are
+defined in [`paid-request-exchange.md`](paid-request-exchange.md). This document
+specifies their Nostr event encoding.
 
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
@@ -18,8 +18,8 @@ URL in their `schema` field for execution.
 ## Actor Naming
 
 The protocol actors are defined in
-[`protocol-contract.md#actors`](protocol-contract.md#actors). This Nostr profile
-maps them to event authors and `p` tags. Pre-1.0 payloads use direct
+[`paid-request-exchange.md#actors`](paid-request-exchange.md#actors). This Nostr
+encoding maps them to event authors and `p` tags. Pre-1.0 payloads use direct
 Customer/Provider field names rather than compatibility aliases.
 
 ## Canonical Implementation Owners
@@ -82,10 +82,10 @@ the signed content fields, not a NIP-90 `bid` tag in the canonical helper.
 | `predicate`        | Schema-specific predicate interpreted by the proof profile |
 | `customer_pubkey`  | Customer Nostr pubkey                                      |
 | `oracle_pubkey`    | Oracle Nostr pubkey                                        |
-| `mint_url`         | Cashu mint URL                                             |
-| `bounty_token`     | Phase-1 HTLC bounty token                                  |
+| `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
+| `bounty_token`     | Phase-1 Cashu token before Provider Selection              |
 | `max_amount_sats`  | Maximum Customer payment in sats                           |
-| `locktime_seconds` | Refund locktime as Unix seconds                            |
+| `locktime_seconds` | Cashu refund locktime as Unix seconds                      |
 | `expires_at`       | Offer cutoff as Unix milliseconds                          |
 
 ## Provider Offer (kind 7000, status=payment-required)
@@ -136,15 +136,12 @@ Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly. The public query may include a `domain_hint` for display
 purposes.
 
-## Provider Preflight
+## Provider Work Gate
 
-Before irreversible work, the Provider verifies the selected escrow and records
-the immutable preflight ticket required by
-[`protocol-contract.md#provider-preflight`](protocol-contract.md#provider-preflight).
-For this Nostr profile, the original request reference is the kind 5300 event
-id, the expected authority is the Oracle pubkey or FROST group key referenced by
-the encrypted request and selection payloads, and the selected offer reference
-is the kind 7000 `status=payment-required` event id when available.
+Before irreversible work, the Provider verifies that the selected Cashu payment
+material corresponds to the request, the selected Provider pubkey, the expected
+Oracle, and the Cashu lock conditions. Any local preflight record is
+implementation state, not Nostr wire data.
 
 ## Proof Submission (kind 6300)
 
@@ -207,18 +204,18 @@ between specific pubkeys.
 ## Release Material and Redeem Gate
 
 Oracle release material follows
-[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
-For this Nostr profile, a release message binds:
+[`paid-request-exchange.md#release-and-redeem`](paid-request-exchange.md#release-and-redeem).
+For v0, a release message binds:
 
-| Field              | Description                                                  |
-| ------------------ | ------------------------------------------------------------ |
-| `query_id`         | Query identifier from the Customer request                   |
-| `request_event_id` | Original kind 5300 event id                                  |
-| `preimage`         | HTLC preimage, when the payment profile uses NUT-14 hashlock |
+| Field              | Description                                       |
+| ------------------ | ------------------------------------------------- |
+| `query_id`         | Query identifier from the Customer request        |
+| `request_event_id` | Original kind 5300 event id                       |
+| `preimage`         | Cashu HTLC preimage for the selected Payment Lock |
 
 Correlation mismatches are audit inputs, not redeem hard failures by themselves;
-the redeem decision remains the universal rule in
-[`protocol-contract.md#release-and-redeem`](protocol-contract.md#release-and-redeem).
+the redeem decision remains the rule in
+[`paid-request-exchange.md#release-and-redeem`](paid-request-exchange.md#release-and-redeem).
 
 FROST group-signature delivery exists in the SDK adapter as an implementation
 path, but it is not yet part of the canonical `@anchr/protocol/events` helper
@@ -237,9 +234,9 @@ signature, they cannot redeem escrow. The Nostr delivery strategy is:
    published to configured relays.
 
 2. **Retry**: Confirmed retry-store semantics are not standardized in this
-   profile yet. A future profile must define whether retry success is measured
-   by relay acknowledgement, authenticated retry delivery, or redeem
-   observation. That work is tracked by issue #0094.
+   contract yet. Future work must define whether retry success is measured by
+   relay acknowledgement, authenticated retry delivery, or redeem observation.
+   That work is tracked by issue #0094.
 
 3. **Recovery**: If direct relay delivery keeps failing, the Provider may send
    an authenticated Nostr retry request that references the original kind 5300
@@ -258,7 +255,7 @@ relays.
 
 ### Deletion Policy
 
-The public Nostr profile does not currently specify Oracle retry-store deletion
+The public Nostr contract does not currently specify Oracle retry-store deletion
 rules. Implementations must not represent a stricter retention guarantee as
 interoperable behavior until issue #0094 standardizes and tests it.
 

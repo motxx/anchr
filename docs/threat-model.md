@@ -122,13 +122,11 @@ Provider signature, or for the Customer refund path after locktime.
 
 ## Settlement Decision Rules
 
-The normative Provider preflight and redeem contract lives in
-[`specs/protocol-contract.md#provider-preflight`](../specs/protocol-contract.md#provider-preflight)
-and
-[`specs/protocol-contract.md#release-and-redeem`](../specs/protocol-contract.md#release-and-redeem).
-This threat model treats that separation as security-sensitive because
-collapsing mint-level spendability, clean settlement, and audit decisions can
-strand Provider funds or hide release anomalies.
+The normative redeem contract lives in
+[`specs/paid-request-exchange.md#release-and-redeem`](../specs/paid-request-exchange.md#release-and-redeem).
+This threat model treats the settlement-decision separation as
+security-sensitive because collapsing Cashu spendability, clean settlement, and
+audit decisions can strand Provider funds or hide release anomalies.
 
 The security claim is that mutable Provider policy, release-source mismatch,
 signature mismatch, `query_id` mismatch, `request_event_id` mismatch, stale

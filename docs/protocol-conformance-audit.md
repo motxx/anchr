@@ -10,8 +10,8 @@ not a new protocol contract.
 
 The current implementation is centered on two public packages:
 
-- `@anchr/protocol` owns role-neutral wire helpers, Nostr primitives, schema
-  URL validation, and protocol types.
+- `@anchr/protocol` owns Nostr wire helpers, Nostr primitives, schema URL
+  validation, Cashu settlement fields in wire payloads, and protocol types.
 - `@anchr/sdk` owns Customer, Provider, Oracle orchestration, adapters,
   payments, proof dispatch, attachments, local state, and test helpers.
 
@@ -28,7 +28,7 @@ public-release parent closes:
 
 | Spec | Implementation owner | Test owner | Audit finding |
 | --- | --- | --- | --- |
-| `specs/protocol-contract.md` | `packages/sdk/src/customer.ts`, `packages/sdk/src/provider.ts`, `packages/sdk/src/oracle.ts`, `packages/sdk/src/requests/`, `packages/sdk/src/payments/`, `packages/sdk/src/proofs/` | `packages/sdk/src/customer.test.ts`, `packages/sdk/src/provider.test.ts`, `packages/sdk/src/integration.test.ts`, `packages/sdk/src/requests/application/query-service.test.ts`, `e2e/protocol/` | Lifecycle, proof dispatch, escrow verification, release, and attack invariants are represented in SDK code and protocol e2e tests. Local state names intentionally differ from the role-neutral spec. |
+| `specs/paid-request-exchange.md` | `packages/sdk/src/customer.ts`, `packages/sdk/src/provider.ts`, `packages/sdk/src/oracle.ts`, `packages/sdk/src/requests/`, `packages/sdk/src/payments/`, `packages/sdk/src/proofs/` | `packages/sdk/src/customer.test.ts`, `packages/sdk/src/provider.test.ts`, `packages/sdk/src/integration.test.ts`, `packages/sdk/src/requests/application/query-service.test.ts`, `e2e/protocol/` | Paid-request exchange links, proof dispatch, Cashu escrow verification, release, and attack invariants are represented in SDK code and protocol e2e tests. Local state names intentionally differ from spec exchange terms. |
 | `specs/messaging.md` | `packages/protocol/src/events.ts`, `packages/protocol/src/nostr.ts` for canonical query/result/feedback/release wire helpers; `packages/sdk/src/adapters/nostr/` for SDK relay services and Oracle announcements | `packages/protocol/src/events.test.ts`, `packages/protocol/src/nostr.test.ts`, `packages/sdk/src/adapters/nostr/*.test.ts`, `e2e/relay/oracle-discovery.test.ts` | Event kind constants, request/result/feedback builders, NIP-44 payload helpers, Oracle-readable result payloads, and discovery events are implemented and tested. Completion feedback and release retry-store semantics remain tracked by #0094. |
 | `specs/oracle-registry.md` | `packages/sdk/src/adapters/oracle-client/oracle-discovery.ts`, `packages/sdk/src/adapters/nostr/events/event-builders.ts` | `packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts`, `e2e/relay/oracle-discovery.test.ts` | Kind `30088`, `d` tag, `anchr-oracle` and capability `t` tags, announcement content fields, capability filtering, and recency filtering are implemented and tested. |
 | `specs/proof-schemas.md` | `packages/protocol/src/schema.ts`, `packages/sdk/src/schema.ts`, `packages/sdk/src/proofs/` | `packages/protocol/src/schema.test.ts`, `packages/sdk/src/schema.test.ts`, proof adapter tests under `packages/sdk/src/proofs/` | HTTPS schema URL shape, exact dispatch, built-in TLSN and C2PA URLs, and adapter `canHandle` dispatch are implemented and tested. |
@@ -36,8 +36,8 @@ public-release parent closes:
 
 ## Wire Behavior Notes
 
-`@anchr/protocol/events` is the public role-neutral event helper surface for
-query, result, feedback, and preimage delivery messages. It builds NIP-90 kind
+`@anchr/protocol/events` is the public Nostr event helper surface for query,
+result, feedback, and preimage delivery messages. It builds NIP-90 kind
 `5300`, `6300`, and `7000` events, signs them, emits request and proof schema
 tags, validates parser shape, and supports Oracle-readable encrypted result
 payloads.

@@ -183,9 +183,9 @@ function applyAiContentResult(
 }
 
 /**
- * Pure, transport-neutral verification. Takes an explicit policy (`requirement`)
- * and evidence (`input`) instead of a request/result pair, so it can be
- * called directly from any host.
+ * Pure proof verification. Takes an explicit policy (`requirement`) and
+ * evidence (`input`) instead of a request/result pair, so it can be called
+ * directly from any host.
  *
  * The host orchestrator is responsible for the *trust envelope* around this
  * call: who signed the requirement, replay protection, deadline enforcement.

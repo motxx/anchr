@@ -7,8 +7,8 @@ tree; current resilience claims must point at the references below.
 ## Current References
 
 - Architecture and role boundaries: [`docs/architecture.md`](architecture.md)
-- Universal lifecycle and state vocabulary:
-  [`specs/protocol-contract.md`](../specs/protocol-contract.md)
+- Paid-request exchange and redeem/refund rules:
+  [`specs/paid-request-exchange.md`](../specs/paid-request-exchange.md)
 - Nostr transport, release retry, and recovery:
   [`specs/messaging.md`](../specs/messaging.md)
 - Security invariants and required test pins:
@@ -27,9 +27,8 @@ tree; current resilience claims must point at the references below.
   rules in `specs/messaging.md`.
 - Confirm security-sensitive resilience claims map to
   `docs/threat-model.md` invariants or get a new issue before publication.
-- Confirm implementation-specific local states are not presented as universal
-  protocol states; use `specs/protocol-contract.md` for cross-implementation
-  lifecycle language.
+- Confirm implementation-specific local states are not presented as protocol
+  states; use `specs/paid-request-exchange.md` for exchange language.
 
 ## Verification Commands
 

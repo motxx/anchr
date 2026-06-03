@@ -111,9 +111,8 @@ export interface QueryResult {
 }
 
 /**
- * Query-independent verification policy. The transport-neutral input to the
- * core verifier. NIP-90 adapters derive this from a signed Query event; a
- * standalone caller builds it directly from authenticated requests.
+ * Query-independent verification policy. NIP-90 adapters derive this from a
+ * signed request event; direct callers build it from authenticated requests.
  */
 export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */

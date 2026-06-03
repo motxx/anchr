@@ -129,7 +129,7 @@ schema identifiers, use `@anchr/protocol` and [`specs/`](specs/).
 | Area | Paths | Role |
 | --- | --- | --- |
 | SDK | [`packages/sdk/`](packages/sdk/) | Customer, Provider, Oracle, payment, proof, attachment, adapter, and testing helpers. |
-| Protocol | [`packages/protocol/`](packages/protocol/), [`specs/`](specs/) | Wire events, schema identifiers, validators, and role-neutral types. |
+| Protocol | [`packages/protocol/`](packages/protocol/), [`specs/`](specs/) | Nostr wire events, Cashu settlement fields, schema identifiers, validators, and protocol types. |
 | Native helpers | [`crates/`](crates/) | Rust binaries used by FROST and TLSNotary tooling. |
 
 See [`docs/architecture.md`](docs/architecture.md) for package boundaries and

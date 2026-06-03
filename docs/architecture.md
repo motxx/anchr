@@ -58,14 +58,14 @@ taxonomy.
 - `/events` for wire event builders and parsers.
 - `/schemas` for proof schema identifiers and schema metadata.
 - `/validators` for validation helpers that protect the Nostr wire contract.
-- `/types` for protocol types used by the Nostr wire contract.
+- `/types` for protocol types used by the Nostr/Cashu v0 contract.
 - `/nostr` for Nostr event signing, encryption, identity, tag, and kind helpers
   that are part of wire compatibility.
 
 Adapter manifests, adapter capability checks, concrete payment clients, proof
 engines, attachment stores, runtime helpers, relay clients, and application
 policies belong to `@anchr/sdk` or SDK internals. They do not belong in
-`@anchr/protocol` unless they define the Nostr wire contract recorded in
+`@anchr/protocol` unless they define the Nostr/Cashu v0 contract recorded in
 `specs/`.
 
 ## Surface Policy
@@ -74,8 +74,8 @@ The current repository map is the target map. New public Anchr packages,
 top-level product shells, or catch-all command categories should not be added
 without first updating this document and the architecture lint. Reusable runtime
 helpers, proof engines, payment helpers, attachment transport, and standard
-adapters live inside `@anchr/sdk` unless they are role-neutral wire contracts
-that belong in `@anchr/protocol`.
+adapters live inside `@anchr/sdk` unless they define compatible Anchr v0 wire
+contracts that belong in `@anchr/protocol`.
 
 Developer-only commands belong under `scripts/` only when required to build,
 test, lint, publish, or verify the SDK/protocol.
@@ -140,12 +140,10 @@ barrel or compatibility facade.
 
 ## Agnostic Component Boundaries
 
-Component names describe protocol responsibilities, not today's bindings. A
-boundary is stable when replacing its current binding changes only SDK adapter
-code, native helper code, or `specs/` guidance. Normative
-cross-implementation requirements live in
-[`specs/protocol-contract.md`](../specs/protocol-contract.md). Placement of any
-rule derived from this table follows
+Component names describe protocol responsibilities within Anchr v0's fixed
+Nostr and Cashu substrates. Normative paid-request exchange requirements live
+in [`specs/paid-request-exchange.md`](../specs/paid-request-exchange.md).
+Placement of any rule derived from this table follows
 [`docs/universality-boundaries.md`](universality-boundaries.md).
 
 | Component | Stable responsibility | Target owner |
@@ -153,7 +151,7 @@ rule derived from this table follows
 | Actor coordination | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Protocol for Nostr wire shapes; SDK for orchestration and relay adapters. |
 | Evidence contract | Identify what evidence a request requires and how verifiers dispatch it without embedding verifier implementation in the protocol. | Protocol for schema identifiers; SDK for dispatch and verifier ports. |
 | Verification decision | Decide whether submitted evidence satisfies Customer constraints and whether release material may be produced. | SDK Oracle/proof modules and native helpers. |
-| Settlement lock | Hold Customer value so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and standard payment adapters. |
+| Settlement lock | Hold Customer value in a Cashu Payment Lock so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and Cashu payment helpers. |
 | Release authority | Produce material that unlocks settlement only after verification succeeds and bind it to the selected work. | SDK Oracle/payment modules; protocol only for interoperable release messages. |
 | Attachment transport | Store and retrieve large or sensitive proof material without making storage a protocol actor. | SDK attachment helpers and bundled Blossom transport; protocol only for attachment references. |
 | Local actor state | Track one actor's private progress without making local implementation state part of the network contract. | SDK state ports and standard test/runtime stores. |
@@ -208,8 +206,8 @@ Nostr DVM-style transport + payment lock + Oracle-verified proof.
 NIP-90 is the Anchr wire contract. The SDK Nostr adapter owns relay
 connections, subscriptions, runtime wiring, and service orchestration;
 `@anchr/protocol` owns the event kinds, tags, payloads, NIP-44 encryption
-boundaries, and signing helpers that independent Anchr actors must share to
-interoperate.
+boundaries, signing helpers, and Cashu settlement fields that compatible Anchr
+actors must share to interoperate in v0.
 
 ## Follow-On Work
 
