@@ -32,7 +32,6 @@ import {
   type CashuProof,
   createCashuClient,
   createCustomer,
-  createHttpOracleClient,
   createRelayClient,
   ProofSchema,
 } from "@anchr/sdk";
@@ -43,12 +42,9 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  oracles: [{
-    pubkey: oraclePubkey,
-    client: createHttpOracleClient({
-      endpoint: "https://oracle.test.example",
-    }),
-  }],
+  // The Oracle hash bootstrap rides the relay as NIP-44 DMs by default;
+  // pass `client: createHttpOracleClient(...)` per oracle to use HTTP.
+  oracles: [{ pubkey: oraclePubkey }],
   relays: relayUrls,
   mint: mintUrl,
   cashuClient: createCashuClient({ mintUrl }),
@@ -67,8 +63,9 @@ const result = await customer.request({
 console.log(result.data, result.proof, result.providerPubkey);
 ```
 
-For a multi-oracle whitelist, keep `oracles` as the trust policy and make the
-selected transport explicit:
+For a multi-oracle whitelist, keep `oracles` as the trust policy; entries
+default to the relay-DM bootstrap, and an HTTP oracle is an explicit
+per-entry override:
 
 ```ts
 import {
@@ -85,12 +82,7 @@ const oracleB = "npub1exampleoracleb";
 
 const multiOracleCustomer = createCustomer({
   oracles: [
-    {
-      pubkey: oracleA,
-      client: createHttpOracleClient({
-        endpoint: "https://oracle-a.test.example",
-      }),
-    },
+    { pubkey: oracleA },
     {
       pubkey: oracleB,
       client: createHttpOracleClient({
