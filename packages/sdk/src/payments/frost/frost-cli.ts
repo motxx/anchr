@@ -7,7 +7,7 @@
 
 import { join } from "node:path";
 
-import { getLogger } from "../internal/runtime/logger.ts";
+import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost"]);
 
 /** Find the frost-signer binary: project-local first, then PATH. */
@@ -16,11 +16,11 @@ export function findFrostSigner(): string | null {
   const localPaths = [
     join(
       here,
-      "../../../../crates/frost-signer/target/release/frost-signer",
+      "../../../../../crates/frost-signer/target/release/frost-signer",
     ),
     join(
       here,
-      "../../../../crates/frost-signer/target/debug/frost-signer",
+      "../../../../../crates/frost-signer/target/debug/frost-signer",
     ),
   ];
   for (const p of localPaths) {

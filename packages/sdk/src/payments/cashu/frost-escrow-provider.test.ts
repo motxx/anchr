@@ -6,7 +6,7 @@ import {
   createFrostEscrowProvider,
   type FrostEscrowConfig,
 } from "./frost-escrow-provider.ts";
-import type { EscrowProvider } from "../requests/application/ports.ts";
+import type { EscrowProvider } from "../../requests/application/ports.ts";
 
 const PROVIDER_PUB =
   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

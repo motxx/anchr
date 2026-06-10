@@ -34,7 +34,7 @@ import {
 import {
   buildHtlcFinalOptions,
   buildHtlcPreselectionOptions,
-} from "../payments/cashu-htlc-options.ts";
+} from "../payments/cashu/cashu-htlc-options.ts";
 import type {
   BindProviderParams,
   BuildHtlcLockParams,

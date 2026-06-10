@@ -274,15 +274,8 @@ export async function doSubmitEscrowResult(
   }
 
   if (passed && query.escrow?.type === "p2pk_frost" && deps.frostSignature) {
-    // Domain-separation tag: any future redeemer (Cashu mint, downstream verifier)
-    // must use the same prefix when validating this signature against the P2PK
-    // lock. The version suffix lets us evolve the encoding without colliding with
-    // sigs from older deployments. See ADR notes in EscrowSubmitOutcome.
-    const message = new TextEncoder().encode(
-      `anchr/query-settle/v1:${query.id}:approved`,
-    );
     const frostSignature = await deps.frostSignature
-      .requestSignature(query.escrow.group_pubkey, message)
+      .requestSignature(verifyingQuery, normalizedResult, blossomKeys)
       .catch((err) => {
         log.error("FROST requestSignature failed", { err, queryId: query.id });
         return null;

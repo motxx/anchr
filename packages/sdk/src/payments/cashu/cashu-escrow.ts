@@ -43,26 +43,12 @@ import {
   sumProofAmounts,
 } from "./cashu-escrow-helpers.ts";
 
-import { getLogger } from "../internal/runtime/logger.ts";
+import { getLogger } from "../../internal/runtime/logger.ts";
 import {
   buildHtlcFinalOptions,
-  buildHtlcInitialOptions,
-  buildHtlcPreselectionOptions,
   type HtlcInitialLockParams,
-  type HtlcPreselectionLockParams,
   type HtlcProviderBindParams,
 } from "./cashu-htlc-options.ts";
-
-export {
-  buildHtlcFinalOptions,
-  buildHtlcInitialOptions,
-  buildHtlcPreselectionOptions,
-};
-export type {
-  HtlcInitialLockParams,
-  HtlcPreselectionLockParams,
-  HtlcProviderBindParams,
-};
 
 const log = getLogger(["anchr", "cashu-escrow"]);
 

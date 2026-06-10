@@ -9,10 +9,38 @@
 
 import type { Oracle, OracleInfo } from "../domain/oracle-types.ts";
 import type {
+  BlossomKeyMap,
   OracleAttestationRecord,
   ProofVisibility,
   Query,
+  QueryResult,
 } from "../domain/types.ts";
+
+// ── HTLC preimage release material ────────────────────────────────
+
+export interface PreimageEntry {
+  hash: string;
+  preimage: string;
+  created_at: number;
+}
+
+/**
+ * Storage abstraction for the HTLC preimage/hash lifecycle. The Oracle
+ * creates a preimage, embeds its hash in the escrow lock, and reveals the
+ * preimage on a passing verification so the Provider can redeem.
+ */
+export interface PreimageStore {
+  /** Generate a new preimage/hash pair. Returns the entry (hash is the key). */
+  create(): PreimageEntry;
+  /** Retrieve the preimage by hash (Oracle-only). */
+  getPreimage(hash: string): string | null;
+  /** Check if a hash exists in the store. */
+  has(hash: string): boolean;
+  /** Verify a preimage matches the stored hash. */
+  verify(hash: string, preimage: string): boolean;
+  /** Delete the entry (after delivery or expiry). */
+  delete(hash: string): void;
+}
 
 // ── Cashu / FROST escrow ──────────────────────────────────────────
 
@@ -70,9 +98,10 @@ export interface OracleRegistry {
  * signature from a FROST Oracle group.
  *
  * Used by the Query lifecycle when an escrow query is approved and the
- * escrow type is `p2pk_frost`. The port abstracts the round-1 / round-2
- * FROST coordinator handshake so the application layer doesn't pull in
- * `../../payments/mod.ts` directly.
+ * escrow type is `p2pk_frost`. The implementing adapter re-derives the
+ * signing message from the query and forwards the verification
+ * requirement/evidence so each peer signer can re-check independently
+ * before contributing a share.
  *
  * Returns the aggregated signature as a hex string on success.
  * Returns `null` when the threshold cannot be met, the coordinator is
@@ -81,8 +110,9 @@ export interface OracleRegistry {
  */
 export interface FrostSignaturePort {
   requestSignature(
-    groupPubkey: string,
-    message: Uint8Array,
+    query: Query,
+    result: QueryResult,
+    blossomKeys?: BlossomKeyMap,
   ): Promise<string | null>;
 }
 

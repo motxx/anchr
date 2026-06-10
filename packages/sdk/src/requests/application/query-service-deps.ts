@@ -1,8 +1,8 @@
 import type { QueryStore } from "../domain/query-store.ts";
-import type { PreimageStore } from "../../payments/mod.ts";
 import type {
   EscrowProvider,
   FrostSignaturePort,
+  PreimageStore,
   ProofDelivery,
 } from "./ports.ts";
 import type {

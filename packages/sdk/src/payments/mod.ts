@@ -1,15 +1,9 @@
-export * from "./cashu-escrow.ts";
-export * from "./cashu-escrow-helpers.ts";
-export * from "./cashu-escrow-provider.ts";
-export * from "./cashu-htlc-options.ts";
-export * from "./cashu-wallet.ts";
-export * from "./frost-escrow-provider.ts";
-export * from "./frost-signer.ts";
-export * from "./preimage-port.ts";
-export * from "./preimage-store.ts";
-export * from "./wallet-store.ts";
-export * from "./frost-cli.ts";
-export * from "./frost-config.ts";
-export * from "./frost-coordinator.ts";
-export * from "./frost-signing-coordinator.ts";
-export * from "./frost-types.ts";
+/**
+ * Payments surface: two single-purpose owners.
+ *
+ *   ./cashu — Cashu Payment Lock escrow (HTLC + P2PK), wallet, and preimage.
+ *   ./frost — FROST distributed key generation and threshold Schnorr signing.
+ */
+
+export * from "./cashu/mod.ts";
+export * from "./frost/mod.ts";

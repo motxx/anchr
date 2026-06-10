@@ -12,6 +12,8 @@
  *          documented request-scoped lifecycle state or lifecycle ports.
  *   [E027] Nostr event-kind constants are owned by @anchr/protocol/nostr;
  *          the sdk package must import them, never define them.
+ *   [E028] direct env reads are confined to documented config-resolution
+ *          surfaces; library modules take config through options/deps.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -44,6 +46,21 @@ const APP_VOCAB =
 // Defining a numeric kind constant in the sdk package re-creates a second
 // wire-contract owner.
 const SDK_KIND_CONST = /\bexport\s+const\s+(KIND_|ANCHR_)[A-Z_0-9]+\s*=\s*\d+/;
+// [E028] Direct env reads are confined to documented config-resolution
+// surfaces; library modules take config through options/deps instead.
+const ENV_READ = /\bDeno\.env\.get\b/;
+const ENV_READ_ALLOWED: readonly string[] = [
+  "packages/sdk/src/internal/runtime/",
+  "packages/sdk/src/testing/helpers.ts",
+  "packages/sdk/src/adapters/nostr/oracle-service.ts",
+  "packages/sdk/src/adapters/oracle-client/config-loader.ts",
+  "packages/sdk/src/adapters/oracle-service/server.ts",
+  "packages/sdk/src/attachments/access.ts",
+  "packages/sdk/src/attachments/blossom.ts",
+  "packages/sdk/src/attachments/url-validation.ts",
+  "packages/sdk/src/payments/cashu/cashu-wallet.ts",
+  "packages/sdk/src/proofs/verification/checks/ai-content.ts",
+];
 
 const IMPORT_RE =
   /(?:^|\n)\s*(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']/g;
@@ -268,13 +285,6 @@ function isAllowedRequestFeatureImport(
     return true;
   }
 
-  if (
-    fileRel.startsWith("packages/sdk/src/requests/application/") &&
-    targetRel === "packages/sdk/src/payments/mod.ts"
-  ) {
-    return true;
-  }
-
   return false;
 }
 
@@ -305,6 +315,21 @@ function checkPackageFile(
         message:
           `Nostr kind constant defined in sdk; import it from @anchr/protocol/nostr instead`,
       });
+    }
+    if (
+      !fileRel.endsWith(".test.ts") &&
+      !ENV_READ_ALLOWED.some((allowed) => fileRel.startsWith(allowed))
+    ) {
+      for (const hit of scanContentLines(source, ENV_READ)) {
+        violations.push({
+          file: fileRel,
+          line: hit.line,
+          code: "E028",
+          severity: "error",
+          message:
+            `direct env read outside the documented config surfaces; take config through options/deps`,
+        });
+      }
     }
   }
 

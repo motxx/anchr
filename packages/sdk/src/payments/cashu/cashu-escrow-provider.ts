@@ -1,4 +1,4 @@
-import type { EscrowProvider } from "../requests/application/ports.ts";
+import type { EscrowProvider } from "../../requests/application/ports.ts";
 import {
   createHtlcToken,
   type EscrowToken,

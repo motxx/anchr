@@ -816,15 +816,10 @@ describe("submitEscrowResult", () => {
   });
 
   test("submitEscrowResult delivers a FROST signature for p2pk_frost queries on success", async () => {
-    const requested: Array<{ groupPubkey: string; messageHex: string }> = [];
+    const requested: Array<{ queryId: string; notes?: string }> = [];
     const mockFrost = {
-      requestSignature: async (groupPubkey: string, message: Uint8Array) => {
-        requested.push({
-          groupPubkey,
-          messageHex: Array.from(message).map((b) =>
-            b.toString(16).padStart(2, "0")
-          ).join(""),
-        });
+      requestSignature: async (query: Query, result: QueryResult) => {
+        requested.push({ queryId: query.id, notes: result.notes });
         return "deadbeef".repeat(8);
       },
     };
@@ -858,14 +853,14 @@ describe("submitEscrowResult", () => {
     expect(outcome.frost_signature).toBe("deadbeef".repeat(8));
     expect(outcome.preimage).toBeUndefined();
     expect(requested).toHaveLength(1);
-    expect(requested[0]!.groupPubkey).toBe("f".repeat(64));
-    expect(requested[0]!.messageHex.length).toBeGreaterThan(0);
+    expect(requested[0]!.queryId).toBe(query.id);
+    expect(requested[0]!.notes).toBe("frost done");
   });
 
   test("submitEscrowResult does NOT request a FROST signature on rejected verification", async () => {
     let calls = 0;
     const mockFrost = {
-      requestSignature: async (_g: string, _m: Uint8Array) => {
+      requestSignature: async (_q: Query, _r: QueryResult) => {
         calls++;
         return "should_not_appear";
       },

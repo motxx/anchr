@@ -13,12 +13,12 @@
  * directly.
  */
 
-import { verifyProof } from "../proofs/mod.ts";
+import { verifyProof } from "../../proofs/mod.ts";
 import type {
   BlossomKeyMap,
   VerificationInput,
   VerificationRequirement,
-} from "../requests/domain/types.ts";
+} from "../../requests/domain/types.ts";
 import {
   dkgRound1,
   dkgRound2,
@@ -27,7 +27,7 @@ import {
   signRound2,
 } from "./frost-cli.ts";
 
-import { getLogger } from "../internal/runtime/logger.ts";
+import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-signer"]);
 
 export interface FrostSignerConfig {

@@ -8,8 +8,14 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
-import type { PreimageEntry, PreimageStore } from "./preimage-port.ts";
-export type { PreimageEntry, PreimageStore } from "./preimage-port.ts";
+import type {
+  PreimageEntry,
+  PreimageStore,
+} from "../../requests/application/ports.ts";
+export type {
+  PreimageEntry,
+  PreimageStore,
+} from "../../requests/application/ports.ts";
 
 function createPreimage(): { preimage: string; hash: string } {
   const raw = crypto.getRandomValues(new Uint8Array(32));
