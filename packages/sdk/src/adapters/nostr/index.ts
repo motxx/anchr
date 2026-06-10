@@ -20,19 +20,6 @@ export {
 } from "./crypto/encryption.ts";
 export { buildOracleAnnouncementEvent } from "./events/events.ts";
 export {
-  closePool,
-  fetchRecentQueries,
-  getNostrConfig,
-  isNostrEnabled,
-  publishEvent,
-  subscribeToAttestations,
-  subscribeToDMs,
-  subscribeToFeedback,
-  subscribeToQueries,
-  subscribeToResponses,
-  subscribeToSettlements,
-} from "./transport/client.ts";
-export {
   buildOracleAttestationEvent,
   type OracleAttestationPayload,
   parseOracleAttestationPayload,

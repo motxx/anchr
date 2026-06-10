@@ -3,7 +3,6 @@
  */
 
 import type { Event } from "nostr-tools";
-import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../../identity.ts";
 import { parseOfferFeedbackEvent } from "@anchr/protocol/events";
 import {
@@ -18,7 +17,7 @@ export interface WatchedQuery {
   customerPubkey: string;
   selectedProviderPubkey?: string;
   offeredProviders: Set<string>;
-  subs: SubCloser[];
+  subs: { close(): void }[];
 }
 
 export function buildQueryFromPayload(

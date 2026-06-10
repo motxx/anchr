@@ -21,14 +21,15 @@ import type {
 } from "../../requests/domain/types.ts";
 import type { NostrIdentity } from "../../identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
-import { publishEvent } from "./transport/client.ts";
+import type { RelayClient } from "../types.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "proof-publisher"]);
 
 export interface NostrProofPublisherConfig {
   identity: NostrIdentity;
-  relayUrls?: string[];
+  /** Relay transport attestations are published on. */
+  relayClient: RelayClient;
 }
 
 export function createNostrProofPublisher(
@@ -66,7 +67,7 @@ export function createNostrProofPublisher(
         oracleAttestation,
       );
 
-      const result = await publishEvent(event, config.relayUrls);
+      const result = await config.relayClient.publish(event);
 
       if (result.successes.length > 0) {
         log.error(

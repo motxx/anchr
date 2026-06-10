@@ -1,10 +1,6 @@
-import { afterEach, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import {
-  _setPublishEventForTest,
-  _setVerifyForTest,
-  createOracleNostrService,
-} from "./oracle-service.ts";
+import { createOracleNostrService } from "./oracle-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
@@ -12,7 +8,26 @@ import { createFrostCoordinator } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
 import type { AttachmentRef } from "../../requests/domain/types.ts";
-import type { VerifiedEvent } from "nostr-tools";
+import type { Event } from "@anchr/protocol/nostr";
+import type { PublishResult, RelayClient } from "../types.ts";
+
+function makeCapturingRelay(): { client: RelayClient; published: Event[] } {
+  const published: Event[] = [];
+  const client: RelayClient = {
+    publish(event: Event): Promise<PublishResult> {
+      published.push(event);
+      return Promise.resolve({ successes: ["relay1"], failures: [] });
+    },
+    subscribe: () => ({ close: () => {} }),
+    close: () => {},
+  };
+  return { client, published };
+}
+
+const verifyPass = () =>
+  Promise.resolve({ passed: true, checks: ["all good"], failures: [] });
+const verifyFail = () =>
+  Promise.resolve({ passed: false, checks: [], failures: ["C2PA invalid"] });
 
 // --- Helpers ---
 
@@ -47,7 +62,7 @@ function makeConfig(
   return {
     identity: generateEphemeralIdentity(),
     preimageStore: createPreimageStore(),
-    relayUrls: [],
+    relayClient: makeCapturingRelay().client,
     ...overrides,
   };
 }
@@ -69,27 +84,17 @@ const makeResult = () => ({ attachments: [] as AttachmentRef[] });
 // --- verifyAndDeliverWithFrost ---
 
 describe("verifyAndDeliverWithFrost", () => {
-  afterEach(() => {
-    _setPublishEventForTest(null);
-    _setVerifyForTest(null);
-  });
-
   test("falls back to HTLC when frostNodeConfig not set", async () => {
     const store = createPreimageStore();
-    const config = makeConfig({ preimageStore: store });
+    const relay = makeCapturingRelay();
+    const published = relay.published;
+    const config = makeConfig({
+      preimageStore: store,
+      relayClient: relay.client,
+      verify: verifyPass,
+    });
     const service = createOracleNostrService(config);
     service.generateRequestHash("q1");
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q1",
@@ -102,23 +107,16 @@ describe("verifyAndDeliverWithFrost", () => {
   });
 
   test("sends rejection DM on verification failure", async () => {
+    const relay = makeCapturingRelay();
+    const published = relay.published;
     const config = makeConfig({
       frostCoordinator: createFrostCoordinator(),
       frostConfig,
       frostNodeConfig,
+      relayClient: relay.client,
+      verify: verifyFail,
     });
     const service = createOracleNostrService(config);
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: false,
-      checks: [],
-      failures: ["C2PA invalid"],
-    }));
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q-rej",
@@ -131,23 +129,16 @@ describe("verifyAndDeliverWithFrost", () => {
   });
 
   test("sends rejection when FROST signing fails (threshold not met)", async () => {
+    const relay = makeCapturingRelay();
+    const published = relay.published;
     const config = makeConfig({
       frostCoordinator: createFrostCoordinator(),
       frostConfig,
       frostNodeConfig,
+      relayClient: relay.client,
+      verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
 
     // Verification passes but coordinateSigning will fail (no real key material, no peers running)
     const passed = await service.verifyAndDeliverWithFrost(

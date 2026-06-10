@@ -21,11 +21,9 @@ import {
   buildPreimageDM,
   buildRejectionDM,
 } from "./events/dm.ts";
-import {
-  publishEvent,
-  subscribeToFeedback,
-  subscribeToResponses,
-} from "./transport/client.ts";
+import { createRelayClient } from "./client.ts";
+import type { RelayClient } from "../types.ts";
+import { serveHashRequests } from "./hash-responder.ts";
 import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostCoordinator } from "../../payments/mod.ts";
@@ -51,25 +49,13 @@ import {
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-nostr"]);
 
-/** Module-level seam for testing — matches _setValidateTlsnForTest pattern. */
-let _publishEventFn: typeof publishEvent = publishEvent;
-let _verifyFn: typeof verify = verify;
-
-/** Allow tests to override the publishEvent implementation. Pass null to reset. */
-export function _setPublishEventForTest(fn: typeof publishEvent | null): void {
-  _publishEventFn = fn ?? publishEvent;
-}
-
-/** Allow tests to override the verify implementation. Pass null to reset. */
-export function _setVerifyForTest(fn: typeof verify | null): void {
-  _verifyFn = fn ?? verify;
-}
-
 export interface OracleNostrServiceConfig {
   /** Oracle's persistent Nostr identity (loaded from secret key). */
   identity: NostrIdentity;
-  /** Relay URLs to subscribe to. */
-  relayUrls?: string[];
+  /** Relay transport the daemon listens and answers on. */
+  relayClient: RelayClient;
+  /** Proof verifier (defaults to the real verifier). Tests inject doubles. */
+  verify?: typeof verify;
   /** Preimage store instance (default: in-memory). */
   preimageStore?: PreimageStore;
   /** FROST coordinator for threshold signing (optional — enables P2PK+FROST flow). */
@@ -127,8 +113,24 @@ export function createOracleNostrService(
   config: OracleNostrServiceConfig,
 ): OracleNostrService {
   const preimageStore = config.preimageStore ?? createPreimageStore();
+  const relayClient = config.relayClient;
+  const verifyFn = config.verify ?? verify;
   const watched = new Map<string, WatchedQuery>();
   const queryHashMap = new Map<string, string>();
+
+  function issueHash(queryId: string): string {
+    const existing = queryHashMap.get(queryId);
+    if (existing !== undefined) return existing;
+    const entry = preimageStore.create();
+    queryHashMap.set(queryId, entry.hash);
+    return entry.hash;
+  }
+
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: config.identity,
+    issueHash,
+  });
 
   async function handleResponseEvent(queryId: string, event: Event) {
     const entry = watched.get(queryId);
@@ -169,7 +171,7 @@ export function createOracleNostrService(
     result: RequestSubmissionResult,
     providerPubkey: string,
   ): Promise<boolean> {
-    const detail = await _verifyFn(query, result);
+    const detail = await verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
     const preimage = hash ? preimageStore.getPreimage(hash) : null;
 
@@ -185,7 +187,7 @@ export function createOracleNostrService(
       const maxAttempts = retryDelaysMs.length + 1;
       let delivered = false;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        const publishResult = await _publishEventFn(dm, config.relayUrls);
+        const publishResult = await relayClient.publish(dm);
         if (publishResult.successes.length > 0) {
           log.error(
             `Preimage delivered to Provider for ${queryId} (${publishResult.successes.length} relay(s))`,
@@ -220,7 +222,7 @@ export function createOracleNostrService(
         queryId,
         reason,
       );
-      await _publishEventFn(dm, config.relayUrls);
+      await relayClient.publish(dm);
       log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
       return false;
     }
@@ -228,9 +230,7 @@ export function createOracleNostrService(
 
   return {
     generateRequestHash(queryId: string) {
-      const entry = preimageStore.create();
-      queryHashMap.set(queryId, entry.hash);
-      return { hash: entry.hash };
+      return { hash: issueHash(queryId) };
     },
 
     watchRequest(
@@ -246,8 +246,8 @@ export function createOracleNostrService(
         subs: [],
       };
 
-      const feedbackSub = subscribeToFeedback(
-        queryEventId,
+      const feedbackSub = relayClient.subscribe(
+        { kinds: [7000], "#e": [queryEventId] },
         (event) =>
           handleFeedbackEvent(
             config.identity,
@@ -256,14 +256,12 @@ export function createOracleNostrService(
             event,
             config.onOffer,
           ),
-        config.relayUrls,
       );
       entry.subs.push(feedbackSub);
 
-      const responseSub = subscribeToResponses(
-        queryEventId,
+      const responseSub = relayClient.subscribe(
+        { kinds: [6300], "#e": [queryEventId] },
         (event) => handleResponseEvent(queryId, event),
-        config.relayUrls,
       );
       entry.subs.push(responseSub);
 
@@ -295,7 +293,7 @@ export function createOracleNostrService(
         return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
       }
 
-      const detail = await _verifyFn(query, result);
+      const detail = await verifyFn(query, result);
       if (!detail.passed) {
         const reason = detail.failures.join(", ") || "Verification failed";
         const dm = buildRejectionDM(
@@ -304,7 +302,7 @@ export function createOracleNostrService(
           queryId,
           reason,
         );
-        await _publishEventFn(dm, config.relayUrls);
+        await relayClient.publish(dm);
         log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
         return false;
       }
@@ -333,7 +331,7 @@ export function createOracleNostrService(
           queryId,
           "FROST threshold not met — insufficient Oracle approvals",
         );
-        await _publishEventFn(dm, config.relayUrls);
+        await relayClient.publish(dm);
         return false;
       }
 
@@ -345,7 +343,7 @@ export function createOracleNostrService(
         sigResult.signature,
         config.frostNodeConfig.group_pubkey,
       );
-      const publishResult = await _publishEventFn(dm, config.relayUrls);
+      const publishResult = await relayClient.publish(dm);
       if (publishResult.successes.length > 0) {
         log.error(
           `FROST signature delivered to Provider for ${queryId} (signers: ${
@@ -359,6 +357,7 @@ export function createOracleNostrService(
     },
 
     stop() {
+      hashResponder.close();
       for (const entry of watched.values()) {
         for (const sub of entry.subs) {
           sub.close();
@@ -377,9 +376,13 @@ export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = Deno.env.get("NOSTR_RELAYS")?.split(",").map((u) =>
-    u.trim()
-  ).filter(Boolean);
+  const relayUrls = (Deno.env.get("NOSTR_RELAYS") ?? "").split(",")
+    .map((u) => u.trim())
+    .filter(Boolean);
+  if (relayUrls.length === 0) return null;
 
-  return createOracleNostrService({ identity, relayUrls });
+  return createOracleNostrService({
+    identity,
+    relayClient: createRelayClient(relayUrls),
+  });
 }

@@ -2,20 +2,37 @@ import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { withEnv } from "../../testing/helpers.ts";
 import {
-  _setPublishEventForTest,
-  _setVerifyForTest,
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
 } from "./oracle-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
-import type { VerifiedEvent } from "nostr-tools";
+import type { Event } from "@anchr/protocol/nostr";
+import type { PublishResult, RelayClient } from "../types.ts";
 
 // --- Helpers ---
 
 const providerIdentity = generateEphemeralIdentity();
 const providerPubkey = providerIdentity.publicKey;
+
+function makeCapturingRelay(
+  result: () => PublishResult = () => ({
+    successes: ["relay1"],
+    failures: [],
+  }),
+): { client: RelayClient; published: Event[] } {
+  const published: Event[] = [];
+  const client: RelayClient = {
+    publish(event: Event): Promise<PublishResult> {
+      published.push(event);
+      return Promise.resolve(result());
+    },
+    subscribe: () => ({ close: () => {} }),
+    close: () => {},
+  };
+  return { client, published };
+}
 
 function makeConfig(
   overrides?: Partial<OracleNostrServiceConfig>,
@@ -23,10 +40,15 @@ function makeConfig(
   return {
     identity: generateEphemeralIdentity(),
     preimageStore: createPreimageStore(),
-    relayUrls: [],
+    relayClient: makeCapturingRelay().client,
     ...overrides,
   };
 }
+
+const verifyPass = () =>
+  Promise.resolve({ passed: true, checks: ["all good"], failures: [] });
+const verifyFail = () =>
+  Promise.resolve({ passed: false, checks: [], failures: ["C2PA invalid"] });
 
 // --- generateRequestHash ---
 
@@ -61,27 +83,17 @@ describe("generateRequestHash", () => {
 // --- verifyAndDeliver ---
 
 describe("verifyAndDeliver", () => {
-  afterEach(() => {
-    _setPublishEventForTest(null);
-    _setVerifyForTest(null);
-  });
-
   test("publishes preimage DM on verification pass", async () => {
     const store = createPreimageStore();
-    const config = makeConfig({ preimageStore: store });
+    const relay = makeCapturingRelay();
+    const published = relay.published;
+    const config = makeConfig({
+      preimageStore: store,
+      relayClient: relay.client,
+      verify: verifyPass,
+    });
     const service = createOracleNostrService(config);
     const { hash } = service.generateRequestHash("q1");
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
 
     const query = {
       id: "q1",
@@ -104,22 +116,18 @@ describe("verifyAndDeliver", () => {
 
   test("returns false and retains preimage when delivery fails", async () => {
     const store = createPreimageStore();
+    const failingRelay = makeCapturingRelay(() => ({
+      successes: [],
+      failures: [{ relay: "relay1", reason: "down" }],
+    }));
     const config = makeConfig({
       deliveryRetryDelaysMs: [0, 0],
       preimageStore: store,
+      relayClient: failingRelay.client,
+      verify: verifyPass,
     });
     const service = createOracleNostrService(config);
     const { hash } = service.generateRequestHash("q-delivery-fail");
-
-    _setPublishEventForTest(async () => ({
-      successes: [],
-      failures: ["relay1"],
-    }));
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
 
     const query = {
       id: "q-delivery-fail",
@@ -143,20 +151,15 @@ describe("verifyAndDeliver", () => {
 
   test("publishes rejection DM on verification fail", async () => {
     const store = createPreimageStore();
-    const config = makeConfig({ preimageStore: store });
+    const relay = makeCapturingRelay();
+    const published = relay.published;
+    const config = makeConfig({
+      preimageStore: store,
+      relayClient: relay.client,
+      verify: verifyFail,
+    });
     const service = createOracleNostrService(config);
     service.generateRequestHash("q1");
-
-    const published: VerifiedEvent[] = [];
-    _setPublishEventForTest(async (event: VerifiedEvent) => {
-      published.push(event);
-      return { successes: ["relay1"], failures: [] };
-    });
-    _setVerifyForTest(async () => ({
-      passed: false,
-      checks: [],
-      failures: ["C2PA invalid"],
-    }));
 
     const query = {
       id: "q1",
@@ -176,16 +179,9 @@ describe("verifyAndDeliver", () => {
   });
 
   test("returns false when hash not registered", async () => {
-    const config = makeConfig();
+    const config = makeConfig({ verify: verifyPass });
     const service = createOracleNostrService(config);
     // Do NOT call generateRequestHash
-
-    _setPublishEventForTest(async () => ({ successes: [], failures: [] }));
-    _setVerifyForTest(async () => ({
-      passed: true,
-      checks: ["all good"],
-      failures: [],
-    }));
 
     const query = {
       id: "q_unknown",
