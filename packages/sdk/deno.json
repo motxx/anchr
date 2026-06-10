@@ -50,6 +50,8 @@
       "src/internal/runtime/**/*.ts",
       "src/requests/**/*.ts",
       "src/testing/**/*.ts",
+      "src/relay-wait.ts",
+      "src/identity.ts",
       "src/schema.ts",
       "src/customer.ts",
       "src/customer-types.ts",
