@@ -68,7 +68,7 @@ Deno.test("request internals may consume only documented feature ports", () => {
       "packages/sdk/src/requests/application/query-service.ts",
       "packages/sdk/src/payments/mod.ts",
     ),
-  ).toBe(true);
+  ).toBe(false);
 
   expect(
     isAllowedRequestFeatureImport(
