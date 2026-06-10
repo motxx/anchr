@@ -12,7 +12,7 @@ example.
 The top-level README is the advertised source for example status. Each listed
 example must keep its own README consistent with the advertised status.
 
-There are no advertised examples at the moment.
+The advertised examples are `quick-start` (Testnet) and `paid-request-simulation` (Simulation), listed in the top-level README examples table.
 
 If an example is not listed in the top-level README, it may still exist as a
 sketch, fixture, or migration artifact, but it must not be described as a

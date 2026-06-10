@@ -21,3 +21,4 @@ export * from "./attachments.ts";
 export * from "./factories.ts";
 export * from "./oracle-registry.ts";
 export * from "./protocol-helpers.ts";
+export * from "./relay.ts";

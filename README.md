@@ -77,6 +77,25 @@ You also need deployment-owned infrastructure: a Cashu mint URL, Nostr relay
 URL, oracle endpoint/pubkey, and Provider Nostr secret key. TLSNotary-based
 schemas also need a notary.
 
+## Quick Start
+
+From a clean checkout (with [Deno](https://deno.com/) installed), publish a
+Public Request Advertisement to a relay you choose and read it back:
+
+```sh
+git clone https://github.com/motxx/anchr && cd anchr
+NOSTR_RELAYS=wss://your-relay.example deno run --allow-net --allow-env examples/quick-start/main.ts
+```
+
+The command builds a kind `5300` advertisement with the SDK under a fresh
+ephemeral keypair, publishes it to your relay, and prints the advertisement
+the relay echoes back. No payment is locked: the advertisement carries only
+public discovery fields, and the full payment-locked exchange is the
+[`paid-request-simulation`](examples/paid-request-simulation/) lesson. A
+deterministic smoke test covers the same code path in CI without contacting
+any third-party relay (see
+[`examples/quick-start/`](examples/quick-start/)).
+
 ## Customer API Sketch
 
 ```ts
@@ -142,6 +161,7 @@ Status labels are defined in
 
 | Example | Status | Lesson |
 | --- | --- | --- |
+| [`quick-start`](examples/quick-start/) | Testnet | Publish a Public Request Advertisement to a real relay with SDK-built events and read it back. |
 | [`paid-request-simulation`](examples/paid-request-simulation/) | Simulation | Compose Customer, Provider, Oracle, payment, proof, attachment, and adapter boundaries through public SDK imports. |
 
 New examples must be tiny lessons for verifiable paid requests and must use

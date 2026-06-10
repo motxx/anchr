@@ -2,7 +2,8 @@
   "workspace": [
     "./packages/protocol",
     "./packages/sdk",
-    "./examples/paid-request-simulation"
+    "./examples/paid-request-simulation",
+    "./examples/quick-start"
   ],
   "compilerOptions": {
     "lib": ["esnext", "dom", "dom.iterable", "deno.ns"],
@@ -63,7 +64,7 @@
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
     "test:integration": "bash -c 'files=$(find packages -name \"*.integration.test.ts\" -type f); if [ -z \"$files\" ]; then echo \"No package integration tests\"; exit 0; fi; deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys $files'",
     "test:scripts": "deno test scripts/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
-    "test:examples": "deno test --allow-all examples/",
+    "test:examples": "deno test --allow-all examples/examples.test.ts examples/sdk-public-api-dogfood.test.ts examples/",
 
     "test:e2e:protocol": "deno test e2e/protocol/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",
     "test:e2e:relay": "ANCHR_E2E_REQUIRE_INFRA=1 deno test e2e/relay/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys",

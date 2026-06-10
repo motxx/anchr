@@ -7,91 +7,20 @@
 
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { createInMemoryRelayClient } from "@anchr/sdk/testing";
 import {
   buildPreimageDeliveryEvent,
   type CashuClient,
   createCustomer,
   createProvider,
-  type Filter,
   generateKeypair,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
   parseQueryRequestEvent,
   ProofSchema,
-  type PublishResult,
   type RedeemHtlcParams,
   type RedeemResult,
-  type RelayClient,
-  type Subscription,
 } from "@anchr/sdk";
-
-type RelayEvent = Parameters<RelayClient["publish"]>[0];
-
-interface SubRecord {
-  id: number;
-  filter: Filter;
-  onEvent: (event: RelayEvent) => void;
-}
-
-class InMemoryRelay {
-  private subscriptions: SubRecord[] = [];
-  private nextId = 1;
-
-  subscribe(
-    filter: Filter,
-    onEvent: (event: RelayEvent) => void,
-  ): Subscription {
-    const id = this.nextId;
-    this.nextId += 1;
-    this.subscriptions.push({ id, filter, onEvent });
-    return {
-      close: () => {
-        this.subscriptions = this.subscriptions.filter((s) => s.id !== id);
-      },
-    };
-  }
-
-  publish(event: RelayEvent): Promise<PublishResult> {
-    for (const sub of [...this.subscriptions]) {
-      if (!matches(sub.filter, event)) continue;
-      queueMicrotask(() => sub.onEvent(event));
-    }
-    return Promise.resolve({
-      successes: ["mock://anonymous-relay-flow"],
-      failures: [],
-    });
-  }
-
-  close(): void {
-    this.subscriptions = [];
-  }
-
-  asClient(): RelayClient {
-    return {
-      publish: (event) => this.publish(event),
-      subscribe: (filter, onEvent) => this.subscribe(filter, onEvent),
-      close: () => this.close(),
-    };
-  }
-}
-
-function matches(filter: Filter, event: RelayEvent): boolean {
-  if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) {
-    return false;
-  }
-  if (filter.authors !== undefined && !filter.authors.includes(event.pubkey)) {
-    return false;
-  }
-  for (const [key, values] of Object.entries(filter)) {
-    if (!key.startsWith("#") || !Array.isArray(values)) continue;
-    const tag = key.slice(1);
-    const tagValues = event.tags
-      .filter((entry) => entry[0] === tag)
-      .map((entry) => entry[1]);
-    if (!values.some((value) => tagValues.includes(value))) return false;
-  }
-  return true;
-}
 
 function makeStubCashuClient(): {
   client: CashuClient;
@@ -130,8 +59,7 @@ const HASH_HEX = "01234567".repeat(8);
 const PREIMAGE_HEX = "89abcdef".repeat(8);
 
 test("INV-08: full exchange completes relay-only with no HTTP endpoint", async () => {
-  const relay = new InMemoryRelay();
-  const relayClient = relay.asClient();
+  const relayClient = createInMemoryRelayClient();
   const customerCashu = makeStubCashuClient();
   const providerCashu = makeStubCashuClient();
   const oracleKey = generateKeypair();
@@ -140,11 +68,11 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
   // In-process Oracle actor: watches results on the relay and delivers the
   // Release Material as a NIP-44 DM — never an HTTP round trip.
   const queryIdsByRequest = new Map<string, string>();
-  relay.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
+  relayClient.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
     const payload = parseQueryRequestEvent(event);
     if (payload !== null) queryIdsByRequest.set(event.id, payload.query_id);
   });
-  relay.subscribe({ kinds: [KIND_QUERY_RESPONSE] }, (event) => {
+  relayClient.subscribe({ kinds: [KIND_QUERY_RESPONSE] }, (event) => {
     const requestId = event.tags.find((tag) => tag[0] === "e")?.[1];
     if (requestId === undefined) return;
     const queryId = queryIdsByRequest.get(requestId);
@@ -154,12 +82,12 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
       request_event_id: requestId,
       preimage: PREIMAGE_HEX,
     });
-    setTimeout(() => void relay.publish(delivery), 10);
+    setTimeout(() => void relayClient.publish(delivery), 10);
   });
 
   const provider = createProvider({
     oracles: [oracleKey.publicKey],
-    relays: ["mock://anonymous-relay-flow"],
+    relays: ["mock://in-memory-relay"],
     mint: "https://mint.test.example",
     privKey: bytesToHex(providerKey.secretKey),
     cashuClient: providerCashu.client,
@@ -190,7 +118,7 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
         requestHash: () => Promise.resolve({ hash: HASH_HEX }),
       },
     }],
-    relays: ["mock://anonymous-relay-flow"],
+    relays: ["mock://in-memory-relay"],
     mint: "https://mint.test.example",
     cashuClient: customerCashu.client,
     relayClient,
@@ -218,6 +146,6 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
   } finally {
     await provider.stop();
     await servePromise;
-    relay.close();
+    relayClient.close();
   }
 });

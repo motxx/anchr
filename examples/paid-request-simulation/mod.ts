@@ -19,85 +19,9 @@ import {
   materializeAttachmentRef,
   validateAttachmentUri,
 } from "@anchr/sdk/attachments";
+import { createInMemoryRelayClient } from "@anchr/sdk/testing";
 
 type RelayEvent = Parameters<RelayClient["publish"]>[0];
-
-interface SubRecord {
-  id: number;
-  filter: Filter;
-  onEvent: (event: RelayEvent) => void;
-}
-
-class InMemoryRelay {
-  private subscriptions: SubRecord[] = [];
-  private nextId = 1;
-
-  subscribe(
-    filter: Filter,
-    onEvent: (event: RelayEvent) => void,
-  ): Subscription {
-    const id = this.nextId;
-    this.nextId += 1;
-    this.subscriptions.push({ id, filter, onEvent });
-    return {
-      close: () => {
-        this.subscriptions = this.subscriptions.filter((sub) => sub.id !== id);
-      },
-    };
-  }
-
-  async publish(event: RelayEvent): Promise<PublishResult> {
-    for (const sub of this.subscriptions) {
-      if (matchesFilter(event, sub.filter)) {
-        queueMicrotask(() => sub.onEvent(event));
-      }
-    }
-    return { successes: ["mock://paid-request-simulation"], failures: [] };
-  }
-
-  close(): void {
-    this.subscriptions = [];
-  }
-
-  asClient(): RelayClient {
-    return {
-      publish: (event) => this.publish(event),
-      subscribe: (filter, onEvent) => this.subscribe(filter, onEvent),
-      close: () => this.close(),
-    };
-  }
-}
-
-function matchesFilter(event: RelayEvent, filter: Filter): boolean {
-  if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) {
-    return false;
-  }
-  if (filter.authors !== undefined && !filter.authors.includes(event.pubkey)) {
-    return false;
-  }
-  for (const { tag, values } of tagFilters(filter)) {
-    const eventValues = event.tags.filter((entry) => entry[0] === tag).map((
-      entry,
-    ) => entry[1]);
-    if (!values.some((value) => eventValues.includes(value))) return false;
-  }
-  return true;
-}
-
-function tagFilters(filter: Filter): { tag: string; values: string[] }[] {
-  const filters: { tag: string; values: string[] }[] = [];
-  for (const [key, value] of Object.entries(filter)) {
-    if (!key.startsWith("#")) continue;
-    if (!isStringArray(value)) continue;
-    filters.push({ tag: key.slice(1), values: value });
-  }
-  return filters;
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) &&
-    value.every((entry) => typeof entry === "string");
-}
 
 function makeCashuClient(mintUrl: string): {
   client: CashuClient;
@@ -174,8 +98,9 @@ const PREIMAGE_HEX = "89abcdef".repeat(8);
 export async function runPaidRequestSimulation(): Promise<
   PaidRequestSimulationResult
 > {
-  const relay = new InMemoryRelay();
-  const relayClient = relay.asClient();
+  const relayClient = createInMemoryRelayClient({
+    relayUrl: "mock://paid-request-simulation",
+  });
   const customerCashu = makeCashuClient("https://mint.test.example");
   const providerCashu = makeCashuClient("https://mint.test.example");
   const oracleKey = generateKeypair();
@@ -190,11 +115,11 @@ export async function runPaidRequestSimulation(): Promise<
   }
 
   const queryIdsByRequest = new Map<string, string>();
-  relay.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
+  relayClient.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
     const payload = parseQueryRequestEvent(event);
     if (payload !== null) queryIdsByRequest.set(event.id, payload.query_id);
   });
-  relay.subscribe({ kinds: [KIND_QUERY_RESPONSE] }, (event) => {
+  relayClient.subscribe({ kinds: [KIND_QUERY_RESPONSE] }, (event) => {
     const requestId = event.tags.find((tag) => tag[0] === "e")?.[1];
     if (requestId === undefined) return;
     const queryId = queryIdsByRequest.get(requestId);
@@ -204,7 +129,7 @@ export async function runPaidRequestSimulation(): Promise<
       request_event_id: requestId,
       preimage: PREIMAGE_HEX,
     });
-    setTimeout(() => void relay.publish(delivery), 10);
+    setTimeout(() => void relayClient.publish(delivery), 10);
   });
 
   const provider = createProvider({
@@ -270,6 +195,6 @@ export async function runPaidRequestSimulation(): Promise<
   } finally {
     await provider.stop();
     await servePromise;
-    relay.close();
+    relayClient.close();
   }
 }
