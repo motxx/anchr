@@ -41,6 +41,7 @@ messages.
 | Job result `6300`           | `@anchr/protocol/events`    | Publishing/subscription flow and attachment transport composition |
 | Job feedback `7000`         | `@anchr/protocol/events`    | Offer and selection service flow                                  |
 | Release DM kind `4`         | `@anchr/protocol/events`    | Waiting for Oracle settlement messages                            |
+| Hash bootstrap DM kind `4`  | `@anchr/protocol/events`    | Default Customer-side client and Oracle-side responder            |
 | Oracle announcement `30088` | `@anchr/sdk/adapters/nostr` | Oracle registry publication and relay E2E coverage                |
 
 ## Event Kinds
@@ -221,6 +222,33 @@ are NIP-44 encrypted to their recipients. Kind `5300` request content and kind
 headers, bearer credentials, proof predicates, proof secrets, Provider
 Redemption Tokens, or spendable release material. Point-to-point messages such
 as preimage delivery use NIP-44 direct messages between specific pubkeys.
+
+## Hash Bootstrap (kind 4)
+
+Before locking payment, the Customer obtains the hash commitment `H` from the
+designated Oracle over the relay. Both messages are NIP-44 kind `4` DMs; no
+HTTP endpoint is required on either side.
+
+Customer → Oracle request content:
+
+| Field      | Description                                |
+| ---------- | ------------------------------------------ |
+| `type`     | `"hash_request"`                           |
+| `query_id` | Caller-chosen unique id the hash binds to |
+
+Oracle → Customer response content:
+
+| Field      | Description                                          |
+| ---------- | ---------------------------------------------------- |
+| `type`     | `"hash_response"`                                    |
+| `query_id` | Matches the request                                  |
+| `hash`     | Hex `H = sha256(S)`; the Oracle holds `S` until release |
+
+The request SHOULD be sent under a fresh ephemeral keypair so the bootstrap
+is unlinkable from the later kind `5300` advertisement. The Oracle answers
+the sender pubkey and MUST be idempotent per `query_id` (a retried request
+returns the same `hash`). An Oracle-operated HTTP `POST /hash` adapter may
+exist as deployment policy, but the interoperable default is this DM pair.
 
 ## Release Material and Redeem Gate
 

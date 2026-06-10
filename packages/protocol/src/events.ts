@@ -543,4 +543,128 @@ export function parsePreimageDeliveryEvent(
   };
 }
 
+/** Customer→Oracle hash bootstrap request (NIP-44 kind 4 DM content). */
+export interface HashRequestPayload {
+  type: "hash_request";
+  /** Caller-chosen unique query id the hash commitment is bound to. */
+  query_id: string;
+}
+
+/** Oracle→Customer hash bootstrap response (NIP-44 kind 4 DM content). */
+export interface HashResponsePayload {
+  type: "hash_response";
+  /** Matches the request's query_id. */
+  query_id: string;
+  /** Hex hash `H = sha256(S)`; the Oracle holds `S` until valid release. */
+  hash: string;
+}
+
+/**
+ * Build a signed kind 4 NIP-44 DM asking the Oracle for a hash commitment.
+ * The sender SHOULD be a fresh ephemeral keypair so the bootstrap is not
+ * linkable to the later advertisement.
+ */
+export function buildHashRequestEvent(
+  identity: Keypair,
+  oraclePubkey: string,
+  payload: HashRequestPayload,
+): Event {
+  const ciphertext = encryptNip44(
+    JSON.stringify(payload),
+    identity.secretKey,
+    oraclePubkey,
+  );
+  return signEvent(
+    {
+      kind: KIND_DIRECT_MESSAGE,
+      created_at: Math.floor(Date.now() / 1000),
+      content: ciphertext,
+      tags: [["p", oraclePubkey]],
+    },
+    identity.secretKey,
+  );
+}
+
+/**
+ * Decrypt + parse a kind 4 DM expected to carry a hash bootstrap request.
+ * Returns null if decryption fails or the payload is not a hash request.
+ */
+export function parseHashRequestEvent(
+  event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
+): HashRequestPayload | null {
+  const p = decryptDmJson(event, recipientSecretKey, senderPubkey);
+  if (p === null) return null;
+  if (p.type !== "hash_request" || typeof p.query_id !== "string") {
+    return null;
+  }
+  return { type: "hash_request", query_id: p.query_id };
+}
+
+/** Build a signed kind 4 NIP-44 DM answering a hash bootstrap request. */
+export function buildHashResponseEvent(
+  identity: Keypair,
+  recipientPubkey: string,
+  payload: HashResponsePayload,
+): Event {
+  const ciphertext = encryptNip44(
+    JSON.stringify(payload),
+    identity.secretKey,
+    recipientPubkey,
+  );
+  return signEvent(
+    {
+      kind: KIND_DIRECT_MESSAGE,
+      created_at: Math.floor(Date.now() / 1000),
+      content: ciphertext,
+      tags: [["p", recipientPubkey]],
+    },
+    identity.secretKey,
+  );
+}
+
+/**
+ * Decrypt + parse a kind 4 DM expected to carry a hash bootstrap response.
+ * Returns null if decryption fails or the payload is not a hash response.
+ */
+export function parseHashResponseEvent(
+  event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
+): HashResponsePayload | null {
+  const p = decryptDmJson(event, recipientSecretKey, senderPubkey);
+  if (p === null) return null;
+  if (
+    p.type !== "hash_response" ||
+    typeof p.query_id !== "string" ||
+    typeof p.hash !== "string"
+  ) {
+    return null;
+  }
+  return { type: "hash_response", query_id: p.query_id, hash: p.hash };
+}
+
+function decryptDmJson(
+  event: Event,
+  recipientSecretKey: Uint8Array,
+  senderPubkey: string,
+): Record<string, unknown> | null {
+  if (event.kind !== KIND_DIRECT_MESSAGE) return null;
+  let plaintext: string;
+  try {
+    plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(plaintext);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  return parsed as Record<string, unknown>;
+}
+
 export { KIND_QUERY_FEEDBACK, KIND_QUERY_REQUEST, KIND_QUERY_RESPONSE };

@@ -31,8 +31,12 @@ export type OracleSelector = (oracles: readonly string[]) => string;
 export interface CustomerOracle {
   /** Trusted oracle pubkey selected into the query request. */
   pubkey: string;
-  /** Adapter for talking to this oracle. */
-  client: OracleClient;
+  /**
+   * Adapter for talking to this oracle. Defaults to the relay-DM hash
+   * bootstrap client (`createNostrOracleClient`) over the Customer's
+   * relayClient; pass an explicit client (e.g. HTTP) to override.
+   */
+  client?: OracleClient;
 }
 
 /** Customer-side construction options. */

@@ -19,6 +19,14 @@
  * different protocol can pass a custom OracleClient implementation.
  */
 
+import {
+  buildHashRequestEvent,
+  parseHashResponseEvent,
+} from "@anchr/protocol/events";
+import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
+import { generateEphemeralIdentity } from "./identity.ts";
+import type { RelayClient } from "./adapters/types.ts";
+
 export interface OracleClient {
   /**
    * Request a fresh hash for a query. The oracle commits to releasing
@@ -121,4 +129,88 @@ function readHash(payload: unknown): string | null {
   }
   const hash = payload.hash;
   return typeof hash === "string" ? hash : null;
+}
+
+/** Thrown when the oracle does not answer a hash bootstrap DM in time. */
+export class OracleTimeoutError extends Error {
+  constructor(public readonly timeoutMs: number) {
+    super(`Oracle hash bootstrap timed out after ${timeoutMs}ms`);
+    this.name = "OracleTimeoutError";
+  }
+}
+
+/** Construction options for {@link createNostrOracleClient}. */
+export interface NostrOracleOptions {
+  /** Relay transport used for the bootstrap DMs. */
+  relayClient: RelayClient;
+  /** The Oracle's Nostr pubkey (hex). */
+  oraclePubkey: string;
+  /** How long to wait for the response DM. Default 10s. */
+  timeoutMs?: number;
+}
+
+/**
+ * Default OracleClient: the hash bootstrap rides the relay as NIP-44 DMs.
+ * Each request uses a fresh ephemeral sender keypair, so the bootstrap is
+ * unlinkable from the later advertisement and neither side needs an HTTP
+ * endpoint (INV-08).
+ */
+export function createNostrOracleClient(
+  options: NostrOracleOptions,
+): OracleClient {
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  if (options.oraclePubkey.length === 0) {
+    throw new OracleConfigError("oraclePubkey must be a non-empty string");
+  }
+
+  return {
+    requestHash(queryId: string): Promise<{ hash: string }> {
+      const identity = generateEphemeralIdentity();
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          subscription.close();
+          reject(new OracleTimeoutError(timeoutMs));
+        }, timeoutMs);
+        const subscription = options.relayClient.subscribe(
+          {
+            kinds: [KIND_DIRECT_MESSAGE],
+            authors: [options.oraclePubkey],
+            "#p": [identity.publicKey],
+          },
+          (event) => {
+            const payload = parseHashResponseEvent(
+              event,
+              identity.secretKey,
+              options.oraclePubkey,
+            );
+            if (payload === null || payload.query_id !== queryId) return;
+            clearTimeout(timer);
+            subscription.close();
+            resolve({ hash: payload.hash });
+          },
+        );
+        const request = buildHashRequestEvent(identity, options.oraclePubkey, {
+          type: "hash_request",
+          query_id: queryId,
+        });
+        options.relayClient.publish(request).then((result) => {
+          if (result.successes.length === 0) {
+            clearTimeout(timer);
+            subscription.close();
+            reject(
+              new OracleResponseError(
+                `no relay accepted the hash bootstrap DM: ${
+                  result.failures.map((f) => f.reason).join(", ")
+                }`,
+              ),
+            );
+          }
+        }, (err) => {
+          clearTimeout(timer);
+          subscription.close();
+          reject(err);
+        });
+      });
+    },
+  };
 }

@@ -149,16 +149,18 @@ payload's `customer_pubkey` matches its own event `pubkey`.
 **Claim:** The full Customer / Provider / Oracle exchange (advertise → offer →
 select → result → release → redeem) completes with relay events and NIP-44 DMs
 as the only inter-actor transport. No actor is required to run or contact an
-HTTP endpoint: the Oracle hash bootstrap goes through the injectable
-`OracleClient` port, and every other step rides the relay.
+HTTP endpoint: the Oracle hash bootstrap rides the relay as NIP-44 DMs by
+default (`createNostrOracleClient` / `serveHashRequests`), and HTTP oracle
+access is an explicitly injected option, never the required path.
 
 **Attack:** A deployment constraint or implementation regression forces an
 actor to expose an IP-revealing network endpoint (or to reach a counterparty's
 endpoint) to complete the exchange.
 
-**Expected:** With an in-process `OracleClient` and an in-memory relay, the
-exchange completes end-to-end — the Provider redeems with the relay-delivered
-Release Material — without any HTTP listener or HTTP request in the flow.
+**Expected:** With the default relay-DM hash bootstrap and an in-memory relay,
+the exchange completes end-to-end — the Provider redeems with the
+relay-delivered Release Material — without any HTTP listener or HTTP request
+in the flow.
 
 **Tests:**
 

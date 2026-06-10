@@ -20,6 +20,7 @@ import {
   ProofSchema,
   type RedeemHtlcParams,
   type RedeemResult,
+  serveHashRequests,
 } from "@anchr/sdk";
 
 function makeStubCashuClient(): {
@@ -65,8 +66,14 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
   const oracleKey = generateKeypair();
   const providerKey = generateKeypair();
 
-  // In-process Oracle actor: watches results on the relay and delivers the
-  // Release Material as a NIP-44 DM — never an HTTP round trip.
+  // In-process Oracle actor: answers hash bootstrap DMs, watches results on
+  // the relay, and delivers the Release Material as a NIP-44 DM — never an
+  // HTTP round trip.
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
   const queryIdsByRequest = new Map<string, string>();
   relayClient.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
     const payload = parseQueryRequestEvent(event);
@@ -109,15 +116,9 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
   await new Promise((resolve) => setTimeout(resolve, 5));
 
   const customer = createCustomer({
-    oracles: [{
-      pubkey: oracleKey.publicKey,
-      // The hash bootstrap goes through the OracleClient port; this
-      // in-process implementation stands where the relay-DM adapter
-      // (issue 0106) will plug in. Nothing in the flow requires HTTP.
-      client: {
-        requestHash: () => Promise.resolve({ hash: HASH_HEX }),
-      },
-    }],
+    // No oracle client injected: the default relay-DM hash bootstrap
+    // (createNostrOracleClient) answers through the same in-memory relay.
+    oracles: [{ pubkey: oracleKey.publicKey }],
     relays: ["mock://in-memory-relay"],
     mint: "https://mint.test.example",
     cashuClient: customerCashu.client,
@@ -146,6 +147,7 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
   } finally {
     await provider.stop();
     await servePromise;
+    hashResponder.close();
     relayClient.close();
   }
 });

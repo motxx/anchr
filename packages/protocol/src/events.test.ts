@@ -2,11 +2,15 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
+  buildHashRequestEvent,
+  buildHashResponseEvent,
   buildOfferFeedbackEvent,
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildSelectionFeedbackEvent,
+  parseHashRequestEvent,
+  parseHashResponseEvent,
   parseOfferFeedbackEvent,
   parseOracleQueryResponseEvent,
   parsePreimageDeliveryEvent,
@@ -307,4 +311,61 @@ test("preimage delivery DMs bind release material to the request event", () => {
     request_event_id: "req123",
     preimage: "aa".repeat(32),
   });
+});
+
+test("hash bootstrap DM round-trips request and response", () => {
+  const customer = generateKeypair();
+  const oracle = generateKeypair();
+
+  const request = buildHashRequestEvent(customer, oracle.publicKey, {
+    type: "hash_request",
+    query_id: "q-bootstrap-1",
+  });
+  expect(request.kind).toBe(4);
+  const parsedRequest = parseHashRequestEvent(
+    request,
+    oracle.secretKey,
+    customer.publicKey,
+  );
+  expect(parsedRequest).toEqual({
+    type: "hash_request",
+    query_id: "q-bootstrap-1",
+  });
+
+  const response = buildHashResponseEvent(oracle, customer.publicKey, {
+    type: "hash_response",
+    query_id: "q-bootstrap-1",
+    hash: "ab".repeat(32),
+  });
+  const parsedResponse = parseHashResponseEvent(
+    response,
+    customer.secretKey,
+    oracle.publicKey,
+  );
+  expect(parsedResponse).toEqual({
+    type: "hash_response",
+    query_id: "q-bootstrap-1",
+    hash: "ab".repeat(32),
+  });
+});
+
+test("hash bootstrap parsers reject other DM payloads", () => {
+  const customer = generateKeypair();
+  const oracle = generateKeypair();
+  const preimage = buildPreimageDeliveryEvent(oracle, customer.publicKey, {
+    query_id: "q1",
+    request_event_id: "e1",
+    preimage: "cd".repeat(32),
+  });
+  expect(parseHashRequestEvent(preimage, customer.secretKey, oracle.publicKey))
+    .toBe(null);
+  expect(parseHashResponseEvent(preimage, customer.secretKey, oracle.publicKey))
+    .toBe(null);
+  const request = buildHashRequestEvent(customer, oracle.publicKey, {
+    type: "hash_request",
+    query_id: "q1",
+  });
+  expect(
+    parsePreimageDeliveryEvent(request, oracle.secretKey, customer.publicKey),
+  ).toBe(null);
 });

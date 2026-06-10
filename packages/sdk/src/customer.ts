@@ -26,6 +26,7 @@ import {
 } from "./schema.ts";
 import { type Event as NostrEvent, type Keypair } from "@anchr/protocol/nostr";
 import { generateEphemeralIdentity } from "./identity.ts";
+import { createNostrOracleClient } from "./oracle.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -168,18 +169,20 @@ export function validateCustomerOptions(
       throw new CustomerConfigError("oracles entries must have unique pubkeys");
     }
     oraclePubkeys.add(pubkey);
-    if (typeof client !== "object" || client === null) {
-      throw new CustomerConfigError(
-        "oracles entries must include an oracle client",
-      );
-    }
-    const requestHash = "requestHash" in client
-      ? client.requestHash
-      : undefined;
-    if (typeof requestHash !== "function") {
-      throw new CustomerConfigError(
-        "oracle clients must expose requestHash",
-      );
+    if (client !== undefined) {
+      if (typeof client !== "object" || client === null) {
+        throw new CustomerConfigError(
+          "oracle client overrides must be objects",
+        );
+      }
+      const requestHash = "requestHash" in client
+        ? client.requestHash
+        : undefined;
+      if (typeof requestHash !== "function") {
+        throw new CustomerConfigError(
+          "oracle clients must expose requestHash",
+        );
+      }
     }
   }
   if (!Array.isArray(o.relays) || o.relays.length === 0) {
@@ -284,7 +287,12 @@ export function createCustomer(options: CustomerOptions): Customer {
       const identity: Keypair = generateEphemeralIdentity();
       const queryId = generateQueryId();
 
-      const { hash } = await selectedOracle.client.requestHash(queryId);
+      const oracleClient = selectedOracle.client ??
+        createNostrOracleClient({
+          relayClient: options.relayClient,
+          oraclePubkey: selectedOracle.pubkey,
+        });
+      const { hash } = await oracleClient.requestHash(queryId);
 
       const locktimeSeconds = Math.floor(Date.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);

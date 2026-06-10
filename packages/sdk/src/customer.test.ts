@@ -160,11 +160,20 @@ test("validateCustomerOptions rejects empty oracle entries", () => {
     .toThrow(CustomerConfigError);
 });
 
-test("validateCustomerOptions rejects oracle entries without a client", () => {
+test("validateCustomerOptions accepts oracle entries without a client (relay-DM default)", () => {
   expect(() =>
     validateCustomerOptions({
       ...validOptions(),
       oracles: [{ pubkey: ORACLE_A }],
+    })
+  ).not.toThrow();
+});
+
+test("validateCustomerOptions rejects malformed oracle client overrides", () => {
+  expect(() =>
+    validateCustomerOptions({
+      ...validOptions(),
+      oracles: [{ pubkey: ORACLE_A, client: { requestHash: 42 } }],
     })
   ).toThrow(CustomerConfigError);
 });

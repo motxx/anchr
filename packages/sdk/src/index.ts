@@ -134,12 +134,19 @@ export {
 
 export {
   createHttpOracleClient,
+  createNostrOracleClient,
   type HttpOracleOptions,
+  type NostrOracleOptions,
   type OracleClient,
   OracleConfigError,
   OracleHttpError,
   OracleResponseError,
+  OracleTimeoutError,
 } from "./oracle.ts";
+export {
+  type HashResponderOptions,
+  serveHashRequests,
+} from "./adapters/nostr/hash-responder.ts";
 
 export {
   type BindProviderParams,

@@ -74,8 +74,8 @@ npm i @anchr/sdk
 ```
 
 You also need deployment-owned infrastructure: a Cashu mint URL, Nostr relay
-URL, oracle endpoint/pubkey, and Provider Nostr secret key. TLSNotary-based
-schemas also need a notary.
+URL, oracle pubkey, and Provider Nostr secret key. TLSNotary-based schemas
+also need a notary.
 
 ## Quick Start
 
@@ -102,7 +102,6 @@ any third-party relay (see
 import {
   createCashuClient,
   createCustomer,
-  createHttpOracleClient,
   createRelayClient,
   ProofSchema,
   type CashuProof,
@@ -114,12 +113,9 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  oracles: [{
-    pubkey: oraclePubkey,
-    client: createHttpOracleClient({
-      endpoint: "https://oracle.test.example",
-    }),
-  }],
+  // The Oracle hash bootstrap rides the relay as NIP-44 DMs by default;
+  // pass `client: createHttpOracleClient(...)` to use an HTTP oracle.
+  oracles: [{ pubkey: oraclePubkey }],
   relays: relayUrls,
   mint: mintUrl,
   cashuClient: createCashuClient({ mintUrl }),
