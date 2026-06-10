@@ -2,6 +2,7 @@
 
 Created: 2026-06-01
 Model: GPT-5 Codex
+Completed: 2026-06-10
 
 ## Priority
 
@@ -60,3 +61,40 @@ Relevant files:
 - Re-read the final event helpers after #0096 and #0097 land.
 - Rewrite the messaging spec privacy sections to match code and tests.
 - Trim README wording so it states the model without over-explaining it.
+
+## Resolution
+
+Implemented by updating:
+
+- `specs/messaging.md` — the kind 5300 public-content denylist now names every
+  rejected payment-bearing field (`payment_lock`, `payment_lock_token`,
+  `bounty_token`, ...) and states that the canonical parser rejects them. The
+  per-class privacy statements (request/offer public signed JSON; selection,
+  result, `oracle_payload`, release DM NIP-44 encrypted) were verified
+  consistent with the post-#0096/#0097 implementation and left as-is.
+- `docs/protocol-conformance-audit.md` — added a "Privacy Boundary Test
+  Owners" table naming the test owner for each message-class privacy model
+  plus the INV-07/INV-08 invariants; fixed the stale
+  `bounty-attacks` test path.
+- `README.md` — no edits needed: it contains no privacy/encryption wording
+  that could contradict the messaging spec (verified by grep).
+
+Verified with:
+
+- `deno task check`
+- `deno task test:unit`
+- `rg -n "not encrypted|encrypted content includes|must not contain private|Plaintext payload" specs/messaging.md docs/protocol-conformance-audit.md`
+  → only wording matching the implemented privacy model.
+
+Harness update:
+
+- None — the privacy boundaries themselves are already locked by the
+  events tests and INV-07/INV-08; this issue aligned the prose with them.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

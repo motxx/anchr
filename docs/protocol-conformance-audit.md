@@ -63,11 +63,27 @@ The security-sensitive surfaces map to existing tests:
 - forged proof rejection: `docs/threat-model.md` `INV-01`, proof verifier
   tests, and protocol attack e2e tests.
 - rejected verification does not leak preimages: `INV-02` and
-  `e2e/protocol/bounty-attacks.test.ts`.
+  `e2e/protocol/paid-request-attacks.test.ts`.
 - refund-before-locktime rejection and Provider-bound redemption:
   `INV-03`/`INV-04`, payment unit tests, and regtest e2e tests.
 - FROST threshold behavior: `e2e/frost/frost-threshold.test.ts` and
   `packages/sdk/src/payments/frost-*.test.ts`.
+
+## Privacy Boundary Test Owners
+
+Each Nostr message class has one stated privacy model in
+`specs/messaging.md` and one test owner that locks it:
+
+| Message class | Privacy model | Test owner |
+| --- | --- | --- |
+| Request `5300` content | Public signed JSON; payment-bearing and execution field names rejected by the parser | `packages/protocol/src/events.test.ts` — public-allowlist and per-field rejection tests |
+| Offer `7000` content | Public signed JSON; `provider_pubkey` must match the event author | `packages/protocol/src/events.test.ts` |
+| Selection `7000` content | NIP-44 encrypted to the selected Provider; `p` tag binding checked | `packages/protocol/src/events.test.ts` |
+| Result `6300` content | NIP-44 encrypted to the Customer | `packages/protocol/src/events.test.ts` |
+| `oracle_payload` tag | NIP-44 encrypted to the Oracle | `packages/protocol/src/events.test.ts` |
+| Release DM kind `4` | NIP-44 encrypted Oracle→Provider | `packages/protocol/src/events.test.ts` |
+| Key-material unlinkability across requests | Fresh ephemeral keypair per request | `docs/threat-model.md` `INV-07`, `packages/sdk/src/customer.test.ts` |
+| Relay-only exchange | No actor requires an HTTP endpoint | `docs/threat-model.md` `INV-08`, `e2e/protocol/anonymous-relay-flow.test.ts` |
 
 ## Follow-Up Gate
 

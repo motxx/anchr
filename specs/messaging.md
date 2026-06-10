@@ -86,7 +86,9 @@ helper does not use a NIP-90 `bid` tag for payment material.
 | `expires_at`      | Offer cutoff as Unix milliseconds                |
 
 The public content MUST NOT include `predicate`, `context`, `mint_url`,
-`bounty_token`, `provider_redemption_token`, or `locktime_seconds`.
+`payment_lock`, `payment_lock_token`, `bounty_token`,
+`provider_redemption_token`, or `locktime_seconds`. The canonical parser
+rejects an advertisement carrying any of these field names.
 
 ## Provider Offer (kind 7000, status=payment-required)
 
