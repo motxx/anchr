@@ -2,6 +2,7 @@
 
 Created: 2026-06-01
 Model: Codex (GPT-5)
+Completed: 2026-06-10
 
 ## Priority
 
@@ -65,3 +66,32 @@ older run.
   verification result without hiding a real Docker build failure.
 - Run or inspect a fresh GitHub Actions run and record the result when closing
   this issue.
+
+## Resolution
+
+Implemented by updating:
+
+- `.github/workflows/ci.yml` — the `Build deploy image` step no longer exists
+  in the CI job (image builds are owned by `deploy.yml` via `workflow_run`
+  after CI succeeds on main); the Docker e2e phases run through
+  `deno task test:all:docker` in one bounded step; `timeout-minutes` is 45,
+  sized for the consolidated pipeline with cold caches.
+
+Verified with:
+
+- `gh run view 27276572266 --json conclusion,jobs` → `conclusion: success`
+  on main; no step ends `cancelled`, and the job list contains no deploy
+  image build.
+
+Harness update:
+
+- None — workflow-shape fix; CI conclusion now reflects the verification
+  result (#0114 restored the green baseline).
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

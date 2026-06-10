@@ -2,6 +2,7 @@
 
 Created: 2026-06-10
 Model: Claude Fable 5
+Completed: 2026-06-10
 
 ## Priority
 
@@ -51,3 +52,31 @@ Blocks:
 - Install cargo-audit in `.github/workflows/ci.yml` via a SHA-pinned
   `taiki-e/install-action` step before `deno task test:all`.
 - Raise `timeout-minutes` to cover the consolidated pipeline.
+
+## Resolution
+
+Implemented by updating:
+
+- `.github/workflows/ci.yml` — install cargo-audit via SHA-pinned
+  `taiki-e/install-action@fd2f5e3d644b484055ebf4268f474c565f148f25` (v2.81.9)
+  before the test pipeline; `timeout-minutes` raised 25 → 45 for the
+  consolidated local+Docker pipeline.
+
+Verified with:
+
+- `gh run view 27276572266 --json conclusion` → `success` (main, commit
+  `ac264a1`): the first green main CI since 2026-05-25, with the `dep audit`
+  step running real `cargo audit` over all four crates.
+
+Harness update:
+
+- None — the failing check itself (lint:deps in CI) is the harness; the fix
+  restores its execution environment.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
