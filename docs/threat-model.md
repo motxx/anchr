@@ -120,6 +120,51 @@ Provider signature, or for the Customer refund path after locktime.
 - `e2e/regtest/regtest-htlc-attacks.test.ts` —
   `ATTACK: Customer redeems own HTLC proofs before locktime — fails`
 
+### INV-07: Requests are unlinkable by key material
+
+**Status:** `enforced`
+
+**Claim:** Every `Customer.request` lifecycle signs and advertises under a
+fresh ephemeral keypair. Two requests from the same Customer instance carry
+distinct event pubkeys and distinct `customer_pubkey` advertisement fields, so
+a relay observer cannot link them through key reuse.
+
+**Attack:** A passive relay observer collects kind 5300 advertisements and
+correlates them to one Customer via a reused signing key or a reused
+`customer_pubkey` field.
+
+**Expected:** The kind 5300 events of two sequential requests have different
+`pubkey` values and different `customer_pubkey` payload fields, and each
+payload's `customer_pubkey` matches its own event `pubkey`.
+
+**Tests:**
+
+- `packages/sdk/src/customer.test.ts` — `INV-07: two sequential requests
+  publish under distinct ephemeral pubkeys`.
+
+### INV-08: The exchange completes relay-only
+
+**Status:** `enforced`
+
+**Claim:** The full Customer / Provider / Oracle exchange (advertise → offer →
+select → result → release → redeem) completes with relay events and NIP-44 DMs
+as the only inter-actor transport. No actor is required to run or contact an
+HTTP endpoint: the Oracle hash bootstrap goes through the injectable
+`OracleClient` port, and every other step rides the relay.
+
+**Attack:** A deployment constraint or implementation regression forces an
+actor to expose an IP-revealing network endpoint (or to reach a counterparty's
+endpoint) to complete the exchange.
+
+**Expected:** With an in-process `OracleClient` and an in-memory relay, the
+exchange completes end-to-end — the Provider redeems with the relay-delivered
+Release Material — without any HTTP listener or HTTP request in the flow.
+
+**Tests:**
+
+- `e2e/protocol/anonymous-relay-flow.test.ts` — `INV-08: full exchange
+  completes relay-only with no HTTP endpoint`.
+
 ## Settlement Decision Rules
 
 The normative redeem contract lives in

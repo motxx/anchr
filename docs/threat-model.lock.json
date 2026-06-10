@@ -14,5 +14,13 @@
   "INV-04": {
     "hash": "sha256:5f5700c5bb3856fdf6748f1a0c4fa52efd024ed769d4e4c7e4f1e4d2d63cec4d",
     "justification": "rename remaining Customer/Provider test wording in the existing two-condition Provider-bound escrow invariant"
+  },
+  "INV-07": {
+    "hash": "sha256:1b15eb0654f2a8c47904434f73bed1b1a30f76a117e93389c7ce48504f04696a",
+    "justification": "declare the ephemeral-identity unlinkability invariant (P1 in docs/lifecycle-unification-design.md) with its locking test"
+  },
+  "INV-08": {
+    "hash": "sha256:3821b2571282f90fecac9040a8c5ff12fd67c9695ba45d4b5437fe502a417561",
+    "justification": "declare the relay-only exchange invariant (P2 in docs/lifecycle-unification-design.md) with its locking test"
   }
 }

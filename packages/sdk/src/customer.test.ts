@@ -1036,3 +1036,42 @@ test("generateQueryId produces unique identifiers", () => {
 test("generateQueryId follows the documented shape", () => {
   expect(generateQueryId()).toMatch(/^query_\d+_[a-z0-9]+$/);
 });
+
+test("INV-07: two sequential requests publish under distinct ephemeral pubkeys", async () => {
+  const published: Event[] = [];
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    offerWindowMs: 10,
+  });
+  const req = () =>
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    });
+
+  await expect(req()).rejects.toThrow(NoOffersReceivedError);
+  await expect(req()).rejects.toThrow(NoOffersReceivedError);
+
+  const requests = published
+    .map((event) => ({ event, payload: parseQueryRequestEvent(event) }))
+    .filter((entry) => entry.payload !== null);
+  expect(requests.length).toBe(2);
+  const [first, second] = requests;
+  expect(first.event.pubkey).not.toBe(second.event.pubkey);
+  expect(first.payload!.customer_pubkey).not.toBe(
+    second.payload!.customer_pubkey,
+  );
+  expect(first.payload!.customer_pubkey).toBe(first.event.pubkey);
+  expect(second.payload!.customer_pubkey).toBe(second.event.pubkey);
+});
