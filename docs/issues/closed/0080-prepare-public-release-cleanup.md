@@ -2,6 +2,7 @@
 
 Created: 2026-05-27
 Model: GPT-5 Codex
+Completed: 2026-06-10
 
 ## Priority
 
@@ -77,3 +78,28 @@ closed and only the final parent close remains.
   cleanup inventory.
 - Close this parent only after the cleanup children have been resolved and the
   final public layout pass is complete.
+
+## Resolution
+
+Tracking issue: every dependency (0082-0090, 0097-0099, 0102, and the
+final layout pass 0085) is closed. The public release surface now leads
+with `@anchr/sdk` and `@anchr/protocol`, has a runnable Quick Start, one
+lifecycle implementation with locked privacy invariants (INV-01..04,
+INV-07, INV-08), green main CI, and clean local + Docker + publish
+verification (recorded in #0085).
+
+Verified with:
+
+- Child issues' own resolutions; final gates in #0085.
+
+Harness update:
+
+- None — tracking issue; the children own the locks.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
