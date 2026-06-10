@@ -116,6 +116,28 @@ test("parseQueryRequestEvent rejects public content carrying execution or paymen
   expect(parseQueryRequestEvent(event)).toBe(null);
 });
 
+test("parseQueryRequestEvent rejects each payment-bearing field name on its own", () => {
+  for (
+    const field of [
+      "payment_lock_token",
+      "payment_lock",
+      "bounty_token",
+      "provider_redemption_token",
+    ]
+  ) {
+    const event = {
+      kind: KIND_QUERY_REQUEST,
+      pubkey: "00".repeat(32),
+      id: "00".repeat(32),
+      sig: "00".repeat(64),
+      created_at: 0,
+      content: JSON.stringify({ ...samplePayload(), [field]: "cashuBfake" }),
+      tags: [],
+    };
+    expect(parseQueryRequestEvent(event)).toBe(null);
+  }
+});
+
 test("parseQueryRequestEvent returns null for a non-kind-5300 event", () => {
   const event = {
     kind: 1,

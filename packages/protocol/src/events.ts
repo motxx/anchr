@@ -116,6 +116,7 @@ export function parseQueryRequestEvent(
     "mint_url" in p ||
     "payment_lock_token" in p ||
     "payment_lock" in p ||
+    "bounty_token" in p ||
     "provider_redemption_token" in p ||
     "locktime_seconds" in p
   ) {
