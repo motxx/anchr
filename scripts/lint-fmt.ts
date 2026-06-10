@@ -10,18 +10,37 @@
 const ROOT = new URL("../", import.meta.url).pathname;
 const CHUNK_SIZE = 120;
 
-const EXCLUDED_PREFIXES = [
-  ".claude/skills/",
-  ".codex/skills/",
-  "docs/",
-  "node_modules/",
-  "skills/",
-];
+// Single source of truth for prose/markdown exclusions: deno.json `fmt.exclude`.
+// Entries shaped `*.<ext>` become suffix rules; everything else is a directory
+// prefix. The two built-ins below are formatter-input concerns (lockfiles,
+// vendored deps), not prose, so they stay here rather than in fmt.exclude.
+function readFmtExclude(): { prefixes: string[]; suffixes: string[] } {
+  const config: unknown = JSON.parse(
+    Deno.readTextFileSync(`${ROOT}deno.json`),
+  );
+  const prefixes = ["node_modules/"];
+  const suffixes = [".lock"];
+  if (typeof config === "object" && config !== null && "fmt" in config) {
+    const fmt: unknown = config.fmt;
+    if (typeof fmt === "object" && fmt !== null && "exclude" in fmt) {
+      const exclude: unknown = fmt.exclude;
+      if (Array.isArray(exclude)) {
+        for (const entry of exclude) {
+          if (typeof entry !== "string") continue;
+          if (entry.startsWith("*.")) {
+            suffixes.push(entry.slice(1));
+          } else {
+            prefixes.push(entry.endsWith("/") ? entry : `${entry}/`);
+          }
+        }
+      }
+    }
+  }
+  return { prefixes, suffixes };
+}
 
-const EXCLUDED_SUFFIXES = [
-  ".lock",
-  ".md",
-];
+const { prefixes: EXCLUDED_PREFIXES, suffixes: EXCLUDED_SUFFIXES } =
+  readFmtExclude();
 
 const SOURCE_EXTENSIONS = [
   ".ts",

@@ -53,8 +53,11 @@ uploads/*
 
 .gstack/
 
-# frost DKG key material
-.frost/
+# frost DKG key material (any local --output-dir variant)
+.frost*/
+
+# local experiment surfaces kept out of the repo
+mobile/
 
 # rust
 crates/*/target/

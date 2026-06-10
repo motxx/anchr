@@ -83,7 +83,6 @@
     "lint:arch:candidates": "deno run --allow-read scripts/arch-lint-candidates.ts",
     "lint:invariants": "deno run --allow-read scripts/lint-invariants.ts",
     "lint:paths": "deno run --allow-read --allow-env --allow-run scripts/check-no-local-paths.ts",
-    "lint:refactor": "deno run --allow-read scripts/refactor-lint.ts",
     "lint:types": "deno run --allow-read scripts/lint-types.ts",
     "lint:deprecation": "deno run --allow-read --allow-env --allow-run scripts/lint-deprecation.ts",
     "lint:no-history-comments": "deno run --allow-read --allow-env --allow-run scripts/lint-no-history-comments.ts",
@@ -91,8 +90,7 @@
     "lint:no-test-sanitizer-bypass": "deno run --allow-read --allow-run scripts/lint-no-test-sanitizer-bypass.ts",
     "lint:no-unit-network-listener": "deno run --allow-read --allow-run scripts/lint-no-unit-network-listener.ts",
     "lint:proof-schema-pages": "deno run --allow-read scripts/check-proof-schema-pages.ts",
-    "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'",
-    "setup:tlsn-ext": "git clone https://github.com/motxx/tlsn-extension.git /tmp/tlsn-extension 2>/dev/null || (cd /tmp/tlsn-extension && git pull) && cd /tmp/tlsn-extension && npm install && npm run build"
+    "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'"
   },
   "exclude": [
     "node_modules",

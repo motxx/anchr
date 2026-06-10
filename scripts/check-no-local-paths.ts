@@ -51,13 +51,11 @@ const PATTERNS: { name: string; re: RegExp }[] = [
 // Only scan text-like extensions when walking git-tracked files.
 const TEXT_EXTS = /\.(ts|tsx|js|jsx|json|md|rs|sh|yml|yaml|toml|html|css)$/;
 
-// Files that legitimately contain pattern strings (this script + its test +
-// this harness's own regex fixtures + the gh-safe-body wrapper that mentions
-// the original leak as motivation). Self-exemption avoids bootstrap issues.
+// Files that legitimately contain pattern strings (this script + its test
+// fixtures). Self-exemption avoids bootstrap issues.
 const SELF_EXEMPT = new Set([
   "scripts/check-no-local-paths.ts",
   "scripts/check-no-local-paths.test.ts",
-  "scripts/gh-safe-body.sh",
 ]);
 
 const OPT_OUT = /allow-local-path:/;

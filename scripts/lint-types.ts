@@ -12,8 +12,7 @@
  *   [T011]  `unknown` declarations          — fine at HTTP/JSON boundaries with a reason
  *
  * Scope:
- *   src/infrastructure, src/application, src/domain, src/runtime, src/testing, packages/
- *   (UI surface and tests get T010/T011 leniency for now — explicit allowlist below.)
+ *   packages/ (tests and scripts get T010/T011 leniency — explicit allowlist below.)
  */
 
 import { walk } from "jsr:@std/fs@^1/walk";
@@ -22,7 +21,6 @@ import { relative } from "jsr:@std/path@^1";
 const ROOT = new URL("../", import.meta.url).pathname;
 
 const HARD_SCOPE = [
-  "src/",
   "packages/",
 ];
 

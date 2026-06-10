@@ -6,8 +6,7 @@
  * command is a "shipping" action (`git push`, `gh pr create`), the hook:
  *
  *   1. Computes the set of in-scope files in the current branch's diff
- *      (load-bearing TypeScript under `src/(domain|application|
- *      infrastructure)/` or `packages/<pkg>/src/`, ≥50 lines).
+ *      (load-bearing TypeScript under `packages/<pkg>/src/`, ≥50 lines).
  *   2. Hashes the contents of those files (SHA-256 of the concatenated
  *      diff). The hash uniquely identifies "this exact set of changes".
  *   3. Reads `.silent-bypass-verified.json` at repo root, which the
@@ -30,8 +29,8 @@
  * Out of scope by design:
  *   - Local commits / staging. The hook only fires on commands that
  *     leave the local workspace.
- *   - Files outside `src/` and `packages/`. Tests, scripts, examples,
- *     and UI code do not host the trust-boundary patterns this skill
+ *   - Files outside `packages/`. Tests, scripts, examples, and UI
+ *     code do not host the trust-boundary patterns this skill
  *     targets.
  *
  * Configuration (via env vars):
@@ -54,8 +53,7 @@ const SHIPPING_VERBS = [
   { head: "gh", arg: "pr" }, // covers `gh pr create`, `gh pr edit --add-label ship`, etc.
 ] as const;
 
-const IN_SCOPE_RE =
-  /^(src\/(domain|application|infrastructure)|packages\/[^/]+\/src)\/.+\.(ts|tsx)$/;
+const IN_SCOPE_RE = /^packages\/[^/]+\/src\/.+\.(ts|tsx)$/;
 
 const MIN_LINES = 50;
 

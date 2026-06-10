@@ -86,9 +86,9 @@ are forbidden (single source of truth: `*.test.ts` *is* the unit tier).
 
 ## Lint
 `deno task lint:strict` chains every gating lint. Rule catalogue and
-allowed-package-deps map: `scripts/arch-lint.ts`. Full list runs on
-every Edit/Write via PostToolUse hook and on every `git push` via
-pre-commit hook.
+allowed-package-deps map: `scripts/arch-lint.ts`. A fast subset runs on
+every Edit/Write via PostToolUse hook; the full chain runs on every
+commit via the pre-commit hook.
 
 ## Layout
 - `packages/protocol/` — Nostr/Cashu v0 wire contract, event helpers,
@@ -96,18 +96,16 @@ pre-commit hook.
 - `packages/sdk/` — Customer, Provider, Oracle orchestration, payment helpers,
   proof helpers, attachments, adapters, request internals, testing helpers, and
   the developer-facing SDK surface.
-- `apps/<app>/` — maintained runnable product or adapter surfaces with their
-  own runtime/config/ops policy. **Must reach Anchr through `@anchr/*` only** —
-  relative paths into `packages/<pkg>/src/...` are an E023 violation.
 - `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
-  Same E023 public-surface rule as `apps/`.
+  **Must reach Anchr through `@anchr/*` only** — relative paths into
+  `packages/<pkg>/src/...` are an E023 violation.
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
 
 Application vocabulary (`market`, `marketplace`, …) is forbidden in
-`packages/` (E022). Concrete apps own their vocabulary in
-`apps/<app>/` or `examples/<name>/`.
+`packages/` (E022). Concrete applications own their vocabulary in
+`examples/<name>/`.
 
 ## Skill routing
 When a request matches an available skill, invoke it via `Skill` as the

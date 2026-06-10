@@ -6,8 +6,7 @@
  * command is a "shipping" action (`git push`, `gh pr create`), the hook:
  *
  *   1. Computes the set of in-scope files in the current branch's diff
- *      (TypeScript under `src/(domain|application|infrastructure|ui)/`
- *      or `packages/<pkg>/src/`, ≥150 lines).
+ *      (TypeScript under `packages/<pkg>/src/`, ≥150 lines).
  *   2. Hashes the contents of those files (SHA-256 of the concatenated
  *      diff). The hash uniquely identifies "this exact set of changes".
  *   3. Reads `.arch-lint-llm-verified.json` at the repo root, which the
@@ -54,8 +53,7 @@ const SHIPPING_VERBS = [
   { head: "gh", arg: "pr" },
 ] as const;
 
-const IN_SCOPE_RE =
-  /^(src\/(domain|application|infrastructure|ui)|packages\/[^/]+\/src)\/.+\.(ts|tsx)$/;
+const IN_SCOPE_RE = /^packages\/[^/]+\/src\/.+\.(ts|tsx)$/;
 
 const MIN_LINES = 150;
 
