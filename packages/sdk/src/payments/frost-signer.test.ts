@@ -1,12 +1,7 @@
-import { afterEach, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createFrostSigner } from "./frost-signer.ts";
-import {
-  _setFrostSignerPathForTest,
-  dkgRound1,
-  dkgRound2,
-  dkgRound3,
-} from "./mod.ts";
+import { dkgRound1, dkgRound2, dkgRound3 } from "./mod.ts";
 import type { AttachmentRef } from "../requests/domain/types.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
@@ -36,10 +31,6 @@ const signerConfig = {
 // --- Tests that do NOT require the frost-signer binary ---
 
 describe("FrostSigner verification gating", () => {
-  afterEach(() => {
-    _setFrostSignerPathForTest(undefined);
-  });
-
   test("verifyAndSign returns null when verification fails (no evidence + GPS required)", async () => {
     const signer = createFrostSigner(signerConfig);
 
@@ -56,8 +47,10 @@ describe("FrostSigner verification gating", () => {
   });
 
   test("dkgRound returns null when frost-signer is not available", async () => {
-    _setFrostSignerPathForTest(null);
-    const signer = createFrostSigner(signerConfig);
+    const signer = createFrostSigner({
+      ...signerConfig,
+      frostSignerPath: null,
+    });
 
     const output = await signer.dkgRound(1, {
       maxSigners: 3,
@@ -88,10 +81,6 @@ describe("FrostSigner verification gating", () => {
 const binaryDescribe = realBinary ? describe : describe.ignore;
 
 binaryDescribe("FrostSigner with real binary", () => {
-  afterEach(() => {
-    _setFrostSignerPathForTest(undefined);
-  });
-
   async function generateKeyPackageForSignerOne(): Promise<string> {
     const total = 3;
     const threshold = 2;
@@ -102,7 +91,7 @@ binaryDescribe("FrostSigner with real binary", () => {
     }> = [];
 
     for (let i = 0; i < total; i++) {
-      const result = await dkgRound1(i + 1, total, threshold);
+      const result = await dkgRound1(i + 1, total, threshold, realBinary!);
       expect(result.ok).toBe(true);
       expect(result.data).toBeDefined();
       const secretPackage = result.data!.secret_package as Record<
@@ -133,6 +122,7 @@ binaryDescribe("FrostSigner with real binary", () => {
       const result = await dkgRound2(
         round1Results[i]!.secretPackage,
         JSON.stringify(round1PackagesFromOthers),
+        realBinary!,
       );
       expect(result.ok).toBe(true);
       expect(result.data).toBeDefined();
@@ -158,6 +148,7 @@ binaryDescribe("FrostSigner with real binary", () => {
       round2Results[0]!.secretPackage,
       JSON.stringify(round1PackagesForSignerOne),
       JSON.stringify(round2PackagesForSignerOne),
+      realBinary!,
     );
     expect(result.ok).toBe(true);
     expect(result.data).toBeDefined();
@@ -165,11 +156,10 @@ binaryDescribe("FrostSigner with real binary", () => {
   }
 
   test("verifyAndSign round 1 returns nonce_commitment when verification passes", async () => {
-    _setFrostSignerPathForTest(realBinary!);
-
     const signer = createFrostSigner({
       signerIndex: 1,
       keyPackage: await generateKeyPackageForSignerOne(),
+      frostSignerPath: realBinary!,
     });
 
     // ai_check is a soft check that passes by default in tests

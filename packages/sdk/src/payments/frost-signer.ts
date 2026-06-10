@@ -35,6 +35,11 @@ export interface FrostSignerConfig {
   signerIndex: number;
   /** This signer's key package (from DKG round 3). */
   keyPackage: string;
+  /**
+   * Override the frost-signer binary path. A path string, or `null` to force
+   * "unavailable". Defaults to auto-detection when omitted.
+   */
+  frostSignerPath?: string | null;
 }
 
 export interface FrostSigner {
@@ -106,6 +111,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
           config.signerIndex,
           input.maxSigners ?? 3,
           input.minSigners ?? 2,
+          config.frostSignerPath,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -119,6 +125,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         const result = await dkgRound2(
           input.secretPackage,
           input.round1Packages,
+          config.frostSignerPath,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -136,6 +143,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
           input.round2SecretPackage,
           input.round1Packages,
           input.round2Packages,
+          config.frostSignerPath,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -167,7 +175,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
 
       // Step 2: If no commitments, this is round 1 — generate nonce commitments
       if (!commitmentsJson) {
-        const r1 = await signRound1(config.keyPackage);
+        const r1 = await signRound1(config.keyPackage, config.frostSignerPath);
         if (!r1.ok || !r1.data) return null;
         pendingNonces = asJsonString(r1.data.nonces);
         return {
@@ -188,6 +196,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         nonces,
         commitmentsJson,
         message,
+        config.frostSignerPath,
       );
       pendingNonces = undefined; // Consume nonces
       if (!r2.ok || !r2.data) return null;

@@ -6,10 +6,9 @@
  * lifecycle request/result types.
  */
 
-import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
-  _setValidateTlsnForTest,
   requestToRequirement,
   resultToVerificationInput,
   verify,
@@ -57,10 +56,6 @@ function injectC2paIntegrity(attachmentId: string, requirementId: string) {
 describe("verifyProof — standalone (no Query envelope)", () => {
   beforeEach(() => {
     clearIntegrityStore();
-  });
-
-  afterEach(() => {
-    _setValidateTlsnForTest(null);
   });
 
   test("rejects empty submission when GPS factor is set", async () => {
@@ -149,34 +144,32 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     };
 
     let receivedReq: TlsnRequirement | undefined;
-    _setValidateTlsnForTest(
-      async (
-        _att: TlsnAttestation,
-        req: TlsnRequirement,
-      ): Promise<TlsnValidationResult> => {
-        receivedReq = req;
-        return {
-          available: true,
-          signatureValid: true,
-          serverIdentityValid: true,
-          conditionResults: [{
-            condition: { type: "contains", expression: "balance" },
-            passed: true,
-            actual_value: "balance: 1000",
-          }],
-          attestationFresh: true,
-          verifiedData: {
-            server_name: "api.example.com",
-            revealed_body: '{"balance": 1000}',
-            session_timestamp: now,
-          },
-          checks: [
-            "TLSNotary: presentation signature valid (cryptographically verified)",
-          ],
-          failures: [],
-        };
-      },
-    );
+    const validateTlsnMock = async (
+      _att: TlsnAttestation,
+      req: TlsnRequirement,
+    ): Promise<TlsnValidationResult> => {
+      receivedReq = req;
+      return {
+        available: true,
+        signatureValid: true,
+        serverIdentityValid: true,
+        conditionResults: [{
+          condition: { type: "contains", expression: "balance" },
+          passed: true,
+          actual_value: "balance: 1000",
+        }],
+        attestationFresh: true,
+        verifiedData: {
+          server_name: "api.example.com",
+          revealed_body: '{"balance": 1000}',
+          session_timestamp: now,
+        },
+        checks: [
+          "TLSNotary: presentation signature valid (cryptographically verified)",
+        ],
+        failures: [],
+      };
+    };
 
     const requirement: VerificationRequirement = {
       id: "req_tlsn_standalone",
@@ -188,7 +181,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
       tlsn_attestation: { presentation: "dGVzdA==" },
     };
 
-    const verification = await verifyProof(requirement, input);
+    const verification = await verifyProof(requirement, input, {
+      validateTlsn: validateTlsnMock,
+    });
 
     expect(verification.passed).toBe(true);
     expect(receivedReq).toBe(tlsnReq);
@@ -199,10 +194,6 @@ describe("verifyProof — standalone (no Query envelope)", () => {
 describe("requestToRequirement / resultToVerificationInput adapter parity", () => {
   beforeEach(() => {
     clearIntegrityStore();
-  });
-
-  afterEach(() => {
-    _setValidateTlsnForTest(null);
   });
 
   test("standalone verifyProof produces the same output as the Query-based path", async () => {

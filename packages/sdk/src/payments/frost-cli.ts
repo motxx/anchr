@@ -10,19 +10,8 @@ import { join } from "node:path";
 import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost"]);
 
-let frostSignerPath: string | null | undefined;
-
-/** Allow tests to override the binary path. Pass `undefined` to reset to auto-detect. */
-export function _setFrostSignerPathForTest(
-  path: string | null | undefined,
-): void {
-  frostSignerPath = path;
-}
-
 /** Find the frost-signer binary: project-local first, then PATH. */
 export function findFrostSigner(): string | null {
-  if (frostSignerPath !== undefined) return frostSignerPath;
-
   const here = new URL(".", import.meta.url).pathname;
   const localPaths = [
     join(
@@ -37,22 +26,30 @@ export function findFrostSigner(): string | null {
   for (const p of localPaths) {
     try {
       if (Deno.statSync(p).isFile) {
-        frostSignerPath = p;
         log.error(`Found frost-signer at ${p}`);
         return p;
       }
     } catch { /* not found */ }
   }
 
-  frostSignerPath = findOnPath("frost-signer");
-  if (frostSignerPath) {
-    log.error(`Found frost-signer at ${frostSignerPath}`);
+  const onPath = findOnPath("frost-signer");
+  if (onPath) {
+    log.error(`Found frost-signer at ${onPath}`);
   }
-  return frostSignerPath ?? null;
+  return onPath;
 }
 
 export function isFrostSignerAvailable(): boolean {
   return findFrostSigner() !== null;
+}
+
+/**
+ * Resolve the binary path: an explicit override (a path string, or `null` to
+ * force "unavailable") takes precedence; `undefined` falls back to
+ * auto-detection.
+ */
+function resolveFrostSigner(frostSignerPath?: string | null): string | null {
+  return frostSignerPath === undefined ? findFrostSigner() : frostSignerPath;
 }
 
 const FROST_TIMEOUT_MS = 30_000;
@@ -67,8 +64,9 @@ export interface FrostCliResult {
 export async function runFrostCommand(
   subcommand: string,
   args: string[],
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
-  const binPath = findFrostSigner();
+  const binPath = resolveFrostSigner(frostSignerPath);
   if (!binPath) {
     return { ok: false, error: "frost-signer binary not available" };
   }
@@ -135,6 +133,7 @@ export async function dkgRound1(
   index: number,
   maxSigners: number,
   minSigners: number,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("dkg-round1", [
     "--index",
@@ -143,25 +142,27 @@ export async function dkgRound1(
     String(maxSigners),
     "--min-signers",
     String(minSigners),
-  ]);
+  ], frostSignerPath);
 }
 
 export async function dkgRound2(
   secretPackage: string,
   round1Packages: string,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("dkg-round2", [
     "--secret-package",
     secretPackage,
     "--round1-packages",
     round1Packages,
-  ]);
+  ], frostSignerPath);
 }
 
 export async function dkgRound3(
   round2SecretPackage: string,
   round1Packages: string,
   round2Packages: string,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("dkg-round3", [
     "--round2-secret-package",
@@ -170,11 +171,18 @@ export async function dkgRound3(
     round1Packages,
     "--round2-packages",
     round2Packages,
-  ]);
+  ], frostSignerPath);
 }
 
-export async function signRound1(keyPackage: string): Promise<FrostCliResult> {
-  return runFrostCommand("sign-round1", ["--key-package", keyPackage]);
+export async function signRound1(
+  keyPackage: string,
+  frostSignerPath?: string | null,
+): Promise<FrostCliResult> {
+  return runFrostCommand(
+    "sign-round1",
+    ["--key-package", keyPackage],
+    frostSignerPath,
+  );
 }
 
 export async function signRound2(
@@ -182,6 +190,7 @@ export async function signRound2(
   nonces: string,
   commitments: string,
   message: string,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("sign-round2", [
     "--key-package",
@@ -192,7 +201,7 @@ export async function signRound2(
     commitments,
     "--message",
     message,
-  ]);
+  ], frostSignerPath);
 }
 
 export async function aggregateSignatures(
@@ -201,6 +210,7 @@ export async function aggregateSignatures(
   message: string,
   signatureShares: string,
   pubkeyPackage: string,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("aggregate", [
     "--group-pubkey",
@@ -213,13 +223,14 @@ export async function aggregateSignatures(
     signatureShares,
     "--pubkey-package",
     pubkeyPackage,
-  ]);
+  ], frostSignerPath);
 }
 
 export async function verifySignature(
   groupPubkey: string,
   signature: string,
   message: string,
+  frostSignerPath?: string | null,
 ): Promise<FrostCliResult> {
   return runFrostCommand("verify", [
     "--group-pubkey",
@@ -228,5 +239,5 @@ export async function verifySignature(
     signature,
     "--message",
     message,
-  ]);
+  ], frostSignerPath);
 }

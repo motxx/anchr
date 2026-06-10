@@ -25,7 +25,7 @@ export const builtInOracle: Oracle = {
     result: QueryResult,
     blossomKeys?: BlossomKeyMap,
   ): Promise<OracleAttestation> {
-    const detail = await verify(query, result, blossomKeys);
+    const detail = await verify(query, result, { blossomKeys });
     return {
       oracle_id: BUILT_IN_ORACLE_ID,
       query_id: query.id,

@@ -63,16 +63,7 @@ export interface TlsnValidationResult {
   failures: string[];
 }
 
-let tlsnVerifierPath: string | null | undefined;
-
-/** Allow tests to override the verifier path. Pass `undefined` to reset to auto-detect. */
-export function _setVerifierPathForTest(path: string | null | undefined): void {
-  tlsnVerifierPath = path;
-}
-
 function findTlsnVerifier(): string | null {
-  if (tlsnVerifierPath !== undefined) return tlsnVerifierPath;
-
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
     join(
@@ -87,7 +78,6 @@ function findTlsnVerifier(): string | null {
   for (const p of localPaths) {
     try {
       if (statSync(p).isFile()) {
-        tlsnVerifierPath = p;
         log.error(`Found tlsn-verifier at ${p}`);
         return p;
       }
@@ -95,15 +85,33 @@ function findTlsnVerifier(): string | null {
   }
 
   // Fall back to PATH
-  tlsnVerifierPath = which("tlsn-verifier");
-  if (tlsnVerifierPath) {
-    log.error(`Found tlsn-verifier at ${tlsnVerifierPath}`);
+  const onPath = which("tlsn-verifier");
+  if (onPath) {
+    log.error(`Found tlsn-verifier at ${onPath}`);
   }
-  return tlsnVerifierPath ?? null;
+  return onPath;
 }
 
 export function isTlsnVerifierAvailable(): boolean {
   return findTlsnVerifier() !== null;
+}
+
+/**
+ * Resolve the verifier binary path: an explicit override (a path string, or
+ * `null` to force "unavailable") takes precedence; `undefined` falls back to
+ * auto-detection.
+ */
+function resolveTlsnVerifier(verifierPath?: string | null): string | null {
+  return verifierPath === undefined ? findTlsnVerifier() : verifierPath;
+}
+
+/** Options for {@link validateTlsn}. */
+export interface ValidateTlsnOptions {
+  /**
+   * Override the tlsn-verifier binary path. A path string, or `null` to force
+   * "unavailable". Defaults to auto-detection when omitted.
+   */
+  verifierPath?: string | null;
 }
 
 /** Default max attestation age: 5 minutes. */
@@ -200,6 +208,7 @@ function resolveDotPath(obj: unknown, path: string): unknown {
 export async function validateTlsn(
   attestation: TlsnAttestation,
   requirement: TlsnRequirement,
+  options?: ValidateTlsnOptions,
 ): Promise<TlsnValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
@@ -224,7 +233,7 @@ export async function validateTlsn(
     };
   }
 
-  const verifierPath = findTlsnVerifier();
+  const verifierPath = resolveTlsnVerifier(options?.verifierPath);
 
   // --- Binary required ---
   if (!verifierPath) {

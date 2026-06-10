@@ -21,8 +21,6 @@ import type {
   VerificationRequirement,
 } from "../../requests/domain/types.ts";
 
-let _validateTlsnFn: typeof validateTlsn = validateTlsn;
-
 export const checkAttachmentContent: AiContentChecker<AttachmentRef> =
   createAiContentChecker<AttachmentRef>({
     getConfig: () => {
@@ -44,12 +42,18 @@ export const checkAttachmentContent: AiContentChecker<AttachmentRef> =
     },
   });
 
-/** Allow tests to override the validateTlsn implementation. Pass null to reset. */
-export function _setValidateTlsnForTest(fn: typeof validateTlsn | null): void {
-  _validateTlsnFn = fn ?? validateTlsn;
-}
-
 const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
+
+/** Options for {@link verifyProof} and {@link verify}. */
+export interface VerifyProofOptions {
+  /** Per-attachment Blossom decryption keys. */
+  blossomKeys?: BlossomKeyMap;
+  /**
+   * TLSNotary validator. Defaults to the real {@link validateTlsn}; callers may
+   * inject an alternative (e.g. one bound to a specific verifier binary).
+   */
+  validateTlsn?: typeof validateTlsn;
+}
 
 interface CheckAccumulator {
   checks: string[];
@@ -114,9 +118,10 @@ async function verifyTlsnExtensionResult(
   },
   requirement: VerificationRequirement,
   acc: CheckAccumulator,
+  validateTlsnFn: typeof validateTlsn,
 ): Promise<TlsnVerifiedData | undefined> {
   if (extResult.presentation && requirement.tlsn_requirements) {
-    const tlsnResult = await _validateTlsnFn(
+    const tlsnResult = await validateTlsnFn(
       { presentation: extResult.presentation },
       requirement.tlsn_requirements,
     );
@@ -137,6 +142,7 @@ async function verifyTlsnAttestation(
   input: VerificationInput,
   requirement: VerificationRequirement,
   acc: CheckAccumulator,
+  validateTlsnFn: typeof validateTlsn,
 ): Promise<TlsnVerifiedData | undefined> {
   if (!input.tlsn_attestation) {
     acc.failures.push("TLSNotary: no attestation provided");
@@ -146,7 +152,7 @@ async function verifyTlsnAttestation(
     acc.failures.push("TLSNotary: query missing tlsn_requirements");
     return undefined;
   }
-  const tlsnResult = await _validateTlsnFn(
+  const tlsnResult = await validateTlsnFn(
     input.tlsn_attestation,
     requirement.tlsn_requirements,
   );
@@ -159,15 +165,21 @@ async function verifyTlsn(
   requirement: VerificationRequirement,
   input: VerificationInput,
   acc: CheckAccumulator,
+  validateTlsnFn: typeof validateTlsn,
 ): Promise<TlsnVerifiedData | undefined> {
   if (input.tlsn_extension_result) {
     const extResult = input.tlsn_extension_result as {
       presentation?: string;
       results?: Array<{ type: string; part: string; value: string }>;
     };
-    return verifyTlsnExtensionResult(extResult, requirement, acc);
+    return verifyTlsnExtensionResult(
+      extResult,
+      requirement,
+      acc,
+      validateTlsnFn,
+    );
   }
-  return verifyTlsnAttestation(input, requirement, acc);
+  return verifyTlsnAttestation(input, requirement, acc, validateTlsnFn);
 }
 
 function applyAiContentResult(
@@ -194,12 +206,13 @@ function applyAiContentResult(
 export async function verifyProof(
   requirement: VerificationRequirement,
   input: VerificationInput,
-  options?: { blossomKeys?: BlossomKeyMap },
+  options?: VerifyProofOptions,
 ): Promise<VerificationDetail> {
   const acc: CheckAccumulator = { checks: [], failures: [], warnings: [] };
   let tlsnVerifiedData: TlsnVerifiedData | undefined;
   const maxGpsDist = requirement.max_gps_distance_km ??
     DEFAULT_MAX_GPS_DISTANCE_KM;
+  const validateTlsnFn = options?.validateTlsn ?? validateTlsn;
 
   const attachments = input.attachments ?? [];
   const hasTlsn = requirement.factors.includes("tlsn");
@@ -211,7 +224,12 @@ export async function verifyProof(
   verifyBodyGps(requirement, input, maxGpsDist, acc);
 
   if (hasTlsn) {
-    tlsnVerifiedData = await verifyTlsn(requirement, input, acc);
+    tlsnVerifiedData = await verifyTlsn(
+      requirement,
+      input,
+      acc,
+      validateTlsnFn,
+    );
   }
 
   if (attachments.length > 0) {
@@ -282,12 +300,12 @@ export function resultToVerificationInput(
 export function verify(
   request: VerifiableRequest,
   result: RequestSubmissionResult,
-  blossomKeys?: BlossomKeyMap,
+  options?: VerifyProofOptions,
 ): Promise<VerificationDetail> {
   return verifyProof(
     requestToRequirement(request),
     resultToVerificationInput(result),
-    { blossomKeys },
+    options,
   );
 }
 

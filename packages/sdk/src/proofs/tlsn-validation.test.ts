@@ -17,7 +17,6 @@ import {
 import { expect } from "@std/expect";
 import {
   _clearSeenPresentationsForTest,
-  _setVerifierPathForTest,
   evaluateCondition,
   validateTlsn,
 } from "./tlsn-validation.ts";
@@ -63,7 +62,6 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  _setVerifierPathForTest(undefined); // reset
   rmSync(mockVerifierDir, { recursive: true, force: true });
 });
 
@@ -156,8 +154,9 @@ describe("evaluateCondition", () => {
 
 describe("validateTlsn without binary", () => {
   test("fails when binary not available", async () => {
-    _setVerifierPathForTest(null);
-    const result = await validateTlsn(makeAttestation(), makeRequirement());
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      verifierPath: null,
+    });
     expect(result.available).toBe(false);
     expect(result.failures.some((f) => f.includes("binary not available")))
       .toBe(true);
@@ -176,8 +175,6 @@ describe("validateTlsn with mock binary", () => {
       revealed_body: '{"bitcoin":{"usd":42000}}',
       time: Math.floor(Date.now() / 1000) - 10,
     });
-    _setVerifierPathForTest(mockVerifierPath);
-
     const result = await validateTlsn(
       makeAttestation(),
       makeRequirement({
@@ -187,6 +184,7 @@ describe("validateTlsn with mock binary", () => {
           description: "BTC price",
         }],
       }),
+      { verifierPath: mockVerifierPath },
     );
 
     expect(result.signatureValid).toBe(true);
@@ -202,9 +200,10 @@ describe("validateTlsn with mock binary", () => {
 
   test("invalid signature fails", async () => {
     writeMockVerifier({ valid: false, error: "signature mismatch" });
-    _setVerifierPathForTest(mockVerifierPath);
 
-    const result = await validateTlsn(makeAttestation(), makeRequirement());
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      verifierPath: mockVerifierPath,
+    });
     expect(result.signatureValid).toBe(false);
     expect(result.failures.some((f) => f.includes("signature invalid"))).toBe(
       true,
@@ -218,9 +217,9 @@ describe("validateTlsn with mock binary", () => {
       revealed_body: "{}",
       time: Math.floor(Date.now() / 1000) - 5,
     });
-    _setVerifierPathForTest(mockVerifierPath);
-
-    const result = await validateTlsn(makeAttestation(), makeRequirement());
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      verifierPath: mockVerifierPath,
+    });
     expect(result.serverIdentityValid).toBe(false);
     expect(result.failures.some((f) => f.includes("does not match target")))
       .toBe(true);
@@ -233,11 +232,10 @@ describe("validateTlsn with mock binary", () => {
       revealed_body: "{}",
       time: Math.floor(Date.now() / 1000) - 600, // 10 min ago
     });
-    _setVerifierPathForTest(mockVerifierPath);
-
     const result = await validateTlsn(
       makeAttestation(),
       makeRequirement({ max_attestation_age_seconds: 300 }),
+      { verifierPath: mockVerifierPath },
     );
     expect(result.attestationFresh).toBe(false);
     expect(result.failures.some((f) => f.includes("too old"))).toBe(true);
@@ -249,9 +247,9 @@ describe("validateTlsn with mock binary", () => {
       server_name: "api.coingecko.com",
       revealed_body: "{}",
     });
-    _setVerifierPathForTest(mockVerifierPath);
-
-    const result = await validateTlsn(makeAttestation(), makeRequirement());
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      verifierPath: mockVerifierPath,
+    });
     expect(result.attestationFresh).toBe(false);
     expect(result.failures.some((f) => f.includes("no timestamp in proof")))
       .toBe(true);
@@ -264,8 +262,6 @@ describe("validateTlsn with mock binary", () => {
       revealed_body: '{"bitcoin":{"usd":42000}}',
       time: Math.floor(Date.now() / 1000) - 5,
     });
-    _setVerifierPathForTest(mockVerifierPath);
-
     const result = await validateTlsn(
       makeAttestation(),
       makeRequirement({
@@ -282,6 +278,7 @@ describe("validateTlsn with mock binary", () => {
           },
         ],
       }),
+      { verifierPath: mockVerifierPath },
     );
 
     expect(result.conditionResults).toHaveLength(2);

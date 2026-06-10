@@ -15,11 +15,8 @@ import {
   test,
 } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import {
-  _clearSeenPresentationsForTest,
-  _setVerifierPathForTest,
-} from "../mod.ts";
-import { verify } from "./verifier.ts";
+import { _clearSeenPresentationsForTest, validateTlsn } from "../mod.ts";
+import { verify, type VerifyProofOptions } from "./verifier.ts";
 import type {
   TlsnAttestation,
   TlsnRequirement,
@@ -27,6 +24,17 @@ import type {
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
+/**
+ * Inject the real validateTlsn bound to a specific verifier binary path, so
+ * the verify() orchestrator exercises the genuine TLSNotary path against the
+ * mock verifier instead of auto-detecting a binary.
+ */
+function withVerifierPath(verifierPath: string | null): VerifyProofOptions {
+  return {
+    validateTlsn: (att, req) => validateTlsn(att, req, { verifierPath }),
+  };
+}
 
 function makeAttestation(
   overrides?: Partial<TlsnAttestation>,
@@ -61,7 +69,6 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  _setVerifierPathForTest(undefined);
   rmSync(mockVerifierDir, { recursive: true, force: true });
 });
 
@@ -69,7 +76,6 @@ describe("verify() integration with tlsn", () => {
   beforeEach(() => _clearSeenPresentationsForTest());
 
   test("tlsn query with missing attestation fails", async () => {
-    _setVerifierPathForTest(null);
     const query = {
       id: "test_tlsn_1",
       status: "pending" as const,
@@ -82,7 +88,7 @@ describe("verify() integration with tlsn", () => {
     };
     const result = { attachments: [] };
 
-    const verification = await verify(query, result);
+    const verification = await verify(query, result, withVerifierPath(null));
     expect(verification.passed).toBe(false);
     expect(
       verification.failures.some((f) => f.includes("no attestation provided")),
@@ -90,7 +96,6 @@ describe("verify() integration with tlsn", () => {
   });
 
   test("tlsn query without tlsn_requirements fails", async () => {
-    _setVerifierPathForTest(null);
     const query = {
       id: "test_tlsn_2",
       status: "pending" as const,
@@ -102,7 +107,7 @@ describe("verify() integration with tlsn", () => {
     };
     const result = { attachments: [], tlsn_attestation: makeAttestation() };
 
-    const verification = await verify(query, result);
+    const verification = await verify(query, result, withVerifierPath(null));
     expect(verification.passed).toBe(false);
     expect(
       verification.failures.some((f) =>
@@ -118,7 +123,6 @@ describe("verify() integration with tlsn", () => {
       revealed_body: '{"bitcoin":{"usd":42000}}',
       time: Math.floor(Date.now() / 1000) - 5,
     });
-    _setVerifierPathForTest(mockVerifierPath);
 
     const query = {
       id: "test_tlsn_3",
@@ -132,7 +136,11 @@ describe("verify() integration with tlsn", () => {
     };
     const result = { attachments: [], tlsn_attestation: makeAttestation() };
 
-    const verification = await verify(query, result);
+    const verification = await verify(
+      query,
+      result,
+      withVerifierPath(mockVerifierPath),
+    );
     expect(verification.failures.filter((f) => f.includes("no media evidence")))
       .toHaveLength(0);
     expect(verification.passed).toBe(true);

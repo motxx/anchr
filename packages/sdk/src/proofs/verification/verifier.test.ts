@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, test } from "@std/testing/bdd";
+import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { _setValidateTlsnForTest, verify } from "./verifier.ts";
+import { verify } from "./verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type {
   Query,
@@ -326,19 +326,16 @@ describe("verify() TLSNotary extension result path", () => {
     clearIntegrityStore();
   });
 
-  afterEach(() => {
-    _setValidateTlsnForTest(null);
-  });
-
   test("extension result + presentation → validateTlsn is called and verifies", async () => {
-    _setValidateTlsnForTest(mockValidateTlsnSuccess());
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
       tlsn_extension_result: { presentation: "dGVzdA==" },
     };
 
-    const verification = await verify(query, result);
+    const verification = await verify(query, result, {
+      validateTlsn: mockValidateTlsnSuccess(),
+    });
 
     expect(verification.passed).toBe(true);
     expect(
@@ -349,14 +346,15 @@ describe("verify() TLSNotary extension result path", () => {
   });
 
   test("extension result + presentation + verification pass → tlsn_verified data is returned", async () => {
-    _setValidateTlsnForTest(mockValidateTlsnSuccess());
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
       tlsn_extension_result: { presentation: "dGVzdA==" },
     };
 
-    const verification = await verify(query, result);
+    const verification = await verify(query, result, {
+      validateTlsn: mockValidateTlsnSuccess(),
+    });
 
     expect(verification.tlsn_verified).toBeDefined();
     expect(verification.tlsn_verified!.server_name).toBe("httpbin.org");
@@ -365,14 +363,15 @@ describe("verify() TLSNotary extension result path", () => {
   });
 
   test("extension result + presentation + verification failure → failures populated", async () => {
-    _setValidateTlsnForTest(mockValidateTlsnFailure());
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
       tlsn_extension_result: { presentation: "dGVzdA==" },
     };
 
-    const verification = await verify(query, result);
+    const verification = await verify(query, result, {
+      validateTlsn: mockValidateTlsnFailure(),
+    });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures.some((f) => f.includes("signature invalid")))
@@ -381,7 +380,6 @@ describe("verify() TLSNotary extension result path", () => {
   });
 
   test("extension result WITHOUT presentation → rejected (self-reported data not trusted)", async () => {
-    _setValidateTlsnForTest(mockValidateTlsnSuccess()); // should NOT be called
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
@@ -390,7 +388,10 @@ describe("verify() TLSNotary extension result path", () => {
       },
     };
 
-    const verification = await verify(query, result);
+    // The injected validator should NOT be called for self-reported data.
+    const verification = await verify(query, result, {
+      validateTlsn: mockValidateTlsnSuccess(),
+    });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures).toContain(
@@ -399,14 +400,16 @@ describe("verify() TLSNotary extension result path", () => {
   });
 
   test("extension result + presentation BUT no tlsn_requirements → rejected", async () => {
-    _setValidateTlsnForTest(mockValidateTlsnSuccess()); // should NOT be called
     const query = makeTlsnQuery({ tlsn_requirements: undefined });
     const result: QueryResult = {
       attachments: [],
       tlsn_extension_result: { presentation: "dGVzdA==" },
     };
 
-    const verification = await verify(query, result);
+    // The injected validator should NOT be called without tlsn_requirements.
+    const verification = await verify(query, result, {
+      validateTlsn: mockValidateTlsnSuccess(),
+    });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures).toContain(
@@ -423,12 +426,12 @@ describe("verify() TLSNotary extension result path", () => {
     };
 
     let calledWith: string | undefined;
-    _setValidateTlsnForTest(async (att, req) => {
-      calledWith = att.presentation;
-      return mockValidateTlsnSuccess()(att, req);
+    const verification = await verify(query, result, {
+      validateTlsn: async (att, req) => {
+        calledWith = att.presentation;
+        return mockValidateTlsnSuccess()(att, req);
+      },
     });
-
-    const verification = await verify(query, result);
 
     expect(verification.passed).toBe(true);
     // The extension presentation should be used, not the CLI one
