@@ -16,7 +16,7 @@ jobs:
   verify:
     name: CI
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -49,6 +49,11 @@ jobs:
 
       - name: Setup Rust (for frost-signer + TLSN binaries)
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit (for lint:deps)
+        uses: taiki-e/install-action@fd2f5e3d644b484055ebf4268f474c565f148f25 # v2.81.9
+        with:
+          tool: cargo-audit
 
       - name: Typecheck
         run: deno task check
