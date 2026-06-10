@@ -1,4 +1,5 @@
 import type { OracleClient } from "./oracle.ts";
+import type { Clock, IdGenerator } from "./requests/domain/ports.ts";
 import type {
   ActorStateStore,
   CashuClient,
@@ -41,6 +42,10 @@ export interface CustomerOracle {
 
 /** Customer-side construction options. */
 export interface CustomerOptions {
+  /** Time source for expiries, locktimes, and state timestamps. */
+  clock?: Clock;
+  /** Query-id source (defaults to the engine's crypto-backed generator). */
+  idGenerator?: IdGenerator;
   /** Trusted oracles. The SDK selects exactly one per query. */
   oracles: CustomerOracle[];
   /** Nostr relay URLs the SDK will publish to and subscribe from. */
@@ -69,4 +74,6 @@ export interface RequestOptions {
   sourceProofs: CashuProof[];
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;
+  /** Optional region code added as a `region` tag for scoped discovery. */
+  regionCode?: string;
 }

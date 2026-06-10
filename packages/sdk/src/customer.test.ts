@@ -4,7 +4,6 @@ import { expect } from "@std/expect";
 import {
   createCustomer,
   CustomerConfigError,
-  generateQueryId,
   NoOffersReceivedError,
   pickOracleForRequest,
   RelayPublishError,
@@ -1034,16 +1033,6 @@ test("selectCheapestOffer picks the lowest amount", () => {
     { providerPubkey: "c", amountSats: 750, offerEventId: "ec", receivedAt: 3 },
   ];
   expect(selectCheapestOffer(offers)?.providerPubkey).toBe("b");
-});
-
-test("generateQueryId produces unique identifiers", () => {
-  const ids = new Set<string>();
-  for (let i = 0; i < 50; i++) ids.add(generateQueryId());
-  expect(ids.size).toBe(50);
-});
-
-test("generateQueryId follows the documented shape", () => {
-  expect(generateQueryId()).toMatch(/^query_\d+_[a-z0-9]+$/);
 });
 
 test("INV-07: two sequential requests publish under distinct ephemeral pubkeys", async () => {

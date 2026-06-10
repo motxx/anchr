@@ -5,10 +5,9 @@
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "../../identity.ts";
+import { parseOfferFeedbackEvent } from "@anchr/protocol/events";
 import {
-  type DvmOfferFeedbackPayload,
   type OracleResponsePayload,
-  parseFeedbackPayload,
   parseOracleResponsePayload,
 } from "./events/events.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
@@ -56,7 +55,7 @@ export function buildResultFromPayload(
 }
 
 export function handleFeedbackEvent(
-  identity: NostrIdentity,
+  _identity: NostrIdentity,
   watched: Map<string, WatchedQuery>,
   queryId: string,
   event: Event,
@@ -69,21 +68,10 @@ export function handleFeedbackEvent(
   const entry = watched.get(queryId);
   if (!entry) return;
 
-  try {
-    const payload = parseFeedbackPayload(
-      event.content,
-      identity.secretKey,
-      event.pubkey,
-    );
-
-    if (payload.status === "payment-required") {
-      const offer = payload as DvmOfferFeedbackPayload;
-      entry.offeredProviders.add(offer.provider_pubkey);
-      onOffer?.(queryId, offer.provider_pubkey, offer.amount_sats);
-    }
-  } catch {
-    // Cannot decrypt — event not for us, ignore
-  }
+  const offer = parseOfferFeedbackEvent(event);
+  if (offer === null) return;
+  entry.offeredProviders.add(offer.provider_pubkey);
+  onOffer?.(queryId, offer.provider_pubkey, offer.amount_sats);
 }
 
 export function parseResponsePayload(

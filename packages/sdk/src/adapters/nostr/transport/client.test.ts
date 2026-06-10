@@ -7,7 +7,9 @@ import {
   publishEvent,
 } from "./client.ts";
 import { generateEphemeralIdentity } from "../../../identity.ts";
-import { buildQueryRequestEvent } from "../events/events.ts";
+import { buildQueryRequestEvent } from "@anchr/protocol/events";
+import { verifyEvent } from "nostr-tools/pure";
+import { ProofSchema } from "../../../schema.ts";
 import { withEnv } from "../../../testing/helpers.ts";
 
 afterEach(() => {
@@ -92,11 +94,15 @@ describe("publishEvent", () => {
   test("returns empty successes and 'No relays configured' failure when no relays", async () => {
     await withEnv({ NOSTR_RELAYS: undefined }, async () => {
       const identity = generateEphemeralIdentity();
-      const event = buildQueryRequestEvent(identity, "q1", {
-        description: "test",
-        nonce: "X",
+      const event = buildQueryRequestEvent(identity, {
+        query_id: "q1",
+        schema: ProofSchema.TlsnV1,
+        customer_pubkey: identity.publicKey,
+        oracle_pubkey: "22".repeat(32),
+        max_amount_sats: 21,
         expires_at: Date.now() + 60_000,
       });
+      if (!verifyEvent(event)) throw new Error("event failed verification");
       const result = await publishEvent(event);
       expect(result.successes).toEqual([]);
       expect(result.failures).toEqual(["No relays configured"]);
@@ -105,11 +111,15 @@ describe("publishEvent", () => {
 
   test("handles relay URLs without throwing", async () => {
     const identity = generateEphemeralIdentity();
-    const event = buildQueryRequestEvent(identity, "q1", {
-      description: "test",
-      nonce: "X",
+    const event = buildQueryRequestEvent(identity, {
+      query_id: "q1",
+      schema: ProofSchema.TlsnV1,
+      customer_pubkey: identity.publicKey,
+      oracle_pubkey: "22".repeat(32),
+      max_amount_sats: 21,
       expires_at: Date.now() + 60_000,
     });
+    if (!verifyEvent(event)) throw new Error("event failed verification");
     const result = await publishEvent(event, ["ws://localhost:1"]);
     expect(result.successes.length + result.failures.length).toBe(1);
   });

@@ -1,3 +1,4 @@
+import type { Clock } from "./requests/domain/ports.ts";
 import type {
   ActorStateStore,
   CashuClient,
@@ -47,6 +48,10 @@ export type ProviderHandler = (
 
 /** Provider-side construction options. */
 export interface ProviderOptions {
+  /** Time source for state timestamps. */
+  clock?: Clock;
+  /** Optional region code; when set, only `#region`-matching requests are served. */
+  regionCode?: string;
   /** Whitelist of accepted oracle pubkeys (npub or hex). */
   oracles: string[];
   /** Nostr relay URLs to subscribe and publish on. */

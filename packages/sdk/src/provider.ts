@@ -16,6 +16,7 @@ import {
 import type {
   ActorStateStore,
   CashuClient,
+  Filter,
   RelayClient,
 } from "./adapters/types.ts";
 import {
@@ -33,6 +34,8 @@ import type {
   ProviderRequestEvent,
 } from "./provider-types.ts";
 import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
+import { waitForFirstEvent } from "./relay-wait.ts";
+import { type Clock, realClock } from "./requests/domain/ports.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -191,6 +194,7 @@ export function createProvider(options: ProviderOptions): Provider {
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
   const stateStore = options.stateStore;
+  const clock = options.clock ?? realClock;
 
   const secretKey = normalizeSecretKey(options.privKey);
   const pubkey = getPublicKey(secretKey);
@@ -209,8 +213,12 @@ export function createProvider(options: ProviderOptions): Provider {
       const relayClient: RelayClient = options.relayClient;
 
       return new Promise<void>((resolveServe) => {
+        const filter: Filter = { kinds: [5300] };
+        if (options.regionCode !== undefined && options.regionCode.length > 0) {
+          filter["#region"] = [options.regionCode.toUpperCase()];
+        }
         const sub = relayClient.subscribe(
-          { kinds: [5300] },
+          filter,
           (event) => {
             // Run each job concurrently so a slow handler does not
             // block the subscription loop.
@@ -223,6 +231,7 @@ export function createProvider(options: ProviderOptions): Provider {
               selectionTimeoutMs,
               preimageTimeoutMs,
               proofGenerators,
+              clock,
             }, handler).catch(() => {
               // One bad event must not tear down the subscription.
             });
@@ -252,6 +261,7 @@ interface JobContext {
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
+  clock: Clock;
 }
 
 async function handleJob(
@@ -309,7 +319,7 @@ async function handleJob(
       status: "offer_published",
       amountSats: offer.amountSats,
       offerEventId: offerEvent.id,
-      updatedAt: Date.now(),
+      updatedAt: ctx.clock.now(),
     });
   }
 
@@ -363,7 +373,7 @@ async function handleJob(
       amountSats: offer.amountSats,
       offerEventId: offerEvent.id,
       responseEventId: responseEvent.id,
-      updatedAt: Date.now(),
+      updatedAt: ctx.clock.now(),
     });
   }
 
@@ -391,7 +401,7 @@ async function handleJob(
         amountSats: offer.amountSats,
         offerEventId: offerEvent.id,
         responseEventId: responseEvent.id,
-        updatedAt: Date.now(),
+        updatedAt: ctx.clock.now(),
       });
     }
   } catch {
@@ -440,37 +450,27 @@ function waitForPreimage(
   queryId: string,
   requestEventId: string,
 ): Promise<string | null> {
-  return new Promise((resolve) => {
-    const handles: {
-      sub?: { close(): void };
-      timeoutId?: ReturnType<typeof setTimeout>;
-    } = {};
-    handles.sub = ctx.relayClient.subscribe(
-      {
-        kinds: [4],
-        authors: [oraclePubkey],
-        "#p": [ctx.identity.publicKey],
-      },
-      (event) => {
-        const parsed = parsePreimageDeliveryEvent(
-          event,
-          ctx.identity.secretKey,
-          oraclePubkey,
-        );
-        if (parsed === null) return;
-        // Cross-check both ids so a stale DM for another request can't be replayed.
-        if (parsed.query_id !== queryId) return;
-        if (parsed.request_event_id !== requestEventId) return;
-        handles.sub?.close();
-        if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
-        resolve(parsed.preimage);
-      },
-    );
-    handles.timeoutId = setTimeout(() => {
-      handles.sub?.close();
-      resolve(null);
-    }, ctx.preimageTimeoutMs);
-  });
+  return waitForFirstEvent(
+    ctx.relayClient,
+    {
+      kinds: [4],
+      authors: [oraclePubkey],
+      "#p": [ctx.identity.publicKey],
+    },
+    (event) => {
+      const parsed = parsePreimageDeliveryEvent(
+        event,
+        ctx.identity.secretKey,
+        oraclePubkey,
+      );
+      if (parsed === null) return null;
+      // Cross-check both ids so a stale DM for another request can't be replayed.
+      if (parsed.query_id !== queryId) return null;
+      if (parsed.request_event_id !== requestEventId) return null;
+      return parsed.preimage;
+    },
+    ctx.preimageTimeoutMs,
+  ).result;
 }
 
 /**
@@ -496,37 +496,27 @@ function waitForSelection(
     };
   } | null
 > {
-  return new Promise((resolve) => {
-    const handles: {
-      sub?: { close(): void };
-      timeoutId?: ReturnType<typeof setTimeout>;
-    } = {};
-    handles.sub = ctx.relayClient.subscribe(
-      {
-        kinds: [7000],
-        "#e": [requestEventId],
-        authors: [customerPubkey],
-      },
-      (event) => {
-        const selectedPubkey = findTagValue(event, "p");
-        if (selectedPubkey !== ctx.identity.publicKey) return;
-        const parsed = parseSelectionFeedbackEvent(
-          event,
-          ctx.identity.secretKey,
-          customerPubkey,
-        );
-        if (parsed === null) return;
-        handles.sub?.close();
-        if (handles.timeoutId !== undefined) clearTimeout(handles.timeoutId);
-        resolve({
-          provider_redemption_token: parsed.provider_redemption_token,
-          execution: parsed.execution,
-        });
-      },
-    );
-    handles.timeoutId = setTimeout(() => {
-      handles.sub?.close();
-      resolve(null);
-    }, ctx.selectionTimeoutMs);
-  });
+  return waitForFirstEvent(
+    ctx.relayClient,
+    {
+      kinds: [7000],
+      "#e": [requestEventId],
+      authors: [customerPubkey],
+    },
+    (event) => {
+      const selectedPubkey = findTagValue(event, "p");
+      if (selectedPubkey !== ctx.identity.publicKey) return null;
+      const parsed = parseSelectionFeedbackEvent(
+        event,
+        ctx.identity.secretKey,
+        customerPubkey,
+      );
+      if (parsed === null) return null;
+      return {
+        provider_redemption_token: parsed.provider_redemption_token,
+        execution: parsed.execution,
+      };
+    },
+    ctx.selectionTimeoutMs,
+  ).result;
 }

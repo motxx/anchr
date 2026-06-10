@@ -65,12 +65,14 @@ export interface SelectionExecutionPayload {
  *   - t:        "anchr" (discovery tag)
  *   - p:        oracle pubkey (NIP-90 marker "oracle")
  *   - s:        proof schema URL (custom tag, indexable as #s)
+ *   - region:   optional uppercase region code (indexable as #region)
  *
  * The content carries only the public advertisement payload above.
  */
 export function buildQueryRequestEvent(
   identity: Keypair,
   payload: QueryRequestPayload,
+  options?: { regionCode?: string },
 ): Event {
   const tags: string[][] = [
     ["d", payload.query_id],
@@ -78,6 +80,9 @@ export function buildQueryRequestEvent(
     ["p", payload.oracle_pubkey, "", "oracle"],
     ["s", payload.schema],
   ];
+  if (options?.regionCode !== undefined && options.regionCode.length > 0) {
+    tags.push(["region", options.regionCode.toUpperCase()]);
+  }
 
   return signEvent(
     {

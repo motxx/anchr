@@ -2,6 +2,7 @@
 
 Created: 2026-06-10
 Model: Claude Fable 5
+Completed: 2026-06-10
 
 ## Priority
 
@@ -52,3 +53,45 @@ generation. Public API and behavior stay as locked by existing unit tests and
 
 - Split at resolution time with `make-sub-issues` if one verified change is
   too large (offer subscription / selection / preimage wait / redeem slices).
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/customer.ts` / `provider.ts` — the root orchestrators are
+  the lifecycle engine: time comes from an injected `Clock`
+  (`options.clock`, default `realClock`), query ids from the engine's
+  `IdGenerator` (`createDefaultIdGenerator`); the ad-hoc
+  `generateQueryId` (`Date.now`+`Math.random`) is deleted, its behavior
+  tests moved to `packages/sdk/src/requests/domain/ports.test.ts`.
+- `packages/sdk/src/relay-wait.ts` (new) — `waitForFirstEvent`, the single
+  subscribe-with-deadline helper; the customer result wait, provider
+  selection/preimage waits, and the relay-DM hash bootstrap all run on it.
+- `packages/sdk/src/customer-types.ts` / `provider-types.ts` — `clock` /
+  `idGenerator` options; `scripts/arch-lint.ts` E026 allowlist names the
+  root orchestrator → `requests/domain/ports.ts` edges.
+
+Resolution note: re-reading the repository showed `requests/` is the
+Oracle-side application layer, not a competing Customer/Provider engine —
+"engine-backed" therefore means the root orchestrators adopt the engine's
+ports (clock/ids) rather than being rebuilt on `QueryService`. The
+remaining second Customer/Provider implementation was deleted by #0108.
+
+Verified with:
+
+- `deno task test:all`
+- No matches: `rg -n "Math.random|Date.now" packages/sdk/src/customer.ts packages/sdk/src/provider.ts`
+- INV-07/INV-08 stay green.
+
+Harness update:
+
+- E026 allowlist documents the only legal root→ports edges; ports tests
+  lock the id-generator contract.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

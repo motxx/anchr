@@ -13,7 +13,6 @@ export {
   DEFAULT_LOCKTIME_SECONDS,
   DEFAULT_OFFER_WINDOW_MS,
   DEFAULT_RESULT_TIMEOUT_MS,
-  generateQueryId,
   NoOffersReceivedError,
   pickOracleForRequest,
   RelayPublishError,
@@ -143,6 +142,7 @@ export {
   OracleResponseError,
   OracleTimeoutError,
 } from "./oracle.ts";
+export type { Clock, IdGenerator } from "./requests/domain/ports.ts";
 export {
   type HashResponderOptions,
   serveHashRequests,

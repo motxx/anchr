@@ -173,6 +173,26 @@ function isAllowedSdkRequestImport(
       targets: ["packages/sdk/src/requests/domain/types.ts"],
     },
     {
+      importer: "packages/sdk/src/customer.ts",
+      targets: ["packages/sdk/src/requests/domain/ports.ts"],
+    },
+    {
+      importer: "packages/sdk/src/index.ts",
+      targets: ["packages/sdk/src/requests/domain/ports.ts"],
+    },
+    {
+      importer: "packages/sdk/src/customer-types.ts",
+      targets: ["packages/sdk/src/requests/domain/ports.ts"],
+    },
+    {
+      importer: "packages/sdk/src/provider.ts",
+      targets: ["packages/sdk/src/requests/domain/ports.ts"],
+    },
+    {
+      importer: "packages/sdk/src/provider-types.ts",
+      targets: ["packages/sdk/src/requests/domain/ports.ts"],
+    },
+    {
       importer: "packages/sdk/src/payments/",
       targets: [
         "packages/sdk/src/requests/application/ports.ts",

@@ -27,6 +27,11 @@ import {
 import { type Event as NostrEvent, type Keypair } from "@anchr/protocol/nostr";
 import { generateEphemeralIdentity } from "./identity.ts";
 import { createNostrOracleClient } from "./oracle.ts";
+import { waitForFirstEvent } from "./relay-wait.ts";
+import {
+  createDefaultIdGenerator,
+  realClock,
+} from "./requests/domain/ports.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -227,13 +232,6 @@ export function validateCustomerOptions(
   }
 }
 
-/** Generate a unique query identifier for a single request. */
-export function generateQueryId(): string {
-  const ts = Date.now();
-  const rand = Math.random().toString(36).slice(2, 10);
-  return `query_${ts}_${rand}`;
-}
-
 /**
  * Construct a Customer client.
  *
@@ -253,6 +251,8 @@ export function createCustomer(options: CustomerOptions): Customer {
   const selector = options.offerSelector ?? selectCheapestOffer;
   const verifierAdapters = options.verifierAdapters ?? [];
   const stateStore = options.stateStore;
+  const clock = options.clock ?? realClock;
+  const idGenerator = options.idGenerator ?? createDefaultIdGenerator(clock);
 
   return {
     oracles: oraclePubkeys,
@@ -285,7 +285,7 @@ export function createCustomer(options: CustomerOptions): Customer {
       }
 
       const identity: Keypair = generateEphemeralIdentity();
-      const queryId = generateQueryId();
+      const queryId = idGenerator.newQueryId();
 
       const oracleClient = selectedOracle.client ??
         createNostrOracleClient({
@@ -294,7 +294,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         });
       const { hash } = await oracleClient.requestHash(queryId);
 
-      const locktimeSeconds = Math.floor(Date.now() / 1000) +
+      const locktimeSeconds = Math.floor(clock.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
       const initialLock: CashuToken = await cashuClient.buildHtlcLock({
         amountSats: req.payment.maxAmount,
@@ -312,9 +312,11 @@ export function createCustomer(options: CustomerOptions): Customer {
         customer_pubkey: identity.publicKey,
         oracle_pubkey: expectedOracle,
         max_amount_sats: req.payment.maxAmount,
-        expires_at: Date.now() + offerWindowMs,
+        expires_at: clock.now() + offerWindowMs,
       };
-      const requestEvent = buildQueryRequestEvent(identity, requestPayload);
+      const requestEvent = buildQueryRequestEvent(identity, requestPayload, {
+        regionCode: req.regionCode,
+      });
       const publishResult = await relayClient.publish(requestEvent);
 
       if (publishResult.successes.length === 0) {
@@ -326,7 +328,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           requestEventId: requestEvent.id,
           schema: req.spec.schema,
           status: "request_published",
-          updatedAt: Date.now(),
+          updatedAt: clock.now(),
         });
       }
 
@@ -350,7 +352,7 @@ export function createCustomer(options: CustomerOptions): Customer {
             providerPubkey: parsed.provider_pubkey,
             amountSats: parsed.amount_sats,
             offerEventId: event.id,
-            receivedAt: Date.now(),
+            receivedAt: clock.now(),
           });
         },
       );
@@ -408,38 +410,23 @@ export function createCustomer(options: CustomerOptions): Customer {
           status: "provider_selected",
           providerPubkey: selected.providerPubkey,
           offerEventId: selected.offerEventId,
-          updatedAt: Date.now(),
+          updatedAt: clock.now(),
         });
       }
 
-      const resultEvent = await new Promise<NostrEvent>((resolve, reject) => {
-        // Mutable holder so the subscribe callback can reach the
-        // eventually-set timeout id (and vice versa).
-        const handles: {
-          sub?: { close(): void };
-          timeoutId?: ReturnType<typeof setTimeout>;
-        } = {};
-        handles.sub = relayClient.subscribe(
-          {
-            kinds: [6300],
-            "#e": [requestEvent.id],
-            authors: [selected.providerPubkey],
-          },
-          (event) => {
-            handles.sub?.close();
-            if (handles.timeoutId !== undefined) {
-              clearTimeout(handles.timeoutId);
-            }
-            resolve(event);
-          },
-        );
-        handles.timeoutId = setTimeout(() => {
-          handles.sub?.close();
-          reject(
-            new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey),
-          );
-        }, resultTimeoutMs);
-      });
+      const resultEvent: NostrEvent | null = await waitForFirstEvent(
+        relayClient,
+        {
+          kinds: [6300],
+          "#e": [requestEvent.id],
+          authors: [selected.providerPubkey],
+        },
+        (event) => event,
+        resultTimeoutMs,
+      ).result;
+      if (resultEvent === null) {
+        throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
+      }
 
       const response = parseQueryResponseEvent(
         resultEvent,
@@ -480,7 +467,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           status: "result_received",
           providerPubkey: selected.providerPubkey,
           offerEventId: selected.offerEventId,
-          updatedAt: Date.now(),
+          updatedAt: clock.now(),
         });
       }
       return result;

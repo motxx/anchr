@@ -26,6 +26,7 @@ import {
 import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
 import { generateEphemeralIdentity } from "./identity.ts";
 import type { RelayClient } from "./adapters/types.ts";
+import { waitForFirstEvent } from "./relay-wait.ts";
 
 export interface OracleClient {
   /**
@@ -164,53 +165,42 @@ export function createNostrOracleClient(
   }
 
   return {
-    requestHash(queryId: string): Promise<{ hash: string }> {
+    async requestHash(queryId: string): Promise<{ hash: string }> {
       const identity = generateEphemeralIdentity();
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          subscription.close();
-          reject(new OracleTimeoutError(timeoutMs));
-        }, timeoutMs);
-        const subscription = options.relayClient.subscribe(
-          {
-            kinds: [KIND_DIRECT_MESSAGE],
-            authors: [options.oraclePubkey],
-            "#p": [identity.publicKey],
-          },
-          (event) => {
-            const payload = parseHashResponseEvent(
-              event,
-              identity.secretKey,
-              options.oraclePubkey,
-            );
-            if (payload === null || payload.query_id !== queryId) return;
-            clearTimeout(timer);
-            subscription.close();
-            resolve({ hash: payload.hash });
-          },
-        );
-        const request = buildHashRequestEvent(identity, options.oraclePubkey, {
-          type: "hash_request",
-          query_id: queryId,
-        });
-        options.relayClient.publish(request).then((result) => {
-          if (result.successes.length === 0) {
-            clearTimeout(timer);
-            subscription.close();
-            reject(
-              new OracleResponseError(
-                `no relay accepted the hash bootstrap DM: ${
-                  result.failures.map((f) => f.reason).join(", ")
-                }`,
-              ),
-            );
-          }
-        }, (err) => {
-          clearTimeout(timer);
-          subscription.close();
-          reject(err);
-        });
+      const wait = waitForFirstEvent(
+        options.relayClient,
+        {
+          kinds: [KIND_DIRECT_MESSAGE],
+          authors: [options.oraclePubkey],
+          "#p": [identity.publicKey],
+        },
+        (event) => {
+          const payload = parseHashResponseEvent(
+            event,
+            identity.secretKey,
+            options.oraclePubkey,
+          );
+          if (payload === null || payload.query_id !== queryId) return null;
+          return payload.hash;
+        },
+        timeoutMs,
+      );
+      const request = buildHashRequestEvent(identity, options.oraclePubkey, {
+        type: "hash_request",
+        query_id: queryId,
       });
+      const published = await options.relayClient.publish(request);
+      if (published.successes.length === 0) {
+        wait.cancel();
+        throw new OracleResponseError(
+          `no relay accepted the hash bootstrap DM: ${
+            published.failures.map((f) => f.reason).join(", ")
+          }`,
+        );
+      }
+      const hash = await wait.result;
+      if (hash === null) throw new OracleTimeoutError(timeoutMs);
+      return { hash };
     },
   };
 }

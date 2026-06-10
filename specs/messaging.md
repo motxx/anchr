@@ -69,6 +69,13 @@ The Customer broadcasts a DVM Job Request as a public request advertisement:
 }
 ```
 
+An optional `region` tag (uppercase region code, indexable as `#region`)
+scopes discovery: region-bound Providers subscribe with a `#region` filter and
+ignore untagged advertisements. Hiding advertisement content from
+out-of-region relay observers via a region-derived shared key remains an
+SDK-local optional layer (`@anchr/sdk/adapters/nostr` encryption helpers), not
+part of the interoperable v0 profile.
+
 The request content is signed JSON, not encrypted NIP-44 content. Its content is
 an explicit public allowlist for open Provider discovery. Sensitive execution
 context and payment-bearing material must travel in later Provider Selection
