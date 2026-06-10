@@ -4,7 +4,7 @@
 
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
-import type { NostrIdentity } from "./crypto/identity.ts";
+import type { NostrIdentity } from "../../identity.ts";
 import {
   type DvmOfferFeedbackPayload,
   type OracleResponsePayload,

@@ -11,7 +11,7 @@ import {
   finalizeEvent,
   type VerifiedEvent,
 } from "nostr-tools";
-import type { NostrIdentity } from "../crypto/identity.ts";
+import type { NostrIdentity } from "../../../identity.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
 import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
 import type { TlsnVerifiedData } from "../../../requests/domain/types.ts";

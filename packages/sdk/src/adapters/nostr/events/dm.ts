@@ -6,7 +6,7 @@ import {
   type VerifiedEvent,
 } from "nostr-tools";
 import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
-import type { NostrIdentity } from "../crypto/identity.ts";
+import type { NostrIdentity } from "../../../identity.ts";
 import {
   decryptNip44,
   deriveConversationKey,

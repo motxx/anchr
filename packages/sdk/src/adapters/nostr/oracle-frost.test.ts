@@ -6,7 +6,7 @@ import {
   createOracleNostrService,
 } from "./oracle-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
-import { generateEphemeralIdentity } from "./crypto/identity.ts";
+import { generateEphemeralIdentity } from "../../identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
 import { createFrostCoordinator } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";

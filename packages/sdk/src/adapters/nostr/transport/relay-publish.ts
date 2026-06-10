@@ -8,7 +8,7 @@
 import type { Query } from "../../../requests/domain/types.ts";
 import { isNostrEnabled, publishEvent } from "./client.ts";
 import { buildQueryRequestEvent } from "../events/event-builders.ts";
-import { generateEphemeralIdentity } from "../crypto/identity.ts";
+import { generateEphemeralIdentity } from "../../../identity.ts";
 
 import { getLogger } from "../../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "relay"]);

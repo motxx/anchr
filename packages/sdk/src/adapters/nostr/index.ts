@@ -10,7 +10,7 @@ export {
   generateEphemeralIdentity,
   type NostrIdentity,
   restoreIdentity,
-} from "./crypto/identity.ts";
+} from "../../identity.ts";
 export {
   decryptNip44,
   deriveConversationKey,

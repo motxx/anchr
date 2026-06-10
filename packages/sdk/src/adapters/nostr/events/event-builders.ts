@@ -7,7 +7,7 @@ import {
   finalizeEvent,
   type VerifiedEvent,
 } from "nostr-tools";
-import type { NostrIdentity } from "../crypto/identity.ts";
+import type { NostrIdentity } from "../../../identity.ts";
 import { deriveConversationKey, encryptNip44 } from "../crypto/encryption.ts";
 import {
   KIND_ORACLE_ANNOUNCEMENT,

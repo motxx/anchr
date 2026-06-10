@@ -17,8 +17,8 @@
 import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { TlsnEncryptedContext } from "../../requests/domain/types.ts";
-import type { NostrIdentity } from "./crypto/identity.ts";
-import { generateEphemeralIdentity } from "./crypto/identity.ts";
+import type { NostrIdentity } from "../../identity.ts";
+import { generateEphemeralIdentity } from "../../identity.ts";
 import {
   buildOfferFeedbackEvent,
   buildQueryResponseEvent,

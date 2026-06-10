@@ -6,7 +6,7 @@ import {
   isNostrEnabled,
   publishEvent,
 } from "./client.ts";
-import { generateEphemeralIdentity } from "../crypto/identity.ts";
+import { generateEphemeralIdentity } from "../../../identity.ts";
 import { buildQueryRequestEvent } from "../events/events.ts";
 import { withEnv } from "../../../testing/helpers.ts";
 

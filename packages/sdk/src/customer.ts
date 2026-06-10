@@ -24,11 +24,8 @@ import {
   isSchemaUri,
   resolveVerifierAdapter,
 } from "./schema.ts";
-import {
-  type Event as NostrEvent,
-  generateKeypair,
-  type Keypair,
-} from "@anchr/protocol/nostr";
+import { type Event as NostrEvent, type Keypair } from "@anchr/protocol/nostr";
+import { generateEphemeralIdentity } from "./identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -284,7 +281,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         );
       }
 
-      const identity: Keypair = generateKeypair();
+      const identity: Keypair = generateEphemeralIdentity();
       const queryId = generateQueryId();
 
       const { hash } = await selectedOracle.client.requestHash(queryId);

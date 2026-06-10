@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "../crypto/identity.ts";
+import { generateEphemeralIdentity } from "../../../identity.ts";
 import {
   KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,

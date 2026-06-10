@@ -19,7 +19,7 @@ import type {
   ProofVisibility,
   Query,
 } from "../../requests/domain/types.ts";
-import type { NostrIdentity } from "./crypto/identity.ts";
+import type { NostrIdentity } from "../../identity.ts";
 import { buildOracleAttestationEvent } from "./events/oracle-attestation.ts";
 import { publishEvent } from "./transport/client.ts";
 

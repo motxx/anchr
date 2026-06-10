@@ -14,8 +14,8 @@
 import type { Event } from "nostr-tools";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { NostrIdentity } from "./crypto/identity.ts";
-import { restoreIdentity } from "./crypto/identity.ts";
+import type { NostrIdentity } from "../../identity.ts";
+import { restoreIdentity } from "../../identity.ts";
 import {
   buildFrostSignatureDM,
   buildPreimageDM,

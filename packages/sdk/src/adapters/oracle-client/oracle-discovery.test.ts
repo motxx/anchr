@@ -1,6 +1,6 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
+import { generateEphemeralIdentity } from "../../identity.ts";
 import { buildOracleAnnouncementEvent } from "../nostr/events/event-builders.ts";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
