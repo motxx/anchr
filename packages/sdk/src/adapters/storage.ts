@@ -11,13 +11,6 @@ export function createMemoryStateStore(
 ): ActorStateStore {
   const values = new Map<string, string>(options.initialEntries);
   return {
-    manifest: {
-      id: "memory-state",
-      technology: "memory",
-      capabilities: ["local_state"],
-      runtimes: ["browser", "deno", "node", "worker"],
-      experimental: false,
-    },
     get(key: string): Promise<string | null> {
       return Promise.resolve(values.get(key) ?? null);
     },
@@ -98,13 +91,6 @@ export function createIndexedDbStateStore(
   const database = openDatabase(factory, databaseName, storeName);
 
   return {
-    manifest: {
-      id: "indexeddb-state",
-      technology: "indexeddb",
-      capabilities: ["local_state"],
-      runtimes: ["browser"],
-      experimental: false,
-    },
     async get(key: string): Promise<string | null> {
       const value = await runRequest(
         database,

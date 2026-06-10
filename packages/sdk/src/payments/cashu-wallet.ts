@@ -54,7 +54,7 @@ export interface CreateBountyTokenOptions {
 }
 
 /**
- * Create a locked ecash token for a query bounty.
+ * Create a locked ecash token for a query payment_lock.
  *
  * Steps:
  *   1. Ask the mint for a Lightning invoice for `amountSats`.
@@ -115,7 +115,7 @@ export async function createBountyToken(
     return { token, proofs };
   } catch (error) {
     log.error(
-      "Failed to create bounty token:",
+      "Failed to create payment_lock token:",
       error instanceof Error ? error.message : error,
     );
     return null;

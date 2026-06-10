@@ -27,10 +27,10 @@ export function publishQueryToRelay(query: Query): void {
     expires_at: query.expires_at,
     oracle_ids: query.oracle_ids,
     verification_requirements: query.verification_requirements,
-    bounty: query.bounty?.escrow_token
+    payment_lock: query.payment_lock?.escrow_token
       ? {
         mint: Deno.env.get("CASHU_MINT_URL") ?? "",
-        token: query.bounty.escrow_token,
+        token: query.payment_lock.escrow_token,
       }
       : undefined,
   }, query.location_hint);

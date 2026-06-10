@@ -27,12 +27,12 @@ import {
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type {
   BlossomKeyMap,
-  BountyInfo,
   CustomerMeta,
   EscrowInfo,
   EscrowSubmitOutcome,
   ExecutorType,
   OfferInfo,
+  PaymentLockInfo,
   Query,
   QueryInput,
   QueryResult,
@@ -61,7 +61,7 @@ export interface CreateQueryOptions {
   ttlMs?: number;
   ttlSeconds?: number;
   customerMeta?: CustomerMeta;
-  bounty?: BountyInfo;
+  payment_lock?: PaymentLockInfo;
   /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
   oracleIds?: string[];
   /** Escrow info — when present, creates an escrow-mode (HTLC or P2PK+FROST) query. */

@@ -52,11 +52,11 @@ The `content` field contains a JSON object:
 | ------------------------ | -------- | ----------------------------------------------------- |
 | `name`                   | yes      | Human-readable Oracle name                            |
 | `endpoint`               | no       | Optional Oracle-operated HTTP adapter URL             |
-| `fee_ppm`                | yes      | Fee in parts-per-million of bounty (e.g., 50000 = 5%) |
+| `fee_ppm`                | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
 | `supported_factors`      | yes      | Array of verification factors this Oracle supports    |
 | `supported_escrow_types` | yes      | Array of escrow types: `htlc`, `p2pk_frost`           |
-| `min_bounty_sats`        | no       | Minimum bounty this Oracle accepts                    |
-| `max_bounty_sats`        | no       | Maximum bounty this Oracle accepts                    |
+| `min_amount_sats`        | no       | Minimum payment amount this Oracle accepts                    |
+| `max_amount_sats`        | no       | Maximum payment amount this Oracle accepts                    |
 | `description`            | no       | Free-text description of the Oracle service           |
 
 ### Example
@@ -67,8 +67,8 @@ The `content` field contains a JSON object:
   "fee_ppm": 50000,
   "supported_factors": ["tlsn", "gps", "c2pa", "nonce", "timestamp"],
   "supported_escrow_types": ["htlc", "p2pk_frost"],
-  "min_bounty_sats": 1,
-  "max_bounty_sats": 1000000,
+  "min_amount_sats": 1,
+  "max_amount_sats": 1000000,
   "description": "Independent Oracle with TLSNotary and C2PA verification"
 }
 ```

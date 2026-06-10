@@ -10,16 +10,18 @@ import {
 import type { NostrIdentity } from "../crypto/identity.ts";
 import { deriveConversationKey, encryptNip44 } from "../crypto/encryption.ts";
 import {
-  ANCHR_ORACLE_ANNOUNCEMENT,
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_REQUEST,
-  ANCHR_QUERY_RESPONSE,
-  type OfferFeedbackPayload,
+  KIND_ORACLE_ANNOUNCEMENT,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+} from "@anchr/protocol/nostr";
+import {
+  type DvmOfferFeedbackPayload,
+  type DvmQueryRequestPayload,
+  type DvmQueryResponsePayload,
+  type DvmSelectionFeedbackPayload,
   type OracleResponsePayload,
-  type QueryRequestPayload,
-  type QueryResponsePayload,
   type QuerySettlementPayload,
-  type SelectionFeedbackPayload,
 } from "./events.ts";
 import type { OracleInfo } from "../../../requests/domain/oracle-types.ts";
 
@@ -41,7 +43,7 @@ function encryptPayload(
 
 function buildRequestTags(
   queryId: string,
-  payload: QueryRequestPayload,
+  payload: DvmQueryRequestPayload,
   regionCode?: string,
 ): string[][] {
   const tags: string[][] = [
@@ -63,8 +65,8 @@ function buildRequestTags(
       payload.verification_requirements.join(","),
     ]);
   }
-  if (payload.bounty?.token) {
-    tags.push(["bid", payload.bounty.token]);
+  if (payload.payment_lock?.token) {
+    tags.push(["bid", payload.payment_lock.token]);
   }
   if (payload.oracle_pubkey) {
     tags.push(["p", payload.oracle_pubkey, "", "oracle"]);
@@ -80,7 +82,7 @@ function buildResponseTags(
   identity: NostrIdentity,
   queryEventId: string,
   customerPubKey: string,
-  payload: QueryResponsePayload,
+  payload: DvmQueryResponsePayload,
   oraclePubKey?: string,
 ): string[][] {
   const tags: string[][] = [
@@ -98,7 +100,7 @@ function buildResponseTags(
 function appendOracleTags(
   tags: string[][],
   identity: NostrIdentity,
-  payload: QueryResponsePayload,
+  payload: DvmQueryResponsePayload,
   oraclePubKey: string,
 ): void {
   tags.push(["p", oraclePubKey, "", "oracle"]);
@@ -131,11 +133,11 @@ function appendOracleTags(
 export function buildQueryRequestEvent(
   identity: NostrIdentity,
   queryId: string,
-  payload: QueryRequestPayload,
+  payload: DvmQueryRequestPayload,
   regionCode?: string,
 ): VerifiedEvent {
   const template: EventTemplate = {
-    kind: ANCHR_QUERY_REQUEST,
+    kind: KIND_QUERY_REQUEST,
     created_at: nowUnix(),
     tags: buildRequestTags(queryId, payload, regionCode),
     content: JSON.stringify(payload),
@@ -147,11 +149,11 @@ export function buildQueryResponseEvent(
   identity: NostrIdentity,
   queryEventId: string,
   customerPubKey: string,
-  payload: QueryResponsePayload,
+  payload: DvmQueryResponsePayload,
   oraclePubKey?: string,
 ): VerifiedEvent {
   const template: EventTemplate = {
-    kind: ANCHR_QUERY_RESPONSE,
+    kind: KIND_QUERY_RESPONSE,
     created_at: nowUnix(),
     tags: buildResponseTags(
       identity,
@@ -169,10 +171,10 @@ export function buildOfferFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
   customerPubKey: string,
-  payload: OfferFeedbackPayload,
+  payload: DvmOfferFeedbackPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
+    kind: KIND_QUERY_FEEDBACK,
     created_at: nowUnix(),
     tags: [
       ["e", queryEventId],
@@ -188,10 +190,10 @@ export function buildSelectionFeedbackEvent(
   identity: NostrIdentity,
   queryEventId: string,
   providerPubKey: string,
-  payload: SelectionFeedbackPayload,
+  payload: DvmSelectionFeedbackPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
+    kind: KIND_QUERY_FEEDBACK,
     created_at: nowUnix(),
     tags: [
       ["e", queryEventId],
@@ -211,7 +213,7 @@ export function buildQuerySettlementEvent(
   payload: QuerySettlementPayload,
 ): VerifiedEvent {
   const template: EventTemplate = {
-    kind: ANCHR_QUERY_FEEDBACK,
+    kind: KIND_QUERY_FEEDBACK,
     created_at: nowUnix(),
     tags: [
       ["e", queryEventId],
@@ -259,16 +261,16 @@ export function buildOracleAnnouncementEvent(
     fee_ppm: oracleInfo.fee_ppm,
     supported_factors: oracleInfo.supported_factors ?? [],
     supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
-    ...(oracleInfo.min_bounty_sats !== undefined &&
-      { min_bounty_sats: oracleInfo.min_bounty_sats }),
-    ...(oracleInfo.max_bounty_sats !== undefined &&
-      { max_bounty_sats: oracleInfo.max_bounty_sats }),
+    ...(oracleInfo.min_amount_sats !== undefined &&
+      { min_amount_sats: oracleInfo.min_amount_sats }),
+    ...(oracleInfo.max_amount_sats !== undefined &&
+      { max_amount_sats: oracleInfo.max_amount_sats }),
     ...(oracleInfo.description !== undefined &&
       { description: oracleInfo.description }),
   });
 
   const template: EventTemplate = {
-    kind: ANCHR_ORACLE_ANNOUNCEMENT,
+    kind: KIND_ORACLE_ANNOUNCEMENT,
     created_at: nowUnix(),
     tags,
     content,

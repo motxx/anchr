@@ -7,7 +7,7 @@
  *     - Local-hold mode: plain proofs stay with the Customer and are
  *       never published before Provider selection.
  *     - Preselection-transfer mode: P2PK(Customer) proofs may be shown
- *       in a request so providers can inspect the bounty amount, but relay
+ *       in a request so providers can inspect the payment_lock amount, but relay
  *       observers cannot spend them.
  *
  *   Phase 2 (after Provider selected, swap to bind Provider):
@@ -91,7 +91,7 @@ export interface EscrowToken {
 }
 
 export interface SwapResult {
-  /** Token for the provider (bounty minus fee). */
+  /** Token for the provider (payment_lock minus fee). */
   providerToken: string;
   /** Token for the oracle (fee). */
   oracleToken: string;
@@ -430,7 +430,7 @@ function validateHtlcSecret(
 }
 
 /**
- * Calculate oracle fee from bounty amount and fee rate.
+ * Calculate oracle fee from payment_lock amount and fee rate.
  */
 export function calculateOracleFee(amountSats: number, feePpm: number): number {
   return Math.ceil((amountSats * feePpm) / 1_000_000);

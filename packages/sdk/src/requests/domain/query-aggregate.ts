@@ -1,10 +1,10 @@
 import type {
   BlossomKeyMap,
-  BountyInfo,
   CustomerMeta,
   EscrowInfo,
   OfferInfo,
   OracleAttestationRecord,
+  PaymentLockInfo,
   PaymentStatus,
   Query,
   QueryInput,
@@ -39,7 +39,7 @@ export type TransitionResult =
 export interface CreateQueryAggregateOptions {
   ttlMs: number;
   customerMeta?: CustomerMeta;
-  bounty?: BountyInfo;
+  payment_lock?: PaymentLockInfo;
   oracleIds?: string[];
   escrow?: EscrowInfo;
   nostrEventId?: string;
@@ -87,7 +87,7 @@ export function createQueryAggregate(
     created_at: now,
     expires_at: now + options.ttlMs,
     customer_meta: options.customerMeta,
-    bounty: options.bounty,
+    payment_lock: options.payment_lock,
     oracle_ids: options.oracleIds,
     payment_status: isEscrow ? "escrow_locked" : "locked",
     escrow: options.escrow,

@@ -91,7 +91,7 @@ test("buildQueryRequestEvent publishes only the public advertisement allowlist",
   expect(content).not.toHaveProperty("predicate");
   expect(content).not.toHaveProperty("context");
   expect(content).not.toHaveProperty("mint_url");
-  expect(content).not.toHaveProperty("bounty_token");
+  expect(content).not.toHaveProperty("payment_lock_token");
   expect(content).not.toHaveProperty("provider_redemption_token");
   expect(content).not.toHaveProperty("locktime_seconds");
   expect(event.tags.some((tag) => tag[0] === "encrypted")).toBe(false);
@@ -108,7 +108,7 @@ test("parseQueryRequestEvent rejects public content carrying execution or paymen
       ...samplePayload(),
       predicate: { target: "https://api.example.org" },
       mint_url: "https://mint.example.org",
-      bounty_token: "cashuBfake",
+      payment_lock_token: "cashuBfake",
       locktime_seconds: 123,
     }),
     tags: [],

@@ -30,7 +30,7 @@ export function doCreateQuery(
   const result = createQueryAggregate(input, {
     ttlMs: resolveTtlMs(options),
     customerMeta: options?.customerMeta,
-    bounty: options?.bounty,
+    payment_lock: options?.payment_lock,
     oracleIds: options?.oracleIds,
     escrow: options?.escrow,
     nostrEventId: options?.nostrEventId,

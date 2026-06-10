@@ -13,9 +13,8 @@ import {
 } from "nostr-tools";
 import type { NostrIdentity } from "../crypto/identity.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
+import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
 import type { TlsnVerifiedData } from "../../../requests/domain/types.ts";
-
-export const ANCHR_ORACLE_ATTESTATION = 30103;
 
 export interface OracleAttestationPayload {
   oracle_id: string;
@@ -50,7 +49,7 @@ export function buildOracleAttestationEvent(
   };
 
   const template: EventTemplate = {
-    kind: ANCHR_ORACLE_ATTESTATION,
+    kind: KIND_ORACLE_ATTESTATION,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["e", queryEventId],

@@ -7,7 +7,7 @@
  *   Phase 1 (initial lock — provider unknown):
  *     `buildHtlcLock` swaps the source proofs into P2PK(customer) proofs.
  *     The resulting token can appear in the kind 5300 event so providers
- *     see the bounty amount, but relay observers cannot spend it.
+ *     see the payment_lock amount, but relay observers cannot spend it.
  *
  *   Phase 2 (swap to bind provider after selection):
  *     `bindProvider` swaps the held proofs at the mint into new proofs
@@ -34,7 +34,7 @@ import {
 import {
   buildHtlcFinalOptions,
   buildHtlcPreselectionOptions,
-} from "./cashu-htlc-options.ts";
+} from "../payments/cashu-htlc-options.ts";
 import type {
   BindProviderParams,
   BuildHtlcLockParams,
@@ -160,7 +160,7 @@ function bytesToHexLocal(bytes: Uint8Array): string {
 }
 
 /**
- * Phase-1 P2PK options: lock to the customer's pubkey only. The bounty
+ * Phase-1 P2PK options: lock to the customer's pubkey only. The payment_lock
  * token is broadcast in the kind 5300 event, so the lock prevents any
  * Nostr-relay subscriber from spending the proofs as bearer tokens —
  * spending requires the customer's signature, which only Phase 2
@@ -241,13 +241,6 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
   }
 
   return {
-    manifest: {
-      id: "cashu-htlc",
-      technology: "cashu",
-      capabilities: ["payment"],
-      runtimes: ["browser", "deno", "node"],
-      experimental: true,
-    },
     mintUrl,
 
     async buildHtlcLock(p: BuildHtlcLockParams): Promise<CashuToken> {

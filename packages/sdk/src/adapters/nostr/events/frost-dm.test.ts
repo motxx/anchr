@@ -1,11 +1,11 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
+import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
 import {
   buildFrostSignatureDM,
   buildPreimageDM,
   buildRejectionDM,
-  DM_KIND,
   parseOracleDM,
 } from "./dm.ts";
 import type { FrostSignatureDMPayload } from "./events.ts";
@@ -23,7 +23,7 @@ describe("FROST DM building and parsing", () => {
       "gpk_" + "cd".repeat(16),
     );
 
-    expect(event.kind).toBe(DM_KIND);
+    expect(event.kind).toBe(KIND_DIRECT_MESSAGE);
     expect(event.pubkey).toBe(oracle.publicKey);
     // Content is encrypted, not plaintext
     expect(event.content).not.toContain("frost_signature");

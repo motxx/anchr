@@ -67,7 +67,7 @@ the Oracle's preimage store is not decremented.
 
 **Tests:**
 
-- `e2e/protocol/bounty-attacks.test.ts` — `preimage not leaked on rejected
+- `e2e/protocol/paid-request-attacks.test.ts` — `preimage not leaked on rejected
   verification`.
 
 ### INV-03: Customer can't unlock escrow before timeout
@@ -87,10 +87,10 @@ Funds remain locked until locktime expires.
 **Tests:** Cross-referenced from existing attack-class tests, annotated with
 `// INV-03` comments:
 
-- `e2e/regtest-htlc-trustless.test.ts` —
+- `e2e/regtest/regtest-htlc-trustless.test.ts` —
   `ATTACK: Customer refund key
   before locktime → Mint REJECTS`
-- `e2e/regtest-htlc-attacks.test.ts` —
+- `e2e/regtest/regtest-htlc-attacks.test.ts` —
   `ATTACK: Customer redeems own
   HTLC proofs before locktime — fails`
 
@@ -141,7 +141,7 @@ spendable and must not redeem.
 
 - **INV-05:** FROST t-of-n threshold safety — no subset of size < t can produce
   a valid aggregate signature. Likely cross-referenced to
-  `e2e/frost-threshold.test.ts::ATTACK: 1-of-3 (below threshold) ->
+  `e2e/frost/frost-threshold.test.ts::ATTACK: 1-of-3 (below threshold) ->
   aggregation fails`
   once declared.
 - **INV-06:** C2PA manifest signature + GPS binding. Scoped after `crates/` gets

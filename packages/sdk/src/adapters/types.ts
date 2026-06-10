@@ -1,50 +1,5 @@
 import type { Event as NostrEvent } from "@anchr/protocol/nostr";
 
-export type RuntimeTarget = "browser" | "deno" | "node" | "worker";
-
-export type AdapterCapability =
-  | "transport"
-  | "payment"
-  | "proof_producer"
-  | "proof_verifier"
-  | "attachment"
-  | "local_state"
-  | "signer";
-
-export interface AdapterManifest {
-  id: string;
-  technology: string;
-  capabilities: readonly AdapterCapability[];
-  runtimes: readonly RuntimeTarget[];
-  experimental: boolean;
-}
-
-export interface CapabilityAdapter {
-  readonly manifest?: AdapterManifest;
-}
-
-export interface CapabilityCheckResult {
-  ok: boolean;
-  missing: readonly AdapterCapability[];
-}
-
-export function missingCapabilities(
-  manifest: AdapterManifest,
-  required: readonly AdapterCapability[],
-): AdapterCapability[] {
-  return required.filter((capability) =>
-    !manifest.capabilities.includes(capability)
-  );
-}
-
-export function checkCapabilities(
-  manifest: AdapterManifest,
-  required: readonly AdapterCapability[],
-): CapabilityCheckResult {
-  const missing = missingCapabilities(manifest, required);
-  return { ok: missing.length === 0, missing };
-}
-
 export type CashuProof = unknown;
 
 export interface BuildHtlcLockParams {
@@ -82,7 +37,6 @@ export interface CashuToken {
 }
 
 export interface CashuClient {
-  readonly manifest?: AdapterManifest;
   buildHtlcLock(params: BuildHtlcLockParams): Promise<CashuToken>;
   bindProvider(params: BindProviderParams): Promise<CashuToken>;
   redeemHtlc(params: RedeemHtlcParams): Promise<RedeemResult>;
@@ -109,7 +63,6 @@ export interface Subscription {
 }
 
 export interface RelayClient {
-  readonly manifest?: AdapterManifest;
   publish(event: NostrEvent): Promise<PublishResult>;
   subscribe(
     filter: Filter,
@@ -120,7 +73,6 @@ export interface RelayClient {
 }
 
 export interface ActorStateStore {
-  readonly manifest?: AdapterManifest;
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;

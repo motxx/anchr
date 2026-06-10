@@ -164,7 +164,7 @@ describe("NUT-07: Customer cannot revoke payment", () => {
 
     const query = service.createQuery(
       { description: "Escrow verify test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -191,7 +191,7 @@ describe("NUT-07: Customer cannot revoke payment", () => {
 
     const query = service.createQuery(
       { description: "Invalid token test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -242,7 +242,7 @@ describe("NUT-11: Timeout refund", () => {
     // Here we test the basic cancel → refund for non-HTLC queries.
     const query = service.createQuery(
       { description: "Refund test" },
-      { bounty: { amount_sats: 100 } },
+      { payment_lock: { amount_sats: 100 } },
     );
     expect(query.status).toBe("pending");
 
@@ -262,7 +262,7 @@ describe("NUT-11: Timeout refund", () => {
       { description: "Reject refund test" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["strict-oracle"],
       },
     );
@@ -379,7 +379,7 @@ describe("Oracle + Customer collusion limits", () => {
       { description: "Settlement test" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -415,7 +415,7 @@ describe("Oracle + Customer collusion limits", () => {
       { description: "Reject test" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["strict-oracle"],
       },
     );

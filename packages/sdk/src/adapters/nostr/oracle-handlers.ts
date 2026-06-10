@@ -6,7 +6,7 @@ import type { Event } from "nostr-tools";
 import type { SubCloser } from "nostr-tools/pool";
 import type { NostrIdentity } from "./crypto/identity.ts";
 import {
-  type OfferFeedbackPayload,
+  type DvmOfferFeedbackPayload,
   type OracleResponsePayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
@@ -77,7 +77,7 @@ export function handleFeedbackEvent(
     );
 
     if (payload.status === "payment-required") {
-      const offer = payload as OfferFeedbackPayload;
+      const offer = payload as DvmOfferFeedbackPayload;
       entry.offeredProviders.add(offer.provider_pubkey);
       onOffer?.(queryId, offer.provider_pubkey, offer.amount_sats);
     }

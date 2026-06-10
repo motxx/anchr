@@ -1,4 +1,9 @@
-import type { BountyInfo, GpsCoord, OfferInfo, QueryInput } from "./types.ts";
+import type {
+  GpsCoord,
+  OfferInfo,
+  PaymentLockInfo,
+  QueryInput,
+} from "./types.ts";
 
 /** Minimum escrow locktime in seconds (10 minutes). Applies to all escrow types. */
 export const MIN_ESCROW_LOCKTIME_SECS = 600;
@@ -16,8 +21,8 @@ export function validateGpsCoord(input: GpsCoord): string | null {
   return null;
 }
 
-/** Validate bounty info. Returns error string or null if valid. */
-export function validateBountyInfo(input: BountyInfo): string | null {
+/** Validate payment_lock info. Returns error string or null if valid. */
+export function validateBountyInfo(input: PaymentLockInfo): string | null {
   if (!Number.isFinite(input.amount_sats)) {
     return "amount_sats must be a finite number";
   }

@@ -1,7 +1,7 @@
 /**
  * Shared protocol test helpers for HTLC query lifecycle tests.
  *
- * Used by e2e/bounty-attacks.test.ts, e2e/bounty-trustless.test.ts, e2e/bounty-vulns.test.ts.
+ * Used by e2e/payment_lock-attacks.test.ts, e2e/payment_lock-trustless.test.ts, e2e/payment_lock-vulns.test.ts.
  */
 
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
@@ -214,14 +214,14 @@ export async function driveToProcessing(
   },
 ): Promise<ProcessingFixture> {
   const providerPub = opts?.providerPubkey ?? "provider_pub";
-  const bounty = opts?.bountyAmount ?? 100;
+  const payment_lock = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
   const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Protocol test" },
     {
       escrow: escrowInfo,
-      bounty: { amount_sats: bounty },
+      payment_lock: { amount_sats: payment_lock },
       oracleIds,
       quorum: opts?.quorum,
     },
@@ -231,7 +231,7 @@ export async function driveToProcessing(
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
-  const token = makeFakeToken(bounty);
+  const token = makeFakeToken(payment_lock);
   await service.selectProvider(query.id, providerPub, token);
   service.beginWork(query.id);
   return { query, entry, providerPub, escrowInfo };
@@ -274,13 +274,13 @@ export async function driveQuorumToProcessing(
   minApprovals: number,
 ): Promise<ProcessingFixture> {
   const providerPub = "provider_pub";
-  const bounty = 100;
+  const payment_lock = 100;
   const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Quorum protocol test" },
     {
       escrow: escrowInfo,
-      bounty: { amount_sats: bounty },
+      payment_lock: { amount_sats: payment_lock },
       oracleIds,
       quorum: { min_approvals: minApprovals },
     },
@@ -290,7 +290,11 @@ export async function driveQuorumToProcessing(
     offer_event_id: "evt_1",
     received_at: Date.now(),
   });
-  await service.selectProvider(query.id, providerPub, makeFakeToken(bounty));
+  await service.selectProvider(
+    query.id,
+    providerPub,
+    makeFakeToken(payment_lock),
+  );
   service.beginWork(query.id);
   return { query, entry, providerPub, escrowInfo };
 }

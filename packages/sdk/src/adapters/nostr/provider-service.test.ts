@@ -5,8 +5,8 @@ import type {
   ProviderNostrConfig,
 } from "./provider-service.ts";
 import {
+  type DvmQueryRequestPayload,
   parseQueryRequestPayload,
-  type QueryRequestPayload,
 } from "./events/events.ts";
 
 describe("Provider service — payload parsing and filtering", () => {
@@ -18,14 +18,14 @@ describe("Provider service — payload parsing and filtering", () => {
   };
 
   function makePayload(
-    overrides?: Partial<QueryRequestPayload>,
-  ): QueryRequestPayload {
+    overrides?: Partial<DvmQueryRequestPayload>,
+  ): DvmQueryRequestPayload {
     return {
       description: "Photo of Tokyo Tower",
       nonce: "ABC123",
       oracle_pubkey: trustedOracle,
       customer_pubkey: "customer_pub",
-      bounty: { mint: "https://mint.example.com", token: "cashuAey..." },
+      payment_lock: { mint: "https://mint.example.com", token: "cashuAey..." },
       expires_at: Date.now() + 600_000,
       ...overrides,
     };

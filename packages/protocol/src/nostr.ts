@@ -29,6 +29,10 @@ export const KIND_QUERY_RESPONSE = 6300;
 export const KIND_QUERY_FEEDBACK = 7000;
 /** NIP-44 encrypted DM (kind 4). */
 export const KIND_DIRECT_MESSAGE = 4;
+/** Oracle announcement (parameterized replaceable, oracle-registry spec). */
+export const KIND_ORACLE_ANNOUNCEMENT = 30088;
+/** Oracle attestation published after verification (publicly verifiable). */
+export const KIND_ORACLE_ATTESTATION = 30103;
 
 /** Pair of secret + derived public key (both hex). */
 export interface Keypair {

@@ -114,7 +114,8 @@ export function parseQueryRequestEvent(
     "predicate" in p ||
     "context" in p ||
     "mint_url" in p ||
-    "bounty_token" in p ||
+    "payment_lock_token" in p ||
+    "payment_lock" in p ||
     "provider_redemption_token" in p ||
     "locktime_seconds" in p
   ) {

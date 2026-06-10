@@ -18,10 +18,7 @@ export {
   encryptNip44,
   regionKeyHex,
 } from "./crypto/encryption.ts";
-export {
-  ANCHR_ORACLE_ANNOUNCEMENT,
-  buildOracleAnnouncementEvent,
-} from "./events/events.ts";
+export { buildOracleAnnouncementEvent } from "./events/events.ts";
 export {
   closePool,
   fetchRecentQueries,
@@ -36,7 +33,6 @@ export {
   subscribeToSettlements,
 } from "./transport/client.ts";
 export {
-  ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
   type OracleAttestationPayload,
   parseOracleAttestationPayload,

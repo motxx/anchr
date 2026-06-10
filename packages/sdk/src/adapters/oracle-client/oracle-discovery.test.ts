@@ -2,7 +2,7 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../nostr/crypto/identity.ts";
 import { buildOracleAnnouncementEvent } from "../nostr/events/event-builders.ts";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events/events.ts";
+import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
 import type { OracleInfo } from "../../requests/domain/oracle-types.ts";
 
@@ -13,8 +13,8 @@ const FULL_ORACLE_INFO: OracleInfo = {
   fee_ppm: 50000,
   supported_factors: ["tlsn", "gps", "nonce"],
   supported_escrow_types: ["htlc", "p2pk_frost"],
-  min_bounty_sats: 100,
-  max_bounty_sats: 1000000,
+  min_amount_sats: 100,
+  max_amount_sats: 1000000,
   description: "A test oracle for unit tests",
 };
 
@@ -22,7 +22,7 @@ test("buildOracleAnnouncementEvent produces kind 30088", () => {
   const identity = generateEphemeralIdentity();
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
 
-  expect(event.kind).toBe(ANCHR_ORACLE_ANNOUNCEMENT);
+  expect(event.kind).toBe(KIND_ORACLE_ANNOUNCEMENT);
   expect(event.kind).toBe(30088);
 });
 
@@ -62,8 +62,8 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   expect(content.fee_ppm).toBe(50000);
   expect(content.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
   expect(content.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
-  expect(content.min_bounty_sats).toBe(100);
-  expect(content.max_bounty_sats).toBe(1000000);
+  expect(content.min_amount_sats).toBe(100);
+  expect(content.max_amount_sats).toBe(1000000);
   expect(content.description).toBe("A test oracle for unit tests");
   expect(content.endpoint).toBe("https://oracle.example.com");
 });
@@ -96,8 +96,8 @@ test("buildOracleAnnouncementEvent omits optional fields when not set", () => {
   expect(content.supported_factors).toEqual([]);
   expect(content.supported_escrow_types).toEqual([]);
   expect(content).not.toHaveProperty("endpoint");
-  expect(content).not.toHaveProperty("min_bounty_sats");
-  expect(content).not.toHaveProperty("max_bounty_sats");
+  expect(content).not.toHaveProperty("min_amount_sats");
+  expect(content).not.toHaveProperty("max_amount_sats");
   expect(content).not.toHaveProperty("description");
 });
 
@@ -123,8 +123,8 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
   expect(announcement!.fee_ppm).toBe(50000);
   expect(announcement!.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
   expect(announcement!.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
-  expect(announcement!.min_bounty_sats).toBe(100);
-  expect(announcement!.max_bounty_sats).toBe(1000000);
+  expect(announcement!.min_amount_sats).toBe(100);
+  expect(announcement!.max_amount_sats).toBe(1000000);
   expect(announcement!.description).toBe("A test oracle for unit tests");
   expect(announcement!.pubkey).toBe(identity.publicKey);
   expect(announcement!.announced_at).toBe(event.created_at);
@@ -194,8 +194,8 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
   expect(result!.supported_factors).toEqual([]);
   expect(result!.supported_escrow_types).toEqual([]);
   expect(result!.endpoint).toBeUndefined();
-  expect(result!.min_bounty_sats).toBeUndefined();
-  expect(result!.max_bounty_sats).toBeUndefined();
+  expect(result!.min_amount_sats).toBeUndefined();
+  expect(result!.max_amount_sats).toBeUndefined();
   expect(result!.description).toBeUndefined();
 });
 
@@ -213,8 +213,8 @@ test("round-trip: build then parse preserves all fields", () => {
   expect(parsed!.supported_escrow_types).toEqual(
     FULL_ORACLE_INFO.supported_escrow_types,
   );
-  expect(parsed!.min_bounty_sats).toBe(FULL_ORACLE_INFO.min_bounty_sats);
-  expect(parsed!.max_bounty_sats).toBe(FULL_ORACLE_INFO.max_bounty_sats);
+  expect(parsed!.min_amount_sats).toBe(FULL_ORACLE_INFO.min_amount_sats);
+  expect(parsed!.max_amount_sats).toBe(FULL_ORACLE_INFO.max_amount_sats);
   expect(parsed!.description).toBe(FULL_ORACLE_INFO.description);
   expect(parsed!.pubkey).toBe(identity.publicKey);
 });

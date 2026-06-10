@@ -22,12 +22,12 @@ import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
   buildOfferFeedbackEvent,
   buildQueryResponseEvent,
-  type OfferFeedbackPayload,
+  type DvmOfferFeedbackPayload,
+  type DvmQueryRequestPayload,
+  type DvmQueryResponsePayload,
+  type DvmSelectionFeedbackPayload,
   parseFeedbackPayload,
   parseQueryRequestPayload,
-  type QueryRequestPayload,
-  type QueryResponsePayload,
-  type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { type OracleDMPayload, parseOracleDM } from "./events/dm.ts";
 import {
@@ -53,7 +53,7 @@ export interface ProviderNostrConfig {
 export interface DiscoveredRequest {
   eventId: string;
   pubkey: string;
-  payload: QueryRequestPayload;
+  payload: DvmQueryRequestPayload;
   oraclePubkey?: string;
   customerPubkey?: string;
 }
@@ -120,7 +120,7 @@ export async function submitOffer(
   amountSats?: number,
   relayUrls?: string[],
 ): Promise<string> {
-  const payload: OfferFeedbackPayload = {
+  const payload: DvmOfferFeedbackPayload = {
     status: "payment-required",
     provider_pubkey: identity.publicKey,
     amount_sats: amountSats,
@@ -161,7 +161,7 @@ export function waitForSelection(
         );
 
         if (payload.status === "processing") {
-          const selection = payload as SelectionFeedbackPayload;
+          const selection = payload as DvmSelectionFeedbackPayload;
           if (selection.selected_provider_pubkey === identity.publicKey) {
             onSelected(selection.htlc_token, selection.encrypted_context);
           } else {
@@ -236,7 +236,7 @@ export async function publishResult(
   notes?: string,
   relayUrls?: string[],
 ): Promise<string> {
-  const payload: QueryResponsePayload = {
+  const payload: DvmQueryResponsePayload = {
     nonce_echo: nonce,
     attachments: [{
       blossom_hash: upload.blossom.hash,

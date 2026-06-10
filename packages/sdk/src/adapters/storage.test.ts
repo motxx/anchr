@@ -18,17 +18,6 @@ test("createMemoryStateStore reads, writes, and deletes string state", async () 
   expect(await store.get("customer:q1")).toBe(null);
 });
 
-test("createMemoryStateStore exposes local-state capability metadata", () => {
-  const store = createMemoryStateStore();
-  expect(store.manifest).toEqual({
-    id: "memory-state",
-    technology: "memory",
-    capabilities: ["local_state"],
-    runtimes: ["browser", "deno", "node", "worker"],
-    experimental: false,
-  });
-});
-
 test("createIndexedDbStateStore rejects runtimes without IndexedDB", () => {
   expect(() => createIndexedDbStateStore({ indexedDB: undefined }))
     .toThrow(IndexedDbStateStoreError);

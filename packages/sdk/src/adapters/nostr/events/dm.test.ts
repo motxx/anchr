@@ -1,12 +1,8 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
-import {
-  buildPreimageDM,
-  buildRejectionDM,
-  DM_KIND,
-  parseOracleDM,
-} from "./dm.ts";
+import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
+import { buildPreimageDM, buildRejectionDM, parseOracleDM } from "./dm.ts";
 
 describe("NIP-44 DM (Oracle ↔ Provider)", () => {
   test("buildPreimageDM creates kind 4 encrypted DM", () => {
@@ -20,7 +16,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       "deadbeef".repeat(8),
     );
 
-    expect(event.kind).toBe(DM_KIND);
+    expect(event.kind).toBe(KIND_DIRECT_MESSAGE);
     expect(event.pubkey).toBe(oracle.publicKey);
     expect(event.content).not.toContain("preimage");
     const pTag = event.tags.find((t) => t[0] === "p");
@@ -61,7 +57,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       "C2PA signature invalid",
     );
 
-    expect(event.kind).toBe(DM_KIND);
+    expect(event.kind).toBe(KIND_DIRECT_MESSAGE);
     expect(event.pubkey).toBe(oracle.publicKey);
   });
 

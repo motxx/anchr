@@ -1,8 +1,8 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
+import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
 import {
-  ANCHR_ORACLE_ATTESTATION,
   buildOracleAttestationEvent,
   parseOracleAttestationPayload,
   toOracleAttestation,
@@ -28,7 +28,7 @@ test("buildOracleAttestationEvent creates valid event", () => {
     attestation,
   );
 
-  expect(event.kind).toBe(ANCHR_ORACLE_ATTESTATION);
+  expect(event.kind).toBe(KIND_ORACLE_ATTESTATION);
   expect(event.pubkey).toBe(oracleIdentity.publicKey);
 
   // Tags

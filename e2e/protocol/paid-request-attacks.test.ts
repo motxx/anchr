@@ -28,7 +28,7 @@ describe("Attack: Preimage Isolation", () => {
       { description: "Query 1" },
       {
         escrow: escrowInfo1,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -63,7 +63,7 @@ describe("Attack: Preimage Isolation", () => {
       { description: "Query 2 reuse" },
       {
         escrow: escrowInfo2,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -145,7 +145,7 @@ describe("Attack: Race Conditions & Timing", () => {
     const { escrowInfo } = makeEscrowInfo(preimageStore);
     const query = service.createQuery(
       { description: "Cancel attack" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -174,7 +174,7 @@ describe("Attack: Race Conditions & Timing", () => {
 
     const query = service.createQuery(
       { description: "Expiry attack" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 }, ttlMs: 1 },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -207,7 +207,7 @@ describe("Attack: Race Conditions & Timing", () => {
 
     const query = service.createQuery(
       { description: "Expired submit" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 }, ttlMs: 1 },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 }, ttlMs: 1 },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -291,7 +291,7 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "Flip-flop Q1" },
       {
         escrow: escrowInfo1,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["flip-oracle"],
       },
     );
@@ -319,7 +319,7 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "Flip-flop Q2" },
       {
         escrow: escrowInfo2,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -357,7 +357,7 @@ describe("Attack: Oracle Manipulation", () => {
       { description: "Quorum split" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["oracle-pass", "oracle-fail-1", "oracle-fail-2"],
         quorum: { min_approvals: 2 },
       },
@@ -402,7 +402,7 @@ describe("Attack: Oracle Manipulation", () => {
 
     const query = service.createQuery(
       { description: "No oracle" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     service.recordOffer(query.id, {
       provider_pubkey: "w1",
@@ -506,7 +506,7 @@ describe("Attack: Cross-Query", () => {
       { description: "Query A" },
       {
         escrow: escrowInfoA,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -525,7 +525,7 @@ describe("Attack: Cross-Query", () => {
       { description: "Query B" },
       {
         escrow: escrowInfoB,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );

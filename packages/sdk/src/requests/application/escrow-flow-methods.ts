@@ -68,7 +68,7 @@ export async function doSelectProvider(
 
   const escrowRef = query.escrow?.escrow_ref ?? query.escrow?.escrow_token ??
     escrowToken;
-  const expectedSats = query.bounty?.amount_sats;
+  const expectedSats = query.payment_lock?.amount_sats;
   let verifiedEscrowSats: number | undefined;
   if (escrowRef && expectedSats && deps.escrowProvider) {
     const check = await verifyEscrowAmount(

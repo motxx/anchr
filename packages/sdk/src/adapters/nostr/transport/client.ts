@@ -4,12 +4,12 @@ import { SimplePool, type SubCloser } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event, VerifiedEvent } from "nostr-tools/core";
 import {
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_REQUEST,
-  ANCHR_QUERY_RESPONSE,
-} from "../events/events.ts";
-import { DM_KIND } from "../events/dm.ts";
-import { ANCHR_ORACLE_ATTESTATION } from "../events/oracle-attestation.ts";
+  KIND_DIRECT_MESSAGE,
+  KIND_ORACLE_ATTESTATION,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+} from "@anchr/protocol/nostr";
 
 export interface NostrClientConfig {
   relayUrls: string[];
@@ -96,7 +96,7 @@ export function subscribeToQueries(
   rememberRelayUrls(urls);
 
   const filter: Filter = {
-    kinds: [ANCHR_QUERY_REQUEST],
+    kinds: [KIND_QUERY_REQUEST],
     "#t": ["anchr"],
     since: Math.floor(Date.now() / 1000) - 3600,
   };
@@ -121,7 +121,7 @@ export function subscribeToResponses(
   rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
-    kinds: [ANCHR_QUERY_RESPONSE],
+    kinds: [KIND_QUERY_RESPONSE],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -139,7 +139,7 @@ export function subscribeToSettlements(
   rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
-    kinds: [ANCHR_QUERY_FEEDBACK],
+    kinds: [KIND_QUERY_FEEDBACK],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -157,7 +157,7 @@ export function subscribeToFeedback(
   rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
-    kinds: [ANCHR_QUERY_FEEDBACK],
+    kinds: [KIND_QUERY_FEEDBACK],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -176,7 +176,7 @@ export function subscribeToDMs(
   rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
-    kinds: [DM_KIND],
+    kinds: [KIND_DIRECT_MESSAGE],
     "#p": [recipientPubkey],
     since: Math.floor(Date.now() / 1000) - 3600,
   }, {
@@ -195,7 +195,7 @@ export function subscribeToAttestations(
   rememberRelayUrls(urls);
 
   return pool.subscribeMany(urls, {
-    kinds: [ANCHR_ORACLE_ATTESTATION],
+    kinds: [KIND_ORACLE_ATTESTATION],
     "#e": [queryEventId],
   }, {
     onevent: onEvent,
@@ -215,7 +215,7 @@ export async function fetchRecentQueries(
   rememberRelayUrls(urls);
 
   const filter: Filter = {
-    kinds: [ANCHR_QUERY_REQUEST],
+    kinds: [KIND_QUERY_REQUEST],
     "#t": ["anchr"],
     since: Math.floor(Date.now() / 1000) - 3600,
     limit: options?.limit ?? 50,

@@ -10,6 +10,8 @@
  *   [E022] application vocabulary must not leak into package code.
  *   [E026] sdk feature folders may touch request internals only through
  *          documented request-scoped lifecycle state or lifecycle ports.
+ *   [E027] Nostr event-kind constants are owned by @anchr/protocol/nostr;
+ *          the sdk package must import them, never define them.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -37,7 +39,11 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
 
 const OPT_OUT = /\/\/\s*allow-arch:/;
 const APP_VOCAB =
-  /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces)\b/;
+  /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces|MARKET|MARKETPLACE|bounty|bounties|Bounty|Bounties|BOUNTY)\b/;
+// [E027] Nostr event-kind constants are owned by @anchr/protocol/nostr.
+// Defining a numeric kind constant in the sdk package re-creates a second
+// wire-contract owner.
+const SDK_KIND_CONST = /\bexport\s+const\s+(KIND_|ANCHR_)[A-Z_0-9]+\s*=\s*\d+/;
 
 const IMPORT_RE =
   /(?:^|\n)\s*(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']/g;
@@ -267,6 +273,19 @@ function checkPackageFile(
       severity: "error",
       message: `application vocabulary "${hit.match}" not allowed in packages/`,
     });
+  }
+
+  if (pkg === "sdk") {
+    for (const hit of scanContentLines(source, SDK_KIND_CONST)) {
+      violations.push({
+        file: fileRel,
+        line: hit.line,
+        code: "E027",
+        severity: "error",
+        message:
+          `Nostr kind constant defined in sdk; import it from @anchr/protocol/nostr instead`,
+      });
+    }
   }
 
   const allowed = ALLOWED_PACKAGE_DEPS[pkg];

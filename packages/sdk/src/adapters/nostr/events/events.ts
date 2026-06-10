@@ -1,13 +1,10 @@
 /**
- * Anchr Nostr event builders and parsers.
+ * SDK-local DVM-dialect payload shapes (not the canonical wire contract).
  *
- * Uses NIP-90 Data Vending Machine (DVM) event kinds so that any
- * DVM-aware client can discover and interact with Anchr queries.
- *
- * Event kind mapping:
- *   ANCHR_QUERY_REQUEST   = 5300  (DVM Job Request)
- *   ANCHR_QUERY_RESPONSE  = 6300  (DVM Job Result)
- *   ANCHR_QUERY_FEEDBACK  = 7000  (DVM Job Feedback — offers, selection, completion)
+ * The canonical Anchr wire contract lives in `@anchr/protocol/events`.
+ * This module carries the generic NIP-90 DVM dialect spoken by the SDK's
+ * Nostr service layer so DVM-aware clients can discover and interact with
+ * Anchr queries; kinds come from `@anchr/protocol/nostr`.
  *
  * Kind 7000 is used for multiple sub-types per NIP-90:
  *   status=payment-required  → Provider offer
@@ -21,27 +18,16 @@ import type {
 } from "../../../requests/domain/types.ts";
 import { decryptNip44, deriveConversationKey } from "../crypto/encryption.ts";
 
-// NIP-90 DVM event kinds for Anchr.
-export const ANCHR_QUERY_REQUEST = 5300; // DVM Job Request
-export const ANCHR_QUERY_RESPONSE = 6300; // DVM Job Result
-export const ANCHR_QUERY_FEEDBACK = 7000; // DVM Job Feedback (offers, selection, settlement)
-
-// Oracle announcement (NIP-78 style parameterized replaceable).
-export const ANCHR_ORACLE_ANNOUNCEMENT = 30088;
-
-// Marketplace listing (NIP-33 parameterized replaceable, Routstr-compatible).
-export const ANCHR_MARKETPLACE_LISTING = 38421;
-
 // --- Payload types ---
 
-export interface QueryRequestPayload {
+export interface DvmQueryRequestPayload {
   description: string;
   nonce?: string;
   /** Oracle's Nostr pubkey (hex) — Providers verify against whitelist. */
   oracle_pubkey?: string;
   /** Customer's Nostr pubkey (hex) — Providers encrypt K_R to this. */
   customer_pubkey?: string;
-  bounty?: {
+  payment_lock?: {
     mint: string;
     token: string;
   };
@@ -51,7 +37,7 @@ export interface QueryRequestPayload {
   expires_at: number;
 }
 
-export interface QueryResponsePayload {
+export interface DvmQueryResponsePayload {
   nonce_echo: string;
   attachments?: Array<{
     blossom_hash: string;
@@ -68,7 +54,7 @@ export interface QueryResponsePayload {
 }
 
 /** Provider offer: kind 7000 with status=payment-required. */
-export interface OfferFeedbackPayload {
+export interface DvmOfferFeedbackPayload {
   status: "payment-required";
   /** Provider's Nostr pubkey (hex). */
   provider_pubkey: string;
@@ -77,7 +63,7 @@ export interface OfferFeedbackPayload {
 }
 
 /** Customer selection announcement: kind 7000 with status=processing. */
-export interface SelectionFeedbackPayload {
+export interface DvmSelectionFeedbackPayload {
   status: "processing";
   /** Selected Provider's Nostr pubkey (hex). */
   selected_provider_pubkey: string;
@@ -95,7 +81,7 @@ export interface CompletionFeedbackPayload {
   escrow_token?: string;
 }
 
-/** Settlement payload published as kind ANCHR_QUERY_FEEDBACK. */
+/** Settlement payload published as kind KIND_QUERY_FEEDBACK. */
 export interface QuerySettlementPayload {
   status: "accepted" | "rejected";
   escrow_token?: string;
@@ -104,8 +90,8 @@ export interface QuerySettlementPayload {
 
 /** Union of all kind 7000 feedback payload types. */
 export type FeedbackPayload =
-  | OfferFeedbackPayload
-  | SelectionFeedbackPayload
+  | DvmOfferFeedbackPayload
+  | DvmSelectionFeedbackPayload
   | CompletionFeedbackPayload
   | QuerySettlementPayload;
 
@@ -167,18 +153,20 @@ export {
 
 // --- Parsers ---
 
-export function parseQueryRequestPayload(content: string): QueryRequestPayload {
-  return JSON.parse(content) as QueryRequestPayload;
+export function parseQueryRequestPayload(
+  content: string,
+): DvmQueryRequestPayload {
+  return JSON.parse(content) as DvmQueryRequestPayload;
 }
 
 export function parseQueryResponsePayload(
   content: string,
   secretKey: Uint8Array,
   senderPubKey: string,
-): QueryResponsePayload {
+): DvmQueryResponsePayload {
   const conversationKey = deriveConversationKey(secretKey, senderPubKey);
   const decrypted = decryptNip44(content, conversationKey);
-  return JSON.parse(decrypted) as QueryResponsePayload;
+  return JSON.parse(decrypted) as DvmQueryResponsePayload;
 }
 
 export function parseOracleResponsePayload(

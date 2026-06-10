@@ -138,12 +138,12 @@ describe("createQueryAggregate", () => {
     expect(q.customer_meta?.customer_type).toBe("agent");
   });
 
-  test("sets bounty", () => {
+  test("sets payment_lock", () => {
     const q = expectOk(createQueryAggregate(defaultInput, {
       ttlMs: 600_000,
-      bounty: { amount_sats: 100 },
+      payment_lock: { amount_sats: 100 },
     }));
-    expect(q.bounty?.amount_sats).toBe(100);
+    expect(q.payment_lock?.amount_sats).toBe(100);
   });
 
   test("sets oracle_ids", () => {

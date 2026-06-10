@@ -1,11 +1,11 @@
 /**
- * E2E tests for the full regtest Cashu bounty flow.
+ * E2E tests for the full regtest Cashu payment_lock flow.
  *
  * Tests the complete lifecycle:
  *   1. Mint Cashu tokens via regtest Lightning
- *   2. Create a query with bounty
+ *   2. Create a query with payment_lock
  *   3. Submit a result
- *   4. Verify bounty release and Cashu token return
+ *   4. Verify payment_lock release and Cashu token return
  *
  * Prerequisites:
  *   docker compose up -d
@@ -68,7 +68,7 @@ const testService = createQueryService({
   hooks: {},
 });
 
-suite("e2e: regtest Cashu bounty lifecycle", () => {
+suite("e2e: regtest Cashu payment_lock lifecycle", () => {
   beforeAll(() => {
     testService.clearQueryStore();
   });
@@ -108,7 +108,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     expect(totalAmount).toBe(BOUNTY_SATS);
   });
 
-  test("full bounty lifecycle: mint → create query → submit → release", async () => {
+  test("full payment_lock lifecycle: mint → create query → submit → release", async () => {
     // 1. Mint Cashu token
     const { token } = await mintCashuToken(BOUNTY_SATS);
     expect(token).toMatch(/^cashuB/);
@@ -122,7 +122,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
       },
       {
         ttlSeconds: 300,
-        bounty: {
+        payment_lock: {
           amount_sats: BOUNTY_SATS,
           escrow_token: token,
         },
@@ -132,11 +132,11 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     expect(created.status).toBe("pending");
     expect(created.payment_status).toBe("locked");
 
-    // 3. Verify query appears in list with bounty
+    // 3. Verify query appears in list with payment_lock
     const queries = testService.listOpenQueries();
     const ourQuery = queries.find((q) => q.id === created.id);
     expect(ourQuery).toBeDefined();
-    expect(ourQuery!.bounty?.amount_sats).toBe(BOUNTY_SATS);
+    expect(ourQuery!.payment_lock?.amount_sats).toBe(BOUNTY_SATS);
 
     // 4. Submit result with GPS
     const submitOutcome = await testService.submitQueryResult(
@@ -159,8 +159,8 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     expect(detail.payment_status).toBe("released");
   });
 
-  test("bounty token is redeemable at cashu mint", async () => {
-    // Create bounty query and submit to get token back
+  test("payment_lock token is redeemable at cashu mint", async () => {
+    // Create payment_lock query and submit to get token back
     const { token } = await mintCashuToken(BOUNTY_SATS);
     const query = testService.createQuery(
       {
@@ -170,7 +170,7 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
       },
       {
         ttlSeconds: 300,
-        bounty: { amount_sats: BOUNTY_SATS, escrow_token: token },
+        payment_lock: { amount_sats: BOUNTY_SATS, escrow_token: token },
       },
     );
     const submitOutcome = await testService.submitQueryResult(
@@ -181,8 +181,8 @@ suite("e2e: regtest Cashu bounty lifecycle", () => {
     expect(submitOutcome.ok).toBe(true);
     expect(submitOutcome.query?.payment_status).toBe("released");
 
-    // Verify query bounty via detail endpoint
+    // Verify query payment_lock via detail endpoint
     const detail = testService.getQuery(query.id)!;
-    expect(detail.bounty?.amount_sats).toBe(BOUNTY_SATS);
+    expect(detail.payment_lock?.amount_sats).toBe(BOUNTY_SATS);
   });
 });

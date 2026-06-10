@@ -24,16 +24,6 @@ export {
 } from "./customer.ts";
 
 export {
-  type AdapterCapability,
-  type AdapterManifest,
-  type CapabilityAdapter,
-  type CapabilityCheckResult,
-  checkCapabilities,
-  missingCapabilities,
-  type RuntimeTarget,
-} from "./adapters/types.ts";
-
-export {
   buildOfferFeedbackEvent,
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,

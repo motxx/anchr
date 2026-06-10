@@ -4,12 +4,12 @@
     "justification": "rename actor wording to Provider without changing the TLSN proof-forgery invariant"
   },
   "INV-02": {
-    "hash": "sha256:c203e198c8d4d9238abc93fa5a5316d8ca963e38a14c3b0d22e4e6e155169ed4",
-    "justification": "update INV-02 from the removed HTTP gateway wording to the query-service result path while preserving the no-preimage-on-failure invariant"
+    "hash": "sha256:903edf3abdcd789477bcc4f67359d6ed547ca0d01b3f18cfd4bb6c0955f7e82d",
+    "justification": "update referenced test path after e2e/protocol/bounty-attacks.test.ts was renamed to paid-request-attacks.test.ts; invariant claim unchanged"
   },
   "INV-03": {
-    "hash": "sha256:225194382fb37491ac6530b39ee1c2fb9372c087791a774b365345ce591ed08a",
-    "justification": "rename actor wording to Customer/Provider without changing the escrow-timeout invariant"
+    "hash": "sha256:3e4b02ae366633ff431741b756c6784fd5ce29c8ad183c34f89227513dddb40d",
+    "justification": "correct referenced e2e test paths to their real e2e/regtest/ locations; invariant claim unchanged"
   },
   "INV-04": {
     "hash": "sha256:5f5700c5bb3856fdf6748f1a0c4fa52efd024ed769d4e4c7e4f1e4d2d63cec4d",

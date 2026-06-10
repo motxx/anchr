@@ -5,6 +5,7 @@ import {
   finalizeEvent,
   type VerifiedEvent,
 } from "nostr-tools";
+import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
 import type { NostrIdentity } from "../crypto/identity.ts";
 import {
   decryptNip44,
@@ -18,8 +19,6 @@ import type {
   RejectionDMPayload,
 } from "./events.ts";
 export type { FrostSignatureDMPayload, OracleDMPayload } from "./events.ts";
-
-export const DM_KIND = 4;
 
 export function buildPreimageDM(
   oracleIdentity: NostrIdentity,
@@ -40,7 +39,7 @@ export function buildPreimageDM(
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
-    kind: DM_KIND,
+    kind: KIND_DIRECT_MESSAGE,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["p", providerPubKey],
@@ -70,7 +69,7 @@ export function buildRejectionDM(
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
-    kind: DM_KIND,
+    kind: KIND_DIRECT_MESSAGE,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["p", providerPubKey],
@@ -104,7 +103,7 @@ export function buildFrostSignatureDM(
   const encrypted = encryptNip44(JSON.stringify(payload), conversationKey);
 
   const template: EventTemplate = {
-    kind: DM_KIND,
+    kind: KIND_DIRECT_MESSAGE,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
       ["p", providerPubKey],

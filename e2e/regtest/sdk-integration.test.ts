@@ -242,7 +242,7 @@ suite(
       >;
       expect(content).not.toHaveProperty("predicate");
       expect(content).not.toHaveProperty("mint_url");
-      expect(content).not.toHaveProperty("bounty_token");
+      expect(content).not.toHaveProperty("payment_lock_token");
       expect(content).not.toHaveProperty("provider_redemption_token");
       expect(content).not.toHaveProperty("locktime_seconds");
     });

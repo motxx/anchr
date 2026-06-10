@@ -195,7 +195,7 @@ describe("Application Service — HTLC lifecycle", () => {
       customer_pubkey: "req_pub",
       locktime: Math.floor(Date.now() / 1000) + 1200,
     },
-    bounty: { amount_sats: 100 },
+    payment_lock: { amount_sats: 100 },
   });
 
   test("create HTLC query starts at awaiting_offers", () => {

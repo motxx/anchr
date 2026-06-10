@@ -2,28 +2,30 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../crypto/identity.ts";
 import {
-  ANCHR_QUERY_FEEDBACK,
-  ANCHR_QUERY_REQUEST,
-  ANCHR_QUERY_RESPONSE,
+  KIND_QUERY_FEEDBACK,
+  KIND_QUERY_REQUEST,
+  KIND_QUERY_RESPONSE,
+} from "@anchr/protocol/nostr";
+import {
   buildOfferFeedbackEvent,
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildQuerySettlementEvent,
   buildSelectionFeedbackEvent,
-  type OfferFeedbackPayload,
+  type DvmOfferFeedbackPayload,
+  type DvmQueryRequestPayload,
+  type DvmSelectionFeedbackPayload,
   parseFeedbackPayload,
   parseOracleResponsePayload,
   parseQueryRequestPayload,
   parseQueryResponsePayload,
   parseQuerySettlementPayload,
-  type QueryRequestPayload,
-  type SelectionFeedbackPayload,
 } from "./events.ts";
 
 describe("Nostr events (NIP-90 DVM)", () => {
   test("builds and parses QueryRequest event with DVM tags", () => {
     const identity = generateEphemeralIdentity();
-    const payload: QueryRequestPayload = {
+    const payload: DvmQueryRequestPayload = {
       description: "テヘラン市街の様子",
       nonce: "K7P4",
       expires_at: Date.now() + 600_000,
@@ -31,7 +33,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
 
     const event = buildQueryRequestEvent(identity, "query_123", payload, "IR");
 
-    expect(event.kind).toBe(ANCHR_QUERY_REQUEST);
+    expect(event.kind).toBe(KIND_QUERY_REQUEST);
     expect(event.kind).toBe(5300); // DVM Job Request
     expect(event.pubkey).toBe(identity.publicKey);
 
@@ -61,7 +63,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
     const encryptedTag = event.tags.find((t) => t[0] === "encrypted");
     expect(encryptedTag).toBeTruthy();
 
-    // No bid tag when no bounty
+    // No bid tag when no payment_lock
     const bidTag = event.tags.find((t) => t[0] === "bid");
     expect(bidTag).toBeUndefined();
 
@@ -71,12 +73,12 @@ describe("Nostr events (NIP-90 DVM)", () => {
     expect(parsed.nonce).toBe("K7P4");
   });
 
-  test("QueryRequest includes bid tag when bounty is present", () => {
+  test("QueryRequest includes bid tag when payment_lock is present", () => {
     const identity = generateEphemeralIdentity();
-    const payload: QueryRequestPayload = {
+    const payload: DvmQueryRequestPayload = {
       description: "storefront observation",
       nonce: "B1C2",
-      bounty: { mint: "https://mint.example", token: "cashuAbc..." },
+      payment_lock: { mint: "https://mint.example", token: "cashuAbc..." },
       expires_at: Date.now() + 600_000,
     };
 
@@ -107,7 +109,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       },
     );
 
-    expect(response.kind).toBe(ANCHR_QUERY_RESPONSE);
+    expect(response.kind).toBe(KIND_QUERY_RESPONSE);
     expect(response.pubkey).toBe(provider.publicKey);
 
     // Customer can decrypt
@@ -137,7 +139,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       },
     );
 
-    expect(settlement.kind).toBe(ANCHR_QUERY_FEEDBACK);
+    expect(settlement.kind).toBe(KIND_QUERY_FEEDBACK);
 
     // Check tags
     const eTags = settlement.tags.filter((t) => t[0] === "e");
@@ -271,7 +273,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
     const provider = generateEphemeralIdentity();
     const customer = generateEphemeralIdentity();
 
-    const payload: OfferFeedbackPayload = {
+    const payload: DvmOfferFeedbackPayload = {
       status: "payment-required",
       provider_pubkey: provider.publicKey,
       amount_sats: 100,
@@ -284,7 +286,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       payload,
     );
 
-    expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
+    expect(event.kind).toBe(KIND_QUERY_FEEDBACK);
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("payment-required");
 
@@ -295,17 +297,17 @@ describe("Nostr events (NIP-90 DVM)", () => {
       provider.publicKey,
     );
     expect(parsed.status).toBe("payment-required");
-    expect((parsed as OfferFeedbackPayload).provider_pubkey).toBe(
+    expect((parsed as DvmOfferFeedbackPayload).provider_pubkey).toBe(
       provider.publicKey,
     );
-    expect((parsed as OfferFeedbackPayload).amount_sats).toBe(100);
+    expect((parsed as DvmOfferFeedbackPayload).amount_sats).toBe(100);
   });
 
   test("builds and decrypts SelectionFeedback event (kind 7000)", () => {
     const customer = generateEphemeralIdentity();
     const provider = generateEphemeralIdentity();
 
-    const payload: SelectionFeedbackPayload = {
+    const payload: DvmSelectionFeedbackPayload = {
       status: "processing",
       selected_provider_pubkey: provider.publicKey,
       htlc_token: "cashuToken123",
@@ -318,7 +320,7 @@ describe("Nostr events (NIP-90 DVM)", () => {
       payload,
     );
 
-    expect(event.kind).toBe(ANCHR_QUERY_FEEDBACK);
+    expect(event.kind).toBe(KIND_QUERY_FEEDBACK);
     const statusTag = event.tags.find((t) => t[0] === "status");
     expect(statusTag?.[1]).toBe("processing");
 
@@ -329,10 +331,11 @@ describe("Nostr events (NIP-90 DVM)", () => {
       customer.publicKey,
     );
     expect(parsed.status).toBe("processing");
-    expect((parsed as SelectionFeedbackPayload).selected_provider_pubkey).toBe(
-      provider.publicKey,
-    );
-    expect((parsed as SelectionFeedbackPayload).htlc_token).toBe(
+    expect((parsed as DvmSelectionFeedbackPayload).selected_provider_pubkey)
+      .toBe(
+        provider.publicKey,
+      );
+    expect((parsed as DvmSelectionFeedbackPayload).htlc_token).toBe(
       "cashuToken123",
     );
   });

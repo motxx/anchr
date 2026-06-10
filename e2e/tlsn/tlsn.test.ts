@@ -250,7 +250,7 @@ describe("TLSNotary E2E", () => {
 
     const query = svc.createQuery(input, {
       ttlSeconds: 600,
-      bounty: { amount_sats: 21 },
+      payment_lock: { amount_sats: 21 },
     });
     expect(query.status).toBe("pending");
     expect(query.tlsn_requirements?.target_url).toBe(TARGET_URL);

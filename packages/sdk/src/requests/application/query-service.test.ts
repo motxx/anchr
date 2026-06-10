@@ -162,13 +162,13 @@ describe("createQueryService", () => {
     expect(query.oracle_ids).toEqual(["oracle-a", "oracle-b"]);
   });
 
-  test("createQuery stores bounty info", async () => {
+  test("createQuery stores payment_lock info", async () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
       { description: "Test query" },
-      { bounty: { amount_sats: 100 } },
+      { payment_lock: { amount_sats: 100 } },
     );
-    expect(query.bounty?.amount_sats).toBe(100);
+    expect(query.payment_lock?.amount_sats).toBe(100);
   });
 
   test("createQuery fires onCreated hook", async () => {
@@ -501,12 +501,12 @@ describe("HTLC lifecycle", () => {
     expect(updated.payment_status).toBe("escrow_swapped");
   });
 
-  test("selectProvider verifies escrow token amount matches bounty", async () => {
+  test("selectProvider verifies escrow token amount matches payment_lock", async () => {
     const { service } = makeIsolatedService();
     const validToken = makeFakeToken(100);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     const outcome = await service.selectProvider(
       query.id,
@@ -523,7 +523,7 @@ describe("HTLC lifecycle", () => {
     const smallToken = makeFakeToken(50);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     const outcome = await service.selectProvider(
       query.id,
@@ -540,7 +540,7 @@ describe("HTLC lifecycle", () => {
     const { service } = makeIsolatedService();
     const query = service.createQuery(
       { description: "HTLC test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     const outcome = await service.selectProvider(
       query.id,
@@ -552,12 +552,12 @@ describe("HTLC lifecycle", () => {
     expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
   });
 
-  test("selectProvider accepts token with more than bounty amount", async () => {
+  test("selectProvider accepts token with more than payment_lock amount", async () => {
     const { service } = makeIsolatedService();
     const bigToken = makeFakeToken(200);
     const query = service.createQuery(
       { description: "HTLC test" },
-      { escrow: escrowInfo, bounty: { amount_sats: 100 } },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
     );
     const outcome = await service.selectProvider(
       query.id,

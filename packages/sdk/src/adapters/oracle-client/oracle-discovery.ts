@@ -8,7 +8,7 @@
 import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "../nostr/events/events.ts";
+import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import {
   type EscrowType,
   VERIFICATION_FACTORS,
@@ -56,8 +56,8 @@ export interface OracleAnnouncement {
   fee_ppm: number;
   supported_factors: VerificationFactor[];
   supported_escrow_types: EscrowType[];
-  min_bounty_sats?: number;
-  max_bounty_sats?: number;
+  min_amount_sats?: number;
+  max_amount_sats?: number;
   description?: string;
   /** Nostr pubkey (hex) of the Oracle that published this announcement. */
   pubkey: string;
@@ -87,8 +87,8 @@ export function parseOracleAnnouncementEvent(
       fee_ppm: requireNumber(content, "fee_ppm"),
       supported_factors: filterVerificationFactors(content.supported_factors),
       supported_escrow_types: filterEscrowTypes(content.supported_escrow_types),
-      min_bounty_sats: optionalNumber(content, "min_bounty_sats"),
-      max_bounty_sats: optionalNumber(content, "max_bounty_sats"),
+      min_amount_sats: optionalNumber(content, "min_amount_sats"),
+      max_amount_sats: optionalNumber(content, "max_amount_sats"),
       description: optionalString(content, "description"),
       pubkey: event.pubkey,
       announced_at: event.created_at,
@@ -125,7 +125,7 @@ export async function discoverOracles(
       : "anchr-oracle";
 
     const filter: Filter = {
-      kinds: [ANCHR_ORACLE_ANNOUNCEMENT],
+      kinds: [KIND_ORACLE_ANNOUNCEMENT],
       "#t": [tag],
     };
 

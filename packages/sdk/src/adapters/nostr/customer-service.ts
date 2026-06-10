@@ -18,10 +18,10 @@ import { generateEphemeralIdentity } from "./crypto/identity.ts";
 import {
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
-  type OfferFeedbackPayload,
+  type DvmOfferFeedbackPayload,
+  type DvmQueryRequestPayload,
+  type DvmSelectionFeedbackPayload,
   parseFeedbackPayload,
-  type QueryRequestPayload,
-  type SelectionFeedbackPayload,
 } from "./events/events.ts";
 import { publishEvent, subscribeToFeedback } from "./transport/client.ts";
 import type { EscrowProvider } from "../../requests/application/ports.ts";
@@ -137,12 +137,12 @@ export async function createHtlcRequest(
   if (!hold) return null;
 
   // Step 3: Publish DVM Job Request (kind 5300)
-  const payload: QueryRequestPayload = {
+  const payload: DvmQueryRequestPayload = {
     description: request.description,
     nonce: "", // Will be set by query-service
     oracle_pubkey: config.oraclePubkey,
     customer_pubkey: identity.publicKey,
-    bounty: {
+    payment_lock: {
       mint: Deno.env.get("CASHU_MINT_URL") ?? "",
       token: hold.escrow_ref,
     },
@@ -198,7 +198,7 @@ export function subscribeToOffers(
           event.pubkey,
         );
         if (payload.status === "payment-required") {
-          const offer = payload as OfferFeedbackPayload;
+          const offer = payload as DvmOfferFeedbackPayload;
           const info: OfferInfo = {
             provider_pubkey: offer.provider_pubkey,
             amount_sats: offer.amount_sats,
@@ -239,7 +239,7 @@ export async function selectProvider(
   state.escrow.escrow_ref = bound.escrow_ref;
 
   // Step 6: Announce selection (kind 7000 status=processing)
-  const selectionPayload: SelectionFeedbackPayload = {
+  const selectionPayload: DvmSelectionFeedbackPayload = {
     status: "processing",
     selected_provider_pubkey: providerPubkey,
     htlc_token: bound.escrow_ref,

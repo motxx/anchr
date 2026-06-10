@@ -127,7 +127,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
         oracleIds: ["e2e-oracle"],
         ttlSeconds: 600,
         escrow: escrowInfo,
-        bounty: { amount_sats: BOUNTY_SATS, escrow_token: escrowToken },
+        payment_lock: { amount_sats: BOUNTY_SATS, escrow_token: escrowToken },
       },
     );
     const queryId = query.id;
@@ -232,7 +232,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
       { description: "E2E rejection test" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: BOUNTY_SATS, escrow_token: token },
+        payment_lock: { amount_sats: BOUNTY_SATS, escrow_token: token },
         oracleIds: ["strict-oracle"],
       },
     );

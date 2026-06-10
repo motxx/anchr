@@ -157,7 +157,7 @@ export interface SubmissionMeta {
   channel: SubmissionChannel;
 }
 
-export interface BountyInfo {
+export interface PaymentLockInfo {
   amount_sats: number;
   escrow_token?: string;
 }
@@ -212,7 +212,7 @@ export type EscrowInfo = HtlcEscrow | P2pkFrostEscrow;
 export interface OfferInfo {
   /** Provider's Nostr pubkey (hex). */
   provider_pubkey: string;
-  /** Requested amount in sats (optional; may match bounty). */
+  /** Requested amount in sats (optional; may match the Payment Lock amount). */
   amount_sats?: number;
   /** Nostr event ID of the kind 7000 offer event. */
   offer_event_id: string;
@@ -271,7 +271,7 @@ export interface Query {
   created_at: number;
   expires_at: number;
   customer_meta?: CustomerMeta;
-  bounty?: BountyInfo;
+  payment_lock?: PaymentLockInfo;
   /** Acceptable oracle IDs set by customer. Empty/undefined = any (defaults to built-in). */
   oracle_ids?: string[];
   /** Oracle selected by provider at submission time. */

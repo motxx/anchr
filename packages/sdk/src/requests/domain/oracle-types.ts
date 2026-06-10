@@ -13,14 +13,14 @@ export interface OracleInfo {
   name: string;
   /** URL for external oracle APIs (undefined for built-in). */
   endpoint?: string;
-  /** Fee in parts-per-million of bounty (e.g. 50_000 = 5%). */
+  /** Fee in parts-per-million of the Payment Lock amount (e.g. 50_000 = 5%). */
   fee_ppm: number;
   supported_factors?: VerificationFactor[];
   supported_escrow_types?: EscrowType[];
-  /** Minimum bounty this oracle accepts (sats). */
-  min_bounty_sats?: number;
-  /** Maximum bounty this oracle accepts (sats). */
-  max_bounty_sats?: number;
+  /** Minimum Payment Lock amount this oracle accepts (sats). */
+  min_amount_sats?: number;
+  /** Maximum Payment Lock amount this oracle accepts (sats). */
+  max_amount_sats?: number;
   description?: string;
 }
 

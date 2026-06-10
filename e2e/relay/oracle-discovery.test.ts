@@ -19,7 +19,7 @@ import {
   discoverOracles,
   parseOracleAnnouncementEvent,
 } from "@anchr/sdk/adapters/oracle-client";
-import { ANCHR_ORACLE_ANNOUNCEMENT } from "@anchr/sdk/adapters/nostr";
+import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import type { OracleInfo } from "@anchr/sdk/adapters/oracle-client";
 import { isRelayReachable } from "../helpers/regtest.ts";
 
@@ -96,8 +96,8 @@ suite(
         fee_ppm: 50_000,
         supported_factors: ["tlsn", "gps"],
         supported_escrow_types: ["htlc"],
-        min_bounty_sats: 1000,
-        max_bounty_sats: 1_000_000,
+        min_amount_sats: 1000,
+        max_amount_sats: 1_000_000,
         description: "Oracle for E2E testing",
       };
 
@@ -117,8 +117,8 @@ suite(
       expect(found!.fee_ppm).toBe(50_000);
       expect(found!.supported_factors).toEqual(["tlsn", "gps"]);
       expect(found!.supported_escrow_types).toEqual(["htlc"]);
-      expect(found!.min_bounty_sats).toBe(1000);
-      expect(found!.max_bounty_sats).toBe(1_000_000);
+      expect(found!.min_amount_sats).toBe(1000);
+      expect(found!.max_amount_sats).toBe(1_000_000);
       expect(found!.description).toBe("Oracle for E2E testing");
       expect(found!.pubkey).toBe(identity.publicKey);
     });

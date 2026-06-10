@@ -1,8 +1,6 @@
 import {
-  type AdapterManifest,
   buildPreimageDeliveryEvent,
   type CashuClient,
-  checkCapabilities,
   createCustomer,
   createProvider,
   type Filter,
@@ -34,14 +32,6 @@ class InMemoryRelay {
   private subscriptions: SubRecord[] = [];
   private nextId = 1;
 
-  readonly manifest: AdapterManifest = {
-    id: "simulation-in-memory-relay",
-    technology: "in-memory",
-    capabilities: ["transport"],
-    runtimes: ["deno"],
-    experimental: false,
-  };
-
   subscribe(
     filter: Filter,
     onEvent: (event: RelayEvent) => void,
@@ -71,7 +61,6 @@ class InMemoryRelay {
 
   asClient(): RelayClient {
     return {
-      manifest: this.manifest,
       publish: (event) => this.publish(event),
       subscribe: (filter, onEvent) => this.subscribe(filter, onEvent),
       close: () => this.close(),
@@ -119,15 +108,7 @@ function makeCashuClient(mintUrl: string): {
   const locks: BuildHtlcLockCall[] = [];
   const binds: BindProviderCall[] = [];
   const redeems: RedeemHtlcParams[] = [];
-  const manifest: AdapterManifest = {
-    id: "simulation-cashu",
-    technology: "cashu-stub",
-    capabilities: ["payment"],
-    runtimes: ["deno"],
-    experimental: false,
-  };
   const client: CashuClient = {
-    manifest,
     mintUrl,
     buildHtlcLock(params) {
       locks.push({
@@ -197,7 +178,6 @@ export async function runPaidRequestSimulation(): Promise<
   const relayClient = relay.asClient();
   const customerCashu = makeCashuClient("https://mint.test.example");
   const providerCashu = makeCashuClient("https://mint.test.example");
-  const customerCashuManifest = customerCashu.client.manifest;
   const oracleKey = generateKeypair();
   const providerKey = generateKeypair();
   const attachment = materializeAttachmentRef(
@@ -207,15 +187,6 @@ export async function runPaidRequestSimulation(): Promise<
 
   if (attachmentError !== null) {
     throw new Error(attachmentError);
-  }
-  if (customerCashuManifest === undefined) {
-    throw new Error("simulation cashu adapter must expose a manifest");
-  }
-  if (!checkCapabilities(relay.manifest, ["transport"]).ok) {
-    throw new Error("simulation relay must expose transport capability");
-  }
-  if (!checkCapabilities(customerCashuManifest, ["payment"]).ok) {
-    throw new Error("simulation cashu adapter must expose payment capability");
   }
 
   const queryIdsByRequest = new Map<string, string>();

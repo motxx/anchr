@@ -72,7 +72,7 @@ test("rejects empty submission when GPS/nonce required", async () => {
 test("empty submission passes weak verification when no evidence required", async () => {
   const query = makeQuery({
     verification_requirements: ["ai_check"],
-    bounty: undefined,
+    payment_lock: undefined,
     expected_gps: undefined,
   });
   const result: QueryResult = {
@@ -155,9 +155,9 @@ test("attachment without C2PA fails", async () => {
   );
 });
 
-test("bounty query without GPS/nonce requirements allows empty submission", async () => {
+test("payment_lock query without GPS/nonce requirements allows empty submission", async () => {
   const query = makeQuery({
-    bounty: { amount_sats: 100 },
+    payment_lock: { amount_sats: 100 },
     verification_requirements: [],
   });
   const result: QueryResult = {
@@ -167,16 +167,16 @@ test("bounty query without GPS/nonce requirements allows empty submission", asyn
 
   const verification = await verify(query, result);
 
-  // Bounty alone doesn't require evidence — verification_requirements control evidence needs
+  // PaymentLock alone doesn't require evidence — verification_requirements control evidence needs
   expect(verification.passed).toBe(true);
   expect(verification.checks).toContain(
     "no media evidence provided (weak verification)",
   );
 });
 
-test("bounty query with GPS requirement rejects empty submission", async () => {
+test("payment_lock query with GPS requirement rejects empty submission", async () => {
   const query = makeQuery({
-    bounty: { amount_sats: 100 },
+    payment_lock: { amount_sats: 100 },
     verification_requirements: ["gps"],
   });
   const result: QueryResult = {

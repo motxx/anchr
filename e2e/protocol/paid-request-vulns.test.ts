@@ -27,7 +27,7 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
       { description: "Preimage reveal test" },
       {
         escrow: escrowInfo,
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -67,7 +67,7 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
           customer_pubkey: "customer_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["test-oracle"],
       },
     );
@@ -119,7 +119,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
       },
     );
     expect(query.oracle_ids).toBeUndefined();
@@ -168,7 +168,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["oracle-a", "oracle-b"],
       },
     );
@@ -215,7 +215,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
         oracleIds: ["legit-oracle"],
       },
     );
@@ -278,7 +278,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
@@ -317,7 +317,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
@@ -355,7 +355,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {
@@ -393,7 +393,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
           customer_pubkey: "req_pub",
           locktime: Math.floor(Date.now() / 1000) + 3600,
         },
-        bounty: { amount_sats: 100 },
+        payment_lock: { amount_sats: 100 },
       },
     );
     service.recordOffer(query.id, {

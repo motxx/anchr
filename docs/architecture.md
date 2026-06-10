@@ -62,11 +62,12 @@ taxonomy.
 - `/nostr` for Nostr event signing, encryption, identity, tag, and kind helpers
   that are part of wire compatibility.
 
-Adapter manifests, adapter capability checks, concrete payment clients, proof
-engines, attachment stores, runtime helpers, relay clients, and application
-policies belong to `@anchr/sdk` or SDK internals. They do not belong in
-`@anchr/protocol` unless they define the Nostr/Cashu v0 contract recorded in
-`specs/`.
+Concrete payment clients, proof engines, attachment stores, runtime helpers,
+relay clients, and application policies belong to `@anchr/sdk` or SDK
+internals. SDK adapters are fixed-substrate runtime bindings for the Nostr and
+Cashu v0 decision (ADR 0001), not a plug-in layer for alternative transport or
+settlement substrates. They do not belong in `@anchr/protocol` unless they
+define the Nostr/Cashu v0 contract recorded in `specs/`.
 
 ## Surface Policy
 
