@@ -10,10 +10,6 @@
  */
 
 import type {
-  Query as VerifiableRequest,
-  QueryResult as RequestSubmissionResult,
-} from "../../requests/domain/types.ts";
-import type {
   VerificationDetail,
   VerificationInput,
   VerificationRequirement,
@@ -59,45 +55,4 @@ export async function verifyProof(
     warnings: acc.warnings.length > 0 ? acc.warnings : undefined,
     tlsn_verified: ctx.tlsnVerified,
   };
-}
-
-export function requestToRequirement(
-  request: VerifiableRequest,
-): VerificationRequirement {
-  return {
-    id: request.id,
-    factors: request.verification_requirements,
-    description: request.description,
-    challenge_nonce: request.challenge_nonce,
-    expected_gps: request.expected_gps,
-    max_gps_distance_km: request.max_gps_distance_km,
-    tlsn_requirements: request.tlsn_requirements,
-  };
-}
-
-export function resultToVerificationInput(
-  result: RequestSubmissionResult,
-): VerificationInput {
-  return {
-    attachments: result.attachments,
-    gps: result.gps,
-    tlsn_attestation: result.tlsn_attestation,
-    tlsn_extension_result: result.tlsn_extension_result,
-  };
-}
-
-/**
- * NIP-90 adapters can use this shape. Standalone callers should construct a
- * `VerificationRequirement` directly and call `verifyProof`.
- */
-export function verify(
-  request: VerifiableRequest,
-  result: RequestSubmissionResult,
-  options?: VerifyProofOptions,
-): Promise<VerificationDetail> {
-  return verifyProof(
-    requestToRequirement(request),
-    resultToVerificationInput(result),
-    options,
-  );
 }

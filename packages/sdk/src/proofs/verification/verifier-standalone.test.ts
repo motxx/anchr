@@ -8,12 +8,12 @@
 
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { verifyProof } from "./verifier.ts";
 import {
   requestToRequirement,
   resultToVerificationInput,
   verify,
-  verifyProof,
-} from "./verifier.ts";
+} from "../../requests/application/query-verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { VerificationInput, VerificationRequirement } from "./contract.ts";

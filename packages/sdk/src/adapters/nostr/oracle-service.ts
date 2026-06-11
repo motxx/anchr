@@ -33,7 +33,7 @@ import {
   requestToRequirement,
   resultToVerificationInput,
   verify,
-} from "../../proofs/verification/verifier.ts";
+} from "../../requests/application/query-verifier.ts";
 import type {
   Query as VerifiableRequest,
   QueryResult as RequestSubmissionResult,

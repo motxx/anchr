@@ -71,3 +71,49 @@ Parent: issue 0122 (A-full direction).
   drop them from `proofs/verification/index.ts` public exports.
 - Repoint the adapter/test callers; verify proofs imports nothing from
   `requests/`.
+
+Completed: 2026-06-12
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/application/query-verifier.ts` (new: owns the
+  Query→contract adapters `verify`, `requestToRequirement`,
+  `resultToVerificationInput`; imports `Query`/`QueryResult` from
+  `requests/domain` and `verifyProof` + the contract from `@anchr/sdk/proofs`)
+- `packages/sdk/src/proofs/verification/verifier.ts` (stripped the three
+  adapters and the `Query`/`QueryResult` import; now exports only `verifyProof`
+  + the contract/check re-exports)
+- `packages/sdk/src/proofs/verification/index.ts` (public proofs surface now
+  exports `checkAttachmentContent` + `verifyProof` only)
+- Callers repointed to `query-verifier.ts`: `adapters/nostr/oracle-service.ts`,
+  `adapters/oracle-client/built-in.ts`,
+  `adapters/oracle-service/htlc-routes.ts`,
+  `payments/frost/frost-signature-adapter.ts`, and the verifier tests
+- `scripts/arch-lint.ts` allowlist adds `query-verifier.ts` as a documented
+  request-internal target for the nostr/oracle-client/oracle-service/payments
+  importers
+
+Verified with:
+
+- `deno task check`, `deno task test:all`, `deno task lint:strict`,
+  `deno task lint:arch`
+- Negative: `grep -rn 'from ".*requests/' packages/sdk/src/proofs --include='*.ts' | grep -v .test.ts`
+  → no matches (`proofs/` imports nothing from `requests/`)
+- `verifyProof` remains public from `@anchr/sdk/proofs`; `verify` no longer is
+
+Harness update:
+
+- The arch-lint allowlist now documents `query-verifier.ts` as the single
+  request-internal bridge adapters may consume; the broader leak guard is
+  issue 0132.
+
+Review residuals:
+
+- None. The `proofs ↔ requests/domain` cycle is fully eliminated and `Query` no
+  longer leaks through the public proofs surface.
+
+Follow-up:
+
+- 0132 (arch-lint guard for requests/ type leaks), then close parent 0122.

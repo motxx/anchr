@@ -14,7 +14,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   requestToRequirement,
   resultToVerificationInput,
-} from "../../proofs/verification/verifier.ts";
+} from "../../requests/application/query-verifier.ts";
 import type { FrostSignaturePort } from "../../requests/application/ports.ts";
 import type { FrostNodeConfig } from "./frost-config.ts";
 import { coordinateSigning } from "./frost-signing-coordinator.ts";

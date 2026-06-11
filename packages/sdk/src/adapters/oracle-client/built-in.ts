@@ -1,4 +1,4 @@
-import { verify } from "../../proofs/verification/verifier.ts";
+import { verify } from "../../requests/application/query-verifier.ts";
 import type { BlossomKeyMap } from "../../values.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 import type {

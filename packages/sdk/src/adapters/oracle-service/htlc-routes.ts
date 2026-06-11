@@ -1,5 +1,5 @@
 import type { Hono, MiddlewareHandler } from "hono";
-import { verify } from "../../proofs/verification/verifier.ts";
+import { verify } from "../../requests/application/query-verifier.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 import type { OracleAttestation } from "../../requests/domain/oracle-types.ts";
 import type { PreimageStore } from "../../payments/mod.ts";

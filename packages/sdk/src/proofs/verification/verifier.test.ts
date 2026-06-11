@@ -1,6 +1,6 @@
 import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { verify } from "./verifier.ts";
+import { verify } from "../../requests/application/query-verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";

@@ -213,6 +213,7 @@ function isAllowedSdkRequestImport(
       importer: "packages/sdk/src/payments/",
       targets: [
         "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/application/query-verifier.ts",
         "packages/sdk/src/requests/domain/types.ts",
       ],
     },
@@ -224,6 +225,7 @@ function isAllowedSdkRequestImport(
       importer: "packages/sdk/src/adapters/nostr/",
       targets: [
         "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/application/query-verifier.ts",
         "packages/sdk/src/requests/domain/oracle-types.ts",
         "packages/sdk/src/requests/domain/types.ts",
       ],
@@ -232,6 +234,7 @@ function isAllowedSdkRequestImport(
       importer: "packages/sdk/src/adapters/oracle-client/",
       targets: [
         "packages/sdk/src/requests/application/ports.ts",
+        "packages/sdk/src/requests/application/query-verifier.ts",
         "packages/sdk/src/requests/domain/oracle-types.ts",
         "packages/sdk/src/requests/domain/types.ts",
       ],
@@ -239,6 +242,7 @@ function isAllowedSdkRequestImport(
     {
       importer: "packages/sdk/src/adapters/oracle-service/",
       targets: [
+        "packages/sdk/src/requests/application/query-verifier.ts",
         "packages/sdk/src/requests/domain/oracle-types.ts",
         "packages/sdk/src/requests/domain/types.ts",
       ],
