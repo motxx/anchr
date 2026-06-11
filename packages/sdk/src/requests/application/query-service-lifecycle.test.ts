@@ -9,11 +9,8 @@ import type {
   OracleRegistry,
 } from "../../testing/oracle-registry.ts";
 import type { BlossomKeyMap } from "../../values.ts";
-import type {
-  Query,
-  QueryResult,
-  VerificationDetail,
-} from "../domain/types.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
 
 function makeMockOracle(opts?: {
   id?: string;

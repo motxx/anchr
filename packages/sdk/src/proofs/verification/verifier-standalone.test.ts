@@ -16,10 +16,7 @@ import {
 } from "./verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
-import type {
-  VerificationInput,
-  VerificationRequirement,
-} from "../../requests/domain/types.ts";
+import type { VerificationInput, VerificationRequirement } from "./contract.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery } from "../../testing/factories.ts";
 

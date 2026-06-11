@@ -6,7 +6,7 @@ import type { BlossomKeyMap } from "../../values.ts";
 import type {
   VerificationInput,
   VerificationRequirement,
-} from "../../requests/domain/types.ts";
+} from "../../proofs/mod.ts";
 
 export interface FrostSignerRouteDeps {
   authMiddleware: MiddlewareHandler;

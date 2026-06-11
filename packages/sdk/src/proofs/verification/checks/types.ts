@@ -11,7 +11,7 @@ import type { BlossomKeyMap } from "../../../values.ts";
 import type {
   VerificationInput,
   VerificationRequirement,
-} from "../../../requests/domain/types.ts";
+} from "../contract.ts";
 
 export interface CheckAccumulator {
   checks: string[];

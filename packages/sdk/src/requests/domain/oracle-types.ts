@@ -1,11 +1,6 @@
 import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
-import type {
-  EscrowType,
-  Query,
-  QueryResult,
-  VerificationDetail,
-} from "./types.ts";
-import type { TlsnVerifiedData } from "../../proofs/mod.ts";
+import type { EscrowType, Query, QueryResult } from "./types.ts";
+import type { TlsnVerifiedData, VerificationDetail } from "../../proofs/mod.ts";
 
 export interface OracleInfo {
   id: string;

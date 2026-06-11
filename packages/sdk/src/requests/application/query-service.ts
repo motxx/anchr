@@ -26,6 +26,7 @@ import {
 } from "./escrow-flow-methods.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   CustomerMeta,
   EscrowInfo,
@@ -38,7 +39,6 @@ import type {
   QueryResult,
   QuorumConfig,
   SubmissionMeta,
-  VerificationDetail,
 } from "../domain/types.ts";
 
 export type {

@@ -1,5 +1,6 @@
 import type { BlossomKeyMap } from "../../values.ts";
 import { DEFAULT_VERIFICATION_FACTORS } from "../../values.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   CustomerMeta,
   EscrowInfo,
@@ -13,7 +14,6 @@ import type {
   QueryStatus,
   QuorumConfig,
   SubmissionMeta,
-  VerificationDetail,
 } from "./types.ts";
 import type { Clock, DomainServices } from "./ports.ts";
 import { realDomainServices } from "./ports.ts";

@@ -1,10 +1,10 @@
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import type { BlossomKeyMap } from "../../values.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   OracleAttestationRecord,
   Query,
   QueryResult,
-  VerificationDetail,
 } from "../domain/types.ts";
 
 export interface QuorumVerificationResult {

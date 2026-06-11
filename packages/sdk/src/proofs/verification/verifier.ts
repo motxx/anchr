@@ -12,10 +12,12 @@
 import type {
   Query as VerifiableRequest,
   QueryResult as RequestSubmissionResult,
+} from "../../requests/domain/types.ts";
+import type {
   VerificationDetail,
   VerificationInput,
   VerificationRequirement,
-} from "../../requests/domain/types.ts";
+} from "./contract.ts";
 import { defaultFactorChecks } from "./checks/registry.ts";
 import type {
   CheckAccumulator,

@@ -5,7 +5,7 @@ import type { TlsnVerifiedData } from "../../tlsn-types.ts";
 import type {
   VerificationInput,
   VerificationRequirement,
-} from "../../../requests/domain/types.ts";
+} from "../contract.ts";
 import type { CheckAccumulator, FactorCheck } from "./types.ts";
 
 async function verifyTlsnExtensionResult(

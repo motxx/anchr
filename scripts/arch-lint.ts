@@ -279,7 +279,7 @@ function isAllowedRequestFeatureImport(
   }
 
   if (
-    fileRel.startsWith("packages/sdk/src/requests/domain/") &&
+    fileRel.startsWith("packages/sdk/src/requests/") &&
     targetRel === "packages/sdk/src/proofs/mod.ts"
   ) {
     return true;

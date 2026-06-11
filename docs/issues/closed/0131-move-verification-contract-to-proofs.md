@@ -69,3 +69,49 @@ the embedding `Query.verification` / `Query.blossom_keys` fields.
 - Repoint importers (`requests/`, `adapters/`, `payments/frost/`, the verifier
   and its tests) to the proofs module.
 - Confirm no `proofs ↔ requests/domain` type cycle remains (0130 prerequisite).
+
+Completed: 2026-06-12
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/verification/contract.ts` (new: `VerificationRequirement`,
+  `VerificationInput`, `VerificationDetail`; imports only the `values.ts` leaf
+  and proofs-internal TLSN types — cycle-free)
+- `packages/sdk/src/proofs/verification/index.ts` re-exports the contract +
+  `VerifyProofOptions`/`FactorCheck`, so they flow to `@anchr/sdk/proofs`
+- `packages/sdk/src/requests/domain/types.ts` (definitions removed; `Query`
+  imports `VerificationDetail` from `proofs/mod.ts`)
+- proofs-internal importers (`verifier.ts`, `checks/types.ts`, `checks/gps.ts`,
+  `checks/tlsn.ts`) repointed to `./contract.ts`
+- external importers (`payments/frost/frost-signer.ts`,
+  `adapters/oracle-service/frost-signer-routes.ts`, `requests/` lifecycle files,
+  `requests/domain/oracle-types.ts`, tests) repointed to `proofs/mod.ts`
+- `scripts/arch-lint.ts` widened the request→proofs exception from
+  `requests/domain/` to all of `requests/` (the lifecycle depends on the
+  verification result type)
+
+Verified with:
+
+- `deno task check`, `deno task test:all`, `deno task lint:strict`
+- `deno eval` confirming `VerificationRequirement`/`VerificationDetail` are
+  nameable from `packages/sdk/src/proofs/mod.ts` (the `@anchr/sdk/proofs` entry)
+- Negative: no `proofs/` file imports `Verification*` from `requests/domain`
+
+Harness update:
+
+- Boundary enforced by the arch-lint guard tracked in issue 0132.
+
+Review residuals:
+
+- The verification contract module is cycle-free. One residual
+  `proofs → requests/domain` import remains: `verifier.ts`'s `Query`/`QueryResult`
+  for the `verify`/`requestToRequirement`/`resultToVerificationInput` adapters
+  (a pre-existing, type-only coupling). Relocating those to `requests/` —
+  removing the last cycle and the public `Query` leak — is split out as
+  issue 0133, which 0122 and 0132 now depend on.
+
+Follow-up:
+
+- 0133 (relocate verifier Query-adapters), then 0132 (arch-lint guard).

@@ -13,6 +13,7 @@ import {
   selectProvider,
   submitResult,
 } from "./query-aggregate.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   EscrowInfo,
   OfferInfo,
@@ -20,7 +21,6 @@ import type {
   QueryInput,
   QueryResult,
   SubmissionMeta,
-  VerificationDetail,
 } from "./types.ts";
 import type {
   CreateQueryAggregateOptions,

@@ -8,6 +8,7 @@ import type {
   TlsnAttestation,
   TlsnRequirement,
   TlsnVerifiedData,
+  VerificationDetail,
 } from "../../proofs/mod.ts";
 
 export type QueryStatus =
@@ -56,42 +57,6 @@ export interface QueryResult {
   tlsn_attestation?: TlsnAttestation;
   /** TLSNotary browser extension result (results[] from MPC-TLS session). */
   tlsn_extension_result?: unknown;
-}
-
-/**
- * Query-independent verification policy. NIP-90 adapters derive this from a
- * signed request event; direct callers build it from authenticated requests.
- */
-export interface VerificationRequirement {
-  /** Stable identifier — used for integrity-store lookup keyed on the request. */
-  id: string;
-  factors: readonly VerificationFactor[];
-  /** Free-text description of what the proof must establish (used by ai_check). */
-  description?: string;
-  /** Per-request handwritten challenge string (used by ai_check + nonce factor). */
-  challenge_nonce?: string;
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km. Defaults to 50 inside the verifier. */
-  max_gps_distance_km?: number;
-  tlsn_requirements?: TlsnRequirement;
-}
-
-/** Query-independent shape of the evidence being verified. */
-export interface VerificationInput {
-  attachments: AttachmentRef[];
-  gps?: GpsCoord;
-  tlsn_attestation?: TlsnAttestation;
-  tlsn_extension_result?: unknown;
-}
-
-export interface VerificationDetail {
-  passed: boolean;
-  checks: string[];
-  failures: string[];
-  /** Advisory warnings (e.g., ai_check) — informational, do not gate payment. */
-  warnings?: string[];
-  /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
-  tlsn_verified?: TlsnVerifiedData;
 }
 
 export interface CustomerMeta {
