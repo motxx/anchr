@@ -1,8 +1,8 @@
 import { createQueryAggregate } from "../domain/query-aggregate.ts";
 import { isCancellable, isExpirable } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   Query,
   QueryInput,
   QueryResult,

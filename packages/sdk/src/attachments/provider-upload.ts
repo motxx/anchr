@@ -3,7 +3,7 @@
 
 import { Buffer } from "node:buffer";
 import { generateEphemeralIdentity } from "../identity.ts";
-import type { AttachmentRef } from "../requests/domain/types.ts";
+import type { AttachmentRef } from "../values.ts";
 import { stripExif } from "./exif-strip.ts";
 import {
   type BlossomUploadResult,

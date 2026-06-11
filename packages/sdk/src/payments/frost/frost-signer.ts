@@ -14,8 +14,8 @@
  */
 
 import { verifyProof } from "../../proofs/mod.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   VerificationInput,
   VerificationRequirement,
 } from "../../requests/domain/types.ts";

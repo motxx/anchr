@@ -25,8 +25,8 @@ import {
   doSubmitEscrowResult,
 } from "./escrow-flow-methods.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
+import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   CustomerMeta,
   EscrowInfo,
   EscrowSubmitOutcome,
@@ -39,19 +39,20 @@ import type {
   QuorumConfig,
   SubmissionMeta,
   VerificationDetail,
-  VerificationFactor,
 } from "../domain/types.ts";
 
 export type {
   AttachmentRef,
   AttachmentStorageKind,
+  VerificationFactor,
+} from "../../values.ts";
+export type {
   CustomerMeta,
   CustomerType,
   Query,
   QueryInput,
   QueryResult,
   QueryStatus,
-  VerificationFactor,
 } from "../domain/types.ts";
 export type QueryVerification = VerificationDetail;
 export type QueryExecutorType = ExecutorType;

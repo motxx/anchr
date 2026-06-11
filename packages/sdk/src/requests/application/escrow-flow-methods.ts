@@ -5,8 +5,8 @@ import {
   verifyEscrowLock,
 } from "./query-escrow-validation.ts";
 import type { QueryStore } from "../domain/query-store.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   EscrowInfo,
   EscrowSubmitOutcome,
   OfferInfo,

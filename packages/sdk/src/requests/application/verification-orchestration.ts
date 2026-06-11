@@ -1,8 +1,8 @@
 import { verifyWithQuorum } from "./query-verification.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type { PreimageStore, ProofDelivery } from "./ports.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   OracleAttestationRecord,
   PaymentStatus,
   Query,

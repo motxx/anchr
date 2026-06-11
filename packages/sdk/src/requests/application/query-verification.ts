@@ -1,6 +1,6 @@
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   OracleAttestationRecord,
   Query,
   QueryResult,

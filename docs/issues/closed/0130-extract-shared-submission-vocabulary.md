@@ -78,3 +78,49 @@ public surface because these types appear in public signatures.
   `requests/domain/types.ts` and the duplicate from `ai-content-check.ts`.
 - Add the new module to `scripts/arch-lint.ts` allowed-deps (leaf) and the
   `docs/architecture.md` component/ownership notes.
+
+Completed: 2026-06-12
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/values.ts` (new leaf module: `AttachmentRef`,
+  `AttachmentStorageKind`, `GpsCoord`, `VerificationFactor`,
+  `VERIFICATION_FACTORS`, `DEFAULT_VERIFICATION_FACTORS`, `BlossomKeyMaterial`,
+  `BlossomKeyMap`; imports nothing from feature directories)
+- `packages/sdk/src/requests/domain/types.ts` (definitions removed; imports the
+  vocab it embeds from `../../values.ts`)
+- `packages/sdk/src/proofs/ai-content-check.ts` (duplicate `BlossomKey*`
+  removed; imported from `../values.ts`)
+- ~25 importers across `attachments/`, `proofs/verification/checks/`,
+  `adapters/`, `payments/frost/`, `requests/`, and their tests repointed to
+  `values.ts`
+- `packages/sdk/src/index.ts` re-exports the vocab from the root `@anchr/sdk`
+- `packages/sdk/deno.json` publish allowlist adds `src/values.ts`
+- `docs/architecture.md` ownership table + leaf-module note
+
+Verified with:
+
+- `deno task check`
+- `deno task test:all`
+- `deno task lint:strict`
+- `deno task publish:dry-run`
+- Negative: `rg -n "interface BlossomKeyMaterial|type BlossomKeyMap = " packages/sdk/src/proofs/ai-content-check.ts` → no matches (duplicate gone)
+
+Harness update:
+
+- None — this is a one-time structural relocation. The boundary it establishes
+  is enforced by the arch-lint rule tracked in issue 0132 (no `requests/`-owned
+  type reachable from a non-`/testing` public export). No silent-bypass review
+  needed: the change is import/export only, with no verification/settlement
+  logic altered.
+
+Review residuals:
+
+- None. The `proofs ↔ requests/domain` type cycle is eliminated; issue 0131 can
+  now move the verification contract to `proofs/` cleanly.
+
+Follow-up:
+
+- 0131 (move verification contract to proofs), 0132 (arch-lint guard).

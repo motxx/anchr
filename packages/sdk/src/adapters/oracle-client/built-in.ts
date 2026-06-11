@@ -1,9 +1,6 @@
 import { verify } from "../../proofs/verification/verifier.ts";
-import type {
-  BlossomKeyMap,
-  Query,
-  QueryResult,
-} from "../../requests/domain/types.ts";
+import type { BlossomKeyMap } from "../../values.ts";
+import type { Query, QueryResult } from "../../requests/domain/types.ts";
 import type {
   Oracle,
   OracleAttestation,

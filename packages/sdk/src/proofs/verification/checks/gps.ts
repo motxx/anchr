@@ -1,8 +1,8 @@
 /** GPS factor: submission-body coordinates against the expected location. */
 
 import { haversineKm } from "../../geo.ts";
+import type { GpsCoord } from "../../../values.ts";
 import type {
-  GpsCoord,
   VerificationInput,
   VerificationRequirement,
 } from "../../../requests/domain/types.ts";

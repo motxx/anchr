@@ -126,11 +126,19 @@ The request internals own request-bound state and lifecycle ports:
 | Concept | Owner |
 | --- | --- |
 | Request lifecycle state | `requests/domain/` owns the `Query` aggregate, statuses, transitions, query store, offer/selection/result state, expiry, and request-scoped quorum and attestation records. |
-| Attachment references in submitted work | `requests/domain/` owns the request-scoped `AttachmentRef` and attachment key records persisted on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. |
+| Attachment references in submitted work | `values.ts` owns the shared `AttachmentRef` and Blossom key value objects; `requests/domain/` persists them on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. |
 | Payment escrow hooks used by the lifecycle | `requests/application/` owns the `EscrowProvider` port because the query lifecycle calls it at hold, provider binding, lock verification, settlement, and cancellation points; `payments/` and `adapters/cashu` own payment implementations and reusable payment-lock or redemption helpers. |
 | Verification inputs and decisions used by release logic | `requests/domain/` owns the request-bound `VerificationRequirement`, `VerificationInput`, and `VerificationDetail` records used to decide whether a query can release payment; `proofs/` owns proof engines, schema dispatch, redaction, and proof-specific verifier adapters. |
 | Oracle lifecycle records and registry lookup | `requests/domain/` owns `OracleAttestation` records that are stored against a query, and `requests/application/` owns the `OracleRegistry` lookup port consumed by the lifecycle; `adapters/oracle-client`, `adapters/oracle-service`, and Nostr adapter modules own concrete Oracle discovery, HTTP, service, and event bindings. |
 | Deterministic lifecycle test helpers | `@anchr/sdk/testing` is the only public testing entry point. It may re-export request service helpers for tests and examples while the underlying lifecycle semantics remain owned by `requests/`. |
+
+Shared submission and evidence value objects — `AttachmentRef`,
+`AttachmentStorageKind`, `GpsCoord`, `VerificationFactor`,
+`BlossomKeyMaterial`, `BlossomKeyMap` — live in the leaf module
+`packages/sdk/src/values.ts`. It imports nothing from feature directories, so
+the request lifecycle, proof verification, and attachment transport all depend
+on it in one direction without a type cycle. These value objects are re-exported
+from the root `@anchr/sdk` surface.
 
 Feature directories should not import from `requests/` to get a generic
 attachment, payment, proof, Oracle, or adapter abstraction. Cross-directory

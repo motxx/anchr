@@ -1,10 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { fetchBlossomAttachment } from "./fetch-attachment.ts";
-import type {
-  AttachmentRef,
-  BlossomKeyMaterial,
-} from "../requests/domain/types.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
 
 describe("fetchBlossomAttachment", () => {
   const validKey: BlossomKeyMaterial = {

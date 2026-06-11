@@ -16,7 +16,7 @@ import type {
   AttachmentRef,
   BlossomKeyMap,
   GpsCoord,
-} from "../../../requests/domain/types.ts";
+} from "../../../values.ts";
 import { checkGpsProximity } from "./gps.ts";
 import type { FactorCheck } from "./types.ts";
 

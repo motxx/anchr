@@ -1,10 +1,9 @@
+import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   EscrowType,
   Query,
   QueryResult,
   VerificationDetail,
-  VerificationFactor,
 } from "./types.ts";
 import type { TlsnVerifiedData } from "../../proofs/mod.ts";
 

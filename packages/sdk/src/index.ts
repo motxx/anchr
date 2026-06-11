@@ -93,6 +93,19 @@ export type {
 
 export type { ProviderOptions } from "./provider-types.ts";
 
+export type {
+  AttachmentRef,
+  AttachmentStorageKind,
+  BlossomKeyMap,
+  BlossomKeyMaterial,
+  GpsCoord,
+  VerificationFactor,
+} from "./values.ts";
+export {
+  DEFAULT_VERIFICATION_FACTORS,
+  VERIFICATION_FACTORS,
+} from "./values.ts";
+
 export {
   createKeypairSigner,
   createNip07Signer,

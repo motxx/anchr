@@ -9,11 +9,8 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
-import {
-  type EscrowType,
-  VERIFICATION_FACTORS,
-  type VerificationFactor,
-} from "../../requests/domain/types.ts";
+import { VERIFICATION_FACTORS, type VerificationFactor } from "../../values.ts";
+import type { EscrowType } from "../../requests/domain/types.ts";
 import {
   isRecord,
   optionalNumber,

@@ -7,7 +7,7 @@ import { createPreimageStore } from "../../payments/mod.ts";
 import { createFrostCoordinator } from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
-import type { AttachmentRef } from "../../requests/domain/types.ts";
+import type { AttachmentRef } from "../../values.ts";
 import type { Event } from "@anchr/protocol/nostr";
 import type { PublishResult, RelayClient } from "../types.ts";
 

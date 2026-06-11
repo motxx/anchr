@@ -1,9 +1,5 @@
-import type {
-  GpsCoord,
-  OfferInfo,
-  PaymentLockInfo,
-  QueryInput,
-} from "./types.ts";
+import type { GpsCoord } from "../../values.ts";
+import type { OfferInfo, PaymentLockInfo, QueryInput } from "./types.ts";
 
 /** Minimum escrow locktime in seconds (10 minutes). Applies to all escrow types. */
 export const MIN_ESCROW_LOCKTIME_SECS = 600;

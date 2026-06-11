@@ -8,8 +8,8 @@ import type {
   OracleAttestation,
   OracleRegistry,
 } from "../../testing/oracle-registry.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  BlossomKeyMap,
   Query,
   QueryResult,
   VerificationDetail,

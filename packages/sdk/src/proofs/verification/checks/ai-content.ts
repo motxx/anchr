@@ -10,10 +10,7 @@ import {
   type AiContentChecker,
   createAiContentChecker,
 } from "../../ai-content-check.ts";
-import type {
-  AttachmentRef,
-  BlossomKeyMaterial,
-} from "../../../requests/domain/types.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../../../values.ts";
 import { fetchAttachmentData } from "./photo-integrity.ts";
 import type { CheckAccumulator, FactorCheck } from "./types.ts";
 

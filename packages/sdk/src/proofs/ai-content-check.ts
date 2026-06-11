@@ -48,14 +48,7 @@ export interface AiContentCheckResult<
   attachments: TRef[];
 }
 
-/** Ephemeral key material for Blossom E2E encryption. */
-export interface BlossomKeyMaterial {
-  encrypt_key: string;
-  encrypt_iv: string;
-}
-
-/** Map of attachment ID → key material. */
-export type BlossomKeyMap = Record<string, BlossomKeyMaterial>;
+import type { BlossomKeyMap, BlossomKeyMaterial } from "../values.ts";
 
 import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "ai-content-check"]);

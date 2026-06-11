@@ -2,7 +2,7 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createFrostSigner } from "./frost-signer.ts";
 import { dkgRound1, dkgRound2, dkgRound3 } from "./mod.ts";
-import type { AttachmentRef } from "../../requests/domain/types.ts";
+import type { AttachmentRef } from "../../values.ts";
 import { statSync } from "node:fs";
 import { join } from "node:path";
 

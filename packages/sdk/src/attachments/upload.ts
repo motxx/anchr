@@ -8,11 +8,7 @@ import {
   validateC2pa,
   validateExif,
 } from "../proofs/mod.ts";
-import type {
-  AttachmentRef,
-  BlossomKeyMaterial,
-  GpsCoord,
-} from "../requests/domain/types.ts";
+import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../values.ts";
 import {
   detectZip,
   extractProofModeIntegrity,

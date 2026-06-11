@@ -2,11 +2,8 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createFrostSignatureAdapter } from "./frost-signature-adapter.ts";
 import type { FrostNodeConfig } from "./frost-config.ts";
-import type {
-  AttachmentRef,
-  Query,
-  QueryResult,
-} from "../../requests/domain/types.ts";
+import type { AttachmentRef } from "../../values.ts";
+import type { Query, QueryResult } from "../../requests/domain/types.ts";
 
 /** Minimal FrostNodeConfig with no real key material and unreachable peers. */
 const nodeConfig: FrostNodeConfig = {

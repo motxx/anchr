@@ -14,8 +14,8 @@ import type {
   AttachmentRef,
   AttachmentStorageKind,
   BlossomKeyMaterial,
-  QueryResult as RequestSubmissionResult,
-} from "../requests/domain/types.ts";
+} from "../values.ts";
+import type { QueryResult as RequestSubmissionResult } from "../requests/domain/types.ts";
 import {
   attachmentRefSource,
   extractBlossomFields,

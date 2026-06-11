@@ -7,8 +7,8 @@
 import type { validateTlsn } from "../../tlsn-validation.ts";
 import type { AiContentCheckConfig } from "../../ai-content-check.ts";
 import type { TlsnVerifiedData } from "../../tlsn-types.ts";
+import type { BlossomKeyMap } from "../../../values.ts";
 import type {
-  BlossomKeyMap,
   VerificationInput,
   VerificationRequirement,
 } from "../../../requests/domain/types.ts";
