@@ -49,22 +49,11 @@ export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
   "ai_check",
 ] as const;
 
-// TLSNotary types live in `../../proofs/mod.ts`. The host shared
-// domain re-exports them so existing call sites keep the single import surface.
 import type {
   TlsnAttestation,
-  TlsnCondition,
-  TlsnEncryptedContext,
   TlsnRequirement,
   TlsnVerifiedData,
 } from "../../proofs/mod.ts";
-export type {
-  TlsnAttestation,
-  TlsnCondition,
-  TlsnEncryptedContext,
-  TlsnRequirement,
-  TlsnVerifiedData,
-};
 
 export interface QueryInput {
   description: string;

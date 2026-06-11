@@ -65,3 +65,17 @@ From `docs/production-readiness-audit.md` §2.3:
   call sites.
 - Extend `arch-lint.ts` resolution to raise on package → examples/e2e/scripts
   imports.
+
+## Progress
+
+- 2026-06-11: **ARCH-04 resolved** in the protocol/sdk role-separation pass.
+  The TLSN re-export barrel was removed from
+  `packages/sdk/src/requests/domain/types.ts`; the proofs/adapters round-trip
+  importers now take TLSN types from `proofs/tlsn-types.ts` /
+  `@anchr/sdk/proofs` (`proofs/verification/checks/types.ts`,
+  `checks/tlsn.ts`, `adapters/nostr/events/oracle-attestation.ts`,
+  `requests/domain/oracle-types.ts`, and the verifier tests). Negative check
+  passes: no proofs file imports a TLSN type from `requests/domain`. Remaining
+  findings ARCH-02, ARCH-03, ARCH-05 stay open under this issue. (The broader
+  "`rg from .*requests/domain/types packages/sdk/src/proofs` returns nothing"
+  goal also depends on the `Verification*` move tracked by issue 0122.)

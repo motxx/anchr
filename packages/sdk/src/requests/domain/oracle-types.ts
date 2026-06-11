@@ -3,10 +3,10 @@ import type {
   EscrowType,
   Query,
   QueryResult,
-  TlsnVerifiedData,
   VerificationDetail,
   VerificationFactor,
 } from "./types.ts";
+import type { TlsnVerifiedData } from "../../proofs/mod.ts";
 
 export interface OracleInfo {
   id: string;

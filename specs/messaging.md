@@ -46,11 +46,12 @@ messages.
 
 ## Event Kinds
 
-| Kind | Name         | Direction         | Purpose                       |
-| ---- | ------------ | ----------------- | ----------------------------- |
-| 5300 | Job Request  | Customer -> Relay | Post a query                  |
-| 6300 | Job Result   | Provider -> Relay | Submit proof                  |
-| 7000 | Job Feedback | Various           | Offers, selection, completion |
+| Kind  | Name               | Direction         | Purpose                         |
+| ----- | ------------------ | ----------------- | ------------------------------- |
+| 5300  | Job Request        | Customer -> Relay | Post a query                    |
+| 6300  | Job Result         | Provider -> Relay | Submit proof                    |
+| 7000  | Job Feedback       | Various           | Offers, selection, completion   |
+| 30103 | Oracle Attestation | Oracle -> Relay   | Publish a public release result |
 
 ## Query Posting (kind 5300)
 
@@ -194,6 +195,49 @@ When an Oracle pubkey is provided, the result also carries an `oracle_payload`
 tag encrypted to the Oracle. The Oracle-readable payload adds `query_id` and
 `request_event_id` to the same `schema`, `data`, and `proof` fields so the
 Oracle can verify without an Anchr-operated result server.
+
+## Oracle Attestation (kind 30103)
+
+After running deterministic verification, an Oracle MAY publish a public,
+plaintext attestation so that anyone — not only the Customer and Provider — can
+check the Oracle signature and reproduce the verification outcome. The
+attestation is a NIP-01 addressable event (`d` tag = `query_id`); a later
+attestation for the same `query_id` replaces an earlier one.
+
+```json
+{
+  "kind": 30103,
+  "content": "<plaintext OracleAttestationPayload JSON>",
+  "tags": [
+    ["e", "<job_request_event_id>"],
+    ["e", "<job_result_event_id>"],
+    ["d", "<query_id>"],
+    ["t", "anchr"],
+    ["t", "attestation"],
+    ["result", "pass"]
+  ]
+}
+```
+
+The `result` tag is `pass` or `fail`. The content is plaintext (attestations are
+public by design — they carry no secret material):
+
+### OracleAttestationPayload
+
+| Field           | Description                                                       |
+| --------------- | ---------------------------------------------------------------- |
+| `oracle_id`     | Oracle identity that produced the attestation                    |
+| `query_id`      | Query this attestation covers                                    |
+| `passed`        | Whether verification passed                                      |
+| `checks`        | Human-readable checks that ran                                   |
+| `failures`      | Human-readable failures, empty when `passed` is true             |
+| `attested_at`   | Unix seconds when the attestation was produced                   |
+| `tlsn_verified` | Redacted TLSNotary verified data, present only for TLSN queries  |
+
+Attestations are advisory and public: they do not gate Cashu redemption, which
+is enforced by the mint's HTLC/P2PK spending conditions. Consumers MUST ignore
+an attestation event whose content fails to parse or whose `oracle_id` is not an
+Oracle they accept, exactly as for the other kinds.
 
 ## Completion Feedback Boundary
 

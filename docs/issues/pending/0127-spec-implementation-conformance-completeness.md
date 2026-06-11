@@ -63,3 +63,13 @@ From `docs/production-readiness-audit.md` §2.6:
 - Re-read the specs and protocol builders/parsers; split with `make-sub-issues`
   if the wire-version marker (SPEC-07) becomes its own change.
 - Apply the low-risk doc/spec edits (SPEC-05, SPEC-09, SPEC-10) directly.
+
+## Progress
+
+- 2026-06-11: **SPEC-05 resolved** in the protocol/sdk role-separation pass.
+  `specs/messaging.md` now documents kind 30103 (Oracle Attestation): the
+  Event Kinds table row, the event shape, the `OracleAttestationPayload`
+  fields, the addressable-event (`d` = `query_id`) semantics, its
+  public/plaintext nature, and the ignore-on-parse-failure rejection rule.
+  Remaining findings SPEC-04, SPEC-06, SPEC-07, SPEC-08, SPEC-09, SPEC-10 stay
+  open under this issue.

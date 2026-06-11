@@ -17,10 +17,7 @@ import {
 import { expect } from "@std/expect";
 import { _clearSeenPresentationsForTest, validateTlsn } from "../mod.ts";
 import { verify, type VerifyProofOptions } from "./verifier.ts";
-import type {
-  TlsnAttestation,
-  TlsnRequirement,
-} from "../../requests/domain/types.ts";
+import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";

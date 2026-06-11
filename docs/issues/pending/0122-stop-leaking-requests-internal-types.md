@@ -41,6 +41,20 @@ From `docs/production-readiness-audit.md` §2.2 (SDK-01):
   checks whether a `requests/`-owned type is re-exported through a public
   `deno.json` subpath.
 
+Constraint discovered 2026-06-11 (do not treat this as a mechanical move):
+the leak is bidirectionally entangled with the `Query` aggregate. `Query`
+embeds `VerificationDetail` and `BlossomKeyMap`
+(`packages/sdk/src/requests/domain/types.ts:282,292`), while
+`VerificationRequirement`/`VerificationInput`/`VerificationDetail` reference the
+shared submission vocabulary `AttachmentRef`/`GpsCoord`/`VerificationFactor`
+owned by the same `requests/domain/types.ts`. Moving only the verification I/O
+contract to `proofs/` creates a `requests/domain ↔ proofs` type cycle; moving
+the shared vocabulary too has wide blast radius across `customer`/`provider`/
+`adapters`. A clean fix needs a deliberate owner decision (e.g. a neutral
+shared submission-vocabulary module that both `requests/domain` and `proofs`
+import in one direction). This is design work, not a rename — split with
+`make-sub-issues` before implementing.
+
 ## Acceptance
 
 - Every public function's parameter and return types are nameable by importing
@@ -60,8 +74,14 @@ From `docs/production-readiness-audit.md` §2.2 (SDK-01):
 ## Plan
 
 - Re-read the public proof-verification/Oracle surface and the architecture
-  ownership table.
-- Choose move-to-owner vs DTO; this issue owns the `Query`/verification type
-  family. The TLSN-type second barrel (ARCH-04) is owned by the
-  architecture-conformance issue — coordinate but do not overlap.
+  ownership table, then decide the owner home for the verification I/O contract
+  and the shared submission vocabulary given the cycle constraint above.
+- Split with `make-sub-issues` (likely: one child for the shared-vocabulary /
+  verification-contract re-home, one child for the arch-lint enforcement that
+  flags `requests/`-owned types re-exported from non-`/testing` subpaths).
+- The TLSN-type second barrel (ARCH-04, the other half of this god module) is
+  already resolved (2026-06-11): the re-export barrel in
+  `requests/domain/types.ts` was removed and the proofs/adapters TLSN imports
+  repointed to `proofs/tlsn-types.ts` / `@anchr/sdk/proofs`. The remaining
+  leak is only the `Verification*`/`BlossomKeyMap` family.
 - Add the arch-lint rule and lock with a sample-consumer compile check.

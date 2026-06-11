@@ -14,7 +14,7 @@ import {
 import type { NostrIdentity } from "../../../identity.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
 import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
-import type { TlsnVerifiedData } from "../../../requests/domain/types.ts";
+import type { TlsnVerifiedData } from "../../../proofs/mod.ts";
 
 export interface OracleAttestationPayload {
   oracle_id: string;

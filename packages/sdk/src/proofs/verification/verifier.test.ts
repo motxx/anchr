@@ -2,12 +2,8 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { verify } from "./verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
-import type {
-  Query,
-  QueryResult,
-  TlsnAttestation,
-  TlsnRequirement,
-} from "../../requests/domain/types.ts";
+import type { Query, QueryResult } from "../../requests/domain/types.ts";
+import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
 

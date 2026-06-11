@@ -69,3 +69,11 @@ From `docs/production-readiness-audit.md` §2.2:
   beyond one coherent change.
 - Apply the smaller items (SDK-03 doc fix, SDK-07 export list) directly; treat
   SDK-06 `visibility` as a design decision needing a recorded outcome.
+
+## Progress
+
+- 2026-06-11: **SDK-03 resolved** in the protocol/sdk role-separation pass.
+  `docs/architecture.md` §Public Subpaths now lists `@anchr/protocol/schema`
+  (singular) and drops the non-existent `/schemas`/`/validators` entries
+  (wire validation is owned by the `/events` parsers). Remaining findings
+  SDK-02, SDK-04, SDK-05, SDK-06, SDK-07 stay open under this issue.

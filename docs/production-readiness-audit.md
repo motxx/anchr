@@ -188,7 +188,8 @@ verified **Status (2026-06-11)** confirmed against the current tree.
 
 #### SDK-03 — `architecture.md` §Public Subpaths lists protocol subpaths that do not exist
 
-- Severity: **medium**
+- Severity: **medium** — **Resolved 2026-06-11** (doc now lists `/schema`,
+  drops `/schemas`/`/validators`; tracked in issue 0125).
 - Files: `docs/architecture.md:55-63`; `packages/protocol/deno.json:4-10`
 - Evidence: the doc names `@anchr/protocol/schemas` (plural) and `/validators`;
   the package exports exactly `.`, `./events`, `./nostr`, `./schema`
@@ -322,7 +323,9 @@ verified **Status (2026-06-11)** confirmed against the current tree.
 
 #### ARCH-04 — `requests/domain/types.ts` re-exports proof-owned TLSN types (second barrel)
 
-- Severity: **medium**
+- Severity: **medium** — **Resolved 2026-06-11** (TLSN barrel removed,
+  proofs/adapters repointed to `proofs/tlsn-types.ts`; tracked in issue 0126).
+  The `Verification*` half of the same god module remains in issue 0122.
 - Files: `packages/sdk/src/requests/domain/types.ts:52-67`;
   `packages/sdk/src/proofs/tlsn-types.ts:2,10,21,33,39`;
   `packages/sdk/src/proofs/verification/checks/tlsn.ts:4-8`;
@@ -685,7 +688,9 @@ compound (SPEC-01, SPEC-03 below describe the same path).
 
 #### SPEC-05 — Code-only event kind 30103 (Oracle Attestation) is undocumented in any spec
 
-- Severity: **medium**
+- Severity: **medium** — **Resolved 2026-06-11** (`specs/messaging.md` now
+  documents kind 30103: table row, event shape, payload, addressable
+  semantics, and rejection rule; tracked in issue 0127).
 - Files: `packages/protocol/src/nostr.ts:35`;
   `packages/sdk/src/adapters/nostr/events/oracle-attestation.ts:1-92`
 - Evidence: a full event shape (kind 30103, tags + plaintext JSON payload)

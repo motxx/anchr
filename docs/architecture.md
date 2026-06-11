@@ -55,9 +55,9 @@ taxonomy.
 `@anchr/protocol` may expose:
 
 - root exports for the common interoperable contract.
-- `/events` for wire event builders and parsers.
-- `/schemas` for proof schema identifiers and schema metadata.
-- `/validators` for validation helpers that protect the Nostr wire contract.
+- `/events` for wire event builders and parsers (the parsers are the wire
+  validators that protect the Nostr contract).
+- `/schema` for proof schema identifiers and schema metadata.
 - `/types` for protocol types used by the Nostr/Cashu v0 contract.
 - `/nostr` for Nostr event signing, encryption, identity, tag, and kind helpers
   that are part of wire compatibility.

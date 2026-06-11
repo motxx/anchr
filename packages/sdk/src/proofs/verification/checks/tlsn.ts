@@ -1,8 +1,8 @@
 /** TLSNotary factor: attestation or extension-result presentations. */
 
 import { validateTlsn } from "../../tlsn-validation.ts";
+import type { TlsnVerifiedData } from "../../tlsn-types.ts";
 import type {
-  TlsnVerifiedData,
   VerificationInput,
   VerificationRequirement,
 } from "../../../requests/domain/types.ts";
