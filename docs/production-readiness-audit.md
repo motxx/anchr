@@ -1072,23 +1072,30 @@ Areas audited that were verified correct:
 
 ## 8. Prioritised remediation backlog
 
-Order for a remediation pass (file each via `make-issues`):
+Filed as tracked issues under `docs/issues/pending/` (2026-06-11). Order for a
+remediation pass:
 
 1. **Blocker / high — relay Oracle correctness** (one cluster): SPEC-01
    (non-canonical `oracle_payload`), PROT-02 (synthetic hardcoded
    requirement), PROT-01 (unbound preimage delivery), SPEC-03 (unvalidated
    decrypt). These four share `createOracleNostrService` and should be fixed
-   or the surface explicitly removed from v0 together.
-2. **High — fund safety:** PROT-03 (FROST empty refund key), PROT-07/OPS-03
-   (redeem token-burn idempotency).
-3. **High — operations:** OPS-01 (dead logger), OPS-05 (unbounded Oracle
-   state), ARCH-01 (no Rust gate).
-4. **High — privacy disclosure:** ANON-01 (Provider/Oracle linkability doc),
-   ANON-02 (mint/Blossom IP exposure doc + transport hook).
-5. **High — public surface:** SDK-01 (request-type leak) before the API is
-   frozen.
-6. **Medium / low:** the remaining SDK / ARCH / ANON / PROT / SPEC / OPS
-   findings, batched by area.
+   or the surface explicitly removed from v0 together. → **issue 0116**.
+2. **High — fund safety:** PROT-03/PROT-05/PROT-06/PROT-08 (FROST escrow
+   settlement) → **issue 0117**; PROT-07/OPS-03 (redeem token-burn
+   idempotency) → **issue 0118**.
+3. **High — operations:** OPS-01 (dead logger) → **issue 0119**; OPS-05
+   (unbounded Oracle state) → **issue 0120**; ARCH-01/OPS-08 (no Rust gate) →
+   **issue 0121**.
+4. **High — public surface:** SDK-01 (request-type leak) before the API is
+   frozen → **issue 0122**.
+5. **High — privacy disclosure:** ANON-01 (Provider/Oracle linkability doc) →
+   **issue 0123**; ANON-02 (mint/Blossom IP exposure doc + transport hook) →
+   **issue 0124**.
+6. **Medium / low**, batched by area: SDK ergonomics (SDK-02…07) →
+   **issue 0125**; architecture/docs conformance (ARCH-02…05) →
+   **issue 0126**; spec conformance/completeness (SPEC-04…10) →
+   **issue 0127**; privacy hardening (ANON-03…05) → **issue 0128**;
+   operations robustness (OPS-02/04/06/07/09/10/11) → **issue 0129**.
 
 Final gate after remediation, from a clean worktree: `deno task test:all`,
 `deno task test:all:docker`, `deno task publish:dry-run`,
