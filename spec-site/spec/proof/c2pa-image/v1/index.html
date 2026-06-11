@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -43,22 +43,20 @@
       <code>https://anchr-spec.org/spec/proof/c2pa-image/v1</code>
     </p>
     <p>
-      This schema identifies C2PA image or media evidence with optional GPS,
-      timestamp, nonce, ProofMode, and advisory content-relevance checks.
+      This schema identifies an image proof whose C2PA Content Credentials
+      manifest is cryptographically verified and whose signed GPS assertion is
+      bound to the request's expected location.
     </p>
 
     <h2>Predicate Shape</h2>
     <p>
-      The predicate describes the requested media evidence and deterministic
-      constraints an Oracle must apply to signed metadata.
+      The predicate describes the expected capture location and accepted
+      distance window for the signed GPS assertion.
     </p>
     <pre><code>{
-  "locationHint": "Shibuya, Tokyo",
-  "expectedGps": { "lat": 35.6595, "lon": 139.7004 },
-  "maxGpsDistanceKm": 0.5,
-  "freshnessSeconds": 600,
-  "challengeNonce": "optional visible nonce",
-  "requiredFactors": ["c2pa", "gps", "timestamp"]
+  "expected_gps": { "lat": 35.6762, "lon": 139.6503 },
+  "max_distance_km": 1,
+  "accepted_mime_types": ["image/jpeg", "image/png", "image/webp"]
 }</code></pre>
     <table>
       <thead>
@@ -69,83 +67,68 @@
       </thead>
       <tbody>
         <tr>
-          <td><code>locationHint</code></td>
-          <td>Human-readable target location or scene description.</td>
+          <td><code>expected_gps</code></td>
+          <td>
+            Latitude and longitude the signed C2PA GPS assertion must match.
+          </td>
         </tr>
         <tr>
-          <td><code>expectedGps</code></td>
-          <td>Expected latitude and longitude for signed media metadata.</td>
+          <td><code>max_distance_km</code></td>
+          <td>
+            Maximum accepted distance between signed GPS and expected GPS.
+          </td>
         </tr>
         <tr>
-          <td><code>maxGpsDistanceKm</code></td>
-          <td>Maximum Haversine distance from expected GPS coordinates.</td>
-        </tr>
-        <tr>
-          <td><code>freshnessSeconds</code></td>
-          <td>Maximum accepted age for signed capture metadata.</td>
-        </tr>
-        <tr>
-          <td><code>challengeNonce</code></td>
-          <td>Optional nonce that should be visible in the media.</td>
-        </tr>
-        <tr>
-          <td><code>requiredFactors</code></td>
-          <td>Required deterministic checks, such as c2pa, gps, and timestamp.</td>
+          <td><code>accepted_mime_types</code></td>
+          <td>Optional image media types accepted by the verifier.</td>
         </tr>
       </tbody>
     </table>
 
     <h2>Proof Payload Shape</h2>
     <p>
-      The proof payload contains the media bytes or encrypted attachment
-      references, plus optional ProofMode sidecar material.
+      The proof payload contains the image bytes or an encrypted attachment
+      reference to the exact image bytes. The image must carry a C2PA manifest
+      with an EXIF GPS assertion.
     </p>
     <pre><code>{
-  "media": "&lt;bytes or encrypted attachment reference&gt;",
-  "filename": "signed-photo.jpg",
-  "proofmode": "&lt;optional ProofMode archive reference&gt;",
-  "notes": "optional Provider notes"
+  "image": "&lt;bytes or attachment reference&gt;",
+  "filename": "capture.jpg",
+  "mime_type": "image/jpeg"
 }</code></pre>
 
     <h2>Response Data Shape</h2>
     <p>
-      On success, verifiers expose only the facts needed to explain the verdict:
+      On success, verifiers expose the verified manifest summary and signed
+      coordinates used for the verdict.
     </p>
     <pre><code>{
-  "c2pa": {
-    "available": true,
-    "hasManifest": true,
-    "signatureValid": true,
-    "gps": { "lat": 35.6595, "lon": 139.7004 },
-    "timestamp": 1770000000
-  },
-  "proofmode": {
-    "signatureValid": true,
-    "gps": { "lat": 35.6595, "lon": 139.7004 }
-  },
-  "warnings": []
+  "claim_generator": "camera-or-app-name",
+  "signature_issuer": "certificate issuer",
+  "signed_at": "2026-06-11T00:00:00Z",
+  "gps": { "lat": 35.6762, "lon": 139.6503 },
+  "distance_km": 0.0
 }</code></pre>
 
     <h2>Verification Requirements</h2>
     <ul>
-      <li>Verify the C2PA manifest signature chain for the submitted media.</li>
-      <li>Require the manifest asset hash to match the submitted media bytes.</li>
+      <li>Reject payloads without a C2PA active manifest.</li>
+      <li>Verify the C2PA manifest signature cryptographically.</li>
       <li>
-        Compare signed GPS coordinates to <code>expectedGps</code> using
-        Haversine distance and <code>maxGpsDistanceKm</code>.
-      </li>
-      <li>Reject stale signed timestamps when freshness is required.</li>
-      <li>
-        Verify ProofMode signatures when ProofMode evidence is submitted or
-        required.
+        Reject manifests with claim-signature or assertion data-hash failures.
       </li>
       <li>
-        Treat AI content relevance as advisory unless a future schema version
-        makes that factor deterministic.
+        Extract GPS only from an EXIF assertion covered by the verified
+        manifest.
       </li>
       <li>
-        Fail closed when a required verifier or companion binary is unavailable.
+        Reject payloads whose verified manifest does not contain signed GPS.
       </li>
+      <li>
+        Reject payloads whose signed GPS is farther than
+        <code>max_distance_km</code> from <code>expected_gps</code>.
+      </li>
+      <li>Reject unsupported or non-image payload types.</li>
     </ul>
   </body>
 </html>

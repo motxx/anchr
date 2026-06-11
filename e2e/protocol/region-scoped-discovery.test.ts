@@ -37,6 +37,7 @@ function stubCashuClient(): CashuClient {
 }
 
 const HASH_HEX = "01234567".repeat(8);
+const CUSTOM_SCHEMA = "https://example.org/spec/proof/out-of-region/v1";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -89,7 +90,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
     // Out-of-region (untagged) advertisement: the Provider never sees it.
     await expect(
       makeCustomer().request({
-        spec: { schema: ProofSchema.C2paImageV1, predicate: {} },
+        spec: { schema: CUSTOM_SCHEMA, predicate: {} },
         payment: { maxAmount: 1000 },
         sourceProofs: [],
       }),

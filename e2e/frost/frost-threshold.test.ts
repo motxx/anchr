@@ -364,7 +364,7 @@ suite(
     // Below-threshold: 1-of-3 should fail
     // =========================================================================
 
-    test("ATTACK: 1-of-3 (below threshold) → aggregation fails", async () => {
+    test("INV-05: ATTACK: 1-of-3 (below threshold) -> aggregation fails", async () => {
       const oracle = oracles[0]!;
       const message = "50505050";
 

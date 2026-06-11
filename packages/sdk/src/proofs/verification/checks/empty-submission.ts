@@ -7,11 +7,13 @@ function verifyEmptySubmission(
   hasTlsn: boolean,
   acc: CheckAccumulator,
 ): void {
-  const requiresEvidence = factors.includes("nonce") || factors.includes("gps");
+  const requiresEvidence = factors.includes("nonce") ||
+    factors.includes("gps") ||
+    factors.includes("c2pa");
 
   if (requiresEvidence && !hasTlsn) {
     acc.failures.push(
-      "no media evidence provided — photos are required when GPS or nonce verification is enabled",
+      "no media evidence provided — photos are required when photo-backed verification is enabled",
     );
   } else if (!hasTlsn) {
     acc.checks.push("no media evidence provided (weak verification)");

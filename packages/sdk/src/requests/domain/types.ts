@@ -40,6 +40,7 @@ export const VERIFICATION_FACTORS = [
   "oracle",
   "ai_check",
   "tlsn",
+  "c2pa",
 ] as const;
 export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 

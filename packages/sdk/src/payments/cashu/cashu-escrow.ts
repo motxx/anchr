@@ -13,7 +13,7 @@
  *   Phase 2 (after Provider selected, swap to bind Provider):
  *     HTLC: hashlock(hash) + P2PK(Provider) + locktime + refund(Customer)
  *     → Provider can redeem with preimage + Provider signature.
- *     → Oracle cannot steal: knows preimage but not Provider's private key.
+ *     → Anchr's redeem path rejects Oracle or impostor keys before mint swap.
  *
  *   Redemption:
  *     Provider provides preimage (from Oracle NIP-44 DM) + Provider signature.
@@ -283,8 +283,8 @@ export async function swapHtlcBindProvider(
  * Redeem HTLC token: Provider provides preimage + Provider signature.
  *
  * The Provider receives the preimage from the Oracle via NIP-44 DM after
- * C2PA verification passes. Combined with the Provider's signature, this
- * satisfies the HTLC spending conditions (NUT-14).
+ * verification passes. Combined with the Provider's signature, this satisfies
+ * the HTLC spending conditions (NUT-14).
  *
  * Steps:
  *   1. Set preimage as HTLC witness on each proof
@@ -292,9 +292,9 @@ export async function swapHtlcBindProvider(
  *   3. **Server-side verification** of HTLC conditions (hashlock + P2PK)
  *   4. Swap signed proofs for fresh, unlocked proofs on the mint
  *
- * Step 3 provides defense-in-depth: the Mint enforces NUT-14 spending
- * conditions on /v1/swap (verified: Nutshell 0.19.2 rejects missing witness),
- * but we also verify locally to fail fast before the network round-trip.
+ * Step 3 is load-bearing: Anchr verifies the Provider-bound P2PK authorization
+ * before the network round-trip instead of relying on mint-specific witness
+ * behavior.
  */
 export async function redeemHtlcToken(
   htlcProofs: Proof[],

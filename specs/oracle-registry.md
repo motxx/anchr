@@ -34,30 +34,32 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
     ["t", "anchr-oracle"],
     ["t", "anchr-oracle-tlsn"],
     ["t", "anchr-oracle-c2pa"],
-    ["t", "anchr-oracle-gps"]
+    ["t", "anchr-oracle-gps"],
+    ["t", "anchr-oracle-nonce"]
   ],
   "content": "{ ... }"
 }
 ```
 
 Capability tags follow the pattern `anchr-oracle-<factor>` where `<factor>` is a
-verification factor that the Oracle can check (`tlsn`, `gps`, `nonce`,
-`timestamp`, `oracle`, `ai_check`, `c2pa`).
+verification factor that the Oracle can check (`tlsn`, `c2pa`, `nonce`, `gps`,
+`timestamp`, `oracle`, `ai_check`). Other factors are application-specific
+extensions unless they are promoted into the v0 registry contract.
 
 ### OracleAnnouncement
 
 The `content` field contains a JSON object:
 
-| Field                    | Required | Description                                           |
-| ------------------------ | -------- | ----------------------------------------------------- |
-| `name`                   | yes      | Human-readable Oracle name                            |
-| `endpoint`               | no       | Optional Oracle-operated HTTP adapter URL             |
+| Field                    | Required | Description                                                       |
+| ------------------------ | -------- | ----------------------------------------------------------------- |
+| `name`                   | yes      | Human-readable Oracle name                                        |
+| `endpoint`               | no       | Optional Oracle-operated HTTP adapter URL                         |
 | `fee_ppm`                | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
-| `supported_factors`      | yes      | Array of verification factors this Oracle supports    |
-| `supported_escrow_types` | yes      | Array of escrow types: `htlc`, `p2pk_frost`           |
-| `min_amount_sats`        | no       | Minimum payment amount this Oracle accepts                    |
-| `max_amount_sats`        | no       | Maximum payment amount this Oracle accepts                    |
-| `description`            | no       | Free-text description of the Oracle service           |
+| `supported_factors`      | yes      | Array of verification factors this Oracle supports                |
+| `supported_escrow_types` | yes      | Array of escrow types: `htlc`, `p2pk_frost`                       |
+| `min_amount_sats`        | no       | Minimum payment amount this Oracle accepts                        |
+| `max_amount_sats`        | no       | Maximum payment amount this Oracle accepts                        |
+| `description`            | no       | Free-text description of the Oracle service                       |
 
 ### Example
 
@@ -65,11 +67,11 @@ The `content` field contains a JSON object:
 {
   "name": "TLSN and C2PA Oracle",
   "fee_ppm": 50000,
-  "supported_factors": ["tlsn", "gps", "c2pa", "nonce", "timestamp"],
+  "supported_factors": ["tlsn", "c2pa", "gps", "nonce", "timestamp"],
   "supported_escrow_types": ["htlc", "p2pk_frost"],
   "min_amount_sats": 1,
   "max_amount_sats": 1000000,
-  "description": "Independent Oracle with TLSNotary and C2PA verification"
+  "description": "Independent Oracle with TLSNotary and C2PA/GPS verification"
 }
 ```
 

@@ -58,6 +58,8 @@ uploads/*
 
 # local experiment surfaces kept out of the repo
 mobile/
+e2e/web/
+e2e/pentest/
 
 # rust
 crates/*/target/

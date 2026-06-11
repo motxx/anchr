@@ -9,6 +9,8 @@ import {
   type VerifierAdapter,
 } from "./schema.ts";
 
+const CUSTOM_SCHEMA = "https://example.com/spec/proof/custom-proof/v1";
+
 test("resolveProofGenerator dispatches with canHandle", () => {
   const first: ProofGenerator = {
     canHandle: () => false,
@@ -37,11 +39,11 @@ test("resolveVerifierAdapter dispatches with canHandle", () => {
     verify: () => false,
   };
   const second: VerifierAdapter = {
-    canHandle: (schema) => schema === ProofSchema.C2paImageV1,
+    canHandle: (schema) => schema === CUSTOM_SCHEMA,
     verify: () => true,
   };
   expect(
-    resolveVerifierAdapter([first, second], ProofSchema.C2paImageV1),
+    resolveVerifierAdapter([first, second], CUSTOM_SCHEMA),
   ).toBe(second);
 });
 
@@ -50,6 +52,6 @@ test("resolveVerifierAdapter returns null for unhandled schema", () => {
     canHandle: () => false,
     verify: () => true,
   };
-  expect(resolveVerifierAdapter([verifier], ProofSchema.C2paImageV1))
+  expect(resolveVerifierAdapter([verifier], CUSTOM_SCHEMA))
     .toBe(null);
 });

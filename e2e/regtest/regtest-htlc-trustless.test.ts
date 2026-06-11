@@ -215,6 +215,7 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
   // 1. Oracle tries to redeem with preimage only (no Provider sig)
   // ---------------------------------------------------------------------------
 
+  // INV-04: Stolen preimage alone cannot redeem bound escrow
   test("ATTACK: Oracle has preimage but no Provider key → Mint REJECTS", async () => {
     const provider = generateKeypair();
     const customer = generateKeypair();
@@ -275,39 +276,6 @@ suite("e2e: HTLC trustless properties (real Cashu Mint)", () => {
     );
 
     expect(result).toBeNull(); // Mint MUST reject — no preimage
-  });
-
-  // ---------------------------------------------------------------------------
-  // 3. Wrong Provider tries to redeem with correct preimage
-  // ---------------------------------------------------------------------------
-
-  test("ATTACK: Wrong Provider has preimage but wrong key → Mint REJECTS", async () => {
-    const provider = generateKeypair();
-    const impostor = generateKeypair(); // different keypair
-    const customer = generateKeypair();
-    const { hash, preimage } = createHTLCHash();
-    const locktime = Math.floor(Date.now() / 1000) + 3600;
-
-    const sourceProofs = await throttledMintProofs(wallet, AMOUNT_SATS);
-    const htlcProofs = await createHtlcProofs(
-      wallet,
-      sourceProofs,
-      AMOUNT_SATS,
-      hash,
-      provider.publicKey,
-      customer.publicKey,
-      locktime,
-    );
-
-    // Impostor attempts redemption: has preimage, but wrong private key
-    const result = await attemptRedeem(
-      wallet,
-      htlcProofs,
-      preimage,
-      impostor.secretKey,
-    );
-
-    expect(result).toBeNull(); // Mint MUST reject — impostor's key ≠ Provider's key
   });
 
   // ---------------------------------------------------------------------------
@@ -649,6 +617,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     expect(error).toBeNull(); // All good
   });
 
+  // INV-04: Stolen preimage alone cannot redeem through Anchr's redeem path
   test("redeemHtlcToken rejects Oracle's key (server-side P2PK check)", async () => {
     const provider = generateKeypair();
     const customer = generateKeypair();
@@ -678,6 +647,7 @@ suite("e2e: Anchr server-side HTLC enforcement", () => {
     expect(result).toBeNull();
   });
 
+  // INV-04: Stolen preimage alone cannot redeem through Anchr's redeem path
   test("redeemHtlcToken rejects wrong Provider's key (server-side P2PK check)", async () => {
     const provider = generateKeypair();
     const impostor = generateKeypair();

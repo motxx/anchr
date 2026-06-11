@@ -1,16 +1,101 @@
 import { Buffer } from "node:buffer";
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isC2paAvailable, validateC2pa } from "./c2pa-validation.ts";
+import {
+  type C2paValidationResult,
+  isC2paAvailable,
+  validateC2pa,
+  verifyC2paGpsBinding,
+} from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  type fileExists,
   readFileAsArrayBuffer,
   spawn,
   writeFile,
 } from "../internal/runtime/mod.ts";
+
+function makeC2paResult(
+  overrides: Partial<C2paValidationResult> = {},
+): C2paValidationResult {
+  return {
+    available: true,
+    hasManifest: true,
+    signatureValid: true,
+    manifest: { title: "photo.jpg", claimGenerator: "anchr-test" },
+    gps: { lat: 35.6762, lon: 139.6503 },
+    checks: ["C2PA manifest found", "C2PA signature valid"],
+    failures: [],
+    ...overrides,
+  };
+}
+
+describe("C2PA GPS binding semantics", () => {
+  test("INV-06: passes only when the verified manifest contains nearby signed GPS", () => {
+    const result = verifyC2paGpsBinding(makeC2paResult(), {
+      expectedGps: { lat: 35.6762, lon: 139.6503 },
+      maxDistanceKm: 1,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.checks).toContain("C2PA: signed manifest verified");
+    expect(
+      result.checks.some((check) =>
+        check.startsWith("C2PA: signed GPS bound to expected location")
+      ),
+    ).toBe(true);
+    expect(result.failures).toHaveLength(0);
+  });
+
+  test("INV-06: rejects GPS when the manifest signature is invalid", () => {
+    const result = verifyC2paGpsBinding(
+      makeC2paResult({ signatureValid: false }),
+      {
+        expectedGps: { lat: 35.6762, lon: 139.6503 },
+        maxDistanceKm: 1,
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain(
+      "C2PA: manifest signature invalid — cannot trust GPS assertion",
+    );
+  });
+
+  test("INV-06: rejects verified manifests without signed GPS", () => {
+    const noGps = makeC2paResult();
+    delete noGps.gps;
+
+    const result = verifyC2paGpsBinding(noGps, {
+      expectedGps: { lat: 35.6762, lon: 139.6503 },
+      maxDistanceKm: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failures).toContain(
+      "C2PA: signed GPS assertion missing from verified manifest",
+    );
+  });
+
+  test("INV-06: rejects signed GPS outside the allowed distance", () => {
+    const result = verifyC2paGpsBinding(
+      makeC2paResult({ gps: { lat: 40.0, lon: 140.0 } }),
+      {
+        expectedGps: { lat: 35.6762, lon: 139.6503 },
+        maxDistanceKm: 1,
+      },
+    );
+
+    expect(result.passed).toBe(false);
+    expect(
+      result.failures.some((failure) =>
+        failure.startsWith("C2PA: signed GPS") &&
+        failure.includes("from expected location")
+      ),
+    ).toBe(true);
+  });
+});
 
 /**
  * Build a minimal valid JPEG from raw bytes (no external dependencies).

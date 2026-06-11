@@ -100,6 +100,8 @@ Each target unit has one owner responsibility:
 | Scripts | Build, test, lint, publish, and verification automation for this repository. |
 | Examples | Optional, tiny lessons that demonstrate one SDK/protocol behavior. |
 | E2E tests | Verify real protocol, payment, proof, relay, native-helper, and SDK integration behavior. |
+| Proof schema site | Publish the static HTTPS pages for built-in proof schema URLs from `spec-site/`. |
+| Tooling type stubs | Provide local TypeScript ambient types under `tools/types/` only when repository automation needs them. |
 
 The SDK may own concrete standard adapters because the SDK is the developer
 composition surface. Protocol must stay narrower: it owns compatibility, not

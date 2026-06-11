@@ -11,6 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, which, writeFile } from "../internal/runtime/mod.ts";
+import { haversineKm } from "./geo.ts";
 
 import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "c2pa"]);
@@ -39,6 +40,18 @@ export interface C2paValidationResult {
   failures: string[];
 }
 
+export interface C2paGpsBindingPolicy {
+  expectedGps: { lat: number; lon: number };
+  maxDistanceKm: number;
+}
+
+export interface C2paGpsBindingResult {
+  passed: boolean;
+  distanceKm?: number;
+  checks: string[];
+  failures: string[];
+}
+
 let c2paToolPath: string | null | undefined;
 
 function findC2paTool(): string | null {
@@ -52,6 +65,76 @@ function findC2paTool(): string | null {
 
 export function isC2paAvailable(): boolean {
   return findC2paTool() !== null;
+}
+
+export function verifyC2paGpsBinding(
+  validation: C2paValidationResult,
+  policy: C2paGpsBindingPolicy,
+): C2paGpsBindingResult {
+  const checks: string[] = [];
+  const failures: string[] = [];
+
+  if (!Number.isFinite(policy.maxDistanceKm) || policy.maxDistanceKm < 0) {
+    return {
+      passed: false,
+      checks,
+      failures: ["C2PA GPS binding policy has an invalid distance limit"],
+    };
+  }
+
+  if (!validation.available) {
+    failures.push(
+      "C2PA: verifier unavailable — cannot bind signed GPS to expected location",
+    );
+  } else if (!validation.hasManifest) {
+    failures.push(
+      "C2PA: no signed manifest found — cannot bind GPS to expected location",
+    );
+  } else if (!validation.signatureValid) {
+    failures.push(
+      "C2PA: manifest signature invalid — cannot trust GPS assertion",
+    );
+  } else {
+    checks.push("C2PA: signed manifest verified");
+  }
+
+  if (!validation.gps) {
+    failures.push(
+      "C2PA: signed GPS assertion missing from verified manifest",
+    );
+    return { passed: false, checks, failures };
+  }
+
+  const distanceKm = haversineKm(
+    validation.gps.lat,
+    validation.gps.lon,
+    policy.expectedGps.lat,
+    policy.expectedGps.lon,
+  );
+
+  if (failures.length > 0) {
+    return { passed: false, distanceKm, checks, failures };
+  }
+
+  if (distanceKm <= policy.maxDistanceKm) {
+    checks.push(
+      `C2PA: signed GPS bound to expected location (${
+        distanceKm.toFixed(1)
+      }km <= ${policy.maxDistanceKm}km)`,
+    );
+  } else {
+    failures.push(
+      `C2PA: signed GPS ${distanceKm.toFixed(1)}km from expected location ` +
+        `(max ${policy.maxDistanceKm}km)`,
+    );
+  }
+
+  return {
+    passed: failures.length === 0,
+    distanceKm,
+    checks,
+    failures,
+  };
 }
 
 const SUPPORTED_EXTENSIONS = new Set([

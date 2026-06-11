@@ -4,7 +4,11 @@
  */
 
 import { Buffer } from "node:buffer";
-import { validateC2pa } from "../../c2pa-validation.ts";
+import {
+  type C2paValidationResult,
+  validateC2pa,
+  verifyC2paGpsBinding,
+} from "../../c2pa-validation.ts";
 import { getIntegrity, getIntegrityForRequest } from "../../integrity-store.ts";
 import { fetchBlossomAttachment } from "../../../attachments/fetch-attachment.ts";
 import { validateAttachmentUri } from "../../../attachments/url-validation.ts";
@@ -34,6 +38,34 @@ function checkC2paSignature(
   } else {
     failures.push("C2PA: Content Credentials signature invalid");
   }
+}
+
+function checkC2paGpsBinding(
+  c2pa: C2paValidationResult,
+  expectedGps: GpsCoord | undefined,
+  maxGpsDist: number,
+  checks: string[],
+  failures: string[],
+): void {
+  if (!expectedGps) {
+    checkC2paSignature(c2pa, checks, failures);
+    checkGpsProximity(
+      c2pa.gps,
+      expectedGps,
+      maxGpsDist,
+      "C2PA",
+      checks,
+      failures,
+    );
+    return;
+  }
+
+  const binding = verifyC2paGpsBinding(c2pa, {
+    expectedGps,
+    maxDistanceKm: maxGpsDist,
+  });
+  for (const c of binding.checks) checks.push(c);
+  for (const f of binding.failures) failures.push(f);
 }
 
 function checkProofModeRecord(
@@ -126,6 +158,7 @@ async function verifyPhotoIntegrity(
   failures: string[],
   expectedGps: GpsCoord | undefined,
   maxGpsDist: number,
+  requiresC2pa: boolean,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   const integrityRecords = attachments
@@ -146,18 +179,17 @@ async function verifyPhotoIntegrity(
       failures,
       expectedGps,
       maxGpsDist,
+      requiresC2pa,
       blossomKeys,
     );
     return;
   }
 
   for (const record of integrityRecords) {
-    checkC2paSignature(record.c2pa, checks, failures);
-    checkGpsProximity(
-      record.c2pa.gps,
+    checkC2paGpsBinding(
+      record.c2pa,
       expectedGps,
       maxGpsDist,
-      "C2PA",
       checks,
       failures,
     );
@@ -206,6 +238,7 @@ async function verifyC2paFromAttachments(
   failures: string[],
   expectedGps: GpsCoord | undefined,
   maxGpsDist: number,
+  requiresC2pa: boolean,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   if (attachments.length === 0) return;
@@ -223,22 +256,18 @@ async function verifyC2paFromAttachments(
     const filename = att.filename ?? att.id ?? "photo.jpg";
     const c2pa = await validateC2pa(Buffer.from(data), filename);
 
-    checkC2paSignature(c2pa, checks, failures);
-    checkGpsProximity(
-      c2pa.gps,
-      expectedGps,
-      maxGpsDist,
-      "C2PA",
-      checks,
-      failures,
-    );
+    checkC2paGpsBinding(c2pa, expectedGps, maxGpsDist, checks, failures);
     validated = true;
   }
 
-  if (
-    !validated && attachments.some((a) => a.mime_type?.startsWith("image/"))
-  ) {
+  if (validated) return;
+
+  if (attachments.some((a) => a.mime_type?.startsWith("image/"))) {
     failures.push("C2PA: no image attachments could be verified");
+  } else if (requiresC2pa) {
+    failures.push(
+      "C2PA: required Content Credentials evidence missing — no image submitted",
+    );
   }
 }
 
@@ -255,6 +284,7 @@ export const photoIntegrityCheck: FactorCheck = {
       ctx.acc.failures,
       ctx.requirement.expected_gps,
       ctx.maxGpsDistanceKm,
+      ctx.requirement.factors.includes("c2pa"),
       ctx.options.blossomKeys,
     );
   },

@@ -17,8 +17,7 @@ It combines:
 
 - **Nostr** for peer discovery and request/response transport
 - **Cashu HTLCs** for escrow and automatic refunds
-- **Oracle verification** for TLSNotary, C2PA/photo, or application-specific
-  proofs
+- **Oracle verification** for TLSNotary, C2PA/GPS images, or application-specific proofs
 
 > **Status:** experimental and testnet-focused. See the
 > [threat model](docs/threat-model.md) before treating any flow as production
@@ -57,13 +56,29 @@ The Oracle never holds funds. It only controls whether the unlock secret is
 released, so oracle trust still matters. Use solo oracles for simple flows, or a
 FROST threshold signer when the trust assumption should be split.
 
+## Trust Assumptions
+
+Anchr removes the pay-first / deliver-first deadlock, but it is not fully
+trustless. Production deployments must choose and monitor two trust roots:
+
+- **Oracle release authority:** INV-02 guarantees that the honest SDK Oracle
+  wrapper does not release the Cashu HTLC preimage when verification fails. A
+  malicious solo Oracle, or a colluding FROST threshold, can still sign the
+  wrong outcome outside that wrapper.
+- **Cashu Mint custody:** the current settlement path trusts one Cashu Mint for
+  solvency and HTLC enforcement. The Mint layer alternatives and their tradeoffs
+  are tracked in the threat model.
+
 ## Example Uses
 
 - Pay an account holder to query a private API and return the response with a
   TLSNotary attestation.
+- Pay a field worker to submit a C2PA-signed photo whose manifest binds GPS to
+  the requested location.
 - Pay someone to prove an account fact such as contribution count, karma, or
   account age without exposing the whole account.
-- Build a verified photo workflow where C2PA provenance gates payment.
+- Build application-specific proof flows behind your own schema URL and Oracle
+  policy.
 
 ## Install
 

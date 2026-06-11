@@ -5,7 +5,7 @@
  * format, and verification rules live in each schema's document. Built-in
  * URLs:
  *   - https://anchr-spec.org/spec/proof/tlsn/v1 — TLSNotary attestation of an HTTPS response
- *   - https://anchr-spec.org/spec/proof/c2pa-image/v1 — C2PA-signed photo / video with optional GPS predicate
+ *   - https://anchr-spec.org/spec/proof/c2pa-image/v1 — C2PA image manifest with signed GPS binding
  */
 
 /** HTTPS proof schema URL form. The SDK validates shape and dispatches by URL. */

@@ -38,6 +38,7 @@ import type {
 // --- Test doubles ---
 
 const ORACLE_A = "a".repeat(64);
+const CUSTOM_SCHEMA = "https://example.org/spec/proof/custom-provider/v1";
 
 const customerKey = generateKeypair();
 const providerKey = generateKeypair();
@@ -339,7 +340,7 @@ test("Provider.serve prefilters requests with proof generator canHandle", async 
   }));
   onEvent(buildQueryRequestEvent(customerKey, {
     query_id: "q2",
-    schema: ProofSchema.C2paImageV1,
+    schema: CUSTOM_SCHEMA,
     customer_pubkey: customerKey.publicKey,
     oracle_pubkey: ORACLE_A,
     max_amount_sats: 1000,
@@ -665,7 +666,7 @@ test("Provider.serve ignores selection whose execution payload mismatches the pu
       selected_provider_pubkey: providerKey.publicKey,
       provider_redemption_token: "cashuBbound",
       execution: selectionExecution({
-        schema: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
+        schema: CUSTOM_SCHEMA,
       }),
     },
   ));

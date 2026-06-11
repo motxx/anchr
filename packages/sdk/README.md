@@ -7,6 +7,20 @@ The actor SDK APIs below are the primary integration path. Anchr has no default
 hosted server, mandatory REST API, or root hosted-server client. App-owned HTTP
 gateways should use explicit adapters outside the root SDK contract.
 
+## Trust Assumptions
+
+The SDK enforces the honest-wrapper invariant from
+`../../docs/threat-model.md#inv-02-oracle-wrapper-does-not-release-preimage-when-verification-fails`:
+the bundled Oracle/query-service path does not release the Cashu HTLC preimage
+when verification fails. That invariant does not make a solo Oracle Byzantine
+fault tolerant; a malicious Oracle, or a colluding FROST threshold, can still
+sign an incorrect outcome outside the wrapper.
+
+The default payment adapters also inherit the current Cashu Mint trust model:
+the deployment trusts its chosen Mint for solvency and HTLC enforcement. Use
+explicit Oracle whitelists, threshold signing where appropriate, and deployment
+owned Mint policy before treating a flow as production infrastructure.
+
 ## Install
 
 ```sh
@@ -64,8 +78,8 @@ console.log(result.data, result.proof, result.providerPubkey);
 ```
 
 For a multi-oracle whitelist, keep `oracles` as the trust policy; entries
-default to the relay-DM bootstrap, and an HTTP oracle is an explicit
-per-entry override:
+default to the relay-DM bootstrap, and an HTTP oracle is an explicit per-entry
+override:
 
 ```ts
 import {
@@ -142,15 +156,15 @@ decisions. The normative rules live in `specs/paid-request-exchange.md` and
 Each request carries a `schema` URL; the provider's handler interprets it. URLs
 the SDK ships as constants:
 
-| URL                                               | Meaning                                    |
-| ------------------------------------------------- | ------------------------------------------ |
-| `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response |
-| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA-signed photo / video                  |
+| URL                                               | Meaning                                     |
+| ------------------------------------------------- | ------------------------------------------- |
+| `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response  |
+| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA image manifest with signed GPS binding |
 
 Wire your own `produce(): Promise<{ data, proof }>` in the provider handler.
-Standard verifier helpers for TLSNotary, C2PA, EXIF, ProofMode, AI-content, and
-GPS checks are exported from `@anchr/sdk/proofs` for Oracle and app-owned
-verification policies.
+TLSNotary and C2PA verifier helpers are exported from `@anchr/sdk/proofs`.
+Applications can publish their own HTTPS schema URLs for proof formats that are
+outside the v0 built-in schema set.
 
 ## Testing
 

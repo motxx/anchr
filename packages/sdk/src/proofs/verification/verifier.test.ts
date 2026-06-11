@@ -65,7 +65,7 @@ test("rejects empty submission when GPS/nonce required", async () => {
   // Fix 1: Empty attachments with GPS/nonce requirements → rejection
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
-    "no media evidence provided — photos are required when GPS or nonce verification is enabled",
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 
@@ -88,6 +88,48 @@ test("empty submission passes weak verification when no evidence required", asyn
   );
 });
 
+test("empty submission fails when C2PA verification is required", async () => {
+  const query = makeQuery({
+    verification_requirements: ["c2pa"],
+    expected_gps: undefined,
+  });
+  const result: QueryResult = {
+    attachments: [],
+    notes: "no photo",
+  };
+
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
+  );
+});
+
+test("c2pa required but only a non-image attachment fails closed", async () => {
+  const query = makeQuery({
+    verification_requirements: ["c2pa"],
+    expected_gps: undefined,
+  });
+  const result: QueryResult = {
+    attachments: [{
+      id: "notes1",
+      uri: "https://blossom.example.com/notes1",
+      mime_type: "text/plain",
+      storage_kind: "blossom",
+      blossom_hash: "notes1",
+    }],
+    notes: "text instead of a photo",
+  };
+
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "C2PA: required Content Credentials evidence missing — no image submitted",
+  );
+});
+
 test("attachment with valid C2PA passes", async () => {
   const query = makeQuery({});
   const result: QueryResult = {
@@ -107,6 +149,31 @@ test("attachment with valid C2PA passes", async () => {
   expect(verification.checks).toContain("attachment present");
   expect(verification.checks).toContain(
     "C2PA: valid Content Credentials signature",
+  );
+});
+
+test("INV-06: attachment with expected GPS requires C2PA-signed GPS binding", async () => {
+  const query = makeQuery({
+    expected_gps: { lat: 35.6762, lon: 139.6503 },
+    verification_requirements: ["gps"],
+  });
+  const result: QueryResult = {
+    attachments: [{
+      id: "photo1",
+      uri: "https://blossom.example.com/photo1",
+      mime_type: "image/jpeg",
+      storage_kind: "blossom",
+      blossom_hash: "photo1",
+    }],
+    gps: { lat: 35.6762, lon: 139.6503 },
+  };
+
+  injectC2paIntegrity("photo1", query.id);
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "C2PA: signed GPS assertion missing from verified manifest",
   );
 });
 
@@ -188,7 +255,7 @@ test("payment_lock query with GPS requirement rejects empty submission", async (
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
-    "no media evidence provided — photos are required when GPS or nonce verification is enabled",
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 

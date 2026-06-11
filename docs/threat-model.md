@@ -72,7 +72,7 @@ the Oracle's preimage store is not decremented.
 
 ### INV-03: Customer can't unlock escrow before timeout
 
-**Status:** `cross-referenced`
+**Status:** `enforced`
 
 **Claim:** Cashu HTLC proofs locked with `locktime > now` cannot be redeemed via
 the Customer's refund key. Only the Provider's key + valid preimage can redeem
@@ -84,8 +84,7 @@ before locktime. The Mint enforces this, not the application layer.
 **Expected:** Cashu Mint rejects the swap (returns `null` from `attemptRedeem`).
 Funds remain locked until locktime expires.
 
-**Tests:** Cross-referenced from existing attack-class tests, annotated with
-`// INV-03` comments:
+**Tests:**
 
 - `e2e/regtest/regtest-htlc-trustless.test.ts` —
   `ATTACK: Customer refund key
@@ -100,25 +99,81 @@ refund path works once locktime elapses.
 
 ### INV-04: Stolen preimage alone cannot redeem bound escrow
 
-**Status:** `cross-referenced`
+**Status:** `enforced`
 
-**Claim:** A Provider-bound Cashu HTLC proof cannot be redeemed with the Oracle
-preimage alone. The redeeming party must also satisfy the bound Provider P2PK
-lock with the selected Provider's signature.
+**Claim:** Anchr's Provider redemption path refuses to redeem a Provider-bound
+Cashu HTLC proof with the Oracle preimage alone. Before asking the Mint to swap,
+the SDK verifies that the witness also satisfies the bound Provider P2PK lock
+with the selected Provider's signature.
 
 **Attack:** Learn or steal the Oracle preimage for an active Provider-bound
-escrow, then attempt to redeem the token with a different private key or with no
-Provider signature.
+escrow, then attempt to redeem through Anchr with a different private key or
+with no Provider signature.
 
-**Expected:** The Cashu Mint rejects the swap. Funds stay locked for the
-selected Provider until they present both the matching preimage and the bound
-Provider signature, or for the Customer refund path after locktime.
+**Expected:** Anchr returns `null` before a successful redemption when the
+signature is missing or does not match the Provider-bound key. The no-signature
+direct Mint attack is also expected to reject; relying on Mint-specific P2PK
+behavior alone is not the invariant.
 
-**Tests:** Cross-referenced from existing attack-class tests, annotated with
-`// INV-04` comments:
+**Tests:**
 
+- `e2e/regtest/regtest-htlc-trustless.test.ts` —
+  `ATTACK: Oracle has preimage but no Provider key → Mint REJECTS`
+- `e2e/regtest/regtest-htlc-trustless.test.ts` —
+  `redeemHtlcToken rejects Oracle's key (server-side P2PK check)`
+- `e2e/regtest/regtest-htlc-trustless.test.ts` —
+  `redeemHtlcToken rejects wrong Provider's key (server-side P2PK check)`
 - `e2e/regtest/regtest-htlc-attacks.test.ts` —
   `ATTACK: Customer redeems own HTLC proofs before locktime — fails`
+
+### INV-05: FROST threshold safety
+
+**Status:** `enforced`
+
+**Claim:** A FROST release-authority group cannot produce a valid aggregate
+signature from fewer than the configured threshold number of signer shares.
+
+**Attack:** Run a 2-of-3 DKG, generate a signing commitment and share from only
+one signer, and attempt to aggregate a group signature for the release message.
+
+**Expected:** Aggregation fails and no valid BIP-340 group signature is
+produced. With any valid threshold pair, aggregation succeeds and the resulting
+signature verifies against the group public key.
+
+**Tests:**
+
+- `e2e/frost/frost-threshold.test.ts` —
+  `INV-05: ATTACK: 1-of-3 (below threshold) -> aggregation fails`
+
+### INV-06: C2PA manifest signature binds GPS evidence
+
+**Status:** `enforced`
+
+**Claim:** A C2PA image proof satisfies Anchr's built-in
+`c2pa-image/v1` schema only when a cryptographically verified active manifest
+contains a signed EXIF GPS assertion within the request's accepted distance
+from the expected location.
+
+**Attack:** Submit an unsigned image, a C2PA image with an invalid manifest
+signature, a verified C2PA manifest without GPS, or a verified manifest whose
+signed GPS is outside the accepted distance window.
+
+**Expected:** The verifier rejects the proof before release. GPS coordinates
+are not trusted unless they come from the verified manifest and satisfy the
+distance policy.
+
+**Tests:**
+
+- `packages/sdk/src/proofs/c2pa-validation.test.ts` —
+  `INV-06: passes only when the verified manifest contains nearby signed GPS`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts` —
+  `INV-06: rejects GPS when the manifest signature is invalid`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts` —
+  `INV-06: rejects verified manifests without signed GPS`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts` —
+  `INV-06: rejects signed GPS outside the allowed distance`
+- `packages/sdk/src/proofs/verification/verifier.test.ts` —
+  `INV-06: attachment with expected GPS requires C2PA-signed GPS binding`
 
 ### INV-07: Requests are unlinkable by key material
 
@@ -184,18 +239,6 @@ that does not match the release material, is not bound to the Provider, cannot
 be signed by the Provider, or is rejected by the settlement backend is not
 spendable and must not redeem.
 
-## Future invariants (declared, not yet specified)
-
-- **INV-05:** FROST t-of-n threshold safety — no subset of size < t can produce
-  a valid aggregate signature. Likely cross-referenced to
-  `e2e/frost/frost-threshold.test.ts::ATTACK: 1-of-3 (below threshold) ->
-  aggregation fails`
-  once declared.
-- **INV-06:** C2PA manifest signature + GPS binding. Scoped after `crates/` gets
-  a C2PA verifier.
-
----
-
 ## Trust surface: Proof publication
 
 Proof publication (visibility `"public"`) is implemented and irreversible (Nostr
@@ -215,10 +258,10 @@ events cannot be deleted). Risks to other use cases:
 | --------------- | ---------------------------------- | ------------------------------------ | --------------- |
 | Cashu (current) | Single Mint trust                  | High (existing impl)                 | 0               |
 | Fedimint        | Federated Mint (threshold signing) | High (EscrowProvider ready)          | ~10 person-days |
-| DLC             | No Mint (2-of-2 multisig)          | Low (incompatible with pool betting) | ~50 person-days |
+| DLC             | No Mint (2-of-2 multisig)          | Low (pairwise outcomes only)         | ~50 person-days |
 
-DLC removes Mint trust entirely but conflicts with Anchr's pool-based betting
-model: DLC requires pairwise contracts (not many-to-many pools), pre-enumerated
-outcomes (limiting Anchr's arbitrary-URL market creation), and TLSNotary-to-DLC
-attestation conversion is an open research problem. Better suited as a future
-"high-value market" option.
+DLC removes Mint trust entirely but conflicts with Anchr's many-to-many
+paid-request model: DLC requires pairwise contracts, pre-enumerated outcomes
+(limiting arbitrary-URL verification targets), and TLSNotary-to-DLC attestation
+conversion is an open research problem. Better suited as a future high-value
+request option.

@@ -30,10 +30,10 @@ Rules:
 
 ## Initial Schemas
 
-| URL | Meaning |
-| --- | --- |
-| `https://anchr-spec.org/spec/proof/tlsn/v1` | TLSNotary proof for an HTTPS response and schema-specific predicate. |
-| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA image or media proof with optional location and content predicates. |
+| URL                                               | Meaning                                                              |
+| ------------------------------------------------- | -------------------------------------------------------------------- |
+| `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary proof for an HTTPS response and schema-specific predicate. |
+| `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA image manifest proof with signed GPS binding.                   |
 
 The public `anchr-spec.org` documents are generated from `spec-site/` and
 published by `.github/workflows/deploy-proof-schema-site.yml`. Run
@@ -56,7 +56,11 @@ Oracles and Customers dispatch verification through adapters with this shape:
 ```ts
 interface VerifierAdapter {
   canHandle(schema: string): boolean;
-  verify(proof: unknown, predicate: unknown, data: unknown): boolean | Promise<boolean>;
+  verify(
+    proof: unknown,
+    predicate: unknown,
+    data: unknown,
+  ): boolean | Promise<boolean>;
 }
 ```
 
@@ -73,6 +77,6 @@ Anchr query events carry the requested proof schema URL in an indexable `s` tag:
 ["s", "https://anchr-spec.org/spec/proof/tlsn/v1"]
 ```
 
-The encrypted request content carries the same URL in its `schema` field. If
-the tag and content disagree, implementations MUST use the encrypted content for
+The encrypted request content carries the same URL in its `schema` field. If the
+tag and content disagree, implementations MUST use the encrypted content for
 execution and treat the public tag as an untrusted discovery hint.

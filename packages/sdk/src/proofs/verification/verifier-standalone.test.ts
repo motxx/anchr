@@ -70,7 +70,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
 
     expect(verification.passed).toBe(false);
     expect(verification.failures).toContain(
-      "no media evidence provided — photos are required when GPS or nonce verification is enabled",
+      "no media evidence provided — photos are required when photo-backed verification is enabled",
     );
   });
 
