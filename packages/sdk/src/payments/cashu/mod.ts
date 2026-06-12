@@ -61,5 +61,6 @@ export type { WalletBalance, WalletRole, WalletStore } from "./wallet-store.ts";
 export {
   createPersistentPreimageStore,
   createPreimageStore,
+  issueQueryHash,
 } from "./preimage-store.ts";
 export type { PreimageEntry, PreimageStore } from "./preimage-store.ts";

@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -52,3 +53,38 @@ singletons, blocking per-test isolation and host composition:
 ## Plan
 
 - Add the two seams with defaults, relocate the helper, update call sites.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/c2pa-validation.ts` — `validateC2pa` /
+  `isC2paAvailable` accept `C2paToolOptions.toolPath` (path or `null` to
+  force unavailable); PATH discovery stays the cached default
+- `packages/sdk/src/proofs/verification/checks/types.ts` —
+  `VerifyProofOptions.integrityStore` seam;
+  `checks/photo-integrity.ts` consumes the injected store and falls back to
+  `getDefaultIntegrityStore()` (`proofs/integrity-store.ts`)
+- `packages/sdk/src/attachments/fetch-attachment.ts` — `fetchAttachmentData`
+  relocated from `photo-integrity.ts` with a result-shaped return
+  (`{ok,data}|{ok,reason}`); `checks/ai-content.ts` and
+  `checks/photo-integrity.ts` consume it from `attachments/`
+
+Verified with:
+
+- `deno task test:unit` (toolPath forcing test; injected-integrity-store
+  test in `verifier-standalone.test.ts`)
+- `deno task lint:strict`
+
+Harness update:
+
+- The injected-store and toolPath tests lock both seams; service-locator
+  findings remain owned by `/arch-lint-llm` (L002).
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

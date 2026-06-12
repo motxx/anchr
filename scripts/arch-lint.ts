@@ -17,6 +17,8 @@
  *   [E029] requests/ internal types must not be re-exported to a non-/testing
  *          public surface; only the documented request ports and Oracle-client
  *          contract may be re-published.
+ *   [E030] package code must not import from examples/, e2e/, or scripts/;
+ *          packages are the dependency roots, never consumers of repo tooling.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -332,6 +334,24 @@ function checkPackageFile(
   source: string,
 ): Violation[] {
   const violations: Violation[] = [];
+
+  for (const { specifier, line } of extractImports(source)) {
+    const target = resolveRelativeImportTarget(specifier, fileRel);
+    if (target === null) continue;
+    const escapedInto = PUBLIC_SURFACE_DIRS.find((dir) =>
+      target === dir || target.startsWith(`${dir}/`)
+    );
+    if (escapedInto !== undefined) {
+      violations.push({
+        file: fileRel,
+        line,
+        code: "E030",
+        severity: "error",
+        message:
+          `package code must not import from ${escapedInto}/ (found "${specifier}")`,
+      });
+    }
+  }
 
   for (const hit of scanContentLines(source, APP_VOCAB)) {
     violations.push({

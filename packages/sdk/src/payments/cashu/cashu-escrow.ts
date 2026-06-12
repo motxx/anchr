@@ -26,6 +26,7 @@
  */
 
 import {
+  CheckStateEnum,
   getDecodedToken,
   isHTLCSpendAuthorised,
   P2PKBuilder,
@@ -304,38 +305,74 @@ export async function redeemHtlcToken(
   const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
+  let signedProofs: Proof[];
   try {
-    const signedProofs = prepareHtlcWitness(
+    signedProofs = prepareHtlcWitness(
       htlcProofs,
       preimage,
       providerPrivateKey,
     );
-    const verifyError = verifyHtlcSpendAuth(signedProofs);
-    if (verifyError) return null;
+  } catch (error) {
+    log.error(
+      "Failed to prepare HTLC witness:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+  const verifyError = verifyHtlcSpendAuth(signedProofs);
+  if (verifyError) return null;
 
-    const amountSats = computeNetAmount(ctx.wallet, signedProofs);
-    if (amountSats === null) {
-      log.error("Fee exceeds total amount");
-      return null;
-    }
+  const amountSats = computeNetAmount(ctx.wallet, signedProofs);
+  if (amountSats === null) {
+    log.error("Fee exceeds total amount");
+    return null;
+  }
 
-    const send = await loadAndSend(
+  let send: Proof[];
+  try {
+    send = await loadAndSend(
       ctx.wallet,
       amountSats,
       signedProofs,
       undefined,
       providerPrivateKey,
     );
-    return {
-      token: encodeProofs(ctx.config.mintUrl, send),
-      proofs: send,
-      amountSats,
-    };
   } catch (error) {
+    // A committed-but-unanswered swap must never be reported as a plain
+    // failure: with the inputs spent (or unknowable) at the mint, a null
+    // would make the caller treat a possibly-settled redemption as a burned
+    // token. Surface the uncertainty loudly instead.
+    const spent = await anyInputSpent(ctx.wallet, signedProofs);
+    if (spent !== false) {
+      throw new Error(
+        "redeemHtlcToken: mint swap failed with inputs spent or unknowable — check the mint before retrying; do not treat the token as burned",
+        { cause: error },
+      );
+    }
     log.error(
-      "Failed to redeem HTLC token:",
+      "Failed to redeem HTLC token (inputs unspent — safe to retry):",
       error instanceof Error ? error.message : error,
     );
+    return null;
+  }
+  return {
+    token: encodeProofs(ctx.config.mintUrl, send),
+    proofs: send,
+    amountSats,
+  };
+}
+
+/** True/false when the mint answered; null when the state is unknowable. */
+async function anyInputSpent(
+  wallet: NonNullable<
+    Awaited<ReturnType<typeof getWalletAndConfig>>
+  >["wallet"],
+  proofs: Proof[],
+): Promise<boolean | null> {
+  try {
+    const states = await wallet.checkProofsStates(proofs);
+    return states.some((s) => s.state === CheckStateEnum.SPENT);
+  } catch {
     return null;
   }
 }

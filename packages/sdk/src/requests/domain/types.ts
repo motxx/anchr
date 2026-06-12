@@ -142,10 +142,9 @@ export interface OfferInfo {
  * outcome; neither is set on rejection or expiry.
  *
  * **FROST message format (settlement contract):** the FROST signature is over
- * the UTF-8 bytes of `anchr/query-settle/v1:${query.id}:approved`. Any
- * downstream redeemer that validates the signature against the P2PK lock
- * **must** use the same prefix and version. See `query-service-methods.ts`
- * `doSubmitEscrowResult` for the canonical encoding.
+ * `sha256("anchr:sign:" + query.id)`. The single owner of this derivation is
+ * `payments/frost/signing-message.ts` (`deriveFrostSigningMessage`); any
+ * downstream validator must use the same rule.
  */
 export interface EscrowSubmitOutcome {
   ok: boolean;

@@ -11,7 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, which, writeFile } from "../internal/runtime/mod.ts";
-import { haversineKm } from "./geo.ts";
+import { evaluateGpsDistancePolicy } from "./geo.ts";
 
 import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "c2pa"]);
@@ -52,19 +52,28 @@ export interface C2paGpsBindingResult {
   failures: string[];
 }
 
+export interface C2paToolOptions {
+  /**
+   * Override c2patool discovery: an explicit binary path, or null to force
+   * the tool-unavailable behavior. Defaults to PATH discovery (cached).
+   */
+  toolPath?: string | null;
+}
+
 let c2paToolPath: string | null | undefined;
 
-function findC2paTool(): string | null {
+function findC2paTool(override?: string | null): string | null {
+  if (override !== undefined) return override;
   if (c2paToolPath !== undefined) return c2paToolPath;
   c2paToolPath = which("c2patool");
   if (c2paToolPath) {
-    log.error(`Found c2patool at ${c2paToolPath}`);
+    log.debug(`Found c2patool at ${c2paToolPath}`);
   }
   return c2paToolPath ?? null;
 }
 
-export function isC2paAvailable(): boolean {
-  return findC2paTool() !== null;
+export function isC2paAvailable(options?: C2paToolOptions): boolean {
+  return findC2paTool(options?.toolPath) !== null;
 }
 
 export function verifyC2paGpsBinding(
@@ -105,18 +114,17 @@ export function verifyC2paGpsBinding(
     return { passed: false, checks, failures };
   }
 
-  const distanceKm = haversineKm(
-    validation.gps.lat,
-    validation.gps.lon,
-    policy.expectedGps.lat,
-    policy.expectedGps.lon,
+  const { distanceKm, withinLimit } = evaluateGpsDistancePolicy(
+    validation.gps,
+    policy.expectedGps,
+    policy.maxDistanceKm,
   );
 
   if (failures.length > 0) {
     return { passed: false, distanceKm, checks, failures };
   }
 
-  if (distanceKm <= policy.maxDistanceKm) {
+  if (withinLimit) {
     checks.push(
       `C2PA: signed GPS bound to expected location (${
         distanceKm.toFixed(1)
@@ -247,7 +255,17 @@ function buildManifest(
   return manifest;
 }
 
-function evaluateSignature(report: Record<string, unknown>): boolean {
+/**
+ * Failure codes that do not invalidate the signature. INV-06 requires this
+ * evaluation to fail closed: any failure entry in the c2patool validation
+ * report (tampered assertion store, untrusted credential, broken data hash,
+ * …) invalidates the signature unless its code is allowlisted here as
+ * informational. Currently empty on purpose — no known c2patool failure
+ * code is safe to ignore for GPS binding.
+ */
+const IGNORABLE_FAILURE_CODES: ReadonlySet<string> = new Set();
+
+export function evaluateSignature(report: Record<string, unknown>): boolean {
   const validationResults = report.validation_results as {
     activeManifest?: {
       success?: Array<{ code: string }>;
@@ -260,20 +278,20 @@ function evaluateSignature(report: Record<string, unknown>): boolean {
   const claimSignatureOk = successCodes.some((v) =>
     v.code === "claimSignature.validated"
   );
-  const hasRealFailures = failureCodes.some((v) =>
-    v.code.startsWith("claimSignature.") ||
-    v.code.startsWith("assertion.dataHash.")
+  const realFailures = failureCodes.filter((v) =>
+    !IGNORABLE_FAILURE_CODES.has(v.code)
   );
-  return claimSignatureOk && !hasRealFailures;
+  return claimSignatureOk && realFailures.length === 0;
 }
 
 export async function validateC2pa(
   data: Buffer,
   filename: string,
+  options?: C2paToolOptions,
 ): Promise<C2paValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
-  const toolPath = findC2paTool();
+  const toolPath = findC2paTool(options?.toolPath);
 
   if (!toolPath) return noToolResult();
 

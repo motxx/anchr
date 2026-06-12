@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -47,3 +48,31 @@ not honoured and nothing tells them.
 
 - Replace the fallback with an explicit rejection path when `query.quorum` is
   set and FROST is unavailable.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/oracle-service.ts` — quorum queries are
+  rejected loudly (rejection DM, `false` result) when FROST
+  coordinator/config/node-config are missing; `verifyAndDeliverWithFrost`
+  no longer falls back to the single-oracle HTLC path
+- `packages/sdk/src/adapters/nostr/oracle-frost.test.ts` — tests lock the
+  rejection DM for both the dispatch path and the FROST entry point, and
+  assert the preimage is never revealed
+
+Verified with:
+
+- `deno task test:unit`
+
+Harness update:
+
+- `oracle-frost.test.ts` locks the no-silent-downgrade contract.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

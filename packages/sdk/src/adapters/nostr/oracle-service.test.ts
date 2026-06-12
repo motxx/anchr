@@ -7,6 +7,7 @@ import {
 } from "./oracle-service.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
+import { makeQuery } from "../../testing/factories.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
 import type { Event } from "@anchr/protocol/nostr";
 import type { PublishResult, RelayClient } from "../types.ts";
@@ -216,7 +217,7 @@ describe("recordSelectedProvider", () => {
 
   test("records provider pubkey for watched query", () => {
     // watchRequest requires relay subscriptions — but with empty relayUrls it still records the entry
-    service.watchRequest("q1", "evt1", "customer_pub");
+    service.watchRequest(makeQuery({ id: "q1" }), "evt1", "customer_pub");
     // Should not throw
     service.recordSelectedProvider("q1", providerPubkey);
   });
@@ -251,7 +252,7 @@ describe("stop", () => {
   test("completes without error after watching queries", () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    service.watchRequest("q1", "evt1", "customer_pub");
+    service.watchRequest(makeQuery({ id: "q1" }), "evt1", "customer_pub");
     // Should not throw
     service.stop();
   });

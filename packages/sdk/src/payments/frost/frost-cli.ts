@@ -26,7 +26,7 @@ export function findFrostSigner(): string | null {
   for (const p of localPaths) {
     try {
       if (Deno.statSync(p).isFile) {
-        log.error(`Found frost-signer at ${p}`);
+        log.debug(`Found frost-signer at ${p}`);
         return p;
       }
     } catch { /* not found */ }
@@ -34,7 +34,7 @@ export function findFrostSigner(): string | null {
 
   const onPath = findOnPath("frost-signer");
   if (onPath) {
-    log.error(`Found frost-signer at ${onPath}`);
+    log.debug(`Found frost-signer at ${onPath}`);
   }
   return onPath;
 }

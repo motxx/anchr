@@ -34,6 +34,11 @@ export function buildFrostP2PKOptions(
   customerRefundPubkey: string,
   locktimeSeconds: number,
 ): P2PKOptions {
+  if (!customerRefundPubkey) {
+    // Without a refund key, funds are stranded forever if the FROST group
+    // never releases — refuse to build such a lock.
+    throw new Error("FROST P2PK escrow requires a customer refund pubkey");
+  }
   return new P2PKBuilder()
     .addLockPubkey([providerPubkey, groupPubkey])
     .requireLockSignatures(2)
@@ -47,7 +52,12 @@ export function buildFrostP2PKOptions(
 export function createFrostEscrowProvider(
   config: FrostEscrowConfig,
 ): EscrowProvider {
-  const tokenMap = new Map<string, { token: string; proofs: Proof[] }>();
+  const tokenMap = new Map<string, {
+    token: string;
+    proofs: Proof[];
+    customerRefundPubkey: string;
+    locktimeSeconds: number;
+  }>();
   let refCounter = 0;
 
   return {
@@ -69,7 +79,12 @@ export function createFrostEscrowProvider(
         );
         const token = encodeProofs(ctx.config.mintUrl, send);
         const ref = `frost_p2pk_${++refCounter}`;
-        tokenMap.set(ref, { token, proofs: send });
+        tokenMap.set(ref, {
+          token,
+          proofs: send,
+          customerRefundPubkey: params.customer_pubkey,
+          locktimeSeconds: params.expiry,
+        });
         return { escrow_ref: ref };
       } catch (error) {
         log.error(
@@ -87,13 +102,16 @@ export function createFrostEscrowProvider(
       const ctx = await getWalletAndConfig();
       if (!ctx) return null;
 
-      const locktimeSeconds = Math.floor(Date.now() / 1000) + 3600;
+      if (!entry.customerRefundPubkey) {
+        log.error("Refusing to bind FROST escrow without a refund pubkey");
+        return null;
+      }
 
       const p2pkOptions = buildFrostP2PKOptions(
         provider_pubkey,
         config.groupPubkey,
-        "",
-        locktimeSeconds,
+        entry.customerRefundPubkey,
+        entry.locktimeSeconds,
       );
 
       try {
@@ -108,7 +126,12 @@ export function createFrostEscrowProvider(
         );
         const token = encodeProofs(ctx.config.mintUrl, send);
         const newRef = `frost_p2pk_${++refCounter}`;
-        tokenMap.set(newRef, { token, proofs: send });
+        tokenMap.set(newRef, {
+          token,
+          proofs: send,
+          customerRefundPubkey: entry.customerRefundPubkey,
+          locktimeSeconds: entry.locktimeSeconds,
+        });
         tokenMap.delete(escrow_ref);
         return { escrow_ref: newRef };
       } catch (error) {

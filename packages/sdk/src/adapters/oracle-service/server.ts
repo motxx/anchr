@@ -26,7 +26,10 @@ import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
 import { buildAuthMiddleware } from "./auth.ts";
 import { registerHtlcRoutes } from "./htlc-routes.ts";
-import { registerFrostSignerRoutes } from "./frost-signer-routes.ts";
+import {
+  type PendingNonceSession,
+  registerFrostSignerRoutes,
+} from "./frost-signer-routes.ts";
 import { registerFrostDkgRoutes } from "./frost-dkg-routes.ts";
 import { registerFrostSignRoutes } from "./frost-sign-routes.ts";
 
@@ -78,7 +81,7 @@ export function buildOracleApp(
   // Per-app session state. Lives only as long as the app instance — the
   // route registrars hold references but never mutate the binding.
   const queryHashMap = new Map<string, string>();
-  const pendingNonces = new Map<string, string>();
+  const pendingNonces = new Map<string, PendingNonceSession>();
 
   registerHtlcRoutes(app, {
     oracleId,

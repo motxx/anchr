@@ -4,6 +4,12 @@
  * Owns SimplePool lifecycle for publish/subscribe over relay URLs.
  * Protocol primitives (kinds, keys, NIP-44, tag helpers) come from
  * `@anchr/protocol/nostr`; this module is runtime I/O binding only.
+ *
+ * Durability contract: this client does NOT auto-reconnect or replay
+ * missed events (beyond SimplePool's socket handling). A long-running
+ * host that must not miss events either runs relays that persist and
+ * replay (resubscribe with a `since` watermark after a reconnect) or
+ * wraps this client with its own reconnect/watermark layer.
  */
 
 import { SimplePool } from "nostr-tools/pool";

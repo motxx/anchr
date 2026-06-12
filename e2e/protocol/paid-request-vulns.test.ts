@@ -6,6 +6,7 @@ import { createPreimageStore } from "@anchr/sdk/payments";
 import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
 import { MIN_ESCROW_LOCKTIME_SECS } from "@anchr/sdk/testing";
 import {
+  createMockEscrowProvider,
   makeFakeToken,
   makeMockOracle,
   makeServiceWithPreimage as makeExploitService,
@@ -105,6 +106,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       store,
       oracleRegistry: registry,
       preimageStore,
+      escrowProvider: createMockEscrowProvider(),
     });
 
     const entry = preimageStore.create();
@@ -154,6 +156,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       store,
       oracleRegistry: registry,
       preimageStore,
+      escrowProvider: createMockEscrowProvider(),
     });
 
     const entry = preimageStore.create();
@@ -201,6 +204,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       store,
       oracleRegistry: registry,
       preimageStore,
+      escrowProvider: createMockEscrowProvider(),
     });
 
     const entry = preimageStore.create();

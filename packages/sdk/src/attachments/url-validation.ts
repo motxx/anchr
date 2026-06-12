@@ -2,10 +2,14 @@
  * Validates attachment URIs to prevent SSRF attacks.
  *
  * Rejects:
- * - Non-HTTPS schemes (except http://localhost for dev)
+ * - Non-HTTPS schemes (except http to loopback in explicit dev mode)
+ * - Loopback hosts, unless `ANCHR_ALLOW_LOCALHOST_ATTACHMENTS=1` opts in
  * - Private/internal IPv4 and IPv6 ranges
- * - IPv6-mapped IPv4 addresses (::ffff:127.0.0.1)
+ * - IPv6-mapped IPv4 addresses (::ffff:127.0.0.1, hex form included)
  * - URLs with embedded credentials (user:pass@host)
+ *
+ * The guard is default-secure: loopback targets are rejected unless the
+ * Deno-native dev opt-in is set; no NODE_ENV-style production switch.
  */
 
 const PRIVATE_IPV4_PATTERNS = [
@@ -69,6 +73,21 @@ function isPrivateIp(hostname: string): boolean {
   return false;
 }
 
+/** Loopback hosts in every spelling the URL parser can hand us. */
+function isLoopback(hostname: string): boolean {
+  const raw = stripBrackets(hostname).toLowerCase();
+  if (raw === "localhost" || raw === "::1") return true;
+  if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(raw)) return true;
+  if (/^::ffff:127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(raw)) return true;
+  // Hex-mapped ::ffff:7fXX:YYYY (127.x.y.z)
+  if (/^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(raw)) return true;
+  return false;
+}
+
+function loopbackAllowed(): boolean {
+  return Deno.env.get("ANCHR_ALLOW_LOCALHOST_ATTACHMENTS") === "1";
+}
+
 /**
  * Validates a URI for safe server-side use (redirect or fetch).
  * Returns null if valid, or an error message string if invalid.
@@ -86,25 +105,24 @@ export function validateAttachmentUri(uri: string): string | null {
     return "URLs with embedded credentials are not allowed";
   }
 
-  const isLocalhost = parsed.hostname === "localhost" ||
-    parsed.hostname === "127.0.0.1";
-  const isProduction = Deno.env.get("NODE_ENV") === "production";
+  const loopback = isLoopback(parsed.hostname);
 
-  // In production, reject localhost/loopback — prevents SSRF to co-hosted services
-  if (isProduction && isLocalhost) {
-    return "URLs pointing to localhost are not allowed in production";
+  // Default-secure: loopback targets need the explicit dev opt-in.
+  if (loopback && !loopbackAllowed()) {
+    return "URLs pointing to localhost are not allowed " +
+      "(set ANCHR_ALLOW_LOCALHOST_ATTACHMENTS=1 for local development)";
   }
 
-  // Allow http only for localhost (dev), otherwise require https
-  if (parsed.protocol === "http:" && !isLocalhost) {
+  // Allow http only toward loopback in dev mode; otherwise require https
+  if (parsed.protocol === "http:" && !loopback) {
     return "Only HTTPS URLs are allowed";
   }
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
     return "Only HTTPS URLs are allowed";
   }
 
-  // Reject private/internal IPs (except localhost for dev)
-  if (!isLocalhost && isPrivateIp(parsed.hostname)) {
+  // Reject private/internal IPs (loopback handled above)
+  if (!loopback && isPrivateIp(parsed.hostname)) {
     return "URLs pointing to private/internal networks are not allowed";
   }
 

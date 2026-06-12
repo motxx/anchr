@@ -14,7 +14,11 @@ import {
   resultToVerificationInput,
   verify,
 } from "../../requests/application/query-verifier.ts";
-import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
+import {
+  clearIntegrityStore,
+  createIntegrityStore,
+  storeIntegrity,
+} from "../mod.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { VerificationInput, VerificationRequirement } from "./contract.ts";
 import type { TlsnValidationResult } from "../mod.ts";
@@ -85,6 +89,83 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
+  test("an injected integrity store is honoured instead of the global singleton", async () => {
+    const requirement: VerificationRequirement = {
+      id: "req_injected_store",
+      factors: ["gps", "ai_check"],
+    };
+    const input: VerificationInput = {
+      attachments: [{
+        id: "photo_injected",
+        uri: "https://blossom.example.com/photo_injected",
+        mime_type: "image/jpeg",
+        storage_kind: "blossom",
+        blossom_hash: "photo_injected",
+      }],
+      gps: { lat: 35.0, lon: 139.0 },
+    };
+
+    // The record lives only in the host-composed store; the global
+    // singleton stays empty.
+    const integrityStore = createIntegrityStore();
+    integrityStore.store({
+      attachmentId: "photo_injected",
+      requestId: requirement.id,
+      capturedAt: Date.now(),
+      exif: {
+        hasExif: false,
+        hasCameraModel: false,
+        hasGps: false,
+        hasTimestamp: false,
+        timestampRecent: false,
+        gpsNearHint: null,
+        metadata: {},
+        checks: [],
+        failures: [],
+      },
+      c2pa: {
+        available: true,
+        hasManifest: true,
+        signatureValid: true,
+        manifest: { title: "test.jpg", claimGenerator: "test" },
+        checks: [],
+        failures: [],
+      },
+    });
+
+    const withInjected = await verifyProof(requirement, input, {
+      integrityStore,
+    });
+    expect(withInjected.passed).toBe(true);
+
+    const withGlobal = await verifyProof(requirement, input);
+    expect(withGlobal.passed).toBe(false);
+  });
+
+  test("rejects a submission without GPS evidence even when no expected location is set", async () => {
+    const requirement: VerificationRequirement = {
+      id: "req_gps_no_expected",
+      factors: ["gps"],
+    };
+    const input: VerificationInput = {
+      attachments: [{
+        id: "photo_b",
+        uri: "https://blossom.example.com/photo_b",
+        mime_type: "image/jpeg",
+        storage_kind: "blossom",
+        blossom_hash: "photo_b",
+      }],
+    };
+
+    injectC2paIntegrity("photo_b", requirement.id);
+    const verification = await verifyProof(requirement, input);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures).toContain(
+      "GPS coordinates missing from submission body — required by verification policy",
+    );
+  });
+
   test("rejects body GPS far from expected location", async () => {
     const requirement: VerificationRequirement = {
       id: "req_3",
@@ -118,6 +199,8 @@ describe("verifyProof — standalone (no Query envelope)", () => {
         storage_kind: "blossom",
         blossom_hash: "photo_a",
       }],
+      // The gps factor demands body GPS evidence even without expected_gps.
+      gps: { lat: 35.0, lon: 139.0 },
     };
 
     injectC2paIntegrity("photo_a", requirement.id);

@@ -9,8 +9,6 @@
  * be reached.
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   requestToRequirement,
   resultToVerificationInput,
@@ -18,15 +16,14 @@ import {
 import type { FrostSignaturePort } from "../../requests/application/ports.ts";
 import type { FrostNodeConfig } from "./frost-config.ts";
 import { coordinateSigning } from "./frost-signing-coordinator.ts";
+import { deriveFrostSigningMessage } from "./signing-message.ts";
 
 export function createFrostSignatureAdapter(
   nodeConfig: FrostNodeConfig,
 ): FrostSignaturePort {
   return {
     async requestSignature(query, result, blossomKeys) {
-      const messageHex = bytesToHex(
-        sha256(new TextEncoder().encode(`anchr:sign:${query.id}`)),
-      );
+      const messageHex = deriveFrostSigningMessage(query.id);
       const sigResult = await coordinateSigning(
         {
           nodeConfig,

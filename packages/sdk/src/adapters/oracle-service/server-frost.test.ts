@@ -1,8 +1,20 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { Hono } from "hono";
 import { buildOracleApp } from "./server.ts";
-import { createFrostCoordinator } from "../../payments/mod.ts";
-import type { ThresholdOracleConfig } from "../../payments/mod.ts";
+import { buildAuthMiddleware } from "./auth.ts";
+import {
+  type PendingNonceSession,
+  registerFrostSignerRoutes,
+} from "./frost-signer-routes.ts";
+import {
+  createFrostCoordinator,
+  deriveFrostSigningMessage,
+} from "../../payments/mod.ts";
+import type {
+  FrostNodeConfig,
+  ThresholdOracleConfig,
+} from "../../payments/mod.ts";
 
 const API_KEY = "frost-test-key";
 
@@ -250,6 +262,76 @@ describe("oracle-server FROST signing endpoints", () => {
     expect(body.shares_count).toBe(1);
     expect(body.threshold).toBe(2);
     expect(body.finalized).toBe(false);
+  });
+});
+
+// --- Signer message binding (round 1 verified requirement → round 2 message) ---
+
+describe("oracle-server FROST signer message binding", () => {
+  const frostNodeConfig: FrostNodeConfig = {
+    signer_index: 1,
+    total_signers: 3,
+    threshold: 2,
+    key_package: {},
+    pubkey_package: {},
+    group_pubkey: "aa".repeat(32),
+    peers: [],
+  };
+
+  function buildSignerApp(pendingNonces: Map<string, PendingNonceSession>) {
+    const app = new Hono();
+    registerFrostSignerRoutes(app, {
+      authMiddleware: buildAuthMiddleware(API_KEY),
+      frostNodeConfig,
+      pendingNonces,
+    });
+    return app;
+  }
+
+  test("round1 rejects a message that does not match the verified requirement (403)", async () => {
+    const pendingNonces = new Map<string, PendingNonceSession>();
+    const app = buildSignerApp(pendingNonces);
+
+    const res = await app.request("/frost/signer/round1", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        message: "deadbeef",
+        requirement: { id: "q-bind", factors: [] },
+        input: { attachments: [] },
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("does not match");
+    expect(pendingNonces.size).toBe(0);
+  });
+
+  test("round2 with a mismatched message returns 403 and no signature share", async () => {
+    const pendingNonces = new Map<string, PendingNonceSession>();
+    pendingNonces.set("session-1", {
+      noncesJson: "{}",
+      messageHex: deriveFrostSigningMessage("q-bind"),
+    });
+    const app = buildSignerApp(pendingNonces);
+
+    const res = await app.request("/frost/signer/round2", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        commitments: "{}",
+        message: "deadbeef",
+        nonce_id: "session-1",
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.signature_share).toBeUndefined();
+    expect(body.error).toContain("round-1");
+    // The nonce session is consumed even on rejection — no replay probing.
+    expect(pendingNonces.size).toBe(0);
   });
 });
 

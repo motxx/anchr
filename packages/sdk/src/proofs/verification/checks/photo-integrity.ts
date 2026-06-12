@@ -9,9 +9,11 @@ import {
   validateC2pa,
   verifyC2paGpsBinding,
 } from "../../c2pa-validation.ts";
-import { getIntegrity, getIntegrityForRequest } from "../../integrity-store.ts";
-import { fetchBlossomAttachment } from "../../../attachments/fetch-attachment.ts";
-import { validateAttachmentUri } from "../../../attachments/url-validation.ts";
+import {
+  getDefaultIntegrityStore,
+  type IntegrityStore,
+} from "../../integrity-store.ts";
+import { fetchAttachmentData } from "../../../attachments/fetch-attachment.ts";
 import type {
   AttachmentRef,
   BlossomKeyMap,
@@ -159,14 +161,15 @@ async function verifyPhotoIntegrity(
   expectedGps: GpsCoord | undefined,
   maxGpsDist: number,
   requiresC2pa: boolean,
+  integrityStore: IntegrityStore,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   const integrityRecords = attachments
-    .map((att) => getIntegrity(att.id))
+    .map((att) => integrityStore.get(att.id))
     .filter((m) => m !== null);
 
   if (integrityRecords.length === 0) {
-    const byRequest = getIntegrityForRequest(requirementId);
+    const byRequest = integrityStore.getForRequest(requirementId);
     if (byRequest.length > 0) {
       integrityRecords.push(...byRequest);
     }
@@ -204,34 +207,6 @@ async function verifyPhotoIntegrity(
   }
 }
 
-async function fetchAttachmentData(
-  att: AttachmentRef,
-  failures: string[],
-  blossomKeys?: BlossomKeyMap,
-): Promise<Uint8Array | null> {
-  if (att.storage_kind === "blossom") {
-    const keyMaterial = blossomKeys?.[att.id];
-    const data = await fetchBlossomAttachment(att, keyMaterial);
-    if (data) return data;
-  }
-
-  if (att.uri) {
-    const uriError = validateAttachmentUri(att.uri);
-    if (uriError) {
-      failures.push(`C2PA: attachment URI rejected (${uriError})`);
-      return null;
-    }
-    try {
-      const response = await fetch(att.uri);
-      if (response.ok) return new Uint8Array(await response.arrayBuffer());
-    } catch {
-      // fetch failed
-    }
-  }
-
-  return null;
-}
-
 async function verifyC2paFromAttachments(
   attachments: AttachmentRef[],
   checks: string[],
@@ -247,14 +222,14 @@ async function verifyC2paFromAttachments(
   for (const att of attachments) {
     if (!att.mime_type?.startsWith("image/")) continue;
 
-    const data = await fetchAttachmentData(att, failures, blossomKeys);
-    if (!data) {
-      failures.push("C2PA: could not retrieve attachment for verification");
+    const fetched = await fetchAttachmentData(att, blossomKeys);
+    if (!fetched.ok) {
+      failures.push(`C2PA: ${fetched.reason}`);
       continue;
     }
 
     const filename = att.filename ?? att.id ?? "photo.jpg";
-    const c2pa = await validateC2pa(Buffer.from(data), filename);
+    const c2pa = await validateC2pa(Buffer.from(fetched.data), filename);
 
     checkC2paGpsBinding(c2pa, expectedGps, maxGpsDist, checks, failures);
     validated = true;
@@ -285,9 +260,8 @@ export const photoIntegrityCheck: FactorCheck = {
       ctx.requirement.expected_gps,
       ctx.maxGpsDistanceKm,
       ctx.requirement.factors.includes("c2pa"),
+      ctx.options.integrityStore ?? getDefaultIntegrityStore(),
       ctx.options.blossomKeys,
     );
   },
 };
-
-export { fetchAttachmentData };

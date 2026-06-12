@@ -58,6 +58,19 @@ export interface SelectionExecutionPayload {
 }
 
 /**
+ * Wire-contract major version carried in the `v` tag of the four protocol
+ * event kinds. Absence of the tag is read as version 0; an event carrying a
+ * different `v` value speaks an incompatible future contract and MUST be
+ * ignored by v0 parsers.
+ */
+export const WIRE_VERSION = "0";
+
+function hasIncompatibleWireVersion(event: Event): boolean {
+  const tag = event.tags.find((t) => t[0] === "v" && t[1] !== undefined);
+  return tag !== undefined && tag[1] !== WIRE_VERSION;
+}
+
+/**
  * Build a signed kind 5300 Job Request event for the given payload.
  *
  * Tag layout:
@@ -79,6 +92,7 @@ export function buildQueryRequestEvent(
     ["t", "anchr"],
     ["p", payload.oracle_pubkey, "", "oracle"],
     ["s", payload.schema],
+    ["v", WIRE_VERSION],
   ];
   if (options?.regionCode !== undefined && options.regionCode.length > 0) {
     tags.push(["region", options.regionCode.toUpperCase()]);
@@ -107,6 +121,7 @@ export function parseQueryRequestEvent(
   event: Event,
 ): QueryRequestPayload | null {
   if (event.kind !== KIND_QUERY_REQUEST) return null;
+  if (hasIncompatibleWireVersion(event)) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(event.content);
@@ -156,6 +171,14 @@ export interface OfferFeedbackPayload {
   amount_sats: number;
 }
 
+/** A parsed offer plus the request/customer binding read from its tags. */
+export interface ParsedOfferFeedback extends OfferFeedbackPayload {
+  /** Kind 5300 request event this offer answers (`e` tag). */
+  request_event_id: string;
+  /** Customer the offer addresses (`p` tag). */
+  customer_pubkey: string;
+}
+
 /** Build a signed kind 7000 offer event referencing the request event. */
 export function buildOfferFeedbackEvent(
   identity: Keypair,
@@ -167,6 +190,7 @@ export function buildOfferFeedbackEvent(
     ["e", requestEventId, "", "request"],
     ["p", customerPubkey],
     ["status", payload.status],
+    ["v", WIRE_VERSION],
   ];
   return signEvent(
     {
@@ -179,11 +203,16 @@ export function buildOfferFeedbackEvent(
   );
 }
 
-/** Parse a kind 7000 offer payload. Returns null if the event is not an offer. */
+/**
+ * Parse a kind 7000 offer payload. Returns null if the event is not an
+ * offer, or if it lacks the request `e`-tag / customer `p`-tag binding —
+ * an unbound offer cannot be attributed to a request and is ignored.
+ */
 export function parseOfferFeedbackEvent(
   event: Event,
-): OfferFeedbackPayload | null {
+): ParsedOfferFeedback | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
+  if (hasIncompatibleWireVersion(event)) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(event.content);
@@ -200,10 +229,17 @@ export function parseOfferFeedbackEvent(
     return null;
   }
   if (p.provider_pubkey !== event.pubkey) return null;
+  const requestEventId = event.tags.find((t) => t[0] === "e" && t[1])?.[1];
+  const customerPubkey = event.tags.find((t) => t[0] === "p" && t[1])?.[1];
+  if (requestEventId === undefined || customerPubkey === undefined) {
+    return null;
+  }
   return {
     status: "payment-required",
     provider_pubkey: p.provider_pubkey,
     amount_sats: p.amount_sats,
+    request_event_id: requestEventId,
+    customer_pubkey: customerPubkey,
   };
 }
 
@@ -233,6 +269,7 @@ export function buildSelectionFeedbackEvent(
     ["e", requestEventId, "", "request"],
     ["p", payload.selected_provider_pubkey],
     ["status", payload.status],
+    ["v", WIRE_VERSION],
   ];
   return signEvent(
     {
@@ -252,6 +289,7 @@ export function parseSelectionFeedbackEvent(
   senderPubkey: string,
 ): SelectionFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
+  if (hasIncompatibleWireVersion(event)) return null;
   let plaintext: string;
   try {
     plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
@@ -359,6 +397,7 @@ export function buildQueryResponseEvent(
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
     ["p", customerPubkey],
+    ["v", WIRE_VERSION],
   ];
   if (oraclePubkey !== undefined) {
     const oraclePlaintext = JSON.stringify({
@@ -393,6 +432,7 @@ export function parseQueryResponseEvent(
   senderPubkey: string,
 ): QueryResponsePayload | null {
   if (event.kind !== KIND_QUERY_RESPONSE) return null;
+  if (hasIncompatibleWireVersion(event)) return null;
   let plaintext: string;
   try {
     plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
@@ -432,6 +472,7 @@ export function parseOracleQueryResponseEvent(
   providerPubkey: string,
 ): OracleQueryResponsePayload | null {
   if (event.kind !== KIND_QUERY_RESPONSE) return null;
+  if (hasIncompatibleWireVersion(event)) return null;
   const tag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
   if (!tag?.[1]) return null;
 

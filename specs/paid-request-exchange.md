@@ -83,6 +83,10 @@ The v0 Cashu Payment Lock must preserve these properties:
 - the Customer cannot redeem before locktime;
 - the Oracle does not hold spend authority over the locked funds.
 
+Cashu tokens exchanged in v0 use the V4 (`cashuB`) token serialization.
+Implementations MUST emit V4 and SHOULD accept V3 (`cashuA`) on receive for
+wallet interoperability.
+
 ## Release And Redeem
 
 Release Material is Oracle-produced material that makes the selected Provider's

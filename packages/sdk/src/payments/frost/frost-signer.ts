@@ -51,7 +51,10 @@ export interface FrostSigner {
 
   /**
    * Independently verify the requirement / evidence pair and produce
-   * signing material if the check passes.
+   * signing material if the check passes. Round 1 (no `commitmentsJson`)
+   * returns a `session_id`; round 2 must present that id and the same
+   * message — each session's nonces are consumed exactly once, so two
+   * concurrent signing sessions can never cross or reuse nonces.
    */
   verifyAndSign(
     requirement: VerificationRequirement,
@@ -59,6 +62,7 @@ export interface FrostSigner {
     message: string,
     commitmentsJson?: string,
     blossomKeys?: BlossomKeyMap,
+    sessionId?: string,
   ): Promise<SignerOutput | null>;
 }
 
@@ -83,8 +87,8 @@ export interface DkgRoundOutput {
 export interface SignerOutput {
   /** Round 1: nonce commitments. */
   nonce_commitment?: string;
-  /** Round 1: nonces (kept secret for round 2). */
-  nonces?: string;
+  /** Round 1: handle for the matching round-2 call. Nonces stay internal. */
+  session_id?: string;
   /** Round 2: signature share. */
   signature_share?: string;
 }
@@ -101,8 +105,12 @@ function asJsonStringMap(value: unknown): Record<string, string> {
 }
 
 export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
-  // Nonces are generated in round 1 and consumed in round 2
-  let pendingNonces: string | undefined;
+  // Nonce reuse in Schnorr leaks the signing share. Sessions are keyed by a
+  // random id and consumed exactly once, so concurrent signings never cross.
+  const pendingSessions = new Map<
+    string,
+    { noncesJson: string; messageHex: string }
+  >();
 
   return {
     async dkgRound(round, input) {
@@ -162,6 +170,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       message,
       commitmentsJson,
       blossomKeys,
+      sessionId,
     ) {
       const detail = await verifyProof(requirement, input, { blossomKeys });
       if (!detail.passed) {
@@ -177,28 +186,40 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
       if (!commitmentsJson) {
         const r1 = await signRound1(config.keyPackage, config.frostSignerPath);
         if (!r1.ok || !r1.data) return null;
-        pendingNonces = asJsonString(r1.data.nonces);
+        const newSessionId = crypto.randomUUID();
+        pendingSessions.set(newSessionId, {
+          noncesJson: asJsonString(r1.data.nonces),
+          messageHex: message,
+        });
         return {
           nonce_commitment: asJsonString(r1.data.commitments),
-          nonces: pendingNonces,
+          session_id: newSessionId,
         };
       }
 
-      // Step 3: Round 2 — produce signature share
-      const nonces = pendingNonces;
-      if (!nonces) {
-        log.error(`No pending nonces for round 2`);
+      // Step 3: Round 2 — produce signature share with this session's nonces
+      if (!sessionId) {
+        log.error(`No session id supplied for round 2`);
+        return null;
+      }
+      const session = pendingSessions.get(sessionId);
+      if (!session) {
+        log.error(`Unknown or already-consumed signing session`);
+        return null;
+      }
+      pendingSessions.delete(sessionId); // single-use — consume on read
+      if (session.messageHex !== message) {
+        log.error(`Round-2 message does not match the round-1 session`);
         return null;
       }
 
       const r2 = await signRound2(
         config.keyPackage,
-        nonces,
+        session.noncesJson,
         commitmentsJson,
         message,
         config.frostSignerPath,
       );
-      pendingNonces = undefined; // Consume nonces
       if (!r2.ok || !r2.data) return null;
 
       return {

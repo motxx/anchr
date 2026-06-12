@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -58,3 +59,36 @@ From `docs/production-readiness-audit.md` §2.4:
 - Floor `expires_at` and update the spec field description.
 - Add the fetch spy to the INV-08 e2e test.
 - Add the `region` anonymity-set sentence to the spec and SDK option docs.
+
+## Resolution
+
+Implemented by updating:
+
+- **ANON-03** — `packages/sdk/src/customer.ts` publishes `expires_at`
+  floored to second granularity; `specs/messaging.md` field description
+  updated; locked by a unit test asserting `expires_at % 1000 === 0`
+- **ANON-04** — `e2e/protocol/anonymous-relay-flow.test.ts` installs a
+  `globalThis.fetch` spy (restored in `finally`) and asserts zero HTTP calls
+  during the exchange
+- **ANON-05** — `specs/messaging.md` and the `RequestOptions.regionCode` doc
+  state that the cleartext indexable `#region` tag shrinks the requester's
+  anonymity set and should be omitted unless required
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+- `deno task lint:invariants`
+
+Harness update:
+
+- The flooring unit test and the INV-08 fetch-spy assertion lock both
+  behaviors.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

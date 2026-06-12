@@ -1,11 +1,14 @@
 import { Buffer } from "node:buffer";
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   decryptBlob,
+  downloadFromBlossom,
   encryptBlob,
   getBlossomConfig,
   isBlossomEnabled,
+  uploadToBlossom,
 } from "./blossom.ts";
 
 describe("Blossom client", () => {
@@ -82,5 +85,52 @@ describe("Blossom client", () => {
     } else {
       Deno.env.delete("BLOSSOM_SERVERS");
     }
+  });
+});
+
+describe("Blossom injectable transport (INV-08 scope limit)", () => {
+  test("uploadToBlossom routes every HTTP call through the injected fetchImpl", async () => {
+    const identity = { secretKey: new Uint8Array(32).fill(7) };
+    const requested: string[] = [];
+    const fetchImpl: typeof fetch = (input) => {
+      requested.push(String(input));
+      return Promise.resolve(new Response(null, { status: 200 }));
+    };
+
+    const result = await uploadToBlossom(
+      new TextEncoder().encode("blob"),
+      identity,
+      ["https://blossom.test.example"],
+      { fetchImpl },
+    );
+
+    expect(result).not.toBeNull();
+    expect(requested).toEqual(["https://blossom.test.example/upload"]);
+  });
+
+  test("downloadFromBlossom routes every HTTP call through the injected fetchImpl", async () => {
+    const data = new TextEncoder().encode("round-trip blob");
+    const { encrypted, key, iv } = await encryptBlob(data);
+    const requested: string[] = [];
+    const fetchImpl: typeof fetch = (input) => {
+      requested.push(String(input));
+      return Promise.resolve(
+        new Response(new Uint8Array(encrypted), { status: 200 }),
+      );
+    };
+
+    const downloaded = await downloadFromBlossom(
+      "ab".repeat(32),
+      bytesToHex(key),
+      bytesToHex(iv),
+      ["https://blossom.test.example"],
+      { fetchImpl, maxRetries: 1 },
+    );
+
+    expect(downloaded).not.toBeNull();
+    expect(new TextDecoder().decode(downloaded!)).toBe("round-trip blob");
+    expect(requested).toEqual([
+      `https://blossom.test.example/${"ab".repeat(32)}`,
+    ]);
   });
 });

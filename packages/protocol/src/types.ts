@@ -14,7 +14,11 @@ export interface Spec {
 export interface Payment {
   /** Maximum amount in sats the customer will pay for a single offer. */
   maxAmount: number;
-  /** Locktime in seconds from now (default: 3600). */
+  /**
+   * Refund-locktime duration in seconds from selection time (default: 3600).
+   * The wire field `locktime_seconds` carries the resulting absolute Unix
+   * timestamp in seconds, computed when the Provider is selected.
+   */
   locktimeSeconds?: number;
 }
 

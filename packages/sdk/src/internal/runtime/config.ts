@@ -28,7 +28,6 @@ function readStringListEnv(...names: string[]): string[] {
 
 export interface RuntimeConfig {
   httpApiPort: number;
-  querySweepIntervalMs: number;
   previewMaxDimension: number;
   previewJpegQuality: number;
   httpApiKeys: string[];
@@ -49,7 +48,6 @@ export const DEFAULT_RUNTIME_DATA_DIR = Deno.env.get("RUNTIME_DATA_DIR") ??
 export function getRuntimeConfig(): RuntimeConfig {
   return {
     httpApiPort: readNumberEnv("HTTP_API_PORT", readNumberEnv("PORT", 3000)),
-    querySweepIntervalMs: readNumberEnv("QUERY_SWEEP_INTERVAL_MS", 30_000),
     previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),

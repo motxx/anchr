@@ -214,6 +214,13 @@ describe("buildFrostP2PKOptions", () => {
     );
     expect(opts.sigFlag).toBe("SIG_ALL");
   });
+
+  test("refuses to build a lock without a customer refund pubkey", () => {
+    // PROT-03: an empty refund key would strand the customer's funds
+    // forever if the FROST group never releases.
+    expect(() => buildFrostP2PKOptions(PROVIDER_PUB, GROUP_PUB, "", 1700000000))
+      .toThrow("refund");
+  });
 });
 
 describe("FROST EscrowProvider", () => {

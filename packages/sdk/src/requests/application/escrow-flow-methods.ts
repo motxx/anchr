@@ -1,19 +1,29 @@
+/**
+ * Application-layer escrow flow: store I/O, escrow-provider verification,
+ * and settlement orchestration. Transition and validation rules are owned by
+ * the domain aggregate (`../domain/query-aggregate.ts`); every state change
+ * here goes through it.
+ */
+
+import {
+  addOffer,
+  beginWork,
+  completeVerification,
+  type EscrowSelectionUpdates,
+  recordResult,
+  selectProvider,
+} from "../domain/query-aggregate.ts";
 import {
   isEscrowQuery,
-  validateEscrowTransition,
   verifyEscrowAmount,
   verifyEscrowLock,
 } from "./query-escrow-validation.ts";
 import type { QueryStore } from "../domain/query-store.ts";
 import type { BlossomKeyMap } from "../../values.ts";
 import type {
-  EscrowInfo,
   EscrowSubmitOutcome,
   OfferInfo,
-  PaymentStatus,
-  Query,
   QueryResult,
-  QueryStatus,
 } from "../domain/types.ts";
 import type { HtlcOutcome } from "./query-service.ts";
 import { identityNormalize, ServiceDeps } from "./query-service-deps.ts";
@@ -32,18 +42,10 @@ export function doRecordOffer(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isEscrowQuery(query)) {
-    return { ok: false, message: "Not an escrow query" };
-  }
-  if (query.status !== "awaiting_offers") {
-    return {
-      ok: false,
-      message: `Query is ${query.status}, not awaiting_offers`,
-    };
-  }
 
-  const offers = [...(query.offers ?? []), offer];
-  store.set(queryId, { ...query, offers });
+  const transition = addOffer(query, offer);
+  if (!transition.ok) return { ok: false, message: transition.error };
+  store.set(queryId, transition.query);
   return { ok: true, message: "Offer recorded" };
 }
 
@@ -56,20 +58,36 @@ export async function doSelectProvider(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isEscrowQuery(query)) {
-    return { ok: false, message: "Not an escrow query" };
-  }
-  if (!validateEscrowTransition(query.status, "provider_selected")) {
-    return {
-      ok: false,
-      message: `Query is ${query.status}, not awaiting_offers`,
-    };
-  }
+
+  // Validate the transition before any escrow I/O so state errors surface
+  // with the domain's message; the committing call happens after the token
+  // checks pass.
+  const dryRun = selectProvider(query, providerPubkey, {});
+  if (!dryRun.ok) return { ok: false, message: dryRun.error };
 
   const escrowRef = query.escrow?.escrow_ref ?? query.escrow?.escrow_token ??
     escrowToken;
   const expectedSats = query.payment_lock?.amount_sats;
-  let verifiedEscrowSats: number | undefined;
+  // CTF-2: P2PK+FROST settlement uses a group signature instead of a preimage;
+  // the hashlock check is HTLC-only and skipped for the FROST variant.
+  const paymentHash = query.escrow?.type === "htlc"
+    ? query.escrow.hash
+    : undefined;
+
+  // CTF-2: when the escrow token demands amount/lock verification, a missing
+  // escrow provider port is a wiring error — fail closed instead of selecting
+  // a provider with the token never verified.
+  if (escrowRef && (expectedSats || paymentHash) && !deps.escrowProvider) {
+    return {
+      ok: false,
+      message:
+        "Escrow provider port not configured — cannot verify escrow token before selection",
+    };
+  }
+
+  const updates: EscrowSelectionUpdates = {};
+  if (escrowToken !== undefined) updates.escrow_token = escrowToken;
+
   if (escrowRef && expectedSats && deps.escrowProvider) {
     const check = await verifyEscrowAmount(
       deps.escrowProvider,
@@ -82,14 +100,9 @@ export async function doSelectProvider(
         message: `Escrow token verification failed: ${check.error}`,
       };
     }
-    verifiedEscrowSats = check.amountSats;
+    updates.verified_escrow_sats = check.amountSats;
   }
 
-  // CTF-2: P2PK+FROST settlement uses a group signature instead of a preimage; the
-  // hashlock check below is HTLC-only and skipped for the FROST variant.
-  const paymentHash = query.escrow?.type === "htlc"
-    ? query.escrow.hash
-    : undefined;
   if (escrowRef && paymentHash && deps.escrowProvider) {
     const lockCheck = await verifyEscrowLock(
       deps.escrowProvider,
@@ -102,19 +115,9 @@ export async function doSelectProvider(
     }
   }
 
-  const escrow: EscrowInfo = {
-    ...query.escrow!,
-    provider_pubkey: providerPubkey,
-    escrow_token: escrowToken ?? query.escrow?.escrow_token,
-    verified_escrow_sats: verifiedEscrowSats,
-  };
-
-  store.set(queryId, {
-    ...query,
-    status: "provider_selected",
-    escrow,
-    payment_status: escrowToken ? "escrow_swapped" : query.payment_status,
-  });
+  const transition = selectProvider(query, providerPubkey, updates);
+  if (!transition.ok) return { ok: false, message: transition.error };
+  store.set(queryId, transition.query);
   return { ok: true, message: "Provider selected" };
 }
 
@@ -124,16 +127,10 @@ export function doBeginWork(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isEscrowQuery(query)) {
-    return { ok: false, message: "Not an escrow query" };
-  }
-  if (!validateEscrowTransition(query.status, "processing")) {
-    return {
-      ok: false,
-      message: `Query is ${query.status}, not provider_selected`,
-    };
-  }
-  store.set(queryId, { ...query, status: "processing" });
+
+  const transition = beginWork(query);
+  if (!transition.ok) return { ok: false, message: transition.error };
+  store.set(queryId, transition.query);
   return { ok: true, message: "Work begun" };
 }
 
@@ -147,31 +144,16 @@ export function doRecordResult(
   const { store } = deps;
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isEscrowQuery(query)) {
-    return { ok: false, message: "Not an escrow query" };
-  }
-  if (!validateEscrowTransition(query.status, "verifying")) {
-    return { ok: false, message: `Query is ${query.status}, not processing` };
-  }
-  if (
-    query.escrow?.provider_pubkey &&
-    query.escrow.provider_pubkey !== providerPubkey
-  ) {
-    return {
-      ok: false,
-      message: "Provider pubkey does not match selected provider",
-    };
-  }
 
   const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
-  store.set(queryId, {
-    ...query,
-    status: "verifying",
-    result: normalizedResult,
-    submitted_at: Date.now(),
-    submission_meta: { executor_type: "human", channel: "adapter" },
-    blossom_keys: blossomKeys,
-  });
+  const transition = recordResult(
+    query,
+    normalizedResult,
+    providerPubkey,
+    blossomKeys,
+  );
+  if (!transition.ok) return { ok: false, message: transition.error };
+  store.set(queryId, transition.query);
   return { ok: true, message: "Result recorded, verification in progress" };
 }
 
@@ -183,22 +165,10 @@ export function doCompleteVerification(
 ): HtlcOutcome {
   const query = store.get(queryId);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isEscrowQuery(query)) {
-    return { ok: false, message: "Not an escrow query" };
-  }
-  const verifyTarget: QueryStatus = passed ? "approved" : "rejected";
-  if (!validateEscrowTransition(query.status, verifyTarget)) {
-    return { ok: false, message: `Query is ${query.status}, not verifying` };
-  }
 
-  const newStatus: QueryStatus = verifyTarget;
-  const paymentStatus: PaymentStatus = passed ? "released" : "cancelled";
-  store.set(queryId, {
-    ...query,
-    status: newStatus,
-    payment_status: paymentStatus,
-    assigned_oracle_id: oracleId,
-  });
+  const transition = completeVerification(query, passed, undefined, oracleId);
+  if (!transition.ok) return { ok: false, message: transition.error };
+  store.set(queryId, transition.query);
   return {
     ok: true,
     message: passed ? "Verification passed" : "Verification failed",
@@ -219,33 +189,18 @@ export async function doSubmitEscrowResult(
   if (!isEscrowQuery(query)) {
     return { ok: false, query, message: "Not an escrow query" };
   }
-  if (!validateEscrowTransition(query.status, "verifying")) {
-    return {
-      ok: false,
-      query,
-      message: `Query is ${query.status}, not processing`,
-    };
-  }
-  if (
-    query.escrow?.provider_pubkey &&
-    query.escrow.provider_pubkey !== providerPubkey
-  ) {
-    return {
-      ok: false,
-      query,
-      message: "Provider pubkey does not match selected provider",
-    };
-  }
 
   const normalizedResult = (deps.normalizeResult ?? identityNormalize)(result);
-  const verifyingQuery: Query = {
-    ...query,
-    status: "verifying",
-    result: normalizedResult,
-    submitted_at: Date.now(),
-    submission_meta: { executor_type: "human", channel: "adapter" },
-    blossom_keys: blossomKeys,
-  };
+  const transition = recordResult(
+    query,
+    normalizedResult,
+    providerPubkey,
+    blossomKeys,
+  );
+  if (!transition.ok) {
+    return { ok: false, query, message: transition.error };
+  }
+  const verifyingQuery = transition.query;
   store.set(queryId, verifyingQuery);
 
   const { passed, verification, updated } = await verifyAndFinalize(

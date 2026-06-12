@@ -5,14 +5,13 @@
 import type { Event } from "nostr-tools";
 import type { NostrIdentity } from "../../identity.ts";
 import { parseOfferFeedbackEvent } from "@anchr/protocol/events";
-import {
-  type OracleResponsePayload,
-  parseOracleResponsePayload,
-} from "./events/events.ts";
+import type { OracleQueryResponsePayload } from "@anchr/protocol/events";
+import type { AttachmentRef, GpsCoord } from "../../values.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 
 export interface WatchedQuery {
-  queryId: string;
+  /** The real request the Oracle verifies submissions against. */
+  query: Query;
   queryEventId: string;
   customerPubkey: string;
   selectedProviderPubkey?: string;
@@ -20,37 +19,84 @@ export interface WatchedQuery {
   subs: { close(): void }[];
 }
 
-export function buildQueryFromPayload(
-  queryId: string,
-  oraclePayload: OracleResponsePayload,
-): Query {
-  return {
-    id: queryId,
-    status: "processing",
-    description: "",
-    challenge_nonce: oraclePayload.nonce_echo,
-    challenge_rule: "",
-    verification_requirements: ["gps", "ai_check"],
-    created_at: 0,
-    expires_at: Date.now() + 600_000,
-    payment_status: "escrow_swapped",
-  };
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
-export function buildResultFromPayload(
-  oraclePayload: OracleResponsePayload,
-): QueryResult {
-  return {
-    attachments: (oraclePayload.attachments ?? []).map((a) => ({
-      id: a.blossom_hash,
-      uri: a.blossom_urls[0] ?? "",
-      mime_type: a.mime,
-      storage_kind: "blossom" as const,
-      blossom_hash: a.blossom_hash,
-      blossom_servers: a.blossom_urls,
-    })),
-    notes: oraclePayload.notes,
+function parseGps(value: unknown): GpsCoord | undefined {
+  if (!isRecord(value)) return undefined;
+  if (typeof value.lat !== "number" || typeof value.lon !== "number") {
+    return undefined;
+  }
+  return { lat: value.lat, lon: value.lon };
+}
+
+function parseAttachment(value: unknown): AttachmentRef | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.id !== "string" ||
+    typeof value.uri !== "string" ||
+    typeof value.mime_type !== "string"
+  ) {
+    return null;
+  }
+  if (value.storage_kind !== "blossom" && value.storage_kind !== "external") {
+    return null;
+  }
+  const ref: AttachmentRef = {
+    id: value.id,
+    uri: value.uri,
+    mime_type: value.mime_type,
+    storage_kind: value.storage_kind,
   };
+  if (typeof value.filename === "string") ref.filename = value.filename;
+  if (typeof value.size_bytes === "number") ref.size_bytes = value.size_bytes;
+  if (typeof value.blossom_hash === "string") {
+    ref.blossom_hash = value.blossom_hash;
+  }
+  if (
+    Array.isArray(value.blossom_servers) &&
+    value.blossom_servers.every((entry) => typeof entry === "string")
+  ) {
+    ref.blossom_servers = value.blossom_servers;
+  }
+  return ref;
+}
+
+/**
+ * Map the canonical Oracle-readable result payload onto the evidence shape
+ * the verifier consumes. `data` carries the evidence fields (`attachments`,
+ * `gps`, `notes`); a TLSN query reads the base64 presentation from `proof`.
+ * Malformed fields are dropped, so verification fails closed on whatever
+ * evidence the requirement demands but the payload does not carry.
+ */
+export function oracleResponseToResult(
+  query: Query,
+  payload: OracleQueryResponsePayload,
+): QueryResult {
+  const data = isRecord(payload.data) ? payload.data : {};
+
+  const attachments: AttachmentRef[] = [];
+  if (Array.isArray(data.attachments)) {
+    for (const entry of data.attachments) {
+      const ref = parseAttachment(entry);
+      if (ref !== null) attachments.push(ref);
+    }
+  }
+
+  const result: QueryResult = { attachments };
+  const gps = parseGps(data.gps);
+  if (gps !== undefined) result.gps = gps;
+  if (typeof data.notes === "string") result.notes = data.notes;
+
+  const wantsTlsn = query.verification_requirements.includes("tlsn") ||
+    query.tlsn_requirements !== undefined;
+  if (
+    wantsTlsn && typeof payload.proof === "string" && payload.proof.length > 0
+  ) {
+    result.tlsn_attestation = { presentation: payload.proof };
+  }
+  return result;
 }
 
 export function handleFeedbackEvent(
@@ -71,11 +117,4 @@ export function handleFeedbackEvent(
   if (offer === null) return;
   entry.offeredProviders.add(offer.provider_pubkey);
   onOffer?.(queryId, offer.provider_pubkey, offer.amount_sats);
-}
-
-export function parseResponsePayload(
-  identity: NostrIdentity,
-  event: Event,
-): OracleResponsePayload | null {
-  return parseOracleResponsePayload(event, identity.secretKey);
 }

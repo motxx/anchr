@@ -492,6 +492,45 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
   expect(content).not.toHaveProperty("locktime_seconds");
 });
 
+test("Customer.request publishes expires_at floored to second granularity", async () => {
+  const recorder: { event: Event | null } = { event: null };
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      recorder.event = event;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    clock: { now: () => 1_700_000_000_123 },
+    offerWindowMs: 10,
+  });
+
+  await expect(
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: { foo: "bar" },
+      },
+      payment: { maxAmount: 500 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow();
+
+  expect(recorder.event).not.toBe(null);
+  if (recorder.event === null) throw new Error("unreachable");
+  const content = JSON.parse(recorder.event.content) as Record<
+    string,
+    unknown
+  >;
+  expect(content.expires_at).toBe(1_700_000_000_000);
+  if (typeof content.expires_at !== "number") {
+    throw new Error("expires_at must be a number");
+  }
+  expect(content.expires_at % 1000).toBe(0);
+});
+
 test("Customer.request happy path: returns the verified data + proof from a provider", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
@@ -1072,4 +1111,15 @@ test("INV-07: two sequential requests publish under distinct ephemeral pubkeys",
   );
   expect(first.payload!.customer_pubkey).toBe(first.event.pubkey);
   expect(second.payload!.customer_pubkey).toBe(second.event.pubkey);
+});
+
+test("Customer.close() closes the injected relay client", async () => {
+  let closed = 0;
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient: makeRelayClient({ close: () => closed++ }),
+  });
+
+  await customer.close();
+  expect(closed).toBe(1);
 });

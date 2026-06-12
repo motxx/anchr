@@ -9,11 +9,14 @@
  *      verify blob hash, decrypt K_O, verify C2PA
  *   5. C2PA valid → deliver preimage via NIP-44 DM (kind 4)
  *   6. C2PA invalid → deliver rejection via NIP-44 DM (kind 4)
+ *
+ * Process concerns are the host's responsibility: wire SIGTERM/SIGINT to
+ * `service.stop()`, expose a health surface, and call
+ * `QueryService.expireQueries()` on a schedule if a request store is
+ * composed alongside the daemon.
  */
 
 import type { Event } from "nostr-tools";
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
 import type { NostrIdentity } from "../../identity.ts";
 import { restoreIdentity } from "../../identity.ts";
 import {
@@ -24,11 +27,18 @@ import {
 import { createRelayClient } from "./client.ts";
 import type { RelayClient } from "../types.ts";
 import { serveHashRequests } from "./hash-responder.ts";
-import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
+import {
+  createPreimageStore,
+  issueQueryHash,
+  type PreimageStore,
+} from "../../payments/mod.ts";
 import type { ThresholdOracleConfig } from "../../payments/mod.ts";
 import type { FrostCoordinator } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
-import { coordinateSigning } from "../../payments/mod.ts";
+import {
+  coordinateSigning,
+  deriveFrostSigningMessage,
+} from "../../payments/mod.ts";
 import {
   requestToRequirement,
   resultToVerificationInput,
@@ -38,11 +48,10 @@ import type {
   Query as VerifiableRequest,
   QueryResult as RequestSubmissionResult,
 } from "../../requests/domain/types.ts";
+import { parseOracleQueryResponseEvent } from "@anchr/protocol/events";
 import {
-  buildQueryFromPayload,
-  buildResultFromPayload,
   handleFeedbackEvent,
-  parseResponsePayload,
+  oracleResponseToResult,
   type WatchedQuery,
 } from "./oracle-handlers.ts";
 
@@ -83,9 +92,13 @@ export interface OracleNostrServiceConfig {
 export interface OracleNostrService {
   /** Generate a preimage for a request and return the hash. */
   generateRequestHash(requestId: string): { hash: string };
-  /** Start watching a request for offers and results. */
+  /**
+   * Start watching a request for offers and results. The caller supplies the
+   * real `Query` — its verification requirements are what relay-submitted
+   * results are verified against.
+   */
   watchRequest(
-    requestId: string,
+    request: VerifiableRequest,
     requestEventId: string,
     customerPubkey: string,
   ): void;
@@ -109,6 +122,16 @@ export interface OracleNostrService {
   stop(): void;
 }
 
+/**
+ * Result of one verify-and-deliver pass. `terminal` marks states where the
+ * request needs no further relay watching (delivered or rejected); delivery
+ * failures stay non-terminal so a retry can still settle.
+ */
+interface DeliveryOutcome {
+  passed: boolean;
+  terminal: boolean;
+}
+
 export function createOracleNostrService(
   config: OracleNostrServiceConfig,
 ): OracleNostrService {
@@ -119,11 +142,7 @@ export function createOracleNostrService(
   const queryHashMap = new Map<string, string>();
 
   function issueHash(queryId: string): string {
-    const existing = queryHashMap.get(queryId);
-    if (existing !== undefined) return existing;
-    const entry = preimageStore.create();
-    queryHashMap.set(queryId, entry.hash);
-    return entry.hash;
+    return issueQueryHash(preimageStore, queryHashMap, queryId).hash;
   }
 
   const hashResponder = serveHashRequests({
@@ -136,33 +155,66 @@ export function createOracleNostrService(
     const entry = watched.get(queryId);
     if (!entry) return;
 
-    if (
-      entry.selectedProviderPubkey &&
-      event.pubkey !== entry.selectedProviderPubkey
-    ) {
-      log.error(`Ignoring result from non-selected Provider ${event.pubkey}`);
+    // Fail closed: release material only ever flows toward the recorded
+    // selected Provider. With no selection recorded, results are ignored.
+    if (!entry.selectedProviderPubkey) {
+      log.warn(
+        `Ignoring result for ${queryId}: no selected Provider recorded`,
+      );
+      return;
+    }
+    if (event.pubkey !== entry.selectedProviderPubkey) {
+      log.warn(`Ignoring result from non-selected Provider ${event.pubkey}`);
       return;
     }
 
     try {
-      const oraclePayload = parseResponsePayload(config.identity, event);
-      if (!oraclePayload) {
-        log.error(`No oracle_payload tag in result for ${queryId}`);
+      const payload = parseOracleQueryResponseEvent(
+        event,
+        config.identity.secretKey,
+        event.pubkey,
+      );
+      if (payload === null) {
+        log.warn(`Result for ${queryId} carries no readable oracle_payload`);
+        return;
+      }
+      if (
+        payload.query_id !== entry.query.id ||
+        payload.request_event_id !== entry.queryEventId
+      ) {
+        log.warn(`Result payload binding mismatch for ${queryId}`);
         return;
       }
 
-      const query = buildQueryFromPayload(queryId, oraclePayload);
-      const result = buildResultFromPayload(oraclePayload);
-      const passed = await verifyAndDeliverInternal(
+      const result = oracleResponseToResult(entry.query, payload);
+      const outcome = await dispatchVerifyAndDeliver(
         queryId,
-        query,
+        entry.query,
         result,
         event.pubkey,
       );
-      config.onVerification?.(queryId, passed, event.pubkey);
+      if (outcome.terminal) unwatchRequest(queryId);
+      config.onVerification?.(queryId, outcome.passed, event.pubkey);
     } catch (error) {
       log.error(`Failed to process result for ${queryId}:`, error);
     }
+  }
+
+  async function rejectQuorumWithoutFrost(
+    queryId: string,
+    providerPubkey: string,
+  ): Promise<DeliveryOutcome> {
+    const reason =
+      "Quorum verification requested but FROST is not configured on this Oracle";
+    const dm = buildRejectionDM(
+      config.identity,
+      providerPubkey,
+      queryId,
+      reason,
+    );
+    await relayClient.publish(dm);
+    log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
+    return { passed: false, terminal: true };
   }
 
   async function verifyAndDeliverInternal(
@@ -170,7 +222,7 @@ export function createOracleNostrService(
     query: VerifiableRequest,
     result: RequestSubmissionResult,
     providerPubkey: string,
-  ): Promise<boolean> {
+  ): Promise<DeliveryOutcome> {
     const detail = await verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
     const preimage = hash ? preimageStore.getPreimage(hash) : null;
@@ -189,7 +241,7 @@ export function createOracleNostrService(
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const publishResult = await relayClient.publish(dm);
         if (publishResult.successes.length > 0) {
-          log.error(
+          log.info(
             `Preimage delivered to Provider for ${queryId} (${publishResult.successes.length} relay(s))`,
           );
           delivered = true;
@@ -197,23 +249,22 @@ export function createOracleNostrService(
         }
         const delayMs = retryDelaysMs[attempt - 1];
         if (delayMs !== undefined) {
-          log.error(
+          log.warn(
             `Preimage delivery failed for ${queryId} (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`,
           );
           await new Promise((r) => setTimeout(r, delayMs));
         }
       }
 
-      if (delivered) {
-        preimageStore.delete(hash);
-        queryHashMap.delete(queryId);
-      } else {
+      if (!delivered) {
         log.error(
           `Preimage delivery failed for ${queryId} after ${maxAttempts} attempts — preimage retained for Nostr retry`,
         );
-        return false;
+        return { passed: false, terminal: false };
       }
-      return true;
+      preimageStore.delete(hash);
+      queryHashMap.delete(queryId);
+      return { passed: true, terminal: true };
     } else {
       const reason = detail.failures.join(", ") || "Verification failed";
       const dm = buildRejectionDM(
@@ -223,9 +274,111 @@ export function createOracleNostrService(
         reason,
       );
       await relayClient.publish(dm);
-      log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
-      return false;
+      log.info(`Rejection sent to Provider for ${queryId}: ${reason}`);
+      return { passed: false, terminal: true };
     }
+  }
+
+  async function verifyAndDeliverWithFrostInternal(
+    queryId: string,
+    query: VerifiableRequest,
+    result: RequestSubmissionResult,
+    providerPubkey: string,
+    frostNodeConfig: FrostNodeConfig,
+  ): Promise<DeliveryOutcome> {
+    const detail = await verifyFn(query, result);
+    if (!detail.passed) {
+      const reason = detail.failures.join(", ") || "Verification failed";
+      const dm = buildRejectionDM(
+        config.identity,
+        providerPubkey,
+        queryId,
+        reason,
+      );
+      await relayClient.publish(dm);
+      log.info(`Rejection sent to Provider for ${queryId}: ${reason}`);
+      return { passed: false, terminal: true };
+    }
+
+    // Coordinate FROST signing with peer Oracle nodes. Each peer's
+    // /frost/signer/round1 endpoint independently verifies before signing;
+    // peers that fail verification refuse to participate → below threshold
+    // = no signature.
+    const messageHex = deriveFrostSigningMessage(queryId);
+
+    const sigResult = await coordinateSigning(
+      {
+        nodeConfig: frostNodeConfig,
+        requirement: requestToRequirement(query),
+        input: resultToVerificationInput(result),
+      },
+      messageHex,
+    );
+
+    if (!sigResult) {
+      log.error(`FROST signing failed for ${queryId} — threshold not met`);
+      const dm = buildRejectionDM(
+        config.identity,
+        providerPubkey,
+        queryId,
+        "FROST threshold not met — insufficient Oracle approvals",
+      );
+      await relayClient.publish(dm);
+      return { passed: false, terminal: true };
+    }
+
+    const dm = buildFrostSignatureDM(
+      config.identity,
+      providerPubkey,
+      queryId,
+      sigResult.signature,
+      frostNodeConfig.group_pubkey,
+    );
+    const publishResult = await relayClient.publish(dm);
+    if (publishResult.successes.length > 0) {
+      log.info(
+        `FROST signature delivered to Provider for ${queryId} (signers: ${
+          sigResult.signers_participated.join(",")
+        })`,
+      );
+      return { passed: true, terminal: true };
+    }
+    log.error(`FROST signature delivery failed for ${queryId}`);
+    return { passed: false, terminal: false };
+  }
+
+  async function dispatchVerifyAndDeliver(
+    queryId: string,
+    query: VerifiableRequest,
+    result: RequestSubmissionResult,
+    providerPubkey: string,
+  ): Promise<DeliveryOutcome> {
+    if (query.quorum) {
+      // A quorum query demands threshold verification. Never downgrade to
+      // the single-oracle preimage path when FROST is not configured —
+      // reject loudly so the customer's trust model is honoured.
+      if (
+        !config.frostCoordinator || !config.frostConfig ||
+        !config.frostNodeConfig
+      ) {
+        return rejectQuorumWithoutFrost(queryId, providerPubkey);
+      }
+      return verifyAndDeliverWithFrostInternal(
+        queryId,
+        query,
+        result,
+        providerPubkey,
+        config.frostNodeConfig,
+      );
+    }
+    return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
+  }
+
+  function unwatchRequest(queryId: string): void {
+    const entry = watched.get(queryId);
+    if (!entry) return;
+    for (const sub of entry.subs) sub.close();
+    watched.delete(queryId);
   }
 
   return {
@@ -234,12 +387,13 @@ export function createOracleNostrService(
     },
 
     watchRequest(
-      queryId: string,
+      request: VerifiableRequest,
       queryEventId: string,
       customerPubkey: string,
     ) {
+      const queryId = request.id;
       const entry: WatchedQuery = {
-        queryId,
+        query: request,
         queryEventId,
         customerPubkey,
         offeredProviders: new Set(),
@@ -276,84 +430,28 @@ export function createOracleNostrService(
     },
 
     async verifyAndDeliver(queryId, query, result, providerPubkey) {
-      if (query.quorum && config.frostCoordinator && config.frostConfig) {
-        return this.verifyAndDeliverWithFrost(
+      const outcome = await dispatchVerifyAndDeliver(
+        queryId,
+        query,
+        result,
+        providerPubkey,
+      );
+      if (outcome.terminal) unwatchRequest(queryId);
+      return outcome.passed;
+    },
+
+    async verifyAndDeliverWithFrost(queryId, query, result, providerPubkey) {
+      const outcome = config.frostNodeConfig === undefined
+        ? await rejectQuorumWithoutFrost(queryId, providerPubkey)
+        : await verifyAndDeliverWithFrostInternal(
           queryId,
           query,
           result,
           providerPubkey,
+          config.frostNodeConfig,
         );
-      }
-      return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
-    },
-
-    async verifyAndDeliverWithFrost(queryId, query, result, providerPubkey) {
-      if (!config.frostNodeConfig) {
-        log.error(`FROST node config not available, falling back to HTLC`);
-        return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
-      }
-
-      const detail = await verifyFn(query, result);
-      if (!detail.passed) {
-        const reason = detail.failures.join(", ") || "Verification failed";
-        const dm = buildRejectionDM(
-          config.identity,
-          providerPubkey,
-          queryId,
-          reason,
-        );
-        await relayClient.publish(dm);
-        log.error(`Rejection sent to Provider for ${queryId}: ${reason}`);
-        return false;
-      }
-
-      // Step 2: Coordinate FROST signing with peer Oracle nodes.
-      // Each peer's /frost/signer/round1 endpoint independently verifies before signing.
-      // Peers that fail verification will refuse to participate → below threshold = no signature.
-      const messageHex = bytesToHex(
-        sha256(new TextEncoder().encode(`anchr:sign:${queryId}`)),
-      );
-
-      const sigResult = await coordinateSigning(
-        {
-          nodeConfig: config.frostNodeConfig,
-          requirement: requestToRequirement(query),
-          input: resultToVerificationInput(result),
-        },
-        messageHex,
-      );
-
-      if (!sigResult) {
-        log.error(`FROST signing failed for ${queryId} — threshold not met`);
-        const dm = buildRejectionDM(
-          config.identity,
-          providerPubkey,
-          queryId,
-          "FROST threshold not met — insufficient Oracle approvals",
-        );
-        await relayClient.publish(dm);
-        return false;
-      }
-
-      // Step 3: Deliver FROST group signature to Provider
-      const dm = buildFrostSignatureDM(
-        config.identity,
-        providerPubkey,
-        queryId,
-        sigResult.signature,
-        config.frostNodeConfig.group_pubkey,
-      );
-      const publishResult = await relayClient.publish(dm);
-      if (publishResult.successes.length > 0) {
-        log.error(
-          `FROST signature delivered to Provider for ${queryId} (signers: ${
-            sigResult.signers_participated.join(",")
-          })`,
-        );
-        return true;
-      }
-      log.error(`FROST signature delivery failed for ${queryId}`);
-      return false;
+      if (outcome.terminal) unwatchRequest(queryId);
+      return outcome.passed;
     },
 
     stop() {

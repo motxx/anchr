@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -54,3 +55,34 @@ From `docs/production-readiness-audit.md` §2.4 (ANON-01):
   property itself — it is accepted design).
 - If invariant: add the entry, a test asserting two Provider serves reuse one
   pubkey while the Customer rotates, and the lock-file entry.
+
+## Resolution
+
+Decision: prose subsection (the property is an accepted design limit, not a
+defended invariant).
+
+Implemented by updating:
+
+- `docs/threat-model.md` — new "Actor linkability" section: INV-07 covers
+  the Customer only; Provider and Oracle identities are intentionally stable
+  and cross-request-linkable (why, what an observer learns, and the
+  key-rotation trade-off)
+
+Verified with:
+
+- `deno task lint:invariants`
+- `deno task lint:strict`
+
+Harness update:
+
+- None — accepted design limit now recorded in the threat model; no
+  enforceable behavior changed (a human universal decision documented at its
+  owning doc).
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

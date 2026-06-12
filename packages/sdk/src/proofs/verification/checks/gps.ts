@@ -1,6 +1,6 @@
 /** GPS factor: submission-body coordinates against the expected location. */
 
-import { haversineKm } from "../../geo.ts";
+import { evaluateGpsDistancePolicy } from "../../geo.ts";
 import type { GpsCoord } from "../../../values.ts";
 import type {
   VerificationInput,
@@ -14,28 +14,18 @@ function verifyBodyGps(
   maxGpsDist: number,
   acc: CheckAccumulator,
 ): void {
-  if (input.gps && requirement.expected_gps) {
-    const dist = haversineKm(
-      input.gps.lat,
-      input.gps.lon,
-      requirement.expected_gps.lat,
-      requirement.expected_gps.lon,
+  if (input.gps) {
+    checkGpsProximity(
+      input.gps,
+      requirement.expected_gps,
+      maxGpsDist,
+      "body",
+      acc.checks,
+      acc.failures,
     );
-    if (dist <= maxGpsDist) {
-      acc.checks.push(
-        `body GPS within ${maxGpsDist}km of expected (${dist.toFixed(1)}km)`,
-      );
-    } else {
-      acc.failures.push(
-        `body GPS ${
-          dist.toFixed(1)
-        }km from expected location (max ${maxGpsDist}km)`,
-      );
-    }
-  } else if (
-    !input.gps && requirement.expected_gps &&
-    requirement.factors.includes("gps")
-  ) {
+  } else if (requirement.factors.includes("gps")) {
+    // The gps factor demands evidence even when the requirement carries no
+    // expected location — fail closed instead of passing an empty submission.
     acc.failures.push(
       "GPS coordinates missing from submission body — required by verification policy",
     );
@@ -51,22 +41,17 @@ export function checkGpsProximity(
   failures: string[],
 ): void {
   if (gps && expectedGps) {
-    const dist = haversineKm(
-      gps.lat,
-      gps.lon,
-      expectedGps.lat,
-      expectedGps.lon,
-    );
-    if (dist <= maxGpsDist) {
+    const policy = evaluateGpsDistancePolicy(gps, expectedGps, maxGpsDist);
+    if (policy.withinLimit) {
       checks.push(
         `${label} GPS within ${maxGpsDist}km of expected (${
-          dist.toFixed(1)
+          policy.distanceKm.toFixed(1)
         }km)`,
       );
     } else {
       failures.push(
         `${label} GPS ${
-          dist.toFixed(1)
+          policy.distanceKm.toFixed(1)
         }km from expected location (max ${maxGpsDist}km)`,
       );
     }

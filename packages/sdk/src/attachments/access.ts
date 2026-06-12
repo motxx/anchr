@@ -16,6 +16,7 @@ import type {
   BlossomKeyMaterial,
 } from "../values.ts";
 import type { QueryResult as RequestSubmissionResult } from "../requests/domain/types.ts";
+import { inferMimeTypeFromFilename } from "./mime.ts";
 import {
   attachmentRefSource,
   extractBlossomFields,
@@ -29,16 +30,6 @@ import {
 import process from "node:process";
 
 type AttachmentLike = AttachmentRef | string;
-
-const MIME_TYPES: Record<string, string> = {
-  ".gif": "image/gif",
-  ".heic": "image/heic",
-  ".heif": "image/heif",
-  ".jpeg": "image/jpeg",
-  ".jpg": "image/jpeg",
-  ".png": "image/png",
-  ".webp": "image/webp",
-};
 
 export interface StoredAttachment {
   filename: string;
@@ -130,11 +121,6 @@ function resolvePreviewCommand():
   return null;
 }
 
-function inferMimeTypeFromFilename(filename: string): string {
-  return MIME_TYPES[extname(filename).toLowerCase()] ??
-    "application/octet-stream";
-}
-
 export function attachmentPublicBaseUrl(requestUrl?: string): string {
   const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ??
     Deno.env.get("PUBLIC_BASE_URL");
@@ -142,7 +128,12 @@ export function attachmentPublicBaseUrl(requestUrl?: string): string {
   if (requestUrl) {
     return new URL("/", requestUrl).toString().replace(/\/+$/, "");
   }
-  return `http://localhost:${getRuntimeConfig().httpApiPort}`;
+  // No silent localhost fallback: a relative attachment published under a
+  // wrong base URL is unreachable for every counterparty.
+  throw new Error(
+    "Attachment base URL is not configured — set ATTACHMENT_PUBLIC_BASE_URL " +
+      "(or PUBLIC_BASE_URL), or pass the incoming request URL",
+  );
 }
 
 export function buildAttachmentAbsoluteUrl(

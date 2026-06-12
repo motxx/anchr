@@ -222,6 +222,39 @@ in the flow.
 - `e2e/protocol/anonymous-relay-flow.test.ts` — `INV-08: full exchange
   completes relay-only with no HTTP endpoint`.
 
+**Scope limit — mint and Blossom touchpoints:** INV-08 covers inter-actor
+transport only. Spending or redeeming the Cashu Payment Lock contacts the
+mint over HTTP, attachment transfer contacts Blossom servers over HTTP, and a
+TLSN proof contacts the target server — all of which expose the caller's IP
+to that operator. IP-level anonymity there requires operator-supplied
+transport: the Blossom helpers accept an injectable `fetchImpl`
+(`BlossomTransportOptions`), the Cashu wallet/client construction accepts an
+injectable request dispatcher (`customRequest`), and the TLSN target
+connection supports `tlsn-prover --socks-proxy` (e.g. Tor at
+`socks5://127.0.0.1:9050`) as the supported Tor path.
+
+## Actor linkability
+
+INV-07 covers the **Customer only**. Provider and Oracle identities are
+intentionally stable and cross-request-linkable, and that asymmetry is an
+accepted design limit, not an oversight:
+
+- A Provider signs every offer, result, and selection exchange under one
+  Nostr key for its operating lifecycle (`provider_pubkey` rides in offer
+  payloads), because offer credibility and selection accountability hang on
+  a persistent identity.
+- An Oracle must advertise one stable pubkey (kind 5300 `p`-tag, the kind
+  30088 registry entry, and the hash-bootstrap DM recipient), because
+  Customers select Oracles by key and bind escrow conditions to them.
+
+A relay observer can therefore profile a Provider's or an Oracle's request
+volume, activity times, and counterparties across requests. Operators who
+need to limit that exposure rotate keys at the cost of discarding discovery
+presence and accumulated reputation; the protocol does not attempt to hide
+Provider/Oracle activity patterns. "Requests are unlinkable" claims in this
+repository always mean Customer-side unlinkability (INV-07), never the whole
+exchange.
+
 ## Settlement Decision Rules
 
 The normative redeem contract lives in
@@ -242,7 +275,11 @@ spendable and must not redeem.
 ## Trust surface: Proof publication
 
 Proof publication (visibility `"public"`) is implemented and irreversible (Nostr
-events cannot be deleted). Risks to other use cases:
+events cannot be deleted). The `visibility` parameter lives on the internal
+request lifecycle (`QueryInput` consumed by the QueryService and the Oracle's
+attestation publication) — hosts that compose the lifecycle own this decision.
+The public `Customer.request` API does not publish proofs and exposes no
+`visibility` switch. Risks to other use cases:
 
 | Risk                                          | Severity | Trigger                                         | Mitigation                                           |
 | --------------------------------------------- | -------- | ----------------------------------------------- | ---------------------------------------------------- |

@@ -118,3 +118,27 @@ Deno.test("request internals may consume only documented feature ports", () => {
     ),
   ).toBe(false);
 });
+
+Deno.test("E030: package code may not import from examples/, e2e/, or scripts/", () => {
+  for (
+    const specifier of [
+      "../../../../examples/quick-start/mod.ts",
+      "../../../../e2e/helpers/regtest.ts",
+      "../../../../scripts/arch-lint.ts",
+    ]
+  ) {
+    const violations = checkPackageFile(
+      "sdk",
+      "packages/sdk/src/adapters/cashu.ts",
+      `import { x } from "${specifier}";`,
+    );
+    expect(violations.some((v) => v.code === "E030")).toBe(true);
+  }
+
+  const clean = checkPackageFile(
+    "sdk",
+    "packages/sdk/src/adapters/cashu.ts",
+    `import { x } from "../payments/mod.ts";`,
+  );
+  expect(clean.some((v) => v.code === "E030")).toBe(false);
+});

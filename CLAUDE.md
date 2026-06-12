@@ -17,9 +17,11 @@ the code and `docs/`.
 `ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
 
 ## Type bar
-`as` and `any` forbidden everywhere in `packages/`. Narrow with type
-predicates. `unknown` only at boundaries (HTTP body, `JSON.parse`,
-`catch (err)`).
+`any` and double casts (`as unknown as T`) are forbidden everywhere in
+`packages/` — `lint:types` hard errors. Plain `as` casts are warned:
+narrow with type predicates instead; keep a cast only at a real parser
+boundary, justified with `// type-lint-allow: <reason>`. `unknown` only
+at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
 
 ## Versioning (pre-1.0)
 Delete replaced paths outright. No `@deprecated`, "legacy", or
@@ -55,7 +57,8 @@ single-purpose parts instead.
 "Done" = full local pass:
 - `deno task test:all` — lint:strict + test:unit + test:integration +
   test:e2e:protocol + test:scripts + test:examples + test:e2e:frost +
-  local static checks
+  Rust crate gate (clippy + cargo test, all four crates) + local static
+  checks
 - `deno task test:all:docker` — Docker-backed e2e
   (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
 
@@ -100,6 +103,12 @@ commit via the pre-commit hook.
 - `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
   **Must reach Anchr through `@anchr/*` only** — relative paths into
   `packages/<pkg>/src/...` are an E023 violation.
+- `crates/` — Rust native helpers (FROST release authority
+  `frost-signer`, TLSNotary `tlsn-prover` / `tlsn-verifier` /
+  `tlsn-server`). Built with
+  `cargo build --release --manifest-path crates/<name>/Cargo.toml`;
+  the Deno-only runtime rule does not apply here (toolchain pinned by
+  `rust-toolchain.toml`, gated by clippy + cargo test in test:all).
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants

@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -49,3 +50,34 @@ verification policy".
 
 - Decide enforce-vs-document with the maintainer if ambiguous; default to
   enforcing the failure whenever the factor is required.
+
+## Resolution
+
+Decision: enforce — a submission without GPS evidence fails whenever the
+`gps` factor is required, regardless of `expected_gps`.
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/verification/checks/gps.ts` — the missing-evidence
+  failure no longer keys on `requirement.expected_gps`
+- `packages/sdk/src/proofs/verification/verifier-standalone.test.ts` — new
+  rejection test without an expected location; C2PA-path fixtures supply body
+  GPS (they relied on the bypass)
+- `packages/sdk/src/proofs/verification/verifier.test.ts` — same fixture fix
+
+Verified with:
+
+- `deno task test:unit`
+
+Harness update:
+
+- The no-expected-location rejection test in `verifier-standalone.test.ts`
+  locks the enforcement.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

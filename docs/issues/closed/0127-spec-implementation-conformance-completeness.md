@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -73,3 +74,48 @@ From `docs/production-readiness-audit.md` §2.6:
   public/plaintext nature, and the ignore-on-parse-failure rejection rule.
   Remaining findings SPEC-04, SPEC-06, SPEC-07, SPEC-08, SPEC-09, SPEC-10 stay
   open under this issue.
+
+## Resolution
+
+Implemented by updating:
+
+- **SPEC-04** — locked by a test: a tampered `s` tag does not affect the
+  parsed schema (content wins; tag is a discovery hint)
+  (`packages/protocol/src/events.test.ts`)
+- **SPEC-05** — closed earlier (see Progress)
+- **SPEC-06** — `parseOfferFeedbackEvent` rejects offers missing the request
+  `e`-tag / customer `p`-tag and returns the binding
+  (`ParsedOfferFeedback.request_event_id` / `customer_pubkey`)
+- **SPEC-07** — adopted: builders for kinds 5300/6300/7000 stamp
+  `["v", "0"]` (`WIRE_VERSION`); parsers ignore events with a different `v`
+  value (absence = v0); `specs/messaging.md` "Wire Version" documents the
+  rejection semantics; builder/parser tests lock both directions
+- **SPEC-08** — Cashu token serialization pinned to V4 (`cashuB`) at every
+  encode site; `specs/paid-request-exchange.md` documents "emit V4, accept
+  V3"
+- **SPEC-09** — `Payment.locktimeSeconds` doc states the duration→absolute
+  conversion; `specs/messaging.md` `locktime_seconds` row states the
+  absolute-at-selection semantics
+- **SPEC-10** — `specs/messaging.md` gains "Parsing And Rejection Semantics"
+  (universal ignore rule, causal tag binding, ordering tolerance) and
+  "Schema Namespace" (allocation owned by `proof-schemas.md`)
+
+Verified with:
+
+- `deno task test:unit` (new `events.test.ts` cases for the version marker,
+  `s`-tag rule, and offer binding)
+- `rg -n 30103 specs/` matches (closed under SPEC-05)
+- `deno task lint:strict`
+
+Harness update:
+
+- The protocol builder/parser tests lock SPEC-04/06/07; the specs own the
+  prose contract.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

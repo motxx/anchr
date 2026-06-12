@@ -54,3 +54,5 @@ export type {
 } from "./frost-types.ts";
 
 export { createFrostSignatureAdapter } from "./frost-signature-adapter.ts";
+
+export { deriveFrostSigningMessage } from "./signing-message.ts";

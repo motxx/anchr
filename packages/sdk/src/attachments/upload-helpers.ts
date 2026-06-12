@@ -13,13 +13,6 @@ export function detectZip(rawBuffer: Buffer, filename: string): boolean {
     (rawBuffer[0] === 0x50 && rawBuffer[1] === 0x4b);
 }
 
-export function inferMimeType(filename: string): string {
-  if (filename.match(/\.(png)$/i)) return "image/png";
-  if (filename.match(/\.(heic)$/i)) return "image/heic";
-  if (filename.match(/\.(webp)$/i)) return "image/webp";
-  return "image/jpeg";
-}
-
 export function extractProofModeIntegrity(
   pmData: ProofModeData,
 ): ProofModeIntegrity {

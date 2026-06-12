@@ -10,7 +10,7 @@ bug
 ## Dependencies
 
 Depends on:
-- None
+- 0142
 
 Blocks:
 - None
@@ -73,3 +73,20 @@ From `docs/production-readiness-audit.md` §2.5:
   are separable).
 - Fix the nonce-session safety independently first; it is a key-leak risk that
   applies either way.
+
+## Progress
+
+- 2026-06-13: **Decision: keep `p2pk_frost` in v0 and complete it.** Fixed in
+  this pass:
+  - **PROT-08** — `frost-signer.ts` keys pending nonces per random session id
+    (`session_id` returned from round 1, required and consumed-once in
+    round 2, message bound to the session); an interleaved two-session unit
+    test locks it. The HTTP signer routes received the same message binding
+    under issue 0134.
+  - **PROT-03** — `frost-escrow-provider.ts` threads the real
+    `customer_pubkey` and `expiry` from `createHold` into the P2PK binding and
+    carries them across re-binds; `buildFrostP2PKOptions` refuses an empty
+    refund pubkey (test locked).
+  - **PROT-05 + PROT-06** (mint-spendable group-signature message + Provider
+    redeem path) need a wire/spec extension and were split into issue 0142;
+    this issue stays pending until 0142 closes.

@@ -5,6 +5,7 @@
  */
 
 import type { validateTlsn } from "../../tlsn-validation.ts";
+import type { IntegrityStore } from "../../integrity-store.ts";
 import type { AiContentCheckConfig } from "../../ai-content-check.ts";
 import type { TlsnVerifiedData } from "../../tlsn-types.ts";
 import type { BlossomKeyMap } from "../../../values.ts";
@@ -34,6 +35,12 @@ export interface VerifyProofOptions {
    * factor without code; inject per-instance config in hosts and tests.
    */
   aiContent?: AiContentCheckConfig;
+  /**
+   * Attachment integrity records. Defaults to the module-level singleton
+   * populated at upload time; hosts that compose their own
+   * `createIntegrityStore()` inject it here.
+   */
+  integrityStore?: IntegrityStore;
 }
 
 export interface FactorCheckContext {

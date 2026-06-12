@@ -1,10 +1,9 @@
 /**
- * SDK-local Oracle and DM payload shapes that ride next to the canonical
- * wire contract (`@anchr/protocol/events`): Oracle↔Provider release DMs
- * and the Oracle-readable result payload carried in `oracle_payload` tags.
+ * SDK-local Oracle↔Provider release DM payload shapes that ride next to the
+ * canonical wire contract (`@anchr/protocol/events`). The Oracle-readable
+ * result payload in `oracle_payload` tags is owned by the canonical
+ * `parseOracleQueryResponseEvent`.
  */
-
-import { decryptNip44, deriveConversationKey } from "../crypto/encryption.ts";
 
 /** Preimage delivery via NIP-44 DM (kind 4). */
 export interface PreimageDMPayload {
@@ -34,33 +33,5 @@ export type OracleDMPayload =
   | PreimageDMPayload
   | RejectionDMPayload
   | FrostSignatureDMPayload;
-
-/**
- * Oracle-accessible payload embedded in kind 6300 tags.
- * Encrypted to Oracle via NIP-44 so only Oracle can read it.
- */
-export interface OracleResponsePayload {
-  nonce_echo: string;
-  attachments: Array<{
-    blossom_hash: string;
-    blossom_urls: string[];
-    decrypt_key_oracle: string;
-    decrypt_iv: string;
-    mime: string;
-  }>;
-  notes?: string;
-}
-
-export function parseOracleResponsePayload(
-  event: { tags: string[][]; pubkey: string },
-  oracleSecretKey: Uint8Array,
-): OracleResponsePayload | null {
-  const oracleTag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
-  if (!oracleTag) return null;
-
-  const conversationKey = deriveConversationKey(oracleSecretKey, event.pubkey);
-  const decrypted = decryptNip44(oracleTag[1]!, conversationKey);
-  return JSON.parse(decrypted) as OracleResponsePayload;
-}
 
 export { buildOracleAnnouncementEvent } from "./event-builders.ts";

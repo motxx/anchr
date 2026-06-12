@@ -67,6 +67,23 @@ export function createPreimageStore(): PreimageStore {
   };
 }
 
+/**
+ * Get-or-create the hash commitment for a query. Single owner of the
+ * query-id → hash issuance rule shared by the relay-DM Oracle service and
+ * the HTTP Oracle routes: one hash per query id, idempotent across retries.
+ */
+export function issueQueryHash(
+  preimageStore: PreimageStore,
+  queryHashMap: Map<string, string>,
+  queryId: string,
+): { hash: string; created: boolean } {
+  const existing = queryHashMap.get(queryId);
+  if (existing !== undefined) return { hash: existing, created: false };
+  const entry = preimageStore.create();
+  queryHashMap.set(queryId, entry.hash);
+  return { hash: entry.hash, created: true };
+}
+
 /** JSON file format for persistent preimage store. */
 interface PreimageFileData {
   entries: { [hash: string]: PreimageEntry };

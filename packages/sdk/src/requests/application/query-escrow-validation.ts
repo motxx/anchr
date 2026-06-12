@@ -1,5 +1,5 @@
 import type { EscrowProvider } from "./ports.ts";
-import type { Query, QueryStatus } from "../domain/types.ts";
+import type { Query } from "../domain/types.ts";
 
 export interface EscrowTokenLockResult {
   ok: boolean;
@@ -21,20 +21,6 @@ export async function verifyEscrowLock(
 }
 
 export { MIN_ESCROW_LOCKTIME_SECS } from "../domain/value-objects.ts";
-
-export const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
-  awaiting_offers: ["provider_selected"],
-  provider_selected: ["processing"],
-  processing: ["verifying"],
-  verifying: ["approved", "rejected"],
-};
-
-export function validateEscrowTransition(
-  from: QueryStatus,
-  to: QueryStatus,
-): boolean {
-  return ESCROW_TRANSITIONS[from]?.includes(to) ?? false;
-}
 
 export function isEscrowQuery(query: Query): boolean {
   return query.escrow !== undefined;

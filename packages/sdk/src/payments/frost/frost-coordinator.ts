@@ -66,13 +66,49 @@ function generateSessionId(): string {
   return `frost_${Date.now()}_${randomBytes(8).toString("hex")}`;
 }
 
-export function createFrostCoordinator(): FrostCoordinator {
+/** Sessions older than this are abandoned and evicted. */
+export const FROST_SESSION_TTL_MS = 30 * 60 * 1000;
+/** Finalized signing sessions stay readable this long after creation. */
+export const FROST_FINALIZED_RETENTION_MS = 60 * 1000;
+
+export interface FrostCoordinatorOptions {
+  /** Clock injection for tests. */
+  now?: () => number;
+}
+
+export function createFrostCoordinator(
+  options: FrostCoordinatorOptions = {},
+): FrostCoordinator {
+  const now = options.now ?? Date.now;
   const dkgSessions = new Map<string, DkgSession>();
   const signingSessions = new Map<string, FrostSigningSession>();
   const querySessionMap = new Map<string, string>();
 
+  // A long-running Oracle accumulates abandoned sessions unless they are
+  // evicted; run on every public entry point so the maps stay bounded by
+  // recent activity.
+  function evictStaleSessions(): void {
+    const cutoff = now() - FROST_SESSION_TTL_MS;
+    for (const [id, session] of dkgSessions) {
+      if (session.created_at < cutoff) dkgSessions.delete(id);
+    }
+    const finalizedCutoff = now() - FROST_FINALIZED_RETENTION_MS;
+    for (const [id, session] of signingSessions) {
+      const abandoned = session.created_at < cutoff;
+      const settled = session.finalized &&
+        session.created_at < finalizedCutoff;
+      if (abandoned || settled) {
+        signingSessions.delete(id);
+        if (querySessionMap.get(session.query_id) === id) {
+          querySessionMap.delete(session.query_id);
+        }
+      }
+    }
+  }
+
   return {
     initDkg(config) {
+      evictStaleSessions();
       const session: DkgSession = {
         session_id: generateSessionId(),
         threshold: config.threshold,
@@ -83,7 +119,7 @@ export function createFrostCoordinator(): FrostCoordinator {
         round2_packages: new Map(),
         round2_secret_packages: new Map(),
         key_packages: new Map(),
-        created_at: Date.now(),
+        created_at: now(),
       };
       dkgSessions.set(session.session_id, session);
       return session;
@@ -163,6 +199,7 @@ export function createFrostCoordinator(): FrostCoordinator {
     },
 
     startSigning(queryId, message, config) {
+      evictStaleSessions();
       const session: FrostSigningSession = {
         session_id: generateSessionId(),
         query_id: queryId,
@@ -171,7 +208,7 @@ export function createFrostCoordinator(): FrostCoordinator {
         nonce_commitments: new Map(),
         signature_shares: new Map(),
         finalized: false,
-        created_at: Date.now(),
+        created_at: now(),
       };
       signingSessions.set(session.session_id, session);
       querySessionMap.set(queryId, session.session_id);

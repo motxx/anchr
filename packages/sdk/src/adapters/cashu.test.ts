@@ -1,12 +1,18 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getEncodedToken, type P2PKOptions, type Proof } from "@cashu/cashu-ts";
+import {
+  getEncodedToken,
+  type OutputDataLike,
+  type P2PKOptions,
+  type Proof,
+} from "@cashu/cashu-ts";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 
 import {
   CashuClientError,
   CashuMintError,
+  CashuMintUncertainError,
   type CashuSendChain,
   type CashuWalletAdapter,
   createCashuClient,
@@ -31,8 +37,18 @@ const PROVIDER_SECRET = (() => {
 })();
 
 const VALID_SOURCE_PROOFS: Record<string, unknown>[] = [
-  { id: "k1", amount: 600, secret: "sec-a", C: "C-a" },
-  { id: "k1", amount: 400, secret: "sec-b", C: "C-b" },
+  {
+    id: "00ad268c4d1f5826",
+    amount: 600,
+    secret: "sec-a",
+    C: "02" + "aa".repeat(32),
+  },
+  {
+    id: "00ad268c4d1f5826",
+    amount: 400,
+    secret: "sec-b",
+    C: "02" + "bb".repeat(32),
+  },
 ];
 
 interface SendCall {
@@ -51,7 +67,7 @@ function makeFakeWallet(opts: {
   errorOnSend?: Error;
   /** Fee (sats) per swap call. Defaults to 0 (free regtest mints). */
   fee?: number;
-  /** Keyset IDs the fake wallet knows. Defaults to ["k1"]. */
+  /** Keyset IDs the fake wallet knows. Defaults to ["00ad268c4d1f5826"]. */
   keysetIds?: readonly string[];
 }): { wallet: CashuWalletAdapter; calls: SendCall[] } {
   const calls: SendCall[] = [];
@@ -82,7 +98,7 @@ function makeFakeWallet(opts: {
     },
     getFeesForProofs: () => opts.fee ?? 0,
     keyChain: {
-      getAllKeysetIds: () => opts.keysetIds ?? ["k1"],
+      getAllKeysetIds: () => opts.keysetIds ?? ["00ad268c4d1f5826"],
     },
   };
   return { wallet, calls };
@@ -107,7 +123,7 @@ function makeHtlcToken(
     },
   ]);
   const proof: Proof = {
-    id: "k1",
+    id: "00ad268c4d1f5826",
     amount: 1000,
     secret,
     C: "02" + "ab".repeat(32),
@@ -127,10 +143,10 @@ test("createCashuClient rejects an empty mint URL", () => {
 test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with no hashlock", async () => {
   const phase1Output: Proof[] = [
     {
-      id: "k1",
+      id: "00ad268c4d1f5826",
       amount: 1000,
       secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
-      C: "C-1",
+      C: "02" + "dd".repeat(32),
     },
   ];
   const { wallet, calls } = makeFakeWallet({ outputProofs: phase1Output });
@@ -253,10 +269,10 @@ test("buildHtlcLock wraps mint errors in CashuMintError", async () => {
 test("bindProvider signs Phase-1 input with customer privkey and locks output with hashlock + provider P2PK + locktime + refund", async () => {
   const phase2Output: Proof[] = [
     {
-      id: "k1",
+      id: "00ad268c4d1f5826",
       amount: 1000,
       secret: '["HTLC",{"data":"' + VALID_HASH + '"}]',
-      C: "C-2",
+      C: "02" + "ee".repeat(32),
     },
   ];
   const { wallet, calls } = makeFakeWallet({ outputProofs: phase2Output });
@@ -267,10 +283,10 @@ test("bindProvider signs Phase-1 input with customer privkey and locks output wi
 
   const phase1Proofs = [
     {
-      id: "k1",
+      id: "00ad268c4d1f5826",
       amount: 1000,
       secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
-      C: "C-1",
+      C: "02" + "dd".repeat(32),
     },
   ];
 
@@ -304,10 +320,10 @@ test("bindProvider rejects a missing or wrong-shape customerSecretKey", async ()
   });
   const phase1Proofs = [
     {
-      id: "k1",
+      id: "00ad268c4d1f5826",
       amount: 1000,
       secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
-      C: "C-1",
+      C: "02" + "dd".repeat(32),
     },
   ];
   await expect(
@@ -353,10 +369,10 @@ test("bindProvider rejects malformed initialProofs (caller misuse)", async () =>
 test("bindProvider wraps mint errors in CashuMintError", async () => {
   const phase1Proofs = [
     {
-      id: "k1",
+      id: "00ad268c4d1f5826",
       amount: 1000,
       secret: '["P2PK",{"data":"' + CUSTOMER_PUBKEY + '"}]',
-      C: "C-1",
+      C: "02" + "dd".repeat(32),
     },
   ];
   const failFake = makeFakeWallet({
@@ -385,7 +401,12 @@ test("redeemHtlc verifies preimage matches each proof's hashlock before mint rou
   const wrongToken = makeHtlcToken("aa".repeat(32), PROVIDER_PUBKEY, lockTime);
 
   const { wallet, calls } = makeFakeWallet({
-    outputProofs: [{ id: "k1", amount: 1000, secret: "plain", C: "C-out" }],
+    outputProofs: [{
+      id: "00ad268c4d1f5826",
+      amount: 1000,
+      secret: "plain",
+      C: "02" + "cc".repeat(32),
+    }],
   });
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
@@ -463,4 +484,135 @@ test("validateLocktime rejects a past or current timestamp", () => {
 test("validateLocktime rejects a non-integer", () => {
   const future = Math.floor(Date.now() / 1000) + 3600;
   expect(() => validateLocktime(future + 0.5)).toThrow(CashuClientError);
+});
+
+// --- Interrupted-swap recovery (committed swap whose response was lost) ---
+
+const G_HEX =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+function makeRecoveryKeyset(): { id: string; keys: Record<number, string> } {
+  const keys: Record<number, string> = {};
+  for (const amount of [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]) {
+    keys[amount] = G_HEX;
+  }
+  return { id: "00ad268c4d1f5826", keys };
+}
+
+function makeRecoveryWallet(opts: {
+  states: Array<{ state: string }> | Error;
+  restore?: "echo" | Error;
+}): CashuWalletAdapter {
+  let registered: OutputDataLike[] = [];
+  return {
+    ops: {
+      send() {
+        const chain: CashuSendChain = {
+          asP2PK: () => chain,
+          privkey: () => chain,
+          asCustom: (data) => {
+            registered = data;
+            return chain;
+          },
+          run: () => Promise.reject(new Error("simulated network loss")),
+        };
+        return chain;
+      },
+    },
+    getFeesForProofs: () => 0,
+    keyChain: { getAllKeysetIds: () => ["00ad268c4d1f5826"] },
+    getKeyset: makeRecoveryKeyset,
+    checkProofsStates() {
+      if (opts.states instanceof Error) return Promise.reject(opts.states);
+      return Promise.resolve(opts.states);
+    },
+    mint: {
+      restore({ outputs }) {
+        if (opts.restore instanceof Error) return Promise.reject(opts.restore);
+        return Promise.resolve({
+          outputs: registered.map((o) => o.blindedMessage),
+          signatures: registered.map((o) => ({
+            id: o.blindedMessage.id,
+            amount: o.blindedMessage.amount,
+            C_: G_HEX,
+          })),
+        });
+      },
+    },
+  };
+}
+
+test("redeemHtlc reports a retry-safe failure when inputs stay unspent", async () => {
+  const wallet = makeRecoveryWallet({ states: [{ state: "UNSPENT" }] });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  const promise = client.redeemHtlc({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, FUTURE_LOCKTIME()),
+    preimageHex: PREIMAGE_HEX,
+    providerSecretKey: PROVIDER_SECRET,
+  });
+  await expect(promise).rejects.toThrow(CashuMintError);
+  await promise.catch((err) => {
+    expect(err).not.toBeInstanceOf(CashuMintUncertainError);
+    expect(String(err.message)).toContain("safe to retry");
+  });
+});
+
+test("redeemHtlc recovers committed outputs via NUT-09 when inputs are spent", async () => {
+  const wallet = makeRecoveryWallet({
+    states: [{ state: "SPENT" }],
+    restore: "echo",
+  });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  const result = await client.redeemHtlc({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, FUTURE_LOCKTIME()),
+    preimageHex: PREIMAGE_HEX,
+    providerSecretKey: PROVIDER_SECRET,
+  });
+  // The swap committed mint-side; the redeem recovers the pre-registered
+  // outputs instead of reporting total loss.
+  expect(result.proofs.length).toBeGreaterThan(0);
+  expect(result.amountSats).toBe(1000);
+});
+
+test("redeemHtlc surfaces a distinct uncertain error when state cannot be checked", async () => {
+  const wallet = makeRecoveryWallet({ states: new Error("mint unreachable") });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  await expect(
+    client.redeemHtlc({
+      token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, FUTURE_LOCKTIME()),
+      preimageHex: PREIMAGE_HEX,
+      providerSecretKey: PROVIDER_SECRET,
+    }),
+  ).rejects.toThrow(CashuMintUncertainError);
+});
+
+test("redeemHtlc surfaces an uncertain error when spent inputs cannot be restored", async () => {
+  const wallet = makeRecoveryWallet({
+    states: [{ state: "SPENT" }],
+    restore: new Error("restore endpoint down"),
+  });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  await expect(
+    client.redeemHtlc({
+      token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, FUTURE_LOCKTIME()),
+      preimageHex: PREIMAGE_HEX,
+      providerSecretKey: PROVIDER_SECRET,
+    }),
+  ).rejects.toThrow(CashuMintUncertainError);
 });

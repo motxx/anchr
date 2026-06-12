@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -49,3 +50,32 @@ token never lock- or amount-verified — the theft the CTF-2 comment in
   `deps.escrowProvider` is absent for a query that requires escrow
   verification, or add `// allow-bypass: <reason>` if test-only wiring is
   intentional and document it.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/application/escrow-flow-methods.ts` —
+  `doSelectProvider` returns an explicit configuration error when the escrow
+  token demands amount/lock verification and `deps.escrowProvider` is absent
+- `packages/sdk/src/requests/application/query-service.test.ts` — CTF-2 test:
+  escrow query + absent port → `{ ok: false }`, query stays `awaiting_offers`
+- `e2e/protocol/paid-request-vulns.test.ts` — CTF-1 fixtures now wire
+  `createMockEscrowProvider()` (they relied on the silent skip)
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task test:e2e:protocol`
+
+Harness update:
+
+- The CTF-2 fail-closed test in `query-service.test.ts` locks the rejection.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

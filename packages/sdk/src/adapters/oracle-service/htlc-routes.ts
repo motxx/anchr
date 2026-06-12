@@ -2,7 +2,7 @@ import type { Hono, MiddlewareHandler } from "hono";
 import { verify } from "../../requests/application/query-verifier.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 import type { OracleAttestation } from "../../requests/domain/oracle-types.ts";
-import type { PreimageStore } from "../../payments/mod.ts";
+import { issueQueryHash, type PreimageStore } from "../../payments/mod.ts";
 
 export interface HtlcRouteDeps {
   oracleId: string;
@@ -31,14 +31,11 @@ export function registerHtlcRoutes(app: Hono, deps: HtlcRouteDeps): void {
       return c.json({ error: "Missing query_id" }, 400);
     }
 
-    const existing = queryHashMap.get(body.query_id);
-    if (existing) {
-      return c.json({ query_id: body.query_id, hash: existing });
-    }
-
-    const entry = preimageStore.create();
-    queryHashMap.set(body.query_id, entry.hash);
-    return c.json({ query_id: body.query_id, hash: entry.hash }, 201);
+    const issued = issueQueryHash(preimageStore, queryHashMap, body.query_id);
+    return c.json(
+      { query_id: body.query_id, hash: issued.hash },
+      issued.created ? 201 : 200,
+    );
   });
 
   app.get("/hash/:queryId", authMiddleware, (c) => {

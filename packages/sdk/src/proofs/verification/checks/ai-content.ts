@@ -11,7 +11,7 @@ import {
   createAiContentChecker,
 } from "../../ai-content-check.ts";
 import type { AttachmentRef, BlossomKeyMaterial } from "../../../values.ts";
-import { fetchAttachmentData } from "./photo-integrity.ts";
+import { fetchAttachmentData } from "../../../attachments/fetch-attachment.ts";
 import type { CheckAccumulator, FactorCheck } from "./types.ts";
 
 /** Env-gated default config: the deployment-level switch for this factor. */
@@ -28,13 +28,12 @@ async function readAttachmentForAiCheck(
   ref: AttachmentRef,
   blossomKey: BlossomKeyMaterial | undefined,
 ) {
-  const data = await fetchAttachmentData(
+  const fetched = await fetchAttachmentData(
     ref,
-    [],
     blossomKey ? { [ref.id]: blossomKey } : undefined,
   );
-  if (!data) return null;
-  return { data: Buffer.from(data), mimeType: ref.mime_type };
+  if (!fetched.ok) return null;
+  return { data: Buffer.from(fetched.data), mimeType: ref.mime_type };
 }
 
 function makeChecker(

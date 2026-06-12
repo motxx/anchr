@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -53,3 +54,35 @@ boolean.
 - Invert the filter to fail closed with a documented allowlist of ignorable
   informational codes.
 - Add the tampered-assertion attack test referencing INV-06.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/c2pa-validation.ts` — `evaluateSignature` fails
+  closed: any failure entry invalidates the signature unless its code is on
+  the explicit `IGNORABLE_FAILURE_CODES` allowlist (currently empty, by
+  design); `claimSignature.validated` is still required
+- `packages/sdk/src/proofs/c2pa-validation.test.ts` — INV-06 attack tests for
+  `assertion.hashedURI.mismatch`, `signingCredential.untrusted`, and unknown
+  future codes; the dev-cert fixture test now expects fail-closed rejection
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task lint:invariants`
+
+Harness update:
+
+- The INV-06 attack tests in `c2pa-validation.test.ts` lock the fail-closed
+  filter against regressions.
+
+Review residuals:
+
+- Populating `IGNORABLE_FAILURE_CODES` with a benign informational code is a
+  maintainer call if c2patool output ever requires it; the empty allowlist is
+  the documented default.
+
+Follow-up:
+
+- None

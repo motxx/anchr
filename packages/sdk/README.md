@@ -75,6 +75,9 @@ const result = await customer.request({
 });
 
 console.log(result.data, result.proof, result.providerPubkey);
+
+// Close the relay pool when done (mirrors Provider.stop()).
+await customer.close();
 ```
 
 For a multi-oracle whitelist, keep `oracles` as the trust policy; entries
@@ -169,42 +172,19 @@ outside the v0 built-in schema set.
 ## Testing
 
 The default `cashuClient` and `relayClient` open live connections. For unit
-tests, inject your own:
+tests, inject the in-memory fakes from `@anchr/sdk/testing`:
 
 ```ts
+import { createCustomer, createHttpOracleClient } from "@anchr/sdk";
 import {
-  type CashuClient,
-  createCustomer,
-  createHttpOracleClient,
-  type RelayClient,
-} from "@anchr/sdk";
+  createInMemoryCashuClient,
+  createInMemoryRelayClient,
+} from "@anchr/sdk/testing";
 
-const mintUrl = "https://mint.test.example";
 const relayUrls = ["wss://relay.test.example"];
 const oraclePubkey = "npub1exampleoraclepubkey";
 
-const fakeCashuClient: CashuClient = {
-  mintUrl,
-  async buildHtlcLock() {
-    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
-  },
-  async bindProvider() {
-    return { token: "cashu-test-token", amountSats: 1000, proofs: [] };
-  },
-  async redeemHtlc() {
-    return { amountSats: 1000, proofs: [] };
-  },
-};
-
-const fakeRelayClient: RelayClient = {
-  async publish() {
-    return { successes: relayUrls, failures: [] };
-  },
-  subscribe() {
-    return { close() {} };
-  },
-  close() {},
-};
+const cashuClient = createInMemoryCashuClient();
 
 const customer = createCustomer({
   oracles: [{
@@ -214,10 +194,13 @@ const customer = createCustomer({
     }),
   }],
   relays: relayUrls,
-  mint: mintUrl,
-  cashuClient: fakeCashuClient,
-  relayClient: fakeRelayClient,
+  mint: cashuClient.mintUrl,
+  cashuClient,
+  relayClient: createInMemoryRelayClient(),
 });
+
+// After driving a flow, assert on the recorded calls:
+// cashuClient.locks / cashuClient.binds / cashuClient.redeems
 ```
 
 Real e2e coverage against a regtest Cashu mint and Nostr relay lives at

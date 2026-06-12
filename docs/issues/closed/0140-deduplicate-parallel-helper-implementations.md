@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -55,3 +56,39 @@ needing one owner:
 
 - Extract one owner helper per concern next to its closest existing module
   and delete the copies.
+
+## Resolution
+
+Implemented by updating:
+
+- Preimage hash issuance: `packages/sdk/src/payments/cashu/preimage-store.ts`
+  gains `issueQueryHash` (get-or-create, idempotent);
+  `adapters/nostr/oracle-service.ts` and
+  `adapters/oracle-service/htlc-routes.ts` both delegate to it
+- Filename→MIME: `packages/sdk/src/attachments/mime.ts` (new single owner,
+  extension table + `application/octet-stream` fallback);
+  `attachments/access.ts` and `attachments/upload.ts` delegate; the divergent
+  regex copy in `upload-helpers.ts` is deleted
+- GPS distance policy: `packages/sdk/src/proofs/geo.ts` gains
+  `evaluateGpsDistancePolicy` (haversine + threshold);
+  `verification/checks/gps.ts`, `c2pa-validation.ts`, and
+  `exif-validation.ts` all decide through it (`verifyBodyGps` also delegates
+  its messaging to `checkGpsProximity`)
+
+Verified with:
+
+- `deno task test:unit` (incl. new `mime.test.ts`)
+- `deno task lint:strict`
+
+Harness update:
+
+- `mime.test.ts` locks the unified inference; duplicate-logic findings remain
+  owned by `/arch-lint-llm` (L003).
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

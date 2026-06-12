@@ -501,6 +501,28 @@ describe("HTLC lifecycle", () => {
     expect(updated.payment_status).toBe("escrow_swapped");
   });
 
+  test("CTF-2: selectProvider fails closed when no escrow provider port is wired", async () => {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      // No escrowProvider: the token can never be amount/lock verified.
+    });
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
+    );
+    const outcome = await service.selectProvider(
+      query.id,
+      "provider_pub_1",
+      makeFakeToken(100),
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Escrow provider port not configured");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
+  });
+
   test("selectProvider verifies escrow token amount matches payment_lock", async () => {
     const { service } = makeIsolatedService();
     const validToken = makeFakeToken(100);

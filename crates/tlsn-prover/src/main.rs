@@ -9,9 +9,8 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use http_body_util::Empty;
-use hyper::{body::Bytes, Request, StatusCode};
+use hyper::{body::Bytes, Request};
 use hyper_util::rt::TokioIo;
-use spansy::Spanned;
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     sync::oneshot,
@@ -38,7 +37,6 @@ use tlsn::{
     verifier::VerifierOutput,
     Session,
 };
-use tlsn_formats::http::{DefaultHttpCommitter, HttpCommit, HttpTranscript};
 
 #[derive(Parser)]
 #[command(name = "tlsn-prove", about = "Generate a TLSNotary presentation for a URL")]
@@ -175,6 +173,9 @@ async fn run_with_local_verifier(
     run_prover(prover_socket, request_tx, attestation_rx, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await
 }
 
+// Every prover transport takes the same flat target/MPC-limit parameter
+// list; collapsing it into a struct would only relocate the verbosity.
+#[allow(clippy::too_many_arguments)]
 async fn run_with_ws_verifier(
     verifier_url: &str,
     host: &str,
@@ -187,7 +188,7 @@ async fn run_with_ws_verifier(
 ) -> Result<(Attestation, Secrets)> {
     use async_tungstenite::tokio::connect_async;
     use async_tungstenite::tungstenite::Message;
-    use futures::{SinkExt, StreamExt};
+    use futures::StreamExt;
 
     let session_ws_url = format!("{}/session", verifier_url);
     eprintln!("[tlsn-prove] Connecting to session endpoint: {}", session_ws_url);
@@ -313,6 +314,7 @@ fn base64_decode(s: &str) -> Result<Vec<u8>> {
 }
 
 /// Run the MPC-TLS prover over a futures AsyncRead+AsyncWrite stream (for WebSocket).
+#[allow(clippy::too_many_arguments)]
 async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWrite + Send + Unpin + 'static>(
     stream: S,
     host: &str,
@@ -423,125 +425,10 @@ async fn run_prover_mpc_futures_stream<S: futures::AsyncRead + futures::AsyncWri
     handle.close();
     driver_task.await??;
 
-    Ok(ProverMpcOutput { request, secrets, request_config })
+    Ok(ProverMpcOutput { request, secrets })
 }
 
-/// Run the MPC-TLS prover over any tokio AsyncRead+AsyncWrite stream (for TCP).
-async fn run_prover_mpc_stream<S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static>(
-    stream: S,
-    host: &str,
-    port: u16,
-    path: &str,
-    socks_proxy: Option<&str>,
-    custom_headers: &[(String, String)],
-    max_sent_data: usize,
-    max_recv_data: usize,
-) -> Result<ProverMpcOutput> {
-    use tokio_util::compat::TokioAsyncReadCompatExt;
-
-    let session = Session::new(stream.compat());
-    let (driver, mut handle) = session.split();
-    let driver_task = tokio::spawn(driver);
-
-    let prover = handle
-        .new_prover(ProverConfig::builder().build()?)?
-        .commit(
-            TlsCommitConfig::builder()
-                .protocol(
-                    MpcTlsConfig::builder()
-                        .max_sent_data(max_sent_data)
-                        .max_recv_data(max_recv_data)
-                        .build()?,
-                )
-                .build()?,
-        )
-        .await?;
-
-    let target_tcp = connect_target(host, port, socks_proxy).await?;
-    eprintln!("[tlsn-prove] Connected to {}:{}", host, port);
-
-    let (tls_connection, prover_fut) = prover
-        .connect(
-            TlsClientConfig::builder()
-                .server_name(ServerName::Dns(host.try_into()?))
-                .root_store(tlsn::webpki::RootCertStore::mozilla())
-                .build()?,
-            target_tcp.compat(),
-        )
-        .await?;
-    let tls_connection = TokioIo::new(tls_connection.compat());
-    let prover_task = tokio::spawn(prover_fut);
-
-    let (mut request_sender, connection) =
-        hyper::client::conn::http1::handshake(tls_connection).await?;
-    tokio::spawn(connection);
-
-    let mut request_builder = Request::builder()
-        .uri(path)
-        .header("Host", host)
-        .header("Accept", "application/json")
-        .header("Accept-Encoding", "identity")
-        .header("Connection", "close")
-        .header("User-Agent", "anchr-tlsn-prover/0.1.0");
-    for (k, v) in custom_headers {
-        request_builder = request_builder.header(k.as_str(), v.as_str());
-    }
-    let request = request_builder.body(Empty::<Bytes>::new())?;
-
-    eprintln!("[tlsn-prove] Sending HTTP request...");
-    let response = request_sender.send_request(request).await?;
-    eprintln!("[tlsn-prove] Response status: {}", response.status());
-
-    let mut prover = prover_task.await??;
-
-    let transcript = prover.transcript();
-    let sent_len = transcript.sent().len();
-    let recv_len = transcript.received().len();
-
-    let mut builder = TranscriptCommitConfig::builder(transcript);
-    builder.commit_sent(&(0..sent_len))?;
-    builder.commit_recv(&(0..recv_len))?;
-    let transcript_commit = builder.build()?;
-
-    let mut req_builder = RequestConfig::builder();
-    req_builder.transcript_commit(transcript_commit);
-    let request_config = req_builder.build()?;
-
-    let mut prove_builder = ProveConfig::builder(prover.transcript());
-    if let Some(tc) = request_config.transcript_commit() {
-        prove_builder.transcript_commit(tc.clone());
-    }
-    let disclosure_config = prove_builder.build()?;
-
-    let ProverOutput {
-        transcript_commitments,
-        transcript_secrets,
-        ..
-    } = prover.prove(&disclosure_config).await?;
-
-    let transcript = prover.transcript().clone();
-    let tls_transcript = prover.tls_transcript().clone();
-    prover.close().await?;
-
-    let mut att_builder = AttestationRequest::builder(&request_config);
-    att_builder
-        .server_name(ServerName::Dns(host.try_into()?))
-        .handshake_data(HandshakeData {
-            certs: tls_transcript.server_cert_chain().expect("cert chain").to_vec(),
-            sig: tls_transcript.server_signature().expect("signature").clone(),
-            binding: tls_transcript.certificate_binding().clone(),
-        })
-        .transcript(transcript)
-        .transcript_commitments(transcript_secrets, transcript_commitments);
-
-    let (request, secrets) = att_builder.build(&CryptoProvider::default())?;
-
-    handle.close();
-    driver_task.await??;
-
-    Ok(ProverMpcOutput { request, secrets, request_config })
-}
-
+#[allow(clippy::too_many_arguments)]
 async fn run_with_remote_verifier(
     verifier_addr: &str,
     host: &str,
@@ -560,7 +447,7 @@ async fn run_with_remote_verifier(
 
     // Two-connection protocol: 'M' opens MPC, 'A' exchanges attestation after MPC closes.
     let mut mpc_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
-    mpc_tcp.write_all(&[b'M']).await?;
+    mpc_tcp.write_all(b"M").await?;
     mpc_tcp.write_all(&session_id).await?;
     mpc_tcp.flush().await?;
 
@@ -571,7 +458,7 @@ async fn run_with_remote_verifier(
     eprintln!("[tlsn-prove] MPC complete, requesting attestation...");
 
     let mut att_tcp = tokio::net::TcpStream::connect(verifier_addr).await?;
-    att_tcp.write_all(&[b'A']).await?;
+    att_tcp.write_all(b"A").await?;
     att_tcp.write_all(&session_id).await?;
 
     let req_bytes = bincode::serialize(&prover_output.request)?;
@@ -598,9 +485,9 @@ async fn run_with_remote_verifier(
 struct ProverMpcOutput {
     request: AttestationRequest,
     secrets: Secrets,
-    request_config: RequestConfig,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_prover_mpc(
     tcp: tokio::net::TcpStream,
     host: &str,
@@ -711,13 +598,12 @@ async fn run_prover_mpc(
     handle.close();
     driver_task.await??;
 
-    Ok(ProverMpcOutput { request, secrets, request_config })
+    Ok(ProverMpcOutput { request, secrets })
 }
 
 fn base64_encode(data: &[u8]) -> String {
-    use std::fmt::Write;
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).copied().unwrap_or(0) as u32;
@@ -739,6 +625,7 @@ fn base64_encode(data: &[u8]) -> String {
     result
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_prover<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
     socket: S,
     req_tx: oneshot::Sender<AttestationRequest>,
@@ -1000,11 +887,11 @@ fn find_header_value_ranges(sent_bytes: &[u8], redact_names: &[String]) -> Vec<s
             let value_byte_start = offset + value_start_in_line + trimmed_start;
             let value_byte_end = offset + line.len();
 
-            if redact_names.iter().any(|r| r.eq_ignore_ascii_case(name)) {
-                if value_byte_start < value_byte_end {
-                    redact_ranges.push(value_byte_start..value_byte_end);
-                    eprintln!("[tlsn-prove] Redacting header: {} (bytes {}..{})", name, value_byte_start, value_byte_end);
-                }
+            if redact_names.iter().any(|r| r.eq_ignore_ascii_case(name))
+                && value_byte_start < value_byte_end
+            {
+                redact_ranges.push(value_byte_start..value_byte_end);
+                eprintln!("[tlsn-prove] Redacting header: {} (bytes {}..{})", name, value_byte_start, value_byte_end);
             }
         }
         offset += line.len() + 2; // +2 for \r\n
@@ -1016,7 +903,7 @@ fn find_header_value_ranges(sent_bytes: &[u8], redact_names: &[String]) -> Vec<s
 /// Compute reveal ranges by subtracting redact ranges from [0..total_len].
 fn subtract_ranges(total_len: usize, redact: &[std::ops::Range<usize>]) -> Vec<std::ops::Range<usize>> {
     if redact.is_empty() {
-        return vec![0..total_len];
+        return std::iter::once(0..total_len).collect();
     }
 
     let mut sorted = redact.to_vec();
