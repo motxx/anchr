@@ -6,15 +6,15 @@ the code and `docs/`.
 ## Runtime
 - **Deno**, not Node. `deno run --allow-all`, `deno test`, `deno install`,
   `deno task <name>`. Never `npm`/`yarn`/`pnpm`/`ts-node`/`vitest`/`jest`.
-- `.env` is loaded via `--env` in task definitions — never `dotenv`.
 - HTTP: `Deno.serve()` + Hono. WebSocket: built-in. Env: `Deno.env.get/set/delete`.
-  Never `express`, `ws`, `process.env`.
+  Never `express`, `ws`, `process.env`, `dotenv`.
 - Runtime helpers belong in `packages/sdk/src/` unless they define the
   interoperable Nostr/Cashu contract owned by `@anchr/protocol`.
 
 ## Logging
-**No `console.*`** in `packages/` (E021). Level read from
-`ANCHR_LOG_LEVEL` / `LOG_LEVEL`.
+**No `console.*`** in `packages/` — emit through the shared
+logtape-backed `getLogger`
+(`packages/sdk/src/internal/runtime/logger.ts`).
 
 ## Type bar
 `as` and `any` forbidden everywhere in `packages/`. Narrow with type
@@ -53,11 +53,13 @@ single-purpose parts instead.
 
 ## Verification bar
 "Done" = full local pass:
-- `deno task test:all` — lint:strict + test:unit + test:integration +
-  test:e2e:protocol + test:scripts + test:examples + test:e2e:frost +
-  local static checks
+- `deno task test:all` — lint:strict + cargo dep audit + test:unit +
+  test:integration + test:e2e:protocol + test:scripts + test:examples +
+  frost-signer build + test:e2e:frost. Needs the Rust toolchain.
 - `deno task test:all:docker` — Docker-backed e2e
   (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
+- `deno task test:all:full` — both; the pre-push hook runs this with a
+  2-hour pass marker (`RUN_TESTS=1 git push` forces a re-run)
 
 Use `docs/review-harness.md` to route recurring review findings to automated
 checks, semantic skills, universal docs, or follow-up issues.
@@ -89,7 +91,19 @@ are forbidden (single source of truth: `*.test.ts` *is* the unit tier).
 `deno task lint:strict` chains every gating lint. Rule catalogue and
 allowed-package-deps map: `scripts/arch-lint.ts`. A fast subset runs on
 every Edit/Write via PostToolUse hook; the full chain runs on every
-commit via the pre-commit hook.
+commit via the pre-commit hook. Install hooks once with
+`deno task setup:hooks`.
+
+Threat-model invariants are drift-locked: every `INV-NN` in
+`docs/threat-model.md` needs a matching test and a hash entry in
+`docs/threat-model.lock.json` (`lint:invariants`). Editing an
+invariant body means bumping its lock hash with a justification.
+
+Shipping is gated: PreToolUse hooks block `git push` / `gh pr create`
+until the `arch-lint-llm` and `check-silent-bypass` skills have
+recorded a clean review of the exact `packages/` diff being shipped
+(diff-hash records in `.arch-lint-llm-verified.json` /
+`.silent-bypass-verified.json`; small diffs are exempt).
 
 ## Layout
 - `packages/protocol/` — Nostr/Cashu v0 wire contract, event helpers,
@@ -97,12 +111,19 @@ commit via the pre-commit hook.
 - `packages/sdk/` — Customer, Provider, Oracle orchestration, payment helpers,
   proof helpers, attachments, adapters, request internals, testing helpers, and
   the developer-facing SDK surface.
+- `crates/<name>/` — Rust sidecar binaries (frost-signer, tlsn-prover,
+  tlsn-server, tlsn-verifier) built with cargo by the frost/tlsn test flows.
 - `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
   **Must reach Anchr through `@anchr/*` only** — relative paths into
-  `packages/<pkg>/src/...` are an E023 violation.
+  `packages/<pkg>/src/...` are an E023 violation (`e2e/` and `scripts/`
+  are held to the same rule).
 - `specs/` — wire-format specs (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
+- `docs/issues/` — tracked issues (`pending/` → `closed/`); manage with
+  the `make-issues` / `resolve-issues` skills.
+- `CONTEXT.md` — domain glossary; use its vocabulary in code, docs, and
+  specs.
 
 Application vocabulary (`market`, `marketplace`, …) is forbidden in
 `packages/` (E022). Concrete applications own their vocabulary in
