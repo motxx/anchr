@@ -21,7 +21,8 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
 | --------- | ------------------------------------ |
 | `kind`    | `30088`                              |
 | `d` tag   | Oracle ID (unique identifier)        |
-| `t` tags  | `anchr-oracle`, plus capability tags |
+| `t` tags  | `anchr-oracle`                       |
+| `s` tags  | Supported proof schema URLs          |
 | `content` | JSON-encoded `OracleAnnouncement`    |
 
 ### Tags
@@ -32,19 +33,16 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
   "tags": [
     ["d", "my-oracle-id"],
     ["t", "anchr-oracle"],
-    ["t", "anchr-oracle-tlsn"],
-    ["t", "anchr-oracle-c2pa"],
-    ["t", "anchr-oracle-gps"],
-    ["t", "anchr-oracle-nonce"]
+    ["s", "https://anchr-spec.org/spec/proof/tlsn/v1"],
+    ["s", "https://anchr-spec.org/spec/proof/c2pa-image/v1"]
   ],
   "content": "{ ... }"
 }
 ```
 
-Capability tags follow the pattern `anchr-oracle-<factor>` where `<factor>` is a
-verification factor that the Oracle can check (`tlsn`, `c2pa`, `nonce`, `gps`,
-`timestamp`, `oracle`, `ai_check`). Other factors are application-specific
-extensions unless they are promoted into the v0 registry contract.
+Each `s` tag is an exact proof schema URL the Oracle claims to verify. The
+schema URL is the only verification capability key in the registry; schema
+modules own any local predicate, evidence, or check vocabulary.
 
 ### OracleAnnouncement
 
@@ -55,7 +53,7 @@ The `content` field contains a JSON object:
 | `name`                   | yes      | Human-readable Oracle name                                        |
 | `endpoint`               | no       | Optional Oracle-operated HTTP adapter URL                         |
 | `fee_ppm`                | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
-| `supported_factors`      | yes      | Array of verification factors this Oracle supports                |
+| `supported_schemas`      | yes      | Array of proof schema URLs this Oracle supports                   |
 | `supported_escrow_types` | yes      | Array of escrow types: `htlc`, `p2pk_frost`                       |
 | `min_amount_sats`        | no       | Minimum payment amount this Oracle accepts                        |
 | `max_amount_sats`        | no       | Maximum payment amount this Oracle accepts                        |
@@ -67,11 +65,14 @@ The `content` field contains a JSON object:
 {
   "name": "TLSN and C2PA Oracle",
   "fee_ppm": 50000,
-  "supported_factors": ["tlsn", "c2pa", "gps", "nonce", "timestamp"],
+  "supported_schemas": [
+    "https://anchr-spec.org/spec/proof/tlsn/v1",
+    "https://anchr-spec.org/spec/proof/c2pa-image/v1"
+  ],
   "supported_escrow_types": ["htlc", "p2pk_frost"],
   "min_amount_sats": 1,
   "max_amount_sats": 1000000,
-  "description": "Independent Oracle with TLSNotary and C2PA/GPS verification"
+  "description": "Independent Oracle with TLSNotary and C2PA image verification"
 }
 ```
 
@@ -86,12 +87,13 @@ Customers discover Oracles by querying Nostr relays:
 }
 ```
 
-To filter by capability (e.g., only TLSNotary-capable Oracles):
+To filter by schema capability:
 
 ```json
 {
   "kinds": [30088],
-  "#t": ["anchr-oracle-tlsn"]
+  "#t": ["anchr-oracle"],
+  "#s": ["https://anchr-spec.org/spec/proof/tlsn/v1"]
 }
 ```
 

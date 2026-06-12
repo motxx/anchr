@@ -166,7 +166,7 @@ The `execution` object includes:
 | Field              | Description                                                |
 | ------------------ | ---------------------------------------------------------- |
 | `schema`           | Proof schema URL                                           |
-| `predicate`        | Schema-specific predicate interpreted by the proof profile |
+| `predicate`        | Schema-owned requirement payload interpreted by the proof schema |
 | `description`      | Optional human-readable request detail                     |
 | `context`          | Optional schema-agnostic context                           |
 | `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
@@ -205,8 +205,8 @@ The Provider submits the result:
 | Field    | Description                                                        |
 | -------- | ------------------------------------------------------------------ |
 | `schema` | Proof schema URL used to dispatch Oracle and Customer verification |
-| `data`   | Verified response payload, shaped by the schema                    |
-| `proof`  | Proof bytes encoded by the schema, usually base64 or hex           |
+| `data`   | Schema-owned response evidence payload                            |
+| `proof`  | Schema-owned proof evidence payload, usually base64 or hex         |
 
 When an Oracle pubkey is provided, the result also carries an `oracle_payload`
 tag encrypted to the Oracle. The Oracle-readable payload adds `query_id` and
@@ -249,7 +249,10 @@ public by design — they carry no secret material):
 | `checks`        | Human-readable checks that ran                                   |
 | `failures`      | Human-readable failures, empty when `passed` is true             |
 | `attested_at`   | Unix seconds when the attestation was produced                   |
-| `tlsn_verified` | Redacted TLSNotary verified data, present only for TLSN queries  |
+| `details`       | Optional schema-owned verifier-detail payload                    |
+
+The `schema` value selected verification, so `details` is interpreted only by
+the schema that produced it. Shared attestation fields remain schema-neutral.
 
 Attestations are advisory and public: they do not gate Cashu redemption, which
 is enforced by the mint's HTLC/P2PK spending conditions. Consumers MUST ignore

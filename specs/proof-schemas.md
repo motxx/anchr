@@ -2,13 +2,20 @@
 
 ## Abstract
 
-Anchr identifies proof formats with HTTPS schema URLs. A schema URL names the
-proof bytes, predicate shape, response data shape, and verification rules that a
-Provider, Oracle, or Customer verifier must use.
+Anchr identifies proof formats with HTTPS schema URLs. A schema URL is the
+only verification dispatch key and names the proof bytes, requirement payload
+shape, evidence payload shape, response data shape, verifier-detail payload
+shape, and verification rules that a Provider, Oracle, or Customer verifier
+must use.
 
 Schema URLs are permissionless extension points. Implementations do not need a
 central numeric registry to add a new proof format; they publish or document a
 stable HTTPS URL and advertise support for it.
+
+There is no protocol-wide verification-factor registry. A schema may use local
+terms such as nonce, timestamp, or location inside its own requirement,
+evidence, checks, and verdict details, but compatible Anchr actors dispatch only
+on the schema URL.
 
 ## URL Shape
 
@@ -68,6 +75,28 @@ interface VerifierAdapter {
 payload. Built-in adapters SHOULD return true only for their exact canonical
 schema URL. A family of schemas can share implementation code internally, but it
 MUST still make an explicit decision for each concrete URL.
+
+## Schema Payloads
+
+Each proof schema defines these schema-owned payloads:
+
+| Payload | Wire location | Owner |
+| ------- | ------------- | ----- |
+| Requirement payload | Encrypted Provider Selection `execution.predicate` | The proof schema identified by `execution.schema` |
+| Evidence payload | Encrypted Job Result `data` and `proof`, including the Oracle-readable result payload | The proof schema identified by the result `schema` |
+| Verdict-detail payload | Schema-scoped verification details emitted by verifier APIs or public attestations when the profile defines them | The proof schema that ran verification |
+
+The shared Anchr fields around these payloads stay schema-neutral: actor
+pubkeys, query ids, event references, payment-lock fields, attachment
+references, and the `schema` URL. Implementations MUST validate schema-owned
+payloads at the selected schema boundary.
+
+This payload model is wire-compatible with the existing encrypted v0 event
+slots. Requirement data continues to serialize into
+`execution.predicate`; submitted evidence continues to serialize into result
+`data` and `proof`; the public `s` tag remains a discovery hint; and the
+encrypted `schema` field remains authoritative for execution and verification.
+No additional Nostr kind, tag, or shared factor field is required.
 
 ## Nostr Tags
 

@@ -19,11 +19,11 @@ Blocks:
 
 ## Summary
 
-GPS proximity verification is a schema-specific concern (location-bound
-photo proofs) living in the shared core. Move `GpsCoord`, `expected_gps`,
-`max_gps_distance_km`, and the GPS factor checks into the schema(s) that own
-location semantics (today: the C2PA-image schema, whose INV-06 binding stays
-intact), using the schema-scoped payloads from 0146.
+GPS proximity verification is schema-specific vocabulary for location-bound
+photo proofs. Move `GpsCoord`, `expected_gps`, `max_gps_distance_km`, and the
+GPS factor checks into the schema(s) that own location semantics (today: the
+C2PA-image schema, whose INV-06 binding stays intact), using the schema-scoped
+payloads from 0146.
 
 Current placement:
 
@@ -53,6 +53,8 @@ Current placement:
 
 - `rg "gps|Gps" packages/sdk/src/values.ts packages/sdk/src/requests/` has
   no matches; GPS types and checks live under the owning schema module.
+- The C2PA-image schema owns signed GPS evidence, maximum-distance policy, and
+  any local GPS factor vocabulary as schema-internal payload/check semantics.
 - INV-06 (C2PA manifest signature binds GPS evidence) still has a passing
   test and an unchanged or justified-and-bumped entry in
   `docs/threat-model.lock.json`.

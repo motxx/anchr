@@ -19,8 +19,9 @@ Blocks:
 ## Summary
 
 Make "add a proof schema" a single registration call against a public SDK
-API, and make the built-in TLSN and C2PA implementations consume that same
-API as reference adapters. Today the dispatch entry points are open
+API keyed only by schema URI, and make the built-in TLSN and C2PA
+implementations consume that same API as reference adapters. Today the dispatch
+entry points are open
 (`resolveProofGenerator` / `resolveVerifierAdapter`,
 `packages/sdk/src/schema.ts:37-49`) but everything behind them is wired
 statically:
@@ -48,10 +49,12 @@ statically:
 ## Acceptance
 
 - A documented public API exists to register a schema implementation
-  (producer + verifier + its checks/config) keyed by schema URI, usable
-  without editing `packages/`.
+  (producer + verifier + requirement/evidence/verdict payload handling +
+  checks/config) keyed by schema URI, usable without editing `packages/`.
 - TLSN and C2PA register through that API; no core module imports their
   internals directly.
+- No public registration API accepts `VerificationFactor` values or shared
+  default factor lists.
 - `provider-types.ts` has no `notary` field; schema options are passed per
   schema URI.
 - `scripts/check-proof-schema-pages.ts` reads a manifest (e.g.

@@ -21,8 +21,9 @@ Blocks:
 
 The schema-neutral verification contract and the `Query` aggregate hardcode
 TLSNotary-specific fields, so a third-party schema cannot carry its own
-requirement or evidence without forking. Replace them with schema-scoped
-payloads keyed by the request's schema URI, per the model decided in 0144.
+requirement, evidence, or verifier details without forking. Replace them with
+schema-scoped payloads keyed by the request's schema URI, per the model decided
+in 0144.
 
 Current hardcoding:
 
@@ -49,12 +50,14 @@ Current hardcoding:
 
 - `VerificationRequirement` / `VerificationInput` / `VerificationDetail` and
   `QueryInput` / `QueryResult` / `Query` contain no schema-named fields;
-  schema requirement/evidence/verdict data travels in schema-scoped payload
-  fields.
+  schema requirement, evidence, and verdict-detail data travels in
+  schema-scoped payload fields.
 - TLSN keeps working end to end as the first consumer of the new payload
   fields (e2e tlsn bucket green).
-- Wire serialization of execution payloads and results is either unchanged
-  or versioned per `specs/` rules.
+- Wire serialization uses the existing encrypted v0 slots documented in
+  `specs/proof-schemas.md`: requirement payload in selection
+  `execution.predicate`, evidence payload in result `data` / `proof`, and no
+  shared factor field.
 
 ## Verification
 
@@ -65,7 +68,9 @@ Current hardcoding:
 
 ## Plan
 
-- Introduce the schema-scoped payload fields decided in 0144.
+- Introduce the schema-scoped requirement, evidence, and verdict-detail payload
+  fields decided in 0144.
 - Move the TLSN field shapes into the TLSN schema module; convert
   `query-verifier.ts` mappings to pass payloads through opaquely.
-- Update `specs/` if the encrypted payload layout changes.
+- Keep encrypted payload field names aligned with `specs/proof-schemas.md` and
+  version any future wire-shape change through `specs/`.
