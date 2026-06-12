@@ -22,8 +22,8 @@ Tracking issue: the SDK reads its runtime environment through three
 hardcoded channels that block browser use. Put each behind an injectable
 port with a server adapter (current behavior) and a browser adapter, then
 split server-only entrypoints out of library modules. The resolver should
-split this issue once 0117/0145/0151/0152 have decided which call sites
-still exist.
+split this issue once 0145, 0151, and 0156 have decided which call sites still
+exist.
 
 1. **Env config** — `Deno.env.get` is called directly in
    `packages/sdk/src/internal/runtime/config.ts` and at feature call sites
@@ -44,7 +44,7 @@ still exist.
    browser), not a core capability.
 4. **Server entrypoints** — `adapters/oracle-service/server.ts:150` calls
    `Deno.serve` inside a library module; bootstrap belongs in a separate
-   entrypoint (final shape depends on 0152).
+   entrypoint (final shape depends on 0156).
 
 ## Rationale
 

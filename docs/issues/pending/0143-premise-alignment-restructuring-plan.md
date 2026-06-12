@@ -10,11 +10,6 @@ design
 ## Dependencies
 
 Depends on:
-- 0116
-- 0117
-- 0124
-- 0128
-- 0144
 - 0145
 - 0146
 - 0147
@@ -22,8 +17,9 @@ Depends on:
 - 0149
 - 0150
 - 0151
-- 0152
 - 0153
+- 0156
+- 0157
 
 Blocks:
 - None
@@ -58,7 +54,8 @@ Phased plan; each phase is owned by the listed issues:
 
 - **Phase A — decide and delete** (shrinks every later phase):
   0145 (remove AI content check), 0151 (strip platform media tooling),
-  0152 (canonical Oracle surface), 0117 (FROST complete-or-remove, existing).
+  0156 (delete HTTP Oracle exchange surface), and 0157 (migrate Oracle
+  discovery to schema URLs).
 - **Phase B — schema-extensibility core** (the centerpiece):
   0144 (decision: schema-owned verification) → 0146 (schema-scoped payloads)
   → 0147 (GPS out of shared core) → 0148 (runtime schema registration and
@@ -67,7 +64,7 @@ Phased plan; each phase is owned by the listed issues:
   0149 (runtime ports for config/persistence/sidecars) → 0150 (browser CI
   gate).
 - **Phase D — privacy/P2P hardening** (mostly already tracked):
-  0116, 0124, 0128 (existing), 0153 (FROST peer transport hook).
+  0153 (FROST peer transport hook).
 
 Correctness issues 0134-0141 remain independent and should generally land
 before or alongside Phase B since they touch the same verification code.

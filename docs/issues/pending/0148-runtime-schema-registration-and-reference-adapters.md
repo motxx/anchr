@@ -10,7 +10,6 @@ feature
 ## Dependencies
 
 Depends on:
-- 0144
 - 0146
 
 Blocks:
