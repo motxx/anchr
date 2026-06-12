@@ -229,7 +229,8 @@ means:
 
 ### DualKeyStore Interface
 
-`DualKeyStore` is the local single-key implementation used for demos and tests:
+`DualKeyStore` is the proposed local single-key interface for demo-grade
+implementations:
 
 ```
 create(swap_id) -> { pubkey_a, pubkey_b }
@@ -241,7 +242,7 @@ has(swap_id) -> boolean
 `sign()` is a one-time operation: the losing side's secret is permanently
 deleted, same irreversibility guarantee as HTLC preimage reveal.
 
-Distributed FROST signing uses the async release-authority port instead:
+Distributed FROST signing would use an async release-authority port instead:
 
 ```
 create(swap_id) -> { pubkey_a, pubkey_b }
@@ -278,12 +279,12 @@ Cashu's standard NUTs (NUT-11 P2PK, NUT-14 HTLC) do not support conditional
 branching (IF outcome=A THEN pay X, ELSE pay Y). This limits the settlement
 options for conditional swaps:
 
-| Settlement Mode                | Oracle Fund Custody     | Fair Exchange                         | Status                                                          |
-| ------------------------------ | ----------------------- | ------------------------------------- | --------------------------------------------------------------- |
-| Oracle escrow (P2PK n_sigs=1)  | Yes — t-of-n can steal  | Not needed                            | Implemented                                                     |
-| P2P cross-lock (P2PK n_sigs=2) | No — Oracle can't steal | Unsolved without trusted intermediary | Experimental                                                    |
-| DLC on Cashu mint              | No                      | Not needed                            | [Proposed (PR #128)](https://github.com/cashubtc/nuts/pull/128) |
-| DLC on Bitcoin L1              | No                      | Not needed                            | Roadmap                                                         |
+| Settlement Mode                | Oracle Fund Custody     | Fair Exchange                         | Status                                                           |
+| ------------------------------ | ----------------------- | ------------------------------------- | ---------------------------------------------------------------- |
+| Oracle escrow (P2PK n_sigs=1)  | Yes — t-of-n can steal  | Not needed                            | Escrow primitive exists in the v0 1:1 flow; N:M use is design-only |
+| P2P cross-lock (P2PK n_sigs=2) | No — Oracle can't steal | Unsolved without trusted intermediary | Design-only                                                       |
+| DLC on Cashu mint              | No                      | Not needed                            | [Proposed (PR #128)](https://github.com/cashubtc/nuts/pull/128)  |
+| DLC on Bitcoin L1              | No                      | Not needed                            | Roadmap                                                           |
 
 The Oracle escrow mode is suitable for scenarios where the Oracle group (t-of-n
 FROST) is trusted. For trustless settlement where the Oracle cannot access

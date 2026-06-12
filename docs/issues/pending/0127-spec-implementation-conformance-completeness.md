@@ -25,7 +25,7 @@ spec-completeness gaps for an independent implementer.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.6:
+From the 2026-06-11 production-readiness audit §2.6:
 
 - **SPEC-04** — the `s`-tag vs content `schema` "content wins" rule is
   unenforced; `parseQueryRequestEvent` never reads the `s` tag

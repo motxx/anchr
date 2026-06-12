@@ -24,7 +24,7 @@ and slow-DoS in the always-on Oracle the design targets.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.7 (OPS-05):
+From the 2026-06-11 production-readiness audit §2.7 (OPS-05):
 
 - `packages/sdk/src/proofs/tlsn-validation.ts:30,337` — `seenPresentations` is
   module-global with only a test-only clear (no TTL/eviction).

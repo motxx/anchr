@@ -24,7 +24,7 @@ re-exports proof-owned TLSN types as a second barrel; and the documented
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.3:
+From the 2026-06-11 production-readiness audit §2.3:
 
 - **ARCH-02** — `crates/` is undocumented in `docs/architecture.md` and
   `CLAUDE.md` (`grep -c crates` → 0 in both); this includes the Rust gate note

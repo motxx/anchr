@@ -24,7 +24,7 @@ default, and no graceful shutdown/health surface for the relay-DM Oracle.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.7:
+From the 2026-06-11 production-readiness audit §2.7:
 
 - **OPS-02** — 62 `log.error` vs 5 info/warn; success/lifecycle events log at
   error level (`oracle-service.ts:192-193,226,306`, `cashu-wallet.ts:173-175`).

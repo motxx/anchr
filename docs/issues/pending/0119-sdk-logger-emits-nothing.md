@@ -24,7 +24,7 @@ or remove the env-var claim and document the host's required setup.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.7 (OPS-01):
+From the 2026-06-11 production-readiness audit §2.7 (OPS-01):
 
 - `packages/sdk/src/internal/runtime/logger.ts:1-43` only calls
   `ltGetLogger(category)` and emits; there is no `configure()`/sink
@@ -39,8 +39,7 @@ From `docs/production-readiness-audit.md` §2.7 (OPS-01):
 - Running an SDK flow with `ANCHR_LOG_LEVEL` (or `LOG_LEVEL`) set produces log
   output at the requested level via a registered sink; or, if configuration is
   intentionally the host's responsibility, the env-var claim is removed from
-  `CLAUDE.md` and `docs/production-readiness-audit.md` §1 and the required host
-  `configure()` call is documented.
+  `CLAUDE.md` and the required host `configure()` call is documented.
 
 ## Verification
 

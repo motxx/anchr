@@ -1,7 +1,7 @@
 /**
  * Region-scoped discovery on the canonical advertisement: a Provider with a
- * region code serves only `#region`-matching requests (P4 in
- * docs/lifecycle-unification-design.md).
+ * region code serves only `#region`-matching requests, so relay operators
+ * learn at most the advertisement metadata.
  */
 
 import { test } from "@std/testing/bdd";
