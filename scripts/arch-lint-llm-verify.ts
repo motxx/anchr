@@ -1,9 +1,17 @@
-#!/usr/bin/env -S deno run --allow-read --allow-run --allow-env
+#!/usr/bin/env -S deno run --allow-read --allow-run --allow-env --allow-write
 /**
- * arch-lint-llm-verify — pre-ship verification hook.
+ * arch-lint-llm-verify — pre-ship verification hook and record writer.
  *
- * Runs as a Claude Code PreToolUse hook for Bash commands. When the
- * command is a "shipping" action (`git push`, `gh pr create`), the hook:
+ * Two modes:
+ *
+ * `--record` — invoked by the arch-lint-llm skill after a clean review.
+ * Computes the in-scope diff with the exact same filter the hook uses
+ * and writes `.arch-lint-llm-verified.json`. Keeping both sides in this
+ * file guarantees the hashes agree by construction.
+ *
+ * Hook mode (default) — runs as a Claude Code PreToolUse hook for Bash
+ * commands. When the command is a "shipping" action (`git push`,
+ * `gh pr create`), the hook:
  *
  *   1. Computes the set of in-scope files in the current branch's diff
  *      (TypeScript under `packages/<pkg>/src/`, ≥150 lines).
@@ -238,7 +246,33 @@ async function repoRoot(): Promise<string> {
   return r.ok ? r.out.trim() : Deno.cwd();
 }
 
+async function writeVerificationRecord(): Promise<void> {
+  const base = Deno.env.get("ARCH_BASE") ?? "origin/main";
+  const root = await repoRoot();
+  const recordPath = Deno.env.get("ARCH_RECORD") ??
+    `${root}/.arch-lint-llm-verified.json`;
+  Deno.chdir(root);
+  const files = await inScopeChangedFiles(base);
+  if (files.length === 0) {
+    console.log(
+      "arch-lint-llm: no in-scope files in the current diff; no record needed.",
+    );
+    return;
+  }
+  const record: VerificationRecord = {
+    diff_sha256: await diffHash(base, files),
+    reviewed_at: new Date().toISOString(),
+    files,
+  };
+  await Deno.writeTextFile(recordPath, JSON.stringify(record, null, 2) + "\n");
+  console.log(`✓ wrote ${recordPath} (${files.length} file(s))`);
+}
+
 if (import.meta.main) {
+  if (Deno.args.includes("--record")) {
+    await writeVerificationRecord();
+    Deno.exit(0);
+  }
   const raw = await readStdin();
   let payload: HookInput;
   try {

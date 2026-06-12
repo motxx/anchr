@@ -60,7 +60,7 @@ From `docs/production-readiness-audit.md` §2.6:
 
 ## Plan
 
-- Re-read the specs and protocol builders/parsers; split with `make-sub-issues`
+- Re-read the specs and protocol builders/parsers; split with `make-issues`
   if the wire-version marker (SPEC-07) becomes its own change.
 - Apply the low-risk doc/spec edits (SPEC-05, SPEC-09, SPEC-10) directly.
 

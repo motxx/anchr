@@ -1,9 +1,8 @@
 # Shared Agent Skills
 
 This directory is the canonical home for repository-local maintainer skills.
-These skills are not public product documentation. They exist only when the
-repository needs an AI-readable rubric that is not already captured by Deno
-tasks, scripts, specs, or docs.
+They exist only when the repository needs an AI-readable judgment rubric that
+cannot be reduced to a Deno task, script, spec, or doc.
 
 Both agent-specific paths point here:
 
@@ -15,19 +14,30 @@ Both agent-specific paths point here:
 Add new skills as `skills/<skill-name>/SKILL.md`. Keep instructions portable
 unless a section is explicitly marked for one agent.
 
-## Scope
+## Current skills
 
-Keep repository-local skills narrow and Anchr-specific:
+- `make-issues` — create `docs/issues/pending/` entries, including child
+  issues that split a broad parent.
+- `resolve-issues` — implement, verify, and close pending issues with
+  resolution notes.
+- `arch-lint-llm` — semantic architecture review that `deno task lint:arch`
+  cannot express; backed by the pre-ship hook
+  `scripts/arch-lint-llm-verify.ts`.
+- `check-silent-bypass` — semantic trust-boundary bypass review; backed by
+  the pre-ship hook `scripts/silent-bypass-verify.ts`.
 
-- Issue bookkeeping: `make-issues`, `make-sub-issues`, and `resolve-issues`.
-- Semantic checks that depend on Anchr architecture or trust boundaries:
-  `arch-lint-llm` and `check-silent-bypass`.
+## Authoring rules
 
-Do not add a local skill for a command sequence already expressed by
-`deno.json`, `scripts/`, or `CONTRIBUTING.md`. Add a skill only when a
-recurring review finding needs judgment across files and cannot be reduced to a
-deterministic check.
-
-Use maintained gstack skills for generic planning, product review, engineering
-review, design review, office-hours, or broad consultation workflows instead of
-adding Anchr-local duplicates.
+- A skill owns judgment: rubrics, decision heuristics, and workflow
+  discipline. Repository facts that another file already owns — issue format
+  (`docs/issues/README.md`), deterministic lint rules (`scripts/arch-lint.ts`),
+  task definitions (`deno.json`), harness routing (`docs/review-harness.md`) —
+  are referenced, never duplicated. Duplicated facts drift.
+- Do not add a skill for a command sequence already expressed by `deno.json`,
+  `scripts/`, or `CONTRIBUTING.md`. Add one only when a recurring review
+  finding needs judgment across files and cannot become a deterministic check.
+- Each skill does one thing; state its owner responsibility in one sentence
+  before adding it.
+- Use maintained gstack skills for generic planning, product review,
+  engineering review, design review, or consultation workflows instead of
+  adding local duplicates.

@@ -43,7 +43,7 @@ them produces changes that the lint gates will reject:
 9. **Repo skills.** After touching verification, settlement, redemption,
    escrow, or quorum code, run the `check-silent-bypass` skill. After
    structural refactors, run `arch-lint-llm`. New work items go through
-   `make-issues` / `make-sub-issues`.
+   `make-issues`.
 10. **Verify before fixing.** Re-read the cited files before editing; this
     document records state as of 2026-06-11 and the repository may have moved.
 

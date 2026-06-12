@@ -1,4 +1,4 @@
 interface:
   display_name: "Make Issues"
-  short_description: "Create docs/issues backlog entries"
-  default_prompt: "Use $make-issues to create tracked docs/issues entries for this work."
+  short_description: "Create or split docs/issues backlog entries"
+  default_prompt: "Use $make-issues to create tracked docs/issues entries (or split a pending issue into children) for this work."

@@ -74,4 +74,4 @@ From `docs/production-readiness-audit.md` §2.7:
 - Apply the mechanical items (publish exclude, license fields, log-level
   reclassification) directly.
 - Treat relay reconnect, SSRF-guard default, and Oracle shutdown/health as
-  separable changes; split with `make-sub-issues` if needed.
+  separable changes; split with `make-issues` if needed.

@@ -65,7 +65,7 @@ From `docs/production-readiness-audit.md` §2.2:
 
 ## Plan
 
-- Re-read each surface; split with `make-sub-issues` if any single item grows
+- Re-read each surface; split with `make-issues` if any single item grows
   beyond one coherent change.
 - Apply the smaller items (SDK-03 doc fix, SDK-07 export list) directly; treat
   SDK-06 `visibility` as a design decision needing a recorded outcome.

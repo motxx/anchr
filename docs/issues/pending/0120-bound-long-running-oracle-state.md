@@ -62,4 +62,4 @@ From `docs/production-readiness-audit.md` §2.7 (OPS-05):
 - Re-read each store's lifecycle and the Oracle `stop()` path.
 - Add bounded eviction + terminal-state cleanup; wire the sweep timer with
   teardown, or delete the dead sweep surface.
-- May be split with `make-sub-issues` per store if one change is too broad.
+- May be split with `make-issues` per store if one change is too broad.
