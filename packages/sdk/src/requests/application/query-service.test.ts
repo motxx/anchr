@@ -501,6 +501,28 @@ describe("HTLC lifecycle", () => {
     expect(updated.payment_status).toBe("escrow_swapped");
   });
 
+  test("CTF-2: selectProvider fails closed when no escrow provider port is wired", async () => {
+    const store = createQueryStore();
+    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const service = createQueryService({
+      store,
+      oracleRegistry: registry,
+      // No escrowProvider: the token can never be amount/lock verified.
+    });
+    const query = service.createQuery(
+      { description: "HTLC test" },
+      { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
+    );
+    const outcome = await service.selectProvider(
+      query.id,
+      "provider_pub_1",
+      makeFakeToken(100),
+    );
+    expect(outcome.ok).toBe(false);
+    expect(outcome.message).toContain("Escrow provider port not configured");
+    expect(service.getQuery(query.id)?.status).toBe("awaiting_offers");
+  });
+
   test("selectProvider verifies escrow token amount matches payment_lock", async () => {
     const { service } = makeIsolatedService();
     const validToken = makeFakeToken(100);
@@ -820,7 +842,7 @@ describe("submitEscrowResult", () => {
     const mockFrost = {
       requestSignature: async (query: Query, result: QueryResult) => {
         requested.push({ queryId: query.id, notes: result.notes });
-        return "deadbeef".repeat(8);
+        return ["deadbeef".repeat(8)];
       },
     };
     const store = createQueryStore();
@@ -850,7 +872,7 @@ describe("submitEscrowResult", () => {
       "test-oracle",
     );
     expect(outcome.ok).toBe(true);
-    expect(outcome.frost_signature).toBe("deadbeef".repeat(8));
+    expect(outcome.frost_signature).toEqual(["deadbeef".repeat(8)]);
     expect(outcome.preimage).toBeUndefined();
     expect(requested).toHaveLength(1);
     expect(requested[0]!.queryId).toBe(query.id);
@@ -862,7 +884,7 @@ describe("submitEscrowResult", () => {
     const mockFrost = {
       requestSignature: async (_q: Query, _r: QueryResult) => {
         calls++;
-        return "should_not_appear";
+        return ["should_not_appear"];
       },
     };
     const store = createQueryStore();

@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -58,3 +59,41 @@ From the 2026-06-11 production-readiness audit §2.5 (PROT-07, folds OPS-03):
 - Persist intended outputs before the swap or query proof state on failure;
   branch on `SPENT` to recover, on `UNSPENT` to safely retry.
 - Lock with the regtest interrupted-swap test.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/cashu.ts` — `redeemHtlc` pre-registers swap
+  outputs (`OutputData.createRandomData` + `asCustom`) so a
+  committed-but-unanswered swap is recoverable; on failure it classifies via
+  `checkProofsStates`: inputs unspent → retry-safe `CashuMintError`; inputs
+  spent → NUT-09 `mint.restore` of the pre-registered outputs and the fresh
+  proofs are returned; anything unknowable → new `CashuMintUncertainError`
+  ("check the mint", never silent loss). `CashuWalletAdapter` gained optional
+  `checkProofsStates`/`getKeyset`/`mint.restore` capabilities (fakes without
+  them keep the old loud-failure behavior)
+- `packages/sdk/src/payments/cashu/cashu-escrow.ts` — `redeemHtlcToken`
+  throws on spent/unknowable inputs instead of returning a burn-shaped null
+- `packages/sdk/src/adapters/cashu.test.ts` — recovery classification tests
+  (unspent-retry, NUT-09 recovery, uncertain × 2)
+- `e2e/regtest/interrupted-redeem.test.ts` (new) — real mint commits the
+  swap, the response is dropped, and the redeem recovers the outputs
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task test:e2e:regtest` (Docker bar)
+
+Harness update:
+
+- The recovery unit tests and the regtest interrupted-swap e2e absorb the
+  interrupted-mint-call finding class.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

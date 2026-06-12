@@ -42,6 +42,7 @@ import {
   loadAndSend,
   sumProofAmounts,
 } from "./cashu-escrow-helpers.ts";
+import { redeemSignedProofs } from "./redeem-swap.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 import {
@@ -304,40 +305,50 @@ export async function redeemHtlcToken(
   const ctx = await getWalletAndConfig();
   if (!ctx) return null;
 
+  let signedProofs: Proof[];
   try {
-    const signedProofs = prepareHtlcWitness(
+    signedProofs = prepareHtlcWitness(
       htlcProofs,
       preimage,
       providerPrivateKey,
     );
-    const verifyError = verifyHtlcSpendAuth(signedProofs);
-    if (verifyError) return null;
-
-    const amountSats = computeNetAmount(ctx.wallet, signedProofs);
-    if (amountSats === null) {
-      log.error("Fee exceeds total amount");
-      return null;
-    }
-
-    const send = await loadAndSend(
-      ctx.wallet,
-      amountSats,
-      signedProofs,
-      undefined,
-      providerPrivateKey,
-    );
-    return {
-      token: encodeProofs(ctx.config.mintUrl, send),
-      proofs: send,
-      amountSats,
-    };
   } catch (error) {
     log.error(
-      "Failed to redeem HTLC token:",
+      "Failed to prepare HTLC witness:",
       error instanceof Error ? error.message : error,
     );
     return null;
   }
+  const verifyError = verifyHtlcSpendAuth(signedProofs);
+  if (verifyError) return null;
+
+  const redeem = await redeemSignedProofs({
+    wallet: ctx.wallet,
+    signedProofs,
+    signingPrivateKey: providerPrivateKey,
+  });
+  if (!redeem.ok) {
+    if (redeem.reason === "fee_exceeds_amount") {
+      log.error("Fee exceeds total amount");
+      return null;
+    }
+    if (redeem.reason !== "inputs_unspent" && redeem.uncertain) {
+      throw new Error(
+        "redeemHtlcToken: mint swap failed with inputs spent or unknowable — check the mint before retrying; do not treat the token as burned",
+        { cause: redeem.cause },
+      );
+    }
+    log.error(
+      "Failed to redeem HTLC token (inputs unspent — safe to retry):",
+      redeem.cause instanceof Error ? redeem.cause.message : redeem.cause,
+    );
+    return null;
+  }
+  return {
+    token: encodeProofs(ctx.config.mintUrl, redeem.proofs),
+    proofs: redeem.proofs,
+    amountSats: redeem.amountSats,
+  };
 }
 
 function prepareHtlcWitness(

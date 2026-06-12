@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -79,3 +80,34 @@ From the 2026-06-11 production-readiness audit §2.3:
   findings ARCH-02, ARCH-03, ARCH-05 stay open under this issue. (The broader
   "`rg from .*requests/domain/types packages/sdk/src/proofs` returns nothing"
   goal also depends on the `Verification*` move tracked by issue 0122.)
+
+## Resolution
+
+Implemented by updating:
+
+- **ARCH-02 / ARCH-03** — `docs/architecture.md` component table now names
+  the directory for every unit and adds `crates/`, `docs/`, and `skills/`
+  rows; `CLAUDE.md` `## Layout` documents `crates/` with its build command
+  and the Rust exception to the Deno-only rule
+- **ARCH-04** — closed earlier (see Progress)
+- **ARCH-05** — `scripts/arch-lint.ts` rule **E030**: package code must not
+  import from `examples/`, `e2e/`, or `scripts/`; locked by
+  `scripts/arch-lint.test.ts`
+
+Verified with:
+
+- `rg -c crates docs/architecture.md CLAUDE.md` > 0
+- `deno task lint:arch`, `deno test scripts/arch-lint.test.ts`
+- `deno task lint:strict`
+
+Harness update:
+
+- E030 absorbs the package→tooling import class deterministically.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

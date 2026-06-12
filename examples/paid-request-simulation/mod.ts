@@ -1,6 +1,5 @@
 import {
   buildPreimageDeliveryEvent,
-  type CashuClient,
   createCustomer,
   createProvider,
   type Filter,
@@ -11,7 +10,6 @@ import {
   ProofSchema,
   type PublishResult,
   type RedeemHtlcParams,
-  type RedeemResult,
   type RelayClient,
   type Subscription,
 } from "@anchr/sdk";
@@ -19,52 +17,12 @@ import {
   materializeAttachmentRef,
   validateAttachmentUri,
 } from "@anchr/sdk/attachments";
-import { createInMemoryRelayClient } from "@anchr/sdk/testing";
+import {
+  createInMemoryCashuClient,
+  createInMemoryRelayClient,
+} from "@anchr/sdk/testing";
 
 type RelayEvent = Parameters<RelayClient["publish"]>[0];
-
-function makeCashuClient(mintUrl: string): {
-  client: CashuClient;
-  locks: BuildHtlcLockCall[];
-  binds: BindProviderCall[];
-  redeems: RedeemHtlcParams[];
-} {
-  const locks: BuildHtlcLockCall[] = [];
-  const binds: BindProviderCall[] = [];
-  const redeems: RedeemHtlcParams[] = [];
-  const client: CashuClient = {
-    mintUrl,
-    buildHtlcLock(params) {
-      locks.push({
-        amountSats: params.amountSats,
-        hashHex: params.hashHex,
-        sourceProofCount: params.sourceProofs.length,
-      });
-      return Promise.resolve({
-        token: "cashu-simulation-initial",
-        amountSats: params.amountSats,
-        proofs: params.sourceProofs,
-      });
-    },
-    bindProvider(params) {
-      binds.push({
-        providerPubkey: params.providerPubkey,
-        hashHex: params.hashHex,
-        initialProofCount: params.initialProofs.length,
-      });
-      return Promise.resolve({
-        token: "cashu-simulation-bound",
-        amountSats: 100,
-        proofs: params.initialProofs,
-      });
-    },
-    redeemHtlc(params): Promise<RedeemResult> {
-      redeems.push(params);
-      return Promise.resolve({ proofs: [], amountSats: 100 });
-    },
-  };
-  return { client, locks, binds, redeems };
-}
 
 export interface BuildHtlcLockCall {
   amountSats: number;
@@ -101,8 +59,12 @@ export async function runPaidRequestSimulation(): Promise<
   const relayClient = createInMemoryRelayClient({
     relayUrl: "mock://paid-request-simulation",
   });
-  const customerCashu = makeCashuClient("https://mint.test.example");
-  const providerCashu = makeCashuClient("https://mint.test.example");
+  const customerCashu = createInMemoryCashuClient({
+    mintUrl: "https://mint.test.example",
+  });
+  const providerCashu = createInMemoryCashuClient({
+    mintUrl: "https://mint.test.example",
+  });
   const oracleKey = generateKeypair();
   const providerKey = generateKeypair();
   const attachment = materializeAttachmentRef(
@@ -137,7 +99,7 @@ export async function runPaidRequestSimulation(): Promise<
     relays: ["mock://paid-request-simulation"],
     mint: "https://mint.test.example",
     privKey: bytesToHex(providerKey.secretKey),
-    cashuClient: providerCashu.client,
+    cashuClient: providerCashu,
     relayClient,
     selectionTimeoutMs: 500,
     preimageTimeoutMs: 500,
@@ -164,7 +126,7 @@ export async function runPaidRequestSimulation(): Promise<
     }],
     relays: ["mock://paid-request-simulation"],
     mint: "https://mint.test.example",
-    cashuClient: customerCashu.client,
+    cashuClient: customerCashu,
     relayClient,
     offerWindowMs: 50,
     resultTimeoutMs: 500,
@@ -188,8 +150,16 @@ export async function runPaidRequestSimulation(): Promise<
       providerPubkey: result.providerPubkey,
       proof: result.proof,
       data: result.data,
-      customerLocks: customerCashu.locks,
-      customerBinds: customerCashu.binds,
+      customerLocks: customerCashu.locks.map((params) => ({
+        amountSats: params.amountSats,
+        hashHex: params.hashHex,
+        sourceProofCount: params.sourceProofs.length,
+      })),
+      customerBinds: customerCashu.binds.map((params) => ({
+        providerPubkey: params.providerPubkey,
+        hashHex: params.hashHex,
+        initialProofCount: params.initialProofs.length,
+      })),
       providerRedeems: providerCashu.redeems,
     };
   } finally {

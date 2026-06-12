@@ -69,6 +69,13 @@ export interface Customer {
   readonly relays: readonly string[];
   /** Currently configured Cashu mint URL. */
   readonly mint: string;
+  /**
+   * Close the injected relay client's connections. Mirrors
+   * `Provider.stop()`: call when the Customer is done so the relay pool
+   * does not keep the process alive. Skip it only when the same
+   * `relayClient` is shared with another still-active actor.
+   */
+  close(): Promise<void>;
 }
 
 /** Thrown when the customer configuration is rejected at construction time. */
@@ -259,6 +266,11 @@ export function createCustomer(options: CustomerOptions): Customer {
     relays,
     mint,
 
+    close(): Promise<void> {
+      options.relayClient.close();
+      return Promise.resolve();
+    },
+
     async request(req: RequestOptions): Promise<RequestResult> {
       if (!isSchemaUri(req.spec.schema)) {
         throw new InvalidSchemaUriError(req.spec.schema);
@@ -312,7 +324,9 @@ export function createCustomer(options: CustomerOptions): Customer {
         customer_pubkey: identity.publicKey,
         oracle_pubkey: expectedOracle,
         max_amount_sats: req.payment.maxAmount,
-        expires_at: clock.now() + offerWindowMs,
+        // Floored to second granularity so the public payload cannot leak
+        // the millisecond publish time to relay observers (ANON-03).
+        expires_at: Math.floor((clock.now() + offerWindowMs) / 1000) * 1000,
       };
       const requestEvent = buildQueryRequestEvent(identity, requestPayload, {
         regionCode: req.regionCode,

@@ -36,14 +36,27 @@ export {
   sumProofAmounts,
 } from "./cashu-escrow-helpers.ts";
 
+export { redeemSignedProofs } from "./redeem-swap.ts";
+export type {
+  CashuRedeemSendChain,
+  CashuRedeemWallet,
+  RedeemSwapFailureReason,
+  RedeemSwapResult,
+} from "./redeem-swap.ts";
+
 export { createCashuEscrowProvider } from "./cashu-escrow-provider.ts";
 export type { CashuEscrowProviderConfig } from "./cashu-escrow-provider.ts";
 
 export {
+  appendFrostP2PKGroupSignatures,
   buildFrostP2PKOptions,
   createFrostEscrowProvider,
+  redeemFrostP2PKToken,
 } from "./frost-escrow-provider.ts";
-export type { FrostEscrowConfig } from "./frost-escrow-provider.ts";
+export type {
+  FrostEscrowConfig,
+  FrostP2pkRedeemResult,
+} from "./frost-escrow-provider.ts";
 
 export {
   createBountyToken,
@@ -61,5 +74,6 @@ export type { WalletBalance, WalletRole, WalletStore } from "./wallet-store.ts";
 export {
   createPersistentPreimageStore,
   createPreimageStore,
+  issueQueryHash,
 } from "./preimage-store.ts";
 export type { PreimageEntry, PreimageStore } from "./preimage-store.ts";

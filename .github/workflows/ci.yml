@@ -47,8 +47,13 @@ jobs:
       - name: Install dependencies (lockfile integrity check)
         run: deno install --frozen
 
-      - name: Setup Rust (for frost-signer + TLSN binaries)
-        uses: dtolnay/rust-toolchain@stable
+      # The @rev selects the toolchain and must match the channel pinned in
+      # rust-toolchain.toml — rustup resolves every in-repo cargo invocation
+      # through that file.
+      - name: Setup Rust (channel pinned by rust-toolchain.toml)
+        uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: clippy
 
       - name: Install cargo-audit (for lint:deps)
         uses: taiki-e/install-action@fd2f5e3d644b484055ebf4268f474c565f148f25 # v2.81.9
@@ -68,8 +73,10 @@ jobs:
         run: cd packages/sdk && bun run build
 
       # Phase 1: Local tests (no Docker). test-all.sh builds frost-signer
-      # itself before the frost e2e bucket.
-      - name: Local tests (lint + unit + integration + protocol e2e + frost e2e + scripts + examples)
+      # itself before the frost e2e bucket and runs the Rust crate gate
+      # (cargo clippy -D warnings + cargo test over all four crates,
+      # including tlsn-server).
+      - name: Local tests (lint + unit + integration + protocol e2e + frost e2e + scripts + examples + Rust crate gate)
         run: deno task test:all
 
       # Phases 2-4: Docker-backed e2e (relay/blossom, regtest Lightning +

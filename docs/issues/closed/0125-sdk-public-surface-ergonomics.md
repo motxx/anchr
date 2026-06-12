@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -77,3 +78,44 @@ From the 2026-06-11 production-readiness audit §2.2:
   (singular) and drops the non-existent `/schemas`/`/validators` entries
   (wire validation is owned by the `/events` parsers). Remaining findings
   SDK-02, SDK-04, SDK-05, SDK-06, SDK-07 stay open under this issue.
+
+## Resolution
+
+Implemented by updating:
+
+- **SDK-02** — `packages/sdk/src/testing/cashu.ts` (new):
+  `createInMemoryCashuClient()` with recorded `locks`/`binds`/`redeems`;
+  `examples/paid-request-simulation/mod.ts` and the `packages/sdk/README.md`
+  testing section use it instead of hand-rolled fakes
+- **SDK-03** — closed earlier (see Progress)
+- **SDK-04** — `Customer.close()` closes the injected relay client
+  (mirrors `Provider.stop()`); README Customer snippet closes it; locked by
+  a unit test
+- **SDK-05** — `CLAUDE.md` type bar now states the enforced contract:
+  `any`/double casts hard-error, plain `as` warns and needs
+  `// type-lint-allow: <reason>` at real parser boundaries
+- **SDK-06** — `docs/threat-model.md` Proof-publication surface is scoped to
+  the internal request lifecycle (`QueryInput`); `Customer.request` exposes
+  no `visibility` switch by design
+- **SDK-07** — `packages/sdk/src/adapters/nostr/mod.ts` uses an explicit
+  export list and documents the relay-DM daemon vs HTTP oracle-server
+  ownership split; the `index.ts` wildcard barrel is deleted
+
+Verified with:
+
+- `deno task test:examples`, `deno task test:unit`, `deno task lint:arch`,
+  `deno task lint:strict`, README snippet check
+
+Harness update:
+
+- The README snippet test guards the documented surface; the dogfood example
+  test exercises the public fake.
+
+Review residuals:
+
+- Tightening the `as`-cast warning (T010) to a hard error remains a future
+  maintainer call; the documented contract now matches enforcement.
+
+Follow-up:
+
+- None

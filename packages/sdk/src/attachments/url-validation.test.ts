@@ -1,6 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { validateAttachmentUri } from "./url-validation.ts";
+import { withEnv } from "../testing/helpers.ts";
 
 describe("validateAttachmentUri", () => {
   // --- Valid URLs ---
@@ -10,9 +11,27 @@ describe("validateAttachmentUri", () => {
       .toBeNull();
   });
 
-  test("accepts http://localhost for dev", () => {
-    expect(validateAttachmentUri("http://localhost:3333/blob")).toBeNull();
-    expect(validateAttachmentUri("http://127.0.0.1:3333/blob")).toBeNull();
+  test("accepts http://localhost only with the explicit dev opt-in", () => {
+    withEnv({ ANCHR_ALLOW_LOCALHOST_ATTACHMENTS: "1" }, () => {
+      expect(validateAttachmentUri("http://localhost:3333/blob")).toBeNull();
+      expect(validateAttachmentUri("http://127.0.0.1:3333/blob")).toBeNull();
+    });
+  });
+
+  test("rejects loopback by default (no opt-in env set)", () => {
+    withEnv({ ANCHR_ALLOW_LOCALHOST_ATTACHMENTS: undefined }, () => {
+      expect(validateAttachmentUri("http://localhost:3333/blob")).toContain(
+        "localhost",
+      );
+      expect(validateAttachmentUri("https://127.0.0.1/blob")).toContain(
+        "localhost",
+      );
+      expect(validateAttachmentUri("https://[::1]/blob")).toContain(
+        "localhost",
+      );
+      expect(validateAttachmentUri("https://[::ffff:127.0.0.1]/blob"))
+        .toContain("localhost");
+    });
   });
 
   // --- Protocol ---
@@ -53,7 +72,7 @@ describe("validateAttachmentUri", () => {
 
   // --- IPv6 loopback ---
   test("rejects IPv6 loopback", () => {
-    expect(validateAttachmentUri("https://[::1]/")).toContain("private");
+    expect(validateAttachmentUri("https://[::1]/")).toContain("localhost");
   });
 
   // --- IPv6 private ranges ---
@@ -69,7 +88,7 @@ describe("validateAttachmentUri", () => {
   // --- IPv6-mapped IPv4 (S-9 SSRF bypass) ---
   test("rejects IPv6-mapped IPv4 loopback (::ffff:127.0.0.1)", () => {
     expect(validateAttachmentUri("https://[::ffff:127.0.0.1]/")).toContain(
-      "private",
+      "localhost",
     );
   });
 

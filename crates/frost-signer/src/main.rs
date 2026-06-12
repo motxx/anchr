@@ -252,7 +252,7 @@ fn sign_round1(key_package_str: &str) -> Result<serde_json::Value> {
 
     let nonces_json = serde_json::to_value(&nonces)
         .context("failed to serialize nonces")?;
-    let commitments_json = serde_json::to_value(&commitments)
+    let commitments_json = serde_json::to_value(commitments)
         .context("failed to serialize commitments")?;
 
     Ok(json!({
@@ -294,7 +294,7 @@ fn sign_round2(
     let signature_share = frost::round2::sign(&signing_package, &nonces, &key_package)
         .context("signing round 2 failed")?;
 
-    let share_json = serde_json::to_value(&signature_share)
+    let share_json = serde_json::to_value(signature_share)
         .context("failed to serialize signature share")?;
 
     Ok(json!({

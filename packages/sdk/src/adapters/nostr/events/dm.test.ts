@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../../../identity.ts";
 import { KIND_DIRECT_MESSAGE } from "@anchr/protocol/nostr";
 import { buildPreimageDM, buildRejectionDM, parseOracleDM } from "./dm.ts";
+import { deriveConversationKey, encryptNip44 } from "../crypto/encryption.ts";
 
 describe("NIP-44 DM (Oracle ↔ Provider)", () => {
   test("buildPreimageDM creates kind 4 encrypted DM", () => {
@@ -41,9 +42,10 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       oracle.publicKey,
     );
 
-    expect(parsed.type).toBe("preimage");
+    expect(parsed?.type).toBe("preimage");
+    if (parsed?.type !== "preimage") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_2");
-    expect((parsed as { preimage: string }).preimage).toBe(preimage);
+    expect(parsed.preimage).toBe(preimage);
   });
 
   test("buildRejectionDM creates kind 4 rejection notice", () => {
@@ -77,11 +79,10 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       oracle.publicKey,
     );
 
-    expect(parsed.type).toBe("rejection");
+    expect(parsed?.type).toBe("rejection");
+    if (parsed?.type !== "rejection") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_4");
-    expect((parsed as { reason: string }).reason).toBe(
-      "C2PA signature invalid",
-    );
+    expect(parsed.reason).toBe("C2PA signature invalid");
   });
 
   test("eavesdropper cannot decrypt DM", () => {
@@ -96,8 +97,33 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       "secret_preimage",
     );
 
-    expect(() => {
-      parseOracleDM(event.content, eavesdropper.secretKey, oracle.publicKey);
-    }).toThrow();
+    expect(
+      parseOracleDM(event.content, eavesdropper.secretKey, oracle.publicKey),
+    ).toBeNull();
+  });
+
+  test("parseOracleDM rejects a decrypted payload with an unknown shape", () => {
+    const oracle = generateEphemeralIdentity();
+    const provider = generateEphemeralIdentity();
+
+    // Encrypt a syntactically valid JSON body that is not a release payload.
+    const event = buildRejectionDM(
+      oracle,
+      provider.publicKey,
+      "query_6",
+      "placeholder",
+    );
+    const tampered = encryptNip44(
+      JSON.stringify({ type: "preimage", query_id: "query_6" }),
+      deriveConversationKey(oracle.secretKey, provider.publicKey),
+    );
+    expect(
+      parseOracleDM(tampered, provider.secretKey, oracle.publicKey),
+    ).toBeNull();
+    // The well-formed event still parses.
+    expect(
+      parseOracleDM(event.content, provider.secretKey, oracle.publicKey)
+        ?.type,
+    ).toBe("rejection");
   });
 });

@@ -136,6 +136,8 @@ test("attachment with valid C2PA passes", async () => {
       storage_kind: "blossom",
       blossom_hash: "photo1",
     }],
+    // The gps factor demands body GPS evidence even without expected_gps.
+    gps: { lat: 35.6762, lon: 139.6503 },
   };
 
   injectC2paIntegrity("photo1", query.id);

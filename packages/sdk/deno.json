@@ -1,6 +1,7 @@
 {
   "name": "@anchr/sdk",
   "version": "0.0.1",
+  "license": "MIT",
   "exports": {
     ".": "./src/index.ts",
     "./adapters": "./src/adapters/mod.ts",
@@ -63,7 +64,8 @@
       "deno.json"
     ],
     "exclude": [
-      "src/*.test.ts",
+      "src/**/*.test.ts",
+      "src/**/*.integration.test.ts",
       "dist/",
       "tsconfig.json",
       "package.json"

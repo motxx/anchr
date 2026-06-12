@@ -16,7 +16,9 @@
 import {
   getDecodedToken,
   getEncodedToken,
+  Mint,
   type Proof,
+  type RequestFn,
   Wallet,
 } from "@cashu/cashu-ts";
 
@@ -33,10 +35,25 @@ export function getCashuConfig(): CashuConfig | null {
   return { mintUrl };
 }
 
-export function getCashuWallet(): Wallet | null {
+/**
+ * Transport options for the Cashu mint HTTP touchpoint. The relay-only
+ * anonymity guarantee (INV-08) does not cover mint calls — operators who
+ * need IP-level anonymity inject a proxy-routed request dispatcher (e.g.
+ * SOCKS5 / Tor) here instead of the global fetch.
+ */
+export interface CashuWalletTransportOptions {
+  customRequest?: RequestFn;
+}
+
+export function getCashuWallet(
+  transport?: CashuWalletTransportOptions,
+): Wallet | null {
   const config = getCashuConfig();
   if (!config) return null;
-  return new Wallet(config.mintUrl, { unit: "sat" });
+  const mint = transport?.customRequest !== undefined
+    ? new Mint(config.mintUrl, { customRequest: transport.customRequest })
+    : config.mintUrl;
+  return new Wallet(mint, { unit: "sat" });
 }
 
 /** Options for {@link createBountyToken}. */
@@ -94,7 +111,7 @@ export async function createBountyToken(
       const state = await wallet.checkMintQuoteBolt11(mintQuote.quote);
       if (state.state === "PAID") break;
       if (state.state === "ISSUED") {
-        log.error("Mint quote already issued — proofs were minted elsewhere");
+        log.warn("Mint quote already issued — proofs were minted elsewhere");
         return null;
       }
       await new Promise((r) => setTimeout(r, pollInterval));
@@ -111,7 +128,7 @@ export async function createBountyToken(
     const token = getEncodedToken({
       mint: getCashuConfig()!.mintUrl,
       proofs,
-    });
+    }, { version: 4 });
     return { token, proofs };
   } catch (error) {
     log.error(
@@ -126,7 +143,8 @@ export async function createBountyToken(
  * Encode proofs into a transferable Cashu token string.
  */
 export function encodeToken(mintUrl: string, proofs: Proof[]): string {
-  return getEncodedToken({ mint: mintUrl, proofs });
+  // V4 ("cashuB") serialization is pinned by the v0 wire contract.
+  return getEncodedToken({ mint: mintUrl, proofs }, { version: 4 });
 }
 
 /**

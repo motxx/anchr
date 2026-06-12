@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -59,3 +60,37 @@ From the 2026-06-11 production-readiness audit §2.7 (OPS-01):
   `Deno.env.get("ANCHR_LOG_LEVEL") ?? Deno.env.get("LOG_LEVEL")` (default
   `"info"`), invoked once on first `getLogger`.
 - Fix the stale comment referencing the non-existent infrastructure file.
+
+## Resolution
+
+Decision: configure in the SDK from the documented env knob.
+
+Implemented by updating:
+
+- `packages/sdk/src/internal/runtime/logger.ts` — first `getLogger` call
+  registers a console sink whose lowest level comes from `ANCHR_LOG_LEVEL`
+  (fallback `LOG_LEVEL`, default `info`); `configureAnchrLogging` is the
+  explicit host entry point (custom sink / `reset`); a host that already
+  configured logTape wins (the SDK never overrides); the stale
+  `src/infrastructure/logger.ts` header reference is gone
+- `packages/sdk/src/internal/runtime/logger.test.ts` (new) — env-driven
+  level changes emitted output (debug opt-in, info default, LOG_LEVEL
+  fallback)
+
+Verified with:
+
+- `deno task test:unit`
+- `rg -n "ANCHR_LOG_LEVEL|LOG_LEVEL" packages/sdk/src` returns the real
+  consumer in `logger.ts`
+
+Harness update:
+
+- `logger.test.ts` locks the env-driven pipeline.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

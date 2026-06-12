@@ -125,14 +125,26 @@ export interface BlossomUploadResult {
   sizeBytes: number;
 }
 
+/**
+ * Transport options for the Blossom HTTP touchpoints. The relay-only
+ * anonymity guarantee (INV-08) does not cover these calls — operators who
+ * need IP-level anonymity inject a proxy-routed `fetchImpl` (e.g. SOCKS5 /
+ * Tor) here instead of the global fetch.
+ */
+export interface BlossomTransportOptions {
+  fetchImpl?: typeof fetch;
+}
+
 export async function uploadToBlossom(
   data: Uint8Array,
   identity: BlossomUploadIdentity,
   servers?: string[],
+  transport?: BlossomTransportOptions,
 ): Promise<BlossomUploadResult | null> {
   const config = getBlossomConfig();
   const urls = servers ?? config?.servers;
   if (!urls || urls.length === 0) return null;
+  const fetchImpl = transport?.fetchImpl ?? fetch;
 
   const { encrypted, key, iv } = await encryptBlob(data);
 
@@ -144,7 +156,7 @@ export async function uploadToBlossom(
     urls.map(async (serverEndpoint) => {
       const authToken = buildAuthEvent(identity, hash, serverEndpoint);
 
-      const response = await fetch(`${serverEndpoint}/upload`, {
+      const response = await fetchImpl(`${serverEndpoint}/upload`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/octet-stream",
@@ -178,7 +190,10 @@ export async function downloadFromBlossom(
   encryptKey: string,
   encryptIv: string,
   servers?: string[],
-  options?: { maxRetries?: number; retryDelayMs?: number },
+  options?: {
+    maxRetries?: number;
+    retryDelayMs?: number;
+  } & BlossomTransportOptions,
 ): Promise<Uint8Array | null> {
   const config = getBlossomConfig();
   const urls = servers ?? config?.servers;
@@ -186,11 +201,12 @@ export async function downloadFromBlossom(
 
   const maxRetries = options?.maxRetries ?? 3;
   const retryDelayMs = options?.retryDelayMs ?? 5000;
+  const fetchImpl = options?.fetchImpl ?? fetch;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     for (const serverEndpoint of urls) {
       try {
-        const response = await fetch(`${serverEndpoint}/${hash}`);
+        const response = await fetchImpl(`${serverEndpoint}/${hash}`);
         if (!response.ok) continue;
 
         const encrypted = new Uint8Array(await response.arrayBuffer());

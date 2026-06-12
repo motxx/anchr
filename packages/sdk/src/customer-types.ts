@@ -74,6 +74,12 @@ export interface RequestOptions {
   sourceProofs: CashuProof[];
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;
-  /** Optional region code added as a `region` tag for scoped discovery. */
+  /**
+   * Optional region code added as a `region` tag for scoped discovery.
+   * The tag is published as cleartext and is relay-indexable (`#region`),
+   * so any relay observer can partition requests by region — supplying it
+   * shrinks the requester's anonymity set. Omit unless regional scoping
+   * is required.
+   */
   regionCode?: string;
 }

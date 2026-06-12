@@ -121,6 +121,11 @@ export interface QueryService {
     blossomKeys?: BlossomKeyMap,
   ): Promise<SubmitQueryOutcome>;
   cancelQuery(id: string): CancelQueryOutcome;
+  /**
+   * Transition past-deadline open queries to `expired`. The service runs no
+   * built-in timer — a long-running host calls this (and
+   * `purgeExpiredFromStore`) on its own schedule.
+   */
   expireQueries(): number;
   purgeExpiredFromStore(): Query[];
   clearQueryStore(): void;

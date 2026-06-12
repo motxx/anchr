@@ -1,6 +1,7 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { createOracleNostrService } from "./oracle-service.ts";
+import { parseOracleDM } from "./events/dm.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
 import { createPreimageStore } from "../../payments/mod.ts";
@@ -84,17 +85,19 @@ const makeResult = () => ({ attachments: [] as AttachmentRef[] });
 // --- verifyAndDeliverWithFrost ---
 
 describe("verifyAndDeliverWithFrost", () => {
-  test("falls back to HTLC when frostNodeConfig not set", async () => {
+  test("rejects when frostNodeConfig not set — no silent HTLC downgrade", async () => {
     const store = createPreimageStore();
     const relay = makeCapturingRelay();
     const published = relay.published;
+    const identity = generateEphemeralIdentity();
     const config = makeConfig({
+      identity,
       preimageStore: store,
       relayClient: relay.client,
       verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-    service.generateRequestHash("q1");
+    const { hash } = service.generateRequestHash("q1");
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q1",
@@ -102,8 +105,47 @@ describe("verifyAndDeliverWithFrost", () => {
       makeResult(),
       providerPubkey,
     );
-    expect(passed).toBe(true);
-    expect(published.length).toBe(1); // Preimage DM (HTLC fallback)
+    expect(passed).toBe(false);
+    expect(published.length).toBe(1);
+    const dm = parseOracleDM(
+      published[0]!.content,
+      providerIdentity.secretKey,
+      identity.publicKey,
+    );
+    expect(dm?.type).toBe("rejection");
+    // The preimage is never revealed on the rejected path.
+    expect(store.has(hash)).toBe(true);
+  });
+
+  test("verifyAndDeliver rejects a quorum query when FROST is not configured", async () => {
+    const store = createPreimageStore();
+    const relay = makeCapturingRelay();
+    const published = relay.published;
+    const identity = generateEphemeralIdentity();
+    const config = makeConfig({
+      identity,
+      preimageStore: store,
+      relayClient: relay.client,
+      verify: verifyPass,
+    });
+    const service = createOracleNostrService(config);
+    const { hash } = service.generateRequestHash("q-quorum");
+
+    const passed = await service.verifyAndDeliver(
+      "q-quorum",
+      { ...makeQuery("q-quorum"), quorum: { min_approvals: 2 } },
+      makeResult(),
+      providerPubkey,
+    );
+    expect(passed).toBe(false);
+    expect(published.length).toBe(1);
+    const dm = parseOracleDM(
+      published[0]!.content,
+      providerIdentity.secretKey,
+      identity.publicKey,
+    );
+    expect(dm?.type).toBe("rejection");
+    expect(store.has(hash)).toBe(true);
   });
 
   test("sends rejection DM on verification failure", async () => {

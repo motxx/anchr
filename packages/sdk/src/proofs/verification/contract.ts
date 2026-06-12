@@ -36,6 +36,8 @@ export interface VerificationRequirement {
   /** Max allowed distance from expected_gps in km. Defaults to 50 inside the verifier. */
   max_gps_distance_km?: number;
   tlsn_requirements?: TlsnRequirement;
+  /** SHA-256 over the encoded p2pk_frost escrow token, when token-bound signing is required. */
+  escrow_token_hash?: string;
 }
 
 /** Query-independent shape of the evidence being verified. */

@@ -9,8 +9,6 @@
  * be reached.
  */
 
-import { sha256 } from "@noble/hashes/sha2.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
 import {
   requestToRequirement,
   resultToVerificationInput,
@@ -18,25 +16,38 @@ import {
 import type { FrostSignaturePort } from "../../requests/application/ports.ts";
 import type { FrostNodeConfig } from "./frost-config.ts";
 import { coordinateSigning } from "./frost-signing-coordinator.ts";
+import {
+  deriveFrostP2pkMessages,
+  deriveFrostSigningMessage,
+} from "./signing-message.ts";
 
 export function createFrostSignatureAdapter(
   nodeConfig: FrostNodeConfig,
 ): FrostSignaturePort {
   return {
     async requestSignature(query, result, blossomKeys) {
-      const messageHex = bytesToHex(
-        sha256(new TextEncoder().encode(`anchr:sign:${query.id}`)),
-      );
-      const sigResult = await coordinateSigning(
-        {
-          nodeConfig,
-          requirement: requestToRequirement(query),
-          input: resultToVerificationInput(result),
-          blossomKeys,
-        },
-        messageHex,
-      );
-      return sigResult?.signature ?? null;
+      const escrowToken = query.escrow?.type === "p2pk_frost"
+        ? query.escrow.escrow_token
+        : undefined;
+      const messages = escrowToken
+        ? deriveFrostP2pkMessages(escrowToken)
+        : [deriveFrostSigningMessage(query.id)];
+      const signatures: string[] = [];
+      for (const messageHex of messages) {
+        const sigResult = await coordinateSigning(
+          {
+            nodeConfig,
+            requirement: requestToRequirement(query),
+            input: resultToVerificationInput(result),
+            blossomKeys,
+            escrowToken,
+          },
+          messageHex,
+        );
+        if (!sigResult) return null;
+        signatures.push(sigResult.signature);
+      }
+      return signatures;
     },
   };
 }

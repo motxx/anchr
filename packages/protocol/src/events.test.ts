@@ -369,3 +369,118 @@ test("hash bootstrap parsers reject other DM payloads", () => {
     parsePreimageDeliveryEvent(request, oracle.secretKey, customer.publicKey),
   ).toBe(null);
 });
+
+test("builders stamp the v0 wire-version tag", () => {
+  const customer = generateKeypair();
+  const provider = generateKeypair();
+
+  const request = buildQueryRequestEvent(customer, samplePayload());
+  expect(findTagValue(request, "v")).toBe("0");
+
+  const offer = buildOfferFeedbackEvent(provider, "req-v", customer.publicKey, {
+    status: "payment-required",
+    provider_pubkey: provider.publicKey,
+    amount_sats: 1,
+  });
+  expect(findTagValue(offer, "v")).toBe("0");
+
+  const selection = buildSelectionFeedbackEvent(customer, "req-v", {
+    status: "processing",
+    selected_provider_pubkey: provider.publicKey,
+    provider_redemption_token: "cashuBbound",
+    execution: {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      predicate: {},
+      mint_url: "https://mint.example.org",
+      max_amount_sats: 1,
+      locktime_seconds: 123456,
+    },
+  });
+  expect(findTagValue(selection, "v")).toBe("0");
+
+  const response = buildQueryResponseEvent(
+    provider,
+    "11".repeat(32),
+    customer.publicKey,
+    {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      data: {},
+      proof: "p",
+    },
+  );
+  expect(findTagValue(response, "v")).toBe("0");
+});
+
+test("parsers ignore events carrying an incompatible wire version", () => {
+  const customer = generateKeypair();
+  const provider = generateKeypair();
+
+  const request = buildQueryRequestEvent(customer, samplePayload());
+  const futureRequest = {
+    ...request,
+    tags: request.tags.map((t) => (t[0] === "v" ? ["v", "1"] : t)),
+  };
+  expect(parseQueryRequestEvent(futureRequest)).toBe(null);
+  // Absent v tag still parses as v0.
+  const untagged = {
+    ...request,
+    tags: request.tags.filter((t) => t[0] !== "v"),
+  };
+  expect(parseQueryRequestEvent(untagged)?.query_id).toBe("query_abc");
+
+  const offer = buildOfferFeedbackEvent(
+    provider,
+    "req-v1",
+    customer.publicKey,
+    {
+      status: "payment-required",
+      provider_pubkey: provider.publicKey,
+      amount_sats: 1,
+    },
+  );
+  const futureOffer = {
+    ...offer,
+    tags: offer.tags.map((t) => (t[0] === "v" ? ["v", "2"] : t)),
+  };
+  expect(parseOfferFeedbackEvent(futureOffer)).toBe(null);
+});
+
+test("parseQueryRequestEvent uses the content schema; the s tag is a discovery hint only", () => {
+  const customer = generateKeypair();
+  const payload = samplePayload();
+  const event = buildQueryRequestEvent(customer, payload);
+  const tampered = {
+    ...event,
+    tags: event.tags.map((t) =>
+      t[0] === "s" ? ["s", "https://evil.example/spec/proof/fake/v1"] : t
+    ),
+  };
+
+  expect(parseQueryRequestEvent(tampered)?.schema).toBe(payload.schema);
+});
+
+test("parseOfferFeedbackEvent binds the offer to its request and customer tags", () => {
+  const customer = generateKeypair();
+  const provider = generateKeypair();
+  const offer = buildOfferFeedbackEvent(
+    provider,
+    "req-bind",
+    customer.publicKey,
+    {
+      status: "payment-required",
+      provider_pubkey: provider.publicKey,
+      amount_sats: 7,
+    },
+  );
+
+  const parsed = parseOfferFeedbackEvent(offer);
+  expect(parsed?.request_event_id).toBe("req-bind");
+  expect(parsed?.customer_pubkey).toBe(customer.publicKey);
+
+  // An offer stripped of its binding tags cannot be attributed — ignored.
+  const unbound = {
+    ...offer,
+    tags: offer.tags.filter((t) => t[0] !== "e"),
+  };
+  expect(parseOfferFeedbackEvent(unbound)).toBe(null);
+});

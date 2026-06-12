@@ -12,9 +12,9 @@ import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../values.ts";
 import {
   detectZip,
   extractProofModeIntegrity,
-  inferMimeType,
   logIntegrity,
 } from "./upload-helpers.ts";
+import { inferMimeTypeFromFilename } from "./mime.ts";
 
 export interface UploadResult {
   attachment: AttachmentRef;
@@ -60,7 +60,7 @@ export async function uploadAttachment(
   const result = await providerUpload(
     new Uint8Array(photoBuffer),
     photoFilename,
-    inferMimeType(photoFilename),
+    inferMimeTypeFromFilename(photoFilename),
   );
   if (!result) {
     throw new Error(`Blossom upload failed for query ${queryId}`);

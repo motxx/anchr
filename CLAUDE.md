@@ -17,9 +17,11 @@ logtape-backed `getLogger`
 (`packages/sdk/src/internal/runtime/logger.ts`).
 
 ## Type bar
-`as` and `any` forbidden everywhere in `packages/`. Narrow with type
-predicates. `unknown` only at boundaries (HTTP body, `JSON.parse`,
-`catch (err)`).
+`any` and double casts (`as unknown as T`) are forbidden everywhere in
+`packages/` — `lint:types` hard errors. Plain `as` casts are warned:
+narrow with type predicates instead; keep a cast only at a real parser
+boundary, justified with `// type-lint-allow: <reason>`. `unknown` only
+at boundaries (HTTP body, `JSON.parse`, `catch (err)`).
 
 ## Versioning (pre-1.0)
 Delete replaced paths outright. No `@deprecated`, "legacy", or
@@ -55,6 +57,7 @@ single-purpose parts instead.
 "Done" = full local pass:
 - `deno task test:all` — lint:strict + cargo dep audit + test:unit +
   test:integration + test:e2e:protocol + test:scripts + test:examples +
+  Rust crate gate (clippy + cargo test, all four crates) +
   frost-signer build + test:e2e:frost. Needs the Rust toolchain.
 - `deno task test:all:docker` — Docker-backed e2e
   (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
@@ -111,8 +114,12 @@ recorded a clean review of the exact `packages/` diff being shipped
 - `packages/sdk/` — Customer, Provider, Oracle orchestration, payment helpers,
   proof helpers, attachments, adapters, request internals, testing helpers, and
   the developer-facing SDK surface.
-- `crates/<name>/` — Rust sidecar binaries (frost-signer, tlsn-prover,
-  tlsn-server, tlsn-verifier) built with cargo by the frost/tlsn test flows.
+- `crates/<name>/` — Rust sidecar binaries (FROST release authority
+  `frost-signer`, TLSNotary `tlsn-prover` / `tlsn-server` /
+  `tlsn-verifier`). Built with
+  `cargo build --release --manifest-path crates/<name>/Cargo.toml`;
+  the Deno-only runtime rule does not apply here (toolchain pinned by
+  `rust-toolchain.toml`, gated by clippy + cargo test in test:all).
 - `examples/<name>/` — small demos, sketches, fixtures, and testnet flows.
   **Must reach Anchr through `@anchr/*` only** — relative paths into
   `packages/<pkg>/src/...` are an E023 violation (`e2e/` and `scripts/`

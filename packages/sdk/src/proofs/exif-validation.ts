@@ -6,7 +6,7 @@
  */
 
 import type { Buffer } from "node:buffer";
-import { haversineKm } from "./geo.ts";
+import { evaluateGpsDistancePolicy } from "./geo.ts";
 
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
@@ -443,18 +443,21 @@ function validateGps(
   let gpsNearHint: boolean | null = null;
 
   if (options?.expectedGps) {
-    const dist = haversineKm(
-      metadata.gps.lat,
-      metadata.gps.lon,
-      options.expectedGps.lat,
-      options.expectedGps.lon,
-    );
     const maxDist = options.maxDistanceKm ?? 50;
-    gpsNearHint = dist <= maxDist;
+    const policy = evaluateGpsDistancePolicy(
+      metadata.gps,
+      options.expectedGps,
+      maxDist,
+    );
+    gpsNearHint = policy.withinLimit;
     if (gpsNearHint) {
-      checks.push(`GPS within ${maxDist}km of hint (${dist.toFixed(1)}km)`);
+      checks.push(
+        `GPS within ${maxDist}km of hint (${policy.distanceKm.toFixed(1)}km)`,
+      );
     } else {
-      failures.push(`GPS ${dist.toFixed(1)}km from hint (max ${maxDist}km)`);
+      failures.push(
+        `GPS ${policy.distanceKm.toFixed(1)}km from hint (max ${maxDist}km)`,
+      );
     }
   }
   return { hasGps: true, gpsNearHint };

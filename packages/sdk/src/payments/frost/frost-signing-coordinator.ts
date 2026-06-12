@@ -25,6 +25,7 @@ export interface SigningCoordinatorConfig {
   requirement?: unknown;
   input?: unknown;
   blossomKeys?: unknown;
+  escrowToken?: string;
 }
 
 export interface SigningCoordinatorResult {
@@ -82,6 +83,7 @@ export async function coordinateSigning(
             requirement: config.requirement,
             input: config.input,
             blossom_keys: config.blossomKeys,
+            escrow_token: config.escrowToken,
           }),
         },
         timeoutMs,

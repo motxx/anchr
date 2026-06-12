@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -80,3 +81,54 @@ From the 2026-06-11 production-readiness audit §2.5/§2.6:
   `parseOracleQueryResponseEvent`, carry the real `Query` into the watched
   entry, make the selected-Provider gate fail closed, and validate DM payloads.
 - Lock each fix with a test that proves the bypass is closed.
+
+## Resolution
+
+Decision: keep and fix. `createOracleNostrService` is the only relay-DM
+Oracle daemon and the architecture targets the relay-only exchange, so the
+surface was repaired against the canonical wire contract instead of removed.
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/nostr/oracle-service.ts` — `watchRequest` now
+  takes the real `Query`; relay-driven results are parsed with the canonical
+  `parseOracleQueryResponseEvent`, bound to `query_id`/`request_event_id`,
+  and verified against the watched request's actual requirements (SPEC-01,
+  PROT-02); the selected-Provider gate fails closed — no recorded selection
+  means no DM of any kind (PROT-01); terminal outcomes unwatch the request
+- `packages/sdk/src/adapters/nostr/oracle-handlers.ts` —
+  `oracleResponseToResult` maps the canonical payload onto the verifier's
+  evidence shape with runtime validation; the non-canonical
+  `buildQueryFromPayload`/`buildResultFromPayload` are deleted
+- `packages/sdk/src/adapters/nostr/events/events.ts` — the non-canonical
+  `OracleResponsePayload`/`parseOracleResponsePayload` reader is deleted
+- `packages/sdk/src/adapters/nostr/events/dm.ts` — `parseOracleDM` validates
+  the decrypted payload shape and returns null on mismatch (SPEC-03)
+- `packages/sdk/src/adapters/nostr/oracle-service.integration.test.ts` (new)
+  — a real `buildQueryResponseEvent` flows through the service on an
+  in-memory relay; release happens only for the selected Provider and only
+  when the real requirement is met
+- test updates: `oracle-service.test.ts`, `oracle-frost.test.ts`,
+  `events/events.test.ts`, `events/dm.test.ts`, `events/frost-dm.test.ts`
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task test:integration` (the new in-memory relay flow)
+- `deno task test:all`
+
+Harness update:
+
+- `oracle-service.integration.test.ts` locks the canonical-payload and
+  fail-closed-selection contract; `specs/messaging.md` "Parsing And Rejection
+  Semantics" documents the binding rules implementations must follow.
+
+Review residuals:
+
+- The Oracle learns the request's requirements from the host
+  (`watchRequest(query, ...)`) — the v0 wire carries no requirement payload
+  to the Oracle. This is the documented contract, not a gap.
+
+Follow-up:
+
+- None

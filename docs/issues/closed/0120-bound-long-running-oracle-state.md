@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -63,3 +64,45 @@ From the 2026-06-11 production-readiness audit §2.7 (OPS-05):
 - Add bounded eviction + terminal-state cleanup; wire the sweep timer with
   teardown, or delete the dead sweep surface.
 - May be split with `make-issues` per store if one change is too broad.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/proofs/replay-guard.ts` (new) + `replay-guard.test.ts` —
+  bounded replay set (7-day TTL, 100k-entry LRU cap);
+  `proofs/tlsn-validation.ts` `seenPresentations` now uses it
+- `packages/sdk/src/payments/frost/frost-coordinator.ts` +
+  `frost-coordinator.test.ts` (new) — DKG/signing sessions are evicted after
+  `FROST_SESSION_TTL_MS` (30 min) and finalized signing sessions after
+  `FROST_FINALIZED_RETENTION_MS`; eviction runs on every public entry point;
+  injectable clock for tests
+- `packages/sdk/src/adapters/nostr/oracle-service.ts` — watched entries are
+  unwatched (subscriptions closed, map entry removed) when a request reaches
+  a terminal state
+- `packages/sdk/src/internal/runtime/config.ts` — the dead
+  `querySweepIntervalMs` knob is deleted;
+  `requests/application/query-service.ts` documents `expireQueries` /
+  `purgeExpiredFromStore` as the host-scheduled sweep (no built-in timer)
+
+Verified with:
+
+- `deno task test:unit` (eviction tests for the replay guard and FROST
+  sessions)
+- `rg -n "delete|clear" packages/sdk/src/payments/frost/frost-coordinator.ts`
+  shows cleanup; `rg -n querySweepIntervalMs packages/sdk/src` returns
+  nothing
+- `deno task lint:strict`
+
+Harness update:
+
+- `replay-guard.test.ts` and `frost-coordinator.test.ts` lock the eviction
+  behavior under load.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

@@ -70,7 +70,7 @@ export function createNostrProofPublisher(
       const result = await config.relayClient.publish(event);
 
       if (result.successes.length > 0) {
-        log.error(
+        log.info(
           `Attestation for query ${query.id} published to ${result.successes.length} relay(s)`,
         );
         return {

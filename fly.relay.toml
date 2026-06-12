@@ -2,7 +2,8 @@ app = "anchr-relay"
 primary_region = "nrt"
 
 [build]
-  image = "scsibug/nostr-rs-relay:latest"
+  # Pinned release — bump deliberately, never float on :latest.
+  image = "scsibug/nostr-rs-relay:0.10.0"
 
 [deploy]
   wait_timeout = "5m"
@@ -16,6 +17,10 @@ primary_region = "nrt"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
+  # Scale-to-zero is accepted for this dev/test relay: a cold start only
+  # delays the first relay connection. A production relay must keep
+  # min_machines_running >= 1 so subscriptions and DMs are not dropped
+  # while a machine wakes.
   min_machines_running = 0
   processes = ["app"]
 

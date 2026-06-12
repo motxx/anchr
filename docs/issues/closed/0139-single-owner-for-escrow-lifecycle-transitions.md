@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -51,3 +52,39 @@ table omits the `expired` targets the domain table includes.
 - Re-read both implementations and route the `do*` methods through the domain
   aggregate's transition functions, keeping store I/O in the application
   layer.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/application/escrow-flow-methods.ts` — every
+  `do*` method delegates transitions to the domain aggregate (`addOffer`,
+  `selectProvider`, `beginWork`, `recordResult`, `completeVerification`);
+  the application layer keeps store I/O, escrow-provider verification, and
+  settlement orchestration
+- `packages/sdk/src/requests/application/query-escrow-validation.ts` — the
+  parallel `ESCROW_TRANSITIONS` table and `validateEscrowTransition` are
+  deleted; `query-transitions.ts` is the single owner
+- Offer validation (`validateOfferInfo`) now applies on the production path
+  via the domain `addOffer`
+
+Verified with:
+
+- `deno task test:unit`, `deno task test:integration`,
+  `deno task test:e2e:protocol`
+- `rg "ESCROW_TRANSITIONS" packages/sdk/src/requests/application/query-escrow-validation.ts`
+  returns nothing
+
+Harness update:
+
+- Duplicated-state-machine findings are owned by the `/arch-lint-llm`
+  semantic review (L003); the existing transition unit tests now exercise the
+  single owner.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

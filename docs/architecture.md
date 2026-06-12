@@ -93,13 +93,15 @@ Each target unit has one owner responsibility:
 
 | Unit | Responsibility |
 | --- | --- |
-| Protocol | Define the interoperable wire contract for verifiable paid requests. |
-| SDK | Orchestrate Customer, Provider, and Oracle roles through explicit ports and standard adapters. |
-| Specs | Record universal wire contracts and proof schema identities that other implementations may use. |
-| Native helpers | Provide low-level prover, verifier, signer, or cryptographic binaries required by SDK adapters. |
-| Scripts | Build, test, lint, publish, and verification automation for this repository. |
-| Examples | Optional, tiny lessons that demonstrate one SDK/protocol behavior. |
-| E2E tests | Verify real protocol, payment, proof, relay, native-helper, and SDK integration behavior. |
+| Protocol (`packages/protocol/`) | Define the interoperable wire contract for verifiable paid requests. |
+| SDK (`packages/sdk/`) | Orchestrate Customer, Provider, and Oracle roles through explicit ports and standard adapters. |
+| Specs (`specs/`) | Record universal wire contracts and proof schema identities that other implementations may use. |
+| Native helpers (`crates/`) | Provide low-level prover, verifier, signer, or cryptographic binaries required by SDK adapters (`frost-signer`, `tlsn-prover`, `tlsn-verifier`, `tlsn-server`; Rust, built with cargo against the pinned `rust-toolchain.toml`). |
+| Scripts (`scripts/`) | Build, test, lint, publish, and verification automation for this repository. |
+| Examples (`examples/`) | Optional, tiny lessons that demonstrate one SDK/protocol behavior. |
+| E2E tests (`e2e/`) | Verify real protocol, payment, proof, relay, native-helper, and SDK integration behavior. |
+| Docs (`docs/`) | Record repository-internal architecture, threat model, runbooks, audits, and the file-based issue tracker. |
+| Skills (`skills/`) | Define repository-local agent skills shared by Claude and Codex (symlinked from `.claude/skills` and `.codex/skills`). |
 | Proof schema site | Publish the static HTTPS pages for built-in proof schema URLs from `spec-site/`. |
 | Tooling type stubs | Provide local TypeScript ambient types under `tools/types/` only when repository automation needs them. |
 

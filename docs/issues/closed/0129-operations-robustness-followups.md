@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -75,3 +76,54 @@ From the 2026-06-11 production-readiness audit §2.7:
   reclassification) directly.
 - Treat relay reconnect, SSRF-guard default, and Oracle shutdown/health as
   separable changes; split with `make-issues` if needed.
+
+## Resolution
+
+Implemented by updating:
+
+- **OPS-02** — success/lifecycle messages reclassified (preimage/FROST
+  delivery → info, retries → warn, binary discovery → debug, quote-reuse →
+  warn) across `oracle-service.ts`, `proof-publisher.ts`, `frost-cli.ts`,
+  `tlsn-validation.ts`, `c2pa-validation.ts`, `cashu-wallet.ts`
+- **OPS-04** — `adapters/nostr/client.ts` documents the durability contract:
+  no auto-reconnect/replay; hosts run replaying relays (resubscribe with a
+  `since` watermark) or wrap the client
+- **OPS-06** — `packages/sdk/deno.json` publish excludes `src/**/*.test.ts`
+  and `src/**/*.integration.test.ts`
+- **OPS-07** — `license: MIT` in both `packages/*/deno.json` and all four
+  `crates/*/Cargo.toml` (matches the repository LICENSE)
+- **OPS-09** — `fly.relay.toml` pins `scsibug/nostr-rs-relay:0.10.0`;
+  scale-to-zero is documented as accepted for the dev/test relay with the
+  production requirement stated
+- **OPS-10** — `attachments/url-validation.ts` is default-secure on the
+  Deno-native `ANCHR_ALLOW_LOCALHOST_ATTACHMENTS=1` opt-in (NODE_ENV signal
+  deleted) and covers `[::1]` and `::ffff:127.*` (dotted and hex);
+  `attachments/access.ts` throws without a configured base URL instead of
+  minting localhost URLs
+- **OPS-11** — `adapters/nostr/oracle-service.ts` documents host
+  responsibility: SIGTERM/SIGINT → `stop()`, health surface, scheduled
+  `expireQueries()`
+
+Verified with:
+
+- `deno publish --dry-run --allow-dirty --config packages/sdk/deno.json`
+  ships zero `*.test.ts`
+- `grep -c '"license"' packages/*/deno.json` and
+  `grep -c '^license' crates/*/Cargo.toml` ≥ 1 each
+- `deno task test:unit` (unset-env + IPv6 loopback SSRF cases)
+- `deno task test:all`; Docker bar for relay/regtest
+
+Harness update:
+
+- The url-validation default-secure tests lock OPS-10; the publish exclude
+  is re-verified by the dry-run command when the publish surface changes.
+
+Review residuals:
+
+- Relay reconnect/watermark layering and daemon health remain host
+  responsibilities, documented at the owning modules (OPS-04 / OPS-11
+  accepted alternative).
+
+Follow-up:
+
+- None

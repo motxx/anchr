@@ -2,6 +2,7 @@
 
 Created: 2026-06-11
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -60,3 +61,39 @@ From the 2026-06-11 production-readiness audit §2.4 (ANON-02):
 - Add the `fetchImpl`/dispatcher option to the Blossom upload/download helpers
   and the Cashu wallet factory, mirroring `createHttpOracleClient`.
 - Update `docs/threat-model.md` and the relevant spec/README transport notes.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/threat-model.md` — INV-08 "Scope limit — mint and Blossom
+  touchpoints" paragraph: the relay-only guarantee excludes mint/Blossom/TLSN
+  target HTTP, and names the injectable transports;
+  `docs/threat-model.lock.json` INV-08 hash bumped with justification
+- `packages/sdk/src/attachments/blossom.ts` — `BlossomTransportOptions`
+  (`fetchImpl`) on `uploadToBlossom` / `downloadFromBlossom`
+- `packages/sdk/src/payments/cashu/cashu-wallet.ts` — `getCashuWallet`
+  accepts a `customRequest` dispatcher (cashu-ts `RequestFn`)
+- `packages/sdk/src/adapters/cashu.ts` — `CashuClientOptions.customRequest`
+  routes all mint HTTP calls
+- `packages/sdk/src/attachments/blossom.test.ts` — injected-transport tests
+- `tlsn-prover --socks-proxy` documented as the supported Tor path in the
+  threat model
+
+Verified with:
+
+- `deno task test:unit`
+- `deno task lint:invariants`, `deno task lint:strict`
+
+Harness update:
+
+- The injected-transport tests lock the seam; the INV-08 scope paragraph is
+  hash-locked by `lint:invariants`.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

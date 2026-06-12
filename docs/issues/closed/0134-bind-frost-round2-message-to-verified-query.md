@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5 (claude-fable-5)
+Completed: 2026-06-13
 
 ## Priority
 
@@ -54,3 +55,41 @@ independence defense.
 - Derive the expected message from the round-1 verified requirement and store
   it alongside the nonces under the same `nonce_id`.
 - Compare in round 2 and reject on mismatch.
+
+## Resolution
+
+Decision: bind round 2 to a message the signer derives itself.
+
+Implemented by updating:
+
+- `packages/sdk/src/payments/frost/signing-message.ts` (new single owner of
+  the `sha256("anchr:sign:" + queryId)` derivation)
+- `packages/sdk/src/payments/frost/mod.ts`,
+  `packages/sdk/src/payments/frost/frost-signature-adapter.ts`,
+  `packages/sdk/src/adapters/nostr/oracle-service.ts` (all derive through it)
+- `packages/sdk/src/adapters/oracle-service/frost-signer-routes.ts` — round 1
+  rejects a message that does not match the verified requirement, stores
+  `{noncesJson, messageHex}` per random session id; round 2 consumes the
+  session once and rejects a mismatched message (403)
+- `packages/sdk/src/adapters/oracle-service/server.ts` (typed session map)
+- `packages/sdk/src/adapters/oracle-service/server-frost.test.ts`
+
+Verified with:
+
+- `deno task test:unit` (new round-1/round-2 message-binding tests)
+- `deno task test:e2e:frost`
+- `deno task test:all`
+
+Harness update:
+
+- `server-frost.test.ts` "FROST signer message binding" suite locks the
+  rejection on both rounds.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- Issue 0154 owns strengthening what the message itself commits to
+  (mint-spendable swap message).

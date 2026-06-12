@@ -3,6 +3,7 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
   type C2paValidationResult,
+  evaluateSignature,
   isC2paAvailable,
   validateC2pa,
   verifyC2paGpsBinding,
@@ -94,6 +95,54 @@ describe("C2PA GPS binding semantics", () => {
         failure.includes("from expected location")
       ),
     ).toBe(true);
+  });
+});
+
+describe("c2patool path injection", () => {
+  test("toolPath: null forces the tool-unavailable result", async () => {
+    const result = await validateC2pa(Buffer.from("x"), "photo.jpg", {
+      toolPath: null,
+    });
+    expect(result.available).toBe(false);
+    expect(result.checks).toContain("c2patool not available (skipped)");
+    expect(isC2paAvailable({ toolPath: null })).toBe(false);
+  });
+});
+
+describe("C2PA signature evaluation (fail closed)", () => {
+  function reportWith(
+    failure: Array<{ code: string; explanation?: string }>,
+    success: Array<{ code: string }> = [{ code: "claimSignature.validated" }],
+  ): Record<string, unknown> {
+    return { validation_results: { activeManifest: { success, failure } } };
+  }
+
+  test("INV-06: ATTACK: tampered assertion store (hashedURI mismatch) invalidates the signature", () => {
+    expect(
+      evaluateSignature(
+        reportWith([{ code: "assertion.hashedURI.mismatch" }]),
+      ),
+    ).toBe(false);
+  });
+
+  test("INV-06: ATTACK: untrusted signing credential invalidates the signature", () => {
+    expect(
+      evaluateSignature(reportWith([{ code: "signingCredential.untrusted" }])),
+    ).toBe(false);
+  });
+
+  test("INV-06: any unrecognized failure code invalidates the signature", () => {
+    expect(
+      evaluateSignature(reportWith([{ code: "some.future.failure" }])),
+    ).toBe(false);
+  });
+
+  test("validated claim signature with no failures evaluates true", () => {
+    expect(evaluateSignature(reportWith([]))).toBe(true);
+  });
+
+  test("missing claimSignature.validated success evaluates false", () => {
+    expect(evaluateSignature(reportWith([], []))).toBe(false);
   });
 });
 
@@ -243,17 +292,19 @@ suite("c2pa-validation", () => {
     signedJpeg = await signWithC2pa(unsignedJpeg);
   });
 
-  test("validates a C2PA-signed JPEG", async () => {
+  test("parses a dev-cert-signed JPEG but fails closed on the untrusted credential", async () => {
     const result = await validateC2pa(signedJpeg, "photo.jpg");
 
     expect(result.available).toBe(true);
     expect(result.hasManifest).toBe(true);
-    expect(result.signatureValid).toBe(true);
+    // The c2patool dev certificate is not on the C2PA trust list, so the
+    // report carries signingCredential.untrusted — INV-06 fail-closed
+    // evaluation must reject it rather than silently ignore the code.
+    expect(result.signatureValid).toBe(false);
     expect(result.manifest).not.toBeNull();
     expect(result.manifest!.signatureInfo?.issuer).toBeDefined();
     expect(result.checks).toContain("C2PA manifest found");
-    expect(result.checks).toContain("C2PA signature valid");
-    expect(result.failures).toHaveLength(0);
+    expect(result.failures).toContain("C2PA signature validation failed");
   });
 
   test("detects unsigned JPEG (no manifest)", async () => {

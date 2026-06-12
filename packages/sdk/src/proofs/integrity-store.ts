@@ -78,6 +78,11 @@ export function createIntegrityStore(): IntegrityStore {
 
 const defaultStore = createIntegrityStore();
 
+/** The module-level singleton, for callers that need the store as a port. */
+export function getDefaultIntegrityStore(): IntegrityStore {
+  return defaultStore;
+}
+
 export function storeIntegrity(metadata: IntegrityMetadata): void {
   defaultStore.store(metadata);
 }

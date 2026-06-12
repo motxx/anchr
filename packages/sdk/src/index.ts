@@ -168,6 +168,7 @@ export {
   CashuClientError,
   type CashuClientOptions,
   CashuMintError,
+  CashuMintUncertainError,
   type CashuProof,
   type CashuSendChain,
   type CashuToken,

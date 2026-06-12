@@ -137,15 +137,9 @@ export interface OfferInfo {
  * Outcome of submitEscrowResult. On verification success the provider receives
  * a settlement artifact whose shape depends on the escrow type:
  *   - HTLC (`escrow.type === "htlc"`):       `preimage` (SHA-256 preimage hex)
- *   - P2PK+FROST (`escrow.type === "p2pk_frost"`): `frost_signature` (BIP-340 hex)
+ *   - P2PK+FROST (`escrow.type === "p2pk_frost"`): `frost_signature` (BIP-340 hex per proof)
  * Exactly one of `preimage` / `frost_signature` is set on a successful
  * outcome; neither is set on rejection or expiry.
- *
- * **FROST message format (settlement contract):** the FROST signature is over
- * the UTF-8 bytes of `anchr/query-settle/v1:${query.id}:approved`. Any
- * downstream redeemer that validates the signature against the P2PK lock
- * **must** use the same prefix and version. See `query-service-methods.ts`
- * `doSubmitEscrowResult` for the canonical encoding.
  */
 export interface EscrowSubmitOutcome {
   ok: boolean;
@@ -153,8 +147,8 @@ export interface EscrowSubmitOutcome {
   message: string;
   /** Preimage revealed on HTLC verification success (Provider redeems the HTLC token with this). */
   preimage?: string;
-  /** Aggregated FROST Schnorr signature delivered on P2PK+FROST verification success. */
-  frost_signature?: string;
+  /** Aggregated FROST Schnorr signatures delivered on P2PK+FROST verification success. */
+  frost_signature?: string[];
 }
 
 export interface QuorumConfig {

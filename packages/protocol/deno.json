@@ -1,6 +1,7 @@
 {
   "name": "@anchr/protocol",
   "version": "0.1.0",
+  "license": "MIT",
   "exports": {
     ".": "./src/mod.ts",
     "./events": "./src/events.ts",
@@ -30,7 +31,11 @@
     ]
   },
   "compilerOptions": {
-    "lib": ["esnext", "dom", "dom.iterable"],
+    "lib": [
+      "esnext",
+      "dom",
+      "dom.iterable"
+    ],
     "strict": true
   },
   "tasks": {

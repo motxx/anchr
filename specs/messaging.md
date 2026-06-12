@@ -53,6 +53,20 @@ messages.
 | 7000  | Job Feedback       | Various           | Offers, selection, completion   |
 | 30103 | Oracle Attestation | Oracle -> Relay   | Publish a public release result |
 
+## Wire Version
+
+Kind 5300, 6300, and 7000 events built by the canonical helpers carry a
+wire-contract version tag:
+
+```json
+["v", "0"]
+```
+
+Absence of the tag is read as version 0. A v0 parser MUST ignore an event
+whose `v` tag carries any other value — such an event speaks an incompatible
+future contract. The check is non-fatal and follows the universal rejection
+rule below: the event is ignored, never an error.
+
 ## Query Posting (kind 5300)
 
 The Customer broadcasts a DVM Job Request as a public request advertisement:
@@ -72,7 +86,10 @@ The Customer broadcasts a DVM Job Request as a public request advertisement:
 
 An optional `region` tag (uppercase region code, indexable as `#region`)
 scopes discovery: region-bound Providers subscribe with a `#region` filter and
-ignore untagged advertisements. Hiding advertisement content from
+ignore untagged advertisements. The tag is cleartext and relay-indexable: any
+relay observer can partition requests by region, shrinking the requester's
+anonymity set from "all requesters" to "requesters in that region". Omit the
+tag when regional scoping is not required. Hiding advertisement content from
 out-of-region relay observers via a region-derived shared key remains an
 SDK-local optional layer (`@anchr/sdk/adapters/nostr` encryption helpers), not
 part of the interoperable v0 profile.
@@ -92,7 +109,7 @@ helper does not use a NIP-90 `bid` tag for payment material.
 | `customer_pubkey` | Customer Nostr pubkey                            |
 | `oracle_pubkey`   | Oracle Nostr pubkey                              |
 | `max_amount_sats` | Maximum Customer payment in sats                 |
-| `expires_at`      | Offer cutoff as Unix milliseconds                |
+| `expires_at`      | Offer cutoff as Unix milliseconds at second granularity (a multiple of 1000) |
 
 The public content MUST NOT include `predicate`, `context`, `mint_url`,
 `payment_lock`, `payment_lock_token`, `bounty_token`,
@@ -154,7 +171,7 @@ The `execution` object includes:
 | `context`          | Optional schema-agnostic context                           |
 | `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
 | `max_amount_sats`  | Maximum Customer payment in sats                           |
-| `locktime_seconds` | Cashu refund locktime as Unix seconds                      |
+| `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly.
@@ -364,6 +381,39 @@ relays.
 The public Nostr contract does not specify Oracle retry-store deletion rules.
 Implementations must not represent a stricter retention guarantee as
 interoperable behavior unless a future profile standardizes and tests it.
+
+## Parsing And Rejection Semantics
+
+Every canonical parser returns null instead of throwing when an event is not
+addressed to the caller, fails decryption, fails JSON parsing, or misses a
+required field or binding tag. Consumers MUST ignore such events and keep
+their subscriptions open: an unparseable event is someone else's traffic, not
+a protocol error.
+
+Causal binding rides on tags and payload fields, never on arrival order:
+
+- an offer binds to its request via the `e` tag and addresses the Customer
+  via the `p` tag; the canonical parser rejects an offer missing either;
+- a selection binds to the request `e` tag and addresses exactly one
+  Provider `p` tag;
+- a result binds to the request `e` tag, and the Oracle-readable payload
+  repeats `query_id` and `request_event_id` so the Oracle rejects a payload
+  bound to a different request;
+- Release Material DMs repeat `query_id` for anti-replay.
+
+Consumers MUST tolerate relay redelivery and out-of-order arrival: an event
+referencing an unknown or already-settled request is ignored. The only
+ordering requirement is causal — act on a result only after its request, and
+on Release Material only after a result the Oracle accepted.
+
+## Schema Namespace
+
+Proof schema URLs, their shape, and the permissionless allocation process are
+owned by [`proof-schemas.md`](proof-schemas.md). Built-in schemas are added
+there (and served from `spec-site/`) before any implementation advertises
+them; vendor schemas use an HTTPS authority the vendor controls. An unknown
+schema URL is not an error at the messaging layer — it fails at verifier
+dispatch.
 
 ## Transport Scope
 

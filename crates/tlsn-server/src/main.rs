@@ -6,7 +6,7 @@
 //! /verifier and /proxy use ws_stream_tungstenite::WsStream (same as official)
 //! /session uses axum WebSocket for JSON message exchange
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
@@ -38,20 +38,12 @@ struct Cli {
     tcp_port: u16,
     #[arg(long, default_value = "7048")]
     ws_port: u16,
-    #[arg(long)]
-    webhook_url: Option<String>,
 }
 
 struct SessionState {
     verifier_output: VerifierOutput,
     connection_info: ConnectionInfo,
     server_ephemeral_key: Vec<u8>,
-}
-
-#[derive(Clone)]
-struct WsSessionEntry {
-    max_sent_data: usize,
-    max_recv_data: usize,
 }
 
 struct WsVerificationResult {
@@ -66,9 +58,8 @@ struct WsVerificationResult {
 #[derive(Clone)]
 struct AppState {
     tcp_sessions: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
-    ws_sessions: Arc<Mutex<HashMap<String, WsSessionEntry>>>,
+    ws_sessions: Arc<Mutex<HashSet<String>>>,
     ws_results: Arc<Mutex<HashMap<String, oneshot::Sender<WsVerificationResult>>>>,
-    webhook_url: Option<String>,
 }
 
 #[tokio::main]
@@ -76,9 +67,8 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let state = AppState {
         tcp_sessions: Arc::new(Mutex::new(HashMap::new())),
-        ws_sessions: Arc::new(Mutex::new(HashMap::new())),
+        ws_sessions: Arc::new(Mutex::new(HashSet::new())),
         ws_results: Arc::new(Mutex::new(HashMap::new())),
-        webhook_url: cli.webhook_url.clone(),
     };
 
     let tcp_state = state.clone();
@@ -116,15 +106,18 @@ async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
             let mut path = String::new();
             let mut query = String::new();
 
-            let ws = match async_tungstenite::tokio::accept_hdr_async(
-                tcp,
+            // The Err type (and its size) is fixed by tungstenite's
+            // `Callback` trait contract.
+            #[allow(clippy::result_large_err)]
+            let header_callback =
                 |req: &Request, resp: Response| -> std::result::Result<Response, ErrorResponse> {
                     path = req.uri().path().to_string();
                     query = req.uri().query().unwrap_or("").to_string();
 
                     Ok(resp)
-                },
-            ).await {
+                };
+
+            let ws = match async_tungstenite::tokio::accept_hdr_async(tcp, header_callback).await {
                 Ok(ws) => ws,
                 Err(e) => {
                     eprintln!("[ws] non-WS connection from {}: {}", addr, e);
@@ -154,9 +147,7 @@ async fn run_ws_server(port: u16, state: AppState) -> Result<()> {
 
 fn parse_query_param(query: &str, key: &str) -> Option<String> {
     query.split('&').find_map(|pair| {
-        let mut parts = pair.splitn(2, '=');
-        let k = parts.next()?;
-        let v = parts.next()?;
+        let (k, v) = pair.split_once('=')?;
         if k == key { Some(v.to_string()) } else { None }
     })
 }
@@ -177,14 +168,9 @@ async fn handle_session_ws_raw(
     };
     if register["type"].as_str() != Some("register") { return; }
 
-    let max_sent = register["maxSentData"].as_u64().unwrap_or(4096) as usize;
-    let max_recv = register["maxRecvData"].as_u64().unwrap_or(16384) as usize;
     let session_id = uuid::Uuid::new_v4().to_string();
 
-    state.ws_sessions.lock().await.insert(session_id.clone(), WsSessionEntry {
-        max_sent_data: max_sent,
-        max_recv_data: max_recv,
-    });
+    state.ws_sessions.lock().await.insert(session_id.clone());
 
     let (result_tx, result_rx) = oneshot::channel::<WsVerificationResult>();
     state.ws_results.lock().await.insert(session_id.clone(), result_tx);
@@ -289,8 +275,7 @@ async fn handle_verifier_ws_raw(
     session_id: String,
     state: AppState,
 ) {
-    let entry = state.ws_sessions.lock().await.remove(&session_id);
-    if entry.is_none() {
+    if !state.ws_sessions.lock().await.remove(&session_id) {
         eprintln!("[tlsn-server] WS session {} not found", &session_id[..8]);
         return;
     }
@@ -594,7 +579,7 @@ async fn handle_tcp_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store:
 
 fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = chunk.get(1).copied().unwrap_or(0) as u32;

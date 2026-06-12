@@ -15,6 +15,7 @@ import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { moduleDir, spawn, which, writeFile } from "../internal/runtime/mod.ts";
+import { createReplayGuard } from "./replay-guard.ts";
 import type {
   TlsnAttestation,
   TlsnCondition,
@@ -26,8 +27,11 @@ import { getLogger } from "../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "tlsn"]);
 
 // --- Proof replay protection ---
-// Stores SHA-256 hashes of accepted presentations to prevent replay. // allow-history: "previously accepted" describes the set's contents, not impl history
-const seenPresentations = new Set<string>();
+// Remembers SHA-256 hashes of accepted presentations to reject replays,
+// bounded by age and entry count so a long-running Oracle stays memory-safe.
+// Retention exceeds any practical max_attestation_age_seconds: once a hash
+// ages out, the freshness check rejects the replayed proof instead.
+const seenPresentations = createReplayGuard();
 
 /** Visible for testing — clear the replay detection set. */
 export function _clearSeenPresentationsForTest(): void {
@@ -78,7 +82,7 @@ function findTlsnVerifier(): string | null {
   for (const p of localPaths) {
     try {
       if (statSync(p).isFile()) {
-        log.error(`Found tlsn-verifier at ${p}`);
+        log.debug(`Found tlsn-verifier at ${p}`);
         return p;
       }
     } catch { /* not found */ }
@@ -87,7 +91,7 @@ function findTlsnVerifier(): string | null {
   // Fall back to PATH
   const onPath = which("tlsn-verifier");
   if (onPath) {
-    log.error(`Found tlsn-verifier at ${onPath}`);
+    log.debug(`Found tlsn-verifier at ${onPath}`);
   }
   return onPath;
 }

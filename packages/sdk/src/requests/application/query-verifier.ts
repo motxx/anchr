@@ -14,8 +14,16 @@ import type {
   VerificationRequirement,
   VerifyProofOptions,
 } from "../../proofs/mod.ts";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex } from "@noble/hashes/utils.js";
+
+const TEXT_ENCODER = new TextEncoder();
 
 export function requestToRequirement(request: Query): VerificationRequirement {
+  const escrowTokenHash = request.escrow?.type === "p2pk_frost" &&
+      request.escrow.escrow_token
+    ? bytesToHex(sha256(TEXT_ENCODER.encode(request.escrow.escrow_token)))
+    : undefined;
   return {
     id: request.id,
     factors: request.verification_requirements,
@@ -24,6 +32,7 @@ export function requestToRequirement(request: Query): VerificationRequirement {
     expected_gps: request.expected_gps,
     max_gps_distance_km: request.max_gps_distance_km,
     tlsn_requirements: request.tlsn_requirements,
+    escrow_token_hash: escrowTokenHash,
   };
 }
 

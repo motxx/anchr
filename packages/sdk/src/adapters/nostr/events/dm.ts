@@ -86,7 +86,7 @@ export function buildFrostSignatureDM(
   oracleIdentity: NostrIdentity,
   providerPubKey: string,
   queryId: string,
-  groupSignature: string,
+  groupSignature: string[],
   groupPubkey: string,
 ): VerifiedEvent {
   const payload: FrostSignatureDMPayload = {
@@ -114,15 +114,56 @@ export function buildFrostSignatureDM(
   return finalizeEvent(template, oracleIdentity.secretKey);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isOracleDMPayload(value: unknown): value is OracleDMPayload {
+  if (!isRecord(value)) return false;
+  if (typeof value.query_id !== "string") return false;
+  switch (value.type) {
+    case "preimage":
+      return typeof value.preimage === "string";
+    case "rejection":
+      return typeof value.reason === "string";
+    case "frost_signature":
+      return isStringArray(value.group_signature) &&
+        typeof value.group_pubkey === "string";
+    default:
+      return false;
+  }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) &&
+    value.every((entry) => typeof entry === "string");
+}
+
+/**
+ * Decrypt + validate an Oracle release DM. Returns null when the content was
+ * not encrypted to us or the decrypted payload does not match a known DM
+ * shape — consumers ignore such events instead of acting on cast garbage.
+ */
 export function parseOracleDM(
   content: string,
   recipientSecretKey: Uint8Array,
   senderPubKey: string,
-): OracleDMPayload {
+): OracleDMPayload | null {
   const conversationKey = deriveConversationKey(
     recipientSecretKey,
     senderPubKey,
   );
-  const decrypted = decryptNip44(content, conversationKey);
-  return JSON.parse(decrypted) as OracleDMPayload;
+  let decrypted: string;
+  try {
+    decrypted = decryptNip44(content, conversationKey);
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decrypted);
+  } catch {
+    return null;
+  }
+  return isOracleDMPayload(parsed) ? parsed : null;
 }

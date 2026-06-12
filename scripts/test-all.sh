@@ -74,6 +74,8 @@ run_local() {
   run_test "scripts tests"      deno task test:scripts
   run_test "example tests"      deno task test:examples
 
+  run_rust_gate
+
   # CI builds frost-signer in a dedicated step before tests run. Mirror that
   # here so e2e/frost/frost-threshold.test.ts actually exercises against the
   # binary locally — without it the FROST e2e silently skips and a green
@@ -84,6 +86,25 @@ run_local() {
   else
     fail "frost-signer build"
   fi
+}
+
+# Clippy + test every Rust crate, including tlsn-server which has no other
+# CI compile step before `flyctl deploy` builds it. The toolchain is pinned
+# by rust-toolchain.toml at the repo root.
+run_rust_gate() {
+  step "Phase 1: Rust Crate Gate (clippy + test)"
+  local crate
+  for crate in \
+    crates/frost-signer \
+    crates/tlsn-prover \
+    crates/tlsn-server \
+    crates/tlsn-verifier
+  do
+    run_test "clippy ${crate#crates/}" \
+      cargo clippy --manifest-path "$crate/Cargo.toml" --all-targets -- -D warnings
+    run_test "cargo test ${crate#crates/}" \
+      cargo test --manifest-path "$crate/Cargo.toml"
+  done
 }
 
 # --- Phase 2: Docker-dependent tests ---

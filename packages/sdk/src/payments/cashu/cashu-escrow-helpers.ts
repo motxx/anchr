@@ -28,7 +28,9 @@ export function sumProofAmounts(proofs: Proof[]): number {
 }
 
 export function encodeProofs(mintUrl: string, proofs: Proof[]): string {
-  return getEncodedToken({ mint: mintUrl, proofs });
+  // The v0 wire contract pins Cashu token serialization to V4 ("cashuB");
+  // never rely on the library default shifting underneath the contract.
+  return getEncodedToken({ mint: mintUrl, proofs }, { version: 4 });
 }
 
 export async function loadAndSend(

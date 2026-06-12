@@ -25,8 +25,10 @@
 import {
   getDecodedToken,
   getEncodedToken,
+  Mint,
   type P2PKOptions,
   type Proof,
+  type RequestFn,
   signP2PKProofs,
   verifyHTLCHash,
   Wallet,
@@ -35,6 +37,12 @@ import {
   buildHtlcFinalOptions,
   buildHtlcPreselectionOptions,
 } from "../payments/cashu/cashu-htlc-options.ts";
+import {
+  type CashuRedeemSendChain,
+  type CashuRedeemWallet,
+  redeemSignedProofs,
+  type RedeemSwapResult,
+} from "../payments/cashu/redeem-swap.ts";
 import type {
   BindProviderParams,
   BuildHtlcLockParams,
@@ -62,13 +70,9 @@ export type {
  * faking the full cashu-ts `Wallet` class (which has private fields).
  * The real `Wallet` from cashu-ts also satisfies this interface.
  */
-export interface CashuSendChain {
-  asP2PK(options: P2PKOptions): CashuSendChain;
-  privkey(k: string | string[]): CashuSendChain;
-  run(): Promise<{ send: Proof[] }>;
-}
+export type CashuSendChain = CashuRedeemSendChain;
 
-export interface CashuWalletAdapter {
+export interface CashuWalletAdapter extends CashuRedeemWallet {
   ops: {
     send(amount: number, proofs: Proof[]): CashuSendChain;
   };
@@ -95,6 +99,12 @@ export interface CashuClientOptions {
   mintUrl: string;
   /** Optional: pre-built wallet adapter (tests inject a fake here). */
   wallet?: CashuWalletAdapter;
+  /**
+   * Optional request dispatcher for all mint HTTP calls. INV-08 does not
+   * cover the mint touchpoint; inject a SOCKS5/Tor-routed dispatcher here
+   * for IP-level anonymity.
+   */
+  customRequest?: RequestFn;
 }
 
 /** Thrown when the Cashu mint rejects an operation or returns an unexpected result. */
@@ -102,6 +112,20 @@ export class CashuMintError extends Error {
   constructor(message: string, cause?: unknown) {
     super(message, cause === undefined ? undefined : { cause });
     this.name = "CashuMintError";
+  }
+}
+
+/**
+ * Thrown when a mint operation may have committed while its response was
+ * lost: the inputs are spent (or unknowable) but the outputs could not be
+ * recovered. Funds are not necessarily lost — the pre-registered outputs
+ * remain restorable via NUT-09 — but the caller must check the mint instead
+ * of blindly retrying or treating the redemption as failed.
+ */
+export class CashuMintUncertainError extends CashuMintError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = "CashuMintUncertainError";
   }
 }
 
@@ -213,6 +237,46 @@ function prepareHtlcRedemption(
   return signP2PKProofs(withPreimage, privkeyHex);
 }
 
+function mapRedeemFailure(result: RedeemSwapResult): never {
+  if (result.ok) {
+    throw new CashuMintError("redeemHtlc: unexpected redeem result");
+  }
+  switch (result.reason) {
+    case "fee_exceeds_amount":
+      throw new CashuMintError(
+        `redeemHtlc: mint fee ${result.fee} exceeds available ${result.totalAmount} sats`,
+        result.cause,
+      );
+    case "mint_error":
+      throw new CashuMintError("redeemHtlc: mint swap failed", result.cause);
+    case "state_unknown":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: mint swap failed and the input state could not be checked — keep the token and retry once the mint is reachable",
+        result.cause,
+      );
+    case "inputs_unspent":
+      throw new CashuMintError(
+        "redeemHtlc: mint swap failed; inputs are unspent — safe to retry with the same token",
+        result.cause,
+      );
+    case "outputs_not_registered":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent at the mint but no recoverable outputs were registered — check the mint before retrying",
+        result.cause,
+      );
+    case "restore_failed":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent and NUT-09 restore failed — outputs remain recoverable; check the mint",
+        result.cause,
+      );
+    case "restore_empty":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent but the mint returned no signatures for the registered outputs — check the mint",
+        result.cause,
+      );
+  }
+}
+
 /**
  * Construct a CashuClient bound to a specific mint.
  *
@@ -232,7 +296,10 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
     if (options.wallet !== undefined) return Promise.resolve(options.wallet);
     if (walletPromise === null) {
       walletPromise = (async () => {
-        const wallet = new Wallet(mintUrl, { unit: "sat" });
+        const mint = options.customRequest !== undefined
+          ? new Mint(mintUrl, { customRequest: options.customRequest })
+          : mintUrl;
+        const wallet = new Wallet(mint, { unit: "sat" });
         await wallet.loadMint();
         return wallet;
       })();
@@ -278,7 +345,9 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       } catch (err) {
         throw new CashuMintError("buildHtlcLock: mint swap failed", err);
       }
-      const token = getEncodedToken({ mint: mintUrl, proofs: send });
+      const token = getEncodedToken({ mint: mintUrl, proofs: send }, {
+        version: 4,
+      });
       return {
         token,
         amountSats: sumAmounts(send),
@@ -338,7 +407,9 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       } catch (err) {
         throw new CashuMintError("bindProvider: mint swap failed", err);
       }
-      const token = getEncodedToken({ mint: mintUrl, proofs: send });
+      const token = getEncodedToken({ mint: mintUrl, proofs: send }, {
+        version: 4,
+      });
       return {
         token,
         amountSats: sumAmounts(send),
@@ -393,29 +464,16 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         p.preimageHex,
         privkeyHex,
       );
-      const totalAmount = sumAmounts(signedProofs);
-
-      const fee = wallet.getFeesForProofs(signedProofs);
-      const swapAmount = totalAmount - fee;
-      if (swapAmount <= 0) {
-        throw new CashuMintError(
-          `redeemHtlc: mint fee ${fee} exceeds available ${totalAmount} sats`,
-        );
-      }
-
-      let received: Proof[];
-      try {
-        const result = await wallet.ops
-          .send(swapAmount, signedProofs)
-          .privkey(privkeyHex)
-          .run();
-        received = result.send;
-      } catch (err) {
-        throw new CashuMintError("redeemHtlc: mint swap failed", err);
-      }
+      const redeem = await redeemSignedProofs({
+        wallet,
+        signedProofs,
+        signingPrivateKey: privkeyHex,
+      });
+      if (!redeem.ok) mapRedeemFailure(redeem);
+      const received = redeem.proofs;
       return {
         proofs: received as CashuProof[],
-        amountSats: sumAmounts(received),
+        amountSats: redeem.amountSats,
       };
     },
   };

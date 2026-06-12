@@ -8,7 +8,6 @@ describe("getRuntimeConfig", () => {
   const envKeys = [
     "HTTP_API_PORT",
     "PORT",
-    "QUERY_SWEEP_INTERVAL_MS",
     "PREVIEW_MAX_DIMENSION",
     "PREVIEW_JPEG_QUALITY",
     "HTTP_API_KEYS",
@@ -27,7 +26,6 @@ describe("getRuntimeConfig", () => {
     withEnv(clear, () => {
       const config = getRuntimeConfig();
       expect(config.httpApiPort).toBe(3000);
-      expect(config.querySweepIntervalMs).toBe(30_000);
       expect(config.previewMaxDimension).toBe(768);
       expect(config.previewJpegQuality).toBe(75);
       expect(config.httpApiKeys).toEqual([]);

@@ -54,3 +54,10 @@ export type {
 } from "./frost-types.ts";
 
 export { createFrostSignatureAdapter } from "./frost-signature-adapter.ts";
+
+export {
+  deriveFrostEscrowTokenHash,
+  deriveFrostP2pkMessages,
+  deriveFrostSigningMessage,
+  tokenMatchesFrostP2pkLock,
+} from "./signing-message.ts";

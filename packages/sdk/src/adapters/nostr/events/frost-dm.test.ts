@@ -8,7 +8,6 @@ import {
   buildRejectionDM,
   parseOracleDM,
 } from "./dm.ts";
-import type { FrostSignatureDMPayload } from "./events.ts";
 
 describe("FROST DM building and parsing", () => {
   test("buildFrostSignatureDM produces a valid Nostr event (kind 4)", () => {
@@ -19,7 +18,7 @@ describe("FROST DM building and parsing", () => {
       oracle,
       provider.publicKey,
       "query_frost_1",
-      "sig_" + "ab".repeat(32),
+      ["ab".repeat(64)],
       "gpk_" + "cd".repeat(16),
     );
 
@@ -39,7 +38,7 @@ describe("FROST DM building and parsing", () => {
   test("buildFrostSignatureDM event can be decrypted by recipient with parseOracleDM", () => {
     const oracle = generateEphemeralIdentity();
     const provider = generateEphemeralIdentity();
-    const groupSig = "ab".repeat(32);
+    const groupSig = ["ab".repeat(64)];
     const groupPubkey = "cd".repeat(16);
 
     const event = buildFrostSignatureDM(
@@ -55,13 +54,13 @@ describe("FROST DM building and parsing", () => {
       provider.secretKey,
       oracle.publicKey,
     );
-    expect(parsed.type).toBe("frost_signature");
+    expect(parsed?.type).toBe("frost_signature");
   });
 
   test("parsed payload has type frost_signature with correct fields", () => {
     const oracle = generateEphemeralIdentity();
     const provider = generateEphemeralIdentity();
-    const groupSig = "deadbeef".repeat(8);
+    const groupSig = ["deadbeef".repeat(16)];
     const groupPubkey = "cafebabe".repeat(4);
 
     const event = buildFrostSignatureDM(
@@ -76,11 +75,12 @@ describe("FROST DM building and parsing", () => {
       event.content,
       provider.secretKey,
       oracle.publicKey,
-    ) as FrostSignatureDMPayload;
+    );
 
-    expect(parsed.type).toBe("frost_signature");
+    expect(parsed?.type).toBe("frost_signature");
+    if (parsed?.type !== "frost_signature") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_frost_3");
-    expect(parsed.group_signature).toBe(groupSig);
+    expect(parsed.group_signature).toEqual(groupSig);
     expect(parsed.group_pubkey).toBe(groupPubkey);
   });
 
@@ -89,7 +89,7 @@ describe("FROST DM building and parsing", () => {
     const provider = generateEphemeralIdentity();
 
     const queryId = "roundtrip_" + Date.now();
-    const groupSig = "ff".repeat(32);
+    const groupSig = ["ff".repeat(64)];
     const groupPubkey = "ee".repeat(16);
 
     const event = buildFrostSignatureDM(
@@ -103,10 +103,12 @@ describe("FROST DM building and parsing", () => {
       event.content,
       provider.secretKey,
       oracle.publicKey,
-    ) as FrostSignatureDMPayload;
+    );
 
+    expect(parsed?.type).toBe("frost_signature");
+    if (parsed?.type !== "frost_signature") throw new Error("unreachable");
     expect(parsed.query_id).toBe(queryId);
-    expect(parsed.group_signature).toBe(groupSig);
+    expect(parsed.group_signature).toEqual(groupSig);
     expect(parsed.group_pubkey).toBe(groupPubkey);
   });
 
@@ -127,9 +129,10 @@ describe("FROST DM building and parsing", () => {
       oracle.publicKey,
     );
 
-    expect(parsed.type).toBe("preimage");
+    expect(parsed?.type).toBe("preimage");
+    if (parsed?.type !== "preimage") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_compat_1");
-    expect((parsed as { preimage: string }).preimage).toBe(preimage);
+    expect(parsed.preimage).toBe(preimage);
   });
 
   test("parseOracleDM handles rejection DM type", () => {
@@ -148,8 +151,9 @@ describe("FROST DM building and parsing", () => {
       oracle.publicKey,
     );
 
-    expect(parsed.type).toBe("rejection");
+    expect(parsed?.type).toBe("rejection");
+    if (parsed?.type !== "rejection") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_compat_2");
-    expect((parsed as { reason: string }).reason).toBe("Invalid C2PA");
+    expect(parsed.reason).toBe("Invalid C2PA");
   });
 });
