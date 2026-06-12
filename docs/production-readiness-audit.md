@@ -141,7 +141,11 @@ verified **Status (2026-06-11)** confirmed against the current tree.
 
 #### SDK-01 — `requests/` internal domain types leak into the public type surface
 
-- Severity: **high**
+- Severity: **high** — **Resolved 2026-06-12** (issue 0122 via the A-full
+  split 0130–0133: vocabulary → `values.ts` (root-public), verification
+  contract → `proofs/verification/contract.ts` (`@anchr/sdk/proofs`-public),
+  `Query` adapters → `requests/application/query-verifier.ts`; arch-lint E029
+  locks the boundary).
 - Files: `packages/sdk/src/index.ts:145`;
   `packages/sdk/src/adapters/oracle-client/index.ts:22-29`;
   `packages/sdk/src/adapters/nostr/oracle-service.ts:37-40,95-107`;

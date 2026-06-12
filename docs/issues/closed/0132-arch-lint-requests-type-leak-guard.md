@@ -61,3 +61,48 @@ else must use the neutral leaf module (0130) or `proofs/` (0131).
   extend to signature reachability if practical).
 - Update the `docs/architecture.md` ownership table and Surface Policy notes.
 - Prove the rule with the scratch-leak experiment, then remove the scratch.
+
+Completed: 2026-06-12
+
+## Resolution
+
+Implemented by updating:
+
+- `scripts/arch-lint.ts` (new rule **E029**: a non-`/testing` sdk module may
+  re-export from `requests/` only from the documented public surfaces — the
+  injection ports `requests/domain/ports.ts` / `requests/application/ports.ts`
+  and the Oracle-client contract `requests/domain/oracle-types.ts`; any other
+  `requests/` re-export, e.g. the `Query` aggregate or verification records, is
+  a violation. Added `extractReExports` to distinguish re-export statements from
+  plain imports.)
+- `scripts/arch-lint.test.ts` (E029 regression tests: flags a `Query`
+  re-export; allows the ports and Oracle contract; exempt inside
+  `requests/`/`testing/`)
+- `docs/architecture.md` ownership table updated to the post-0130/0131 homes
+  (verification contract in `proofs/verification/contract.ts`, Query adapters in
+  `requests/application/query-verifier.ts`) and a paragraph documenting the
+  E029 re-export boundary
+
+Verified with:
+
+- `deno task lint:arch` (clean) and the scratch-leak experiment: adding
+  `export type { Query } from "./requests/domain/types.ts"` to `index.ts`
+  produced `E029`; reverted.
+- `deno test scripts/arch-lint.test.ts`, `deno task lint:strict`,
+  `deno task test:all`.
+
+Harness update:
+
+- `scripts/arch-lint.ts` E029 — this is itself the harness that absorbs the
+  SDK-01 leak class. Locked with `scripts/arch-lint.test.ts` cases.
+
+Review residuals:
+
+- The Oracle-client contract types (`Oracle`/`OracleInfo`/
+  `OracleVerificationDetail`/`OracleAttestation`) remain `requests/domain`-owned
+  and are an intentional, now-documented public re-export. Relocating them to
+  `adapters/oracle-client/` is a possible future refinement, not a leak.
+
+Follow-up:
+
+- None — closes the A-full chain; parent 0122 can close.

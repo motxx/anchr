@@ -62,6 +62,40 @@ Deno.test("SDK feature folders may not import arbitrary request internals", () =
   expect(violations.map((v) => v.code)).toContain("E026");
 });
 
+Deno.test("E029 flags re-exporting a requests/ lifecycle type to a public surface", () => {
+  const violations = checkPackageFile(
+    "sdk",
+    "packages/sdk/src/index.ts",
+    `export type { Query } from "./requests/domain/types.ts";`,
+  );
+  expect(violations.map((v) => v.code)).toContain("E029");
+});
+
+Deno.test("E029 allows re-exporting documented request ports and the Oracle contract", () => {
+  const ports = checkPackageFile(
+    "sdk",
+    "packages/sdk/src/index.ts",
+    `export type { Clock, IdGenerator } from "./requests/domain/ports.ts";`,
+  );
+  expect(ports.map((v) => v.code)).not.toContain("E029");
+
+  const oracleContract = checkPackageFile(
+    "sdk",
+    "packages/sdk/src/adapters/oracle-client/index.ts",
+    `export type {\n  Oracle,\n  OracleVerificationDetail,\n} from "../../requests/domain/oracle-types.ts";`,
+  );
+  expect(oracleContract.map((v) => v.code)).not.toContain("E029");
+});
+
+Deno.test("E029 does not apply inside requests/ or testing/", () => {
+  const testing = checkPackageFile(
+    "sdk",
+    "packages/sdk/src/testing/mod.ts",
+    `export { QueryService } from "../requests/application/query-service.ts";`,
+  );
+  expect(testing.map((v) => v.code)).not.toContain("E029");
+});
+
 Deno.test("request internals may consume only documented feature ports", () => {
   expect(
     isAllowedRequestFeatureImport(

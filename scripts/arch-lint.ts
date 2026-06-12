@@ -14,6 +14,9 @@
  *          the sdk package must import them, never define them.
  *   [E028] direct env reads are confined to documented config-resolution
  *          surfaces; library modules take config through options/deps.
+ *   [E029] requests/ internal types must not be re-exported to a non-/testing
+ *          public surface; only the documented request ports and Oracle-client
+ *          contract may be re-published.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -40,6 +43,17 @@ const ALLOWED_PACKAGE_DEPS: Record<string, ReadonlySet<string>> = {
 };
 
 const OPT_OUT = /\/\/\s*allow-arch:/;
+// [E029] A non-/testing module may re-export from requests/ only when the
+// source is a documented public surface: the dependency-injection ports and the
+// Oracle-client contract. Re-publishing any other requests/ type (the Query
+// aggregate, verification records, lifecycle state) re-creates the SDK-01 leak.
+const REQUEST_PUBLIC_REEXPORT_TARGETS: readonly string[] = [
+  "packages/sdk/src/requests/domain/ports.ts",
+  "packages/sdk/src/requests/application/ports.ts",
+  "packages/sdk/src/requests/domain/oracle-types.ts",
+];
+const REEXPORT_RE =
+  /export\s+(?:type\s+)?(?:\*(?:\s+as\s+[A-Za-z0-9_$]+)?|\{[\s\S]*?\})\s+from\s+["']([^"']+)["']/g;
 const APP_VOCAB =
   /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces|MARKET|MARKETPLACE|bounty|bounties|Bounty|Bounties|BOUNTY)\b/;
 // [E027] Nostr event-kind constants are owned by @anchr/protocol/nostr.
@@ -84,11 +98,31 @@ function extractImports(source: string): { specifier: string; line: number }[] {
   }
 
   for (const re of [IMPORT_RE, DYNAMIC_IMPORT_RE]) {
-    re.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(stripped)) !== null) {
-      results.push({ specifier: m[1], line: lineOf(m.index) });
+    for (const m of stripped.matchAll(re)) {
+      results.push({ specifier: m[1], line: lineOf(m.index ?? 0) });
     }
+  }
+  return results;
+}
+
+function extractReExports(
+  source: string,
+): { specifier: string; line: number }[] {
+  const results: { specifier: string; line: number }[] = [];
+  const stripped = source
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|\n)([^\n]*?)\/\/[^\n]*/g, (_m, p1, p2) => `${p1}${p2}`);
+
+  function lineOf(offset: number): number {
+    let line = 1;
+    for (let i = 0; i < offset; i++) {
+      if (stripped[i] === "\n") line++;
+    }
+    return line;
+  }
+
+  for (const m of stripped.matchAll(REEXPORT_RE)) {
+    results.push({ specifier: m[1], line: lineOf(m.index ?? 0) });
   }
   return results;
 }
@@ -371,6 +405,27 @@ function checkPackageFile(
           severity: "error",
           message:
             `SDK request internals may be imported only through documented request-scoped state or lifecycle ports (found "${specifier}")`,
+        });
+      }
+    }
+
+    const isRequestOrTesting =
+      fileRel.startsWith("packages/sdk/src/requests/") ||
+      fileRel.startsWith("packages/sdk/src/testing/");
+    if (!isRequestOrTesting) {
+      for (const { specifier, line } of extractReExports(source)) {
+        const target = resolveRelativeImportTarget(specifier, fileRel);
+        if (!target || !target.startsWith("packages/sdk/src/requests/")) {
+          continue;
+        }
+        if (REQUEST_PUBLIC_REEXPORT_TARGETS.includes(target)) continue;
+        violations.push({
+          file: fileRel,
+          line,
+          code: "E029",
+          severity: "error",
+          message:
+            `re-exporting a requests/ internal type to a public surface; only documented request ports/contracts may be re-published (found "${specifier}")`,
         });
       }
     }

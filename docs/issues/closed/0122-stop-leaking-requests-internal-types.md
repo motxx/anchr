@@ -88,3 +88,49 @@ import in one direction). This is design work, not a rename — split with
   repointed to `proofs/tlsn-types.ts` / `@anchr/sdk/proofs`. The remaining
   leak is only the `Verification*`/`BlossomKeyMap` family.
 - Add the arch-lint rule and lock with a sample-consumer compile check.
+
+Completed: 2026-06-12
+
+## Resolution
+
+Resolved via the A-full split (cycle-free) across four child issues:
+
+- **0130** — shared submission/evidence vocabulary moved to the neutral leaf
+  `packages/sdk/src/values.ts` (re-exported from root `@anchr/sdk`); `BlossomKeyMap`
+  duplicate removed.
+- **0131** — the proof-verification contract (`VerificationRequirement`,
+  `VerificationInput`, `VerificationDetail`, `VerifyProofOptions`) moved to
+  `proofs/verification/contract.ts` and exported from `@anchr/sdk/proofs`.
+- **0133** — the `Query`→contract adapters (`verify`,
+  `requestToRequirement`, `resultToVerificationInput`) moved to
+  `requests/application/query-verifier.ts`; `proofs/` now imports nothing from
+  `requests/`, and `Query` no longer leaks through the public proofs surface.
+- **0132** — arch-lint rule **E029** locks the boundary: requests/ types may not
+  be re-exported to a non-`/testing` surface except the documented ports and
+  Oracle-client contract.
+
+Outcome: every public proof-verification function's parameter and return types
+are now nameable by importing only non-`/testing` subpaths (`@anchr/sdk` root
+for the value objects, `@anchr/sdk/proofs` for the verification contract), and
+the leak class is CI-enforced.
+
+Verified with:
+
+- `deno task check`, `deno task test:all`, `deno task lint:strict`,
+  `deno task lint:arch` (all green across each phase)
+- Negative: `proofs/` imports nothing from `requests/`; a scratch `Query`
+  re-export trips E029
+
+Harness update:
+
+- `scripts/arch-lint.ts` E029 + `scripts/arch-lint.test.ts` (see 0132).
+
+Review residuals:
+
+- The Oracle-client contract types remain `requests/domain`-owned as a
+  documented intentional public re-export (see 0132); optional future
+  relocation to `adapters/oracle-client/`.
+
+Follow-up:
+
+- None.
