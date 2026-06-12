@@ -28,6 +28,7 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  getEncodedToken,
   P2PKBuilder,
   type P2PKOptions,
   type Proof,
@@ -37,6 +38,18 @@ import {
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1";
+import {
+  aggregateSignatures,
+  appendFrostP2PKGroupSignatures,
+  deriveFrostP2pkMessages,
+  dkgRound1,
+  dkgRound2,
+  dkgRound3,
+  isFrostSignerAvailable,
+  signRound1,
+  signRound2,
+  verifySignature,
+} from "@anchr/sdk/payments";
 
 import {
   checkInfraReady,
@@ -48,6 +61,7 @@ import {
 
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
 const BET_SATS = 64;
+const FROST_AVAILABLE = isFrostSignerAvailable();
 
 // ---------------------------------------------------------------------------
 // Infrastructure readiness
@@ -80,7 +94,6 @@ function buildFrostSwapForPartyA(params: {
     .lockUntil(params.locktime)
     .addRefundPubkey(params.refundPubkey)
     .requireRefundSignatures(1)
-    .sigAll()
     .toOptions();
 }
 
@@ -96,7 +109,6 @@ function buildFrostSwapForPartyB(params: {
     .lockUntil(params.locktime)
     .addRefundPubkey(params.refundPubkey)
     .requireRefundSignatures(1)
-    .sigAll()
     .toOptions();
 }
 
@@ -130,6 +142,161 @@ async function createP2PKLockedProofs(
   return send;
 }
 
+interface DkgSigner {
+  identifier: string;
+  keyPackage: string;
+}
+
+interface DkgGroup {
+  signers: DkgSigner[];
+  groupPubkey: string;
+  pubkeyPackage: string;
+}
+
+async function runFrostDkg(): Promise<DkgGroup> {
+  const total = 3;
+  const threshold = 2;
+  const round1Results: Array<{
+    identifier: string;
+    secretPackage: string;
+    package: string;
+  }> = [];
+
+  for (let i = 0; i < total; i++) {
+    const result = await dkgRound1(i + 1, total, threshold);
+    expect(result.ok).toBe(true);
+    expect(result.data).toBeDefined();
+    const secretPackage = result.data!.secret_package as Record<
+      string,
+      unknown
+    >;
+    round1Results.push({
+      identifier: String(secretPackage.identifier),
+      secretPackage: JSON.stringify(result.data!.secret_package),
+      package: JSON.stringify(result.data!.package),
+    });
+  }
+
+  const round2Results: Array<{
+    secretPackage: string;
+    packages: Record<string, string>;
+  }> = [];
+  for (let i = 0; i < total; i++) {
+    const others: Record<string, unknown> = {};
+    for (let j = 0; j < total; j++) {
+      if (j === i) continue;
+      others[round1Results[j]!.identifier] = JSON.parse(
+        round1Results[j]!.package,
+      );
+    }
+    const result = await dkgRound2(
+      round1Results[i]!.secretPackage,
+      JSON.stringify(others),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.data).toBeDefined();
+    round2Results.push({
+      secretPackage: JSON.stringify(result.data!.secret_package),
+      packages: result.data!.packages as Record<string, string>,
+    });
+  }
+
+  const signers: DkgSigner[] = [];
+  let groupPubkey = "";
+  let pubkeyPackage = "";
+  for (let i = 0; i < total; i++) {
+    const round2ForMe: Record<string, unknown> = {};
+    for (let j = 0; j < total; j++) {
+      if (j === i) continue;
+      const packages = round2Results[j]!.packages as Record<string, unknown>;
+      round2ForMe[round1Results[j]!.identifier] =
+        packages[round1Results[i]!.identifier];
+    }
+
+    const othersRound1: Record<string, unknown> = {};
+    for (let j = 0; j < total; j++) {
+      if (j === i) continue;
+      othersRound1[round1Results[j]!.identifier] = JSON.parse(
+        round1Results[j]!.package,
+      );
+    }
+
+    const result = await dkgRound3(
+      round2Results[i]!.secretPackage,
+      JSON.stringify(othersRound1),
+      JSON.stringify(round2ForMe),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.data).toBeDefined();
+    if (i === 0) {
+      groupPubkey = String(result.data!.group_pubkey);
+      pubkeyPackage = JSON.stringify(result.data!.pubkey_package);
+    }
+    signers.push({
+      identifier: round1Results[i]!.identifier,
+      keyPackage: JSON.stringify(result.data!.key_package),
+    });
+  }
+
+  return { signers, groupPubkey, pubkeyPackage };
+}
+
+async function signWithFrostPair(
+  group: DkgGroup,
+  messageHex: string,
+): Promise<string> {
+  const signerA = group.signers[0]!;
+  const signerB = group.signers[1]!;
+  const round1A = await signRound1(signerA.keyPackage);
+  const round1B = await signRound1(signerB.keyPackage);
+  expect(round1A.ok).toBe(true);
+  expect(round1B.ok).toBe(true);
+
+  const commitments: Record<string, unknown> = {};
+  commitments[signerA.identifier] = round1A.data!.commitments;
+  commitments[signerB.identifier] = round1B.data!.commitments;
+  const commitmentsJson = JSON.stringify(commitments);
+
+  const round2A = await signRound2(
+    signerA.keyPackage,
+    JSON.stringify(round1A.data!.nonces),
+    commitmentsJson,
+    messageHex,
+  );
+  const round2B = await signRound2(
+    signerB.keyPackage,
+    JSON.stringify(round1B.data!.nonces),
+    commitmentsJson,
+    messageHex,
+  );
+  expect(round2A.ok).toBe(true);
+  expect(round2B.ok).toBe(true);
+
+  const shares: Record<string, unknown> = {};
+  shares[signerA.identifier] = round2A.data!.signature_share;
+  shares[signerB.identifier] = round2B.data!.signature_share;
+
+  const aggregate = await aggregateSignatures(
+    group.groupPubkey,
+    commitmentsJson,
+    messageHex,
+    JSON.stringify(shares),
+    group.pubkeyPackage,
+  );
+  expect(aggregate.ok).toBe(true);
+  expect(aggregate.data?.signature).toBeDefined();
+
+  const signature = String(aggregate.data!.signature);
+  const verified = await verifySignature(
+    group.groupPubkey,
+    signature,
+    messageHex,
+  );
+  expect(verified.ok).toBe(true);
+  expect(verified.data?.valid).toBe(true);
+  return signature;
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -140,6 +307,7 @@ suite(
   "e2e: FROST P2PK + real Cashu mint — trustless two-party binary bet flow",
   () => {
     const wallet = sharedWallet!;
+    const frostTest = FROST_AVAILABLE ? test : test.ignore;
 
     // Oracle keypairs (simulating FROST DKG output)
     let oracleYes: { secretKey: string; publicKey: string };
@@ -312,7 +480,7 @@ suite(
       // In production: FROST threshold signers cooperate to produce group signature.
       // In demo mode: single Schnorr sign with the YES outcome's secret key.
       //
-      // The signature is over the proof secret (SIG_ALL mode). This is verified
+      // The signature is over sha256(proof.secret) in SIG_INPUTS mode. This is verified
       // by the Cashu mint as part of the P2PK NUT-11 protocol.
 
       // Verify the Oracle YES key is valid for Schnorr signing
@@ -357,6 +525,66 @@ suite(
       const redeemedTotal = redeemed.reduce((s, p) => s + p.amount, 0);
       expect(redeemedTotal).toBe(totalSats - fee);
     });
+
+    frostTest(
+      "6b. Provider redeems with merged FROST group signatures without the group key",
+      async () => {
+        const frostGroup = await runFrostDkg();
+        const provider = genKeypair();
+        const customer = genKeypair();
+        const sourceProofs = await throttledMintProofs(wallet, BET_SATS);
+        const options = new P2PKBuilder()
+          .addLockPubkey([provider.publicKey, frostGroup.groupPubkey])
+          .requireLockSignatures(2)
+          .lockUntil(Math.floor(Date.now() / 1000) + 3600)
+          .addRefundPubkey(customer.publicKey)
+          .requireRefundSignatures(1)
+          .toOptions();
+
+        const lockedProofs = await createP2PKLockedProofs(
+          wallet,
+          sourceProofs,
+          BET_SATS,
+          options,
+        );
+        const token = getEncodedToken(
+          { mint: MINT_URL, proofs: lockedProofs },
+          {
+            version: 4,
+          },
+        );
+        const groupSignatures: string[] = [];
+        for (const message of deriveFrostP2pkMessages(token)) {
+          groupSignatures.push(await signWithFrostPair(frostGroup, message));
+        }
+
+        const providerSigned = signP2PKProofs(lockedProofs, provider.secretKey);
+        const merged = appendFrostP2PKGroupSignatures(
+          providerSigned,
+          groupSignatures,
+        );
+        for (const proof of merged) {
+          const witness = typeof proof.witness === "string"
+            ? JSON.parse(proof.witness)
+            : proof.witness;
+          expect(witness.signatures.length).toBe(2);
+        }
+
+        const totalSats = lockedProofs.reduce((s, p) => s + p.amount, 0);
+        const fee = wallet.getFeesForProofs(lockedProofs);
+        await throttleMintOp();
+        const { send: redeemed } = await retryOnRateLimit(() =>
+          wallet.ops
+            .send(totalSats - fee, merged)
+            .run()
+        );
+
+        expect(redeemed.length).toBeGreaterThan(0);
+        expect(redeemed.reduce((s, p) => s + p.amount, 0)).toBe(
+          totalSats - fee,
+        );
+      },
+    );
 
     // -------------------------------------------------------------------------
     // Step 7: Verify Bob CANNOT produce valid P2PK signatures for Alice's proofs
@@ -496,11 +724,10 @@ describe("FROST P2PK structural tests (no mint required)", () => {
       .lockUntil(locktime)
       .addRefundPubkey(refund.publicKey)
       .requireRefundSignatures(1)
-      .sigAll()
       .toOptions();
 
     expect(opts.locktime).toBe(locktime);
-    expect(opts.sigFlag).toBe("SIG_ALL");
+    expect(opts.sigFlag ?? "SIG_INPUTS").toBe("SIG_INPUTS");
 
     const pubkeys = Array.isArray(opts.pubkey) ? opts.pubkey : [opts.pubkey];
     expect(pubkeys.length).toBe(2);
@@ -524,7 +751,7 @@ describe("FROST P2PK structural tests (no mint required)", () => {
         tags: [
           ["pubkeys", `02${key1.publicKey}`, `02${key2.publicKey}`],
           ["n_sigs", "2"],
-          ["sigflag", "SIG_ALL"],
+          ["sigflag", "SIG_INPUTS"],
         ],
       },
     ]);

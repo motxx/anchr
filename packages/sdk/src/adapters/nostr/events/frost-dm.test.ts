@@ -18,7 +18,7 @@ describe("FROST DM building and parsing", () => {
       oracle,
       provider.publicKey,
       "query_frost_1",
-      "sig_" + "ab".repeat(32),
+      ["ab".repeat(64)],
       "gpk_" + "cd".repeat(16),
     );
 
@@ -38,7 +38,7 @@ describe("FROST DM building and parsing", () => {
   test("buildFrostSignatureDM event can be decrypted by recipient with parseOracleDM", () => {
     const oracle = generateEphemeralIdentity();
     const provider = generateEphemeralIdentity();
-    const groupSig = "ab".repeat(32);
+    const groupSig = ["ab".repeat(64)];
     const groupPubkey = "cd".repeat(16);
 
     const event = buildFrostSignatureDM(
@@ -60,7 +60,7 @@ describe("FROST DM building and parsing", () => {
   test("parsed payload has type frost_signature with correct fields", () => {
     const oracle = generateEphemeralIdentity();
     const provider = generateEphemeralIdentity();
-    const groupSig = "deadbeef".repeat(8);
+    const groupSig = ["deadbeef".repeat(16)];
     const groupPubkey = "cafebabe".repeat(4);
 
     const event = buildFrostSignatureDM(
@@ -80,7 +80,7 @@ describe("FROST DM building and parsing", () => {
     expect(parsed?.type).toBe("frost_signature");
     if (parsed?.type !== "frost_signature") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_frost_3");
-    expect(parsed.group_signature).toBe(groupSig);
+    expect(parsed.group_signature).toEqual(groupSig);
     expect(parsed.group_pubkey).toBe(groupPubkey);
   });
 
@@ -89,7 +89,7 @@ describe("FROST DM building and parsing", () => {
     const provider = generateEphemeralIdentity();
 
     const queryId = "roundtrip_" + Date.now();
-    const groupSig = "ff".repeat(32);
+    const groupSig = ["ff".repeat(64)];
     const groupPubkey = "ee".repeat(16);
 
     const event = buildFrostSignatureDM(
@@ -108,7 +108,7 @@ describe("FROST DM building and parsing", () => {
     expect(parsed?.type).toBe("frost_signature");
     if (parsed?.type !== "frost_signature") throw new Error("unreachable");
     expect(parsed.query_id).toBe(queryId);
-    expect(parsed.group_signature).toBe(groupSig);
+    expect(parsed.group_signature).toEqual(groupSig);
     expect(parsed.group_pubkey).toBe(groupPubkey);
   });
 

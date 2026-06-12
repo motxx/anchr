@@ -37,6 +37,7 @@ import type { FrostCoordinator } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
 import {
   coordinateSigning,
+  deriveFrostP2pkMessages,
   deriveFrostSigningMessage,
 } from "../../payments/mod.ts";
 import {
@@ -304,41 +305,52 @@ export function createOracleNostrService(
     // /frost/signer/round1 endpoint independently verifies before signing;
     // peers that fail verification refuse to participate → below threshold
     // = no signature.
-    const messageHex = deriveFrostSigningMessage(queryId);
-
-    const sigResult = await coordinateSigning(
-      {
-        nodeConfig: frostNodeConfig,
-        requirement: requestToRequirement(query),
-        input: resultToVerificationInput(result),
-      },
-      messageHex,
-    );
-
-    if (!sigResult) {
-      log.error(`FROST signing failed for ${queryId} — threshold not met`);
-      const dm = buildRejectionDM(
-        config.identity,
-        providerPubkey,
-        queryId,
-        "FROST threshold not met — insufficient Oracle approvals",
+    const escrowToken = query.escrow?.type === "p2pk_frost"
+      ? query.escrow.escrow_token
+      : undefined;
+    const messages = escrowToken
+      ? deriveFrostP2pkMessages(escrowToken)
+      : [deriveFrostSigningMessage(queryId)];
+    const groupSignatures: string[] = [];
+    const signers = new Set<number>();
+    for (const messageHex of messages) {
+      const sigResult = await coordinateSigning(
+        {
+          nodeConfig: frostNodeConfig,
+          requirement: requestToRequirement(query),
+          input: resultToVerificationInput(result),
+          escrowToken,
+        },
+        messageHex,
       );
-      await relayClient.publish(dm);
-      return { passed: false, terminal: true };
+
+      if (!sigResult) {
+        log.error(`FROST signing failed for ${queryId} — threshold not met`);
+        const dm = buildRejectionDM(
+          config.identity,
+          providerPubkey,
+          queryId,
+          "FROST threshold not met — insufficient Oracle approvals",
+        );
+        await relayClient.publish(dm);
+        return { passed: false, terminal: true };
+      }
+      groupSignatures.push(sigResult.signature);
+      for (const signer of sigResult.signers_participated) signers.add(signer);
     }
 
     const dm = buildFrostSignatureDM(
       config.identity,
       providerPubkey,
       queryId,
-      sigResult.signature,
+      groupSignatures,
       frostNodeConfig.group_pubkey,
     );
     const publishResult = await relayClient.publish(dm);
     if (publishResult.successes.length > 0) {
       log.info(
         `FROST signature delivered to Provider for ${queryId} (signers: ${
-          sigResult.signers_participated.join(",")
+          [...signers].join(",")
         })`,
       );
       return { passed: true, terminal: true };

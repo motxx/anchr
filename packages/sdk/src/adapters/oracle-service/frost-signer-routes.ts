@@ -1,9 +1,12 @@
 import type { Hono, MiddlewareHandler } from "hono";
 import { verifyProof } from "../../proofs/verification/verifier.ts";
 import {
+  deriveFrostEscrowTokenHash,
+  deriveFrostP2pkMessages,
   deriveFrostSigningMessage,
   signRound1,
   signRound2,
+  tokenMatchesFrostP2pkLock,
 } from "../../payments/mod.ts";
 import type { FrostNodeConfig } from "../../payments/mod.ts";
 import type { BlossomKeyMap } from "../../values.ts";
@@ -52,6 +55,7 @@ export function registerFrostSignerRoutes(
       requirement: VerificationRequirement;
       input: VerificationInput;
       blossom_keys?: BlossomKeyMap;
+      escrow_token?: string;
     }>().catch(() => null);
     if (!body?.message || !body?.requirement || !body?.input) {
       return c.json({ error: "Missing message, requirement, or input" }, 400);
@@ -75,8 +79,12 @@ export function registerFrostSignerRoutes(
     // The signer only commits to the message it can re-derive from the
     // requirement it just verified — a coordinator that passed verification
     // for query X cannot obtain a share over an arbitrary other message.
-    const expectedMessage = deriveFrostSigningMessage(body.requirement.id);
-    if (body.message !== expectedMessage) {
+    if (
+      !isAllowedSigningMessage(body.message, body.requirement, {
+        escrowToken: body.escrow_token,
+        groupPubkey: deps.frostNodeConfig.group_pubkey,
+      })
+    ) {
       return c.json(
         { error: "Message does not match the verified requirement" },
         403,
@@ -93,7 +101,7 @@ export function registerFrostSignerRoutes(
     const nonceId = crypto.randomUUID();
     pendingNonces.set(nonceId, {
       noncesJson: JSON.stringify(result.data!.nonces),
-      messageHex: expectedMessage,
+      messageHex: body.message,
     });
 
     return c.json({ commitments: result.data!.commitments, nonce_id: nonceId });
@@ -135,4 +143,23 @@ export function registerFrostSignerRoutes(
     if (!result.ok) return c.json({ error: result.error }, 500);
     return c.json({ signature_share: result.data!.signature_share });
   });
+}
+
+function isAllowedSigningMessage(
+  message: string,
+  requirement: VerificationRequirement,
+  context: { escrowToken?: string; groupPubkey: string },
+): boolean {
+  if (message === deriveFrostSigningMessage(requirement.id)) return true;
+  if (!context.escrowToken || !requirement.escrow_token_hash) return false;
+  if (
+    deriveFrostEscrowTokenHash(context.escrowToken) !==
+      requirement.escrow_token_hash
+  ) {
+    return false;
+  }
+  if (!tokenMatchesFrostP2pkLock(context.escrowToken, context.groupPubkey)) {
+    return false;
+  }
+  return deriveFrostP2pkMessages(context.escrowToken).includes(message);
 }

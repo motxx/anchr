@@ -7,6 +7,7 @@ import {
   P2PKBuilder,
   type P2PKOptions,
   type Proof,
+  signP2PKProofs,
 } from "@cashu/cashu-ts";
 import type { EscrowProvider } from "../../requests/application/ports.ts";
 import {
@@ -17,6 +18,7 @@ import {
   sumProofAmounts,
 } from "./cashu-escrow-helpers.ts";
 import { verifyToken } from "./cashu-wallet.ts";
+import { redeemSignedProofs } from "./redeem-swap.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-escrow"]);
@@ -26,6 +28,12 @@ export interface FrostEscrowConfig {
   groupPubkey: string;
   /** Source proofs resolver. */
   sourceProofsResolver?: (amount: number) => Promise<Proof[]>;
+}
+
+export interface FrostP2pkRedeemResult {
+  token: string;
+  proofs: Proof[];
+  amountSats: number;
 }
 
 export function buildFrostP2PKOptions(
@@ -45,7 +53,6 @@ export function buildFrostP2PKOptions(
     .lockUntil(locktimeSeconds)
     .addRefundPubkey(customerRefundPubkey)
     .requireRefundSignatures(1)
-    .sigAll()
     .toOptions();
 }
 
@@ -166,18 +173,30 @@ export function createFrostEscrowProvider(
           if (!Array.isArray(secret) || secret[0] !== "P2PK") {
             return { ok: false, message: "Not a P2PK proof" };
           }
-          const tags: string[][] = secret[1]?.tags ?? [];
-          const pubkeys = tags.find((t: string[]) => t[0] === "pubkeys");
-          if (!pubkeys) {
-            return { ok: false, message: "No pubkeys tag in P2PK proof" };
+          const body = secret[1];
+          if (!isRecord(body)) {
+            return { ok: false, message: "Malformed P2PK proof" };
           }
-          const hasProvider = pubkeys.slice(1).some((pk: string) =>
-            pk === provider_pubkey || pk === `02${provider_pubkey}` ||
-            pk === `03${provider_pubkey}`
+          const tags = readStringTags(body.tags);
+          const lockPubkeys: string[] = [];
+          if (typeof body.data === "string") lockPubkeys.push(body.data);
+          const pubkeys = tags.find((tag) => tag[0] === "pubkeys");
+          if (pubkeys) lockPubkeys.push(...pubkeys.slice(1));
+          if (lockPubkeys.length === 0) {
+            return { ok: false, message: "No lock pubkeys in P2PK proof" };
+          }
+          const nSigs = tags.find((tag) => tag[0] === "n_sigs");
+          if (nSigs?.[1] !== "2") {
+            return {
+              ok: false,
+              message: "FROST P2PK lock must require 2 signatures",
+            };
+          }
+          const hasProvider = lockPubkeys.some((pk) =>
+            sameXOnlyPubkey(pk, provider_pubkey)
           );
-          const hasGroup = pubkeys.slice(1).some((pk: string) =>
-            pk === config.groupPubkey || pk === `02${config.groupPubkey}` ||
-            pk === `03${config.groupPubkey}`
+          const hasGroup = lockPubkeys.some((pk) =>
+            sameXOnlyPubkey(pk, config.groupPubkey)
           );
           if (!hasProvider) {
             return { ok: false, message: "Provider pubkey not in P2PK lock" };
@@ -216,4 +235,111 @@ export function createFrostEscrowProvider(
       return { cancelled: deleted };
     },
   };
+}
+
+export async function redeemFrostP2PKToken(
+  encodedToken: string,
+  providerPrivateKey: string,
+  groupSignatures: string[],
+): Promise<FrostP2pkRedeemResult | null> {
+  const ctx = await getWalletAndConfig();
+  if (!ctx) return null;
+
+  const decoded = getDecodedToken(encodedToken);
+  const providerSigned = signP2PKProofs(decoded.proofs, providerPrivateKey);
+  const signedProofs = appendFrostP2PKGroupSignatures(
+    providerSigned,
+    groupSignatures,
+  );
+  const redeem = await redeemSignedProofs({
+    wallet: ctx.wallet,
+    signedProofs,
+    signingPrivateKey: providerPrivateKey,
+  });
+  if (!redeem.ok) {
+    if (redeem.uncertain) {
+      throw new Error(
+        "redeemFrostP2PKToken: mint swap failed with inputs spent or unknowable — check the mint before retrying",
+        { cause: redeem.cause },
+      );
+    }
+    log.error(
+      "Failed to redeem FROST P2PK token:",
+      redeem.cause instanceof Error ? redeem.cause.message : redeem.reason,
+    );
+    return null;
+  }
+  return {
+    token: encodeProofs(ctx.config.mintUrl, redeem.proofs),
+    proofs: redeem.proofs,
+    amountSats: redeem.amountSats,
+  };
+}
+
+export function appendFrostP2PKGroupSignatures(
+  proofs: Proof[],
+  groupSignatures: string[],
+): Proof[] {
+  if (proofs.length !== groupSignatures.length) {
+    throw new Error("FROST signature count must match proof count");
+  }
+  return proofs.map((proof, index) => {
+    const witness = parseWitness(proof.witness);
+    const signatures = getWitnessSignatures(witness);
+    const groupSignature = groupSignatures[index];
+    if (groupSignature === undefined) {
+      throw new Error("Missing FROST group signature for proof");
+    }
+    return {
+      ...proof,
+      witness: JSON.stringify({
+        ...witness,
+        signatures: [...signatures, groupSignature],
+      }),
+    };
+  });
+}
+
+function parseWitness(witness: unknown): Record<string, unknown> {
+  if (typeof witness === "string") {
+    try {
+      const parsed = JSON.parse(witness);
+      return isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return isRecord(witness) ? witness : {};
+}
+
+function getWitnessSignatures(witness: Record<string, unknown>): string[] {
+  const signatures = witness.signatures;
+  if (!Array.isArray(signatures)) return [];
+  return signatures.filter((entry) => typeof entry === "string");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readStringTags(value: unknown): string[][] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string[] =>
+    Array.isArray(entry) &&
+    entry.every((item) => typeof item === "string")
+  );
+}
+
+function sameXOnlyPubkey(candidate: string, expected: string): boolean {
+  return toXOnly(candidate).toLowerCase() === toXOnly(expected).toLowerCase();
+}
+
+function toXOnly(pubkey: string): string {
+  if (
+    pubkey.length === 66 &&
+    (pubkey.startsWith("02") || pubkey.startsWith("03"))
+  ) {
+    return pubkey.slice(2);
+  }
+  return pubkey;
 }

@@ -26,7 +26,6 @@
  */
 
 import {
-  CheckStateEnum,
   getDecodedToken,
   isHTLCSpendAuthorised,
   P2PKBuilder,
@@ -43,6 +42,7 @@ import {
   loadAndSend,
   sumProofAmounts,
 } from "./cashu-escrow-helpers.ts";
+import { redeemSignedProofs } from "./redeem-swap.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 import {
@@ -322,59 +322,33 @@ export async function redeemHtlcToken(
   const verifyError = verifyHtlcSpendAuth(signedProofs);
   if (verifyError) return null;
 
-  const amountSats = computeNetAmount(ctx.wallet, signedProofs);
-  if (amountSats === null) {
-    log.error("Fee exceeds total amount");
-    return null;
-  }
-
-  let send: Proof[];
-  try {
-    send = await loadAndSend(
-      ctx.wallet,
-      amountSats,
-      signedProofs,
-      undefined,
-      providerPrivateKey,
-    );
-  } catch (error) {
-    // A committed-but-unanswered swap must never be reported as a plain
-    // failure: with the inputs spent (or unknowable) at the mint, a null
-    // would make the caller treat a possibly-settled redemption as a burned
-    // token. Surface the uncertainty loudly instead.
-    const spent = await anyInputSpent(ctx.wallet, signedProofs);
-    if (spent !== false) {
+  const redeem = await redeemSignedProofs({
+    wallet: ctx.wallet,
+    signedProofs,
+    signingPrivateKey: providerPrivateKey,
+  });
+  if (!redeem.ok) {
+    if (redeem.reason === "fee_exceeds_amount") {
+      log.error("Fee exceeds total amount");
+      return null;
+    }
+    if (redeem.reason !== "inputs_unspent" && redeem.uncertain) {
       throw new Error(
         "redeemHtlcToken: mint swap failed with inputs spent or unknowable — check the mint before retrying; do not treat the token as burned",
-        { cause: error },
+        { cause: redeem.cause },
       );
     }
     log.error(
       "Failed to redeem HTLC token (inputs unspent — safe to retry):",
-      error instanceof Error ? error.message : error,
+      redeem.cause instanceof Error ? redeem.cause.message : redeem.cause,
     );
     return null;
   }
   return {
-    token: encodeProofs(ctx.config.mintUrl, send),
-    proofs: send,
-    amountSats,
+    token: encodeProofs(ctx.config.mintUrl, redeem.proofs),
+    proofs: redeem.proofs,
+    amountSats: redeem.amountSats,
   };
-}
-
-/** True/false when the mint answered; null when the state is unknowable. */
-async function anyInputSpent(
-  wallet: NonNullable<
-    Awaited<ReturnType<typeof getWalletAndConfig>>
-  >["wallet"],
-  proofs: Proof[],
-): Promise<boolean | null> {
-  try {
-    const states = await wallet.checkProofsStates(proofs);
-    return states.some((s) => s.state === CheckStateEnum.SPENT);
-  } catch {
-    return null;
-  }
 }
 
 function prepareHtlcWitness(

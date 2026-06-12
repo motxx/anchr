@@ -23,8 +23,8 @@ export interface RejectionDMPayload {
 export interface FrostSignatureDMPayload {
   type: "frost_signature";
   query_id: string;
-  /** BIP-340 Schnorr signature hex (from FROST threshold signing). */
-  group_signature: string;
+  /** BIP-340 Schnorr signature hex values, ordered by token proof. */
+  group_signature: string[];
   /** FROST group public key for verification. */
   group_pubkey: string;
 }

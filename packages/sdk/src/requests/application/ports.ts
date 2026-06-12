@@ -103,7 +103,7 @@ export interface OracleRegistry {
  * requirement/evidence so each peer signer can re-check independently
  * before contributing a share.
  *
- * Returns the aggregated signature as a hex string on success.
+ * Returns aggregated signatures as hex strings on success.
  * Returns `null` when the threshold cannot be met, the coordinator is
  * unreachable, or signing was rejected — callers must treat `null` as
  * "settlement not available, do not include in the response."
@@ -113,7 +113,7 @@ export interface FrostSignaturePort {
     query: Query,
     result: QueryResult,
     blossomKeys?: BlossomKeyMap,
-  ): Promise<string | null>;
+  ): Promise<string[] | null>;
 }
 
 // ── Proof delivery (Nostr publish or customer-only DM) ───────────

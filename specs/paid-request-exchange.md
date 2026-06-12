@@ -115,6 +115,46 @@ Oracle release depends on proof validity and expected authority. A host,
 coordinator, adapter, or Customer cancel observed after proof verification must
 not suppress Release Material for valid completed work.
 
+## FROST P2PK Settlement
+
+For `p2pk_frost` settlement, the Provider Redemption Token is a Cashu NUT-11
+P2PK token. Each proof MUST be locked to the selected Provider pubkey and the
+FROST group pubkey with `n_sigs=2`, a Customer refund key, and the request
+locktime. The lock uses NUT-11 `SIG_INPUTS` semantics.
+
+The FROST group signs one message per proof:
+
+```text
+message_i = sha256(utf8(proof_i.secret))
+```
+
+The Oracle release material for `p2pk_frost` is the ordered array of aggregated
+BIP-340 FROST signatures, one entry per proof in the encoded Provider
+Redemption Token. A Provider redeems by signing the same proofs with its
+Provider key, appending the corresponding group signature to each proof
+witness, and swapping the signed proofs at the mint. The Provider does not need
+and must not receive a FROST group private key.
+
+`SIG_INPUTS` is required because peers can derive each mint-spendable message
+from the token they verify. `SIG_ALL` would include the Provider's chosen swap
+outputs, forcing peers to sign coordinator-selected output material and making
+independent message derivation impractical for the threshold group.
+
+Before a peer signer contributes a nonce or signature share for a token-bound
+FROST P2PK release, it MUST:
+
+- verify the submitted proof material against the request requirement;
+- verify `sha256(utf8(encoded_token))` equals the token hash carried in the
+  verified requirement;
+- verify every token proof is a P2PK proof whose lock includes this peer's
+  configured FROST group pubkey and `n_sigs=2`;
+- accept only messages in the derived set
+  `sha256(utf8(proof.secret))` for that token.
+
+The coordinator MUST run a separate FROST signing session for each proof
+message. Nonces from one proof message are never reused for another proof
+message.
+
 ## Security Invariants
 
 Security claims live in [`docs/threat-model.md`](../docs/threat-model.md), not

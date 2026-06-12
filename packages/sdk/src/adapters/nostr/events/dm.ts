@@ -86,7 +86,7 @@ export function buildFrostSignatureDM(
   oracleIdentity: NostrIdentity,
   providerPubKey: string,
   queryId: string,
-  groupSignature: string,
+  groupSignature: string[],
   groupPubkey: string,
 ): VerifiedEvent {
   const payload: FrostSignatureDMPayload = {
@@ -127,11 +127,16 @@ function isOracleDMPayload(value: unknown): value is OracleDMPayload {
     case "rejection":
       return typeof value.reason === "string";
     case "frost_signature":
-      return typeof value.group_signature === "string" &&
+      return isStringArray(value.group_signature) &&
         typeof value.group_pubkey === "string";
     default:
       return false;
   }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) &&
+    value.every((entry) => typeof entry === "string");
 }
 
 /**

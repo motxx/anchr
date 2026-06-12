@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { Hono } from "hono";
+import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
 import { buildOracleApp } from "./server.ts";
 import { buildAuthMiddleware } from "./auth.ts";
 import {
@@ -9,6 +10,8 @@ import {
 } from "./frost-signer-routes.ts";
 import {
   createFrostCoordinator,
+  deriveFrostEscrowTokenHash,
+  deriveFrostP2pkMessages,
   deriveFrostSigningMessage,
 } from "../../payments/mod.ts";
 import type {
@@ -17,6 +20,7 @@ import type {
 } from "../../payments/mod.ts";
 
 const API_KEY = "frost-test-key";
+const KEYSET_ID = "00ad268c4d1f5826";
 
 const authHeaders = (extra?: Record<string, string>) => ({
   "authorization": `Bearer ${API_KEY}`,
@@ -288,6 +292,32 @@ describe("oracle-server FROST signer message binding", () => {
     return app;
   }
 
+  function makeP2pkToken(params: {
+    groupPubkey: string;
+    nSigs: string;
+  }): string {
+    const proof: Proof = {
+      amount: 1,
+      id: KEYSET_ID,
+      secret: JSON.stringify([
+        "P2PK",
+        {
+          data: "02" + "11".repeat(32),
+          nonce: "testnonce",
+          tags: [
+            ["pubkeys", `02${params.groupPubkey}`],
+            ["n_sigs", params.nSigs],
+            ["sigflag", "SIG_INPUTS"],
+          ],
+        },
+      ]),
+      C: "02" + "22".repeat(32),
+    };
+    return getEncodedToken({ mint: "https://mint.example", proofs: [proof] }, {
+      version: 4,
+    });
+  }
+
   test("round1 rejects a message that does not match the verified requirement (403)", async () => {
     const pendingNonces = new Map<string, PendingNonceSession>();
     const app = buildSignerApp(pendingNonces);
@@ -299,6 +329,61 @@ describe("oracle-server FROST signer message binding", () => {
         message: "deadbeef",
         requirement: { id: "q-bind", factors: [] },
         input: { attachments: [] },
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("does not match");
+    expect(pendingNonces.size).toBe(0);
+  });
+
+  test("round1 rejects a token-bound P2PK message without a matching token hash", async () => {
+    const pendingNonces = new Map<string, PendingNonceSession>();
+    const app = buildSignerApp(pendingNonces);
+    const token = makeP2pkToken({
+      groupPubkey: frostNodeConfig.group_pubkey,
+      nSigs: "2",
+    });
+
+    const res = await app.request("/frost/signer/round1", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        message: deriveFrostP2pkMessages(token)[0],
+        requirement: {
+          id: "q-bind",
+          factors: [],
+          escrow_token_hash: "00".repeat(32),
+        },
+        input: { attachments: [] },
+        escrow_token: token,
+      }),
+    });
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toContain("does not match");
+    expect(pendingNonces.size).toBe(0);
+  });
+
+  test("round1 rejects a token-bound P2PK message when the group key is not in the lock", async () => {
+    const pendingNonces = new Map<string, PendingNonceSession>();
+    const app = buildSignerApp(pendingNonces);
+    const token = makeP2pkToken({ groupPubkey: "33".repeat(32), nSigs: "2" });
+
+    const res = await app.request("/frost/signer/round1", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        message: deriveFrostP2pkMessages(token)[0],
+        requirement: {
+          id: "q-bind",
+          factors: [],
+          escrow_token_hash: deriveFrostEscrowTokenHash(token),
+        },
+        input: { attachments: [] },
+        escrow_token: token,
       }),
     });
 

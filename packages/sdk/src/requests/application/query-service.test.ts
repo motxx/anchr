@@ -842,7 +842,7 @@ describe("submitEscrowResult", () => {
     const mockFrost = {
       requestSignature: async (query: Query, result: QueryResult) => {
         requested.push({ queryId: query.id, notes: result.notes });
-        return "deadbeef".repeat(8);
+        return ["deadbeef".repeat(8)];
       },
     };
     const store = createQueryStore();
@@ -872,7 +872,7 @@ describe("submitEscrowResult", () => {
       "test-oracle",
     );
     expect(outcome.ok).toBe(true);
-    expect(outcome.frost_signature).toBe("deadbeef".repeat(8));
+    expect(outcome.frost_signature).toEqual(["deadbeef".repeat(8)]);
     expect(outcome.preimage).toBeUndefined();
     expect(requested).toHaveLength(1);
     expect(requested[0]!.queryId).toBe(query.id);
@@ -884,7 +884,7 @@ describe("submitEscrowResult", () => {
     const mockFrost = {
       requestSignature: async (_q: Query, _r: QueryResult) => {
         calls++;
-        return "should_not_appear";
+        return ["should_not_appear"];
       },
     };
     const store = createQueryStore();

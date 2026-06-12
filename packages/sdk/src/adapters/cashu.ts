@@ -23,17 +23,12 @@
  */
 
 import {
-  CheckStateEnum,
   getDecodedToken,
   getEncodedToken,
   Mint,
-  OutputData,
-  type OutputDataLike,
   type P2PKOptions,
   type Proof,
   type RequestFn,
-  type SerializedBlindedMessage,
-  type SerializedBlindedSignature,
   signP2PKProofs,
   verifyHTLCHash,
   Wallet,
@@ -42,6 +37,12 @@ import {
   buildHtlcFinalOptions,
   buildHtlcPreselectionOptions,
 } from "../payments/cashu/cashu-htlc-options.ts";
+import {
+  type CashuRedeemSendChain,
+  type CashuRedeemWallet,
+  redeemSignedProofs,
+  type RedeemSwapResult,
+} from "../payments/cashu/redeem-swap.ts";
 import type {
   BindProviderParams,
   BuildHtlcLockParams,
@@ -69,15 +70,9 @@ export type {
  * faking the full cashu-ts `Wallet` class (which has private fields).
  * The real `Wallet` from cashu-ts also satisfies this interface.
  */
-export interface CashuSendChain {
-  asP2PK(options: P2PKOptions): CashuSendChain;
-  privkey(k: string | string[]): CashuSendChain;
-  /** Pre-registered swap outputs — enables interrupted-swap recovery. */
-  asCustom?(data: OutputDataLike[]): CashuSendChain;
-  run(): Promise<{ send: Proof[] }>;
-}
+export type CashuSendChain = CashuRedeemSendChain;
 
-export interface CashuWalletAdapter {
+export interface CashuWalletAdapter extends CashuRedeemWallet {
   ops: {
     send(amount: number, proofs: Proof[]): CashuSendChain;
   };
@@ -95,19 +90,6 @@ export interface CashuWalletAdapter {
    */
   keyChain: {
     getAllKeysetIds(): readonly string[];
-  };
-  /** NUT-07 proof-state check — classifies interrupted-swap failures. */
-  checkProofsStates?(
-    proofs: Array<Pick<Proof, "secret">>,
-  ): Promise<Array<{ state: string }>>;
-  /** Active keyset (id + keys) — pre-generates recoverable swap outputs. */
-  getKeyset?(): { id: string; keys: Record<number, string> };
-  /** NUT-09 restore — re-requests signatures for pre-registered outputs. */
-  mint?: {
-    restore(payload: { outputs: SerializedBlindedMessage[] }): Promise<{
-      outputs: SerializedBlindedMessage[];
-      signatures: SerializedBlindedSignature[];
-    }>;
   };
 }
 
@@ -255,84 +237,44 @@ function prepareHtlcRedemption(
   return signP2PKProofs(withPreimage, privkeyHex);
 }
 
-/**
- * Classify and, where possible, recover a redeem swap whose response was
- * lost. A network error must never burn the token:
- *   - inputs unspent → the swap never committed; safe to retry.
- *   - inputs spent + pre-registered outputs → recover the fresh proofs via
- *     NUT-09 restore (the mint re-issues signatures for known outputs).
- *   - anything unknowable → a distinct "uncertain — check mint" error.
- */
-async function recoverInterruptedRedeem(
-  wallet: CashuWalletAdapter,
-  inputs: Proof[],
-  outputData: OutputData[] | null,
-  keyset: { id: string; keys: Record<number, string> } | undefined,
-  cause: unknown,
-): Promise<Proof[]> {
-  if (!wallet.checkProofsStates) {
-    throw new CashuMintError("redeemHtlc: mint swap failed", cause);
+function mapRedeemFailure(result: RedeemSwapResult): never {
+  if (result.ok) {
+    throw new CashuMintError("redeemHtlc: unexpected redeem result");
   }
-
-  let states: Array<{ state: string }>;
-  try {
-    states = await wallet.checkProofsStates(inputs);
-  } catch (stateErr) {
-    throw new CashuMintUncertainError(
-      "redeemHtlc: mint swap failed and the input state could not be checked — keep the token and retry once the mint is reachable",
-      stateErr,
-    );
+  switch (result.reason) {
+    case "fee_exceeds_amount":
+      throw new CashuMintError(
+        `redeemHtlc: mint fee ${result.fee} exceeds available ${result.totalAmount} sats`,
+        result.cause,
+      );
+    case "mint_error":
+      throw new CashuMintError("redeemHtlc: mint swap failed", result.cause);
+    case "state_unknown":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: mint swap failed and the input state could not be checked — keep the token and retry once the mint is reachable",
+        result.cause,
+      );
+    case "inputs_unspent":
+      throw new CashuMintError(
+        "redeemHtlc: mint swap failed; inputs are unspent — safe to retry with the same token",
+        result.cause,
+      );
+    case "outputs_not_registered":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent at the mint but no recoverable outputs were registered — check the mint before retrying",
+        result.cause,
+      );
+    case "restore_failed":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent and NUT-09 restore failed — outputs remain recoverable; check the mint",
+        result.cause,
+      );
+    case "restore_empty":
+      throw new CashuMintUncertainError(
+        "redeemHtlc: inputs are spent but the mint returned no signatures for the registered outputs — check the mint",
+        result.cause,
+      );
   }
-
-  const anySpent = states.some((s) => s.state === CheckStateEnum.SPENT);
-  if (!anySpent) {
-    throw new CashuMintError(
-      "redeemHtlc: mint swap failed; inputs are unspent — safe to retry with the same token",
-      cause,
-    );
-  }
-
-  if (!outputData || !keyset || !wallet.mint) {
-    throw new CashuMintUncertainError(
-      "redeemHtlc: inputs are spent at the mint but no recoverable outputs were registered — check the mint before retrying",
-      cause,
-    );
-  }
-
-  // The swap committed mint-side; re-request signatures for our
-  // pre-registered blinded outputs and unblind them locally.
-  let restored: {
-    outputs: SerializedBlindedMessage[];
-    signatures: SerializedBlindedSignature[];
-  };
-  try {
-    restored = await wallet.mint.restore({
-      outputs: outputData.map((o) => o.blindedMessage),
-    });
-  } catch (restoreErr) {
-    throw new CashuMintUncertainError(
-      "redeemHtlc: inputs are spent and NUT-09 restore failed — outputs remain recoverable; check the mint",
-      restoreErr,
-    );
-  }
-
-  const byBlindedMessage = new Map(
-    outputData.map((o) => [o.blindedMessage.B_, o]),
-  );
-  const recovered: Proof[] = [];
-  for (let i = 0; i < restored.outputs.length; i++) {
-    const data = byBlindedMessage.get(restored.outputs[i]!.B_);
-    const signature = restored.signatures[i];
-    if (data === undefined || signature === undefined) continue;
-    recovered.push(data.toProof(signature, keyset));
-  }
-  if (recovered.length === 0) {
-    throw new CashuMintUncertainError(
-      "redeemHtlc: inputs are spent but the mint returned no signatures for the registered outputs — check the mint",
-      cause,
-    );
-  }
-  return recovered;
 }
 
 /**
@@ -522,43 +464,16 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         p.preimageHex,
         privkeyHex,
       );
-      const totalAmount = sumAmounts(signedProofs);
-
-      const fee = wallet.getFeesForProofs(signedProofs);
-      const swapAmount = totalAmount - fee;
-      if (swapAmount <= 0) {
-        throw new CashuMintError(
-          `redeemHtlc: mint fee ${fee} exceeds available ${totalAmount} sats`,
-        );
-      }
-
-      // Pre-generate the swap outputs when the wallet supports it, so a
-      // committed-but-unanswered swap can be recovered via NUT-09 restore
-      // instead of burning the token.
-      const keyset = wallet.getKeyset?.();
-      let outputData: OutputData[] | null = null;
-      let chain = wallet.ops.send(swapAmount, signedProofs).privkey(privkeyHex);
-      if (keyset && chain.asCustom) {
-        outputData = OutputData.createRandomData(swapAmount, keyset);
-        chain = chain.asCustom(outputData);
-      }
-
-      let received: Proof[];
-      try {
-        const result = await chain.run();
-        received = result.send;
-      } catch (err) {
-        received = await recoverInterruptedRedeem(
-          wallet,
-          signedProofs,
-          outputData,
-          keyset,
-          err,
-        );
-      }
+      const redeem = await redeemSignedProofs({
+        wallet,
+        signedProofs,
+        signingPrivateKey: privkeyHex,
+      });
+      if (!redeem.ok) mapRedeemFailure(redeem);
+      const received = redeem.proofs;
       return {
         proofs: received as CashuProof[],
-        amountSats: sumAmounts(received),
+        amountSats: redeem.amountSats,
       };
     },
   };
