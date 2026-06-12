@@ -74,7 +74,7 @@ From `docs/production-readiness-audit.md` §2.5/§2.6:
 
 - Re-read `oracle-service.ts`, `oracle-handlers.ts`, `events/events.ts`, and
   the canonical `@anchr/protocol/events` parser to decide keep-and-fix vs
-  remove-from-v0. This issue may be split with `make-sub-issues` if keep-and-fix
+  remove-from-v0. This issue may be split with `make-issues` if keep-and-fix
   is one change too large.
 - If kept: replace `parseOracleResponsePayload` with
   `parseOracleQueryResponseEvent`, carry the real `Query` into the watched

@@ -79,6 +79,14 @@ Links, code references, logs, threat-model notes, or compatibility constraints.
 - Another concrete next step
 ```
 
+Priority must be one of:
+
+- `bug`: incorrect behavior or regression.
+- `feature`: new user-visible or developer-facing capability.
+- `design`: architecture, API, UX, protocol, or product decision work.
+- `maintenance`: cleanup, refactor, docs, tooling, dependency, or test debt.
+- `investigation`: unknown root cause or research needed before implementation.
+
 `Acceptance` should state observable completion conditions, not implementation
 steps. `Verification` should state focused commands or manual checks that prove
 the issue is resolved. Use `- Unknown until investigation` for investigation
@@ -134,8 +142,8 @@ Resolution starts by re-reading the current repository state. If the target
 issue is too broad for one coherent, verifiable change, split it before editing
 implementation code:
 
-1. Use `skills/make-sub-issues/SKILL.md` to create independently closeable
-   child issues.
+1. Use `skills/make-issues/SKILL.md` (child-issue mode) to create
+   independently closeable child issues.
 2. Set each child issue's `Blocks` list to the parent issue number.
 3. Add each child issue number to the parent issue's `Depends on` list.
 4. Leave the parent pending until the required children close, unless the

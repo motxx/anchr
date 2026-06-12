@@ -68,7 +68,7 @@ From `docs/production-readiness-audit.md` §2.5:
 ## Plan
 
 - Re-read the FROST escrow + signer code and make the v0 keep/remove decision.
-- Split with `make-sub-issues` if completing FROST escrow is one change too
+- Split with `make-issues` if completing FROST escrow is one change too
   large (refund-key binding, message binding, redeem path, nonce-session safety
   are separable).
 - Fix the nonce-session safety independently first; it is a key-leak risk that

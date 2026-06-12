@@ -41,8 +41,7 @@ from ad hoc review into one of these homes.
 | `skills/arch-lint-llm/SKILL.md` | `semantic skill` | God modules, hidden service locators, duplicated state machines, inappropriate intimacy, oversized functions, and domain leakage that deterministic architecture lint cannot prove. |
 | `skills/check-silent-bypass/SKILL.md` | `semantic skill` | Plausible-looking branches that skip verification, validation, settlement, redemption, auth, signing, or quorum checks. |
 | `skills/resolve-issues/SKILL.md` | `semantic skill` | Issue closure discipline: dependency checks, resolver-led splitting, focused implementation, verification, resolution notes, and moving issues only after checks pass. |
-| `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues without overfitting the implementation split. |
-| `skills/make-sub-issues/SKILL.md` | `semantic skill` | Creating resolver-led child issues and parent/child dependency links when one issue is too broad for a coherent verified change. |
+| `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues without overfitting the implementation split, and creating resolver-led child issues with parent/child dependency links when one issue is too broad for a coherent verified change. |
 | `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
 | `docs/threat-model.md` plus `docs/threat-model.lock.json` | `human universal decision` and `automated` | Security invariants and drift-locked changes to their claims, attacks, and expected outcomes. |
 | `docs/universality-boundaries.md` | `human universal decision` | Placement of universal protocol, security, architecture, package, adapter, example, and agent-harness decisions. |
@@ -99,7 +98,7 @@ the runbook must state which live dependencies remain outside the smoke check.
 | Developer-local path, secret-shaped data, or private operational detail in docs or issue text | `automated` for local paths; `human universal decision` for sensitive disclosure | `deno task lint:paths`, `docs/issues/README.md` | Add a redaction rule or a pending issue when the leak pattern is not local-path-shaped. |
 | Human disagreement about risk acceptance | `human universal decision` | `docs/threat-model.md`, `docs/universality-boundaries.md`, pending issue resolution notes | Record the accepted risk and the harness follow-up, or leave the issue pending. |
 | Review residuals after all required checks pass | `human universal decision` | This document, `docs/issues/README.md`, and pending issue resolution notes | Record only the residual decision, its owning document, or the pending issue that will resolve it. |
-| Broad issue requires implementation-aware decomposition | `semantic skill` | `skills/resolve-issues/SKILL.md`, `skills/make-sub-issues/SKILL.md`, `docs/issues/README.md` | Split the parent before implementation and resolve children as independently verified units. |
+| Broad issue requires implementation-aware decomposition | `semantic skill` | `skills/resolve-issues/SKILL.md`, `skills/make-issues/SKILL.md`, `docs/issues/README.md` | Split the parent before implementation and resolve children as independently verified units. |
 
 ## Not Yet Covered
 
