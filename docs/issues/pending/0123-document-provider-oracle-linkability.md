@@ -24,7 +24,7 @@ exchange is unlinkable. Record the accepted design limit.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.4 (ANON-01):
+From the 2026-06-11 production-readiness audit §2.4 (ANON-01):
 
 - `packages/sdk/src/provider.ts:199-201,226` signs every offer/result/selection
   under one stable key for the Provider's lifecycle;

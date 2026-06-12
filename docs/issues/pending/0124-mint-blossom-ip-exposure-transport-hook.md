@@ -24,7 +24,7 @@ so callers can route those calls over a proxy.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.4 (ANON-02):
+From the 2026-06-11 production-readiness audit §2.4 (ANON-02):
 
 - `packages/sdk/src/attachments/blossom.ts:147-154,193` and the
   `@cashu/cashu-ts` wallet (`packages/sdk/src/payments/cashu/cashu-wallet.ts:36-40`)

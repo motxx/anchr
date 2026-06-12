@@ -25,7 +25,7 @@ and only fails at deploy.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.3 (ARCH-01, folds OPS-08):
+From the 2026-06-11 production-readiness audit §2.3 (ARCH-01, folds OPS-08):
 
 - `scripts/test-all.sh:82,188,193` only `cargo build`s `frost-signer`,
   `tlsn-prover`, `tlsn-verifier`. No `cargo clippy` and no `cargo test` exist

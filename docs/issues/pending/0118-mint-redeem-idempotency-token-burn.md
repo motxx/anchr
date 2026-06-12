@@ -24,7 +24,7 @@ network error must never burn a token.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.5 (PROT-07, folds OPS-03):
+From the 2026-06-11 production-readiness audit §2.5 (PROT-07, folds OPS-03):
 
 - `packages/sdk/src/payments/cashu/cashu-escrow-helpers.ts:34-73` `loadAndSend`
   uses a 30s `Promise.race` timeout that rejects without aborting the in-flight

@@ -7,12 +7,10 @@ Anchr's SDK, protocol, security, verification, or issue workflow.
 
 - [Architecture](architecture.md) - package boundaries and public-surface policy.
 - [Threat model](threat-model.md) - trust assumptions and security invariants.
-- [Protocol conformance audit](protocol-conformance-audit.md) - implemented
-  protocol coverage and tracked gaps.
 - [Universality boundaries](universality-boundaries.md) - where protocol,
   security, package, adapter, example, and harness rules belong.
-- [Resilience checklist](resilience-checklist.md) - current resilience review
-  entry point.
+- [Architecture decision records](adr/) - durable substrate and wire-contract
+  decisions.
 - [Specs](../specs/) - CC0 wire-format and proof-schema contracts.
 
 ## Design Notes

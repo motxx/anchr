@@ -25,7 +25,7 @@ release-authority research only.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.5:
+From the 2026-06-11 production-readiness audit §2.5:
 
 - **PROT-03 (high)** — `packages/sdk/src/payments/cashu/frost-escrow-provider.ts:90-97`
   calls `buildFrostP2PKOptions(provider_pubkey, config.groupPubkey, "",

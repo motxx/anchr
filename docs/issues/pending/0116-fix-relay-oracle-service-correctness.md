@@ -26,7 +26,7 @@ but unexercised.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.5/§2.6:
+From the 2026-06-11 production-readiness audit §2.5/§2.6:
 
 - **SPEC-01 (blocker)** — `packages/sdk/src/adapters/nostr/events/events.ts:42-64`
   defines `OracleResponsePayload` as `{nonce_echo, attachments[], notes}` and

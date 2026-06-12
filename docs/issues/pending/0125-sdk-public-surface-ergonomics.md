@@ -25,7 +25,7 @@ separately by 0122 and is out of scope here.
 
 ## Rationale
 
-From `docs/production-readiness-audit.md` §2.2:
+From the 2026-06-11 production-readiness audit §2.2:
 
 - **SDK-02** — no public `CashuClient` fake in `@anchr/sdk/testing`; the example
   and README hand-roll one (`packages/sdk/src/testing/mod.ts:1-25`,
