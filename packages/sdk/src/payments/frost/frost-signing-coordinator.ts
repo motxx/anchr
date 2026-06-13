@@ -16,6 +16,8 @@ export interface SigningCoordinatorConfig {
   nodeConfig: FrostNodeConfig;
   /** Timeout for HTTP calls to peers (ms). */
   peerTimeoutMs?: number;
+  /** Optional custom fetch implementation; defaults to `globalThis.fetch`. */
+  fetchImpl?: typeof fetch;
   /**
    * Verification requirement + evidence forwarded to each peer's
    * independent verify-and-sign step. Treated opaquely here; the host
@@ -46,6 +48,7 @@ export async function coordinateSigning(
 ): Promise<SigningCoordinatorResult | null> {
   const { nodeConfig } = config;
   const timeoutMs = config.peerTimeoutMs ?? 10_000;
+  const fetchImpl = config.fetchImpl ?? globalThis.fetch;
   const keyPackageJson = JSON.stringify(nodeConfig.key_package);
   const pubkeyPackageJson = JSON.stringify(nodeConfig.pubkey_package);
 
@@ -87,6 +90,7 @@ export async function coordinateSigning(
           }),
         },
         timeoutMs,
+        fetchImpl,
       );
 
       if (!res.ok) {
@@ -152,6 +156,7 @@ export async function coordinateSigning(
           }),
         },
         timeoutMs,
+        fetchImpl,
       );
 
       if (!res.ok) {
@@ -223,11 +228,12 @@ async function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
+  fetchImpl: typeof fetch,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetchImpl(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }

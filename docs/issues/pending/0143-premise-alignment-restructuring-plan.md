@@ -17,7 +17,6 @@ Depends on:
 - 0149
 - 0150
 - 0151
-- 0153
 - 0156
 - 0157
 
@@ -64,7 +63,7 @@ Phased plan; each phase is owned by the listed issues:
   0149 (runtime ports for config/persistence/sidecars) → 0150 (browser CI
   gate).
 - **Phase D — privacy/P2P hardening** (mostly already tracked):
-  0153 (FROST peer transport hook).
+  closed by 0153 (FROST peer transport hook).
 
 Correctness issues 0134-0141 remain independent and should generally land
 before or alongside Phase B since they touch the same verification code.

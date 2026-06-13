@@ -28,7 +28,7 @@
     "justification": "declare the ephemeral-identity unlinkability invariant (P1 in docs/lifecycle-unification-design.md) with its locking test"
   },
   "INV-08": {
-    "hash": "sha256:181e9dc0397aba9a6581755187eb126d2d437a107dae9afbd193fb2167c853ac",
-    "justification": "document the mint/Blossom/TLSN-target HTTP touchpoints as outside the relay-only guarantee and name the injectable transports (fetchImpl, customRequest, tlsn-prover --socks-proxy); the relay-only claim itself is unchanged"
+    "hash": "sha256:fa8ed21198073476de456e8c0c1da3618e97b62b689ce9f7008ff8957c63134f",
+    "justification": "document FROST peer round HTTP alongside mint/Blossom/TLSN-target touchpoints as outside the relay-only guarantee and name the injectable transports (fetchImpl, customRequest, tlsn-prover --socks-proxy); the relay-only claim itself is unchanged"
   }
 }

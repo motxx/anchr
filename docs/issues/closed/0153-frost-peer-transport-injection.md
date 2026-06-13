@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -49,3 +50,42 @@ gap class that 0124 closes for mint/Blossom, but untracked for FROST.
 
 - Thread `fetchImpl` through `SigningCoordinatorConfig` into
   `fetchWithTimeout`; reuse the transport type introduced by 0124.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/payments/frost/frost-signing-coordinator.ts`
+- `packages/sdk/src/payments/frost/frost-signing-coordinator.test.ts` (new)
+- `docs/threat-model.md`
+- `docs/threat-model.lock.json`
+- `docs/issues/pending/0143-premise-alignment-restructuring-plan.md`
+
+`SigningCoordinatorConfig` gained an optional `fetchImpl` (defaulting to
+`globalThis.fetch`), threaded through `fetchWithTimeout` into both peer
+round-1 and round-2 calls — the same injection shape 0124 established for
+mint/Blossom. The INV-08 scope note now lists FROST peer round HTTP alongside
+the mint/Blossom/TLSN touchpoints as proxy-routable exposure, with its lock
+hash bumped and justified.
+
+Verified with:
+
+- `deno task check` (0 errors), `deno task lint:strict`, `deno task test:unit`
+  (297 passed); the new unit test asserts all peer round-1/round-2 calls route
+  through the injected `fetchImpl` and `globalThis.fetch` is never called
+  during coordination (spy rejects, asserted empty).
+- `deno task test:e2e:frost` is exercised by the integrated `deno task
+  test:all` run on the branch (default transport unchanged).
+
+Harness update:
+
+- `frost-signing-coordinator.test.ts` locks the injected-transport behavior;
+  `docs/threat-model.lock.json` drift-locks the INV-08 scope-note change.
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None
