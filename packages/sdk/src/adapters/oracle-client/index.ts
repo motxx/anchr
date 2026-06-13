@@ -1,16 +1,10 @@
 /**
- * Oracle client — the host as a *customer* of oracle services.
+ * Oracle client registry and relay discovery helpers.
  *
- * Pulls oracle definitions from config / Nostr discovery, exposes a
- * registry the request service can resolve against, and ships an HTTP
- * adapter for talking to remote oracle nodes.
- *
- * The other half runs this host as an Oracle node through the Oracle service
- * adapter.
+ * Pulls Oracle definitions from Nostr discovery and exposes a registry the
+ * request service can resolve against.
  */
 
-export { createHttpOracle } from "./http-oracle.ts";
-export type { HttpOracleConfig } from "./http-oracle.ts";
 export {
   createOracleRegistry,
   getOracle,
@@ -25,8 +19,6 @@ export type {
   OracleInfo,
   OracleVerificationDetail,
 } from "../../requests/domain/oracle-types.ts";
-export { loadOraclesFromEnv, parseOracleRegistry } from "./config-loader.ts";
-export type { OracleConfigEntry } from "./config-loader.ts";
 export {
   discoverOracles,
   parseOracleAnnouncementEvent,

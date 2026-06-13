@@ -8,15 +8,9 @@
  *   2. Settlement: after receiving the provider's proof and verifying
  *      it, sends the preimage `S` to the provider via NIP-44 DM.
  *
- * Different deployments expose the pre-flight role differently — some
- * over HTTP, some via Nostr DM, some via FROST signing protocols. The
- * SDK does not pick one; it accepts an OracleClient and lets the caller
- * provide the right adapter for their deployment.
- *
- * `DefaultHttpOracleClient` is a thin HTTP client for the simplest
- * deployment shape: an oracle that exposes `POST /hash` returning
- * `{ hash: string }`. Host operators that run their own oracle on a
- * different protocol can pass a custom OracleClient implementation.
+ * The v0 exchange uses relay-delivered Nostr DMs for hash bootstrap.
+ * Host operators can pass a custom OracleClient implementation when their
+ * application owns a different deployment-specific policy.
  */
 
 import {
@@ -40,29 +34,11 @@ export interface OracleClient {
   requestHash(queryId: string): Promise<{ hash: string }>;
 }
 
-/** Construction options for {@link DefaultHttpOracleClient}. */
-export interface HttpOracleOptions {
-  /** Endpoint URL serving `POST /hash`. */
-  endpoint: string;
-  /** Optional API key sent as `Authorization: Bearer <apiKey>`. */
-  apiKey?: string;
-  /** Optional custom fetch implementation; defaults to `globalThis.fetch`. */
-  fetchImpl?: typeof globalThis.fetch;
-}
-
 /** Thrown when the oracle client is configured with invalid options. */
 export class OracleConfigError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "OracleConfigError";
-  }
-}
-
-/** Thrown when the oracle returns an unsuccessful HTTP response. */
-export class OracleHttpError extends Error {
-  constructor(public readonly status: number, public readonly body: string) {
-    super(`Oracle /hash failed: ${status}`);
-    this.name = "OracleHttpError";
   }
 }
 
@@ -72,64 +48,6 @@ export class OracleResponseError extends Error {
     super(message);
     this.name = "OracleResponseError";
   }
-}
-
-/**
- * Default OracleClient that talks to an HTTP oracle exposing
- * `POST /hash` and returning `{ hash: "<hex>" }`.
- */
-export function createHttpOracleClient(
-  options: HttpOracleOptions,
-): OracleClient {
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
-  const endpoint = normalizeEndpoint(options.endpoint);
-
-  return {
-    async requestHash(queryId: string): Promise<{ hash: string }> {
-      const headers: Record<string, string> = {
-        "content-type": "application/json",
-      };
-      if (options.apiKey) headers["authorization"] = `Bearer ${options.apiKey}`;
-
-      const res = await fetchImpl(`${endpoint}/hash`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ query_id: queryId }),
-      });
-
-      if (!res.ok) {
-        let body = "";
-        try {
-          body = await res.text();
-        } catch { /* body unreadable */ }
-        throw new OracleHttpError(res.status, body);
-      }
-
-      const payload: unknown = await res.json();
-      const hash = readHash(payload);
-      if (hash === null) {
-        throw new OracleResponseError(
-          `Oracle response missing 'hash' field: ${JSON.stringify(payload)}`,
-        );
-      }
-      return { hash };
-    },
-  };
-}
-
-function normalizeEndpoint(endpoint: string): string {
-  if (endpoint.length === 0) {
-    throw new OracleConfigError("oracle endpoint must be a non-empty string");
-  }
-  return endpoint.replace(/\/+$/, "");
-}
-
-function readHash(payload: unknown): string | null {
-  if (typeof payload !== "object" || payload === null || !("hash" in payload)) {
-    return null;
-  }
-  const hash = payload.hash;
-  return typeof hash === "string" ? hash : null;
 }
 
 /** Thrown when the oracle does not answer a hash bootstrap DM in time. */

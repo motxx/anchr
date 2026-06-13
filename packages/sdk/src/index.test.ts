@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import {
   createCashuClient,
   createCustomer,
-  createHttpOracleClient,
+  createNostrOracleClient,
   createProvider,
   createRelayClient,
   ProofSchema,
@@ -14,7 +14,7 @@ describe("Anchr SDK", () => {
   test("root surface exposes actor setup helpers", () => {
     expect(createCustomer).toBeInstanceOf(Function);
     expect(createProvider).toBeInstanceOf(Function);
-    expect(createHttpOracleClient).toBeInstanceOf(Function);
+    expect(createNostrOracleClient).toBeInstanceOf(Function);
     expect(createRelayClient).toBeInstanceOf(Function);
     expect(createCashuClient).toBeInstanceOf(Function);
     expect(ProofSchema.TlsnV1).toBe(

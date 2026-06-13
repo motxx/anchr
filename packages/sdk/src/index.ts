@@ -156,13 +156,10 @@ export {
 } from "./adapters/storage.ts";
 
 export {
-  createHttpOracleClient,
   createNostrOracleClient,
-  type HttpOracleOptions,
   type NostrOracleOptions,
   type OracleClient,
   OracleConfigError,
-  OracleHttpError,
   OracleResponseError,
   OracleTimeoutError,
 } from "./oracle.ts";

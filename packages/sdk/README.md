@@ -56,8 +56,7 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  // The Oracle hash bootstrap rides the relay as NIP-44 DMs by default;
-  // pass `client: createHttpOracleClient(...)` per oracle to use HTTP.
+  // The Oracle hash bootstrap rides the relay as NIP-44 DMs.
   oracles: [{ pubkey: oraclePubkey }],
   relays: relayUrls,
   mint: mintUrl,
@@ -80,15 +79,13 @@ console.log(result.data, result.proof, result.providerPubkey);
 await customer.close();
 ```
 
-For a multi-oracle whitelist, keep `oracles` as the trust policy; entries
-default to the relay-DM bootstrap, and an HTTP oracle is an explicit per-entry
-override:
+For a multi-oracle whitelist, keep `oracles` as the trust policy; entries use
+the relay-DM bootstrap:
 
 ```ts
 import {
   createCashuClient,
   createCustomer,
-  createHttpOracleClient,
   createRelayClient,
 } from "@anchr/sdk";
 
@@ -100,12 +97,7 @@ const oracleB = "npub1exampleoracleb";
 const multiOracleCustomer = createCustomer({
   oracles: [
     { pubkey: oracleA },
-    {
-      pubkey: oracleB,
-      client: createHttpOracleClient({
-        endpoint: "https://oracle-b.test.example",
-      }),
-    },
+    { pubkey: oracleB },
   ],
   relays: relayUrls,
   mint: mintUrl,
@@ -175,7 +167,7 @@ The default `cashuClient` and `relayClient` open live connections. For unit
 tests, inject the in-memory fakes from `@anchr/sdk/testing`:
 
 ```ts
-import { createCustomer, createHttpOracleClient } from "@anchr/sdk";
+import { createCustomer } from "@anchr/sdk";
 import {
   createInMemoryCashuClient,
   createInMemoryRelayClient,
@@ -187,12 +179,7 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuClient = createInMemoryCashuClient();
 
 const customer = createCustomer({
-  oracles: [{
-    pubkey: oraclePubkey,
-    client: createHttpOracleClient({
-      endpoint: "https://oracle.test.example",
-    }),
-  }],
+  oracles: [{ pubkey: oraclePubkey }],
   relays: relayUrls,
   mint: cashuClient.mintUrl,
   cashuClient,

@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: GPT-5.4-Codex
+Completed: 2026-06-13
 
 ## Priority
 
@@ -73,3 +74,67 @@ round-2 transport injectable.
 - Remove HTTP Oracle client/config exports and migrate callers to relay Oracle
   exchange or explicit application-owned static registry composition.
 - Update tests and examples that import the removed HTTP exchange surface.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/oracle-service/server.ts`
+- `packages/sdk/src/adapters/oracle-service/index.ts`
+- `packages/sdk/src/adapters/oracle-service/htlc-routes.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-service/server.test.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-client/index.ts`
+- `packages/sdk/src/adapters/oracle-client/http-oracle.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-client/http-oracle.test.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-client/config-loader.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-client/config-loader.test.ts` (deleted)
+- `packages/sdk/src/oracle.ts`
+- `packages/sdk/src/oracle.test.ts` (deleted)
+- `packages/sdk/src/index.ts`
+- `packages/sdk/src/index.test.ts`
+- `packages/sdk/src/adapters/nostr/mod.ts`
+- `packages/sdk/README.md`
+- `docs/issues/pending/0143-premise-alignment-restructuring-plan.md`
+
+The `@anchr/sdk/adapters/oracle-service` `buildOracleApp` entrypoint now
+composes only the FROST DKG, coordinator signing, and signer round endpoints.
+The relay Oracle service in `@anchr/sdk/adapters/nostr` remains the SDK owner
+for exchange preimage and release-material issuance. The regtest, tlsn, and
+protocol e2e suites did not import the deleted HTTP exchange surface; their
+attack and vulnerability coverage uses in-process registries or relay-owned
+Oracle behavior, so no exchange attack test was weakened or removed.
+
+Verified with:
+
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `deno task test:e2e:frost`
+- `rg "POST /verify|POST /hash|createHttpOracle|HttpOracleConfig" packages/sdk/src` (no matches)
+- `rg -l "preimage" packages/sdk/src/adapters/` confirmed the deleted
+  `adapters/oracle-service` issuer is gone; remaining matches are relay Oracle
+  issuance under `adapters/nostr` plus Cashu payment redemption contracts and
+  tests that consume a preimage, not a second Oracle exchange issuer.
+- `check-silent-bypass` review of the changed non-test package files: no
+  silent-bypass patterns detected.
+- `arch-lint-llm` review of the changed non-test package files after
+  `deno task lint:arch --errors-only`: no semantic architecture violations
+  detected.
+
+Harness update:
+
+- The issue's negative HTTP exchange guard is now satisfied by
+  `rg "POST /verify|POST /hash|createHttpOracle|HttpOracleConfig" packages/sdk/src`;
+  `server-frost.test.ts` and `test:e2e:frost` lock the reduced FROST endpoint
+  home. The literal `preimage` scan remains useful with the documented Cashu
+  redemption exception above.
+
+Review residuals:
+
+- The literal `rg -l "preimage" packages/sdk/src/adapters/` scan still reports
+  Cashu adapter redemption files because payment redemption must consume a
+  preimage. No HTTP Oracle exchange issuer remains.
+
+Follow-up:
+
+- None

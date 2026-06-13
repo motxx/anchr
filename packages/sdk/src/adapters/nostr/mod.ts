@@ -3,10 +3,9 @@
  *
  * Oracle-service ownership: this module owns the **relay-DM Oracle daemon**
  * (`createOracleNostrService` — watches requests on relays, verifies, and
- * delivers Release Material as NIP-44 DMs). The **HTTP Oracle server** is a
+ * delivers Release Material as NIP-44 DMs). The **FROST peer server** is a
  * separate single-purpose owner at `@anchr/sdk/adapters/oracle-service`
- * (`buildOracleApp` — FROST signer/DKG routes and HTLC hash issuance over
- * HTTP). Neither re-exports the other.
+ * (`buildOracleApp` — FROST signer/DKG routes). Neither re-exports the other.
  */
 
 export { createRelayClient, publishOnce } from "./client.ts";
