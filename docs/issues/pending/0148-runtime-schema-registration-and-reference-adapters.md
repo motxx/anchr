@@ -10,10 +10,17 @@ feature
 ## Dependencies
 
 Depends on:
-- None
+- 0159
+- 0160
+- 0161
 
 Blocks:
 - 0143
+
+This issue is now a tracking parent. Its resolution is the closure of children
+0159 (core registration API + reference adapters + notary removal), 0160
+(manifest-driven schema-page lint), and 0161 (custom-schema end-to-end
+demonstration). The detailed plan below is owned by those children.
 
 ## Summary
 
