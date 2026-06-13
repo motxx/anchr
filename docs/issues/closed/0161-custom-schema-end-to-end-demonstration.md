@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -52,3 +53,32 @@ schema is produced, submitted, verified, and released — without editing
   `packages/`.
 - Register it through the 0159 API and drive a paid request through verification
   to release in an e2e or example.
+
+## Resolution
+
+Implemented by updating:
+
+- `e2e/protocol/custom-schema.test.ts`
+
+Verified with:
+
+- `deno task test:e2e:protocol`
+- `deno task lint:strict`
+- `deno task check`
+
+Harness update:
+
+- The custom-schema protocol e2e locks the public extension surface by
+  registering `https://example.test/spec/proof/custom/v1` through
+  `registerSchemaBundle`, producing schema evidence through
+  `resolveProofGenerator`, verifying it through the registered check/verifier
+  in the paid escrow lifecycle, and asserting missing/tampered evidence rejects
+  fail closed.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
