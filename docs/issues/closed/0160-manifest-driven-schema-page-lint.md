@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -51,3 +52,36 @@ spec-site page path; the lint reads the manifest.
 - Add `spec-site/schemas.json` listing schema URL → page path for the built-in
   schemas.
 - Update `scripts/check-proof-schema-pages.ts` to read and iterate the manifest.
+
+## Resolution
+
+Implemented by updating:
+
+- `spec-site/schemas.json`
+- `scripts/check-proof-schema-pages.ts`
+
+Verified with:
+
+- `deno task lint:proof-schema-pages`
+- Negative check: temporarily pointed
+  `https://anchr-spec.org/spec/proof/tlsn/v1` at
+  `spec-site/spec/proof/tlsn/v1/missing.html`; the
+  `deno task lint:proof-schema-pages` command failed with a
+  `spec-site/schemas.json lists missing page for https://anchr-spec.org/spec/proof/tlsn/v1`
+  error.
+- `deno task lint:proof-schema-pages`
+- `deno task lint:strict`
+- `deno task check`
+
+Harness update:
+
+- The manifest-driven `lint:proof-schema-pages` now guards any registered
+  schema's published page.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
