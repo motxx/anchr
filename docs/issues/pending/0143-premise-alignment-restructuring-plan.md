@@ -10,7 +10,6 @@ design
 ## Dependencies
 
 Depends on:
-- 0149
 - 0150
 
 Blocks:
