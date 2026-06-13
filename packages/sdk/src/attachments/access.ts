@@ -1,15 +1,4 @@
 import { Buffer } from "node:buffer";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { extname, join } from "node:path";
-import {
-  fileExists,
-  readFileAsArrayBuffer,
-  spawn,
-  which,
-  writeFile,
-} from "../internal/runtime/mod.ts";
-import { getRuntimeConfig } from "../internal/runtime/config.ts";
 import type {
   AttachmentRef,
   AttachmentStorageKind,
@@ -27,7 +16,6 @@ import {
   readBlossomAttachment,
   readExternalAttachment,
 } from "./attachment-helpers.ts";
-import process from "node:process";
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -42,83 +30,8 @@ export interface StoredAttachmentBuffer extends StoredAttachment {
   data: Buffer;
 }
 
-export interface AttachmentPreview {
-  data: string;
-  mimeType: string;
-  filename: string;
-  size: number;
-  maxDimension: number;
-}
-
 export interface StoredAttachmentStats extends StoredAttachment {
   size: number;
-}
-
-function resolvePreviewCommand():
-  | {
-    command: string;
-    args: (
-      inputPath: string,
-      outputPath: string,
-      maxDimension: number,
-      jpegQuality: number,
-    ) => string[];
-  }
-  | null {
-  if (process.platform === "darwin") {
-    return {
-      command: "/usr/bin/sips",
-      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
-        "-Z",
-        String(maxDimension),
-        "-s",
-        "format",
-        "jpeg",
-        "-s",
-        "formatOptions",
-        String(jpegQuality),
-        inputPath,
-        "--out",
-        outputPath,
-      ],
-    };
-  }
-
-  const magick = which("magick");
-  if (magick) {
-    return {
-      command: magick,
-      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
-        inputPath,
-        "-auto-orient",
-        "-thumbnail",
-        `${maxDimension}x${maxDimension}>`,
-        "-strip",
-        "-quality",
-        String(jpegQuality),
-        outputPath,
-      ],
-    };
-  }
-
-  const convert = which("convert");
-  if (convert) {
-    return {
-      command: convert,
-      args: (inputPath, outputPath, maxDimension, jpegQuality) => [
-        inputPath,
-        "-auto-orient",
-        "-thumbnail",
-        `${maxDimension}x${maxDimension}>`,
-        "-strip",
-        "-quality",
-        String(jpegQuality),
-        outputPath,
-      ],
-    };
-  }
-
-  return null;
 }
 
 export function attachmentPublicBaseUrl(requestUrl?: string): string {
@@ -256,64 +169,6 @@ export async function readStoredAttachmentBuffer(
   if (!attachment) return null;
 
   return readExternalAttachment(attachment);
-}
-
-export async function renderStoredAttachmentPreview(
-  ref: AttachmentLike,
-  requestUrl?: string,
-  options?: { maxDimension?: number; jpegQuality?: number },
-): Promise<AttachmentPreview | null> {
-  const attachment = await readStoredAttachmentBuffer(ref, requestUrl);
-  if (!attachment) return null;
-
-  if (!attachment.mimeType.startsWith("image/")) {
-    return null;
-  }
-
-  const runtimeConfig = getRuntimeConfig();
-  const maxDimension = options?.maxDimension ??
-    runtimeConfig.previewMaxDimension;
-  const jpegQuality = options?.jpegQuality ?? runtimeConfig.previewJpegQuality;
-  const previewCommand = resolvePreviewCommand();
-  if (!previewCommand) {
-    return null;
-  }
-  const tempDir = await mkdtemp(join(tmpdir(), "anchr-preview-"));
-  const inputExt = extname(attachment.filename) || ".bin";
-  const inputPath = join(tempDir, `input${inputExt}`);
-  const outputPath = join(tempDir, "preview.jpg");
-
-  try {
-    await writeFile(inputPath, attachment.data);
-    const proc = spawn([
-      previewCommand.command,
-      ...previewCommand.args(inputPath, outputPath, maxDimension, jpegQuality),
-    ], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    await proc.exited;
-    if (proc.exitCode !== 0) {
-      return null;
-    }
-
-    if (!(await fileExists(outputPath))) {
-      return null;
-    }
-
-    const data = Buffer.from(await readFileAsArrayBuffer(outputPath));
-    return {
-      data: data.toString("base64"),
-      mimeType: "image/jpeg",
-      filename: `${
-        attachment.filename.replace(/\.[^.]+$/, "") || "preview"
-      }.preview.jpg`,
-      size: data.length,
-      maxDimension,
-    };
-  } finally {
-    await rm(tempDir, { recursive: true, force: true });
-  }
 }
 
 export async function statStoredAttachment(

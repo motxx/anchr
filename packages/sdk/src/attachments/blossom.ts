@@ -5,10 +5,9 @@
  * Any Blossom server can serve the same blob — content is portable.
  *
  * For Anchr, we:
- * 1. Strip EXIF from the image (caller-side)
- * 2. Encrypt with a random AES-256-GCM key
- * 3. Upload the encrypted blob to Blossom
- * 4. Share hash + decryption key via NIP-44 encrypted Nostr event
+ * 1. Encrypt caller-sanitized bytes with a random AES-256-GCM key
+ * 2. Upload the encrypted blob to Blossom
+ * 3. Share hash + decryption key via NIP-44 encrypted Nostr event
  *
  * Result: Blossom server sees only encrypted bytes. Content is opaque.
  */

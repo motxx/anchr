@@ -51,7 +51,7 @@ function isPrivateIp(hostname: string): boolean {
     }
     return false;
   }
-  // Hex form: ::ffff:XXYY:ZZWW — convert to dotted decimal and check
+  // Hex form: ::ffff:XXYY:ZZWW — map to dotted decimal and check
   const v4HexMapped = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
   if (v4HexMapped) {
     const hi = parseInt(v4HexMapped[1]!, 16);

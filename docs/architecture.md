@@ -45,7 +45,8 @@ taxonomy.
 - `/proofs` for proof producer, verifier, schema dispatch, and policy ports.
 - `/attachments` for encrypted attachment references and the bundled Blossom
   upload/download helpers that keep large proof material content-addressed,
-  encrypted, and portable across Blossom servers.
+  encrypted, and portable across Blossom servers. Callers own private metadata
+  removal before upload; the SDK preserves the bytes it is given.
 - `/adapters` for standard Nostr, Cashu, relay-based Oracle discovery, local
   state, and signer adapters. The concrete Cashu HTLC mint client is the Cashu
   payment adapter surface and is exported from `@anchr/sdk/adapters/cashu`,
@@ -129,7 +130,7 @@ The request internals own request-bound state and lifecycle ports:
 | Concept | Owner |
 | --- | --- |
 | Request lifecycle state | `requests/domain/` owns the `Query` aggregate, statuses, transitions, query store, offer/selection/result state, expiry, and request-scoped quorum and attestation records. |
-| Attachment references in submitted work | `values.ts` owns the shared `AttachmentRef` and Blossom key value objects; `requests/domain/` persists them on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. |
+| Attachment references in submitted work | `values.ts` owns the shared `AttachmentRef` and Blossom key value objects; `requests/domain/` persists them on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. Metadata stripping is producer-owned before upload because schemas and applications decide which evidence metadata is private versus intentionally retained. |
 | Payment escrow hooks used by the lifecycle | `requests/application/` owns the `EscrowProvider` port because the query lifecycle calls it at hold, provider binding, lock verification, settlement, and cancellation points; `payments/` and `adapters/cashu` own payment implementations and reusable payment-lock or redemption helpers. |
 | Verification inputs and decisions used by release logic | `proofs/verification/contract.ts` owns the schema-neutral `VerificationRequirement`, `VerificationInput`, and `VerificationDetail` envelopes (exported from `@anchr/sdk/proofs`); each proof schema owns its requirement payload, evidence payload, checks, and verdict-detail payload; `requests/domain/` embeds schema-neutral verification detail on the `Query`; `requests/application/query-verifier.ts` owns the `Query`→contract adapters (`verify`, `requestToRequirement`, `resultToVerificationInput`); `proofs/` owns `verifyProof`, schema-URI dispatch, redaction, and verifier adapters. |
 | Oracle lifecycle records, release, and registry lookup | `requests/domain/` owns `OracleAttestation` records that are stored against a query, and `requests/application/` owns the `OracleRegistry` lookup port consumed by the lifecycle; Nostr adapter modules own the relay Oracle exchange and kind 30088 registry event bindings; a reduced FROST peer endpoint module owns Oracle-to-Oracle signing coordination endpoints; applications may supply static Oracle lists as their own policy. |

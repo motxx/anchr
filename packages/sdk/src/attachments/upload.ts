@@ -30,6 +30,9 @@ export interface UploadOptions {
  * Upload an attachment: validate integrity → encrypt → upload to Blossom.
  *
  * Accepts a photo file directly, or a ProofMode zip bundle.
+ * Callers must remove private metadata such as EXIF GPS/device fields before
+ * calling this API; the SDK preserves submitted bytes so evidence production
+ * owns the privacy policy.
  * Blossom is the only storage backend. BLOSSOM_SERVERS must be configured.
  * The encryption key is returned separately and never stored on the server (E2E).
  */

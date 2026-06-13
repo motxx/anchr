@@ -1,10 +1,5 @@
-// Provider-side: EXIF strip happens locally so GPS/device metadata never
-// leaves the provider's device.
-
-import { Buffer } from "node:buffer";
 import { generateEphemeralIdentity } from "../identity.ts";
 import type { AttachmentRef } from "../values.ts";
-import { stripExif } from "./exif-strip.ts";
 import {
   type BlossomUploadResult,
   getBlossomConfig,
@@ -14,8 +9,6 @@ import {
 export interface ProviderUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */
   servers?: string[];
-  /** Skip EXIF stripping (e.g. if already stripped). */
-  skipExifStrip?: boolean;
 }
 
 export interface ProviderUploadResult {
@@ -35,16 +28,8 @@ export async function providerUpload(
   const servers = options?.servers ?? config?.servers;
   if (!servers || servers.length === 0) return null;
 
-  let processed: Uint8Array;
-  if (options?.skipExifStrip) {
-    processed = data;
-  } else {
-    const stripped = await stripExif(Buffer.from(data), filename);
-    processed = new Uint8Array(stripped);
-  }
-
   const identity = generateEphemeralIdentity();
-  const result = await uploadToBlossom(processed, identity, servers);
+  const result = await uploadToBlossom(data, identity, servers);
   if (!result) return null;
 
   // E2E: no encryption keys stored in the AttachmentRef.
@@ -54,7 +39,7 @@ export async function providerUpload(
     mime_type: mimeType,
     storage_kind: "blossom",
     filename,
-    size_bytes: processed.length,
+    size_bytes: data.length,
     blossom_hash: result.hash,
     blossom_servers: servers,
   };
