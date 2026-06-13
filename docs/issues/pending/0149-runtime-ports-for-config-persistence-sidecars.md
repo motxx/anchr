@@ -10,11 +10,20 @@ design
 ## Dependencies
 
 Depends on:
-- None
+- 0162
+- 0163
+- 0164
+- 0165
 
 Blocks:
 - 0143
 - 0150
+
+This issue is now a tracking parent. After re-reading the call sites left by
+Phase A/B deletions (0145, 0151, 0156, 0159), it splits into one child per
+runtime port: 0162 (env-config port), 0163 (persistence port), 0164
+(sidecar-execution port), and 0165 (server-entrypoint split). Its resolution is
+the closure of those four children. The detail below is owned by them.
 
 ## Summary
 
