@@ -1,6 +1,12 @@
-import type { ActorStateStore } from "./types.ts";
+import {
+  readTextFile,
+  replaceTextFileAtomically,
+  RuntimeFileNotFoundError,
+  writeTextFile,
+} from "../internal/runtime/mod.ts";
+import type { ActorStateStore, PersistenceStore } from "./types.ts";
 
-export type { ActorStateStore } from "./types.ts";
+export type { ActorStateStore, PersistenceStore } from "./types.ts";
 
 export interface MemoryStateStoreOptions {
   initialEntries?: readonly (readonly [string, string])[];
@@ -21,6 +27,68 @@ export function createMemoryStateStore(
     delete(key: string): Promise<void> {
       values.delete(key);
       return Promise.resolve();
+    },
+  };
+}
+
+export class PersistenceNotFoundError extends Error {
+  constructor(readonly key: string, cause?: unknown) {
+    super(
+      `Persistence entry not found: ${key}`,
+      cause === undefined ? undefined : { cause },
+    );
+    this.name = "PersistenceNotFoundError";
+  }
+}
+
+export function isPersistenceNotFoundError(
+  error: unknown,
+): error is PersistenceNotFoundError {
+  return error instanceof PersistenceNotFoundError;
+}
+
+export interface MemoryPersistenceStoreOptions {
+  initialEntries?: readonly (readonly [string, string])[];
+}
+
+export function createMemoryPersistenceStore(
+  options: MemoryPersistenceStoreOptions = {},
+): PersistenceStore {
+  const values = new Map<string, string>(options.initialEntries);
+  return {
+    async readText(key: string): Promise<string> {
+      const value = values.get(key);
+      if (value === undefined) {
+        throw new PersistenceNotFoundError(key);
+      }
+      return value;
+    },
+    async writeText(key: string, value: string): Promise<void> {
+      values.set(key, value);
+    },
+    async replaceTextAtomically(key: string, value: string): Promise<void> {
+      values.set(key, value);
+    },
+  };
+}
+
+export function createFileSystemPersistenceStore(): PersistenceStore {
+  return {
+    async readText(key: string): Promise<string> {
+      try {
+        return await readTextFile(key);
+      } catch (error) {
+        if (error instanceof RuntimeFileNotFoundError) {
+          throw new PersistenceNotFoundError(key, error);
+        }
+        throw error;
+      }
+    },
+    async writeText(key: string, value: string): Promise<void> {
+      await writeTextFile(key, value);
+    },
+    async replaceTextAtomically(key: string, value: string): Promise<void> {
+      await replaceTextFileAtomically(key, value);
     },
   };
 }

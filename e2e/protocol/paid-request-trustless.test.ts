@@ -88,7 +88,7 @@ describe("NUT-11: Oracle cannot steal BTC", () => {
 
     // After successful preimage reveal, preimage is deleted from store
     // (defense-in-depth: prevents re-reading after one-time delivery)
-    const storedPreimage = preimageStore.getPreimage(entry.hash);
+    const storedPreimage = await preimageStore.getPreimage(entry.hash);
     expect(storedPreimage).toBeNull();
   });
 });
@@ -121,7 +121,7 @@ describe("NUT-14: Provider cannot redeem without valid proof", () => {
     expect(outcome.query?.payment_status).toBe("cancelled");
 
     // Preimage still exists in store but was NOT revealed to Provider
-    expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+    expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
   });
 
   test("HTLC hashlock binds redemption to Oracle's preimage", () => {
@@ -137,19 +137,21 @@ describe("NUT-14: Provider cannot redeem without valid proof", () => {
     // Without the preimage that hashes to this value, Provider cannot redeem
   });
 
-  test("preimage verification is correct (createHTLCHash round-trip)", () => {
+  test("preimage verification is correct (createHTLCHash round-trip)", async () => {
     const preimageStore = createPreimageStore();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     // Correct preimage verifies
-    expect(preimageStore.verify(entry.hash, entry.preimage)).toBe(true);
+    expect(await preimageStore.verify(entry.hash, entry.preimage)).toBe(true);
 
     // Wrong preimage does not verify (must be valid 64-char hex)
     const wrongPreimage = "ff".repeat(32);
-    expect(preimageStore.verify(entry.hash, wrongPreimage)).toBe(false);
+    expect(await preimageStore.verify(entry.hash, wrongPreimage)).toBe(false);
 
     // Non-existent hash does not verify
-    expect(preimageStore.verify("aa".repeat(32), entry.preimage)).toBe(false);
+    expect(await preimageStore.verify("aa".repeat(32), entry.preimage)).toBe(
+      false,
+    );
   });
 });
 
@@ -160,7 +162,7 @@ describe("NUT-14: Provider cannot redeem without valid proof", () => {
 describe("NUT-07: Customer cannot revoke payment", () => {
   test("escrow token amount is verified at provider selection", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Escrow verify test" },
@@ -187,7 +189,7 @@ describe("NUT-07: Customer cannot revoke payment", () => {
 
   test("invalid escrow token is rejected at provider selection", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Invalid token test" },
@@ -256,7 +258,7 @@ describe("NUT-11: Timeout refund", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Reject refund test" },
@@ -314,7 +316,7 @@ describe("Provider impersonation prevention", () => {
 
   test("only offered Provider can be selected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Provider check" },
@@ -353,7 +355,7 @@ describe("Oracle + Customer collusion limits", () => {
     );
 
     // Oracle "withholds" by deleting preimage before result submission
-    preimageStore.delete(entry.hash);
+    await preimageStore.delete(entry.hash);
 
     const outcome = await service.submitEscrowResult(
       query.id,
@@ -373,7 +375,7 @@ describe("Oracle + Customer collusion limits", () => {
 
   test("approved query reveals preimage (honest Oracle)", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Settlement test" },
@@ -409,7 +411,7 @@ describe("Oracle + Customer collusion limits", () => {
     const { service, preimageStore } = makeServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Reject test" },
@@ -475,22 +477,22 @@ describe("Preimage reveal conditions", () => {
     expect(failOutcome.preimage).toBeUndefined();
   });
 
-  test("each query gets a unique preimage", () => {
+  test("each query gets a unique preimage", async () => {
     const preimageStore = createPreimageStore();
-    const entry1 = preimageStore.create();
-    const entry2 = preimageStore.create();
+    const entry1 = await preimageStore.create();
+    const entry2 = await preimageStore.create();
 
     expect(entry1.hash).not.toBe(entry2.hash);
     expect(entry1.preimage).not.toBe(entry2.preimage);
   });
 
-  test("preimage cannot be retrieved with wrong hash", () => {
+  test("preimage cannot be retrieved with wrong hash", async () => {
     const preimageStore = createPreimageStore();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
-    expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
-    expect(preimageStore.getPreimage("wrong_hash")).toBeNull();
-    expect(preimageStore.getPreimage("")).toBeNull();
+    expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+    expect(await preimageStore.getPreimage("wrong_hash")).toBeNull();
+    expect(await preimageStore.getPreimage("")).toBeNull();
   });
 });
 
@@ -501,7 +503,7 @@ describe("Preimage reveal conditions", () => {
 describe("HTLC state machine — invalid transitions blocked", () => {
   test("cannot submit result before Provider is selected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "State test" },
@@ -522,7 +524,7 @@ describe("HTLC state machine — invalid transitions blocked", () => {
 
   test("cannot select Provider twice", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Double select" },

@@ -96,7 +96,7 @@ export interface OracleNostrServiceConfig {
 
 export interface OracleNostrService {
   /** Generate a preimage for a request and return the hash. */
-  generateRequestHash(requestId: string): { hash: string };
+  generateRequestHash(requestId: string): Promise<{ hash: string }>;
   /**
    * Start watching a request for offers and results. The caller supplies the
    * real `Query` — its verification requirements are what relay-submitted
@@ -146,8 +146,8 @@ export function createOracleNostrService(
   const watched = new Map<string, WatchedQuery>();
   const queryHashMap = new Map<string, string>();
 
-  function issueHash(queryId: string): string {
-    return issueQueryHash(preimageStore, queryHashMap, queryId).hash;
+  async function issueHash(queryId: string): Promise<string> {
+    return (await issueQueryHash(preimageStore, queryHashMap, queryId)).hash;
   }
 
   const hashResponder = serveHashRequests({
@@ -230,7 +230,7 @@ export function createOracleNostrService(
   ): Promise<DeliveryOutcome> {
     const detail = await verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
-    const preimage = hash ? preimageStore.getPreimage(hash) : null;
+    const preimage = hash ? await preimageStore.getPreimage(hash) : null;
 
     if (detail.passed && preimage && hash) {
       const dm = buildPreimageDM(
@@ -267,7 +267,7 @@ export function createOracleNostrService(
         );
         return { passed: false, terminal: false };
       }
-      preimageStore.delete(hash);
+      await preimageStore.delete(hash);
       queryHashMap.delete(queryId);
       return { passed: true, terminal: true };
     } else {
@@ -398,8 +398,8 @@ export function createOracleNostrService(
   }
 
   return {
-    generateRequestHash(queryId: string) {
-      return { hash: issueHash(queryId) };
+    async generateRequestHash(queryId: string) {
+      return { hash: await issueHash(queryId) };
     },
 
     watchRequest(

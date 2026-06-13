@@ -222,7 +222,7 @@ async function submitPaidCustomSchemaResult(schemaEvidence?: unknown) {
     preimageStore,
     escrowProvider: createMockEscrowProvider(),
   });
-  const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
+  const { escrowInfo, entry } = await makeEscrowInfo(preimageStore);
   const providerPubkey = "provider_pub";
   const query = service.createQuery(
     {
@@ -309,7 +309,7 @@ describe("custom schema bundle e2e", () => {
       expect(query?.verification?.failures).toContain(
         "custom schema_evidence missing or invalid",
       );
-      expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+      expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
     } finally {
       unregister();
     }
@@ -333,7 +333,7 @@ describe("custom schema bundle e2e", () => {
       expect(query?.verification?.failures).toContain(
         "custom schema verifier rejected evidence",
       );
-      expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+      expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
     } finally {
       unregister();
     }

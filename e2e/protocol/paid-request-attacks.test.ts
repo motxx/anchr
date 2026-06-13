@@ -15,7 +15,7 @@ describe("Attack: Preimage Isolation", () => {
   test("preimage reuse across queries — second query cannot re-use revealed preimage", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
-    const entry1 = preimageStore.create();
+    const entry1 = await preimageStore.create();
     const escrowInfo1 = {
       type: "htlc" as const,
       hash: entry1.hash,
@@ -49,7 +49,7 @@ describe("Attack: Preimage Isolation", () => {
     expect(outcome1.ok).toBe(true);
     expect(outcome1.preimage).toBe(entry1.preimage);
 
-    expect(preimageStore.getPreimage(entry1.hash)).toBeNull();
+    expect(await preimageStore.getPreimage(entry1.hash)).toBeNull();
 
     const escrowInfo2 = {
       type: "htlc" as const,
@@ -107,7 +107,7 @@ describe("Attack: Preimage Isolation", () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.preimage).toBeUndefined();
     // Preimage remains in store (not deleted) — but NOT leaked to caller
-    expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+    expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
   });
 
   test("deleted preimage cannot be re-requested via second submitEscrowResult", async () => {
@@ -125,7 +125,7 @@ describe("Attack: Preimage Isolation", () => {
     );
     expect(first.ok).toBe(true);
     expect(first.preimage).toBe(entry.preimage);
-    expect(preimageStore.getPreimage(entry.hash)).toBeNull();
+    expect(await preimageStore.getPreimage(entry.hash)).toBeNull();
 
     const second = await service.submitEscrowResult(
       query.id,
@@ -142,7 +142,7 @@ describe("Attack: Race Conditions & Timing", () => {
   test("cancel during processing — query moves to rejected", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
     const query = service.createQuery(
       { description: "Cancel attack" },
       { escrow: escrowInfo, payment_lock: { amount_sats: 100 } },
@@ -162,7 +162,7 @@ describe("Attack: Race Conditions & Timing", () => {
 
   test("expiry during processing expires correctly", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const escrowInfo = {
       type: "htlc" as const,
@@ -195,7 +195,7 @@ describe("Attack: Race Conditions & Timing", () => {
 
   test("submit result to expired query fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const escrowInfo = {
       type: "htlc" as const,
@@ -286,7 +286,7 @@ describe("Attack: Oracle Manipulation", () => {
       mockOracle: makeMockOracle("flip-oracle", () => false),
     });
 
-    const { escrowInfo: escrowInfo1 } = makeEscrowInfo(preimageStore);
+    const { escrowInfo: escrowInfo1 } = await makeEscrowInfo(preimageStore);
     const q1 = service.createQuery(
       { description: "Flip-flop Q1" },
       {
@@ -314,7 +314,9 @@ describe("Attack: Oracle Manipulation", () => {
 
     const { service: service2, preimageStore: ps2 } = makeServiceWithPreimage();
 
-    const { escrowInfo: escrowInfo2, entry: entry2 } = makeEscrowInfo(ps2);
+    const { escrowInfo: escrowInfo2, entry: entry2 } = await makeEscrowInfo(
+      ps2,
+    );
     const q2 = service2.createQuery(
       { description: "Flip-flop Q2" },
       {
@@ -352,7 +354,7 @@ describe("Attack: Oracle Manipulation", () => {
       mockOracles: oracles,
     });
 
-    const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
+    const { escrowInfo, entry } = await makeEscrowInfo(preimageStore);
     const query = service.createQuery(
       { description: "Quorum split" },
       {
@@ -391,7 +393,7 @@ describe("Attack: Oracle Manipulation", () => {
       preimageStore,
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,
@@ -426,7 +428,7 @@ describe("Attack: Oracle Manipulation", () => {
 describe("Attack: State Machine — illegal transitions", () => {
   test("skip awaiting_offers -> verifying: submit result directly", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
-    const { escrowInfo } = makeEscrowInfo(preimageStore);
+    const { escrowInfo } = await makeEscrowInfo(preimageStore);
 
     const query = service.createQuery(
       { description: "Skip state" },
@@ -499,7 +501,7 @@ describe("Attack: Cross-Query", () => {
   test("provider accepted on query A tries to submit on query B — fails", async () => {
     const { service, preimageStore } = makeServiceWithPreimage();
 
-    const { escrowInfo: escrowInfoA, entry: entryA } = makeEscrowInfo(
+    const { escrowInfo: escrowInfoA, entry: entryA } = await makeEscrowInfo(
       preimageStore,
     );
     const qA = service.createQuery(
@@ -518,7 +520,7 @@ describe("Attack: Cross-Query", () => {
     await service.selectProvider(qA.id, "provider_a", makeFakeToken(100));
     service.beginWork(qA.id);
 
-    const { escrowInfo: escrowInfoB, entry: entryB } = makeEscrowInfo(
+    const { escrowInfo: escrowInfoB, entry: entryB } = await makeEscrowInfo(
       preimageStore,
     );
     const qB = service.createQuery(

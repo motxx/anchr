@@ -88,15 +88,15 @@ export async function verifyAndFinalize(
 }
 
 /** Attempt to reveal a preimage for an approved escrow query. */
-export function tryRevealPreimage(
+export async function tryRevealPreimage(
   preimageStore: PreimageStore | undefined,
   htlcHash: string | undefined,
   passed: boolean,
-): string | undefined {
+): Promise<string | undefined> {
   if (!passed || !preimageStore || !htlcHash) return undefined;
-  const preimage = preimageStore.getPreimage(htlcHash);
+  const preimage = await preimageStore.getPreimage(htlcHash);
   if (preimage) {
-    preimageStore.delete(htlcHash);
+    await preimageStore.delete(htlcHash);
     return preimage;
   }
   return undefined;

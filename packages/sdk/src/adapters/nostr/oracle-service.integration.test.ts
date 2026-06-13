@@ -114,8 +114,8 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
         max_gps_distance_km: 50,
       },
     });
-    const { hash } = service.generateRequestHash(query.id);
-    const preimage = store.getPreimage(hash);
+    const { hash } = await service.generateRequestHash(query.id);
+    const preimage = await store.getPreimage(hash);
     expect(preimage).not.toBeNull();
 
     service.watchRequest(query, REQUEST_EVENT_ID, "customer_pub");
@@ -159,7 +159,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
     expect(dm.query_id).toBe(query.id);
     expect(dm.preimage).toBe(preimage);
     // Release material is consumed after delivery.
-    expect(store.has(hash)).toBe(false);
+    expect(await store.has(hash)).toBe(false);
 
     service.stop();
     relay.close();
@@ -190,7 +190,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
         max_gps_distance_km: 50,
       },
     });
-    const { hash } = service.generateRequestHash(query.id);
+    const { hash } = await service.generateRequestHash(query.id);
     service.watchRequest(query, REQUEST_EVENT_ID, "customer_pub");
     service.recordSelectedProvider(query.id, provider.publicKey);
 
@@ -235,7 +235,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
     if (dm?.type !== "rejection") throw new Error("unreachable");
     expect(dm.reason).toContain("GPS");
     // The preimage is never revealed on the rejected path.
-    expect(store.has(hash)).toBe(true);
+    expect(await store.has(hash)).toBe(true);
 
     service.stop();
     relay.close();

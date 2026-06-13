@@ -733,8 +733,8 @@ describe("submitEscrowResult", () => {
   }
 
   /** Create escrowInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: PreimageStore) {
-    const entry = preimageStore.create();
+  async function makeHtlcWithHash(preimageStore: PreimageStore) {
+    const entry = await preimageStore.create();
     return {
       escrowInfo: {
         type: "htlc" as const,
@@ -749,7 +749,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo, entry } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo, entry } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
       oracleIds: ["test-oracle"],
@@ -772,7 +772,7 @@ describe("submitEscrowResult", () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
       oracleIds: ["strict-oracle"],
@@ -806,7 +806,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult fails for wrong provider", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
@@ -824,7 +824,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult fails for wrong state", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
@@ -1056,7 +1056,7 @@ describe("verifyWithQuorum", () => {
       preimageStore,
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,

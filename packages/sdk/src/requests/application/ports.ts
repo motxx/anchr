@@ -31,15 +31,15 @@ export interface PreimageEntry {
  */
 export interface PreimageStore {
   /** Generate a new preimage/hash pair. Returns the entry (hash is the key). */
-  create(): PreimageEntry;
+  create(): Promise<PreimageEntry>;
   /** Retrieve the preimage by hash (Oracle-only). */
-  getPreimage(hash: string): string | null;
+  getPreimage(hash: string): Promise<string | null>;
   /** Check if a hash exists in the store. */
-  has(hash: string): boolean;
+  has(hash: string): Promise<boolean>;
   /** Verify a preimage matches the stored hash. */
-  verify(hash: string, preimage: string): boolean;
+  verify(hash: string, preimage: string): Promise<boolean>;
   /** Delete the entry (after delivery or expiry). */
-  delete(hash: string): void;
+  delete(hash: string): Promise<void>;
 }
 
 // ── Cashu / FROST escrow ──────────────────────────────────────────

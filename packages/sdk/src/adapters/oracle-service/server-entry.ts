@@ -25,7 +25,7 @@ let frostConfig: ThresholdOracleConfig | undefined;
 
 if (FROST_CONFIG_PATH) {
   try {
-    frostNodeConfig = loadFrostNodeConfig(FROST_CONFIG_PATH);
+    frostNodeConfig = await loadFrostNodeConfig(FROST_CONFIG_PATH);
     frostConfig = toThresholdOracleConfig(frostNodeConfig);
     log.info(
       `FROST ${frostNodeConfig.threshold}-of-${frostNodeConfig.total_signers} loaded (group_pubkey=${

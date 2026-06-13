@@ -9,7 +9,11 @@ export {
   fileLastModified,
   readFile,
   readFileAsArrayBuffer,
+  readTextFile,
+  replaceTextFileAtomically,
+  RuntimeFileNotFoundError,
   writeFile,
+  writeTextFile,
 } from "./fs.ts";
 export { which } from "./which.ts";
 export { moduleDir } from "./env.ts";

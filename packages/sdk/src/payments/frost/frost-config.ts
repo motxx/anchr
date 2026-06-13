@@ -5,6 +5,10 @@
  * Each Oracle node loads its own config file at startup.
  */
 
+import {
+  createFileSystemPersistenceStore,
+  type PersistenceStore,
+} from "../../adapters/storage.ts";
 import type { ThresholdOracleConfig } from "./frost-types.ts";
 
 export interface FrostNodeConfig {
@@ -34,17 +38,21 @@ export interface PeerConfig {
 }
 
 /** Load a FROST node config from a JSON file. */
-export function loadFrostNodeConfig(filePath: string): FrostNodeConfig {
-  const text = Deno.readTextFileSync(filePath);
+export async function loadFrostNodeConfig(
+  filePath: string,
+  persistence: PersistenceStore = createFileSystemPersistenceStore(),
+): Promise<FrostNodeConfig> {
+  const text = await persistence.readText(filePath);
   return JSON.parse(text) as FrostNodeConfig;
 }
 
 /** Save a FROST node config to a JSON file. */
-export function saveFrostNodeConfig(
+export async function saveFrostNodeConfig(
   filePath: string,
   config: FrostNodeConfig,
-): void {
-  Deno.writeTextFileSync(filePath, JSON.stringify(config, null, 2));
+  persistence: PersistenceStore = createFileSystemPersistenceStore(),
+): Promise<void> {
+  await persistence.writeText(filePath, JSON.stringify(config, null, 2));
 }
 
 /** Build a ThresholdOracleConfig from a FrostNodeConfig. */

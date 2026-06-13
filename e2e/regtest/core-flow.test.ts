@@ -92,7 +92,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     // === Phase 1: Setup ===
 
     // 1a. Oracle generates preimage/hash pair
-    const preimageEntry = preimageStore.create();
+    const preimageEntry = await preimageStore.create();
     const hash = preimageEntry.hash;
     const preimage = preimageEntry.preimage;
 
@@ -195,7 +195,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     expect(finalQuery.assigned_oracle_id).toBe("e2e-oracle");
 
     // Preimage is consumed — cannot be retrieved again (replay prevention)
-    expect(preimageStore.getPreimage(hash)).toBeNull();
+    expect(await preimageStore.getPreimage(hash)).toBeNull();
   });
 
   test("rejected flow: Oracle fails verification → no preimage revealed", async () => {
@@ -215,7 +215,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     };
     registry.register(strictOracle);
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,
@@ -258,11 +258,11 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
     expect(outcome.query?.payment_status).toBe("cancelled");
 
     // Preimage is still in store (not consumed — can be used for refund logic)
-    expect(preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
+    expect(await preimageStore.getPreimage(entry.hash)).toBe(entry.preimage);
   });
 
   test("expiry flow: no submission before locktime → query expires", async () => {
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,

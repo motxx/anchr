@@ -77,3 +77,9 @@ export interface ActorStateStore {
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
 }
+
+export interface PersistenceStore {
+  readText(key: string): Promise<string>;
+  writeText(key: string, value: string): Promise<void>;
+  replaceTextAtomically(key: string, value: string): Promise<void>;
+}
