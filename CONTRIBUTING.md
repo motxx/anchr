@@ -16,6 +16,24 @@ instead of GitHub Issues.
 See [`docs/issues/README.md`](docs/issues/README.md) for the file format and
 workflow.
 
+## Local hooks
+
+Install [Deno](https://deno.com/) and
+[gitleaks](https://github.com/gitleaks/gitleaks/releases), then enable the
+repository-managed git hooks:
+
+```bash
+brew install gitleaks
+# or
+nix profile install nixpkgs#gitleaks
+
+deno task setup:hooks
+```
+
+The pre-commit hook fails closed when `gitleaks` is not on `PATH`. This keeps
+the local staged-change secret scan aligned with CI's gitleaks backstop instead
+of silently relying on the post-push scan.
+
 ## Running the test suite
 
 Three tiers, mapped 1:1 to deno tasks:

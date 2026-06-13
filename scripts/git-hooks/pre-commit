@@ -3,6 +3,19 @@
 # Enable with: deno task setup:hooks
 # (which runs `git config core.hooksPath scripts/git-hooks`)
 set -e
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+error: gitleaks is required by the pre-commit hook and was not found on PATH.
+Install gitleaks, then rerun the commit:
+  brew install gitleaks
+  nix profile install nixpkgs#gitleaks
+  https://github.com/gitleaks/gitleaks/releases
+EOF
+  exit 1
+fi
+
+gitleaks git --staged --redact --no-banner --verbose
 deno task lint:strict
 # Scan commit message for local paths once git has written it out.
 # (Message-body scanning handled by commit-msg hook if present.)
