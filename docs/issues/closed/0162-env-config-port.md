@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -67,3 +68,49 @@ Current direct `Deno.env` reads (non-test, after Phase A/B deletions):
 - Define the config port + server adapter; thread injected config into the
   feature modules listed above.
 - Keep the server adapter as the default so server behavior is unchanged.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/internal/runtime/config.ts`
+- `packages/sdk/src/internal/runtime/config.test.ts`
+- `packages/sdk/src/internal/runtime/logger.ts`
+- `packages/sdk/src/attachments/access.ts`
+- `packages/sdk/src/attachments/blossom.ts`
+- `packages/sdk/src/attachments/blossom.test.ts`
+- `packages/sdk/src/attachments/fetch-attachment.ts`
+- `packages/sdk/src/attachments/provider-upload.ts`
+- `packages/sdk/src/attachments/upload.ts`
+- `packages/sdk/src/attachments/upload.test.ts`
+- `packages/sdk/src/attachments/url-validation.ts`
+- `packages/sdk/src/attachments/url-validation.test.ts`
+- `packages/sdk/src/adapters/nostr/oracle-service.ts`
+- `packages/sdk/src/adapters/nostr/oracle-service.integration.test.ts`
+- `packages/sdk/src/payments/cashu/cashu-wallet.ts`
+- `packages/sdk/src/payments/cashu/cashu-escrow-helpers.ts`
+- `packages/sdk/src/payments/cashu/wallet-store.ts`
+- `packages/sdk/src/payments/cashu/wallet-store-helpers.ts`
+- `scripts/arch-lint.ts`
+
+Verified with:
+
+- `rg -n "Deno\.env\.(get|set|delete)" packages/sdk/src --glob '!**/testing/**'`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `deno task test:integration`
+
+Harness update:
+
+- The E028 ENV_READ arch-lint rule and its shrunk `ENV_READ_ALLOWED` list now
+  enforce that only the config adapter, testing helper, and server entrypoint
+  read env directly.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

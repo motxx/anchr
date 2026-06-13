@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import type { AttachmentRuntimeConfig } from "../internal/runtime/config.ts";
 import { isBlossomEnabled } from "./blossom.ts";
 import { providerUpload } from "./provider-upload.ts";
 import {
@@ -27,6 +28,7 @@ export interface UploadResult {
 
 export interface UploadOptions {
   expectedGps?: GpsCoord;
+  config?: AttachmentRuntimeConfig;
 }
 
 /**
@@ -44,7 +46,7 @@ export async function uploadAttachment(
   file: File,
   options?: UploadOptions,
 ): Promise<UploadResult> {
-  if (!isBlossomEnabled()) {
+  if (!isBlossomEnabled({ config: options?.config })) {
     throw new Error(
       "Blossom is not configured. Set BLOSSOM_SERVERS to enable attachment uploads.",
     );
@@ -67,6 +69,7 @@ export async function uploadAttachment(
     new Uint8Array(photoBuffer),
     photoFilename,
     inferMimeTypeFromFilename(photoFilename),
+    { config: options?.config },
   );
   if (!result) {
     throw new Error(`Blossom upload failed for query ${queryId}`);

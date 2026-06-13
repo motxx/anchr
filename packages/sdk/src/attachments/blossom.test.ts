@@ -10,6 +10,13 @@ import {
   isBlossomEnabled,
   uploadToBlossom,
 } from "./blossom.ts";
+import type { AttachmentRuntimeConfig } from "../internal/runtime/config.ts";
+
+const baseAttachmentConfig: AttachmentRuntimeConfig = {
+  publicBaseUrl: undefined,
+  allowLocalhostAttachments: false,
+  blossomServers: [],
+};
 
 describe("Blossom client", () => {
   test("encrypt/decrypt roundtrip", async () => {
@@ -57,34 +64,25 @@ describe("Blossom client", () => {
   });
 
   test("isBlossomEnabled returns false when not configured", () => {
-    const original = Deno.env.get("BLOSSOM_SERVERS");
-    Deno.env.delete("BLOSSOM_SERVERS");
-
-    expect(isBlossomEnabled()).toBe(false);
-    expect(getBlossomConfig()).toBe(null);
-
-    if (original) Deno.env.set("BLOSSOM_SERVERS", original);
+    expect(isBlossomEnabled({ config: baseAttachmentConfig })).toBe(false);
+    expect(getBlossomConfig({ config: baseAttachmentConfig })).toBe(null);
   });
 
   test("getBlossomConfig parses comma-separated URLs", () => {
-    const original = Deno.env.get("BLOSSOM_SERVERS");
-    Deno.env.set(
-      "BLOSSOM_SERVERS",
-      "https://blossom1.example, https://blossom2.example/",
-    );
-
-    const config = getBlossomConfig();
+    const config = getBlossomConfig({
+      config: {
+        ...baseAttachmentConfig,
+        blossomServers: [
+          "https://blossom1.example",
+          "https://blossom2.example",
+        ],
+      },
+    });
     expect(config).not.toBe(null);
     expect(config!.servers).toEqual([
       "https://blossom1.example",
       "https://blossom2.example",
     ]);
-
-    if (original) {
-      Deno.env.set("BLOSSOM_SERVERS", original);
-    } else {
-      Deno.env.delete("BLOSSOM_SERVERS");
-    }
   });
 });
 

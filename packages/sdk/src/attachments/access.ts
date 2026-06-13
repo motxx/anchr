@@ -5,6 +5,10 @@ import type {
   BlossomKeyMaterial,
 } from "../values.ts";
 import type { QueryResult as RequestSubmissionResult } from "../requests/domain/types.ts";
+import {
+  type AttachmentRuntimeConfig,
+  getAttachmentConfig,
+} from "../internal/runtime/config.ts";
 import { inferMimeTypeFromFilename } from "./mime.ts";
 import {
   attachmentRefSource,
@@ -18,6 +22,10 @@ import {
 } from "./attachment-helpers.ts";
 
 type AttachmentLike = AttachmentRef | string;
+
+export interface AttachmentAccessOptions {
+  config?: AttachmentRuntimeConfig;
+}
 
 export interface StoredAttachment {
   filename: string;
@@ -34,9 +42,11 @@ export interface StoredAttachmentStats extends StoredAttachment {
   size: number;
 }
 
-export function attachmentPublicBaseUrl(requestUrl?: string): string {
-  const configured = Deno.env.get("ATTACHMENT_PUBLIC_BASE_URL") ??
-    Deno.env.get("PUBLIC_BASE_URL");
+export function attachmentPublicBaseUrl(
+  requestUrl?: string,
+  options?: AttachmentAccessOptions,
+): string {
+  const configured = (options?.config ?? getAttachmentConfig()).publicBaseUrl;
   if (configured) return configured.replace(/\/+$/, "");
   if (requestUrl) {
     return new URL("/", requestUrl).toString().replace(/\/+$/, "");
@@ -52,12 +62,13 @@ export function attachmentPublicBaseUrl(requestUrl?: string): string {
 export function buildAttachmentAbsoluteUrl(
   ref: AttachmentLike,
   requestUrl?: string,
+  options?: AttachmentAccessOptions,
 ): string {
   const source = attachmentRefSource(ref);
   try {
     return new URL(source).toString();
   } catch {
-    return new URL(source, `${attachmentPublicBaseUrl(requestUrl)}/`)
+    return new URL(source, `${attachmentPublicBaseUrl(requestUrl, options)}/`)
       .toString();
   }
 }
@@ -83,23 +94,25 @@ export function normalizeAttachmentRef(
 export function materializeAttachmentRef(
   ref: AttachmentLike,
   requestUrl?: string,
+  options?: AttachmentAccessOptions,
 ): AttachmentRef {
   const normalized = normalizeAttachmentRef(ref, requestUrl);
   return {
     ...normalized,
-    uri: buildAttachmentAbsoluteUrl(normalized, requestUrl),
+    uri: buildAttachmentAbsoluteUrl(normalized, requestUrl, options),
   };
 }
 
 export function materializeResultAttachments(
   result: RequestSubmissionResult,
   requestUrl?: string,
+  options?: AttachmentAccessOptions,
 ): RequestSubmissionResult {
   if (!result.attachments?.length) return result;
   return {
     ...result,
     attachments: result.attachments.map((attachment) =>
-      materializeAttachmentRef(attachment, requestUrl)
+      materializeAttachmentRef(attachment, requestUrl, options)
     ),
   };
 }

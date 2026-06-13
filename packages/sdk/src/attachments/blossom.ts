@@ -17,6 +17,10 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { type EventTemplate, finalizeEvent } from "nostr-tools";
 
 import { getLogger } from "../internal/runtime/logger.ts";
+import {
+  type AttachmentRuntimeConfig,
+  getAttachmentConfig,
+} from "../internal/runtime/config.ts";
 const log = getLogger(["anchr", "blossom"]);
 
 export interface BlossomConfig {
@@ -31,17 +35,20 @@ export interface BlossomUploadIdentity {
   secretKey: Uint8Array;
 }
 
-export function getBlossomConfig(): BlossomConfig | null {
-  const urls = Deno.env.get("BLOSSOM_SERVERS")?.split(",")
-    .map((u) => u.trim().replace(/\/+$/, ""))
-    .filter(Boolean);
+export interface BlossomConfigOptions {
+  config?: AttachmentRuntimeConfig;
+}
 
+export function getBlossomConfig(
+  options?: BlossomConfigOptions,
+): BlossomConfig | null {
+  const urls = (options?.config ?? getAttachmentConfig()).blossomServers;
   if (!urls || urls.length === 0) return null;
   return { servers: urls };
 }
 
-export function isBlossomEnabled(): boolean {
-  return getBlossomConfig() !== null;
+export function isBlossomEnabled(options?: BlossomConfigOptions): boolean {
+  return getBlossomConfig(options) !== null;
 }
 
 export async function encryptBlob(data: Uint8Array): Promise<{
@@ -132,6 +139,7 @@ export interface BlossomUploadResult {
  */
 export interface BlossomTransportOptions {
   fetchImpl?: typeof fetch;
+  config?: AttachmentRuntimeConfig;
 }
 
 export async function uploadToBlossom(
@@ -140,7 +148,7 @@ export async function uploadToBlossom(
   servers?: string[],
   transport?: BlossomTransportOptions,
 ): Promise<BlossomUploadResult | null> {
-  const config = getBlossomConfig();
+  const config = getBlossomConfig({ config: transport?.config });
   const urls = servers ?? config?.servers;
   if (!urls || urls.length === 0) return null;
   const fetchImpl = transport?.fetchImpl ?? fetch;
@@ -194,7 +202,7 @@ export async function downloadFromBlossom(
     retryDelayMs?: number;
   } & BlossomTransportOptions,
 ): Promise<Uint8Array | null> {
-  const config = getBlossomConfig();
+  const config = getBlossomConfig({ config: options?.config });
   const urls = servers ?? config?.servers;
   if (!urls || urls.length === 0) return null;
 

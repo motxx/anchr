@@ -22,6 +22,10 @@ import {
   Wallet,
 } from "@cashu/cashu-ts";
 
+import {
+  type CashuRuntimeConfig,
+  getCashuRuntimeConfig,
+} from "../../internal/runtime/config.ts";
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "cashu"]);
 
@@ -29,8 +33,14 @@ export interface CashuConfig {
   mintUrl: string;
 }
 
-export function getCashuConfig(): CashuConfig | null {
-  const mintUrl = Deno.env.get("CASHU_MINT_URL")?.trim();
+export interface CashuConfigOptions {
+  config?: CashuRuntimeConfig;
+}
+
+export function getCashuConfig(
+  options?: CashuConfigOptions,
+): CashuConfig | null {
+  const mintUrl = (options?.config ?? getCashuRuntimeConfig()).mintUrl?.trim();
   if (!mintUrl) return null;
   return { mintUrl };
 }
@@ -43,12 +53,13 @@ export function getCashuConfig(): CashuConfig | null {
  */
 export interface CashuWalletTransportOptions {
   customRequest?: RequestFn;
+  config?: CashuRuntimeConfig;
 }
 
 export function getCashuWallet(
   transport?: CashuWalletTransportOptions,
 ): Wallet | null {
-  const config = getCashuConfig();
+  const config = getCashuConfig({ config: transport?.config });
   if (!config) return null;
   const mint = transport?.customRequest !== undefined
     ? new Mint(config.mintUrl, { customRequest: transport.customRequest })
@@ -68,6 +79,8 @@ export interface CreateBountyTokenOptions {
    * external coordinator). Returning a rejected promise aborts the poll loop.
    */
   onInvoice?: (bolt11: string) => Promise<void> | void;
+  customRequest?: RequestFn;
+  config?: CashuRuntimeConfig;
 }
 
 /**
@@ -92,8 +105,12 @@ export async function createBountyToken(
     proofs: Proof[];
   } | null
 > {
-  const wallet = getCashuWallet();
-  if (!wallet) return null;
+  const config = getCashuConfig({ config: opts?.config });
+  const wallet = getCashuWallet({
+    customRequest: opts?.customRequest,
+    config: opts?.config,
+  });
+  if (!wallet || !config) return null;
 
   const pollInterval = opts?.pollIntervalMs ?? 2_000;
   const timeoutMs = opts?.invoiceTimeoutMs ?? 5 * 60_000;
@@ -126,7 +143,7 @@ export async function createBountyToken(
 
     const proofs = await wallet.mintProofs(amountSats, mintQuote.quote);
     const token = getEncodedToken({
-      mint: getCashuConfig()!.mintUrl,
+      mint: config.mintUrl,
       proofs,
     }, { version: 4 });
     return { token, proofs };
@@ -154,6 +171,7 @@ export function encodeToken(mintUrl: string, proofs: Proof[]): string {
 export async function verifyToken(
   token: string,
   expectedMinSats?: number,
+  options?: CashuWalletTransportOptions,
 ): Promise<{
   valid: boolean;
   amountSats: number;
@@ -175,7 +193,7 @@ export async function verifyToken(
     }
 
     // Query the Cashu mint to verify proofs are actually unspent
-    const wallet = getCashuWallet();
+    const wallet = getCashuWallet(options);
     if (wallet) {
       try {
         await wallet.loadMint();
@@ -215,6 +233,6 @@ export async function verifyToken(
 /**
  * Check if Cashu payments are enabled.
  */
-export function isCashuEnabled(): boolean {
-  return getCashuConfig() !== null;
+export function isCashuEnabled(options?: CashuConfigOptions): boolean {
+  return getCashuConfig(options) !== null;
 }

@@ -10,6 +10,7 @@ import { beforeEach, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { buildQueryResponseEvent } from "@anchr/protocol/events";
 import type { Event } from "@anchr/protocol/nostr";
+import { ProofSchema } from "@anchr/protocol/schema";
 import { createInMemoryRelayClient } from "../../testing/relay.ts";
 import { makeQuery } from "../../testing/factories.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
@@ -21,7 +22,11 @@ import type { OracleDMPayload } from "./events/events.ts";
 
 const REQUEST_EVENT_ID = "11".repeat(32);
 
-function injectC2paIntegrity(attachmentId: string, queryId: string) {
+function injectC2paIntegrity(
+  attachmentId: string,
+  queryId: string,
+  gps = { lat: 35.0001, lon: 139.0001 },
+) {
   storeIntegrity({
     attachmentId,
     requestId: queryId,
@@ -41,7 +46,7 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
       available: true,
       hasManifest: true,
       signatureValid: true,
-      gps: { lat: 35.0001, lon: 139.0001 },
+      gps,
       manifest: { title: "test.jpg", claimGenerator: "test" },
       checks: ["C2PA manifest found", "C2PA signature valid"],
       failures: [],
@@ -49,7 +54,10 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
   });
 }
 
-function evidenceData(attachmentId: string): Record<string, unknown> {
+function evidenceData(
+  attachmentId: string,
+  gps = { lat: 35.0001, lon: 139.0001 },
+): Record<string, unknown> {
   return {
     attachments: [{
       id: attachmentId,
@@ -58,7 +66,7 @@ function evidenceData(attachmentId: string): Record<string, unknown> {
       storage_kind: "blossom",
       blossom_hash: attachmentId,
     }],
-    gps: { lat: 35.0001, lon: 139.0001 },
+    gps,
   };
 }
 
@@ -100,6 +108,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
     const query = makeQuery({
       id: "q-int-pass",
       verification_requirements: ["c2pa"],
+      schema: ProofSchema.C2paImageV1,
       schema_requirement: {
         expected_gps: { lat: 35.0, lon: 139.0 },
         max_gps_distance_km: 50,
@@ -118,7 +127,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
         REQUEST_EVENT_ID,
         customer.publicKey,
         {
-          schema: "https://anchr-spec.org/spec/proof/photo/v1",
+          schema: ProofSchema.C2paImageV1,
           data: evidenceData("photo_int"),
           proof: "proof-bytes",
         },
@@ -175,6 +184,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
     const query = makeQuery({
       id: "q-int-fail",
       verification_requirements: ["c2pa"],
+      schema: ProofSchema.C2paImageV1,
       schema_requirement: {
         expected_gps: { lat: 35.0, lon: 139.0 },
         max_gps_distance_km: 50,
@@ -190,7 +200,7 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
       REQUEST_EVENT_ID,
       customer.publicKey,
       {
-        schema: "https://anchr-spec.org/spec/proof/photo/v1",
+        schema: ProofSchema.C2paImageV1,
         data: evidenceData("photo_other"),
         proof: "proof-bytes",
       },
@@ -198,14 +208,16 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
       "another-query",
     ));
 
-    // A bound result without the demanded GPS evidence is rejected.
+    injectC2paIntegrity("photo_fail", query.id, { lat: 36.0, lon: 140.0 });
+
+    // A bound result with GPS outside the requested policy is rejected.
     await relay.publish(buildQueryResponseEvent(
       provider,
       REQUEST_EVENT_ID,
       customer.publicKey,
       {
-        schema: "https://anchr-spec.org/spec/proof/photo/v1",
-        data: {},
+        schema: ProofSchema.C2paImageV1,
+        data: evidenceData("photo_fail", { lat: 36.0, lon: 140.0 }),
         proof: "proof-bytes",
       },
       oracle.publicKey,

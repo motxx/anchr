@@ -16,6 +16,7 @@ import {
   type LogLevel,
   type Sink,
 } from "@logtape/logtape";
+import { getLoggingConfig, type LoggingRuntimeConfig } from "./config.ts";
 
 const LEVEL_ALIASES: Record<string, LogLevel> = {
   trace: "trace",
@@ -27,19 +28,8 @@ const LEVEL_ALIASES: Record<string, LogLevel> = {
   fatal: "fatal",
 };
 
-function readEnv(name: string): string | undefined {
-  try {
-    return Deno.env.get(name);
-  } catch {
-    // Missing --allow-env: fall back to the default level.
-    return undefined;
-  }
-}
-
-function envLogLevel(): LogLevel {
-  const raw = (readEnv("ANCHR_LOG_LEVEL") ?? readEnv("LOG_LEVEL"))
-    ?.trim()
-    .toLowerCase();
+function configuredLogLevel(config: LoggingRuntimeConfig): LogLevel {
+  const raw = config.logLevel?.trim().toLowerCase();
   return (raw !== undefined ? LEVEL_ALIASES[raw] : undefined) ?? "info";
 }
 
@@ -48,6 +38,8 @@ export interface AnchrLoggingOptions {
   sink?: Sink;
   /** Replace an existing logTape configuration instead of yielding to it. */
   reset?: boolean;
+  /** Host-supplied logging config. Defaults to the server config adapter. */
+  config?: LoggingRuntimeConfig;
 }
 
 let configured = false;
@@ -63,11 +55,16 @@ export function configureAnchrLogging(
 ): void {
   configured = true;
   try {
+    const config = options.config ?? getLoggingConfig();
     configureSync({
       reset: options.reset ?? false,
       sinks: { anchr: options.sink ?? getConsoleSink() },
       loggers: [
-        { category: [], sinks: ["anchr"], lowestLevel: envLogLevel() },
+        {
+          category: [],
+          sinks: ["anchr"],
+          lowestLevel: configuredLogLevel(config),
+        },
         {
           category: ["logtape", "meta"],
           sinks: ["anchr"],

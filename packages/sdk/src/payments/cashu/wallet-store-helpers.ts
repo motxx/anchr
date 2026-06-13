@@ -1,5 +1,5 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuWallet } from "./cashu-wallet.ts";
+import { type CashuConfigOptions, getCashuWallet } from "./cashu-wallet.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "wallet"]);
@@ -63,8 +63,9 @@ export async function pruneSpentProofs(
   data: WalletData,
   role: WalletRole,
   pubkey: string,
+  options?: CashuConfigOptions,
 ): Promise<void> {
-  const wallet = getCashuWallet();
+  const wallet = getCashuWallet({ config: options?.config });
   if (!wallet || data.confirmed.length === 0) return;
 
   try {

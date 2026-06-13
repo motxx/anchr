@@ -1,4 +1,5 @@
 import { generateEphemeralIdentity } from "../identity.ts";
+import type { AttachmentRuntimeConfig } from "../internal/runtime/config.ts";
 import type { AttachmentRef } from "../values.ts";
 import {
   type BlossomUploadResult,
@@ -9,6 +10,7 @@ import {
 export interface ProviderUploadOptions {
   /** Blossom server URLs (overrides BLOSSOM_SERVERS env). */
   servers?: string[];
+  config?: AttachmentRuntimeConfig;
 }
 
 export interface ProviderUploadResult {
@@ -24,12 +26,14 @@ export async function providerUpload(
   mimeType: string,
   options?: ProviderUploadOptions,
 ): Promise<ProviderUploadResult | null> {
-  const config = getBlossomConfig();
+  const config = getBlossomConfig({ config: options?.config });
   const servers = options?.servers ?? config?.servers;
   if (!servers || servers.length === 0) return null;
 
   const identity = generateEphemeralIdentity();
-  const result = await uploadToBlossom(data, identity, servers);
+  const result = await uploadToBlossom(data, identity, servers, {
+    config: options?.config,
+  });
   if (!result) return null;
 
   // E2E: no encryption keys stored in the AttachmentRef.

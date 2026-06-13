@@ -64,17 +64,11 @@ const APP_VOCAB =
 const SDK_KIND_CONST = /\bexport\s+const\s+(KIND_|ANCHR_)[A-Z_0-9]+\s*=\s*\d+/;
 // [E028] Direct env reads are confined to documented config-resolution
 // surfaces; library modules take config through options/deps instead.
-const ENV_READ = /\bDeno\.env\.get\b/;
+const ENV_READ = /\bDeno\.env\.(?:get|set|delete)\b/;
 const ENV_READ_ALLOWED: readonly string[] = [
   "packages/sdk/src/internal/runtime/",
   "packages/sdk/src/testing/helpers.ts",
-  "packages/sdk/src/adapters/nostr/oracle-service.ts",
-  "packages/sdk/src/adapters/oracle-client/config-loader.ts",
   "packages/sdk/src/adapters/oracle-service/server-entry.ts",
-  "packages/sdk/src/attachments/access.ts",
-  "packages/sdk/src/attachments/blossom.ts",
-  "packages/sdk/src/attachments/url-validation.ts",
-  "packages/sdk/src/payments/cashu/cashu-wallet.ts",
 ];
 
 const IMPORT_RE =

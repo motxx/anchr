@@ -56,6 +56,10 @@ import {
   type WatchedQuery,
 } from "./oracle-handlers.ts";
 
+import {
+  getOracleNostrConfig,
+  type OracleNostrRuntimeConfig,
+} from "../../internal/runtime/config.ts";
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-nostr"]);
 
@@ -481,14 +485,14 @@ export function createOracleNostrService(
 /**
  * Create an Oracle Nostr service from environment variable.
  */
-export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
-  const secretKeyHex = Deno.env.get("ORACLE_NOSTR_SECRET_KEY")?.trim();
+export function createOracleNostrServiceFromEnv(
+  config: OracleNostrRuntimeConfig = getOracleNostrConfig(),
+): OracleNostrService | null {
+  const secretKeyHex = config.secretKeyHex?.trim();
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = (Deno.env.get("NOSTR_RELAYS") ?? "").split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
+  const relayUrls = config.relayUrls;
   if (relayUrls.length === 0) return null;
 
   return createOracleNostrService({
