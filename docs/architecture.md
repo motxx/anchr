@@ -70,6 +70,34 @@ Cashu v0 decision (ADR 0001), not a plug-in layer for alternative transport or
 settlement substrates. They do not belong in `@anchr/protocol` unless they
 define the Nostr/Cashu v0 contract recorded in `specs/`.
 
+## Browser-Portable Surface
+
+Browser hosts compose Anchr through the role and contract modules that do not
+own process, filesystem, environment, or sidecar execution. The portable roots
+are the full `@anchr/protocol` surface plus these SDK public subpaths:
+
+- `@anchr/sdk/customer`
+- `@anchr/sdk/provider`
+- `@anchr/sdk/oracle`
+- `@anchr/sdk/schema`
+- `@anchr/sdk/adapters/oracle-client`
+
+Those roots may use SDK port types from `@anchr/sdk` internals, but server
+runtime behavior is supplied by injected adapters rather than imported by the
+portable code. `deno task lint:arch` enforces this browser surface with E031:
+the reachable portable graph must not reference `Deno.*`, import `node:*`, or
+import server-only SDK adapters.
+
+Server-only adapters are the `packages/sdk/src/internal/runtime/` Deno-backed
+runtime adapters, the FROST peer server under
+`packages/sdk/src/adapters/oracle-service/` including
+`server-entry.ts`, the relay Oracle daemon/hash responder process modules under
+`packages/sdk/src/adapters/nostr/`, FROST CLI/payment execution under
+`packages/sdk/src/payments/frost/`, and the built-in TLSN/C2PA proof execution
+adapters under `packages/sdk/src/proofs/`. Browser applications provide
+equivalent behavior through ports or schema bundles instead of importing those
+modules.
+
 ## Surface Policy
 
 The current repository map is the target map. New public Anchr packages,

@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-14
 
 ## Priority
 
@@ -56,3 +57,32 @@ into `lint:strict` or the test chain.
   or an arch-lint rule class (E0xx) over the portable module set.
 - Define the portable entrypoint list with 0149's port boundaries.
 - Wire into `lint:strict` and document in `docs/architecture.md`.
+
+## Resolution
+
+Implemented by updating:
+
+- `scripts/arch-lint.ts`
+- `docs/architecture.md`
+- `docs/issues/pending/0143-premise-alignment-restructuring-plan.md`
+
+Verified with:
+
+- `deno task lint:arch`
+- Temporary `Deno.env.get("ANCHR_BROWSER_GATE_DEMO")` in `packages/sdk/src/schema.ts` made `deno task lint:arch` fail with `ERROR [E031] packages/sdk/src/schema.ts:7` and existing `ERROR [E028] packages/sdk/src/schema.ts:7`; reverting the line made `deno task lint:arch` pass again.
+- `deno test --allow-read scripts/arch-lint.test.ts`
+- `deno task lint:strict`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- `deno task lint:arch` now owns the browser-portability class with E031. The rule walks the documented portable SDK/protocol browser roots and rejects `Deno.*`, `node:*`, and server-only SDK adapter imports; because `lint:strict` already runs `lint:arch`, the pre-commit/pre-push lint gate enforces it.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
