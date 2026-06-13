@@ -59,8 +59,6 @@ export interface Provider {
   readonly relays: readonly string[];
   /** Currently configured Cashu mint URL. */
   readonly mint: string;
-  /** Currently configured TLSN notary URL, if any. */
-  readonly notary?: string;
   /** Provider's hex pubkey (derived from the configured secret key). */
   readonly pubkey: string;
 }
@@ -131,10 +129,10 @@ export function validateProviderOptions(
       );
     }
   }
-  if (o.notary !== undefined) {
-    if (typeof o.notary !== "string" || o.notary.length === 0) {
+  if (o.schemaOptions !== undefined) {
+    if (typeof o.schemaOptions !== "object" || o.schemaOptions === null) {
       throw new ProviderConfigError(
-        "notary, when provided, must be a non-empty string",
+        "schemaOptions, when provided, must be an object",
       );
     }
   }
@@ -186,13 +184,13 @@ export function createProvider(options: ProviderOptions): Provider {
   const oracles = [...options.oracles];
   const relays = [...options.relays];
   const mint = options.mint;
-  const notary = options.notary;
   const cashuClient = options.cashuClient;
   const selectionTimeoutMs = options.selectionTimeoutMs ??
     DEFAULT_SELECTION_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ??
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
+  const schemaOptions = options.schemaOptions;
   const stateStore = options.stateStore;
   const clock = options.clock ?? realClock;
 
@@ -206,7 +204,6 @@ export function createProvider(options: ProviderOptions): Provider {
     oracles,
     relays,
     mint,
-    notary,
     pubkey,
 
     async serve(handler: ProviderHandler): Promise<void> {
@@ -231,6 +228,7 @@ export function createProvider(options: ProviderOptions): Provider {
               selectionTimeoutMs,
               preimageTimeoutMs,
               proofGenerators,
+              schemaOptions,
               clock,
             }, handler).catch(() => {
               // One bad event must not tear down the subscription.
@@ -261,6 +259,7 @@ interface JobContext {
   selectionTimeoutMs: number;
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
+  schemaOptions?: ProviderOptions["schemaOptions"];
   clock: Clock;
 }
 
@@ -287,6 +286,7 @@ async function handleJob(
     maxAmountSats: payload.max_amount_sats,
     oraclePubkey: payload.oracle_pubkey,
     proofGenerator: proofGenerator ?? undefined,
+    schemaOptions: ctx.schemaOptions,
   };
 
   let offer: ProviderOffer | null;

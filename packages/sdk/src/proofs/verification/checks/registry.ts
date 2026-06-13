@@ -1,16 +1,14 @@
-/**
- * Default factor-check registry. Adding a verification factor is one check
- * module plus one entry here; the verifier core never imports a concrete
- * validator.
- */
+import { registerSchemaBundle } from "../../../schema.ts";
+import { createC2paImageSchemaBundle } from "../../c2pa-image-schema.ts";
+import { createGenericMediaSchemaBundle } from "../../generic-media-schema.ts";
+import { createTlsnSchemaBundle } from "../../tlsn-schema.ts";
 
-import { emptySubmissionCheck } from "./empty-submission.ts";
-import { tlsnCheck } from "./tlsn.ts";
-import { photoIntegrityCheck } from "./photo-integrity.ts";
-import type { FactorCheck } from "./types.ts";
+let registered = false;
 
-export const defaultFactorChecks: readonly FactorCheck[] = [
-  emptySubmissionCheck,
-  tlsnCheck,
-  photoIntegrityCheck,
-];
+export function ensureReferenceSchemaBundlesRegistered(): void {
+  if (registered) return;
+  registerSchemaBundle(createGenericMediaSchemaBundle());
+  registerSchemaBundle(createTlsnSchemaBundle());
+  registerSchemaBundle(createC2paImageSchemaBundle());
+  registered = true;
+}

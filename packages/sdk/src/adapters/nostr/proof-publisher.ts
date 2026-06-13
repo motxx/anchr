@@ -2,9 +2,9 @@
  * NostrProofPublisher — publishes oracle attestations to Nostr relays.
  *
  * Implements the ProofDelivery interface. For "public" visibility queries,
- * builds a kind 30103 event with TLSNotary verified data and publishes it.
+ * builds a kind 30103 event with schema verdict data and publishes it.
  *
- * Selective disclosure is handled at the TLSNotary protocol level:
+ * Selective disclosure is handled at the schema protocol level:
  * the prover redacts sensitive header values before generating the
  * cryptographic presentation. The data published here is exactly
  * what was cryptographically verified — no post-hoc modification.
@@ -44,7 +44,7 @@ export function createNostrProofPublisher(
       if (visibility !== "public") return null;
 
       // Note: credential leakage in the *request* (Authorization, Cookie, etc.)
-      // is prevented at the TLSNotary protocol level via selective disclosure
+      // is prevented at the schema protocol level via selective disclosure
       // (--redact-sent-header). The revealed data here only contains the
       // *response* (revealed_body, revealed_headers) which doesn't contain
       // the customer's credentials, so no credential check is needed.

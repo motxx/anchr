@@ -78,8 +78,6 @@ export interface C2paToolOptions {
 
 export const DEFAULT_C2PA_MAX_GPS_DISTANCE_KM = 50;
 
-let c2paToolPath: string | null | undefined;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -165,12 +163,11 @@ export function evaluateC2paGpsProximity(
 
 function findC2paTool(override?: string | null): string | null {
   if (override !== undefined) return override;
-  if (c2paToolPath !== undefined) return c2paToolPath;
-  c2paToolPath = which("c2patool");
-  if (c2paToolPath) {
-    log.debug(`Found c2patool at ${c2paToolPath}`);
+  const toolPath = which("c2patool");
+  if (toolPath) {
+    log.debug(`Found c2patool at ${toolPath}`);
   }
-  return c2paToolPath ?? null;
+  return toolPath ?? null;
 }
 
 export function isC2paAvailable(options?: C2paToolOptions): boolean {

@@ -30,11 +30,11 @@ export function extractProofModeIntegrity(
 export function logIntegrity(
   queryId: string,
   exifResult: { checks: string[]; failures: string[] },
-  c2paResult: { checks: string[]; failures: string[] },
+  provenanceResult: { checks: string[]; failures: string[] },
   proofmode?: ProofModeIntegrity,
 ) {
-  const checks = [...exifResult.checks, ...c2paResult.checks];
-  const failures = [...exifResult.failures, ...c2paResult.failures];
+  const checks = [...exifResult.checks, ...provenanceResult.checks];
+  const failures = [...exifResult.failures, ...provenanceResult.failures];
   if (proofmode) {
     checks.push(...proofmode.checks);
     failures.push(...proofmode.failures);

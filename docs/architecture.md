@@ -209,6 +209,35 @@ Terms such as nonce, timestamp, GPS distance, or any local "factor" label are
 schema-internal vocabulary. They are not protocol-wide or SDK-wide dispatch
 values.
 
+The SDK extension point is a schema bundle registered by exact schema URI via
+`registerSchemaBundle` from the public SDK surface:
+
+```ts
+registerSchemaBundle({
+  uri,
+  producer,
+  verifier,
+  checks,
+  configSchema,
+  resolveEvidence,
+});
+```
+
+`producer` and `verifier` are optional Provider/Customer local adapters.
+`checks` are the Oracle-side proof checks for that schema. `configSchema`
+narrows the opaque per-schema options payload, and `resolveEvidence` maps
+transport response payloads into the schema's opaque evidence payload. The
+shared verifier looks up the request's schema URI, resolves that bundle, and
+runs only that bundle's checks; it does not import schema-specific validators
+or maintain a shared default factor list.
+
+Schema-specific runtime configuration is passed as a map keyed by schema URI
+(`schemaOptions[uri]`). Built-in reference adapters use that map for values
+such as a notary URL, verifier binary path, content-credential tool path, or
+integrity-store instance. The TLSNotary and C2PA image implementations are
+registered as reference bundles under `packages/sdk/src/proofs/`; core SDK
+modules route through the registry rather than importing their internals.
+
 ## Naming
 
 Public protocol, docs, SDKs, and examples should use **Customer**,

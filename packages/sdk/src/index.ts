@@ -53,13 +53,18 @@ export {
 } from "./provider.ts";
 
 export {
+  getRegisteredSchemaBundles,
+  getSchemaBundle,
   InvalidSchemaUriError,
   isSchemaUri,
   ProofSchema,
+  registerSchemaBundle,
   resolveProofGenerator,
+  resolveSchemaEvidence,
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
+  unregisterSchemaBundle,
 } from "./schema.ts";
 
 export type {
@@ -71,9 +76,16 @@ export type {
 
 export type {
   ProofGenerator,
+  SchemaBundle,
+  SchemaConfigParser,
+  SchemaEvidencePayload,
+  SchemaEvidenceResolver,
+  SchemaOptions,
+  SchemaOptionsMap,
   SchemaProducer,
   SchemaProducerContext,
   SchemaVerifier,
+  SchemaVerifierContext,
   VerifierAdapter,
 } from "./schema.ts";
 
@@ -100,7 +112,6 @@ export type {
   BlossomKeyMaterial,
   VerificationFactor,
 } from "./values.ts";
-export type { GpsCoord } from "./proofs/c2pa-validation.ts";
 export {
   DEFAULT_VERIFICATION_FACTORS,
   VERIFICATION_FACTORS,

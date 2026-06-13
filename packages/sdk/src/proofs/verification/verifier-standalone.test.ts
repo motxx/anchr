@@ -24,6 +24,7 @@ import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { VerificationInput, VerificationRequirement } from "./contract.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery } from "../../testing/factories.ts";
+import { ProofSchema } from "../../schema.ts";
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -62,8 +63,24 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("rejects empty submission when C2PA factor is set", async () => {
     const requirement: VerificationRequirement = {
       id: "req_1",
+      schema: ProofSchema.C2paImageV1,
       factors: ["c2pa"],
       schema_requirement: { expected_gps: { lat: 35.0, lon: 139.0 } },
+    };
+    const input: VerificationInput = { attachments: [] };
+
+    const verification = await verifyProof(requirement, input);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures).toContain(
+      "no media evidence provided — photos are required when photo-backed verification is enabled",
+    );
+  });
+
+  test("rejects empty submission for the default generic-media schema", async () => {
+    const requirement: VerificationRequirement = {
+      id: "req_default_media",
+      factors: [],
     };
     const input: VerificationInput = { attachments: [] };
 
@@ -78,6 +95,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("an injected integrity store is honoured instead of the global singleton", async () => {
     const requirement: VerificationRequirement = {
       id: "req_injected_store",
+      schema: ProofSchema.C2paImageV1,
       factors: ["c2pa"],
     };
     const input: VerificationInput = {
@@ -119,7 +137,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     });
 
     const withInjected = await verifyProof(requirement, input, {
-      integrityStore,
+      schemaOptions: {
+        [ProofSchema.C2paImageV1]: { integrityStore },
+      },
     });
     expect(withInjected.passed).toBe(true);
 
@@ -130,6 +150,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("accepts C2PA evidence without location payload when no expected location is set", async () => {
     const requirement: VerificationRequirement = {
       id: "req_c2pa_no_expected",
+      schema: ProofSchema.C2paImageV1,
       factors: ["c2pa"],
     };
     const input: VerificationInput = {
@@ -151,6 +172,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("rejects C2PA schema evidence GPS far from expected location", async () => {
     const requirement: VerificationRequirement = {
       id: "req_3",
+      schema: ProofSchema.C2paImageV1,
       factors: ["c2pa"],
       schema_requirement: {
         expected_gps: { lat: 35.0, lon: 139.0 },
@@ -173,6 +195,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("attachment with valid C2PA passes via integrity-store keyed by requirement.id", async () => {
     const requirement: VerificationRequirement = {
       id: "req_c2pa",
+      schema: ProofSchema.C2paImageV1,
       factors: ["c2pa"],
     };
     const input: VerificationInput = {
@@ -234,6 +257,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
 
     const requirement: VerificationRequirement = {
       id: "req_tlsn_standalone",
+      schema: ProofSchema.TlsnV1,
       factors: ["tlsn"],
       schema_requirement: tlsnReq,
     };
@@ -243,7 +267,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     };
 
     const verification = await verifyProof(requirement, input, {
-      validateTlsn: validateTlsnMock,
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: validateTlsnMock },
+      },
     });
 
     expect(verification.passed).toBe(true);
@@ -262,6 +288,7 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
   test("standalone verifyProof produces the same output as the Query-based path", async () => {
     const query = makeQuery({
       id: "query_parity",
+      schema: ProofSchema.C2paImageV1,
       verification_requirements: ["c2pa"],
       schema_requirement: {
         expected_gps: { lat: 35.0, lon: 139.0 },

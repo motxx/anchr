@@ -18,6 +18,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
 const TEXT_ENCODER = new TextEncoder();
+const DEFAULT_QUERY_SCHEMA = "https://anchr-spec.org/spec/proof/photo/v1";
 
 export function requestToRequirement(request: Query): VerificationRequirement {
   const escrowTokenHash = request.escrow?.type === "p2pk_frost" &&
@@ -26,6 +27,7 @@ export function requestToRequirement(request: Query): VerificationRequirement {
     : undefined;
   return {
     id: request.id,
+    schema: request.schema ?? DEFAULT_QUERY_SCHEMA,
     factors: request.verification_requirements,
     description: request.description,
     challenge_nonce: request.challenge_nonce,

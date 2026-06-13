@@ -216,6 +216,13 @@ export function validateCustomerOptions(
       "oracleSelector, when provided, must be a function",
     );
   }
+  if (o.schemaOptions !== undefined) {
+    if (typeof o.schemaOptions !== "object" || o.schemaOptions === null) {
+      throw new CustomerConfigError(
+        "schemaOptions, when provided, must be an object",
+      );
+    }
+  }
   if (o.stateStore !== undefined) {
     if (typeof o.stateStore !== "object" || o.stateStore === null) {
       throw new CustomerConfigError(
@@ -257,6 +264,7 @@ export function createCustomer(options: CustomerOptions): Customer {
   const oracleSelector = options.oracleSelector ?? pickOracleForRequest;
   const selector = options.offerSelector ?? selectCheapestOffer;
   const verifierAdapters = options.verifierAdapters ?? [];
+  const schemaOptions = options.schemaOptions;
   const stateStore = options.stateStore;
   const clock = options.clock ?? realClock;
   const idGenerator = options.idGenerator ?? createDefaultIdGenerator(clock);
@@ -460,7 +468,9 @@ export function createCustomer(options: CustomerOptions): Customer {
       );
       if (verifier !== null) {
         const ok = await Promise.resolve(
-          verifier.verify(response.proof, req.spec.predicate, response.data),
+          verifier.verify(response.proof, req.spec.predicate, response.data, {
+            options: schemaOptions?.[req.spec.schema],
+          }),
         );
         if (!ok) {
           throw new SchemaVerificationError(req.spec.schema);

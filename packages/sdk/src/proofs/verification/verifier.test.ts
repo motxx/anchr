@@ -7,6 +7,7 @@ import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
+import { ProofSchema } from "../../schema.ts";
 
 function makeQuery(overrides: Partial<Query>): Query {
   return makeBaseQuery({
@@ -14,6 +15,7 @@ function makeQuery(overrides: Partial<Query>): Query {
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
     verification_requirements: ["nonce", "c2pa"],
+    schema: ProofSchema.C2paImageV1,
     expires_at: Date.now() + 60_000,
     ...overrides,
   });
@@ -217,8 +219,9 @@ test("attachment without C2PA fails", async () => {
   );
 });
 
-test("payment_lock query without C2PA/nonce requirements allows empty submission", async () => {
+test("payment_lock query without C2PA/nonce requirements rejects empty submission", async () => {
   const query = makeQuery({
+    schema: "https://anchr-spec.org/spec/proof/photo/v1",
     payment_lock: { amount_sats: 100 },
     verification_requirements: [],
   });
@@ -229,9 +232,9 @@ test("payment_lock query without C2PA/nonce requirements allows empty submission
 
   const verification = await verify(query, result);
 
-  expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain(
-    "no media evidence provided (weak verification)",
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 
@@ -326,6 +329,7 @@ function makeTlsnQuery(overrides: Partial<Query> = {}): Query {
     id: "query_tlsn",
     status: "pending",
     description: "TLSNotary test",
+    schema: ProofSchema.TlsnV1,
     verification_requirements: ["tlsn"],
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
@@ -403,7 +407,9 @@ describe("verify() TLSNotary extension result path", () => {
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(true);
@@ -422,7 +428,9 @@ describe("verify() TLSNotary extension result path", () => {
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.schema_verdict).toBeDefined();
@@ -441,7 +449,9 @@ describe("verify() TLSNotary extension result path", () => {
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnFailure(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnFailure() },
+      },
     });
 
     expect(verification.passed).toBe(false);
@@ -461,7 +471,9 @@ describe("verify() TLSNotary extension result path", () => {
 
     // The injected validator should NOT be called for self-reported data.
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(false);
@@ -479,7 +491,9 @@ describe("verify() TLSNotary extension result path", () => {
 
     // The injected validator should NOT be called without schema_requirement.
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(false);
@@ -497,9 +511,16 @@ describe("verify() TLSNotary extension result path", () => {
 
     let calledWith: string | undefined;
     const verification = await verify(query, result, {
-      validateTlsn: async (att, req) => {
-        calledWith = att.presentation;
-        return mockValidateTlsnSuccess()(att, req);
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: {
+          validateTlsn: async (
+            att: TlsnAttestation,
+            req: TlsnRequirement,
+          ): Promise<TlsnValidationResult> => {
+            calledWith = att.presentation;
+            return mockValidateTlsnSuccess()(att, req);
+          },
+        },
       },
     });
 

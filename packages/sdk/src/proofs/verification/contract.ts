@@ -9,6 +9,7 @@
  */
 
 import type { AttachmentRef, VerificationFactor } from "../../values.ts";
+import type { SchemaUri } from "../../schema.ts";
 
 /**
  * Query-independent verification policy. NIP-90 adapters derive this from a
@@ -17,6 +18,8 @@ import type { AttachmentRef, VerificationFactor } from "../../values.ts";
 export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */
   id: string;
+  /** Proof schema URI that owns requirement, evidence, checks, and verdict. */
+  schema?: SchemaUri;
   factors: readonly VerificationFactor[];
   /** Free-text description of what the proof must establish. */
   description?: string;

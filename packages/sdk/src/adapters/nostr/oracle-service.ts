@@ -6,9 +6,9 @@
  *   2. Listen for kind 7000 offers → record Provider pubkeys
  *   3. On selection announcement → verify HTLC condition, record selected Provider
  *   4. Listen for kind 6300 results → verify Provider pubkey, download blob,
- *      verify blob hash, decrypt K_O, verify C2PA
- *   5. C2PA valid → deliver preimage via NIP-44 DM (kind 4)
- *   6. C2PA invalid → deliver rejection via NIP-44 DM (kind 4)
+ *      verify blob hash, decrypt K_O, verify schema evidence
+ *   5. Evidence valid → deliver preimage via NIP-44 DM (kind 4)
+ *   6. Evidence invalid → deliver rejection via NIP-44 DM (kind 4)
  *
  * Process concerns are the host's responsibility: wire SIGTERM/SIGINT to
  * `service.stop()`, expose a health surface, and call

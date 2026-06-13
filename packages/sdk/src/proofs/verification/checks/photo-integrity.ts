@@ -24,6 +24,54 @@ import { fetchAttachmentData } from "../../../attachments/fetch-attachment.ts";
 import type { AttachmentRef, BlossomKeyMap } from "../../../values.ts";
 import type { FactorCheck } from "./types.ts";
 
+export interface C2paImageSchemaOptions {
+  c2paToolPath?: string | null;
+  integrityStore?: IntegrityStore;
+}
+
+function isIntegrityStore(value: unknown): value is IntegrityStore {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.get === "function" &&
+    typeof record.getForRequest === "function" &&
+    typeof record.store === "function" &&
+    typeof record.clear === "function";
+}
+
+function isC2paImageSchemaOptions(
+  value: unknown,
+): value is C2paImageSchemaOptions {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  if (
+    record.c2paToolPath !== undefined &&
+    record.c2paToolPath !== null &&
+    typeof record.c2paToolPath !== "string"
+  ) {
+    return false;
+  }
+  if (
+    record.integrityStore !== undefined &&
+    !isIntegrityStore(record.integrityStore)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function schemaOptionsRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : {};
+}
+
+export function parseC2paImageSchemaOptions(
+  value: unknown,
+): C2paImageSchemaOptions {
+  if (isC2paImageSchemaOptions(value)) return value;
+  throw new Error("C2PA image schema options must be an object");
+}
+
 function checkC2paSignature(
   c2pa: { available: boolean; hasManifest: boolean; signatureValid: boolean },
   checks: string[],
@@ -212,6 +260,7 @@ async function verifyPhotoIntegrity(
   maxGpsDist: number,
   requiresC2pa: boolean,
   integrityStore: IntegrityStore,
+  c2paToolPath?: string | null,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   const integrityRecords = attachments
@@ -233,6 +282,7 @@ async function verifyPhotoIntegrity(
       expectedGps,
       maxGpsDist,
       requiresC2pa,
+      c2paToolPath,
       blossomKeys,
     );
     return;
@@ -264,6 +314,7 @@ async function verifyC2paFromAttachments(
   expectedGps: GpsCoord | undefined,
   maxGpsDist: number,
   requiresC2pa: boolean,
+  c2paToolPath?: string | null,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   if (attachments.length === 0) return;
@@ -279,7 +330,9 @@ async function verifyC2paFromAttachments(
     }
 
     const filename = att.filename ?? att.id ?? "photo.jpg";
-    const c2pa = await validateC2pa(Buffer.from(fetched.data), filename);
+    const c2pa = await validateC2pa(Buffer.from(fetched.data), filename, {
+      toolPath: c2paToolPath,
+    });
 
     checkC2paGpsBinding(c2pa, expectedGps, maxGpsDist, checks, failures);
     validated = true;
@@ -296,45 +349,50 @@ async function verifyC2paFromAttachments(
   }
 }
 
-export const photoIntegrityCheck: FactorCheck = {
-  name: "photo-integrity",
-  async run(ctx) {
-    const attachments = ctx.input.attachments ?? [];
-    const requiresC2pa = ctx.requirement.factors.includes("c2pa");
-    if (!requiresC2pa && ctx.requirement.factors.includes("tlsn")) return;
-    if (!requiresC2pa && attachments.length === 0) return;
+export function createPhotoIntegrityCheck(
+  defaultOptions: C2paImageSchemaOptions = {},
+): FactorCheck {
+  return {
+    name: "photo-integrity",
+    async run(ctx) {
+      const attachments = ctx.input.attachments ?? [];
+      const c2paRequirement = resolveC2paRequirement(
+        ctx.requirement.schema_requirement,
+        ctx.acc.failures,
+      );
+      const c2paEvidence = resolveC2paEvidence(
+        ctx.input.schema_evidence,
+        ctx.acc.failures,
+      );
+      if (c2paRequirement === null || c2paEvidence === null) return;
 
-    const c2paRequirement = resolveC2paRequirement(
-      ctx.requirement.schema_requirement,
-      ctx.acc.failures,
-    );
-    const c2paEvidence = resolveC2paEvidence(
-      ctx.input.schema_evidence,
-      ctx.acc.failures,
-    );
-    if (c2paRequirement === null || c2paEvidence === null) return;
+      checkSchemaEvidenceGps(
+        c2paRequirement,
+        c2paEvidence,
+        ctx.acc.checks,
+        ctx.acc.failures,
+      );
 
-    checkSchemaEvidenceGps(
-      c2paRequirement,
-      c2paEvidence,
-      ctx.acc.checks,
-      ctx.acc.failures,
-    );
-
-    if (attachments.length === 0) return;
-    ctx.acc.checks.push("attachment present");
-    const maxGpsDistanceKm = c2paRequirement.max_gps_distance_km ??
-      DEFAULT_C2PA_MAX_GPS_DISTANCE_KM;
-    await verifyPhotoIntegrity(
-      ctx.requirement.id,
-      attachments,
-      ctx.acc.checks,
-      ctx.acc.failures,
-      c2paRequirement.expected_gps,
-      maxGpsDistanceKm,
-      requiresC2pa,
-      ctx.options.integrityStore ?? getDefaultIntegrityStore(),
-      ctx.options.blossomKeys,
-    );
-  },
-};
+      if (attachments.length === 0) return;
+      ctx.acc.checks.push("attachment present");
+      const maxGpsDistanceKm = c2paRequirement.max_gps_distance_km ??
+        DEFAULT_C2PA_MAX_GPS_DISTANCE_KM;
+      const options = parseC2paImageSchemaOptions({
+        ...defaultOptions,
+        ...schemaOptionsRecord(ctx.schemaOptions),
+      });
+      await verifyPhotoIntegrity(
+        ctx.requirement.id,
+        attachments,
+        ctx.acc.checks,
+        ctx.acc.failures,
+        c2paRequirement.expected_gps,
+        maxGpsDistanceKm,
+        true,
+        options.integrityStore ?? getDefaultIntegrityStore(),
+        options.c2paToolPath,
+        ctx.options.blossomKeys,
+      );
+    },
+  };
+}

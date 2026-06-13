@@ -4,6 +4,7 @@ import type {
   VerificationFactor,
 } from "../../values.ts";
 import type { VerificationDetail } from "../../proofs/mod.ts";
+import type { SchemaUri } from "../../schema.ts";
 
 export type QueryStatus =
   | "pending"
@@ -32,6 +33,7 @@ export type ProofVisibility = "public" | "customer_only";
 
 export interface QueryInput {
   description: string;
+  schema?: SchemaUri;
   location_hint?: string;
   verification_requirements?: readonly VerificationFactor[];
   schema_requirement?: unknown;
@@ -154,6 +156,7 @@ export interface OracleAttestationRecord {
 
 export interface Query {
   id: string;
+  schema?: SchemaUri;
   status: QueryStatus;
   description: string;
   location_hint?: string;

@@ -130,11 +130,13 @@ test("validateProviderOptions accepts a well-formed options object", () => {
   expect(() => validateProviderOptions(validOptions())).not.toThrow();
 });
 
-test("validateProviderOptions accepts an optional notary URL", () => {
+test("validateProviderOptions accepts schema options", () => {
   expect(() =>
     validateProviderOptions({
       ...validOptions(),
-      notary: "wss://notary.example.org",
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { notaryUrl: "wss://notary.example.org" },
+      },
     })
   ).not.toThrow();
 });
@@ -154,8 +156,8 @@ test("validateProviderOptions rejects missing privKey", () => {
     .toThrow(ProviderConfigError);
 });
 
-test("validateProviderOptions rejects empty-string notary when provided", () => {
-  expect(() => validateProviderOptions({ ...validOptions(), notary: "" }))
+test("validateProviderOptions rejects malformed schema options", () => {
+  expect(() => validateProviderOptions({ ...validOptions(), schemaOptions: 1 }))
     .toThrow(ProviderConfigError);
 });
 
@@ -203,21 +205,12 @@ test("validateProviderOptions rejects a non-object input", () => {
 
 // --- Constructor ---
 
-test("createProvider exposes oracles / relays / mint / notary / pubkey as readonly", () => {
-  const provider = createProvider({
-    ...validOptions(),
-    notary: "wss://notary.example.org",
-  });
+test("createProvider exposes oracles / relays / mint / pubkey as readonly", () => {
+  const provider = createProvider(validOptions());
   expect([...provider.oracles]).toEqual([ORACLE_A]);
   expect([...provider.relays]).toEqual(["wss://relay.example.org"]);
   expect(provider.mint).toEqual("https://mint.example.org");
-  expect(provider.notary).toEqual("wss://notary.example.org");
   expect(provider.pubkey).toBe(providerKey.publicKey);
-});
-
-test("createProvider does not require notary (defaults to undefined)", () => {
-  const provider = createProvider(validOptions());
-  expect(provider.notary).toBe(undefined);
 });
 
 // --- canOfferForRequest helper ---

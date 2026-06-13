@@ -20,6 +20,7 @@ import type { VerifyProofOptions } from "./verifier.ts";
 import { verify } from "../../requests/application/query-verifier.ts";
 import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
+import { ProofSchema } from "../../schema.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -31,7 +32,9 @@ import { tmpdir } from "node:os";
  */
 function withVerifierPath(verifierPath: string | null): VerifyProofOptions {
   return {
-    validateTlsn: (att, req) => validateTlsn(att, req, { verifierPath }),
+    schemaOptions: {
+      [ProofSchema.TlsnV1]: { verifierPath, validateTlsn },
+    },
   };
 }
 
@@ -77,6 +80,7 @@ describe("verify() integration with tlsn", () => {
   test("tlsn query with missing attestation fails", async () => {
     const query = {
       id: "test_tlsn_1",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,
@@ -97,6 +101,7 @@ describe("verify() integration with tlsn", () => {
   test("tlsn query without schema_requirement fails", async () => {
     const query = {
       id: "test_tlsn_2",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,
@@ -125,6 +130,7 @@ describe("verify() integration with tlsn", () => {
 
     const query = {
       id: "test_tlsn_3",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,

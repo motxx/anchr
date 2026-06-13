@@ -32,6 +32,8 @@ import {
 export { MIN_ESCROW_LOCKTIME_SECS };
 import { buildChallengeRule } from "./challenge.ts";
 
+const DEFAULT_QUERY_SCHEMA = "https://anchr-spec.org/spec/proof/photo/v1";
+
 export type TransitionResult =
   | { ok: true; query: Query }
   | { ok: false; error: string };
@@ -76,6 +78,7 @@ export function createQueryAggregate(
 
   const query: Query = {
     id: services.idGenerator.newQueryId(),
+    schema: input.schema ?? DEFAULT_QUERY_SCHEMA,
     status: isEscrow ? "awaiting_offers" : "pending",
     description: input.description,
     location_hint: input.location_hint,

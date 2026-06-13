@@ -45,8 +45,8 @@ describe("buildChallengeRule", () => {
     expect(rule).toContain("撮影");
   });
 
-  test("recommends C2PA camera", () => {
-    expect(buildChallengeRule("X", "test")).toContain("C2PA");
-    expect(buildChallengeRule(undefined, "test")).toContain("C2PA");
+  test("recommends a provenance-capable camera", () => {
+    expect(buildChallengeRule("X", "test")).toContain("来歴証明");
+    expect(buildChallengeRule(undefined, "test")).toContain("来歴証明");
   });
 });

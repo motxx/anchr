@@ -6,6 +6,7 @@ import {
   isTlsnExtensionResult,
   isTlsnRequirement,
 } from "../../tlsn-types.ts";
+import type { ValidateTlsnOptions } from "../../tlsn-validation.ts";
 import type {
   TlsnAttestation,
   TlsnExtensionResult,
@@ -18,16 +19,59 @@ import type {
 } from "../contract.ts";
 import type { CheckAccumulator, FactorCheck } from "./types.ts";
 
+export interface TlsnSchemaOptions {
+  validateTlsn?: typeof validateTlsn;
+  verifierPath?: string | null;
+  notaryUrl?: string;
+}
+
+function isTlsnSchemaOptions(value: unknown): value is TlsnSchemaOptions {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  if (
+    record.validateTlsn !== undefined &&
+    typeof record.validateTlsn !== "function"
+  ) {
+    return false;
+  }
+  if (
+    record.verifierPath !== undefined &&
+    record.verifierPath !== null &&
+    typeof record.verifierPath !== "string"
+  ) {
+    return false;
+  }
+  if (
+    record.notaryUrl !== undefined && typeof record.notaryUrl !== "string"
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function schemaOptionsRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? value as Record<string, unknown>
+    : {};
+}
+
+export function parseTlsnSchemaOptions(value: unknown): TlsnSchemaOptions {
+  if (isTlsnSchemaOptions(value)) return value;
+  throw new Error("TLSNotary schema options must be an object");
+}
+
 async function verifyTlsnExtensionResult(
   extResult: TlsnExtensionResult,
   requirement: TlsnRequirementPayload,
   acc: CheckAccumulator,
   validateTlsnFn: typeof validateTlsn,
+  validateOptions?: ValidateTlsnOptions,
 ): Promise<TlsnVerifiedData | undefined> {
   if (extResult.presentation) {
     const tlsnResult = await validateTlsnFn(
       { presentation: extResult.presentation },
       requirement,
+      validateOptions,
     );
     acc.checks.push(...tlsnResult.checks);
     acc.failures.push(...tlsnResult.failures);
@@ -44,10 +88,12 @@ async function verifyTlsnAttestation(
   requirement: TlsnRequirementPayload,
   acc: CheckAccumulator,
   validateTlsnFn: typeof validateTlsn,
+  validateOptions?: ValidateTlsnOptions,
 ): Promise<TlsnVerifiedData | undefined> {
   const tlsnResult = await validateTlsnFn(
     attestation,
     requirement,
+    validateOptions,
   );
   acc.checks.push(...tlsnResult.checks);
   acc.failures.push(...tlsnResult.failures);
@@ -61,6 +107,7 @@ async function verifyTlsn(
   input: VerificationInput,
   acc: CheckAccumulator,
   validateTlsnFn: typeof validateTlsn,
+  validateOptions?: ValidateTlsnOptions,
 ): Promise<TlsnVerifiedData | undefined> {
   if (!isTlsnRequirement(requirement.schema_requirement)) {
     acc.failures.push("TLSNotary: query missing or invalid schema_requirement");
@@ -76,6 +123,7 @@ async function verifyTlsn(
       requirement.schema_requirement,
       acc,
       validateTlsnFn,
+      validateOptions,
     );
   }
   if (isTlsnAttestation(input.schema_evidence)) {
@@ -84,21 +132,30 @@ async function verifyTlsn(
       requirement.schema_requirement,
       acc,
       validateTlsnFn,
+      validateOptions,
     );
   }
   acc.failures.push("TLSNotary: invalid schema_evidence");
   return undefined;
 }
 
-export const tlsnCheck: FactorCheck = {
-  name: "tlsn",
-  async run(ctx) {
-    if (!ctx.requirement.factors.includes("tlsn")) return;
-    ctx.schemaVerdict = await verifyTlsn(
-      ctx.requirement,
-      ctx.input,
-      ctx.acc,
-      ctx.options.validateTlsn ?? validateTlsn,
-    );
-  },
-};
+export function createTlsnCheck(
+  defaultOptions: TlsnSchemaOptions = {},
+): FactorCheck {
+  return {
+    name: "tlsn",
+    async run(ctx) {
+      const options = parseTlsnSchemaOptions({
+        ...defaultOptions,
+        ...schemaOptionsRecord(ctx.schemaOptions),
+      });
+      ctx.schemaVerdict = await verifyTlsn(
+        ctx.requirement,
+        ctx.input,
+        ctx.acc,
+        options.validateTlsn ?? validateTlsn,
+        { verifierPath: options.verifierPath },
+      );
+    },
+  };
+}

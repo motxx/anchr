@@ -5,10 +5,12 @@ import {
   type GpsCoord,
   parseProofModeZip,
   type ProofModeIntegrity,
-  storeIntegrity,
-  validateC2pa,
   validateExif,
 } from "../proofs/mod.ts";
+import {
+  storeContentCredentialsIntegrity,
+  validateContentCredentials,
+} from "../proofs/content-credentials.ts";
 import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
 import {
   detectZip,
@@ -54,11 +56,11 @@ export async function uploadAttachment(
     file.name,
   );
 
-  const [exifResult, c2paResult] = await Promise.all([
+  const [exifResult, provenanceResult] = await Promise.all([
     Promise.resolve(
       validateExif(photoBuffer, { expectedGps: options?.expectedGps }),
     ),
-    validateC2pa(photoBuffer, photoFilename),
+    validateContentCredentials(photoBuffer, photoFilename),
   ]);
 
   const result = await providerUpload(
@@ -72,15 +74,15 @@ export async function uploadAttachment(
 
   const attachment = buildAttachmentRef(result);
 
-  storeIntegrity({
+  storeContentCredentialsIntegrity({
     attachmentId: attachment.id,
     requestId: queryId,
     capturedAt: Date.now(),
     exif: exifResult,
-    c2pa: c2paResult,
+    provenance: provenanceResult,
     proofmode,
   });
-  logIntegrity(queryId, exifResult, c2paResult, proofmode);
+  logIntegrity(queryId, exifResult, provenanceResult, proofmode);
 
   return {
     attachment,

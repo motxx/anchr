@@ -2,10 +2,14 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 
 import {
+  getSchemaBundle,
   type ProofGenerator,
   ProofSchema,
+  registerSchemaBundle,
   resolveProofGenerator,
+  resolveSchemaEvidence,
   resolveVerifierAdapter,
+  unregisterSchemaBundle,
   type VerifierAdapter,
 } from "./schema.ts";
 
@@ -54,4 +58,44 @@ test("resolveVerifierAdapter returns null for unhandled schema", () => {
   };
   expect(resolveVerifierAdapter([verifier], CUSTOM_SCHEMA))
     .toBe(null);
+});
+
+test("registerSchemaBundle registers producer, verifier, checks, and evidence resolver by URI", async () => {
+  unregisterSchemaBundle(CUSTOM_SCHEMA);
+  const dispose = registerSchemaBundle({
+    uri: CUSTOM_SCHEMA,
+    producer: async () => ({ data: "registered", proof: "proof" }),
+    verifier: () => true,
+    checks: [{
+      name: "custom-check",
+      run(ctx) {
+        ctx.acc.checks.push("custom check ran");
+      },
+    }],
+    resolveEvidence: (payload) => ({ data: payload.data }),
+  });
+  try {
+    expect(getSchemaBundle(CUSTOM_SCHEMA)?.uri).toBe(CUSTOM_SCHEMA);
+    const generator = resolveProofGenerator([], CUSTOM_SCHEMA);
+    expect(generator).not.toBe(null);
+    expect(await generator?.produce({}, { customerPubkey: "customer" }))
+      .toEqual({ data: "registered", proof: "proof" });
+    const verifier = resolveVerifierAdapter([], CUSTOM_SCHEMA);
+    expect(verifier?.verify("proof", {}, {})).toBe(true);
+    expect(
+      resolveSchemaEvidence(CUSTOM_SCHEMA, { data: { ok: true }, proof: "" }),
+    ).toEqual({ data: { ok: true } });
+  } finally {
+    dispose();
+  }
+});
+
+test("registerSchemaBundle rejects duplicate schema URIs", () => {
+  unregisterSchemaBundle(CUSTOM_SCHEMA);
+  const dispose = registerSchemaBundle({ uri: CUSTOM_SCHEMA });
+  try {
+    expect(() => registerSchemaBundle({ uri: CUSTOM_SCHEMA })).toThrow();
+  } finally {
+    dispose();
+  }
 });

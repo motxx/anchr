@@ -1,4 +1,5 @@
 import type { OfferInfo, PaymentLockInfo, QueryInput } from "./types.ts";
+import { isSchemaUri } from "../../schema.ts";
 
 /** Minimum escrow locktime in seconds (10 minutes). Applies to all escrow types. */
 export const MIN_ESCROW_LOCKTIME_SECS = 600;
@@ -33,6 +34,9 @@ export function validateEscrowLocktime(
 export function validateQueryInput(input: QueryInput): string | null {
   if (!input.description || input.description.trim().length === 0) {
     return "description must not be empty";
+  }
+  if (input.schema !== undefined && !isSchemaUri(input.schema)) {
+    return "schema must be a valid schema URI";
   }
   return null;
 }

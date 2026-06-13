@@ -33,10 +33,6 @@ export interface RuntimeConfig {
   httpApiKeys: string[];
   /** Trusted Oracle pubkeys for Provider allowlist (from TRUSTED_ORACLE_PUBKEYS env). */
   trustedOraclePubkeys: string[];
-  /** TLSNotary Verifier Server URL (served to providers). */
-  tlsnVerifierUrl?: string;
-  /** TLSNotary WebSocket proxy URL (served to providers). */
-  tlsnProxyUrl?: string;
   /** Persistent preimage-store file (JSON). Survives restarts. */
   preimageStorePath: string;
 }
@@ -50,8 +46,6 @@ export function getRuntimeConfig(): RuntimeConfig {
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
     trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
-    tlsnVerifierUrl: Deno.env.get("TLSN_VERIFIER_URL")?.trim() || undefined,
-    tlsnProxyUrl: Deno.env.get("TLSN_PROXY_URL")?.trim() || undefined,
     preimageStorePath: Deno.env.get("PREIMAGE_STORE_PATH")?.trim() ||
       join(DEFAULT_RUNTIME_DATA_DIR, "preimages.json"),
   };

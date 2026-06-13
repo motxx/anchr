@@ -9,7 +9,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
-import { VERIFICATION_FACTORS, type VerificationFactor } from "../../values.ts";
+import type { VerificationFactor } from "../../values.ts";
 import type { EscrowType } from "../../requests/domain/types.ts";
 import {
   isRecord,
@@ -19,7 +19,6 @@ import {
   requireString,
 } from "../../internal/runtime/types.ts";
 
-const VERIFICATION_FACTOR_VALUES = new Set<string>(VERIFICATION_FACTORS);
 const ESCROW_TYPE_VALUES = new Set<string>(["htlc", "p2pk_frost"]);
 const RELAY_CLOSE_GRACE_MS = 250;
 
@@ -28,7 +27,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function isVerificationFactor(x: unknown): x is VerificationFactor {
-  return typeof x === "string" && VERIFICATION_FACTOR_VALUES.has(x);
+  return typeof x === "string" && x.length > 0;
 }
 
 function isEscrowType(x: unknown): x is EscrowType {
@@ -99,7 +98,7 @@ export function parseOracleAnnouncementEvent(
  * Discover oracles by querying Nostr relays for kind 30088 events
  * tagged with `anchr-oracle`.
  *
- * Optionally filter by capability (e.g., `tlsn`, `c2pa`).
+ * Optionally filter by schema-local capability label.
  */
 export async function discoverOracles(
   relayUrls: string[],

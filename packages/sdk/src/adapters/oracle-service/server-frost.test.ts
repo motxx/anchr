@@ -328,7 +328,7 @@ describe("oracle-server FROST signer message binding", () => {
       body: JSON.stringify({
         message: "deadbeef",
         requirement: { id: "q-bind", factors: [] },
-        input: { attachments: [] },
+        input: { attachments: [], schema_evidence: {} },
       }),
     });
 
@@ -356,7 +356,7 @@ describe("oracle-server FROST signer message binding", () => {
           factors: [],
           escrow_token_hash: "00".repeat(32),
         },
-        input: { attachments: [] },
+        input: { attachments: [], schema_evidence: {} },
         escrow_token: token,
       }),
     });
@@ -382,7 +382,7 @@ describe("oracle-server FROST signer message binding", () => {
           factors: [],
           escrow_token_hash: deriveFrostEscrowTokenHash(token),
         },
-        input: { attachments: [] },
+        input: { attachments: [], schema_evidence: {} },
         escrow_token: token,
       }),
     });

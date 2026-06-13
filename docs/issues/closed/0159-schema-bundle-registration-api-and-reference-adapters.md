@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -83,3 +84,67 @@ split into 0160 and 0161 respectively.
   bundle construction.
 - Replace the static factor-check registry with runtime registration.
 - Remove `notary`; route schema config through the schema-scoped options map.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `packages/sdk/src/schema.ts`
+- `packages/sdk/src/index.ts`
+- `packages/sdk/src/provider-types.ts`
+- `packages/sdk/src/provider.ts`
+- `packages/sdk/src/customer-types.ts`
+- `packages/sdk/src/customer.ts`
+- `packages/sdk/src/proofs/generic-media-schema.ts`
+- `packages/sdk/src/proofs/tlsn-schema.ts`
+- `packages/sdk/src/proofs/c2pa-image-schema.ts`
+- `packages/sdk/src/proofs/content-credentials.ts`
+- `packages/sdk/src/proofs/c2pa-validation.ts`
+- `packages/sdk/src/proofs/verification/verifier.ts`
+- `packages/sdk/src/proofs/verification/contract.ts`
+- `packages/sdk/src/proofs/verification/checks/registry.ts`
+- `packages/sdk/src/proofs/verification/checks/tlsn.ts`
+- `packages/sdk/src/proofs/verification/checks/photo-integrity.ts`
+- `packages/sdk/src/proofs/verification/checks/empty-submission.ts`
+- `packages/sdk/src/proofs/verification/checks/types.ts`
+- `packages/sdk/src/adapters/nostr/oracle-handlers.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.ts`
+- focused unit tests for schema registration, provider options, and verifier
+  schema-scoped dependency injection.
+
+Verified with:
+
+- `rg "notary" packages/sdk/src/provider-types.ts packages/sdk/src/schema.ts`
+  (no matches)
+- `rg -i "tlsn|c2pa" packages/sdk/src --glob '!**/proofs/**' --glob '!*.test.ts'`
+  (no matches)
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `check-silent-bypass` review of changed package source files: no
+  silent-bypass patterns detected; recorded with
+  `scripts/silent-bypass-verify.ts --record`
+- `arch-lint-llm` review of changed package source files: no semantic
+  architecture violations detected; recorded with
+  `scripts/arch-lint-llm-verify.ts --record`
+
+Harness update:
+
+- `packages/sdk/src/schema.test.ts` locks public schema-bundle registration,
+  duplicate-URI rejection, resolver fallback, and evidence-resolution behavior.
+- `packages/sdk/src/proofs/verification/verifier-standalone.test.ts`,
+  `verifier-tlsn.test.ts`, and `verifier.test.ts` lock schema-scoped TLSN
+  validator injection and C2PA integrity-store injection.
+- The negative `rg` guards above lock removal of top-level `notary` and
+  schema-specific TLSN/C2PA imports outside proof modules.
+
+Review residuals:
+
+- During review, restored the default-schema empty-submission guard in
+  `photo/v1` and locked it with a standalone verifier regression test.
+
+Follow-up:
+
+- 0160
+- 0161

@@ -108,7 +108,7 @@ describe("createQueryService", () => {
     const query = service.createQuery({ description: "Test query" });
     expect(query.status).toBe("pending");
     expect(query.challenge_nonce).toBeUndefined();
-    expect(query.verification_requirements).toEqual(["c2pa"]);
+    expect(query.verification_requirements).toEqual([]);
     expect(query.id).toMatch(/^query_/);
   });
 

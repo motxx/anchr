@@ -10,22 +10,11 @@
 
 export type AttachmentStorageKind = "blossom" | "external";
 
-/**
- * Verification factors that a Customer can request.
- * When omitted, defaults to ["c2pa"].
- */
-export const VERIFICATION_FACTORS = [
-  "nonce",
-  "timestamp",
-  "oracle",
-  "tlsn",
-  "c2pa",
-] as const;
+/** Verification labels are schema-internal strings carried opaquely. */
+export const VERIFICATION_FACTORS = [] as const;
 export type VerificationFactor = string;
 
-export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
-  "c2pa",
-] as const;
+export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [];
 
 export interface AttachmentRef {
   id: string;

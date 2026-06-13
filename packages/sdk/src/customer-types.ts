@@ -12,7 +12,7 @@ import type {
   RequestResult,
   Spec,
 } from "@anchr/protocol/types";
-import type { VerifierAdapter } from "./schema.ts";
+import type { SchemaOptionsMap, VerifierAdapter } from "./schema.ts";
 
 export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
 export type {
@@ -64,6 +64,7 @@ export interface CustomerOptions {
   offerWindowMs?: number;
   resultTimeoutMs?: number;
   verifierAdapters?: readonly VerifierAdapter[];
+  schemaOptions?: SchemaOptionsMap;
 }
 
 /** Options for a single customer.request() call. */
