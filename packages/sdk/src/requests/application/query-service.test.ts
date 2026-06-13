@@ -108,7 +108,7 @@ describe("createQueryService", () => {
     const query = service.createQuery({ description: "Test query" });
     expect(query.status).toBe("pending");
     expect(query.challenge_nonce).toBeUndefined();
-    expect(query.verification_requirements).toEqual(["gps"]);
+    expect(query.verification_requirements).toEqual(["c2pa"]);
     expect(query.id).toMatch(/^query_/);
   });
 
@@ -117,12 +117,12 @@ describe("createQueryService", () => {
     const query = service.createQuery(
       {
         description: "Test query",
-        verification_requirements: ["nonce", "gps"],
+        verification_requirements: ["nonce", "c2pa"],
       },
     );
     expect(query.challenge_nonce).toBeTruthy();
     expect(query.challenge_nonce!.length).toBe(6);
-    expect(query.verification_requirements).toEqual(["nonce", "gps"]);
+    expect(query.verification_requirements).toEqual(["nonce", "c2pa"]);
   });
 
   test("createQuery respects ttlMs option", async () => {

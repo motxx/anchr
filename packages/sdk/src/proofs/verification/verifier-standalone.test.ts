@@ -59,11 +59,11 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     clearIntegrityStore();
   });
 
-  test("rejects empty submission when GPS factor is set", async () => {
+  test("rejects empty submission when C2PA factor is set", async () => {
     const requirement: VerificationRequirement = {
       id: "req_1",
-      factors: ["gps"],
-      expected_gps: { lat: 35.0, lon: 139.0 },
+      factors: ["c2pa"],
+      schema_requirement: { expected_gps: { lat: 35.0, lon: 139.0 } },
     };
     const input: VerificationInput = { attachments: [] };
 
@@ -78,7 +78,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("an injected integrity store is honoured instead of the global singleton", async () => {
     const requirement: VerificationRequirement = {
       id: "req_injected_store",
-      factors: ["gps"],
+      factors: ["c2pa"],
     };
     const input: VerificationInput = {
       attachments: [{
@@ -88,7 +88,6 @@ describe("verifyProof — standalone (no Query envelope)", () => {
         storage_kind: "blossom",
         blossom_hash: "photo_injected",
       }],
-      gps: { lat: 35.0, lon: 139.0 },
     };
 
     // The record lives only in the host-composed store; the global
@@ -128,10 +127,10 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     expect(withGlobal.passed).toBe(false);
   });
 
-  test("rejects a submission without GPS evidence even when no expected location is set", async () => {
+  test("accepts C2PA evidence without location payload when no expected location is set", async () => {
     const requirement: VerificationRequirement = {
-      id: "req_gps_no_expected",
-      factors: ["gps"],
+      id: "req_c2pa_no_expected",
+      factors: ["c2pa"],
     };
     const input: VerificationInput = {
       attachments: [{
@@ -146,22 +145,21 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     injectC2paIntegrity("photo_b", requirement.id);
     const verification = await verifyProof(requirement, input);
 
-    expect(verification.passed).toBe(false);
-    expect(verification.failures).toContain(
-      "GPS coordinates missing from submission body — required by verification policy",
-    );
+    expect(verification.passed).toBe(true);
   });
 
-  test("rejects body GPS far from expected location", async () => {
+  test("rejects C2PA schema evidence GPS far from expected location", async () => {
     const requirement: VerificationRequirement = {
       id: "req_3",
-      factors: ["gps"],
-      expected_gps: { lat: 35.0, lon: 139.0 },
-      max_gps_distance_km: 10,
+      factors: ["c2pa"],
+      schema_requirement: {
+        expected_gps: { lat: 35.0, lon: 139.0 },
+        max_gps_distance_km: 10,
+      },
     };
     const input: VerificationInput = {
       attachments: [],
-      gps: { lat: 36.0, lon: 140.0 },
+      schema_evidence: { gps: { lat: 36.0, lon: 140.0 } },
     };
 
     const verification = await verifyProof(requirement, input);
@@ -175,7 +173,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("attachment with valid C2PA passes via integrity-store keyed by requirement.id", async () => {
     const requirement: VerificationRequirement = {
       id: "req_c2pa",
-      factors: ["gps"],
+      factors: ["c2pa"],
     };
     const input: VerificationInput = {
       attachments: [{
@@ -185,8 +183,6 @@ describe("verifyProof — standalone (no Query envelope)", () => {
         storage_kind: "blossom",
         blossom_hash: "photo_a",
       }],
-      // The gps factor demands body GPS evidence even without expected_gps.
-      gps: { lat: 35.0, lon: 139.0 },
     };
 
     injectC2paIntegrity("photo_a", requirement.id);
@@ -266,14 +262,16 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
   test("standalone verifyProof produces the same output as the Query-based path", async () => {
     const query = makeQuery({
       id: "query_parity",
-      verification_requirements: ["gps"],
-      expected_gps: { lat: 35.0, lon: 139.0 },
-      max_gps_distance_km: 50,
+      verification_requirements: ["c2pa"],
+      schema_requirement: {
+        expected_gps: { lat: 35.0, lon: 139.0 },
+        max_gps_distance_km: 50,
+      },
       expires_at: Date.now() + 60_000,
     });
     const result = {
       attachments: [],
-      gps: { lat: 35.001, lon: 139.001 },
+      schema_evidence: { gps: { lat: 35.001, lon: 139.001 } },
     };
 
     const viaQuery = await verify(query, result);
@@ -285,8 +283,11 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
     expect(viaStandalone.passed).toBe(viaQuery.passed);
     expect(viaStandalone.checks).toEqual(viaQuery.checks);
     expect(viaStandalone.failures).toEqual(viaQuery.failures);
-    expect(viaStandalone.checks.some((c) => c.includes("body GPS within 50km")))
-      .toBe(true);
+    expect(
+      viaStandalone.checks.some((c) =>
+        c.includes("C2PA schema_evidence GPS within 50km")
+      ),
+    ).toBe(true);
   });
 
   test("requestToRequirement carries every security-relevant field", () => {
@@ -298,9 +299,7 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
       id: "query_carry",
       description: "describe the proof",
       challenge_nonce: "ABCD",
-      verification_requirements: ["tlsn", "gps"],
-      expected_gps: { lat: 1, lon: 2 },
-      max_gps_distance_km: 25,
+      verification_requirements: ["tlsn", "c2pa"],
       schema_requirement: tlsnReq,
     });
 
@@ -309,9 +308,7 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
     expect(requirement.id).toBe("query_carry");
     expect(requirement.description).toBe("describe the proof");
     expect(requirement.challenge_nonce).toBe("ABCD");
-    expect(requirement.factors).toEqual(["tlsn", "gps"]);
-    expect(requirement.expected_gps).toEqual({ lat: 1, lon: 2 });
-    expect(requirement.max_gps_distance_km).toBe(25);
+    expect(requirement.factors).toEqual(["tlsn", "c2pa"]);
     expect(requirement.schema_requirement).toBe(tlsnReq);
   });
 });

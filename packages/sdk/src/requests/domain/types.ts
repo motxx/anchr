@@ -1,7 +1,6 @@
 import type {
   AttachmentRef,
   BlossomKeyMap,
-  GpsCoord,
   VerificationFactor,
 } from "../../values.ts";
 import type { VerificationDetail } from "../../proofs/mod.ts";
@@ -34,9 +33,6 @@ export type ProofVisibility = "public" | "customer_only";
 export interface QueryInput {
   description: string;
   location_hint?: string;
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km (default: 50). */
-  max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
   schema_requirement?: unknown;
   /** Proof visibility controls whether schema verdict details are published. */
@@ -46,8 +42,6 @@ export interface QueryInput {
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
-  /** GPS coordinates reported by the provider's device at submission time. */
-  gps?: GpsCoord;
   schema_evidence?: unknown;
 }
 
@@ -188,10 +182,6 @@ export interface Query {
   nostr_event_id?: string;
   /** Ephemeral Blossom encryption keys — stored for customer download via HTTP API. */
   blossom_keys?: BlossomKeyMap;
-  /** Expected GPS coordinates for proximity check. */
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km (default: 50). */
-  max_gps_distance_km?: number;
   schema_requirement?: unknown;
   /** Multi-oracle quorum config (if set, multiple oracles verify independently). */
   quorum?: QuorumConfig;

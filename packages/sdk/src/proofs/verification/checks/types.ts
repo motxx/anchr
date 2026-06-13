@@ -38,7 +38,6 @@ export interface VerifyProofOptions {
 export interface FactorCheckContext {
   requirement: VerificationRequirement;
   input: VerificationInput;
-  maxGpsDistanceKm: number;
   acc: CheckAccumulator;
   options: VerifyProofOptions;
   schemaVerdict?: unknown;

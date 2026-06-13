@@ -10,27 +10,21 @@
 
 export type AttachmentStorageKind = "blossom" | "external";
 
-export interface GpsCoord {
-  lat: number;
-  lon: number;
-}
-
 /**
  * Verification factors that a Customer can request.
- * When omitted, defaults to ["gps"].
+ * When omitted, defaults to ["c2pa"].
  */
 export const VERIFICATION_FACTORS = [
   "nonce",
-  "gps",
   "timestamp",
   "oracle",
   "tlsn",
   "c2pa",
 ] as const;
-export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
+export type VerificationFactor = string;
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
-  "gps",
+  "c2pa",
 ] as const;
 
 export interface AttachmentRef {

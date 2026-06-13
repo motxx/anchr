@@ -8,7 +8,6 @@ function verifyEmptySubmission(
   acc: CheckAccumulator,
 ): void {
   const requiresEvidence = factors.includes("nonce") ||
-    factors.includes("gps") ||
     factors.includes("c2pa");
 
   if (requiresEvidence && !hasTlsn) {

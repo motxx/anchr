@@ -24,8 +24,6 @@ import type {
 
 export type { FactorCheck, VerifyProofOptions };
 
-const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
-
 /** Pure proof verification over an explicit policy and evidence pair. */
 export async function verifyProof(
   requirement: VerificationRequirement,
@@ -37,8 +35,6 @@ export async function verifyProof(
   const ctx: FactorCheckContext = {
     requirement,
     input,
-    maxGpsDistanceKm: requirement.max_gps_distance_km ??
-      DEFAULT_MAX_GPS_DISTANCE_KM,
     acc,
     options: options ?? {},
   };

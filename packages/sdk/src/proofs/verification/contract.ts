@@ -8,11 +8,7 @@
  * imports `VerificationDetail` from here in one direction.
  */
 
-import type {
-  AttachmentRef,
-  GpsCoord,
-  VerificationFactor,
-} from "../../values.ts";
+import type { AttachmentRef, VerificationFactor } from "../../values.ts";
 
 /**
  * Query-independent verification policy. NIP-90 adapters derive this from a
@@ -26,9 +22,6 @@ export interface VerificationRequirement {
   description?: string;
   /** Per-request handwritten challenge string used by the nonce factor. */
   challenge_nonce?: string;
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km. Defaults to 50 inside the verifier. */
-  max_gps_distance_km?: number;
   schema_requirement?: unknown;
   /** SHA-256 over the encoded p2pk_frost escrow token, when token-bound signing is required. */
   escrow_token_hash?: string;
@@ -37,7 +30,6 @@ export interface VerificationRequirement {
 /** Query-independent shape of the evidence being verified. */
 export interface VerificationInput {
   attachments: AttachmentRef[];
-  gps?: GpsCoord;
   schema_evidence?: unknown;
 }
 

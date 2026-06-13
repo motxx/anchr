@@ -11,7 +11,7 @@ const FULL_ORACLE_INFO: OracleInfo = {
   name: "Test Oracle",
   endpoint: "https://oracle.example.com",
   fee_ppm: 50000,
-  supported_factors: ["tlsn", "gps", "nonce"],
+  supported_factors: ["tlsn", "c2pa", "nonce"],
   supported_escrow_types: ["htlc", "p2pk_frost"],
   min_amount_sats: 100,
   max_amount_sats: 1000000,
@@ -49,7 +49,7 @@ test("buildOracleAnnouncementEvent includes capability t tags", () => {
 
   const tTags = event.tags.filter((t) => t[0] === "t").map((t) => t[1]);
   expect(tTags).toContain("anchr-oracle-tlsn");
-  expect(tTags).toContain("anchr-oracle-gps");
+  expect(tTags).toContain("anchr-oracle-c2pa");
   expect(tTags).toContain("anchr-oracle-nonce");
 });
 
@@ -60,7 +60,7 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   const content = JSON.parse(event.content);
   expect(content.name).toBe("Test Oracle");
   expect(content.fee_ppm).toBe(50000);
-  expect(content.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
+  expect(content.supported_factors).toEqual(["tlsn", "c2pa", "nonce"]);
   expect(content.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
   expect(content.min_amount_sats).toBe(100);
   expect(content.max_amount_sats).toBe(1000000);
@@ -121,7 +121,7 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
   expect(announcement!.name).toBe("Test Oracle");
   expect(announcement!.endpoint).toBe("https://oracle.example.com");
   expect(announcement!.fee_ppm).toBe(50000);
-  expect(announcement!.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
+  expect(announcement!.supported_factors).toEqual(["tlsn", "c2pa", "nonce"]);
   expect(announcement!.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
   expect(announcement!.min_amount_sats).toBe(100);
   expect(announcement!.max_amount_sats).toBe(1000000);

@@ -99,7 +99,7 @@ export function parseOracleAnnouncementEvent(
  * Discover oracles by querying Nostr relays for kind 30088 events
  * tagged with `anchr-oracle`.
  *
- * Optionally filter by capability (e.g., `tlsn`, `gps`).
+ * Optionally filter by capability (e.g., `tlsn`, `c2pa`).
  */
 export async function discoverOracles(
   relayUrls: string[],

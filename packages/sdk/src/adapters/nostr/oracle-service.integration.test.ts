@@ -99,9 +99,11 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
 
     const query = makeQuery({
       id: "q-int-pass",
-      verification_requirements: ["gps"],
-      expected_gps: { lat: 35.0, lon: 139.0 },
-      max_gps_distance_km: 50,
+      verification_requirements: ["c2pa"],
+      schema_requirement: {
+        expected_gps: { lat: 35.0, lon: 139.0 },
+        max_gps_distance_km: 50,
+      },
     });
     const { hash } = service.generateRequestHash(query.id);
     const preimage = store.getPreimage(hash);
@@ -172,9 +174,11 @@ describe("oracle-service relay integration (canonical wire contract)", () => {
 
     const query = makeQuery({
       id: "q-int-fail",
-      verification_requirements: ["gps"],
-      expected_gps: { lat: 35.0, lon: 139.0 },
-      max_gps_distance_km: 50,
+      verification_requirements: ["c2pa"],
+      schema_requirement: {
+        expected_gps: { lat: 35.0, lon: 139.0 },
+        max_gps_distance_km: 50,
+      },
     });
     const { hash } = service.generateRequestHash(query.id);
     service.watchRequest(query, REQUEST_EVENT_ID, "customer_pub");

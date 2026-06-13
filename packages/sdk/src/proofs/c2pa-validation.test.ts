@@ -5,7 +5,10 @@ import {
   type C2paValidationResult,
   evaluateSignature,
   isC2paAvailable,
+  isC2paImageEvidence,
+  isC2paImageRequirement,
   validateC2pa,
+  validateGpsCoord,
   verifyC2paGpsBinding,
 } from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -31,6 +34,37 @@ function makeC2paResult(
     ...overrides,
   };
 }
+
+describe("C2PA image GPS payload predicates", () => {
+  test("validates GPS coordinates at the schema boundary", () => {
+    expect(validateGpsCoord({ lat: 35.6762, lon: 139.6503 })).toBeNull();
+    expect(validateGpsCoord({ lat: 91, lon: 0 })).toContain("lat");
+    expect(validateGpsCoord({ lat: 0, lon: 181 })).toContain("lon");
+    expect(validateGpsCoord({ lat: NaN, lon: 0 })).toContain("finite");
+  });
+
+  test("narrows C2PA image requirement payloads", () => {
+    expect(isC2paImageRequirement({
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+      max_gps_distance_km: 10,
+    })).toBe(true);
+    expect(isC2paImageRequirement({
+      expected_gps: { lat: 999, lon: 0 },
+    })).toBe(false);
+    expect(isC2paImageRequirement({
+      max_gps_distance_km: 0,
+    })).toBe(false);
+  });
+
+  test("narrows C2PA image evidence payloads", () => {
+    expect(isC2paImageEvidence({
+      gps: { lat: 35.6762, lon: 139.6503 },
+    })).toBe(true);
+    expect(isC2paImageEvidence({ gps: { lat: 0, lon: Infinity } })).toBe(
+      false,
+    );
+  });
+});
 
 describe("C2PA GPS binding semantics", () => {
   test("INV-06: passes only when the verified manifest contains nearby signed GPS", () => {

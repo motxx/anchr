@@ -6,7 +6,7 @@
  */
 
 import type { Buffer } from "node:buffer";
-import { evaluateGpsDistancePolicy } from "./geo.ts";
+import { evaluateC2paGpsProximity } from "./c2pa-validation.ts";
 
 const JPEG_SOI = 0xffd8;
 const JPEG_APP1 = 0xffe1;
@@ -444,19 +444,21 @@ function validateGps(
 
   if (options?.expectedGps) {
     const maxDist = options.maxDistanceKm ?? 50;
-    const policy = evaluateGpsDistancePolicy(
+    const policy = evaluateC2paGpsProximity(
       metadata.gps,
       options.expectedGps,
       maxDist,
+      "EXIF",
     );
-    gpsNearHint = policy.withinLimit;
+    gpsNearHint = policy.failures.length === 0;
+    const distanceKm = policy.distanceKm ?? 0;
     if (gpsNearHint) {
       checks.push(
-        `GPS within ${maxDist}km of hint (${policy.distanceKm.toFixed(1)}km)`,
+        `GPS within ${maxDist}km of hint (${distanceKm.toFixed(1)}km)`,
       );
     } else {
       failures.push(
-        `GPS ${policy.distanceKm.toFixed(1)}km from hint (max ${maxDist}km)`,
+        `GPS ${distanceKm.toFixed(1)}km from hint (max ${maxDist}km)`,
       );
     }
   }

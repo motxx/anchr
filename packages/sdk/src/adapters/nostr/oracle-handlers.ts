@@ -6,7 +6,7 @@ import type { Event } from "nostr-tools";
 import type { NostrIdentity } from "../../identity.ts";
 import { parseOfferFeedbackEvent } from "@anchr/protocol/events";
 import type { OracleQueryResponsePayload } from "@anchr/protocol/events";
-import type { AttachmentRef, GpsCoord } from "../../values.ts";
+import type { AttachmentRef } from "../../values.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
 
 export interface WatchedQuery {
@@ -21,14 +21,6 @@ export interface WatchedQuery {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function parseGps(value: unknown): GpsCoord | undefined {
-  if (!isRecord(value)) return undefined;
-  if (typeof value.lat !== "number" || typeof value.lon !== "number") {
-    return undefined;
-  }
-  return { lat: value.lat, lon: value.lon };
 }
 
 function parseAttachment(value: unknown): AttachmentRef | null {
@@ -65,8 +57,9 @@ function parseAttachment(value: unknown): AttachmentRef | null {
 
 /**
  * Map the canonical Oracle-readable result payload onto the evidence shape
- * the verifier consumes. `data` carries the evidence fields (`attachments`,
- * `gps`, `notes`); a TLSN query reads the base64 presentation from `proof`.
+ * the verifier consumes. `data` carries schema-owned evidence fields plus
+ * shared attachment references; a TLSN query reads the base64 presentation
+ * from `proof`.
  * Malformed fields are dropped, so verification fails closed on whatever
  * evidence the requirement demands but the payload does not carry.
  */
@@ -85,16 +78,15 @@ export function oracleResponseToResult(
   }
 
   const result: QueryResult = { attachments };
-  const gps = parseGps(data.gps);
-  if (gps !== undefined) result.gps = gps;
   if (typeof data.notes === "string") result.notes = data.notes;
 
-  const wantsTlsn = query.verification_requirements.includes("tlsn") ||
-    query.schema_requirement !== undefined;
+  const wantsTlsn = query.verification_requirements.includes("tlsn");
   if (
     wantsTlsn && typeof payload.proof === "string" && payload.proof.length > 0
   ) {
     result.schema_evidence = { presentation: payload.proof };
+  } else if (query.verification_requirements.includes("c2pa")) {
+    result.schema_evidence = data;
   }
   return result;
 }

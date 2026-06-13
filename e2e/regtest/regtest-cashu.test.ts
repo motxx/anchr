@@ -117,7 +117,6 @@ suite("e2e: regtest Cashu payment_lock lifecycle", () => {
       {
         description: "E2E 渋谷交差点の撮影テスト",
         location_hint: "Shibuya",
-        expected_gps: { lat: 35.6595, lon: 139.7004 },
         verification_requirements: [],
       },
       {
@@ -138,12 +137,11 @@ suite("e2e: regtest Cashu payment_lock lifecycle", () => {
     expect(ourQuery).toBeDefined();
     expect(ourQuery!.payment_lock?.amount_sats).toBe(BOUNTY_SATS);
 
-    // 4. Submit result with GPS
+    // 4. Submit result
     const submitOutcome = await testService.submitQueryResult(
       created.id,
       {
         attachments: [],
-        gps: { lat: 35.6595, lon: 139.7004 },
       },
       { executor_type: "human", channel: "adapter" },
     );
@@ -175,7 +173,7 @@ suite("e2e: regtest Cashu payment_lock lifecycle", () => {
     );
     const submitOutcome = await testService.submitQueryResult(
       query.id,
-      { attachments: [], gps: { lat: 35.68, lon: 139.76 } },
+      { attachments: [] },
       { executor_type: "human", channel: "adapter" },
     );
     expect(submitOutcome.ok).toBe(true);

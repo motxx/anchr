@@ -13,7 +13,7 @@ function makeQuery(overrides: Partial<Query>): Query {
     id: "query_test",
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
-    verification_requirements: ["nonce", "gps"],
+    verification_requirements: ["nonce", "c2pa"],
     expires_at: Date.now() + 60_000,
     ...overrides,
   });
@@ -50,7 +50,7 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
   });
 }
 
-test("rejects empty submission when GPS/nonce required", async () => {
+test("rejects empty submission when C2PA/nonce required", async () => {
   const query = makeQuery({});
   const result: QueryResult = {
     attachments: [],
@@ -59,7 +59,6 @@ test("rejects empty submission when GPS/nonce required", async () => {
 
   const verification = await verify(query, result);
 
-  // Fix 1: Empty attachments with GPS/nonce requirements → rejection
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
     "no media evidence provided — photos are required when photo-backed verification is enabled",
@@ -70,7 +69,6 @@ test("empty submission fails when nonce evidence is required", async () => {
   const query = makeQuery({
     verification_requirements: ["nonce"],
     payment_lock: undefined,
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [],
@@ -88,7 +86,6 @@ test("empty submission fails when nonce evidence is required", async () => {
 test("empty submission fails when C2PA verification is required", async () => {
   const query = makeQuery({
     verification_requirements: ["c2pa"],
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [],
@@ -106,7 +103,6 @@ test("empty submission fails when C2PA verification is required", async () => {
 test("c2pa required but only a non-image attachment fails closed", async () => {
   const query = makeQuery({
     verification_requirements: ["c2pa"],
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [{
@@ -137,8 +133,6 @@ test("attachment with valid C2PA passes", async () => {
       storage_kind: "blossom",
       blossom_hash: "photo1",
     }],
-    // The gps factor demands body GPS evidence even without expected_gps.
-    gps: { lat: 35.6762, lon: 139.6503 },
   };
 
   injectC2paIntegrity("photo1", query.id);
@@ -153,8 +147,10 @@ test("attachment with valid C2PA passes", async () => {
 
 test("INV-06: attachment with expected GPS requires C2PA-signed GPS binding", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [{
@@ -164,7 +160,7 @@ test("INV-06: attachment with expected GPS requires C2PA-signed GPS binding", as
       storage_kind: "blossom",
       blossom_hash: "photo1",
     }],
-    gps: { lat: 35.6762, lon: 139.6503 },
+    schema_evidence: { gps: { lat: 35.6762, lon: 139.6503 } },
   };
 
   injectC2paIntegrity("photo1", query.id);
@@ -221,7 +217,7 @@ test("attachment without C2PA fails", async () => {
   );
 });
 
-test("payment_lock query without GPS/nonce requirements allows empty submission", async () => {
+test("payment_lock query without C2PA/nonce requirements allows empty submission", async () => {
   const query = makeQuery({
     payment_lock: { amount_sats: 100 },
     verification_requirements: [],
@@ -233,17 +229,16 @@ test("payment_lock query without GPS/nonce requirements allows empty submission"
 
   const verification = await verify(query, result);
 
-  // PaymentLock alone doesn't require evidence — verification_requirements control evidence needs
   expect(verification.passed).toBe(true);
   expect(verification.checks).toContain(
     "no media evidence provided (weak verification)",
   );
 });
 
-test("payment_lock query with GPS requirement rejects empty submission", async () => {
+test("payment_lock query with C2PA requirement rejects empty submission", async () => {
   const query = makeQuery({
     payment_lock: { amount_sats: 100 },
-    verification_requirements: ["gps"],
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
@@ -258,34 +253,39 @@ test("payment_lock query with GPS requirement rejects empty submission", async (
   );
 });
 
-test("body GPS within range passes", async () => {
+test("C2PA schema evidence GPS within range passes its local check", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
     notes: "nearby",
-    gps: { lat: 35.68, lon: 139.65 },
+    schema_evidence: { gps: { lat: 35.68, lon: 139.65 } },
   };
 
   const verification = await verify(query, result);
 
-  // Still fails because no attachments + GPS required, but body GPS check itself passes
-  expect(verification.checks.some((c) => c.includes("body GPS within"))).toBe(
-    true,
-  );
+  expect(
+    verification.checks.some((c) =>
+      c.includes("C2PA schema_evidence GPS within")
+    ),
+  ).toBe(true);
 });
 
-test("body GPS too far fails", async () => {
+test("C2PA schema evidence GPS too far fails", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
     notes: "far away",
-    gps: { lat: 40.0, lon: 140.0 },
+    schema_evidence: { gps: { lat: 40.0, lon: 140.0 } },
   };
 
   const verification = await verify(query, result);
@@ -293,15 +293,18 @@ test("body GPS too far fails", async () => {
   expect(verification.passed).toBe(false);
   expect(
     verification.failures.some((f) =>
-      f.includes("body GPS") && f.includes("from expected location")
+      f.includes("C2PA schema_evidence GPS") &&
+      f.includes("from expected location")
     ),
   ).toBe(true);
 });
 
-test("missing body GPS fails when GPS verification required", async () => {
+test("missing C2PA schema evidence GPS fails when expected location is set", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
@@ -312,7 +315,7 @@ test("missing body GPS fails when GPS verification required", async () => {
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
-    "GPS coordinates missing from submission body — required by verification policy",
+    "C2PA image: GPS coordinates missing from schema_evidence",
   );
 });
 

@@ -93,8 +93,6 @@ export function createQueryAggregate(
     escrow: options.escrow,
     offers: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
-    expected_gps: input.expected_gps,
-    max_gps_distance_km: input.max_gps_distance_km,
     schema_requirement: input.schema_requirement,
     quorum: options.quorum,
     visibility: input.visibility,

@@ -29,8 +29,6 @@ export function requestToRequirement(request: Query): VerificationRequirement {
     factors: request.verification_requirements,
     description: request.description,
     challenge_nonce: request.challenge_nonce,
-    expected_gps: request.expected_gps,
-    max_gps_distance_km: request.max_gps_distance_km,
     schema_requirement: request.schema_requirement,
     escrow_token_hash: escrowTokenHash,
   };
@@ -41,7 +39,6 @@ export function resultToVerificationInput(
 ): VerificationInput {
   return {
     attachments: result.attachments,
-    gps: result.gps,
     schema_evidence: result.schema_evidence,
   };
 }

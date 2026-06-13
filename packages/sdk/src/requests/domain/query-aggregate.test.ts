@@ -84,14 +84,14 @@ function makeHtlcQuery(overrides?: Partial<Query>): Query {
 
 const passedVerification: VerificationDetail = {
   passed: true,
-  checks: ["GPS check passed", "AI check passed"],
+  checks: ["C2PA check passed"],
   failures: [],
 };
 
 const failedVerification: VerificationDetail = {
   passed: false,
-  checks: ["GPS check passed"],
-  failures: ["AI check failed"],
+  checks: [],
+  failures: ["C2PA check failed"],
 };
 
 const defaultMeta: SubmissionMeta = {
@@ -170,16 +170,6 @@ describe("createQueryAggregate", () => {
     expect(q.quorum?.min_approvals).toBe(2);
   });
 
-  test("sets expected_gps and max_gps_distance_km", () => {
-    const q = expectOk(createQueryAggregate({
-      ...defaultInput,
-      expected_gps: { lat: 35.6, lon: 139.7 },
-      max_gps_distance_km: 5,
-    }, defaultOptions));
-    expect(q.expected_gps?.lat).toBe(35.6);
-    expect(q.max_gps_distance_km).toBe(5);
-  });
-
   test("sets schema_requirement", () => {
     const q = expectOk(createQueryAggregate({
       ...defaultInput,
@@ -195,7 +185,7 @@ describe("createQueryAggregate", () => {
   test("generates nonce when nonce is in verification_requirements", () => {
     const q = expectOk(createQueryAggregate({
       ...defaultInput,
-      verification_requirements: ["nonce", "gps"],
+      verification_requirements: ["nonce", "c2pa"],
     }, defaultOptions));
     expect(q.challenge_nonce).toBeDefined();
     expect(q.challenge_rule).toBeDefined();
@@ -212,14 +202,6 @@ describe("createQueryAggregate", () => {
       createQueryAggregate({ description: "" }, defaultOptions),
     );
     expect(err).toContain("description");
-  });
-
-  test("rejects invalid GPS", () => {
-    const result = createQueryAggregate({
-      description: "Photo",
-      expected_gps: { lat: 999, lon: 0 },
-    }, defaultOptions);
-    expect(result.ok).toBe(false);
   });
 
   test("rejects HTLC locktime too short", () => {

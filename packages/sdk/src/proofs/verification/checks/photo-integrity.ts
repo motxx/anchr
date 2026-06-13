@@ -5,7 +5,14 @@
 
 import { Buffer } from "node:buffer";
 import {
+  type C2paImageEvidence,
+  type C2paImageRequirement,
   type C2paValidationResult,
+  DEFAULT_C2PA_MAX_GPS_DISTANCE_KM,
+  evaluateC2paGpsProximity,
+  type GpsCoord,
+  isC2paImageEvidence,
+  isC2paImageRequirement,
   validateC2pa,
   verifyC2paGpsBinding,
 } from "../../c2pa-validation.ts";
@@ -14,12 +21,7 @@ import {
   type IntegrityStore,
 } from "../../integrity-store.ts";
 import { fetchAttachmentData } from "../../../attachments/fetch-attachment.ts";
-import type {
-  AttachmentRef,
-  BlossomKeyMap,
-  GpsCoord,
-} from "../../../values.ts";
-import { checkGpsProximity } from "./gps.ts";
+import type { AttachmentRef, BlossomKeyMap } from "../../../values.ts";
 import type { FactorCheck } from "./types.ts";
 
 function checkC2paSignature(
@@ -51,14 +53,16 @@ function checkC2paGpsBinding(
 ): void {
   if (!expectedGps) {
     checkC2paSignature(c2pa, checks, failures);
-    checkGpsProximity(
-      c2pa.gps,
-      expectedGps,
-      maxGpsDist,
-      "C2PA",
-      checks,
-      failures,
-    );
+    if (c2pa.gps) {
+      const result = evaluateC2paGpsProximity(
+        c2pa.gps,
+        expectedGps,
+        maxGpsDist,
+        "C2PA",
+      );
+      checks.push(...result.checks);
+      failures.push(...result.failures);
+    }
     return;
   }
 
@@ -94,14 +98,60 @@ function checkProofModeRecord(
       lat: proofmode.proof.locationLatitude,
       lon: proofmode.proof.locationLongitude,
     };
-    checkGpsProximity(
+    const result = evaluateC2paGpsProximity(
       gps,
       expectedGps,
       maxGpsDist,
       "ProofMode",
-      checks,
-      failures,
     );
+    checks.push(...result.checks);
+    failures.push(...result.failures);
+  }
+}
+
+function resolveC2paRequirement(
+  payload: unknown,
+  failures: string[],
+): C2paImageRequirement | null {
+  if (payload === undefined) return {};
+  if (!isC2paImageRequirement(payload)) {
+    failures.push("C2PA image: query missing or invalid schema_requirement");
+    return null;
+  }
+  return payload;
+}
+
+function resolveC2paEvidence(
+  payload: unknown,
+  failures: string[],
+): C2paImageEvidence | null {
+  if (payload === undefined) return {};
+  if (!isC2paImageEvidence(payload)) {
+    failures.push("C2PA image: invalid schema_evidence");
+    return null;
+  }
+  return payload;
+}
+
+function checkSchemaEvidenceGps(
+  requirement: C2paImageRequirement,
+  evidence: C2paImageEvidence,
+  checks: string[],
+  failures: string[],
+): void {
+  const maxGpsDist = requirement.max_gps_distance_km ??
+    DEFAULT_C2PA_MAX_GPS_DISTANCE_KM;
+  if (evidence.gps) {
+    const result = evaluateC2paGpsProximity(
+      evidence.gps,
+      requirement.expected_gps,
+      maxGpsDist,
+      "C2PA schema_evidence",
+    );
+    checks.push(...result.checks);
+    failures.push(...result.failures);
+  } else if (requirement.expected_gps) {
+    failures.push("C2PA image: GPS coordinates missing from schema_evidence");
   }
 }
 
@@ -250,16 +300,39 @@ export const photoIntegrityCheck: FactorCheck = {
   name: "photo-integrity",
   async run(ctx) {
     const attachments = ctx.input.attachments ?? [];
+    const requiresC2pa = ctx.requirement.factors.includes("c2pa");
+    if (!requiresC2pa && ctx.requirement.factors.includes("tlsn")) return;
+    if (!requiresC2pa && attachments.length === 0) return;
+
+    const c2paRequirement = resolveC2paRequirement(
+      ctx.requirement.schema_requirement,
+      ctx.acc.failures,
+    );
+    const c2paEvidence = resolveC2paEvidence(
+      ctx.input.schema_evidence,
+      ctx.acc.failures,
+    );
+    if (c2paRequirement === null || c2paEvidence === null) return;
+
+    checkSchemaEvidenceGps(
+      c2paRequirement,
+      c2paEvidence,
+      ctx.acc.checks,
+      ctx.acc.failures,
+    );
+
     if (attachments.length === 0) return;
     ctx.acc.checks.push("attachment present");
+    const maxGpsDistanceKm = c2paRequirement.max_gps_distance_km ??
+      DEFAULT_C2PA_MAX_GPS_DISTANCE_KM;
     await verifyPhotoIntegrity(
       ctx.requirement.id,
       attachments,
       ctx.acc.checks,
       ctx.acc.failures,
-      ctx.requirement.expected_gps,
-      ctx.maxGpsDistanceKm,
-      ctx.requirement.factors.includes("c2pa"),
+      c2paRequirement.expected_gps,
+      maxGpsDistanceKm,
+      requiresC2pa,
       ctx.options.integrityStore ?? getDefaultIntegrityStore(),
       ctx.options.blossomKeys,
     );

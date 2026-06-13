@@ -2,13 +2,14 @@ import { Buffer } from "node:buffer";
 import { isBlossomEnabled } from "./blossom.ts";
 import { providerUpload } from "./provider-upload.ts";
 import {
+  type GpsCoord,
   parseProofModeZip,
   type ProofModeIntegrity,
   storeIntegrity,
   validateC2pa,
   validateExif,
 } from "../proofs/mod.ts";
-import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../values.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
 import {
   detectZip,
   extractProofModeIntegrity,

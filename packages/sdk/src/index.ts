@@ -98,9 +98,9 @@ export type {
   AttachmentStorageKind,
   BlossomKeyMap,
   BlossomKeyMaterial,
-  GpsCoord,
   VerificationFactor,
 } from "./values.ts";
+export type { GpsCoord } from "./proofs/c2pa-validation.ts";
 export {
   DEFAULT_VERIFICATION_FACTORS,
   VERIFICATION_FACTORS,
