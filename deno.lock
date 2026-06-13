@@ -14,7 +14,6 @@
     "jsr:@std/path@^1.1.4": "1.1.4",
     "jsr:@std/testing@1": "1.0.17",
     "jsr:@std/yaml@*": "1.1.0",
-    "npm:@anthropic-ai/sdk@0.78": "0.78.0",
     "npm:@cashu/cashu-ts@3": "3.6.2",
     "npm:@logtape/logtape@^2.1.1": "2.1.1",
     "npm:@noble/curves@2": "2.0.1",
@@ -80,13 +79,6 @@
     }
   },
   "npm": {
-    "@anthropic-ai/sdk@0.78.0": {
-      "integrity": "sha512-PzQhR715td/m1UaaN5hHXjYB8Gl2lF9UVhrrGrZeysiF6Rb74Wc9GCB8hzLdzmQtBd1qe89F9OptgB9Za1Ib5w==",
-      "dependencies": [
-        "json-schema-to-ts"
-      ],
-      "bin": true
-    },
     "@babel/code-frame@7.29.0": {
       "integrity": "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw==",
       "dependencies": [
@@ -97,9 +89,6 @@
     },
     "@babel/helper-validator-identifier@7.28.5": {
       "integrity": "sha512-qSs4ifwzKJSV39ucNjsvc6WVHs6b7S03sOh2OcHF9UHfVPqWWALUsNUVzhSBiItjRZoLHx7nIarVjqKVusUZ1Q=="
-    },
-    "@babel/runtime@7.29.2": {
-      "integrity": "sha512-JiDShH45zKHWyGe4ZNVRrCjBz8Nh9TMmZG1kh4QTK8hCBTWBi8Da+i7s1fJw7/lYpM4ccepSNfqzZ/QvABBi5g=="
     },
     "@cashu/cashu-ts@3.6.2": {
       "integrity": "sha512-wdlX1rIFC+cdr+qVnVl2ko6ShKeNSJCGnQFQ1NyeS+EwZ8e0t6BQXF5uLgGnA8DB44RkfCgiH2Iw5RHTDkb6YQ==",
@@ -687,13 +676,6 @@
     "json-parse-even-better-errors@2.3.1": {
       "integrity": "sha512-xyFwyhro/JEof6Ghe2iz2NcXoj2sloNsWr/XsERDK/oiPCfaNhl5ONfp+jQdAZRQQ0IJWNzH9zIZF7li91kh2w=="
     },
-    "json-schema-to-ts@3.1.1": {
-      "integrity": "sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==",
-      "dependencies": [
-        "@babel/runtime",
-        "ts-algebra"
-      ]
-    },
     "lightningcss-android-arm64@1.32.0": {
       "integrity": "sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==",
       "os": ["android"],
@@ -1023,9 +1005,6 @@
         "b4a"
       ]
     },
-    "ts-algebra@2.0.0": {
-      "integrity": "sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw=="
-    },
     "tslib@2.8.1": {
       "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
     },
@@ -1092,7 +1071,6 @@
       "jsr:@noble/hashes@2",
       "jsr:@std/expect@1",
       "jsr:@std/testing@1",
-      "npm:@anthropic-ai/sdk@0.78",
       "npm:@cashu/cashu-ts@3",
       "npm:@noble/curves@2",
       "npm:nostr-tools@2",
@@ -1114,13 +1092,11 @@
           "jsr:@noble/hashes@2",
           "jsr:@std/expect@1",
           "jsr:@std/testing@1",
-          "npm:@anthropic-ai/sdk@0.78",
           "npm:@cashu/cashu-ts@3",
           "npm:nostr-tools@2"
         ],
         "packageJson": {
           "dependencies": [
-            "npm:@anthropic-ai/sdk@0.78",
             "npm:@cashu/cashu-ts@3",
             "npm:@logtape/logtape@^2.1.1",
             "npm:@noble/hashes@^2.2.0",

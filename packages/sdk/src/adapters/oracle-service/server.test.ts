@@ -17,7 +17,7 @@ const app = buildOracleApp({
 const makeQuery = (id: string): Query =>
   makeBaseQuery({
     id,
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     expires_at: Date.now() + 60_000,
   });
 
@@ -129,7 +129,16 @@ describe("oracle-server HTLC endpoints", () => {
     expect(created.hash).toBeTruthy();
 
     const query = makeQuery(qid);
-    const result: QueryResult = { attachments: [], notes: "test" };
+    const result: QueryResult = {
+      attachments: [{
+        id: "proof-q-hash-after-verify",
+        uri: "https://blossom.example.com/proof-q-hash-after-verify.txt",
+        mime_type: "text/plain",
+        storage_kind: "blossom",
+        blossom_hash: "proof-q-hash-after-verify",
+      }],
+      notes: "test",
+    };
     const verifyRes = await app.request("/verify", {
       method: "POST",
       headers: authHeaders(),

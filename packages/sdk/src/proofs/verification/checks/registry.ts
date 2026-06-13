@@ -8,7 +8,6 @@ import { emptySubmissionCheck } from "./empty-submission.ts";
 import { bodyGpsCheck } from "./gps.ts";
 import { tlsnCheck } from "./tlsn.ts";
 import { photoIntegrityCheck } from "./photo-integrity.ts";
-import { aiContentCheck } from "./ai-content.ts";
 import type { FactorCheck } from "./types.ts";
 
 export const defaultFactorChecks: readonly FactorCheck[] = [
@@ -16,5 +15,4 @@ export const defaultFactorChecks: readonly FactorCheck[] = [
   bodyGpsCheck,
   tlsnCheck,
   photoIntegrityCheck,
-  aiContentCheck,
 ];

@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -67,3 +68,40 @@ dependency, and the ffmpeg frame-extraction path it drags in.
   `ANTHROPIC_API_KEY` / `AI_CONTENT_CHECK` keys from
   `packages/sdk/src/internal/runtime/config.ts`.
 - Update `docs/` and `specs/` references to the `ai_check` factor.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/bun.lock`
+- `packages/sdk/src/adapters/nostr/oracle-frost.test.ts`
+- `packages/sdk/src/adapters/oracle-client/http-oracle.test.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle.test.ts`
+- `packages/sdk/src/adapters/oracle-service/server.test.ts`
+- `packages/sdk/src/payments/frost/frost-signature-adapter.test.ts`
+- `packages/sdk/src/payments/frost/frost-signer.test.ts`
+- `packages/sdk/src/proofs/verification/verifier-standalone.test.ts`
+- `packages/sdk/src/proofs/verification/verifier.test.ts`
+- `packages/sdk/src/requests/application/query-service.test.ts`
+- `packages/sdk/src/requests/application/query-verification.test.ts`
+- `packages/sdk/src/testing/factories.ts`
+- `docs/issues/pending/0147-move-gps-into-schema-owned-verification.md`
+
+Verified with:
+
+- `rg -i "ai_check|anthropic|ffmpeg" packages/`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+
+Harness update:
+
+- Updated verifier-registry/defaults unit tests lock the removal; `lint:deprecation` prevents reintroduction.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

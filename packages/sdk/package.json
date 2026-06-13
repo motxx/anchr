@@ -51,7 +51,6 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78",
     "@cashu/cashu-ts": "^3",
     "@logtape/logtape": "^2.1.1",
     "@noble/hashes": "^2.2.0",

@@ -10,7 +10,6 @@ maintenance
 ## Dependencies
 
 Depends on:
-- 0145
 - 0146
 
 Blocks:

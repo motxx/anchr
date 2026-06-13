@@ -46,12 +46,21 @@ test("built-in oracle verify returns attestation", async () => {
     description: "Test query",
     challenge_nonce: "ABC",
     challenge_rule: "test",
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "locked",
   };
-  const result: QueryResult = { attachments: [], notes: "open" };
+  const result: QueryResult = {
+    attachments: [{
+      id: "proof-q1",
+      uri: "https://blossom.example.com/proof-q1.txt",
+      mime_type: "text/plain",
+      storage_kind: "blossom",
+      blossom_hash: "proof-q1",
+    }],
+    notes: "open",
+  };
 
   const attestation = await builtInOracle.verify(query, result);
 

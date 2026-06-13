@@ -75,7 +75,6 @@ const ENV_READ_ALLOWED: readonly string[] = [
   "packages/sdk/src/attachments/blossom.ts",
   "packages/sdk/src/attachments/url-validation.ts",
   "packages/sdk/src/payments/cashu/cashu-wallet.ts",
-  "packages/sdk/src/proofs/verification/checks/ai-content.ts",
 ];
 
 const IMPORT_RE =

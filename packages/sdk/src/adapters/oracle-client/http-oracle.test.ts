@@ -14,7 +14,7 @@ const makeQuery = (id: string): Query =>
     description: "Test Store status check",
     challenge_nonce: "nonce",
     challenge_rule: "rule",
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     expires_at: Date.now() + 60_000,
   });
 
@@ -54,7 +54,16 @@ describe("http-oracle", () => {
 
   test("oracle server verify with valid auth", async () => {
     const query = makeQuery("q2");
-    const result: QueryResult = { attachments: [], notes: "open" };
+    const result: QueryResult = {
+      attachments: [{
+        id: "proof-q2",
+        uri: "https://blossom.example.com/proof-q2.txt",
+        mime_type: "text/plain",
+        storage_kind: "blossom",
+        blossom_hash: "proof-q2",
+      }],
+      notes: "open",
+    };
 
     const res = await app.request("/verify", {
       method: "POST",
@@ -89,7 +98,16 @@ describe("http-oracle", () => {
     expect(oracle.info.endpoint).toBe(baseUrl);
 
     const query = makeQuery("q4");
-    const result: QueryResult = { attachments: [], notes: "closed" };
+    const result: QueryResult = {
+      attachments: [{
+        id: "proof-q4",
+        uri: "https://blossom.example.com/proof-q4.txt",
+        mime_type: "text/plain",
+        storage_kind: "blossom",
+        blossom_hash: "proof-q4",
+      }],
+      notes: "closed",
+    };
     const attestation = await oracle.verify(query, result);
 
     expect(attestation.oracle_id).toBe(TEST_ORACLE_ID);

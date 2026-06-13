@@ -17,14 +17,13 @@ export interface GpsCoord {
 
 /**
  * Verification factors that a Customer can request.
- * When omitted, defaults to ["gps", "ai_check"].
+ * When omitted, defaults to ["gps"].
  */
 export const VERIFICATION_FACTORS = [
   "nonce",
   "gps",
   "timestamp",
   "oracle",
-  "ai_check",
   "tlsn",
   "c2pa",
 ] as const;
@@ -32,7 +31,6 @@ export type VerificationFactor = (typeof VERIFICATION_FACTORS)[number];
 
 export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [
   "gps",
-  "ai_check",
 ] as const;
 
 export interface AttachmentRef {

@@ -74,25 +74,10 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
-  test("passes empty submission when only ai_check is requested", async () => {
-    const requirement: VerificationRequirement = {
-      id: "req_2",
-      factors: ["ai_check"],
-    };
-    const input: VerificationInput = { attachments: [] };
-
-    const verification = await verifyProof(requirement, input);
-
-    expect(verification.passed).toBe(true);
-    expect(verification.checks).toContain(
-      "no media evidence provided (weak verification)",
-    );
-  });
-
   test("an injected integrity store is honoured instead of the global singleton", async () => {
     const requirement: VerificationRequirement = {
       id: "req_injected_store",
-      factors: ["gps", "ai_check"],
+      factors: ["gps"],
     };
     const input: VerificationInput = {
       attachments: [{
@@ -189,7 +174,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
   test("attachment with valid C2PA passes via integrity-store keyed by requirement.id", async () => {
     const requirement: VerificationRequirement = {
       id: "req_c2pa",
-      factors: ["gps", "ai_check"],
+      factors: ["gps"],
     };
     const input: VerificationInput = {
       attachments: [{

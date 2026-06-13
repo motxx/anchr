@@ -23,7 +23,6 @@ import type {
 } from "./checks/types.ts";
 
 export type { FactorCheck, VerifyProofOptions };
-export { checkAttachmentContent } from "./checks/ai-content.ts";
 
 const DEFAULT_MAX_GPS_DISTANCE_KM = 50;
 

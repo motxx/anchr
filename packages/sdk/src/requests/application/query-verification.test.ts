@@ -37,7 +37,7 @@ function makeQuery(overrides?: Partial<Query>): Query {
     id: "test-query-1",
     status: "verifying",
     description: "Test query",
-    verification_requirements: ["gps", "ai_check"],
+    verification_requirements: ["gps"],
     created_at: Date.now(),
     expires_at: Date.now() + 3600_000,
     payment_status: "none",

@@ -16,7 +16,7 @@ export function makeQuery(overrides?: Partial<Query>): Query {
     id: `test_query_${++queryCounter}`,
     status: "pending",
     description: "Test query",
-    verification_requirements: ["gps", "ai_check"],
+    verification_requirements: ["gps"],
     created_at: Date.now(),
     expires_at: Date.now() + 600_000,
     payment_status: "locked",

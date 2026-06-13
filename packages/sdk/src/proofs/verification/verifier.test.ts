@@ -12,7 +12,7 @@ function makeQuery(overrides: Partial<Query>): Query {
     id: "query_test",
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
-    verification_requirements: ["nonce", "gps", "ai_check"],
+    verification_requirements: ["nonce", "gps"],
     expires_at: Date.now() + 60_000,
     ...overrides,
   });
@@ -65,9 +65,9 @@ test("rejects empty submission when GPS/nonce required", async () => {
   );
 });
 
-test("empty submission passes weak verification when no evidence required", async () => {
+test("empty submission fails when nonce evidence is required", async () => {
   const query = makeQuery({
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     payment_lock: undefined,
     expected_gps: undefined,
   });
@@ -78,9 +78,9 @@ test("empty submission passes weak verification when no evidence required", asyn
 
   const verification = await verify(query, result);
 
-  expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain(
-    "no media evidence provided (weak verification)",
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 

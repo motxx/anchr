@@ -12,8 +12,6 @@ describe("getRuntimeConfig", () => {
     "PREVIEW_JPEG_QUALITY",
     "HTTP_API_KEYS",
     "HTTP_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "AI_CONTENT_CHECK",
     "TRUSTED_ORACLE_PUBKEYS",
     "TLSN_VERIFIER_URL",
     "TLSN_PROXY_URL",
@@ -29,8 +27,6 @@ describe("getRuntimeConfig", () => {
       expect(config.previewMaxDimension).toBe(768);
       expect(config.previewJpegQuality).toBe(75);
       expect(config.httpApiKeys).toEqual([]);
-      expect(config.anthropicApiKey).toBeUndefined();
-      expect(config.aiContentCheckEnabled).toBe(false);
       expect(config.trustedOraclePubkeys).toEqual([]);
     });
   });
@@ -78,31 +74,9 @@ describe("getRuntimeConfig", () => {
     });
   });
 
-  test("reads boolean AI_CONTENT_CHECK", () => {
-    withEnv({ AI_CONTENT_CHECK: "true" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(true);
-    });
-    withEnv({ AI_CONTENT_CHECK: "1" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(true);
-    });
-    withEnv({ AI_CONTENT_CHECK: "false" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(false);
-    });
-  });
-
   test("reads trusted oracle pubkeys", () => {
     withEnv({ TRUSTED_ORACLE_PUBKEYS: "pub1,pub2" }, () => {
       expect(getRuntimeConfig().trustedOraclePubkeys).toEqual(["pub1", "pub2"]);
-    });
-  });
-
-  test("trims optional string env vars", () => {
-    withEnv({ ANTHROPIC_API_KEY: "  sk-ant-123  " }, () => {
-      expect(getRuntimeConfig().anthropicApiKey).toBe("sk-ant-123");
-    });
-
-    withEnv({ ANTHROPIC_API_KEY: "  " }, () => {
-      expect(getRuntimeConfig().anthropicApiKey).toBeUndefined();
     });
   });
 });

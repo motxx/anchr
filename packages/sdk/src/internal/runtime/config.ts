@@ -31,8 +31,6 @@ export interface RuntimeConfig {
   previewMaxDimension: number;
   previewJpegQuality: number;
   httpApiKeys: string[];
-  anthropicApiKey?: string;
-  aiContentCheckEnabled: boolean;
   /** Trusted Oracle pubkeys for Provider allowlist (from TRUSTED_ORACLE_PUBKEYS env). */
   trustedOraclePubkeys: string[];
   /** TLSNotary Verifier Server URL (served to providers). */
@@ -51,9 +49,6 @@ export function getRuntimeConfig(): RuntimeConfig {
     previewMaxDimension: readNumberEnv("PREVIEW_MAX_DIMENSION", 768),
     previewJpegQuality: readNumberEnv("PREVIEW_JPEG_QUALITY", 75),
     httpApiKeys: readStringListEnv("HTTP_API_KEYS", "HTTP_API_KEY"),
-    anthropicApiKey: Deno.env.get("ANTHROPIC_API_KEY")?.trim() || undefined,
-    aiContentCheckEnabled: Deno.env.get("AI_CONTENT_CHECK") === "true" ||
-      Deno.env.get("AI_CONTENT_CHECK") === "1",
     trustedOraclePubkeys: readStringListEnv("TRUSTED_ORACLE_PUBKEYS"),
     tlsnVerifierUrl: Deno.env.get("TLSN_VERIFIER_URL")?.trim() || undefined,
     tlsnProxyUrl: Deno.env.get("TLSN_PROXY_URL")?.trim() || undefined,

@@ -28,9 +28,9 @@ export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */
   id: string;
   factors: readonly VerificationFactor[];
-  /** Free-text description of what the proof must establish (used by ai_check). */
+  /** Free-text description of what the proof must establish. */
   description?: string;
-  /** Per-request handwritten challenge string (used by ai_check + nonce factor). */
+  /** Per-request handwritten challenge string used by the nonce factor. */
   challenge_nonce?: string;
   expected_gps?: GpsCoord;
   /** Max allowed distance from expected_gps in km. Defaults to 50 inside the verifier. */
@@ -52,7 +52,7 @@ export interface VerificationDetail {
   passed: boolean;
   checks: string[];
   failures: string[];
-  /** Advisory warnings (e.g., ai_check) — informational, do not gate payment. */
+  /** Advisory warnings — informational, do not gate payment. */
   warnings?: string[];
   /** Cryptographically verified TLSNotary data (populated only for tlsn queries). */
   tlsn_verified?: TlsnVerifiedData;
