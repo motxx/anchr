@@ -92,6 +92,24 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
+  test("rejects empty generic-media submission with empty schema evidence", async () => {
+    const requirement: VerificationRequirement = {
+      id: "req_default_media_empty_evidence",
+      factors: [],
+    };
+    const input: VerificationInput = {
+      attachments: [],
+      schema_evidence: {},
+    };
+
+    const verification = await verifyProof(requirement, input);
+
+    expect(verification.passed).toBe(false);
+    expect(verification.failures).toContain(
+      "no media evidence provided — photos are required when photo-backed verification is enabled",
+    );
+  });
+
   test("an injected integrity store is honoured instead of the global singleton", async () => {
     const requirement: VerificationRequirement = {
       id: "req_injected_store",

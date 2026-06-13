@@ -328,7 +328,15 @@ describe("oracle-server FROST signer message binding", () => {
       body: JSON.stringify({
         message: "deadbeef",
         requirement: { id: "q-bind", factors: [] },
-        input: { attachments: [], schema_evidence: {} },
+        input: {
+          attachments: [{
+            id: "att-bind",
+            uri: "https://blossom.example/att-bind",
+            mime_type: "image/jpeg",
+            storage_kind: "blossom",
+          }],
+          schema_evidence: {},
+        },
       }),
     });
 
@@ -356,7 +364,15 @@ describe("oracle-server FROST signer message binding", () => {
           factors: [],
           escrow_token_hash: "00".repeat(32),
         },
-        input: { attachments: [], schema_evidence: {} },
+        input: {
+          attachments: [{
+            id: "att-bind",
+            uri: "https://blossom.example/att-bind",
+            mime_type: "image/jpeg",
+            storage_kind: "blossom",
+          }],
+          schema_evidence: {},
+        },
         escrow_token: token,
       }),
     });
@@ -382,7 +398,15 @@ describe("oracle-server FROST signer message binding", () => {
           factors: [],
           escrow_token_hash: deriveFrostEscrowTokenHash(token),
         },
-        input: { attachments: [], schema_evidence: {} },
+        input: {
+          attachments: [{
+            id: "att-bind",
+            uri: "https://blossom.example/att-bind",
+            mime_type: "image/jpeg",
+            storage_kind: "blossom",
+          }],
+          schema_evidence: {},
+        },
         escrow_token: token,
       }),
     });

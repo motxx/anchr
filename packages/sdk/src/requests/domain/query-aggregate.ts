@@ -1,5 +1,4 @@
 import type { BlossomKeyMap } from "../../values.ts";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../values.ts";
 import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   CustomerMeta,
@@ -68,8 +67,7 @@ export function createQueryAggregate(
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
-  const requirements = input.verification_requirements ??
-    DEFAULT_VERIFICATION_FACTORS;
+  const requirements = input.verification_requirements ?? [];
   const needsNonce = requirements.includes("nonce");
   const nonce = needsNonce
     ? services.nonceGenerator.newChallengeNonce()

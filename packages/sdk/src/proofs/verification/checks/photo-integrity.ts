@@ -214,8 +214,6 @@ function checkSchemaEvidenceGps(
     );
     checks.push(...result.checks);
     failures.push(...result.failures);
-  } else if (requirement.expected_gps) {
-    failures.push("C2PA image: GPS coordinates missing from schema_evidence");
   }
 }
 
@@ -393,7 +391,12 @@ export function createPhotoIntegrityCheck(
         ctx.acc.failures,
       );
 
-      if (attachments.length === 0) return;
+      if (attachments.length === 0) {
+        ctx.acc.failures.push(
+          "C2PA: required Content Credentials evidence missing — no image submitted",
+        );
+        return;
+      }
       ctx.acc.checks.push("attachment present");
       const maxGpsDistanceKm = c2paRequirement.max_gps_distance_km ??
         DEFAULT_C2PA_MAX_GPS_DISTANCE_KM;

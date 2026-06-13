@@ -14,8 +14,6 @@ export type AttachmentStorageKind = "blossom" | "external";
 export const VERIFICATION_FACTORS = [] as const;
 export type VerificationFactor = string;
 
-export const DEFAULT_VERIFICATION_FACTORS: readonly VerificationFactor[] = [];
-
 export interface AttachmentRef {
   id: string;
   uri: string;

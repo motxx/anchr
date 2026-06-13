@@ -256,7 +256,7 @@ test("payment_lock query with C2PA requirement rejects empty submission", async 
   );
 });
 
-test("C2PA schema evidence GPS within range passes its local check", async () => {
+test("ATTACK: c2pa-image rejects self-reported GPS without a signed manifest", async () => {
   const query = makeQuery({
     schema_requirement: {
       expected_gps: { lat: 35.6762, lon: 139.6503 },
@@ -271,6 +271,13 @@ test("C2PA schema evidence GPS within range passes its local check", async () =>
 
   const verification = await verify(query, result);
 
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
+  );
+  expect(verification.failures).toContain(
+    "C2PA: required Content Credentials evidence missing — no image submitted",
+  );
   expect(
     verification.checks.some((c) =>
       c.includes("C2PA schema_evidence GPS within")
@@ -302,7 +309,7 @@ test("C2PA schema evidence GPS too far fails", async () => {
   ).toBe(true);
 });
 
-test("missing C2PA schema evidence GPS fails when expected location is set", async () => {
+test("missing signed C2PA manifest fails when expected location is set", async () => {
   const query = makeQuery({
     schema_requirement: {
       expected_gps: { lat: 35.6762, lon: 139.6503 },
@@ -318,7 +325,7 @@ test("missing C2PA schema evidence GPS fails when expected location is set", asy
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
-    "C2PA image: GPS coordinates missing from schema_evidence",
+    "C2PA: required Content Credentials evidence missing — no image submitted",
   );
 });
 

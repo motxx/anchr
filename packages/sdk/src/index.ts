@@ -112,10 +112,7 @@ export type {
   BlossomKeyMaterial,
   VerificationFactor,
 } from "./values.ts";
-export {
-  DEFAULT_VERIFICATION_FACTORS,
-  VERIFICATION_FACTORS,
-} from "./values.ts";
+export { VERIFICATION_FACTORS } from "./values.ts";
 
 export {
   createKeypairSigner,
