@@ -5,6 +5,10 @@
 
 export { spawn, type SpawnOptions, type SpawnResult } from "./process.ts";
 export {
+  serverSidecarExecutor,
+  type SidecarExecutor,
+} from "./sidecar-execution.ts";
+export {
   fileExists,
   fileLastModified,
   readFile,
@@ -15,7 +19,7 @@ export {
   writeFile,
   writeTextFile,
 } from "./fs.ts";
-export { which } from "./which.ts";
+export { isFile, which } from "./which.ts";
 export { moduleDir } from "./env.ts";
 export {
   detectRuntimeTarget,

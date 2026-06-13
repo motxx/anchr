@@ -16,7 +16,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   readFileAsArrayBuffer,
+  type SidecarExecutor,
   spawn,
+  type SpawnResult,
   writeFile,
 } from "../internal/runtime/mod.ts";
 
@@ -140,6 +142,56 @@ describe("c2patool path injection", () => {
     expect(result.available).toBe(false);
     expect(result.checks).toContain("c2patool not available (skipped)");
     expect(isC2paAvailable({ toolPath: null })).toBe(false);
+  });
+
+  test("uses the injected executor for lookup and validation", async () => {
+    const commands: string[][] = [];
+    const executor: SidecarExecutor = {
+      spawn(cmd): SpawnResult {
+        commands.push(cmd);
+        return {
+          exited: Promise.resolve(),
+          exitCode: 0,
+          stdout: new Blob([
+            JSON.stringify({
+              active_manifest: "claim",
+              manifests: {
+                claim: {
+                  title: "photo.jpg",
+                  claim_generator: "anchr-test",
+                  assertions: [],
+                  signature_info: { issuer: "test" },
+                },
+              },
+              validation_results: {
+                activeManifest: {
+                  success: [{ code: "claimSignature.validated" }],
+                  failure: [],
+                },
+              },
+            }),
+          ]).stream(),
+          stderr: new Blob([""]).stream(),
+          kill() {},
+        };
+      },
+      which(name) {
+        return name === "c2patool" ? "/mock/c2patool" : null;
+      },
+      isFile() {
+        return false;
+      },
+    };
+
+    expect(isC2paAvailable({ executor })).toBe(true);
+    const result = await validateC2pa(Buffer.from("x"), "photo.jpg", {
+      executor,
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.hasManifest).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(commands[0]?.[0]).toBe("/mock/c2patool");
   });
 });
 

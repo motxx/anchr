@@ -7,6 +7,7 @@ import {
   isTlsnRequirement,
 } from "../../tlsn-types.ts";
 import type { ValidateTlsnOptions } from "../../tlsn-validation.ts";
+import type { SidecarExecutor } from "../../../internal/runtime/mod.ts";
 import type {
   TlsnAttestation,
   TlsnExtensionResult,
@@ -22,7 +23,16 @@ import type { CheckAccumulator, FactorCheck } from "./types.ts";
 export interface TlsnSchemaOptions {
   validateTlsn?: typeof validateTlsn;
   verifierPath?: string | null;
+  executor?: SidecarExecutor;
   notaryUrl?: string;
+}
+
+function isSidecarExecutor(value: unknown): value is SidecarExecutor {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.spawn === "function" &&
+    typeof record.which === "function" &&
+    typeof record.isFile === "function";
 }
 
 function isTlsnSchemaOptions(value: unknown): value is TlsnSchemaOptions {
@@ -38,6 +48,12 @@ function isTlsnSchemaOptions(value: unknown): value is TlsnSchemaOptions {
     record.verifierPath !== undefined &&
     record.verifierPath !== null &&
     typeof record.verifierPath !== "string"
+  ) {
+    return false;
+  }
+  if (
+    record.executor !== undefined &&
+    !isSidecarExecutor(record.executor)
   ) {
     return false;
   }
@@ -154,7 +170,7 @@ export function createTlsnCheck(
         ctx.input,
         ctx.acc,
         options.validateTlsn ?? validateTlsn,
-        { verifierPath: options.verifierPath },
+        { verifierPath: options.verifierPath, executor: options.executor },
       );
     },
   };

@@ -10,7 +10,11 @@ import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, which, writeFile } from "../internal/runtime/mod.ts";
+import {
+  serverSidecarExecutor,
+  type SidecarExecutor,
+  writeFile,
+} from "../internal/runtime/mod.ts";
 import { evaluateGpsDistancePolicy } from "./geo.ts";
 
 import { getLogger } from "../internal/runtime/logger.ts";
@@ -74,6 +78,7 @@ export interface C2paToolOptions {
    * the tool-unavailable behavior. Defaults to PATH discovery (cached).
    */
   toolPath?: string | null;
+  executor?: SidecarExecutor;
 }
 
 export const DEFAULT_C2PA_MAX_GPS_DISTANCE_KM = 50;
@@ -161,9 +166,12 @@ export function evaluateC2paGpsProximity(
   };
 }
 
-function findC2paTool(override?: string | null): string | null {
+function findC2paTool(
+  override: string | null | undefined,
+  executor: SidecarExecutor,
+): string | null {
   if (override !== undefined) return override;
-  const toolPath = which("c2patool");
+  const toolPath = executor.which("c2patool");
   if (toolPath) {
     log.debug(`Found c2patool at ${toolPath}`);
   }
@@ -171,7 +179,10 @@ function findC2paTool(override?: string | null): string | null {
 }
 
 export function isC2paAvailable(options?: C2paToolOptions): boolean {
-  return findC2paTool(options?.toolPath) !== null;
+  return findC2paTool(
+    options?.toolPath,
+    options?.executor ?? serverSidecarExecutor,
+  ) !== null;
 }
 
 export function verifyC2paGpsBinding(
@@ -284,8 +295,12 @@ async function runC2paTool(
   inputPath: string,
   checks: string[],
   failures: string[],
+  executor: SidecarExecutor,
 ): Promise<Record<string, unknown> | null> {
-  const proc = spawn([toolPath, inputPath], { stdout: "pipe", stderr: "pipe" });
+  const proc = executor.spawn([toolPath, inputPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   await proc.exited;
 
   if (proc.exitCode !== 0) {
@@ -389,7 +404,8 @@ export async function validateC2pa(
 ): Promise<C2paValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
-  const toolPath = findC2paTool(options?.toolPath);
+  const executor = options?.executor ?? serverSidecarExecutor;
+  const toolPath = findC2paTool(options?.toolPath, executor);
 
   if (!toolPath) return noToolResult();
 
@@ -404,7 +420,13 @@ export async function validateC2pa(
   try {
     await writeFile(inputPath, data);
 
-    const report = await runC2paTool(toolPath, inputPath, checks, failures);
+    const report = await runC2paTool(
+      toolPath,
+      inputPath,
+      checks,
+      failures,
+      executor,
+    );
     if (!report) return noManifestResult(checks, failures);
 
     const parsed = parseActiveManifest(report);

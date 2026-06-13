@@ -11,10 +11,14 @@
 import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
-import { statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { moduleDir, spawn, which, writeFile } from "../internal/runtime/mod.ts";
+import {
+  moduleDir,
+  serverSidecarExecutor,
+  type SidecarExecutor,
+  writeFile,
+} from "../internal/runtime/mod.ts";
 import { createReplayGuard } from "./replay-guard.ts";
 import type {
   TlsnAttestation,
@@ -67,7 +71,9 @@ export interface TlsnValidationResult {
   failures: string[];
 }
 
-function findTlsnVerifier(): string | null {
+function findTlsnVerifier(
+  executor: SidecarExecutor = serverSidecarExecutor,
+): string | null {
   // Check project-local binary first (built from crates/tlsn-verifier)
   const localPaths = [
     join(
@@ -80,24 +86,23 @@ function findTlsnVerifier(): string | null {
     ),
   ];
   for (const p of localPaths) {
-    try {
-      if (statSync(p).isFile()) {
-        log.debug(`Found tlsn-verifier at ${p}`);
-        return p;
-      }
-    } catch { /* not found */ }
+    if (executor.isFile(p)) {
+      log.debug(`Found tlsn-verifier at ${p}`);
+      return p;
+    }
   }
 
-  // Fall back to PATH
-  const onPath = which("tlsn-verifier");
+  const onPath = executor.which("tlsn-verifier");
   if (onPath) {
     log.debug(`Found tlsn-verifier at ${onPath}`);
   }
   return onPath;
 }
 
-export function isTlsnVerifierAvailable(): boolean {
-  return findTlsnVerifier() !== null;
+export function isTlsnVerifierAvailable(
+  executor: SidecarExecutor = serverSidecarExecutor,
+): boolean {
+  return findTlsnVerifier(executor) !== null;
 }
 
 /**
@@ -105,8 +110,11 @@ export function isTlsnVerifierAvailable(): boolean {
  * `null` to force "unavailable") takes precedence; `undefined` falls back to
  * auto-detection.
  */
-function resolveTlsnVerifier(verifierPath?: string | null): string | null {
-  return verifierPath === undefined ? findTlsnVerifier() : verifierPath;
+function resolveTlsnVerifier(
+  verifierPath: string | null | undefined,
+  executor: SidecarExecutor,
+): string | null {
+  return verifierPath === undefined ? findTlsnVerifier(executor) : verifierPath;
 }
 
 /** Options for {@link validateTlsn}. */
@@ -116,6 +124,7 @@ export interface ValidateTlsnOptions {
    * "unavailable". Defaults to auto-detection when omitted.
    */
   verifierPath?: string | null;
+  executor?: SidecarExecutor;
 }
 
 /** Default max attestation age: 5 minutes. */
@@ -237,7 +246,8 @@ export async function validateTlsn(
     };
   }
 
-  const verifierPath = resolveTlsnVerifier(options?.verifierPath);
+  const executor = options?.executor ?? serverSidecarExecutor;
+  const verifierPath = resolveTlsnVerifier(options?.verifierPath, executor);
 
   // --- Binary required ---
   if (!verifierPath) {
@@ -256,7 +266,11 @@ export async function validateTlsn(
   }
 
   // --- Cryptographic verification ---
-  const cryptoResult = await runVerifierBinary(verifierPath, attestation);
+  const cryptoResult = await runVerifierBinary(
+    verifierPath,
+    attestation,
+    executor,
+  );
   if (!cryptoResult.signatureValid) {
     failures.push(
       `TLSNotary: presentation signature invalid — ${
@@ -371,6 +385,7 @@ interface VerifierBinaryResult {
 async function runVerifierBinary(
   verifierPath: string,
   attestation: TlsnAttestation,
+  executor: SidecarExecutor,
 ): Promise<VerifierBinaryResult> {
   const tempDir = await mkdtemp(join(tmpdir(), "anchr-tlsn-"));
   const presentationPath = join(tempDir, "presentation.tlsn");
@@ -379,7 +394,7 @@ async function runVerifierBinary(
     const presentationData = Buffer.from(attestation.presentation, "base64");
     await writeFile(presentationPath, presentationData);
 
-    const proc = spawn([verifierPath, "verify", presentationPath], {
+    const proc = executor.spawn([verifierPath, "verify", presentationPath], {
       stdout: "pipe",
       stderr: "pipe",
     });

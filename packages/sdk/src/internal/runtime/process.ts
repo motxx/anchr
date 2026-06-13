@@ -1,8 +1,4 @@
-/**
- * Process spawning compat layer: Bun.spawn → Deno.Command
- *
- * Wraps Deno.Command to match the Bun.spawn interface.
- */
+/** Server-side subprocess adapter. */
 
 export interface SpawnOptions {
   stdout?: "pipe" | "inherit" | "ignore";
@@ -68,8 +64,12 @@ function collectStream(
 }
 
 export function spawn(cmd: string[], opts?: SpawnOptions): SpawnResult {
-  const [command, ...args] = cmd;
-  const child = new Deno.Command(command!, {
+  const command = cmd[0];
+  if (command === undefined) {
+    throw new Error("Cannot spawn an empty command");
+  }
+  const args = cmd.slice(1);
+  const child = new Deno.Command(command, {
     args,
     stdout: mapStdio(opts?.stdout),
     stderr: mapStdio(opts?.stderr),

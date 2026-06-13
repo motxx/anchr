@@ -2,6 +2,10 @@ import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { coordinateSigning } from "./frost-signing-coordinator.ts";
 import type { FrostNodeConfig } from "./frost-config.ts";
+import type {
+  SidecarExecutor,
+  SpawnResult,
+} from "../../internal/runtime/mod.ts";
 
 const nodeConfig: FrostNodeConfig = {
   signer_index: 1,
@@ -45,49 +49,39 @@ function commandOutput(args: string[]): string {
   }
 }
 
+function streamText(text: string): ReadableStream<Uint8Array> {
+  return new Blob([text]).stream();
+}
+
+function makeFrostExecutor(): SidecarExecutor {
+  return {
+    spawn(cmd): SpawnResult {
+      return {
+        exited: Promise.resolve(),
+        exitCode: 0,
+        stdout: streamText(commandOutput(cmd.slice(1))),
+        stderr: streamText(""),
+        kill() {},
+      };
+    },
+    which(name) {
+      return name === "frost-signer" ? "/tmp/frost-signer" : null;
+    },
+    isFile() {
+      return false;
+    },
+  };
+}
+
 describe("coordinateSigning injectable transport", () => {
   test("routes all peer round HTTP calls through fetchImpl", async () => {
-    const originalCommand = Object.getOwnPropertyDescriptor(Deno, "Command");
-    const originalStatSync = Deno.statSync;
     const originalFetch = globalThis.fetch;
     const globalFetchCalls: string[] = [];
     const globalFetchSpy: typeof globalThis.fetch = (input) => {
       globalFetchCalls.push(inputUrl(input));
       return Promise.reject(new Error("global fetch should not be called"));
     };
-    const missingStatSync: typeof Deno.statSync = () => {
-      throw new Deno.errors.NotFound("not found");
-    };
-    class FakeCommand {
-      constructor(
-        readonly command: string | URL,
-        readonly options: Deno.CommandOptions = {},
-      ) {}
 
-      outputSync() {
-        return {
-          code: 0,
-          stdout: new TextEncoder().encode("/tmp/frost-signer\n"),
-          stderr: new Uint8Array(),
-        };
-      }
-
-      spawn() {
-        const args = this.options.args ?? [];
-        return {
-          stdout: new Blob([commandOutput(args)]).stream(),
-          stderr: new Blob([""]).stream(),
-          status: Promise.resolve({ success: true, code: 0, signal: null }),
-          kill() {},
-        };
-      }
-    }
-
-    Object.defineProperty(Deno, "Command", {
-      configurable: true,
-      value: FakeCommand,
-    });
-    Deno.statSync = missingStatSync;
     globalThis.fetch = globalFetchSpy;
 
     const peerCalls: string[] = [];
@@ -122,6 +116,7 @@ describe("coordinateSigning injectable transport", () => {
           requirement: { kind: "unit" },
           input: { passed: true },
           escrowToken: "token",
+          executor: makeFrostExecutor(),
         },
         "ff".repeat(32),
       );
@@ -137,10 +132,6 @@ describe("coordinateSigning injectable transport", () => {
       expect(globalFetchCalls).toEqual([]);
     } finally {
       globalThis.fetch = originalFetch;
-      Deno.statSync = originalStatSync;
-      if (originalCommand) {
-        Object.defineProperty(Deno, "Command", originalCommand);
-      }
     }
   });
 });

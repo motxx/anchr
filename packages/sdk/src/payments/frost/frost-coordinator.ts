@@ -14,6 +14,7 @@ import type {
   ThresholdOracleConfig,
 } from "./frost-types.ts";
 import { aggregateSignatures } from "./frost-cli.ts";
+import type { SidecarExecutor } from "../../internal/runtime/mod.ts";
 
 export interface FrostCoordinator {
   /** Start a new DKG session. */
@@ -74,6 +75,8 @@ export const FROST_FINALIZED_RETENTION_MS = 60 * 1000;
 export interface FrostCoordinatorOptions {
   /** Clock injection for tests. */
   now?: () => number;
+  /** Optional sidecar executor for signature aggregation. */
+  executor?: SidecarExecutor;
 }
 
 export function createFrostCoordinator(
@@ -250,6 +253,8 @@ export function createFrostCoordinator(
         session.message,
         JSON.stringify(sharesObj),
         resolvedPubkeyPkg,
+        undefined,
+        options.executor,
       );
 
       if (!result.ok || !result.data?.signature) return null;

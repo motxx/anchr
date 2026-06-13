@@ -21,11 +21,13 @@ import {
   type IntegrityStore,
 } from "../../integrity-store.ts";
 import { fetchAttachmentData } from "../../../attachments/fetch-attachment.ts";
+import type { SidecarExecutor } from "../../../internal/runtime/mod.ts";
 import type { AttachmentRef, BlossomKeyMap } from "../../../values.ts";
 import type { FactorCheck } from "./types.ts";
 
 export interface C2paImageSchemaOptions {
   c2paToolPath?: string | null;
+  executor?: SidecarExecutor;
   integrityStore?: IntegrityStore;
 }
 
@@ -36,6 +38,14 @@ function isIntegrityStore(value: unknown): value is IntegrityStore {
     typeof record.getForRequest === "function" &&
     typeof record.store === "function" &&
     typeof record.clear === "function";
+}
+
+function isSidecarExecutor(value: unknown): value is SidecarExecutor {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.spawn === "function" &&
+    typeof record.which === "function" &&
+    typeof record.isFile === "function";
 }
 
 function isC2paImageSchemaOptions(
@@ -53,6 +63,12 @@ function isC2paImageSchemaOptions(
   if (
     record.integrityStore !== undefined &&
     !isIntegrityStore(record.integrityStore)
+  ) {
+    return false;
+  }
+  if (
+    record.executor !== undefined &&
+    !isSidecarExecutor(record.executor)
   ) {
     return false;
   }
@@ -261,6 +277,7 @@ async function verifyPhotoIntegrity(
   requiresC2pa: boolean,
   integrityStore: IntegrityStore,
   c2paToolPath?: string | null,
+  executor?: SidecarExecutor,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   const integrityRecords = attachments
@@ -283,6 +300,7 @@ async function verifyPhotoIntegrity(
       maxGpsDist,
       requiresC2pa,
       c2paToolPath,
+      executor,
       blossomKeys,
     );
     return;
@@ -315,6 +333,7 @@ async function verifyC2paFromAttachments(
   maxGpsDist: number,
   requiresC2pa: boolean,
   c2paToolPath?: string | null,
+  executor?: SidecarExecutor,
   blossomKeys?: BlossomKeyMap,
 ): Promise<void> {
   if (attachments.length === 0) return;
@@ -332,6 +351,7 @@ async function verifyC2paFromAttachments(
     const filename = att.filename ?? att.id ?? "photo.jpg";
     const c2pa = await validateC2pa(Buffer.from(fetched.data), filename, {
       toolPath: c2paToolPath,
+      executor,
     });
 
     checkC2paGpsBinding(c2pa, expectedGps, maxGpsDist, checks, failures);
@@ -391,6 +411,7 @@ export function createPhotoIntegrityCheck(
         true,
         options.integrityStore ?? getDefaultIntegrityStore(),
         options.c2paToolPath,
+        options.executor,
         ctx.options.blossomKeys,
       );
     },

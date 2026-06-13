@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -66,3 +67,46 @@ they consume the injected executor rather than spawning in core.)
   `internal/runtime/process.ts` and `which.ts`.
 - Thread the executor into `frost-cli.ts`; confirm schema verifier execution
   uses the per-schema adapter rather than spawning in core.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/internal/runtime/process.ts`
+- `packages/sdk/src/internal/runtime/which.ts`
+- `packages/sdk/src/internal/runtime/sidecar-execution.ts`
+- `packages/sdk/src/internal/runtime/mod.ts`
+- `packages/sdk/src/payments/frost/frost-cli.ts`
+- `packages/sdk/src/payments/frost/frost-signing-coordinator.ts`
+- `packages/sdk/src/payments/frost/frost-signer.ts`
+- `packages/sdk/src/payments/frost/frost-coordinator.ts`
+- `packages/sdk/src/proofs/c2pa-validation.ts`
+- `packages/sdk/src/proofs/tlsn-validation.ts`
+- `packages/sdk/src/proofs/verification/checks/photo-integrity.ts`
+- `packages/sdk/src/proofs/verification/checks/tlsn.ts`
+- `packages/sdk/src/payments/frost/frost-signing-coordinator.test.ts`
+- `packages/sdk/src/proofs/c2pa-validation.test.ts`
+- `packages/sdk/src/proofs/tlsn-validation.test.ts`
+
+Verified with:
+
+- `rg -n "new Deno\.Command|Deno\.Command\(" packages/sdk/src --glob '!**/testing/**'`
+- `deno test --allow-all packages/sdk/src/payments/frost/frost-signing-coordinator.test.ts packages/sdk/src/proofs/c2pa-validation.test.ts packages/sdk/src/proofs/tlsn-validation.test.ts`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `deno task test:e2e:frost`
+- `deno task test:e2e:tlsn` attempted after `docker compose up tlsn-verifier -d`; blocked because the TLSN verifier readiness probe still reported `localhost:7046` / `127.0.0.1:7046` unreachable. No dedicated C2PA e2e task exists.
+- `check-silent-bypass` review recorded with `deno run --allow-read --allow-run --allow-write --allow-env scripts/silent-bypass-verify.ts --record`.
+
+Harness update:
+
+- The Deno.Command rg guard confirms only the server execution adapter in `internal/runtime/process.ts` and `internal/runtime/which.ts` uses `Deno.Command`; focused unit tests now cover `frost-cli`, C2PA, and TLSN consuming the injected executor.
+
+Review residuals:
+
+- TLSN e2e should be rerun when local TLSN verifier infrastructure is reachable; required FROST signer e2e passed locally.
+
+Follow-up:
+
+- None

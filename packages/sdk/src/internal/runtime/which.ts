@@ -1,6 +1,4 @@
-/**
- * which() compat layer: Bun.which → Deno.Command("which")
- */
+/** Server-side binary lookup helpers. */
 
 export function which(name: string): string | null {
   try {
@@ -14,5 +12,13 @@ export function which(name: string): string | null {
     return new TextDecoder().decode(result.stdout).trim() || null;
   } catch {
     return null;
+  }
+}
+
+export function isFile(path: string): boolean {
+  try {
+    return Deno.statSync(path).isFile;
+  } catch {
+    return false;
   }
 }
