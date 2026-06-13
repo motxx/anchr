@@ -70,7 +70,7 @@ const ENV_READ_ALLOWED: readonly string[] = [
   "packages/sdk/src/testing/helpers.ts",
   "packages/sdk/src/adapters/nostr/oracle-service.ts",
   "packages/sdk/src/adapters/oracle-client/config-loader.ts",
-  "packages/sdk/src/adapters/oracle-service/server.ts",
+  "packages/sdk/src/adapters/oracle-service/server-entry.ts",
   "packages/sdk/src/attachments/access.ts",
   "packages/sdk/src/attachments/blossom.ts",
   "packages/sdk/src/attachments/url-validation.ts",

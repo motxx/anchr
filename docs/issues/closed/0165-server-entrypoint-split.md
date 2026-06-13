@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -61,3 +62,31 @@ the process bootstrap (`Deno.serve` + env wiring) moves to a separate entrypoint
 - Extract the `Deno.serve` bootstrap + env wiring into a separate entrypoint;
   keep `buildOracleApp` as a side-effect-free library export.
 - Update any task/docs that launched the old server module path.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/adapters/oracle-service/server.ts`
+- `packages/sdk/src/adapters/oracle-service/server-entry.ts`
+
+Verified with:
+
+- `rg "Deno\.serve" packages/sdk/src`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `deno task test:e2e:frost`
+
+Harness update:
+
+- `rg "Deno\.serve" packages/sdk/src` guards library-module bootstrap;
+  `test:e2e:frost` locks the side-effect-free `buildOracleApp` builder import.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
