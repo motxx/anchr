@@ -10,7 +10,6 @@ design
 ## Dependencies
 
 Depends on:
-- 0148
 - 0149
 - 0150
 - 0156

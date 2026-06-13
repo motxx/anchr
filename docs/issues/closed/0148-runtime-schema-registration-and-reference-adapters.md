@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -83,3 +84,41 @@ statically:
 - Convert TLSN, then C2PA, to reference adapters; fold 0141's injection
   work into the bundle construction.
 - Add the spec-site manifest and update the lint script.
+
+## Resolution
+
+Tracking parent resolved by closing its three children:
+
+- 0159 — public `registerSchemaBundle` API keyed by schema URI; TLSN, C2PA-image,
+  and generic-media converted to reference adapters; static factor-check
+  registry and the provider `notary` field removed; schema config carried in a
+  schema-scoped options map. A review pass restored the default-schema
+  empty-submission guard and locked it with a test.
+- 0160 — `scripts/check-proof-schema-pages.ts` reads `spec-site/schemas.json`
+  instead of a hardcoded URL list, failing closed on a malformed manifest or a
+  missing page.
+- 0161 — `e2e/protocol/custom-schema.test.ts` registers an out-of-tree schema
+  through the public API (via `@anchr/*` only) and verifies a paid request end
+  to end, asserting valid proofs pass and missing/tampered evidence fails closed.
+
+Verified with:
+
+- `deno task check`, `deno task lint:strict`, `deno task test:unit`,
+  `deno task lint:proof-schema-pages`, `deno task test:e2e:protocol` (per child).
+- Decoupling guards hold: `rg "notary" packages/sdk/src/provider-types.ts packages/sdk/src/schema.ts`
+  and `rg -i "tlsn|c2pa" packages/sdk/src --glob '!**/proofs/**' --glob '!*.test.ts'`
+  both return zero.
+
+Harness update:
+
+- The `rg -i "tlsn|c2pa"` decoupling guard, the manifest-driven
+  `lint:proof-schema-pages`, and the custom-schema e2e lock the extension
+  surface against regression (owned by the children).
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None
