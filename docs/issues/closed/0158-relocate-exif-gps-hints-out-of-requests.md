@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: GPT-5 Codex
+Completed: 2026-06-13
 
 ## Priority
 
@@ -52,3 +53,30 @@ under `packages/sdk/src/requests/`.
 - Move the shared EXIF metadata fixture builder to a proof-owned testing helper.
 - Update request-service tests to call the helper without naming GPS hint
   fields locally.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/application/query-service-defaults.test.ts`
+- `packages/sdk/src/requests/application/query-service.test.ts`
+
+Verified with:
+
+- `rg "gps|Gps" packages/sdk/src/requests/`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+
+Harness update:
+
+- The negative guard `rg "gps|Gps" packages/sdk/src/requests/` absorbs this
+  class of request-package proof-vocabulary drift.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

@@ -1,13 +1,14 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
+import { Buffer } from "node:buffer";
 import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
 import { createOracleRegistry } from "../../testing/oracle-registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./ports.ts";
-import { createIntegrityStore } from "../../proofs/mod.ts";
+import { createIntegrityStore, validateExif } from "../../proofs/mod.ts";
 
 function makeFakeToken(amountSats: number): string {
   return getEncodedToken({
@@ -1093,17 +1094,7 @@ describe("createIntegrityStore isolation", () => {
       attachmentId: "a.jpg",
       requestId: "q1",
       capturedAt: Date.now(),
-      exif: {
-        hasExif: false,
-        hasCameraModel: false,
-        hasGps: false,
-        hasTimestamp: false,
-        timestampRecent: false,
-        gpsNearHint: null,
-        metadata: {},
-        checks: [],
-        failures: [],
-      },
+      exif: validateExif(Buffer.from([])),
       c2pa: {
         available: false,
         hasManifest: false,
