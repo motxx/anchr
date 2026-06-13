@@ -90,7 +90,7 @@ describe("toAttestationRecord", () => {
       checks: ["check1"],
       failures: [],
       attested_at: 1700000000,
-      tlsn_verified: {
+      schema_verdict: {
         server_name: "example.com",
         revealed_body: "body",
         session_timestamp: 1700000000,
@@ -103,10 +103,14 @@ describe("toAttestationRecord", () => {
     expect(record.checks).toEqual(["check1"]);
     expect(record.failures).toEqual([]);
     expect(record.attested_at).toBe(1700000000);
-    expect(record.tlsn_verified?.server_name).toBe("example.com");
+    expect(record.schema_verdict).toEqual({
+      server_name: "example.com",
+      revealed_body: "body",
+      session_timestamp: 1700000000,
+    });
   });
 
-  test("handles attestation without tlsn_verified", () => {
+  test("handles attestation without schema_verdict", () => {
     const att: OracleAttestation = {
       oracle_id: "oracle-2",
       query_id: "q2",
@@ -119,7 +123,7 @@ describe("toAttestationRecord", () => {
 
     expect(record.passed).toBe(false);
     expect(record.failures).toEqual(["failed check"]);
-    expect(record.tlsn_verified).toBeUndefined();
+    expect(record.schema_verdict).toBeUndefined();
   });
 });
 

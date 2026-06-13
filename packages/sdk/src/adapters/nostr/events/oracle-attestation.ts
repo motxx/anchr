@@ -14,7 +14,6 @@ import {
 import type { NostrIdentity } from "../../../identity.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
 import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
-import type { TlsnVerifiedData } from "../../../proofs/mod.ts";
 
 export interface OracleAttestationPayload {
   oracle_id: string;
@@ -23,8 +22,28 @@ export interface OracleAttestationPayload {
   checks: string[];
   failures: string[];
   attested_at: number;
-  /** Redacted TLSNotary verified data (included only for public attestations). */
-  tlsn_verified?: TlsnVerifiedData;
+  details?: unknown;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) &&
+    value.every((entry) => typeof entry === "string");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isOracleAttestationPayload(
+  value: unknown,
+): value is OracleAttestationPayload {
+  return isRecord(value) &&
+    typeof value.oracle_id === "string" &&
+    typeof value.query_id === "string" &&
+    typeof value.passed === "boolean" &&
+    isStringArray(value.checks) &&
+    isStringArray(value.failures) &&
+    typeof value.attested_at === "number";
 }
 
 /**
@@ -45,7 +64,7 @@ export function buildOracleAttestationEvent(
     checks: attestation.checks,
     failures: attestation.failures,
     attested_at: attestation.attested_at,
-    tlsn_verified: attestation.tlsn_verified,
+    details: attestation.schema_verdict,
   };
 
   const template: EventTemplate = {
@@ -71,7 +90,11 @@ export function buildOracleAttestationEvent(
 export function parseOracleAttestationPayload(
   content: string,
 ): OracleAttestationPayload {
-  return JSON.parse(content) as OracleAttestationPayload;
+  const parsed: unknown = JSON.parse(content);
+  if (!isOracleAttestationPayload(parsed)) {
+    throw new Error("invalid OracleAttestationPayload");
+  }
+  return parsed;
 }
 
 /**
@@ -87,5 +110,6 @@ export function toOracleAttestation(
     checks: payload.checks,
     failures: payload.failures,
     attested_at: payload.attested_at,
+    schema_verdict: payload.details,
   };
 }

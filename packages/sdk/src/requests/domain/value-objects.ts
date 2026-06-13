@@ -60,20 +60,6 @@ export function validateQueryInput(input: QueryInput): string | null {
       return "max_gps_distance_km must be positive";
     }
   }
-  if (input.tlsn_requirements) {
-    const url = input.tlsn_requirements.target_url;
-    if (!url || url.trim().length === 0) {
-      return "tlsn_requirements.target_url must not be empty";
-    }
-    try {
-      new URL(url);
-    } catch {
-      return `tlsn_requirements.target_url is not a valid URL: ${url}`;
-    }
-    if (!input.visibility) {
-      return "visibility is required when tlsn_requirements is set";
-    }
-  }
   return null;
 }
 

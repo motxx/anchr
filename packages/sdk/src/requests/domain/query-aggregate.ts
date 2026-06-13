@@ -95,7 +95,7 @@ export function createQueryAggregate(
     nostr_event_id: options.nostrEventId,
     expected_gps: input.expected_gps,
     max_gps_distance_km: input.max_gps_distance_km,
-    tlsn_requirements: input.tlsn_requirements,
+    schema_requirement: input.schema_requirement,
     quorum: options.quorum,
     visibility: input.visibility,
   };

@@ -25,7 +25,7 @@ function createMockOracle(id: string, passResult: boolean): Oracle {
         checks: passResult ? ["all_ok"] : [],
         failures: passResult ? [] : ["failed"],
         attested_at: Date.now(),
-        tlsn_verified: {
+        schema_verdict: {
           server_name: "example.com",
           revealed_body: '{"status":"ok"}',
           revealed_headers: "Content-Type: application/json",
@@ -81,7 +81,7 @@ describe("proof-delivery integration", () => {
 
     const query = svc.createQuery({
       description: "Test TLSNotary public",
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "public",
     }, { oracleIds: ["test-oracle"] });
 
@@ -117,7 +117,7 @@ describe("proof-delivery integration", () => {
 
     const query = svc.createQuery({
       description: "Test TLSNotary private",
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "customer_only",
     }, { oracleIds: ["test-oracle"] });
 
@@ -154,7 +154,7 @@ describe("proof-delivery integration", () => {
 
     const query = svc.createQuery({
       description: "Test TLSNotary quorum public",
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "public",
     }, {
       oracleIds: ["oracle-1", "oracle-2", "oracle-3"],

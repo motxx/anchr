@@ -19,6 +19,7 @@ import {
   createIntegrityStore,
   storeIntegrity,
 } from "../mod.ts";
+import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { VerificationInput, VerificationRequirement } from "./contract.ts";
 import type { TlsnValidationResult } from "../mod.ts";
@@ -197,7 +198,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
-  test("TLSNotary path runs validateTlsn() against the requirement's tlsn_requirements", async () => {
+  test("TLSNotary path runs validateTlsn() against the requirement's schema_requirement", async () => {
     const tlsnReq: TlsnRequirement = {
       target_url: "https://api.example.com/balance",
       conditions: [{
@@ -238,11 +239,11 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     const requirement: VerificationRequirement = {
       id: "req_tlsn_standalone",
       factors: ["tlsn"],
-      tlsn_requirements: tlsnReq,
+      schema_requirement: tlsnReq,
     };
     const input: VerificationInput = {
       attachments: [],
-      tlsn_attestation: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verifyProof(requirement, input, {
@@ -251,7 +252,9 @@ describe("verifyProof — standalone (no Query envelope)", () => {
 
     expect(verification.passed).toBe(true);
     expect(receivedReq).toBe(tlsnReq);
-    expect(verification.tlsn_verified?.server_name).toBe("api.example.com");
+    expect(isTlsnVerifiedData(verification.schema_verdict)).toBe(true);
+    if (!isTlsnVerifiedData(verification.schema_verdict)) return;
+    expect(verification.schema_verdict.server_name).toBe("api.example.com");
   });
 });
 
@@ -298,7 +301,7 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
       verification_requirements: ["tlsn", "gps"],
       expected_gps: { lat: 1, lon: 2 },
       max_gps_distance_km: 25,
-      tlsn_requirements: tlsnReq,
+      schema_requirement: tlsnReq,
     });
 
     const requirement = requestToRequirement(query);
@@ -309,6 +312,6 @@ describe("requestToRequirement / resultToVerificationInput adapter parity", () =
     expect(requirement.factors).toEqual(["tlsn", "gps"]);
     expect(requirement.expected_gps).toEqual({ lat: 1, lon: 2 });
     expect(requirement.max_gps_distance_km).toBe(25);
-    expect(requirement.tlsn_requirements).toBe(tlsnReq);
+    expect(requirement.schema_requirement).toBe(tlsnReq);
   });
 });

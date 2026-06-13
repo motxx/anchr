@@ -31,7 +31,7 @@ export function requestToRequirement(request: Query): VerificationRequirement {
     challenge_nonce: request.challenge_nonce,
     expected_gps: request.expected_gps,
     max_gps_distance_km: request.max_gps_distance_km,
-    tlsn_requirements: request.tlsn_requirements,
+    schema_requirement: request.schema_requirement,
     escrow_token_hash: escrowTokenHash,
   };
 }
@@ -42,8 +42,7 @@ export function resultToVerificationInput(
   return {
     attachments: result.attachments,
     gps: result.gps,
-    tlsn_attestation: result.tlsn_attestation,
-    tlsn_extension_result: result.tlsn_extension_result,
+    schema_evidence: result.schema_evidence,
   };
 }
 

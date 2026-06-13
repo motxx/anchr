@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { verify } from "../../requests/application/query-verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
+import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
@@ -326,7 +327,7 @@ function makeTlsnQuery(overrides: Partial<Query> = {}): Query {
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "locked",
-    tlsn_requirements: {
+    schema_requirement: {
       target_url: "https://httpbin.org/get",
       conditions: [{
         type: "contains",
@@ -395,7 +396,7 @@ describe("verify() TLSNotary extension result path", () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
@@ -410,28 +411,30 @@ describe("verify() TLSNotary extension result path", () => {
       .toBe(true);
   });
 
-  test("extension result + presentation + verification pass → tlsn_verified data is returned", async () => {
+  test("extension result + presentation + verification pass → schema_verdict data is returned", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
       validateTlsn: mockValidateTlsnSuccess(),
     });
 
-    expect(verification.tlsn_verified).toBeDefined();
-    expect(verification.tlsn_verified!.server_name).toBe("httpbin.org");
-    expect(verification.tlsn_verified!.revealed_body).toContain("httpbin");
-    expect(verification.tlsn_verified!.session_timestamp).toBe(now);
+    expect(verification.schema_verdict).toBeDefined();
+    expect(isTlsnVerifiedData(verification.schema_verdict)).toBe(true);
+    if (!isTlsnVerifiedData(verification.schema_verdict)) return;
+    expect(verification.schema_verdict.server_name).toBe("httpbin.org");
+    expect(verification.schema_verdict.revealed_body).toContain("httpbin");
+    expect(verification.schema_verdict.session_timestamp).toBe(now);
   });
 
   test("extension result + presentation + verification failure → failures populated", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
@@ -441,14 +444,14 @@ describe("verify() TLSNotary extension result path", () => {
     expect(verification.passed).toBe(false);
     expect(verification.failures.some((f) => f.includes("signature invalid")))
       .toBe(true);
-    expect(verification.tlsn_verified).toBeUndefined();
+    expect(verification.schema_verdict).toBeUndefined();
   });
 
   test("extension result WITHOUT presentation → rejected (self-reported data not trusted)", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: {
+      schema_evidence: {
         results: [{ type: "text", part: "body", value: "fake data" }],
       },
     };
@@ -464,30 +467,29 @@ describe("verify() TLSNotary extension result path", () => {
     );
   });
 
-  test("extension result + presentation BUT no tlsn_requirements → rejected", async () => {
-    const query = makeTlsnQuery({ tlsn_requirements: undefined });
+  test("extension result + presentation BUT no schema_requirement → rejected", async () => {
+    const query = makeTlsnQuery({ schema_requirement: undefined });
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
-    // The injected validator should NOT be called without tlsn_requirements.
+    // The injected validator should NOT be called without schema_requirement.
     const verification = await verify(query, result, {
       validateTlsn: mockValidateTlsnSuccess(),
     });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures).toContain(
-      "TLSNotary extension: query missing tlsn_requirements",
+      "TLSNotary: query missing or invalid schema_requirement",
     );
   });
 
-  test("extension result and CLI attestation both present → extension path takes priority", async () => {
+  test("schema evidence presentation is passed to the validator", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "ZXh0ZW5zaW9u" },
-      tlsn_attestation: { presentation: "Y2xp" },
+      schema_evidence: { presentation: "ZXh0ZW5zaW9u" },
     };
 
     let calledWith: string | undefined;
@@ -499,7 +501,6 @@ describe("verify() TLSNotary extension result path", () => {
     });
 
     expect(verification.passed).toBe(true);
-    // The extension presentation should be used, not the CLI one
     expect(calledWith).toBe("ZXh0ZW5zaW9u");
   });
 });

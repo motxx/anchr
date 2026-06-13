@@ -6,7 +6,6 @@
 
 import type { validateTlsn } from "../../tlsn-validation.ts";
 import type { IntegrityStore } from "../../integrity-store.ts";
-import type { TlsnVerifiedData } from "../../tlsn-types.ts";
 import type { BlossomKeyMap } from "../../../values.ts";
 import type {
   VerificationInput,
@@ -42,8 +41,7 @@ export interface FactorCheckContext {
   maxGpsDistanceKm: number;
   acc: CheckAccumulator;
   options: VerifyProofOptions;
-  /** Set by the TLSN check; surfaced on the final verdict. */
-  tlsnVerified?: TlsnVerifiedData;
+  schemaVerdict?: unknown;
 }
 
 export interface FactorCheck {

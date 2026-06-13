@@ -57,7 +57,7 @@ export function createNostrProofPublisher(
         checks: attestation.checks,
         failures: attestation.failures,
         attested_at: attestation.attested_at,
-        tlsn_verified: attestation.tlsn_verified,
+        schema_verdict: attestation.schema_verdict,
       };
 
       const event = buildOracleAttestationEvent(

@@ -90,11 +90,11 @@ export function oracleResponseToResult(
   if (typeof data.notes === "string") result.notes = data.notes;
 
   const wantsTlsn = query.verification_requirements.includes("tlsn") ||
-    query.tlsn_requirements !== undefined;
+    query.schema_requirement !== undefined;
   if (
     wantsTlsn && typeof payload.proof === "string" && payload.proof.length > 0
   ) {
-    result.tlsn_attestation = { presentation: payload.proof };
+    result.schema_evidence = { presentation: payload.proof };
   }
   return result;
 }

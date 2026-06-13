@@ -52,6 +52,6 @@ export async function verifyProof(
     checks: acc.checks,
     failures: acc.failures,
     warnings: acc.warnings.length > 0 ? acc.warnings : undefined,
-    tlsn_verified: ctx.tlsnVerified,
+    schema_verdict: ctx.schemaVerdict,
   };
 }

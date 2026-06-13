@@ -123,7 +123,7 @@ describe("validateQueryInput", () => {
       location_hint: "Tokyo",
       expected_gps: { lat: 35.6, lon: 139.7 },
       max_gps_distance_km: 10,
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "public",
     })).toBeNull();
   });
@@ -163,30 +163,17 @@ describe("validateQueryInput", () => {
       max_gps_distance_km: NaN,
     })).toContain("max_gps_distance_km");
   });
-  test("empty tlsn target_url", () => {
+  test("opaque schema_requirement is accepted by generic validation", () => {
     expect(validateQueryInput({
       description: "Photo",
-      tlsn_requirements: { target_url: "" },
-    })).toContain("target_url");
-  });
-  test("invalid tlsn target_url", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      tlsn_requirements: { target_url: "not-a-url" },
-    })).toContain("target_url");
-  });
-  test("valid tlsn target_url", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      tlsn_requirements: { target_url: "https://api.example.com/data" },
-      visibility: "customer_only",
+      schema_requirement: { target_url: "" },
     })).toBeNull();
   });
-  test("tlsn_requirements without visibility", () => {
+  test("schema_requirement does not require visibility", () => {
     expect(validateQueryInput({
       description: "Photo",
-      tlsn_requirements: { target_url: "https://api.example.com/data" },
-    })).toContain("visibility");
+      schema_requirement: { target_url: "https://api.example.com/data" },
+    })).toBeNull();
   });
 });
 

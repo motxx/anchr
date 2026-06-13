@@ -180,13 +180,15 @@ describe("createQueryAggregate", () => {
     expect(q.max_gps_distance_km).toBe(5);
   });
 
-  test("sets tlsn_requirements", () => {
+  test("sets schema_requirement", () => {
     const q = expectOk(createQueryAggregate({
       ...defaultInput,
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "public",
     }, defaultOptions));
-    expect(q.tlsn_requirements?.target_url).toBe("https://example.com/api");
+    expect(q.schema_requirement).toEqual({
+      target_url: "https://example.com/api",
+    });
     expect(q.visibility).toBe("public");
   });
 

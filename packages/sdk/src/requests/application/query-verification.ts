@@ -34,7 +34,7 @@ export function toAttestationRecord(
     checks: a.checks,
     failures: a.failures,
     attested_at: a.attested_at,
-    tlsn_verified: a.tlsn_verified,
+    schema_verdict: a.schema_verdict,
   };
 }
 
@@ -95,7 +95,7 @@ async function verifySingleOracle(
       passed: att.passed,
       checks: att.checks,
       failures: att.failures,
-      tlsn_verified: att.tlsn_verified,
+      schema_verdict: att.schema_verdict,
     },
   };
 }
@@ -153,7 +153,7 @@ async function verifyQuorum(
       passed,
       checks: allChecks,
       failures: allFailures,
-      tlsn_verified: firstPass?.tlsn_verified,
+      schema_verdict: firstPass?.schema_verdict,
     },
   };
 }
