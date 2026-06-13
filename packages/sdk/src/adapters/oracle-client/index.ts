@@ -9,7 +9,6 @@
  * adapter.
  */
 
-export { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
 export { createHttpOracle } from "./http-oracle.ts";
 export type { HttpOracleConfig } from "./http-oracle.ts";
 export {

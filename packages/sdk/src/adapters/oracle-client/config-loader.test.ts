@@ -70,7 +70,7 @@ describe("loadOraclesFromEnv", () => {
     const originalEnv = Deno.env.get("ORACLE_REGISTRY");
     Deno.env.set("ORACLE_REGISTRY", "ext1:https://oracle1.example.com:50000");
 
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const count = loadOraclesFromEnv(registry);
 
     expect(count).toBe(1);
@@ -86,7 +86,7 @@ describe("loadOraclesFromEnv", () => {
     const originalEnv = Deno.env.get("ORACLE_REGISTRY");
     Deno.env.delete("ORACLE_REGISTRY");
 
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const count = loadOraclesFromEnv(registry);
     expect(count).toBe(0);
 

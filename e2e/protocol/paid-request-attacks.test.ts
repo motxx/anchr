@@ -383,7 +383,7 @@ describe("Attack: Oracle Manipulation", () => {
 
   test("all oracles unreachable — query not falsely approved", async () => {
     const store = createQueryStore();
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const preimageStore = createPreimageStore();
     const service = createQueryService({
       store,

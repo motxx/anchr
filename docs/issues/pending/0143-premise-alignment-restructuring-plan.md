@@ -13,7 +13,6 @@ Depends on:
 - 0149
 - 0150
 - 0156
-- 0157
 
 Blocks:
 - None

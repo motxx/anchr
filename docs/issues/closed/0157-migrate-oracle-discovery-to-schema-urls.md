@@ -2,6 +2,7 @@
 
 Created: 2026-06-13
 Model: GPT-5.4-Codex
+Completed: 2026-06-13
 
 ## Priority
 
@@ -68,3 +69,47 @@ applications that want a static Oracle list may pass their own registry entries.
   tags.
 - Remove the built-in Oracle whitelist and update registry tests and callers to
   pass explicit application-owned Oracle entries.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/requests/domain/oracle-types.ts`
+- `packages/sdk/src/adapters/nostr/events/event-builders.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.ts`
+- `packages/sdk/src/adapters/oracle-client/registry.ts`
+- `packages/sdk/src/adapters/oracle-client/index.ts`
+- `packages/sdk/src/adapters/oracle-client/built-in.ts` (deleted)
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts`
+- `packages/sdk/src/adapters/oracle-client/registry.test.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle.test.ts`
+- `packages/sdk/src/adapters/oracle-client/config-loader.test.ts`
+- `packages/sdk/src/adapters/nostr/events/events.test.ts`
+- `e2e/relay/oracle-discovery.test.ts`
+- `e2e/regtest/core-flow.test.ts`
+- `e2e/protocol/paid-request-vulns.test.ts`
+- `e2e/protocol/custom-schema.test.ts`
+- `e2e/protocol/paid-request-attacks.test.ts`
+- `packages/sdk/src/requests/application/query-service.ts`
+- `packages/sdk/src/requests/domain/types.ts`
+
+Verified with:
+
+- `deno test -A packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts packages/sdk/src/adapters/nostr/events/events.test.ts packages/sdk/src/adapters/oracle-client/registry.test.ts packages/sdk/src/adapters/oracle-client/oracle.test.ts packages/sdk/src/adapters/oracle-client/config-loader.test.ts`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:unit`
+- `rg "supported_factors|anchr-oracle-" packages/sdk/src e2e/relay`
+- `deno task test:e2e:relay` (blocked locally: `NOSTR_RELAYS` was not set and the task requires relay infrastructure)
+
+Harness update:
+
+- The `rg "supported_factors|anchr-oracle-" packages/sdk/src e2e/relay` negative guard and the updated relay discovery test lock the schema-URL capability contract.
+
+Review residuals:
+
+- Reviewer must run `NOSTR_RELAYS=ws://localhost:7777 deno task test:e2e:relay` with relay infrastructure available.
+
+Follow-up:
+
+- None

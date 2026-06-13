@@ -1,6 +1,5 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
 import {
   getOracle,
   listOracles,
@@ -32,53 +31,10 @@ function makeFakeOracle(id: string, feePpm = 50_000): Oracle {
   };
 }
 
-// --- Built-in Oracle ---
-
-test("built-in oracle has correct info", () => {
-  expect(builtInOracle.info.id).toBe("built-in");
-  expect(builtInOracle.info.fee_ppm).toBe(0);
-});
-
-test("built-in oracle verify returns attestation", async () => {
-  const query: Query = {
-    id: "q1",
-    status: "pending",
-    description: "Test query",
-    challenge_nonce: "ABC",
-    challenge_rule: "test",
-    verification_requirements: ["nonce"],
-    created_at: Date.now(),
-    expires_at: Date.now() + 60_000,
-    payment_status: "locked",
-  };
-  const result: QueryResult = {
-    attachments: [{
-      id: "proof-q1",
-      uri: "https://blossom.example.com/proof-q1.txt",
-      mime_type: "text/plain",
-      storage_kind: "blossom",
-      blossom_hash: "proof-q1",
-    }],
-    notes: "open",
-  };
-
-  const attestation = await builtInOracle.verify(query, result);
-
-  expect(attestation.oracle_id).toBe(BUILT_IN_ORACLE_ID);
-  expect(attestation.query_id).toBe("q1");
-  expect(attestation.passed).toBe(true);
-  expect(attestation.attested_at).toBeGreaterThan(0);
-});
-
 // --- Registry ---
 
-test("built-in oracle is registered by default", () => {
-  expect(getOracle(BUILT_IN_ORACLE_ID)).toBe(builtInOracle);
-});
-
-test("listOracles includes built-in", () => {
-  const infos = listOracles();
-  expect(infos.some((i) => i.id === BUILT_IN_ORACLE_ID)).toBe(true);
+test("module registry starts empty", () => {
+  expect(listOracles()).toEqual([]);
 });
 
 test("registerOracle adds a new oracle", () => {
@@ -95,20 +51,21 @@ test("getOracle returns null for unknown id", () => {
 // --- resolveOracle ---
 
 test("resolveOracle with explicit id returns that oracle", () => {
-  const oracle = resolveOracle(BUILT_IN_ORACLE_ID, undefined);
-  expect(oracle).toBe(builtInOracle);
+  const fake = makeFakeOracle("resolve-test-oracle");
+  registerOracle(fake);
+
+  const oracle = resolveOracle("resolve-test-oracle", undefined);
+  expect(oracle).toBe(fake);
 });
 
 test("resolveOracle with explicit id checks acceptable set", () => {
   const fake = makeFakeOracle("test-oracle-2");
   registerOracle(fake);
 
-  // Oracle is in acceptable set → ok
-  expect(resolveOracle("test-oracle-2", ["test-oracle-2", BUILT_IN_ORACLE_ID]))
+  expect(resolveOracle("test-oracle-2", ["test-oracle-2", "other-oracle"]))
     .toBe(fake);
 
-  // Oracle is NOT in acceptable set → rejected
-  expect(resolveOracle("test-oracle-2", [BUILT_IN_ORACLE_ID])).toBe(null);
+  expect(resolveOracle("test-oracle-2", ["other-oracle"])).toBe(null);
 });
 
 test("resolveOracle with no explicit id and single acceptable → uses that one", () => {
@@ -119,14 +76,14 @@ test("resolveOracle with no explicit id and single acceptable → uses that one"
   expect(oracle).toBe(fake);
 });
 
-test("resolveOracle with no explicit id and no acceptable → built-in", () => {
+test("resolveOracle with no explicit id and no acceptable returns null", () => {
   const oracle = resolveOracle(undefined, undefined);
-  expect(oracle).toBe(builtInOracle);
+  expect(oracle).toBeNull();
 });
 
-test("resolveOracle with no explicit id and empty acceptable → built-in", () => {
+test("resolveOracle with no explicit id and empty acceptable returns null", () => {
   const oracle = resolveOracle(undefined, []);
-  expect(oracle).toBe(builtInOracle);
+  expect(oracle).toBeNull();
 });
 
 test("resolveOracle with unknown explicit id → null", () => {

@@ -95,8 +95,6 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
 
 describe("CTF-1: Provider forces dishonest oracle selection", () => {
   test("BLOCKED: provider-supplied oracle_id is ignored when query has no oracle_ids", async () => {
-    // Registry contains built-in (rejects) AND evil oracle (always passes); the
-    // attack is to see whether provider-supplied oracle_id can override built-in selection
     const store = createQueryStore();
     const registry = createOracleRegistry();
     const evilOracle = makeMockOracle("evil-oracle", () => true);
@@ -141,12 +139,13 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       "evil-oracle",
     );
 
-    expect(outcome.query?.assigned_oracle_id).toBe("built-in");
+    expect(outcome.ok).toBe(false);
+    expect(outcome.query?.assigned_oracle_id).toBeUndefined();
   });
 
   test("ALLOWED: provider-supplied oracle_id is used when query explicitly allows it", async () => {
     const store = createQueryStore();
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle1 = makeMockOracle("oracle-a", () => true);
     const oracle2 = makeMockOracle("oracle-b", () => true);
     registry.register(oracle1);
@@ -197,7 +196,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
 
   test("BLOCKED: provider cannot use unregistered oracle even via oracle_id param", async () => {
     const store = createQueryStore();
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeMockOracle("legit-oracle"));
     const preimageStore = createPreimageStore();
     const service = createQueryService({

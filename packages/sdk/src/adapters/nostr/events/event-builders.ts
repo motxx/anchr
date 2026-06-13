@@ -31,10 +31,9 @@ export function buildOracleAnnouncementEvent(
     ["t", "anchr-oracle"],
   ];
 
-  // Add capability tags: anchr-oracle-<factor>
-  if (oracleInfo.supported_factors?.length) {
-    for (const factor of oracleInfo.supported_factors) {
-      tags.push(["t", `anchr-oracle-${factor}`]);
+  if (oracleInfo.supported_schemas?.length) {
+    for (const schema of oracleInfo.supported_schemas) {
+      tags.push(["s", schema]);
     }
   }
 
@@ -49,7 +48,7 @@ export function buildOracleAnnouncementEvent(
     name: oracleInfo.name,
     ...(oracleInfo.endpoint !== undefined && { endpoint: oracleInfo.endpoint }),
     fee_ppm: oracleInfo.fee_ppm,
-    supported_factors: oracleInfo.supported_factors ?? [],
+    supported_schemas: oracleInfo.supported_schemas ?? [],
     supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
     ...(oracleInfo.min_amount_sats !== undefined &&
       { min_amount_sats: oracleInfo.min_amount_sats }),

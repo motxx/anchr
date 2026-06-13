@@ -168,7 +168,7 @@ export interface Query {
   expires_at: number;
   customer_meta?: CustomerMeta;
   payment_lock?: PaymentLockInfo;
-  /** Acceptable oracle IDs set by customer. Empty/undefined = any (defaults to built-in). */
+  /** Acceptable oracle IDs set by customer. Empty/undefined leaves registry selection to the host. */
   oracle_ids?: string[];
   /** Oracle selected by provider at submission time. */
   assigned_oracle_id?: string;

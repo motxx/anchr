@@ -9,7 +9,7 @@ import { SimplePool } from "nostr-tools/pool";
 import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
-import type { VerificationFactor } from "../../values.ts";
+import { isSchemaUri, type SchemaUri } from "../../schema.ts";
 import type { EscrowType } from "../../requests/domain/types.ts";
 import {
   isRecord,
@@ -26,17 +26,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isVerificationFactor(x: unknown): x is VerificationFactor {
-  return typeof x === "string" && x.length > 0;
-}
-
 function isEscrowType(x: unknown): x is EscrowType {
   return typeof x === "string" && ESCROW_TYPE_VALUES.has(x);
 }
 
-function filterVerificationFactors(value: unknown): VerificationFactor[] {
+function filterSchemaUris(value: unknown): SchemaUri[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isVerificationFactor);
+  return value.filter(isSchemaUri);
 }
 
 function filterEscrowTypes(value: unknown): EscrowType[] {
@@ -50,7 +46,7 @@ export interface OracleAnnouncement {
   name: string;
   endpoint?: string;
   fee_ppm: number;
-  supported_factors: VerificationFactor[];
+  supported_schemas: SchemaUri[];
   supported_escrow_types: EscrowType[];
   min_amount_sats?: number;
   max_amount_sats?: number;
@@ -81,7 +77,7 @@ export function parseOracleAnnouncementEvent(
       name: requireString(content, "name"),
       endpoint: optionalString(content, "endpoint"),
       fee_ppm: requireNumber(content, "fee_ppm"),
-      supported_factors: filterVerificationFactors(content.supported_factors),
+      supported_schemas: filterSchemaUris(content.supported_schemas),
       supported_escrow_types: filterEscrowTypes(content.supported_escrow_types),
       min_amount_sats: optionalNumber(content, "min_amount_sats"),
       max_amount_sats: optionalNumber(content, "max_amount_sats"),
@@ -98,13 +94,13 @@ export function parseOracleAnnouncementEvent(
  * Discover oracles by querying Nostr relays for kind 30088 events
  * tagged with `anchr-oracle`.
  *
- * Optionally filter by schema-local capability label.
+ * Optionally filter by exact proof schema URL.
  */
 export async function discoverOracles(
   relayUrls: string[],
   options?: {
-    /** Filter by specific verification factor capability. */
-    factor?: VerificationFactor;
+    /** Filter by exact proof schema URL. */
+    schema?: SchemaUri;
     /** Only return announcements newer than this unix timestamp. */
     since?: number;
     /** Maximum number of events to fetch. */
@@ -116,15 +112,14 @@ export async function discoverOracles(
   const pool = new SimplePool();
 
   try {
-    const tag = options?.factor
-      ? `anchr-oracle-${options.factor}`
-      : "anchr-oracle";
-
     const filter: Filter = {
       kinds: [KIND_ORACLE_ANNOUNCEMENT],
-      "#t": [tag],
+      "#t": ["anchr-oracle"],
     };
 
+    if (options?.schema !== undefined) {
+      filter["#s"] = [options.schema];
+    }
     if (options?.since !== undefined) {
       filter.since = options.since;
     }

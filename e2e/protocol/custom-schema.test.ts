@@ -215,7 +215,7 @@ async function produceCustomEvidence(): Promise<SchemaEvidencePayload> {
 
 async function submitPaidCustomSchemaResult(schemaEvidence?: unknown) {
   const preimageStore = createPreimageStore();
-  const registry = createOracleRegistry({ skipBuiltIn: true });
+  const registry = createOracleRegistry();
   registry.register(createCustomSchemaOracle());
   const service = createQueryService({
     oracleRegistry: registry,

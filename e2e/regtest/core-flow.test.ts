@@ -74,7 +74,7 @@ suite("e2e: Core Protocol Flow (Specs 00-06)", () => {
   // Build isolated service with real Cashu escrow + preimage store
   const store = createQueryStore();
   const preimageStore = createPreimageStore();
-  const registry = createOracleRegistry({ skipBuiltIn: true });
+  const registry = createOracleRegistry();
   registry.register(createPassingOracle("e2e-oracle"));
 
   const service = createQueryService({
