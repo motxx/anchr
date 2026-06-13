@@ -3,16 +3,19 @@ import { expect } from "@std/expect";
 import { verify } from "../../requests/application/query-verifier.ts";
 import { clearIntegrityStore, storeIntegrity } from "../mod.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
+import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery as makeBaseQuery } from "../../testing/factories.ts";
+import { ProofSchema } from "../../schema.ts";
 
 function makeQuery(overrides: Partial<Query>): Query {
   return makeBaseQuery({
     id: "query_test",
     challenge_nonce: "K7P4",
     challenge_rule: "include nonce",
-    verification_requirements: ["nonce", "gps", "ai_check"],
+    verification_requirements: ["nonce", "c2pa"],
+    schema: ProofSchema.C2paImageV1,
     expires_at: Date.now() + 60_000,
     ...overrides,
   });
@@ -49,7 +52,7 @@ function injectC2paIntegrity(attachmentId: string, queryId: string) {
   });
 }
 
-test("rejects empty submission when GPS/nonce required", async () => {
+test("rejects empty submission when C2PA/nonce required", async () => {
   const query = makeQuery({});
   const result: QueryResult = {
     attachments: [],
@@ -58,18 +61,16 @@ test("rejects empty submission when GPS/nonce required", async () => {
 
   const verification = await verify(query, result);
 
-  // Fix 1: Empty attachments with GPS/nonce requirements → rejection
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
     "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 
-test("empty submission passes weak verification when no evidence required", async () => {
+test("empty submission fails when nonce evidence is required", async () => {
   const query = makeQuery({
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     payment_lock: undefined,
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [],
@@ -78,16 +79,15 @@ test("empty submission passes weak verification when no evidence required", asyn
 
   const verification = await verify(query, result);
 
-  expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain(
-    "no media evidence provided (weak verification)",
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 
 test("empty submission fails when C2PA verification is required", async () => {
   const query = makeQuery({
     verification_requirements: ["c2pa"],
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [],
@@ -105,7 +105,6 @@ test("empty submission fails when C2PA verification is required", async () => {
 test("c2pa required but only a non-image attachment fails closed", async () => {
   const query = makeQuery({
     verification_requirements: ["c2pa"],
-    expected_gps: undefined,
   });
   const result: QueryResult = {
     attachments: [{
@@ -136,8 +135,6 @@ test("attachment with valid C2PA passes", async () => {
       storage_kind: "blossom",
       blossom_hash: "photo1",
     }],
-    // The gps factor demands body GPS evidence even without expected_gps.
-    gps: { lat: 35.6762, lon: 139.6503 },
   };
 
   injectC2paIntegrity("photo1", query.id);
@@ -152,8 +149,10 @@ test("attachment with valid C2PA passes", async () => {
 
 test("INV-06: attachment with expected GPS requires C2PA-signed GPS binding", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [{
@@ -163,7 +162,7 @@ test("INV-06: attachment with expected GPS requires C2PA-signed GPS binding", as
       storage_kind: "blossom",
       blossom_hash: "photo1",
     }],
-    gps: { lat: 35.6762, lon: 139.6503 },
+    schema_evidence: { gps: { lat: 35.6762, lon: 139.6503 } },
   };
 
   injectC2paIntegrity("photo1", query.id);
@@ -220,29 +219,11 @@ test("attachment without C2PA fails", async () => {
   );
 });
 
-test("payment_lock query without GPS/nonce requirements allows empty submission", async () => {
+test("payment_lock query without C2PA/nonce requirements rejects empty submission", async () => {
   const query = makeQuery({
+    schema: "https://anchr-spec.org/spec/proof/photo/v1",
     payment_lock: { amount_sats: 100 },
     verification_requirements: [],
-  });
-  const result: QueryResult = {
-    attachments: [],
-    notes: "Observed the target",
-  };
-
-  const verification = await verify(query, result);
-
-  // PaymentLock alone doesn't require evidence — verification_requirements control evidence needs
-  expect(verification.passed).toBe(true);
-  expect(verification.checks).toContain(
-    "no media evidence provided (weak verification)",
-  );
-});
-
-test("payment_lock query with GPS requirement rejects empty submission", async () => {
-  const query = makeQuery({
-    payment_lock: { amount_sats: 100 },
-    verification_requirements: ["gps"],
   });
   const result: QueryResult = {
     attachments: [],
@@ -257,34 +238,64 @@ test("payment_lock query with GPS requirement rejects empty submission", async (
   );
 });
 
-test("body GPS within range passes", async () => {
+test("payment_lock query with C2PA requirement rejects empty submission", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    payment_lock: { amount_sats: 100 },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
-    notes: "nearby",
-    gps: { lat: 35.68, lon: 139.65 },
+    notes: "Observed the target",
   };
 
   const verification = await verify(query, result);
 
-  // Still fails because no attachments + GPS required, but body GPS check itself passes
-  expect(verification.checks.some((c) => c.includes("body GPS within"))).toBe(
-    true,
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
   );
 });
 
-test("body GPS too far fails", async () => {
+test("ATTACK: c2pa-image rejects self-reported GPS without a signed manifest", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
+  });
+  const result: QueryResult = {
+    attachments: [],
+    notes: "nearby",
+    schema_evidence: { gps: { lat: 35.68, lon: 139.65 } },
+  };
+
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(false);
+  expect(verification.failures).toContain(
+    "no media evidence provided — photos are required when photo-backed verification is enabled",
+  );
+  expect(verification.failures).toContain(
+    "C2PA: required Content Credentials evidence missing — no image submitted",
+  );
+  expect(
+    verification.checks.some((c) =>
+      c.includes("C2PA schema_evidence GPS within")
+    ),
+  ).toBe(true);
+});
+
+test("C2PA schema evidence GPS too far fails", async () => {
+  const query = makeQuery({
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
     notes: "far away",
-    gps: { lat: 40.0, lon: 140.0 },
+    schema_evidence: { gps: { lat: 40.0, lon: 140.0 } },
   };
 
   const verification = await verify(query, result);
@@ -292,15 +303,18 @@ test("body GPS too far fails", async () => {
   expect(verification.passed).toBe(false);
   expect(
     verification.failures.some((f) =>
-      f.includes("body GPS") && f.includes("from expected location")
+      f.includes("C2PA schema_evidence GPS") &&
+      f.includes("from expected location")
     ),
   ).toBe(true);
 });
 
-test("missing body GPS fails when GPS verification required", async () => {
+test("missing signed C2PA manifest fails when expected location is set", async () => {
   const query = makeQuery({
-    expected_gps: { lat: 35.6762, lon: 139.6503 },
-    verification_requirements: ["gps"],
+    schema_requirement: {
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+    },
+    verification_requirements: ["c2pa"],
   });
   const result: QueryResult = {
     attachments: [],
@@ -311,7 +325,7 @@ test("missing body GPS fails when GPS verification required", async () => {
 
   expect(verification.passed).toBe(false);
   expect(verification.failures).toContain(
-    "GPS coordinates missing from submission body — required by verification policy",
+    "C2PA: required Content Credentials evidence missing — no image submitted",
   );
 });
 
@@ -322,11 +336,12 @@ function makeTlsnQuery(overrides: Partial<Query> = {}): Query {
     id: "query_tlsn",
     status: "pending",
     description: "TLSNotary test",
+    schema: ProofSchema.TlsnV1,
     verification_requirements: ["tlsn"],
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "locked",
-    tlsn_requirements: {
+    schema_requirement: {
       target_url: "https://httpbin.org/get",
       conditions: [{
         type: "contains",
@@ -395,11 +410,13 @@ describe("verify() TLSNotary extension result path", () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(true);
@@ -410,52 +427,60 @@ describe("verify() TLSNotary extension result path", () => {
       .toBe(true);
   });
 
-  test("extension result + presentation + verification pass → tlsn_verified data is returned", async () => {
+  test("extension result + presentation + verification pass → schema_verdict data is returned", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
-    expect(verification.tlsn_verified).toBeDefined();
-    expect(verification.tlsn_verified!.server_name).toBe("httpbin.org");
-    expect(verification.tlsn_verified!.revealed_body).toContain("httpbin");
-    expect(verification.tlsn_verified!.session_timestamp).toBe(now);
+    expect(verification.schema_verdict).toBeDefined();
+    expect(isTlsnVerifiedData(verification.schema_verdict)).toBe(true);
+    if (!isTlsnVerifiedData(verification.schema_verdict)) return;
+    expect(verification.schema_verdict.server_name).toBe("httpbin.org");
+    expect(verification.schema_verdict.revealed_body).toContain("httpbin");
+    expect(verification.schema_verdict.session_timestamp).toBe(now);
   });
 
   test("extension result + presentation + verification failure → failures populated", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnFailure(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnFailure() },
+      },
     });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures.some((f) => f.includes("signature invalid")))
       .toBe(true);
-    expect(verification.tlsn_verified).toBeUndefined();
+    expect(verification.schema_verdict).toBeUndefined();
   });
 
   test("extension result WITHOUT presentation → rejected (self-reported data not trusted)", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: {
+      schema_evidence: {
         results: [{ type: "text", part: "body", value: "fake data" }],
       },
     };
 
     // The injected validator should NOT be called for self-reported data.
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(false);
@@ -464,42 +489,49 @@ describe("verify() TLSNotary extension result path", () => {
     );
   });
 
-  test("extension result + presentation BUT no tlsn_requirements → rejected", async () => {
-    const query = makeTlsnQuery({ tlsn_requirements: undefined });
+  test("extension result + presentation BUT no schema_requirement → rejected", async () => {
+    const query = makeTlsnQuery({ schema_requirement: undefined });
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "dGVzdA==" },
+      schema_evidence: { presentation: "dGVzdA==" },
     };
 
-    // The injected validator should NOT be called without tlsn_requirements.
+    // The injected validator should NOT be called without schema_requirement.
     const verification = await verify(query, result, {
-      validateTlsn: mockValidateTlsnSuccess(),
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: { validateTlsn: mockValidateTlsnSuccess() },
+      },
     });
 
     expect(verification.passed).toBe(false);
     expect(verification.failures).toContain(
-      "TLSNotary extension: query missing tlsn_requirements",
+      "TLSNotary: query missing or invalid schema_requirement",
     );
   });
 
-  test("extension result and CLI attestation both present → extension path takes priority", async () => {
+  test("schema evidence presentation is passed to the validator", async () => {
     const query = makeTlsnQuery();
     const result: QueryResult = {
       attachments: [],
-      tlsn_extension_result: { presentation: "ZXh0ZW5zaW9u" },
-      tlsn_attestation: { presentation: "Y2xp" },
+      schema_evidence: { presentation: "ZXh0ZW5zaW9u" },
     };
 
     let calledWith: string | undefined;
     const verification = await verify(query, result, {
-      validateTlsn: async (att, req) => {
-        calledWith = att.presentation;
-        return mockValidateTlsnSuccess()(att, req);
+      schemaOptions: {
+        [ProofSchema.TlsnV1]: {
+          validateTlsn: async (
+            att: TlsnAttestation,
+            req: TlsnRequirement,
+          ): Promise<TlsnValidationResult> => {
+            calledWith = att.presentation;
+            return mockValidateTlsnSuccess()(att, req);
+          },
+        },
       },
     });
 
     expect(verification.passed).toBe(true);
-    // The extension presentation should be used, not the CLI one
     expect(calledWith).toBe("ZXh0ZW5zaW9u");
   });
 });

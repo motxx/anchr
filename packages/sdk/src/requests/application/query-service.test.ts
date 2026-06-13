@@ -1,13 +1,14 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { getDecodedToken, getEncodedToken } from "@cashu/cashu-ts";
+import { Buffer } from "node:buffer";
 import { createPreimageStore, type PreimageStore } from "../../payments/mod.ts";
 import { createOracleRegistry } from "../../testing/oracle-registry.ts";
 import type { Oracle, OracleAttestation } from "../domain/oracle-types.ts";
 import { createQueryService, createQueryStore } from "./query-service.ts";
 import type { Query, QueryResult } from "../domain/types.ts";
 import type { EscrowProvider } from "./ports.ts";
-import { createIntegrityStore } from "../../proofs/mod.ts";
+import { createIntegrityStore, validateExif } from "../../proofs/mod.ts";
 
 function makeFakeToken(amountSats: number): string {
   return getEncodedToken({
@@ -108,7 +109,7 @@ describe("createQueryService", () => {
     const query = service.createQuery({ description: "Test query" });
     expect(query.status).toBe("pending");
     expect(query.challenge_nonce).toBeUndefined();
-    expect(query.verification_requirements).toEqual(["gps", "ai_check"]);
+    expect(query.verification_requirements).toEqual([]);
     expect(query.id).toMatch(/^query_/);
   });
 
@@ -117,12 +118,12 @@ describe("createQueryService", () => {
     const query = service.createQuery(
       {
         description: "Test query",
-        verification_requirements: ["nonce", "gps"],
+        verification_requirements: ["nonce", "c2pa"],
       },
     );
     expect(query.challenge_nonce).toBeTruthy();
     expect(query.challenge_nonce!.length).toBe(6);
-    expect(query.verification_requirements).toEqual(["nonce", "gps"]);
+    expect(query.verification_requirements).toEqual(["nonce", "c2pa"]);
   });
 
   test("createQuery respects ttlMs option", async () => {
@@ -732,8 +733,8 @@ describe("submitEscrowResult", () => {
   }
 
   /** Create escrowInfo using a real preimage hash from the store. */
-  function makeHtlcWithHash(preimageStore: PreimageStore) {
-    const entry = preimageStore.create();
+  async function makeHtlcWithHash(preimageStore: PreimageStore) {
+    const entry = await preimageStore.create();
     return {
       escrowInfo: {
         type: "htlc" as const,
@@ -748,7 +749,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult returns preimage on verification success", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo, entry } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo, entry } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
       oracleIds: ["test-oracle"],
@@ -771,7 +772,7 @@ describe("submitEscrowResult", () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage({
       mockOracle: makeMockOracle("strict-oracle", () => false),
     });
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
       oracleIds: ["strict-oracle"],
@@ -805,7 +806,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult fails for wrong provider", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
@@ -823,7 +824,7 @@ describe("submitEscrowResult", () => {
 
   test("submitEscrowResult fails for wrong state", async () => {
     const { service, preimageStore } = makeIsolatedServiceWithPreimage();
-    const { escrowInfo } = makeHtlcWithHash(preimageStore);
+    const { escrowInfo } = await makeHtlcWithHash(preimageStore);
     const query = service.createQuery({ description: "HTLC test" }, {
       escrow: escrowInfo,
     });
@@ -1055,7 +1056,7 @@ describe("verifyWithQuorum", () => {
       preimageStore,
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,
@@ -1093,17 +1094,7 @@ describe("createIntegrityStore isolation", () => {
       attachmentId: "a.jpg",
       requestId: "q1",
       capturedAt: Date.now(),
-      exif: {
-        hasExif: false,
-        hasCameraModel: false,
-        hasGps: false,
-        hasTimestamp: false,
-        timestampRecent: false,
-        gpsNearHint: null,
-        metadata: {},
-        checks: [],
-        failures: [],
-      },
+      exif: validateExif(Buffer.from([])),
       c2pa: {
         available: false,
         hasManifest: false,

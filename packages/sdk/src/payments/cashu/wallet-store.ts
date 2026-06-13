@@ -1,5 +1,5 @@
 import type { Proof } from "@cashu/cashu-ts";
-import { getCashuConfig } from "./cashu-wallet.ts";
+import { type CashuConfigOptions, getCashuConfig } from "./cashu-wallet.ts";
 import {
   computeBalance,
   makeKey,
@@ -53,9 +53,9 @@ export interface WalletStore {
   ): Promise<T>;
 }
 
-export function createWalletStore(): WalletStore {
+export function createWalletStore(options?: CashuConfigOptions): WalletStore {
   const wallets = new Map<string, WalletData>();
-  const mintUrl = getCashuConfig()?.mintUrl ?? null;
+  const mintUrl = getCashuConfig({ config: options?.config })?.mintUrl ?? null;
   /** Per-wallet mutex: prevents concurrent lock/transfer/unlock races. */
   const locks = new Map<string, Promise<void>>();
 
@@ -131,7 +131,7 @@ export function createWalletStore(): WalletStore {
 
     async getVerifiedBalance(role, pubkey) {
       const data = getData(role, pubkey);
-      await pruneSpentProofs(data, role, pubkey);
+      await pruneSpentProofs(data, role, pubkey, { config: options?.config });
       return computeBalance(data, mintUrl);
     },
   };

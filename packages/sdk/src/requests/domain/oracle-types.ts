@@ -1,15 +1,16 @@
-import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
+import type { SchemaUri } from "../../schema.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type { EscrowType, Query, QueryResult } from "./types.ts";
-import type { TlsnVerifiedData, VerificationDetail } from "../../proofs/mod.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
 
 export interface OracleInfo {
   id: string;
   name: string;
-  /** URL for external oracle APIs (undefined for built-in). */
+  /** URL for external oracle APIs. */
   endpoint?: string;
   /** Fee in parts-per-million of the Payment Lock amount (e.g. 50_000 = 5%). */
   fee_ppm: number;
-  supported_factors?: VerificationFactor[];
+  supported_schemas?: SchemaUri[];
   supported_escrow_types?: EscrowType[];
   /** Minimum Payment Lock amount this oracle accepts (sats). */
   min_amount_sats?: number;
@@ -25,7 +26,7 @@ export interface OracleAttestation {
   checks: string[];
   failures: string[];
   attested_at: number;
-  tlsn_verified?: TlsnVerifiedData;
+  schema_verdict?: unknown;
 }
 
 export interface Oracle {

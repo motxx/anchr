@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -75,3 +76,48 @@ discovery/built-in whitelist is reduced to relay-based discovery
 - Sequence against 0116 (relay correctness) and 0117 (FROST routes).
 - File implementation children for the move/delete and for relay-based
   discovery.
+
+## Resolution
+
+Decision: the relay path in `adapters/nostr` is the canonical v0 Oracle
+transport for the Customer/Provider/Oracle exchange. The HTTP Oracle exchange
+surface is deleted from the SDK package surface by follow-up issue 0156:
+HTLC `/hash`, `/hash/:queryId`, `/verify`, HTTP Oracle client, and HTTP config
+loader stop owning exchange behavior. FROST Oracle-to-Oracle coordination keeps
+a home as a reduced FROST-only peer endpoint module because 0117 kept FROST and
+`test:e2e:frost` depends on that coordination surface; 0153 owns the injectable
+peer transport. Oracle discovery is relay-based through kind 30088 registry
+events with `supported_schemas` and `s` tags containing exact schema URL
+capability keys; the built-in Oracle whitelist is application policy and is
+deleted by follow-up issue 0157.
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `docs/issues/SEQUENCE`
+- `docs/issues/pending/0143-premise-alignment-restructuring-plan.md`
+- `docs/issues/pending/0146-schema-scoped-payloads-in-contract-and-query.md`
+- `docs/issues/pending/0147-move-gps-into-schema-owned-verification.md`
+- `docs/issues/pending/0148-runtime-schema-registration-and-reference-adapters.md`
+- `docs/issues/pending/0149-runtime-ports-for-config-persistence-sidecars.md`
+- `docs/issues/pending/0153-frost-peer-transport-injection.md`
+- `docs/issues/pending/0156-delete-http-oracle-exchange-surface.md`
+- `docs/issues/pending/0157-migrate-oracle-discovery-to-schema-urls.md`
+- `docs/issues/closed/0152-canonical-relay-oracle-surface-decision.md`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- None — human universal decision locked in docs; child issues carry implementation drift locks.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- 0156
+- 0157

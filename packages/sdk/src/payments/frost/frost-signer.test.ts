@@ -177,13 +177,20 @@ binaryDescribe("FrostSigner with real binary", () => {
       frostSignerPath: realBinary!,
     });
 
-    // ai_check is a soft check that passes by default in tests
     const requirement = {
       id: "q-sign-test",
-      factors: ["ai_check" as const],
+      factors: ["nonce" as const],
       description: "test query for signing",
     };
-    const input = { attachments: [] as AttachmentRef[] };
+    const input = {
+      attachments: [{
+        id: "proof-q-sign-test",
+        uri: "https://blossom.example.com/proof-q-sign-test.txt",
+        mime_type: "text/plain",
+        storage_kind: "blossom",
+        blossom_hash: "proof-q-sign-test",
+      }] as AttachmentRef[],
+    };
 
     const output = await signer.verifyAndSign(
       requirement,
@@ -205,10 +212,18 @@ binaryDescribe("FrostSigner with real binary", () => {
 
     const requirement = {
       id: "q-interleave",
-      factors: ["ai_check" as const],
+      factors: ["nonce" as const],
       description: "interleaved sessions",
     };
-    const input = { attachments: [] as AttachmentRef[] };
+    const input = {
+      attachments: [{
+        id: "proof-q-interleave",
+        uri: "https://blossom.example.com/proof-q-interleave.txt",
+        mime_type: "text/plain",
+        storage_kind: "blossom",
+        blossom_hash: "proof-q-interleave",
+      }] as AttachmentRef[],
+    };
 
     const r1a = await signer.verifyAndSign(requirement, input, "aaaa01");
     const r1b = await signer.verifyAndSign(requirement, input, "bbbb02");

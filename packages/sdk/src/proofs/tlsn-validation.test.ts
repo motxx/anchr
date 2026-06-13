@@ -20,6 +20,7 @@ import {
   evaluateCondition,
   validateTlsn,
 } from "./tlsn-validation.ts";
+import type { SidecarExecutor, SpawnResult } from "../internal/runtime/mod.ts";
 import type { TlsnAttestation, TlsnRequirement } from "./tlsn-types.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -167,6 +168,43 @@ describe("validateTlsn without binary", () => {
 
 describe("validateTlsn with mock binary", () => {
   beforeEach(() => _clearSeenPresentationsForTest());
+
+  test("uses the injected executor for lookup and verifier execution", async () => {
+    const commands: string[][] = [];
+    const executor: SidecarExecutor = {
+      spawn(cmd): SpawnResult {
+        commands.push(cmd);
+        return {
+          exited: Promise.resolve(),
+          exitCode: 0,
+          stdout: new Blob([
+            JSON.stringify({
+              valid: true,
+              server_name: "api.coingecko.com",
+              revealed_body: '{"bitcoin":{"usd":42000}}',
+              time: Math.floor(Date.now() / 1000) - 5,
+            }),
+          ]).stream(),
+          stderr: new Blob([""]).stream(),
+          kill() {},
+        };
+      },
+      which(name) {
+        return name === "tlsn-verifier" ? "/mock/tlsn-verifier" : null;
+      },
+      isFile() {
+        return false;
+      },
+    };
+
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      executor,
+    });
+
+    expect(result.signatureValid).toBe(true);
+    expect(result.serverIdentityValid).toBe(true);
+    expect(commands[0]?.slice(0, 2)).toEqual(["/mock/tlsn-verifier", "verify"]);
+  });
 
   test("valid presentation passes all checks", async () => {
     writeMockVerifier({

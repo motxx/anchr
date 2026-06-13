@@ -54,30 +54,30 @@ const verifyFail = () =>
 // --- generateRequestHash ---
 
 describe("generateRequestHash", () => {
-  test("returns a hash string", () => {
+  test("returns a hash string", async () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    const { hash } = service.generateRequestHash("q1");
+    const { hash } = await service.generateRequestHash("q1");
     expect(typeof hash).toBe("string");
     expect(hash.length).toBeGreaterThan(0);
   });
 
-  test("returns unique hash per query", () => {
+  test("returns unique hash per query", async () => {
     const config = makeConfig();
     const service = createOracleNostrService(config);
-    const h1 = service.generateRequestHash("q1").hash;
-    const h2 = service.generateRequestHash("q2").hash;
+    const h1 = (await service.generateRequestHash("q1")).hash;
+    const h2 = (await service.generateRequestHash("q2")).hash;
     expect(h1).not.toBe(h2);
   });
 
-  test("stores preimage in preimage store", () => {
+  test("stores preimage in preimage store", async () => {
     const store = createPreimageStore();
     const service = createOracleNostrService(
       makeConfig({ preimageStore: store }),
     );
-    const { hash } = service.generateRequestHash("q1");
-    expect(store.has(hash)).toBe(true);
-    expect(store.getPreimage(hash)).not.toBeNull();
+    const { hash } = await service.generateRequestHash("q1");
+    expect(await store.has(hash)).toBe(true);
+    expect(await store.getPreimage(hash)).not.toBeNull();
   });
 });
 
@@ -94,13 +94,13 @@ describe("verifyAndDeliver", () => {
       verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateRequestHash("q1");
+    const { hash } = await service.generateRequestHash("q1");
 
     const query = {
       id: "q1",
       status: "processing" as const,
       description: "test",
-      verification_requirements: ["gps" as const],
+      verification_requirements: ["c2pa" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
       payment_status: "escrow_swapped" as const,
@@ -112,7 +112,7 @@ describe("verifyAndDeliver", () => {
     expect(passed).toBe(true);
     expect(published.length).toBe(1);
     // Preimage should be deleted from store after delivery
-    expect(store.has(hash)).toBe(false);
+    expect(await store.has(hash)).toBe(false);
   });
 
   test("returns false and retains preimage when delivery fails", async () => {
@@ -128,13 +128,13 @@ describe("verifyAndDeliver", () => {
       verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateRequestHash("q-delivery-fail");
+    const { hash } = await service.generateRequestHash("q-delivery-fail");
 
     const query = {
       id: "q-delivery-fail",
       status: "processing" as const,
       description: "test",
-      verification_requirements: ["gps" as const],
+      verification_requirements: ["c2pa" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
       payment_status: "escrow_swapped" as const,
@@ -147,7 +147,7 @@ describe("verifyAndDeliver", () => {
       providerPubkey,
     );
     expect(passed).toBe(false);
-    expect(store.has(hash)).toBe(true);
+    expect(await store.has(hash)).toBe(true);
   });
 
   test("publishes rejection DM on verification fail", async () => {
@@ -160,13 +160,13 @@ describe("verifyAndDeliver", () => {
       verify: verifyFail,
     });
     const service = createOracleNostrService(config);
-    service.generateRequestHash("q1");
+    await service.generateRequestHash("q1");
 
     const query = {
       id: "q1",
       status: "processing" as const,
       description: "test",
-      verification_requirements: ["gps" as const],
+      verification_requirements: ["c2pa" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
       payment_status: "escrow_swapped" as const,
@@ -188,7 +188,7 @@ describe("verifyAndDeliver", () => {
       id: "q_unknown",
       status: "processing" as const,
       description: "test",
-      verification_requirements: ["gps" as const],
+      verification_requirements: ["c2pa" as const],
       created_at: Date.now(),
       expires_at: Date.now() + 600_000,
       payment_status: "escrow_swapped" as const,

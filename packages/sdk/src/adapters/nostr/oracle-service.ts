@@ -6,9 +6,9 @@
  *   2. Listen for kind 7000 offers → record Provider pubkeys
  *   3. On selection announcement → verify HTLC condition, record selected Provider
  *   4. Listen for kind 6300 results → verify Provider pubkey, download blob,
- *      verify blob hash, decrypt K_O, verify C2PA
- *   5. C2PA valid → deliver preimage via NIP-44 DM (kind 4)
- *   6. C2PA invalid → deliver rejection via NIP-44 DM (kind 4)
+ *      verify blob hash, decrypt K_O, verify schema evidence
+ *   5. Evidence valid → deliver preimage via NIP-44 DM (kind 4)
+ *   6. Evidence invalid → deliver rejection via NIP-44 DM (kind 4)
  *
  * Process concerns are the host's responsibility: wire SIGTERM/SIGINT to
  * `service.stop()`, expose a health surface, and call
@@ -56,6 +56,10 @@ import {
   type WatchedQuery,
 } from "./oracle-handlers.ts";
 
+import {
+  getOracleNostrConfig,
+  type OracleNostrRuntimeConfig,
+} from "../../internal/runtime/config.ts";
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "oracle-nostr"]);
 
@@ -92,7 +96,7 @@ export interface OracleNostrServiceConfig {
 
 export interface OracleNostrService {
   /** Generate a preimage for a request and return the hash. */
-  generateRequestHash(requestId: string): { hash: string };
+  generateRequestHash(requestId: string): Promise<{ hash: string }>;
   /**
    * Start watching a request for offers and results. The caller supplies the
    * real `Query` — its verification requirements are what relay-submitted
@@ -142,8 +146,8 @@ export function createOracleNostrService(
   const watched = new Map<string, WatchedQuery>();
   const queryHashMap = new Map<string, string>();
 
-  function issueHash(queryId: string): string {
-    return issueQueryHash(preimageStore, queryHashMap, queryId).hash;
+  async function issueHash(queryId: string): Promise<string> {
+    return (await issueQueryHash(preimageStore, queryHashMap, queryId)).hash;
   }
 
   const hashResponder = serveHashRequests({
@@ -226,7 +230,7 @@ export function createOracleNostrService(
   ): Promise<DeliveryOutcome> {
     const detail = await verifyFn(query, result);
     const hash = queryHashMap.get(queryId);
-    const preimage = hash ? preimageStore.getPreimage(hash) : null;
+    const preimage = hash ? await preimageStore.getPreimage(hash) : null;
 
     if (detail.passed && preimage && hash) {
       const dm = buildPreimageDM(
@@ -263,7 +267,7 @@ export function createOracleNostrService(
         );
         return { passed: false, terminal: false };
       }
-      preimageStore.delete(hash);
+      await preimageStore.delete(hash);
       queryHashMap.delete(queryId);
       return { passed: true, terminal: true };
     } else {
@@ -394,8 +398,8 @@ export function createOracleNostrService(
   }
 
   return {
-    generateRequestHash(queryId: string) {
-      return { hash: issueHash(queryId) };
+    async generateRequestHash(queryId: string) {
+      return { hash: await issueHash(queryId) };
     },
 
     watchRequest(
@@ -481,14 +485,14 @@ export function createOracleNostrService(
 /**
  * Create an Oracle Nostr service from environment variable.
  */
-export function createOracleNostrServiceFromEnv(): OracleNostrService | null {
-  const secretKeyHex = Deno.env.get("ORACLE_NOSTR_SECRET_KEY")?.trim();
+export function createOracleNostrServiceFromEnv(
+  config: OracleNostrRuntimeConfig = getOracleNostrConfig(),
+): OracleNostrService | null {
+  const secretKeyHex = config.secretKeyHex?.trim();
   if (!secretKeyHex) return null;
 
   const identity = restoreIdentity(secretKeyHex);
-  const relayUrls = (Deno.env.get("NOSTR_RELAYS") ?? "").split(",")
-    .map((u) => u.trim())
-    .filter(Boolean);
+  const relayUrls = config.relayUrls;
   if (relayUrls.length === 0) return null;
 
   return createOracleNostrService({

@@ -31,7 +31,6 @@
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",
     "@anchr/protocol/types": "../protocol/src/types.ts",
-    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk@^0.78",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
     "hono": "jsr:@hono/hono@^4",
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",

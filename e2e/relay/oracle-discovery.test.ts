@@ -19,6 +19,7 @@ import {
   discoverOracles,
   parseOracleAnnouncementEvent,
 } from "@anchr/sdk/adapters/oracle-client";
+import { ProofSchema } from "@anchr/sdk";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import type { OracleInfo } from "@anchr/sdk/adapters/oracle-client";
 import { isRelayReachable } from "../helpers/regtest.ts";
@@ -94,7 +95,10 @@ suite(
         name: "E2E Test Oracle",
         endpoint: "https://oracle.example.com/api",
         fee_ppm: 50_000,
-        supported_factors: ["tlsn", "gps"],
+        supported_schemas: [
+          ProofSchema.TlsnV1,
+          "https://example.com/spec/proof/gps/v1",
+        ],
         supported_escrow_types: ["htlc"],
         min_amount_sats: 1000,
         max_amount_sats: 1_000_000,
@@ -115,7 +119,10 @@ suite(
       expect(found!.name).toBe("E2E Test Oracle");
       expect(found!.endpoint).toBe("https://oracle.example.com/api");
       expect(found!.fee_ppm).toBe(50_000);
-      expect(found!.supported_factors).toEqual(["tlsn", "gps"]);
+      expect(found!.supported_schemas).toEqual([
+        ProofSchema.TlsnV1,
+        "https://example.com/spec/proof/gps/v1",
+      ]);
       expect(found!.supported_escrow_types).toEqual(["htlc"]);
       expect(found!.min_amount_sats).toBe(1000);
       expect(found!.max_amount_sats).toBe(1_000_000);
@@ -130,7 +137,7 @@ suite(
         id: `e2e-parse-${Date.now()}`,
         name: "Parse Test Oracle",
         fee_ppm: 10_000,
-        supported_factors: ["nonce"],
+        supported_schemas: ["https://example.com/spec/proof/nonce/v1"],
         supported_escrow_types: ["p2pk_frost"],
       };
 
@@ -144,31 +151,32 @@ suite(
       expect(parsed!.id).toBe(oracleInfo.id);
       expect(parsed!.name).toBe("Parse Test Oracle");
       expect(parsed!.fee_ppm).toBe(10_000);
-      expect(parsed!.supported_factors).toEqual(["nonce"]);
+      expect(parsed!.supported_schemas).toEqual([
+        "https://example.com/spec/proof/nonce/v1",
+      ]);
       expect(parsed!.supported_escrow_types).toEqual(["p2pk_frost"]);
       expect(parsed!.endpoint).toBeUndefined();
       expect(parsed!.pubkey).toBe(identity.publicKey);
     });
 
-    test("capability filtering: discover by factor tag", async () => {
+    test("capability filtering: discover by schema tag", async () => {
       const identity = generateEphemeralIdentity();
       const uniqueSuffix = Date.now();
+      const gpsSchema = "https://example.com/spec/proof/gps/v1";
 
-      // Oracle with tlsn capability
       const tlsnOracle: OracleInfo = {
         id: `e2e-tlsn-${uniqueSuffix}`,
         name: "TLSNotary Oracle",
         fee_ppm: 30_000,
-        supported_factors: ["tlsn"],
+        supported_schemas: [ProofSchema.TlsnV1],
         supported_escrow_types: ["htlc"],
       };
 
-      // Oracle with gps-only capability
       const gpsOracle: OracleInfo = {
         id: `e2e-gps-${uniqueSuffix}`,
         name: "GPS Oracle",
         fee_ppm: 20_000,
-        supported_factors: ["gps"],
+        supported_schemas: [gpsSchema],
         supported_escrow_types: ["htlc"],
       };
 
@@ -182,9 +190,8 @@ suite(
       await publishToRelay(tlsnEvent);
       await publishToRelay(gpsEvent);
 
-      // Filter by tlsn — should find the TLSNotary oracle but not the GPS-only one
       const tlsnResults = await discoverOracles([RELAY_URL], {
-        factor: "tlsn",
+        schema: ProofSchema.TlsnV1,
         since: Math.floor(Date.now() / 1000) - 60,
       });
 
@@ -195,9 +202,8 @@ suite(
       expect(foundTlsn!.name).toBe("TLSNotary Oracle");
       expect(foundGpsInTlsn).toBeUndefined();
 
-      // Filter by gps — should find the GPS oracle but not the TLSNotary-only one
       const gpsResults = await discoverOracles([RELAY_URL], {
-        factor: "gps",
+        schema: gpsSchema,
         since: Math.floor(Date.now() / 1000) - 60,
       });
 
@@ -218,7 +224,7 @@ suite(
         id: oracleId,
         name: "Oracle V1",
         fee_ppm: 10_000,
-        supported_factors: ["gps"],
+        supported_schemas: ["https://example.com/spec/proof/gps/v1"],
         supported_escrow_types: ["htlc"],
         description: "First version",
       };
@@ -236,7 +242,10 @@ suite(
         id: oracleId,
         name: "Oracle V2",
         fee_ppm: 25_000,
-        supported_factors: ["gps", "tlsn"],
+        supported_schemas: [
+          "https://example.com/spec/proof/gps/v1",
+          ProofSchema.TlsnV1,
+        ],
         supported_escrow_types: ["htlc", "p2pk_frost"],
         description: "Updated version",
       };
@@ -260,7 +269,10 @@ suite(
       expect(matching.length).toBe(1);
       expect(matching[0]!.name).toBe("Oracle V2");
       expect(matching[0]!.fee_ppm).toBe(25_000);
-      expect(matching[0]!.supported_factors).toEqual(["gps", "tlsn"]);
+      expect(matching[0]!.supported_schemas).toEqual([
+        "https://example.com/spec/proof/gps/v1",
+        ProofSchema.TlsnV1,
+      ]);
       expect(matching[0]!.supported_escrow_types).toEqual([
         "htlc",
         "p2pk_frost",
@@ -269,7 +281,7 @@ suite(
     });
 
     test("discoverOracles returns empty for no matching relays", async () => {
-      const results = await discoverOracles([], { factor: "tlsn" });
+      const results = await discoverOracles([], { schema: ProofSchema.TlsnV1 });
       expect(results).toEqual([]);
     });
   },

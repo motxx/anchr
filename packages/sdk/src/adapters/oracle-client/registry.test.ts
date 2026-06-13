@@ -1,6 +1,5 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { BUILT_IN_ORACLE_ID, builtInOracle } from "./built-in.ts";
 import { createOracleRegistry } from "./registry.ts";
 import type {
   Oracle,
@@ -28,20 +27,13 @@ function makeFakeOracle(id: string): Oracle {
 }
 
 describe("createOracleRegistry", () => {
-  test("includes built-in oracle by default", () => {
+  test("starts empty by default", () => {
     const registry = createOracleRegistry();
-    expect(registry.get(BUILT_IN_ORACLE_ID)).toBe(builtInOracle);
-    expect(registry.list().some((o) => o.id === BUILT_IN_ORACLE_ID)).toBe(true);
-  });
-
-  test("skipBuiltIn excludes built-in oracle", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
-    expect(registry.get(BUILT_IN_ORACLE_ID)).toBeNull();
     expect(registry.list()).toHaveLength(0);
   });
 
   test("register adds an oracle", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle = makeFakeOracle("my-oracle");
     registry.register(oracle);
     expect(registry.get("my-oracle")).toBe(oracle);
@@ -50,7 +42,7 @@ describe("createOracleRegistry", () => {
   });
 
   test("register overwrites existing oracle with same id", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const v1 = makeFakeOracle("oracle-x");
     const v2 = makeFakeOracle("oracle-x");
     registry.register(v1);
@@ -65,8 +57,8 @@ describe("createOracleRegistry", () => {
   });
 
   test("instances are isolated", () => {
-    const r1 = createOracleRegistry({ skipBuiltIn: true });
-    const r2 = createOracleRegistry({ skipBuiltIn: true });
+    const r1 = createOracleRegistry();
+    const r2 = createOracleRegistry();
     r1.register(makeFakeOracle("only-in-r1"));
     expect(r1.get("only-in-r1")).not.toBeNull();
     expect(r2.get("only-in-r1")).toBeNull();
@@ -75,14 +67,14 @@ describe("createOracleRegistry", () => {
 
 describe("resolve", () => {
   test("explicit oracleId returns that oracle", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle = makeFakeOracle("my-oracle");
     registry.register(oracle);
     expect(registry.resolve("my-oracle", undefined)).toBe(oracle);
   });
 
   test("explicit oracleId checks acceptableIds", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle = makeFakeOracle("my-oracle");
     registry.register(oracle);
     expect(registry.resolve("my-oracle", ["my-oracle"])).toBe(oracle);
@@ -90,20 +82,20 @@ describe("resolve", () => {
   });
 
   test("no oracleId with single acceptable returns that oracle", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle = makeFakeOracle("sole-oracle");
     registry.register(oracle);
     expect(registry.resolve(undefined, ["sole-oracle"])).toBe(oracle);
   });
 
-  test("no oracleId and no acceptable returns built-in", () => {
+  test("no oracleId and no acceptable returns null", () => {
     const registry = createOracleRegistry();
-    expect(registry.resolve(undefined, undefined)).toBe(builtInOracle);
+    expect(registry.resolve(undefined, undefined)).toBeNull();
   });
 
-  test("no oracleId and empty acceptable returns built-in", () => {
+  test("no oracleId and empty acceptable returns null", () => {
     const registry = createOracleRegistry();
-    expect(registry.resolve(undefined, [])).toBe(builtInOracle);
+    expect(registry.resolve(undefined, [])).toBeNull();
   });
 
   test("unknown explicit oracleId returns null", () => {
@@ -111,17 +103,17 @@ describe("resolve", () => {
     expect(registry.resolve("nonexistent", undefined)).toBeNull();
   });
 
-  test("no oracleId with multiple acceptable returns built-in", () => {
+  test("no oracleId with multiple acceptable returns null", () => {
     const registry = createOracleRegistry();
     registry.register(makeFakeOracle("a"));
     registry.register(makeFakeOracle("b"));
-    expect(registry.resolve(undefined, ["a", "b"])).toBe(builtInOracle);
+    expect(registry.resolve(undefined, ["a", "b"])).toBeNull();
   });
 });
 
 describe("resolveMultiple", () => {
   test("returns oracles matching acceptable IDs", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeFakeOracle("a"));
     registry.register(makeFakeOracle("b"));
     registry.register(makeFakeOracle("c"));
@@ -131,7 +123,7 @@ describe("resolveMultiple", () => {
   });
 
   test("returns all registered when acceptableIds is undefined", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeFakeOracle("a"));
     registry.register(makeFakeOracle("b"));
     const result = registry.resolveMultiple(undefined, 10);
@@ -139,7 +131,7 @@ describe("resolveMultiple", () => {
   });
 
   test("limits to count parameter", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeFakeOracle("a"));
     registry.register(makeFakeOracle("b"));
     registry.register(makeFakeOracle("c"));
@@ -148,7 +140,7 @@ describe("resolveMultiple", () => {
   });
 
   test("skips unknown IDs in acceptable list", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeFakeOracle("a"));
     const result = registry.resolveMultiple(
       ["a", "unknown", "also-unknown"],
@@ -159,7 +151,7 @@ describe("resolveMultiple", () => {
   });
 
   test("returns empty when no oracles match", () => {
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const result = registry.resolveMultiple(["unknown"], 5);
     expect(result).toHaveLength(0);
   });

@@ -8,6 +8,11 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 
+import {
+  createFileSystemPersistenceStore,
+  isPersistenceNotFoundError,
+  type PersistenceStore,
+} from "../../adapters/storage.ts";
 import type {
   PreimageEntry,
   PreimageStore,
@@ -36,7 +41,7 @@ export function createPreimageStore(): PreimageStore {
   const entries = new Map<string, PreimageEntry>();
 
   return {
-    create(): PreimageEntry {
+    create(): Promise<PreimageEntry> {
       const { hash, preimage } = createPreimage();
       const entry: PreimageEntry = {
         hash,
@@ -44,25 +49,26 @@ export function createPreimageStore(): PreimageStore {
         created_at: Date.now(),
       };
       entries.set(hash, entry);
-      return entry;
+      return Promise.resolve(entry);
     },
 
-    getPreimage(hash: string): string | null {
-      return entries.get(hash)?.preimage ?? null;
+    getPreimage(hash: string): Promise<string | null> {
+      return Promise.resolve(entries.get(hash)?.preimage ?? null);
     },
 
-    has(hash: string): boolean {
-      return entries.has(hash);
+    has(hash: string): Promise<boolean> {
+      return Promise.resolve(entries.has(hash));
     },
 
-    verify(hash: string, preimage: string): boolean {
+    verify(hash: string, preimage: string): Promise<boolean> {
       const entry = entries.get(hash);
-      if (!entry) return false;
-      return verifyPreimageHash(preimage, entry.hash);
+      if (!entry) return Promise.resolve(false);
+      return Promise.resolve(verifyPreimageHash(preimage, entry.hash));
     },
 
-    delete(hash: string): void {
+    delete(hash: string): Promise<void> {
       entries.delete(hash);
+      return Promise.resolve();
     },
   };
 }
@@ -72,14 +78,14 @@ export function createPreimageStore(): PreimageStore {
  * query-id → hash issuance rule shared by the relay-DM Oracle service and
  * the HTTP Oracle routes: one hash per query id, idempotent across retries.
  */
-export function issueQueryHash(
+export async function issueQueryHash(
   preimageStore: PreimageStore,
   queryHashMap: Map<string, string>,
   queryId: string,
-): { hash: string; created: boolean } {
+): Promise<{ hash: string; created: boolean }> {
   const existing = queryHashMap.get(queryId);
   if (existing !== undefined) return { hash: existing, created: false };
-  const entry = preimageStore.create();
+  const entry = await preimageStore.create();
   queryHashMap.set(queryId, entry.hash);
   return { hash: entry.hash, created: true };
 }
@@ -93,34 +99,35 @@ interface PreimageFileData {
  * Read the JSON file and return the entries map.
  * Returns an empty map if the file does not exist.
  */
-function loadFromFile(filePath: string): Map<string, PreimageEntry> {
+async function loadFromPersistence(
+  persistence: PersistenceStore,
+  key: string,
+): Promise<Map<string, PreimageEntry>> {
   try {
-    const text = Deno.readTextFileSync(filePath);
+    const text = await persistence.readText(key);
     const data: PreimageFileData = JSON.parse(text);
     return new Map(Object.entries(data.entries));
-  } catch (e) {
-    if (e instanceof Deno.errors.NotFound) {
+  } catch (error) {
+    if (isPersistenceNotFoundError(error)) {
       return new Map();
     }
-    throw e;
+    throw error;
   }
 }
 
 /**
- * Atomically write the entries map to the JSON file.
- * Writes to a temp file first, then renames to prevent corruption.
+ * Atomically write the entries map through the persistence port.
  */
-function saveToFile(
-  filePath: string,
+async function saveToPersistence(
+  persistence: PersistenceStore,
+  key: string,
   entries: Map<string, PreimageEntry>,
-): void {
+): Promise<void> {
   const data: PreimageFileData = {
     entries: Object.fromEntries(entries),
   };
   const json = JSON.stringify(data, null, 2);
-  const tmpPath = filePath + ".tmp";
-  Deno.writeTextFileSync(tmpPath, json);
-  Deno.renameSync(tmpPath, filePath);
+  await persistence.replaceTextAtomically(key, json);
 }
 
 /**
@@ -131,11 +138,19 @@ function saveToFile(
  */
 export function createPersistentPreimageStore(
   filePath: string,
-): PreimageStore {
-  const entries = loadFromFile(filePath);
+  persistence: PersistenceStore = createFileSystemPersistenceStore(),
+): Promise<PreimageStore> {
+  return createPersistencePreimageStore(filePath, persistence);
+}
+
+export async function createPersistencePreimageStore(
+  key: string,
+  persistence: PersistenceStore,
+): Promise<PreimageStore> {
+  const entries = await loadFromPersistence(persistence, key);
 
   return {
-    create(): PreimageEntry {
+    async create(): Promise<PreimageEntry> {
       const { hash, preimage } = createPreimage();
       const entry: PreimageEntry = {
         hash,
@@ -143,27 +158,27 @@ export function createPersistentPreimageStore(
         created_at: Date.now(),
       };
       entries.set(hash, entry);
-      saveToFile(filePath, entries);
+      await saveToPersistence(persistence, key, entries);
       return entry;
     },
 
-    getPreimage(hash: string): string | null {
+    async getPreimage(hash: string): Promise<string | null> {
       return entries.get(hash)?.preimage ?? null;
     },
 
-    has(hash: string): boolean {
+    async has(hash: string): Promise<boolean> {
       return entries.has(hash);
     },
 
-    verify(hash: string, preimage: string): boolean {
+    async verify(hash: string, preimage: string): Promise<boolean> {
       const entry = entries.get(hash);
       if (!entry) return false;
       return verifyPreimageHash(preimage, entry.hash);
     },
 
-    delete(hash: string): void {
+    async delete(hash: string): Promise<void> {
       entries.delete(hash);
-      saveToFile(filePath, entries);
+      await saveToPersistence(persistence, key, entries);
     },
   };
 }

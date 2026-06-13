@@ -25,7 +25,7 @@ function makeQuery(id: string): Query {
     id,
     status: "verifying",
     description: "test",
-    verification_requirements: ["ai_check"],
+    verification_requirements: ["nonce"],
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "escrow_swapped",

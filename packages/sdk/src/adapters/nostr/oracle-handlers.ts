@@ -6,8 +6,12 @@ import type { Event } from "nostr-tools";
 import type { NostrIdentity } from "../../identity.ts";
 import { parseOfferFeedbackEvent } from "@anchr/protocol/events";
 import type { OracleQueryResponsePayload } from "@anchr/protocol/events";
-import type { AttachmentRef, GpsCoord } from "../../values.ts";
+import type { AttachmentRef } from "../../values.ts";
+import { resolveSchemaEvidence } from "../../schema.ts";
+import { ensureReferenceSchemaBundlesRegistered } from "../../proofs/verification/checks/registry.ts";
 import type { Query, QueryResult } from "../../requests/domain/types.ts";
+
+const DEFAULT_QUERY_SCHEMA = "https://anchr-spec.org/spec/proof/photo/v1";
 
 export interface WatchedQuery {
   /** The real request the Oracle verifies submissions against. */
@@ -21,14 +25,6 @@ export interface WatchedQuery {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function parseGps(value: unknown): GpsCoord | undefined {
-  if (!isRecord(value)) return undefined;
-  if (typeof value.lat !== "number" || typeof value.lon !== "number") {
-    return undefined;
-  }
-  return { lat: value.lat, lon: value.lon };
 }
 
 function parseAttachment(value: unknown): AttachmentRef | null {
@@ -65,8 +61,8 @@ function parseAttachment(value: unknown): AttachmentRef | null {
 
 /**
  * Map the canonical Oracle-readable result payload onto the evidence shape
- * the verifier consumes. `data` carries the evidence fields (`attachments`,
- * `gps`, `notes`); a TLSN query reads the base64 presentation from `proof`.
+ * the verifier consumes. `data` carries schema-owned evidence fields plus
+ * shared attachment references.
  * Malformed fields are dropped, so verification fails closed on whatever
  * evidence the requirement demands but the payload does not carry.
  */
@@ -74,6 +70,7 @@ export function oracleResponseToResult(
   query: Query,
   payload: OracleQueryResponsePayload,
 ): QueryResult {
+  ensureReferenceSchemaBundlesRegistered();
   const data = isRecord(payload.data) ? payload.data : {};
 
   const attachments: AttachmentRef[] = [];
@@ -85,17 +82,16 @@ export function oracleResponseToResult(
   }
 
   const result: QueryResult = { attachments };
-  const gps = parseGps(data.gps);
-  if (gps !== undefined) result.gps = gps;
   if (typeof data.notes === "string") result.notes = data.notes;
 
-  const wantsTlsn = query.verification_requirements.includes("tlsn") ||
-    query.tlsn_requirements !== undefined;
-  if (
-    wantsTlsn && typeof payload.proof === "string" && payload.proof.length > 0
-  ) {
-    result.tlsn_attestation = { presentation: payload.proof };
-  }
+  const schemaEvidence = resolveSchemaEvidence(
+    query.schema ?? DEFAULT_QUERY_SCHEMA,
+    {
+      data,
+      proof: payload.proof,
+    },
+  );
+  if (schemaEvidence !== undefined) result.schema_evidence = schemaEvidence;
   return result;
 }
 

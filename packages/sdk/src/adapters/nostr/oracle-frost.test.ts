@@ -73,7 +73,7 @@ function makeQuery(id: string) {
     id,
     status: "verifying" as const,
     description: "test",
-    verification_requirements: ["ai_check"] as const,
+    verification_requirements: ["nonce"] as const,
     created_at: Date.now(),
     expires_at: Date.now() + 60_000,
     payment_status: "escrow_swapped" as const,
@@ -97,7 +97,7 @@ describe("verifyAndDeliverWithFrost", () => {
       verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateRequestHash("q1");
+    const { hash } = await service.generateRequestHash("q1");
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q1",
@@ -114,7 +114,7 @@ describe("verifyAndDeliverWithFrost", () => {
     );
     expect(dm?.type).toBe("rejection");
     // The preimage is never revealed on the rejected path.
-    expect(store.has(hash)).toBe(true);
+    expect(await store.has(hash)).toBe(true);
   });
 
   test("verifyAndDeliver rejects a quorum query when FROST is not configured", async () => {
@@ -129,7 +129,7 @@ describe("verifyAndDeliverWithFrost", () => {
       verify: verifyPass,
     });
     const service = createOracleNostrService(config);
-    const { hash } = service.generateRequestHash("q-quorum");
+    const { hash } = await service.generateRequestHash("q-quorum");
 
     const passed = await service.verifyAndDeliver(
       "q-quorum",
@@ -145,7 +145,7 @@ describe("verifyAndDeliverWithFrost", () => {
       identity.publicKey,
     );
     expect(dm?.type).toBe("rejection");
-    expect(store.has(hash)).toBe(true);
+    expect(await store.has(hash)).toBe(true);
   });
 
   test("sends rejection DM on verification failure", async () => {

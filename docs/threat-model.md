@@ -222,15 +222,16 @@ in the flow.
 - `e2e/protocol/anonymous-relay-flow.test.ts` — `INV-08: full exchange
   completes relay-only with no HTTP endpoint`.
 
-**Scope limit — mint and Blossom touchpoints:** INV-08 covers inter-actor
-transport only. Spending or redeeming the Cashu Payment Lock contacts the
-mint over HTTP, attachment transfer contacts Blossom servers over HTTP, and a
-TLSN proof contacts the target server — all of which expose the caller's IP
-to that operator. IP-level anonymity there requires operator-supplied
-transport: the Blossom helpers accept an injectable `fetchImpl`
-(`BlossomTransportOptions`), the Cashu wallet/client construction accepts an
-injectable request dispatcher (`customRequest`), and the TLSN target
-connection supports `tlsn-prover --socks-proxy` (e.g. Tor at
+**Scope limit — mint, Blossom, TLSN, and FROST peer touchpoints:** INV-08
+covers inter-actor transport only. Spending or redeeming the Cashu Payment
+Lock contacts the mint over HTTP, attachment transfer contacts Blossom servers
+over HTTP, a TLSN proof contacts the target server, and FROST peer round-1 /
+round-2 coordination contacts peer Oracle signer endpoints over HTTP — all of
+which expose the caller's IP to that operator. IP-level anonymity there
+requires operator-supplied transport: the Blossom helpers and FROST signing
+coordinator accept an injectable `fetchImpl`, the Cashu wallet/client
+construction accepts an injectable request dispatcher (`customRequest`), and
+the TLSN target connection supports `tlsn-prover --socks-proxy` (e.g. Tor at
 `socks5://127.0.0.1:9050`) as the supported Tor path.
 
 ## Actor linkability

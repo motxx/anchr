@@ -15,7 +15,7 @@ import {
 describe("VULN-1: Preimage is returned on successful oracle verification", () => {
   test("preimage is returned when oracle verification passes", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
     const escrowInfo = {
       type: "htlc" as const,
       hash: entry.hash,
@@ -56,7 +56,7 @@ describe("VULN-1: Preimage is returned on successful oracle verification", () =>
 describe("End-to-end settlement: preimage reveal on oracle approval", () => {
   test("successful oracle verification returns preimage and marks query approved", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "E2E settlement test" },
@@ -95,8 +95,6 @@ describe("End-to-end settlement: preimage reveal on oracle approval", () => {
 
 describe("CTF-1: Provider forces dishonest oracle selection", () => {
   test("BLOCKED: provider-supplied oracle_id is ignored when query has no oracle_ids", async () => {
-    // Registry contains built-in (rejects) AND evil oracle (always passes); the
-    // attack is to see whether provider-supplied oracle_id can override built-in selection
     const store = createQueryStore();
     const registry = createOracleRegistry();
     const evilOracle = makeMockOracle("evil-oracle", () => true);
@@ -109,7 +107,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       escrowProvider: createMockEscrowProvider(),
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-1 exploit" },
@@ -141,12 +139,13 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       "evil-oracle",
     );
 
-    expect(outcome.query?.assigned_oracle_id).toBe("built-in");
+    expect(outcome.ok).toBe(false);
+    expect(outcome.query?.assigned_oracle_id).toBeUndefined();
   });
 
   test("ALLOWED: provider-supplied oracle_id is used when query explicitly allows it", async () => {
     const store = createQueryStore();
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     const oracle1 = makeMockOracle("oracle-a", () => true);
     const oracle2 = makeMockOracle("oracle-b", () => true);
     registry.register(oracle1);
@@ -159,7 +158,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       escrowProvider: createMockEscrowProvider(),
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-1 allowed" },
@@ -197,7 +196,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
 
   test("BLOCKED: provider cannot use unregistered oracle even via oracle_id param", async () => {
     const store = createQueryStore();
-    const registry = createOracleRegistry({ skipBuiltIn: true });
+    const registry = createOracleRegistry();
     registry.register(makeMockOracle("legit-oracle"));
     const preimageStore = createPreimageStore();
     const service = createQueryService({
@@ -207,7 +206,7 @@ describe("CTF-1: Provider forces dishonest oracle selection", () => {
       escrowProvider: createMockEscrowProvider(),
     });
 
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-1 unregistered" },
@@ -270,7 +269,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
 
   test("BLOCKED: token locked to customer (not provider) is rejected", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-2 exploit" },
@@ -309,7 +308,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
 
   test("ALLOWED: token locked to provider passes verification", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-2 legit" },
@@ -347,7 +346,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
 
   test("BLOCKED: token with wrong hashlock is rejected", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-2 wrong hash" },
@@ -385,7 +384,7 @@ describe("CTF-2: Customer submits self-locked HTLC token", () => {
 
   test("ALLOWED: plain (non-HTLC) token passes through verifyLock", async () => {
     const { service, preimageStore } = makeExploitService();
-    const entry = preimageStore.create();
+    const entry = await preimageStore.create();
 
     const query = service.createQuery(
       { description: "CTF-2 plain token" },

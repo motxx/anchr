@@ -1,6 +1,12 @@
-import { afterEach, describe, test } from "@std/testing/bdd";
+import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { getRuntimeConfig } from "./config.ts";
+import {
+  getAttachmentConfig,
+  getCashuRuntimeConfig,
+  getLoggingConfig,
+  getOracleNostrConfig,
+  getRuntimeConfig,
+} from "./config.ts";
 import { withEnv } from "../../testing/helpers.ts";
 
 describe("getRuntimeConfig", () => {
@@ -12,11 +18,18 @@ describe("getRuntimeConfig", () => {
     "PREVIEW_JPEG_QUALITY",
     "HTTP_API_KEYS",
     "HTTP_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "AI_CONTENT_CHECK",
     "TRUSTED_ORACLE_PUBKEYS",
     "TLSN_VERIFIER_URL",
     "TLSN_PROXY_URL",
+    "ATTACHMENT_PUBLIC_BASE_URL",
+    "PUBLIC_BASE_URL",
+    "ANCHR_ALLOW_LOCALHOST_ATTACHMENTS",
+    "BLOSSOM_SERVERS",
+    "ORACLE_NOSTR_SECRET_KEY",
+    "NOSTR_RELAYS",
+    "CASHU_MINT_URL",
+    "ANCHR_LOG_LEVEL",
+    "LOG_LEVEL",
   ];
 
   test("returns default values when env is empty", () => {
@@ -29,8 +42,6 @@ describe("getRuntimeConfig", () => {
       expect(config.previewMaxDimension).toBe(768);
       expect(config.previewJpegQuality).toBe(75);
       expect(config.httpApiKeys).toEqual([]);
-      expect(config.anthropicApiKey).toBeUndefined();
-      expect(config.aiContentCheckEnabled).toBe(false);
       expect(config.trustedOraclePubkeys).toEqual([]);
     });
   });
@@ -78,31 +89,64 @@ describe("getRuntimeConfig", () => {
     });
   });
 
-  test("reads boolean AI_CONTENT_CHECK", () => {
-    withEnv({ AI_CONTENT_CHECK: "true" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(true);
-    });
-    withEnv({ AI_CONTENT_CHECK: "1" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(true);
-    });
-    withEnv({ AI_CONTENT_CHECK: "false" }, () => {
-      expect(getRuntimeConfig().aiContentCheckEnabled).toBe(false);
-    });
-  });
-
   test("reads trusted oracle pubkeys", () => {
     withEnv({ TRUSTED_ORACLE_PUBKEYS: "pub1,pub2" }, () => {
       expect(getRuntimeConfig().trustedOraclePubkeys).toEqual(["pub1", "pub2"]);
     });
   });
 
-  test("trims optional string env vars", () => {
-    withEnv({ ANTHROPIC_API_KEY: "  sk-ant-123  " }, () => {
-      expect(getRuntimeConfig().anthropicApiKey).toBe("sk-ant-123");
+  test("reads attachment config", () => {
+    withEnv({
+      ATTACHMENT_PUBLIC_BASE_URL: "https://cdn.example",
+      PUBLIC_BASE_URL: "https://fallback.example",
+      ANCHR_ALLOW_LOCALHOST_ATTACHMENTS: "1",
+      BLOSSOM_SERVERS: "https://blossom1.example, https://blossom2.example/",
+    }, () => {
+      expect(getAttachmentConfig()).toEqual({
+        publicBaseUrl: "https://cdn.example",
+        allowLocalhostAttachments: true,
+        blossomServers: [
+          "https://blossom1.example",
+          "https://blossom2.example",
+        ],
+      });
     });
+  });
 
-    withEnv({ ANTHROPIC_API_KEY: "  " }, () => {
-      expect(getRuntimeConfig().anthropicApiKey).toBeUndefined();
+  test("falls back to PUBLIC_BASE_URL for attachment public URL", () => {
+    withEnv({
+      ATTACHMENT_PUBLIC_BASE_URL: undefined,
+      PUBLIC_BASE_URL: "https://fallback.example",
+    }, () => {
+      expect(getAttachmentConfig().publicBaseUrl).toBe(
+        "https://fallback.example",
+      );
+    });
+  });
+
+  test("reads oracle Nostr config", () => {
+    withEnv({
+      ORACLE_NOSTR_SECRET_KEY: "  secret  ",
+      NOSTR_RELAYS: "wss://relay1.example, wss://relay2.example ",
+    }, () => {
+      expect(getOracleNostrConfig()).toEqual({
+        secretKeyHex: "secret",
+        relayUrls: ["wss://relay1.example", "wss://relay2.example"],
+      });
+    });
+  });
+
+  test("reads Cashu config", () => {
+    withEnv({ CASHU_MINT_URL: " https://mint.example " }, () => {
+      expect(getCashuRuntimeConfig()).toEqual({
+        mintUrl: "https://mint.example",
+      });
+    });
+  });
+
+  test("reads logging config", () => {
+    withEnv({ ANCHR_LOG_LEVEL: "debug", LOG_LEVEL: "error" }, () => {
+      expect(getLoggingConfig()).toEqual({ logLevel: "debug" });
     });
   });
 });

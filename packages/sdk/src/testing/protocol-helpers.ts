@@ -186,10 +186,10 @@ export function makeServiceWithPreimage(
 }
 
 /** Generate an EscrowInfo (HTLC mode) and a corresponding preimage store entry. */
-export function makeEscrowInfo(
+export async function makeEscrowInfo(
   preimageStore: PreimageStore,
-): EscrowInfoFixture {
-  const entry = preimageStore.create();
+): Promise<EscrowInfoFixture> {
+  const entry = await preimageStore.create();
   return {
     escrowInfo: {
       type: "htlc" as const,
@@ -216,7 +216,7 @@ export async function driveToProcessing(
   const providerPub = opts?.providerPubkey ?? "provider_pub";
   const payment_lock = opts?.bountyAmount ?? 100;
   const oracleIds = opts?.oracleIds ?? ["test-oracle"];
-  const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
+  const { escrowInfo, entry } = await makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Protocol test" },
     {
@@ -275,7 +275,7 @@ export async function driveQuorumToProcessing(
 ): Promise<ProcessingFixture> {
   const providerPub = "provider_pub";
   const payment_lock = 100;
-  const { escrowInfo, entry } = makeEscrowInfo(preimageStore);
+  const { escrowInfo, entry } = await makeEscrowInfo(preimageStore);
   const query = service.createQuery(
     { description: "Quorum protocol test" },
     {

@@ -3,6 +3,7 @@ import { expect } from "@std/expect";
 import { generateEphemeralIdentity } from "../../identity.ts";
 import { buildOracleAnnouncementEvent } from "../nostr/events/event-builders.ts";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
+import { ProofSchema } from "../../schema.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
 import type { OracleInfo } from "../../requests/domain/oracle-types.ts";
 
@@ -11,7 +12,11 @@ const FULL_ORACLE_INFO: OracleInfo = {
   name: "Test Oracle",
   endpoint: "https://oracle.example.com",
   fee_ppm: 50000,
-  supported_factors: ["tlsn", "gps", "nonce"],
+  supported_schemas: [
+    ProofSchema.TlsnV1,
+    ProofSchema.C2paImageV1,
+    "https://example.com/spec/proof/nonce/v1",
+  ],
   supported_escrow_types: ["htlc", "p2pk_frost"],
   min_amount_sats: 100,
   max_amount_sats: 1000000,
@@ -40,17 +45,15 @@ test("buildOracleAnnouncementEvent includes anchr-oracle t tag", () => {
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
 
   const tTags = event.tags.filter((t) => t[0] === "t").map((t) => t[1]);
-  expect(tTags).toContain("anchr-oracle");
+  expect(tTags).toEqual(["anchr-oracle"]);
 });
 
-test("buildOracleAnnouncementEvent includes capability t tags", () => {
+test("buildOracleAnnouncementEvent includes schema tags", () => {
   const identity = generateEphemeralIdentity();
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
 
-  const tTags = event.tags.filter((t) => t[0] === "t").map((t) => t[1]);
-  expect(tTags).toContain("anchr-oracle-tlsn");
-  expect(tTags).toContain("anchr-oracle-gps");
-  expect(tTags).toContain("anchr-oracle-nonce");
+  const sTags = event.tags.filter((t) => t[0] === "s").map((t) => t[1]);
+  expect(sTags).toEqual(FULL_ORACLE_INFO.supported_schemas);
 });
 
 test("buildOracleAnnouncementEvent content is valid JSON with announcement payload", () => {
@@ -60,7 +63,7 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   const content = JSON.parse(event.content);
   expect(content.name).toBe("Test Oracle");
   expect(content.fee_ppm).toBe(50000);
-  expect(content.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
+  expect(content.supported_schemas).toEqual(FULL_ORACLE_INFO.supported_schemas);
   expect(content.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
   expect(content.min_amount_sats).toBe(100);
   expect(content.max_amount_sats).toBe(1000000);
@@ -93,7 +96,7 @@ test("buildOracleAnnouncementEvent omits optional fields when not set", () => {
   const content = JSON.parse(event.content);
   expect(content.name).toBe("Minimal");
   expect(content.fee_ppm).toBe(10000);
-  expect(content.supported_factors).toEqual([]);
+  expect(content.supported_schemas).toEqual([]);
   expect(content.supported_escrow_types).toEqual([]);
   expect(content).not.toHaveProperty("endpoint");
   expect(content).not.toHaveProperty("min_amount_sats");
@@ -121,7 +124,9 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
   expect(announcement!.name).toBe("Test Oracle");
   expect(announcement!.endpoint).toBe("https://oracle.example.com");
   expect(announcement!.fee_ppm).toBe(50000);
-  expect(announcement!.supported_factors).toEqual(["tlsn", "gps", "nonce"]);
+  expect(announcement!.supported_schemas).toEqual(
+    FULL_ORACLE_INFO.supported_schemas,
+  );
   expect(announcement!.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
   expect(announcement!.min_amount_sats).toBe(100);
   expect(announcement!.max_amount_sats).toBe(1000000);
@@ -180,7 +185,11 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
     kind: 30088,
     created_at: 1700000000,
     tags: [["d", "minimal"]],
-    content: JSON.stringify({ name: "Minimal", fee_ppm: 5000 }),
+    content: JSON.stringify({
+      name: "Minimal",
+      fee_ppm: 5000,
+      supported_schemas: [],
+    }),
     pubkey: "deadbeef",
     id: "fake",
     sig: "fake",
@@ -191,12 +200,36 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
   expect(result!.id).toBe("minimal");
   expect(result!.name).toBe("Minimal");
   expect(result!.fee_ppm).toBe(5000);
-  expect(result!.supported_factors).toEqual([]);
+  expect(result!.supported_schemas).toEqual([]);
   expect(result!.supported_escrow_types).toEqual([]);
   expect(result!.endpoint).toBeUndefined();
   expect(result!.min_amount_sats).toBeUndefined();
   expect(result!.max_amount_sats).toBeUndefined();
   expect(result!.description).toBeUndefined();
+});
+
+test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
+  const event = {
+    kind: 30088,
+    created_at: 1700000000,
+    tags: [["d", "schema-filter"]],
+    content: JSON.stringify({
+      name: "Schema Filter",
+      fee_ppm: 5000,
+      supported_schemas: [
+        ProofSchema.TlsnV1,
+        "tlsn",
+        "http://anchr-spec.org/spec/proof/tlsn/v1",
+      ],
+    }),
+    pubkey: "deadbeef",
+    id: "fake",
+    sig: "fake",
+  };
+
+  const result = parseOracleAnnouncementEvent(event);
+  expect(result).not.toBeNull();
+  expect(result!.supported_schemas).toEqual([ProofSchema.TlsnV1]);
 });
 
 test("round-trip: build then parse preserves all fields", () => {
@@ -209,7 +242,9 @@ test("round-trip: build then parse preserves all fields", () => {
   expect(parsed!.name).toBe(FULL_ORACLE_INFO.name);
   expect(parsed!.endpoint).toBe(FULL_ORACLE_INFO.endpoint);
   expect(parsed!.fee_ppm).toBe(FULL_ORACLE_INFO.fee_ppm);
-  expect(parsed!.supported_factors).toEqual(FULL_ORACLE_INFO.supported_factors);
+  expect(parsed!.supported_schemas).toEqual(
+    FULL_ORACLE_INFO.supported_schemas,
+  );
   expect(parsed!.supported_escrow_types).toEqual(
     FULL_ORACLE_INFO.supported_escrow_types,
   );

@@ -10,7 +10,11 @@ import type { Buffer } from "node:buffer";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawn, which, writeFile } from "../internal/runtime/mod.ts";
+import {
+  serverSidecarExecutor,
+  type SidecarExecutor,
+  writeFile,
+} from "../internal/runtime/mod.ts";
 import { evaluateGpsDistancePolicy } from "./geo.ts";
 
 import { getLogger } from "../internal/runtime/logger.ts";
@@ -35,13 +39,29 @@ export interface C2paValidationResult {
   signatureValid: boolean;
   manifest: C2paManifest | null;
   /** GPS coordinates extracted from C2PA EXIF assertion (cryptographically signed). */
-  gps?: { lat: number; lon: number };
+  gps?: GpsCoord;
   checks: string[];
   failures: string[];
 }
 
+export interface GpsCoord {
+  lat: number;
+  lon: number;
+}
+
+/** Requirement payload for the built-in C2PA image schema. */
+export interface C2paImageRequirement {
+  expected_gps?: GpsCoord;
+  max_gps_distance_km?: number;
+}
+
+/** Evidence payload for the built-in C2PA image schema. */
+export interface C2paImageEvidence {
+  gps?: GpsCoord;
+}
+
 export interface C2paGpsBindingPolicy {
-  expectedGps: { lat: number; lon: number };
+  expectedGps: GpsCoord;
   maxDistanceKm: number;
 }
 
@@ -58,22 +78,111 @@ export interface C2paToolOptions {
    * the tool-unavailable behavior. Defaults to PATH discovery (cached).
    */
   toolPath?: string | null;
+  executor?: SidecarExecutor;
 }
 
-let c2paToolPath: string | null | undefined;
+export const DEFAULT_C2PA_MAX_GPS_DISTANCE_KM = 50;
 
-function findC2paTool(override?: string | null): string | null {
-  if (override !== undefined) return override;
-  if (c2paToolPath !== undefined) return c2paToolPath;
-  c2paToolPath = which("c2patool");
-  if (c2paToolPath) {
-    log.debug(`Found c2patool at ${c2paToolPath}`);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function validateGpsCoord(input: GpsCoord): string | null {
+  if (!Number.isFinite(input.lat)) return "lat must be a finite number";
+  if (!Number.isFinite(input.lon)) return "lon must be a finite number";
+  if (input.lat < -90 || input.lat > 90) {
+    return `lat must be between -90 and 90 (got ${input.lat})`;
   }
-  return c2paToolPath ?? null;
+  if (input.lon < -180 || input.lon > 180) {
+    return `lon must be between -180 and 180 (got ${input.lon})`;
+  }
+  return null;
+}
+
+export function isGpsCoord(value: unknown): value is GpsCoord {
+  if (!isRecord(value)) return false;
+  const lat = value.lat;
+  const lon = value.lon;
+  if (typeof lat !== "number" || typeof lon !== "number") return false;
+  return validateGpsCoord({ lat, lon }) === null;
+}
+
+export function isC2paImageRequirement(
+  value: unknown,
+): value is C2paImageRequirement {
+  if (!isRecord(value)) return false;
+  if (value.expected_gps !== undefined && !isGpsCoord(value.expected_gps)) {
+    return false;
+  }
+  const maxDistance = value.max_gps_distance_km;
+  if (maxDistance !== undefined) {
+    if (typeof maxDistance !== "number") return false;
+    if (!Number.isFinite(maxDistance) || maxDistance <= 0) return false;
+  }
+  return true;
+}
+
+export function isC2paImageEvidence(
+  value: unknown,
+): value is C2paImageEvidence {
+  if (!isRecord(value)) return false;
+  if (value.gps !== undefined && !isGpsCoord(value.gps)) return false;
+  return true;
+}
+
+export function evaluateC2paGpsProximity(
+  gps: GpsCoord,
+  expectedGps: GpsCoord | undefined,
+  maxGpsDist: number,
+  label: string,
+): { checks: string[]; failures: string[]; distanceKm?: number } {
+  if (!expectedGps) {
+    return {
+      checks: [`${label} GPS: ${gps.lat.toFixed(4)}, ${gps.lon.toFixed(4)}`],
+      failures: [],
+    };
+  }
+
+  const policy = evaluateGpsDistancePolicy(gps, expectedGps, maxGpsDist);
+  if (policy.withinLimit) {
+    return {
+      checks: [
+        `${label} GPS within ${maxGpsDist}km of expected (${
+          policy.distanceKm.toFixed(1)
+        }km)`,
+      ],
+      failures: [],
+      distanceKm: policy.distanceKm,
+    };
+  }
+  return {
+    checks: [],
+    failures: [
+      `${label} GPS ${
+        policy.distanceKm.toFixed(1)
+      }km from expected location (max ${maxGpsDist}km)`,
+    ],
+    distanceKm: policy.distanceKm,
+  };
+}
+
+function findC2paTool(
+  override: string | null | undefined,
+  executor: SidecarExecutor,
+): string | null {
+  if (override !== undefined) return override;
+  const toolPath = executor.which("c2patool");
+  if (toolPath) {
+    log.debug(`Found c2patool at ${toolPath}`);
+  }
+  return toolPath ?? null;
 }
 
 export function isC2paAvailable(options?: C2paToolOptions): boolean {
-  return findC2paTool(options?.toolPath) !== null;
+  return findC2paTool(
+    options?.toolPath,
+    options?.executor ?? serverSidecarExecutor,
+  ) !== null;
 }
 
 export function verifyC2paGpsBinding(
@@ -114,27 +223,27 @@ export function verifyC2paGpsBinding(
     return { passed: false, checks, failures };
   }
 
-  const { distanceKm, withinLimit } = evaluateGpsDistancePolicy(
+  const proximity = evaluateC2paGpsProximity(
     validation.gps,
     policy.expectedGps,
     policy.maxDistanceKm,
+    "C2PA: signed",
   );
+  const distanceKm = proximity.distanceKm;
 
   if (failures.length > 0) {
     return { passed: false, distanceKm, checks, failures };
   }
 
-  if (withinLimit) {
+  if (proximity.failures.length === 0) {
+    const distanceLabel = distanceKm === undefined
+      ? "unknown"
+      : distanceKm.toFixed(1);
     checks.push(
-      `C2PA: signed GPS bound to expected location (${
-        distanceKm.toFixed(1)
-      }km <= ${policy.maxDistanceKm}km)`,
+      `C2PA: signed GPS bound to expected location (${distanceLabel}km <= ${policy.maxDistanceKm}km)`,
     );
   } else {
-    failures.push(
-      `C2PA: signed GPS ${distanceKm.toFixed(1)}km from expected location ` +
-        `(max ${policy.maxDistanceKm}km)`,
-    );
+    failures.push(...proximity.failures);
   }
 
   return {
@@ -186,8 +295,12 @@ async function runC2paTool(
   inputPath: string,
   checks: string[],
   failures: string[],
+  executor: SidecarExecutor,
 ): Promise<Record<string, unknown> | null> {
-  const proc = spawn([toolPath, inputPath], { stdout: "pipe", stderr: "pipe" });
+  const proc = executor.spawn([toolPath, inputPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   await proc.exited;
 
   if (proc.exitCode !== 0) {
@@ -291,7 +404,8 @@ export async function validateC2pa(
 ): Promise<C2paValidationResult> {
   const checks: string[] = [];
   const failures: string[] = [];
-  const toolPath = findC2paTool(options?.toolPath);
+  const executor = options?.executor ?? serverSidecarExecutor;
+  const toolPath = findC2paTool(options?.toolPath, executor);
 
   if (!toolPath) return noToolResult();
 
@@ -306,7 +420,13 @@ export async function validateC2pa(
   try {
     await writeFile(inputPath, data);
 
-    const report = await runC2paTool(toolPath, inputPath, checks, failures);
+    const report = await runC2paTool(
+      toolPath,
+      inputPath,
+      checks,
+      failures,
+      executor,
+    );
     if (!report) return noManifestResult(checks, failures);
 
     const parsed = parseActiveManifest(report);

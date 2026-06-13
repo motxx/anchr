@@ -3,9 +3,11 @@ import { expect } from "@std/expect";
 
 import {
   createIndexedDbStateStore,
+  createMemoryPersistenceStore,
   createMemoryStateStore,
   type IndexedDbFactoryLike,
   IndexedDbStateStoreError,
+  isPersistenceNotFoundError,
 } from "./storage.ts";
 
 test("createMemoryStateStore reads, writes, and deletes string state", async () => {
@@ -35,6 +37,25 @@ test("createIndexedDbStateStore persists state through an injected IndexedDB fac
   expect(await store.get("customer:q2")).toBe('{"status":"result_received"}');
   await store.delete("customer:q2");
   expect(await store.get("customer:q2")).toBe(null);
+});
+
+test("createMemoryPersistenceStore reads, writes, and atomically replaces text", async () => {
+  const store = createMemoryPersistenceStore();
+  await store.writeText("preimages.json", "old");
+  expect(await store.readText("preimages.json")).toBe("old");
+  await store.replaceTextAtomically("preimages.json", "new");
+  expect(await store.readText("preimages.json")).toBe("new");
+});
+
+test("createMemoryPersistenceStore reports missing text entries", async () => {
+  const store = createMemoryPersistenceStore();
+  let caught: unknown;
+  try {
+    await store.readText("missing.json");
+  } catch (error) {
+    caught = error;
+  }
+  expect(isPersistenceNotFoundError(caught)).toBe(true);
 });
 
 class FakeIndexedDb {

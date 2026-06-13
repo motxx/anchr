@@ -213,7 +213,7 @@ export async function doSubmitEscrowResult(
   store.set(queryId, updated);
 
   if (passed && query.escrow?.type === "htlc") {
-    const preimage = tryRevealPreimage(
+    const preimage = await tryRevealPreimage(
       deps.preimageStore,
       query.escrow.hash,
       passed,

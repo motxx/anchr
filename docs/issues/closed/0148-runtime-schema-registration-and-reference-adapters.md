@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -10,17 +11,24 @@ feature
 ## Dependencies
 
 Depends on:
-- 0144
-- 0146
+- 0159
+- 0160
+- 0161
 
 Blocks:
 - 0143
 
+This issue is now a tracking parent. Its resolution is the closure of children
+0159 (core registration API + reference adapters + notary removal), 0160
+(manifest-driven schema-page lint), and 0161 (custom-schema end-to-end
+demonstration). The detailed plan below is owned by those children.
+
 ## Summary
 
 Make "add a proof schema" a single registration call against a public SDK
-API, and make the built-in TLSN and C2PA implementations consume that same
-API as reference adapters. Today the dispatch entry points are open
+API keyed only by schema URI, and make the built-in TLSN and C2PA
+implementations consume that same API as reference adapters. Today the dispatch
+entry points are open
 (`resolveProofGenerator` / `resolveVerifierAdapter`,
 `packages/sdk/src/schema.ts:37-49`) but everything behind them is wired
 statically:
@@ -48,10 +56,12 @@ statically:
 ## Acceptance
 
 - A documented public API exists to register a schema implementation
-  (producer + verifier + its checks/config) keyed by schema URI, usable
-  without editing `packages/`.
+  (producer + verifier + requirement/evidence/verdict payload handling +
+  checks/config) keyed by schema URI, usable without editing `packages/`.
 - TLSN and C2PA register through that API; no core module imports their
   internals directly.
+- No public registration API accepts `VerificationFactor` values or shared
+  default factor lists.
 - `provider-types.ts` has no `notary` field; schema options are passed per
   schema URI.
 - `scripts/check-proof-schema-pages.ts` reads a manifest (e.g.
@@ -74,3 +84,41 @@ statically:
 - Convert TLSN, then C2PA, to reference adapters; fold 0141's injection
   work into the bundle construction.
 - Add the spec-site manifest and update the lint script.
+
+## Resolution
+
+Tracking parent resolved by closing its three children:
+
+- 0159 — public `registerSchemaBundle` API keyed by schema URI; TLSN, C2PA-image,
+  and generic-media converted to reference adapters; static factor-check
+  registry and the provider `notary` field removed; schema config carried in a
+  schema-scoped options map. A review pass restored the default-schema
+  empty-submission guard and locked it with a test.
+- 0160 — `scripts/check-proof-schema-pages.ts` reads `spec-site/schemas.json`
+  instead of a hardcoded URL list, failing closed on a malformed manifest or a
+  missing page.
+- 0161 — `e2e/protocol/custom-schema.test.ts` registers an out-of-tree schema
+  through the public API (via `@anchr/*` only) and verifies a paid request end
+  to end, asserting valid proofs pass and missing/tampered evidence fails closed.
+
+Verified with:
+
+- `deno task check`, `deno task lint:strict`, `deno task test:unit`,
+  `deno task lint:proof-schema-pages`, `deno task test:e2e:protocol` (per child).
+- Decoupling guards hold: `rg "notary" packages/sdk/src/provider-types.ts packages/sdk/src/schema.ts`
+  and `rg -i "tlsn|c2pa" packages/sdk/src --glob '!**/proofs/**' --glob '!*.test.ts'`
+  both return zero.
+
+Harness update:
+
+- The `rg -i "tlsn|c2pa"` decoupling guard, the manifest-driven
+  `lint:proof-schema-pages`, and the custom-schema e2e lock the extension
+  surface against regression (owned by the children).
+
+Review residuals:
+
+- None.
+
+Follow-up:
+
+- None

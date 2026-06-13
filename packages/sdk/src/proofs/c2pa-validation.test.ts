@@ -5,7 +5,10 @@ import {
   type C2paValidationResult,
   evaluateSignature,
   isC2paAvailable,
+  isC2paImageEvidence,
+  isC2paImageRequirement,
   validateC2pa,
+  validateGpsCoord,
   verifyC2paGpsBinding,
 } from "./c2pa-validation.ts";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -13,7 +16,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   readFileAsArrayBuffer,
+  type SidecarExecutor,
   spawn,
+  type SpawnResult,
   writeFile,
 } from "../internal/runtime/mod.ts";
 
@@ -31,6 +36,37 @@ function makeC2paResult(
     ...overrides,
   };
 }
+
+describe("C2PA image GPS payload predicates", () => {
+  test("validates GPS coordinates at the schema boundary", () => {
+    expect(validateGpsCoord({ lat: 35.6762, lon: 139.6503 })).toBeNull();
+    expect(validateGpsCoord({ lat: 91, lon: 0 })).toContain("lat");
+    expect(validateGpsCoord({ lat: 0, lon: 181 })).toContain("lon");
+    expect(validateGpsCoord({ lat: NaN, lon: 0 })).toContain("finite");
+  });
+
+  test("narrows C2PA image requirement payloads", () => {
+    expect(isC2paImageRequirement({
+      expected_gps: { lat: 35.6762, lon: 139.6503 },
+      max_gps_distance_km: 10,
+    })).toBe(true);
+    expect(isC2paImageRequirement({
+      expected_gps: { lat: 999, lon: 0 },
+    })).toBe(false);
+    expect(isC2paImageRequirement({
+      max_gps_distance_km: 0,
+    })).toBe(false);
+  });
+
+  test("narrows C2PA image evidence payloads", () => {
+    expect(isC2paImageEvidence({
+      gps: { lat: 35.6762, lon: 139.6503 },
+    })).toBe(true);
+    expect(isC2paImageEvidence({ gps: { lat: 0, lon: Infinity } })).toBe(
+      false,
+    );
+  });
+});
 
 describe("C2PA GPS binding semantics", () => {
   test("INV-06: passes only when the verified manifest contains nearby signed GPS", () => {
@@ -106,6 +142,56 @@ describe("c2patool path injection", () => {
     expect(result.available).toBe(false);
     expect(result.checks).toContain("c2patool not available (skipped)");
     expect(isC2paAvailable({ toolPath: null })).toBe(false);
+  });
+
+  test("uses the injected executor for lookup and validation", async () => {
+    const commands: string[][] = [];
+    const executor: SidecarExecutor = {
+      spawn(cmd): SpawnResult {
+        commands.push(cmd);
+        return {
+          exited: Promise.resolve(),
+          exitCode: 0,
+          stdout: new Blob([
+            JSON.stringify({
+              active_manifest: "claim",
+              manifests: {
+                claim: {
+                  title: "photo.jpg",
+                  claim_generator: "anchr-test",
+                  assertions: [],
+                  signature_info: { issuer: "test" },
+                },
+              },
+              validation_results: {
+                activeManifest: {
+                  success: [{ code: "claimSignature.validated" }],
+                  failure: [],
+                },
+              },
+            }),
+          ]).stream(),
+          stderr: new Blob([""]).stream(),
+          kill() {},
+        };
+      },
+      which(name) {
+        return name === "c2patool" ? "/mock/c2patool" : null;
+      },
+      isFile() {
+        return false;
+      },
+    };
+
+    expect(isC2paAvailable({ executor })).toBe(true);
+    const result = await validateC2pa(Buffer.from("x"), "photo.jpg", {
+      executor,
+    });
+
+    expect(result.available).toBe(true);
+    expect(result.hasManifest).toBe(true);
+    expect(result.signatureValid).toBe(true);
+    expect(commands[0]?.[0]).toBe("/mock/c2patool");
   });
 });
 

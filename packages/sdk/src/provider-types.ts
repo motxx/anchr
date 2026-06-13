@@ -7,6 +7,7 @@ import type {
 import type { Spec } from "@anchr/protocol/types";
 import type {
   ProofGenerator,
+  SchemaOptionsMap,
   SchemaProducer,
   SchemaProducerContext,
 } from "./schema.ts";
@@ -33,6 +34,7 @@ export interface ProviderRequestEvent {
   maxAmountSats: number;
   oraclePubkey: string;
   proofGenerator?: ProofGenerator;
+  schemaOptions?: SchemaOptionsMap;
 }
 
 export interface ProviderSelectionContext {
@@ -66,8 +68,8 @@ export interface ProviderOptions {
   relayClient: RelayClient;
   /** Optional local state adapter for browser, Node, Deno, or test persistence. */
   stateStore?: ActorStateStore;
-  /** Optional: TLSN notary URL. */
-  notary?: string;
+  /** Optional schema-specific configuration keyed by schema URI. */
+  schemaOptions?: SchemaOptionsMap;
   selectionTimeoutMs?: number;
   preimageTimeoutMs?: number;
   proofGenerators?: readonly ProofGenerator[];

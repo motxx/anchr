@@ -12,6 +12,11 @@
  * Deno-native dev opt-in is set; no NODE_ENV-style production switch.
  */
 
+import {
+  type AttachmentRuntimeConfig,
+  getAttachmentConfig,
+} from "../internal/runtime/config.ts";
+
 const PRIVATE_IPV4_PATTERNS = [
   /^127\./, // loopback
   /^10\./, // 10.0.0.0/8
@@ -51,7 +56,7 @@ function isPrivateIp(hostname: string): boolean {
     }
     return false;
   }
-  // Hex form: ::ffff:XXYY:ZZWW — convert to dotted decimal and check
+  // Hex form: ::ffff:XXYY:ZZWW — map to dotted decimal and check
   const v4HexMapped = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
   if (v4HexMapped) {
     const hi = parseInt(v4HexMapped[1]!, 16);
@@ -84,15 +89,23 @@ function isLoopback(hostname: string): boolean {
   return false;
 }
 
-function loopbackAllowed(): boolean {
-  return Deno.env.get("ANCHR_ALLOW_LOCALHOST_ATTACHMENTS") === "1";
+export interface AttachmentUriValidationOptions {
+  config?: AttachmentRuntimeConfig;
+}
+
+function loopbackAllowed(config: AttachmentRuntimeConfig): boolean {
+  return config.allowLocalhostAttachments;
 }
 
 /**
  * Validates a URI for safe server-side use (redirect or fetch).
  * Returns null if valid, or an error message string if invalid.
  */
-export function validateAttachmentUri(uri: string): string | null {
+export function validateAttachmentUri(
+  uri: string,
+  options?: AttachmentUriValidationOptions,
+): string | null {
+  const config = options?.config ?? getAttachmentConfig();
   let parsed: URL;
   try {
     parsed = new URL(uri);
@@ -108,7 +121,7 @@ export function validateAttachmentUri(uri: string): string | null {
   const loopback = isLoopback(parsed.hostname);
 
   // Default-secure: loopback targets need the explicit dev opt-in.
-  if (loopback && !loopbackAllowed()) {
+  if (loopback && !loopbackAllowed(config)) {
     return "URLs pointing to localhost are not allowed " +
       "(set ANCHR_ALLOW_LOCALHOST_ATTACHMENTS=1 for local development)";
   }

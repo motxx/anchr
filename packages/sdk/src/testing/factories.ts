@@ -14,9 +14,10 @@ export function resetQueryCounter(): void {
 export function makeQuery(overrides?: Partial<Query>): Query {
   return {
     id: `test_query_${++queryCounter}`,
+    schema: "https://anchr-spec.org/spec/proof/photo/v1",
     status: "pending",
     description: "Test query",
-    verification_requirements: ["gps", "ai_check"],
+    verification_requirements: [],
     created_at: Date.now(),
     expires_at: Date.now() + 600_000,
     payment_status: "locked",

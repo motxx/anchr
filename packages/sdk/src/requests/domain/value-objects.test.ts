@@ -3,65 +3,9 @@ import { expect } from "@std/expect";
 import {
   validateBountyInfo,
   validateEscrowLocktime,
-  validateGpsCoord,
   validateOfferInfo,
   validateQueryInput,
 } from "./value-objects.ts";
-
-describe("validateGpsCoord", () => {
-  test("origin (0, 0)", () => {
-    expect(validateGpsCoord({ lat: 0, lon: 0 })).toBeNull();
-  });
-  test("equator", () => {
-    expect(validateGpsCoord({ lat: 0, lon: 139.6917 })).toBeNull();
-  });
-  test("north pole", () => {
-    expect(validateGpsCoord({ lat: 90, lon: 0 })).toBeNull();
-  });
-  test("south pole", () => {
-    expect(validateGpsCoord({ lat: -90, lon: 0 })).toBeNull();
-  });
-  test("date line east", () => {
-    expect(validateGpsCoord({ lat: 0, lon: 180 })).toBeNull();
-  });
-  test("date line west", () => {
-    expect(validateGpsCoord({ lat: 0, lon: -180 })).toBeNull();
-  });
-  test("typical Tokyo coord", () => {
-    expect(validateGpsCoord({ lat: 35.6762, lon: 139.6503 })).toBeNull();
-  });
-  test("negative lat/lon", () => {
-    expect(validateGpsCoord({ lat: -33.8688, lon: -70.6693 })).toBeNull();
-  });
-
-  test("lat > 90", () => {
-    expect(validateGpsCoord({ lat: 91, lon: 0 })).toContain("lat");
-  });
-  test("lat < -90", () => {
-    expect(validateGpsCoord({ lat: -91, lon: 0 })).toContain("lat");
-  });
-  test("lon > 180", () => {
-    expect(validateGpsCoord({ lat: 0, lon: 181 })).toContain("lon");
-  });
-  test("lon < -180", () => {
-    expect(validateGpsCoord({ lat: 0, lon: -181 })).toContain("lon");
-  });
-  test("lat = 999", () => {
-    expect(validateGpsCoord({ lat: 999, lon: 0 })).toContain("lat");
-  });
-  test("lat = NaN", () => {
-    expect(validateGpsCoord({ lat: NaN, lon: 0 })).toContain("finite");
-  });
-  test("lon = NaN", () => {
-    expect(validateGpsCoord({ lat: 0, lon: NaN })).toContain("finite");
-  });
-  test("lat = Infinity", () => {
-    expect(validateGpsCoord({ lat: Infinity, lon: 0 })).toContain("finite");
-  });
-  test("lon = -Infinity", () => {
-    expect(validateGpsCoord({ lat: 0, lon: -Infinity })).toContain("finite");
-  });
-});
 
 describe("validateBountyInfo", () => {
   test("valid amount", () => {
@@ -121,9 +65,7 @@ describe("validateQueryInput", () => {
     expect(validateQueryInput({
       description: "Photo",
       location_hint: "Tokyo",
-      expected_gps: { lat: 35.6, lon: 139.7 },
-      max_gps_distance_km: 10,
-      tlsn_requirements: { target_url: "https://example.com/api" },
+      schema_requirement: { target_url: "https://example.com/api" },
       visibility: "public",
     })).toBeNull();
   });
@@ -133,60 +75,17 @@ describe("validateQueryInput", () => {
   test("whitespace-only description", () => {
     expect(validateQueryInput({ description: "   " })).toContain("description");
   });
-  test("invalid expected_gps", () => {
+  test("opaque schema_requirement is accepted by generic validation", () => {
     expect(validateQueryInput({
       description: "Photo",
-      expected_gps: { lat: 999, lon: 0 },
-    })).toContain("expected_gps");
-  });
-  test("invalid GPS NaN lat", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      expected_gps: { lat: NaN, lon: 0 },
-    })).toContain("expected_gps");
-  });
-  test("max_gps_distance_km = 0", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      max_gps_distance_km: 0,
-    })).toContain("max_gps_distance_km");
-  });
-  test("max_gps_distance_km negative", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      max_gps_distance_km: -5,
-    })).toContain("max_gps_distance_km");
-  });
-  test("max_gps_distance_km NaN", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      max_gps_distance_km: NaN,
-    })).toContain("max_gps_distance_km");
-  });
-  test("empty tlsn target_url", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      tlsn_requirements: { target_url: "" },
-    })).toContain("target_url");
-  });
-  test("invalid tlsn target_url", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      tlsn_requirements: { target_url: "not-a-url" },
-    })).toContain("target_url");
-  });
-  test("valid tlsn target_url", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      tlsn_requirements: { target_url: "https://api.example.com/data" },
-      visibility: "customer_only",
+      schema_requirement: { target_url: "" },
     })).toBeNull();
   });
-  test("tlsn_requirements without visibility", () => {
+  test("schema_requirement does not require visibility", () => {
     expect(validateQueryInput({
       description: "Photo",
-      tlsn_requirements: { target_url: "https://api.example.com/data" },
-    })).toContain("visibility");
+      schema_requirement: { target_url: "https://api.example.com/data" },
+    })).toBeNull();
   });
 });
 

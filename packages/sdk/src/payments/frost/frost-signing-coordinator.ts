@@ -7,6 +7,7 @@
 
 import type { FrostNodeConfig, PeerConfig } from "./frost-config.ts";
 import { aggregateSignatures, signRound1, signRound2 } from "./frost-cli.ts";
+import type { SidecarExecutor } from "../../internal/runtime/mod.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-coord"]);
@@ -16,6 +17,10 @@ export interface SigningCoordinatorConfig {
   nodeConfig: FrostNodeConfig;
   /** Timeout for HTTP calls to peers (ms). */
   peerTimeoutMs?: number;
+  /** Optional custom fetch implementation; defaults to `globalThis.fetch`. */
+  fetchImpl?: typeof fetch;
+  /** Optional sidecar executor for the local frost-signer process. */
+  executor?: SidecarExecutor;
   /**
    * Verification requirement + evidence forwarded to each peer's
    * independent verify-and-sign step. Treated opaquely here; the host
@@ -46,13 +51,14 @@ export async function coordinateSigning(
 ): Promise<SigningCoordinatorResult | null> {
   const { nodeConfig } = config;
   const timeoutMs = config.peerTimeoutMs ?? 10_000;
+  const fetchImpl = config.fetchImpl ?? globalThis.fetch;
   const keyPackageJson = JSON.stringify(nodeConfig.key_package);
   const pubkeyPackageJson = JSON.stringify(nodeConfig.pubkey_package);
 
   // --- Round 1: collect nonce commitments ---
 
   // This node's round 1
-  const localR1 = await signRound1(keyPackageJson);
+  const localR1 = await signRound1(keyPackageJson, undefined, config.executor);
   if (!localR1.ok || !localR1.data) {
     log.error("Local sign-round1 failed:", localR1.error);
     return null;
@@ -87,6 +93,7 @@ export async function coordinateSigning(
           }),
         },
         timeoutMs,
+        fetchImpl,
       );
 
       if (!res.ok) {
@@ -130,6 +137,8 @@ export async function coordinateSigning(
     localNonces,
     commitmentsJson,
     messageHex,
+    undefined,
+    config.executor,
   );
   if (!localR2.ok || !localR2.data) {
     log.error("Local sign-round2 failed:", localR2.error);
@@ -152,6 +161,7 @@ export async function coordinateSigning(
           }),
         },
         timeoutMs,
+        fetchImpl,
       );
 
       if (!res.ok) {
@@ -187,6 +197,8 @@ export async function coordinateSigning(
     messageHex,
     JSON.stringify(shares),
     pubkeyPackageJson,
+    undefined,
+    config.executor,
   );
 
   if (!agg.ok || !agg.data?.signature) {
@@ -223,11 +235,12 @@ async function fetchWithTimeout(
   url: string,
   init: RequestInit,
   timeoutMs: number,
+  fetchImpl: typeof fetch,
 ): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetchImpl(url, { ...init, signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }

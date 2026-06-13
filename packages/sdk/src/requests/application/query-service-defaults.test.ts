@@ -1,10 +1,15 @@
 import { beforeEach, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
+import { Buffer } from "node:buffer";
 import { createQueryService } from "./query-service.ts";
 import type { QueryService } from "./query-service.ts";
 import { createOracleRegistry } from "../../testing/oracle-registry.ts";
 import { normalizeQueryResult } from "../../testing/attachments.ts";
-import { clearIntegrityStore, storeIntegrity } from "../../proofs/mod.ts";
+import {
+  clearIntegrityStore,
+  storeIntegrity,
+  validateExif,
+} from "../../proofs/mod.ts";
 
 let svc: QueryService;
 
@@ -21,17 +26,7 @@ function injectValidC2pa(attachmentId: string, queryId: string) {
     attachmentId,
     requestId: queryId,
     capturedAt: Date.now(),
-    exif: {
-      hasExif: false,
-      hasCameraModel: false,
-      hasGps: false,
-      hasTimestamp: false,
-      timestampRecent: false,
-      gpsNearHint: null,
-      metadata: {},
-      checks: [],
-      failures: [],
-    },
+    exif: validateExif(Buffer.from([])),
     c2pa: {
       available: true,
       hasManifest: true,

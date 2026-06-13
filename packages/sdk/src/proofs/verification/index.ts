@@ -1,4 +1,4 @@
-export { checkAttachmentContent, verifyProof } from "./verifier.ts";
+export { verifyProof } from "./verifier.ts";
 export type {
   VerificationDetail,
   VerificationInput,

@@ -18,7 +18,9 @@ import { expect } from "@std/expect";
 import { _clearSeenPresentationsForTest, validateTlsn } from "../mod.ts";
 import type { VerifyProofOptions } from "./verifier.ts";
 import { verify } from "../../requests/application/query-verifier.ts";
+import { isTlsnVerifiedData } from "../tlsn-types.ts";
 import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
+import { ProofSchema } from "../../schema.ts";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -30,7 +32,9 @@ import { tmpdir } from "node:os";
  */
 function withVerifierPath(verifierPath: string | null): VerifyProofOptions {
   return {
-    validateTlsn: (att, req) => validateTlsn(att, req, { verifierPath }),
+    schemaOptions: {
+      [ProofSchema.TlsnV1]: { verifierPath, validateTlsn },
+    },
   };
 }
 
@@ -76,13 +80,14 @@ describe("verify() integration with tlsn", () => {
   test("tlsn query with missing attestation fails", async () => {
     const query = {
       id: "test_tlsn_1",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,
       created_at: Date.now(),
       expires_at: Date.now() + 60_000,
       payment_status: "locked" as const,
-      tlsn_requirements: makeRequirement(),
+      schema_requirement: makeRequirement(),
     };
     const result = { attachments: [] };
 
@@ -93,9 +98,10 @@ describe("verify() integration with tlsn", () => {
     ).toBe(true);
   });
 
-  test("tlsn query without tlsn_requirements fails", async () => {
+  test("tlsn query without schema_requirement fails", async () => {
     const query = {
       id: "test_tlsn_2",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,
@@ -103,13 +109,13 @@ describe("verify() integration with tlsn", () => {
       expires_at: Date.now() + 60_000,
       payment_status: "locked" as const,
     };
-    const result = { attachments: [], tlsn_attestation: makeAttestation() };
+    const result = { attachments: [], schema_evidence: makeAttestation() };
 
     const verification = await verify(query, result, withVerifierPath(null));
     expect(verification.passed).toBe(false);
     expect(
       verification.failures.some((f) =>
-        f.includes("missing tlsn_requirements")
+        f.includes("missing or invalid schema_requirement")
       ),
     ).toBe(true);
   });
@@ -124,15 +130,16 @@ describe("verify() integration with tlsn", () => {
 
     const query = {
       id: "test_tlsn_3",
+      schema: ProofSchema.TlsnV1,
       status: "pending" as const,
       description: "Test",
       verification_requirements: ["tlsn"] as const,
       created_at: Date.now(),
       expires_at: Date.now() + 60_000,
       payment_status: "locked" as const,
-      tlsn_requirements: makeRequirement(),
+      schema_requirement: makeRequirement(),
     };
-    const result = { attachments: [], tlsn_attestation: makeAttestation() };
+    const result = { attachments: [], schema_evidence: makeAttestation() };
 
     const verification = await verify(
       query,
@@ -142,6 +149,8 @@ describe("verify() integration with tlsn", () => {
     expect(verification.failures.filter((f) => f.includes("no media evidence")))
       .toHaveLength(0);
     expect(verification.passed).toBe(true);
-    expect(verification.tlsn_verified?.server_name).toBe("api.coingecko.com");
+    expect(isTlsnVerifiedData(verification.schema_verdict)).toBe(true);
+    if (!isTlsnVerifiedData(verification.schema_verdict)) return;
+    expect(verification.schema_verdict.server_name).toBe("api.coingecko.com");
   });
 });

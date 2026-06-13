@@ -45,11 +45,12 @@ taxonomy.
 - `/proofs` for proof producer, verifier, schema dispatch, and policy ports.
 - `/attachments` for encrypted attachment references and the bundled Blossom
   upload/download helpers that keep large proof material content-addressed,
-  encrypted, and portable across Blossom servers.
-- `/adapters` for standard Nostr, Cashu, Oracle HTTP, local state, and signer
-  adapters. The concrete Cashu HTLC mint client is the Cashu payment adapter
-  surface and is exported from `@anchr/sdk/adapters/cashu`, with root SDK
-  exports available for the common setup path.
+  encrypted, and portable across Blossom servers. Callers own private metadata
+  removal before upload; the SDK preserves the bytes it is given.
+- `/adapters` for standard Nostr, Cashu, relay-based Oracle discovery, local
+  state, and signer adapters. The concrete Cashu HTLC mint client is the Cashu
+  payment adapter surface and is exported from `@anchr/sdk/adapters/cashu`,
+  with root SDK exports available for the common setup path.
 - `/testing` for deterministic in-memory helpers used by examples and tests.
 
 `@anchr/protocol` may expose:
@@ -69,6 +70,34 @@ Cashu v0 decision (ADR 0001), not a plug-in layer for alternative transport or
 settlement substrates. They do not belong in `@anchr/protocol` unless they
 define the Nostr/Cashu v0 contract recorded in `specs/`.
 
+## Browser-Portable Surface
+
+Browser hosts compose Anchr through the role and contract modules that do not
+own process, filesystem, environment, or sidecar execution. The portable roots
+are the full `@anchr/protocol` surface plus these SDK public subpaths:
+
+- `@anchr/sdk/customer`
+- `@anchr/sdk/provider`
+- `@anchr/sdk/oracle`
+- `@anchr/sdk/schema`
+- `@anchr/sdk/adapters/oracle-client`
+
+Those roots may use SDK port types from `@anchr/sdk` internals, but server
+runtime behavior is supplied by injected adapters rather than imported by the
+portable code. `deno task lint:arch` enforces this browser surface with E031:
+the reachable portable graph must not reference `Deno.*`, import `node:*`, or
+import server-only SDK adapters.
+
+Server-only adapters are the `packages/sdk/src/internal/runtime/` Deno-backed
+runtime adapters, the FROST peer server under
+`packages/sdk/src/adapters/oracle-service/` including
+`server-entry.ts`, the relay Oracle daemon/hash responder process modules under
+`packages/sdk/src/adapters/nostr/`, FROST CLI/payment execution under
+`packages/sdk/src/payments/frost/`, and the built-in TLSN/C2PA proof execution
+adapters under `packages/sdk/src/proofs/`. Browser applications provide
+equivalent behavior through ports or schema bundles instead of importing those
+modules.
+
 ## Surface Policy
 
 The current repository map is the target map. New public Anchr packages,
@@ -85,7 +114,8 @@ Blossom remains under the SDK attachment surface because the bundled Blossom
 code owns attachment-specific behavior: encrypted blob upload and download,
 per-attachment key material, Blossom server selection, and BUD-02 upload
 authorization for attachment blobs. It is not exposed as a generic SDK adapter
-owner alongside actor transport, payment, Oracle HTTP, or local state adapters.
+owner alongside actor transport, payment, Oracle discovery, or local state
+adapters.
 
 ## Component Boundaries
 
@@ -128,19 +158,23 @@ The request internals own request-bound state and lifecycle ports:
 | Concept | Owner |
 | --- | --- |
 | Request lifecycle state | `requests/domain/` owns the `Query` aggregate, statuses, transitions, query store, offer/selection/result state, expiry, and request-scoped quorum and attestation records. |
-| Attachment references in submitted work | `values.ts` owns the shared `AttachmentRef` and Blossom key value objects; `requests/domain/` persists them on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. |
+| Attachment references in submitted work | `values.ts` owns the shared `AttachmentRef` and Blossom key value objects; `requests/domain/` persists them on `QueryResult`; `attachments/` owns upload, download, encryption, URL validation, Blossom transport, and helpers that produce or consume those references. Metadata stripping is producer-owned before upload because schemas and applications decide which evidence metadata is private versus intentionally retained. |
 | Payment escrow hooks used by the lifecycle | `requests/application/` owns the `EscrowProvider` port because the query lifecycle calls it at hold, provider binding, lock verification, settlement, and cancellation points; `payments/` and `adapters/cashu` own payment implementations and reusable payment-lock or redemption helpers. |
-| Verification inputs and decisions used by release logic | `proofs/verification/contract.ts` owns the `VerificationRequirement`, `VerificationInput`, and `VerificationDetail` contract (exported from `@anchr/sdk/proofs`); `requests/domain/` embeds `VerificationDetail` on the `Query`; `requests/application/query-verifier.ts` owns the `Query`→contract adapters (`verify`, `requestToRequirement`, `resultToVerificationInput`); `proofs/` owns the `verifyProof` engine, schema dispatch, redaction, and verifier adapters. |
-| Oracle lifecycle records and registry lookup | `requests/domain/` owns `OracleAttestation` records that are stored against a query, and `requests/application/` owns the `OracleRegistry` lookup port consumed by the lifecycle; `adapters/oracle-client`, `adapters/oracle-service`, and Nostr adapter modules own concrete Oracle discovery, HTTP, service, and event bindings. |
+| Verification inputs and decisions used by release logic | `proofs/verification/contract.ts` owns the schema-neutral `VerificationRequirement`, `VerificationInput`, and `VerificationDetail` envelopes (exported from `@anchr/sdk/proofs`); each proof schema owns its requirement payload, evidence payload, checks, and verdict-detail payload; `requests/domain/` embeds schema-neutral verification detail on the `Query`; `requests/application/query-verifier.ts` owns the `Query`→contract adapters (`verify`, `requestToRequirement`, `resultToVerificationInput`); `proofs/` owns `verifyProof`, schema-URI dispatch, redaction, and verifier adapters. |
+| Oracle lifecycle records, release, and registry lookup | `requests/domain/` owns `OracleAttestation` records that are stored against a query, and `requests/application/` owns the `OracleRegistry` lookup port consumed by the lifecycle; Nostr adapter modules own the relay Oracle exchange and kind 30088 registry event bindings; a reduced FROST peer endpoint module owns Oracle-to-Oracle signing coordination endpoints; applications may supply static Oracle lists as their own policy. |
 | Deterministic lifecycle test helpers | `@anchr/sdk/testing` is the only public testing entry point. It may re-export request service helpers for tests and examples while the underlying lifecycle semantics remain owned by `requests/`. |
 
 Shared submission and evidence value objects — `AttachmentRef`,
-`AttachmentStorageKind`, `GpsCoord`, `VerificationFactor`,
-`BlossomKeyMaterial`, `BlossomKeyMap` — live in the leaf module
+`AttachmentStorageKind`, `BlossomKeyMaterial`, `BlossomKeyMap` — live in the leaf module
 `packages/sdk/src/values.ts`. It imports nothing from feature directories, so
 the request lifecycle, proof verification, and attachment transport all depend
 on it in one direction without a type cycle. These value objects are re-exported
 from the root `@anchr/sdk` surface.
+
+Schema-specific verification vocabulary belongs to the schema module that
+defines it. Location evidence, timestamp freshness, nonce replay prevention,
+and schema-specific verdict details are carried through the shared lifecycle as
+opaque schema-scoped payloads, not as shared SDK value objects.
 
 Feature directories should not import from `requests/` to get a generic
 attachment, payment, proof, Oracle, or adapter abstraction. Cross-directory
@@ -169,13 +203,68 @@ Placement of any rule derived from this table follows
 | Component | Stable responsibility | Target owner |
 | --- | --- | --- |
 | Actor coordination | Move request, offer, selection, proof, release, and completion messages between Customer, Provider, and Oracle while preserving role identity and causal links. | Protocol for Nostr wire shapes; SDK for orchestration and relay adapters. |
-| Evidence contract | Identify what evidence a request requires and how verifiers dispatch it without embedding verifier implementation in the protocol. | Protocol for schema identifiers; SDK for dispatch and verifier ports. |
+| Evidence contract | Identify what evidence a request requires and how verifiers dispatch it without embedding verifier implementation in the protocol. | Protocol for schema URI identifiers and wire payload slots; SDK for schema-URI dispatch, schema registration, and verifier ports; proof schemas for requirement payloads, evidence payloads, checks, and verdict details. |
 | Verification decision | Decide whether submitted evidence satisfies Customer constraints and whether release material may be produced. | SDK Oracle/proof modules and native helpers. |
 | Settlement lock | Hold Customer value in a Cashu Payment Lock so the selected Provider can redeem after valid Oracle release and the Customer can refund after timeout. | SDK payment ports and Cashu payment helpers. |
-| Release authority | Produce material that unlocks settlement only after verification succeeds and bind it to the selected work. | SDK Oracle/payment modules; protocol only for interoperable release messages. |
+| Release authority | Produce material that unlocks settlement only after verification succeeds and bind it to the selected work. | SDK relay Oracle and payment modules; FROST peer endpoints for Oracle-to-Oracle threshold signing; protocol only for interoperable release messages. |
 | Attachment transport | Store and retrieve large or sensitive proof material without making storage a protocol actor. | SDK attachment helpers and bundled Blossom transport; protocol only for attachment references. |
 | Local actor state | Track one actor's private progress without making local implementation state part of the network contract. | SDK state ports and standard test/runtime stores. |
 | Runtime adapter | Bind an SDK role or standard adapter to a concrete process, UI, or operator policy. | Outside the public protocol; optional examples only when tiny. |
+
+## Schema-Owned Verification
+
+The proof schema URI is the only verification dispatch key. A verifier selects
+proof-generation and verification behavior by exact schema URI, then passes the
+schema-owned requirement payload, evidence payload, and verifier-detail payload
+to that schema's module.
+
+The shared verification contract carries only schema-neutral fields plus opaque
+schema-scoped payloads. The target architecture has no shared
+`VerificationFactor` union, no `DEFAULT_VERIFICATION_FACTORS`, and no SDK-wide
+static factor-check registry. Issues 0146, 0147, and 0148 own relocating any
+remaining implementation to schema payload fields, schema modules, and runtime
+schema registration keyed by URI.
+
+Built-in schemas follow the same boundary as third-party schemas:
+
+- The TLSNotary schema owns its HTTPS response predicate, nonce or replay
+  prevention rules, timestamp freshness rules, proof evidence shape, and
+  redacted verifier-detail payload.
+- The C2PA image schema owns its manifest predicate, signed GPS evidence shape,
+  maximum-distance policy, C2PA integrity checks, and verifier-detail payload.
+
+Terms such as nonce, timestamp, GPS distance, or any local "factor" label are
+schema-internal vocabulary. They are not protocol-wide or SDK-wide dispatch
+values.
+
+The SDK extension point is a schema bundle registered by exact schema URI via
+`registerSchemaBundle` from the public SDK surface:
+
+```ts
+registerSchemaBundle({
+  uri,
+  producer,
+  verifier,
+  checks,
+  configSchema,
+  resolveEvidence,
+});
+```
+
+`producer` and `verifier` are optional Provider/Customer local adapters.
+`checks` are the Oracle-side proof checks for that schema. `configSchema`
+narrows the opaque per-schema options payload, and `resolveEvidence` maps
+transport response payloads into the schema's opaque evidence payload. The
+shared verifier looks up the request's schema URI, resolves that bundle, and
+runs only that bundle's checks; it does not import schema-specific validators
+or maintain a shared default factor list.
+
+Schema-specific runtime configuration is passed as a map keyed by schema URI
+(`schemaOptions[uri]`). Built-in reference adapters use that map for values
+such as a notary URL, verifier binary path, content-credential tool path, or
+integrity-store instance. The TLSNotary and C2PA image implementations are
+registered as reference bundles under `packages/sdk/src/proofs/`; core SDK
+modules route through the registry rather than importing their internals.
 
 ## Naming
 
@@ -228,6 +317,16 @@ connections, subscriptions, runtime wiring, and service orchestration;
 `@anchr/protocol` owns the event kinds, tags, payloads, NIP-44 encryption
 boundaries, signing helpers, and Cashu settlement fields that compatible Anchr
 actors must share to interoperate in v0.
+
+The canonical v0 Customer/Provider/Oracle exchange uses relay-delivered Nostr
+events and NIP-44 direct messages. The relay Oracle service is the SDK owner for
+verification-triggered preimage or release-material issuance in that exchange.
+
+Oracle discovery is relay-based. Oracles announce kind 30088 registry events
+with a stable `t` tag of `anchr-oracle`; proof-schema capability keys are exact
+schema URLs carried in `s` tags and the announcement's `supported_schemas`
+field. Static Oracle lists are application policy and are supplied by the
+application when needed.
 
 ## Follow-On Work
 

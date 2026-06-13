@@ -22,7 +22,7 @@ export interface HashResponderOptions {
   /** The Oracle's identity (DM recipient and response signer). */
   identity: Keypair;
   /** Issues the hash commitment for a query id (e.g. PreimageStore.create). */
-  issueHash: (queryId: string) => string;
+  issueHash: (queryId: string) => string | Promise<string>;
 }
 
 /**
@@ -37,38 +37,42 @@ export function serveHashRequests(options: HashResponderOptions): Subscription {
       kinds: [KIND_DIRECT_MESSAGE],
       "#p": [options.identity.publicKey],
     },
-    (event) => {
-      const request = parseHashRequestEvent(
-        event,
-        options.identity.secretKey,
-        event.pubkey,
-      );
-      if (request === null) return;
+    async (event) => {
+      try {
+        const request = parseHashRequestEvent(
+          event,
+          options.identity.secretKey,
+          event.pubkey,
+        );
+        if (request === null) return;
 
-      let hash = issued.get(request.query_id);
-      if (hash === undefined) {
-        hash = options.issueHash(request.query_id);
-        issued.set(request.query_id, hash);
-      }
-
-      const response = buildHashResponseEvent(
-        options.identity,
-        event.pubkey,
-        {
-          type: "hash_response",
-          query_id: request.query_id,
-          hash,
-        },
-      );
-      options.relayClient.publish(response).then((result) => {
-        if (result.successes.length === 0) {
-          log.error(
-            `hash_response for ${request.query_id} accepted by no relay`,
-          );
+        let hash = issued.get(request.query_id);
+        if (hash === undefined) {
+          hash = await options.issueHash(request.query_id);
+          issued.set(request.query_id, hash);
         }
-      }, (err) => {
-        log.error(`hash_response publish failed: ${err}`);
-      });
+
+        const response = buildHashResponseEvent(
+          options.identity,
+          event.pubkey,
+          {
+            type: "hash_response",
+            query_id: request.query_id,
+            hash,
+          },
+        );
+        options.relayClient.publish(response).then((result) => {
+          if (result.successes.length === 0) {
+            log.error(
+              `hash_response for ${request.query_id} accepted by no relay`,
+            );
+          }
+        }, (err) => {
+          log.error(`hash_response publish failed: ${err}`);
+        });
+      } catch (error) {
+        log.error("hash_response handling failed", { error });
+      }
     },
   );
 }

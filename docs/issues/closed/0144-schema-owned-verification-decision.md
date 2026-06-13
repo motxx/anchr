@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-13
 
 ## Priority
 
@@ -82,3 +83,34 @@ fields plus a schema-scoped opaque payload.
   serialized into the existing encrypted execution payload and result events.
 - Update `specs/proof-schemas.md` if the schema contract gains a
   requirement/evidence payload definition.
+
+## Resolution
+
+Implemented by updating:
+
+- `docs/architecture.md`
+- `specs/proof-schemas.md`
+- `specs/messaging.md`
+- `specs/oracle-registry.md`
+- `docs/issues/pending/0146-schema-scoped-payloads-in-contract-and-query.md`
+- `docs/issues/pending/0147-move-gps-into-schema-owned-verification.md`
+- `docs/issues/pending/0148-runtime-schema-registration-and-reference-adapters.md`
+- `docs/issues/closed/0144-schema-owned-verification-decision.md`
+
+Verified with:
+
+- `deno task lint:strict`
+
+Harness update:
+
+- None — one-time design decision now locked in docs (human universal decision per docs/universality-boundaries.md); implementation issues 0146-0148 carry the drift locks.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- 0146
+- 0147
+- 0148

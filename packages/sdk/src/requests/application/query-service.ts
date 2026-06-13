@@ -63,7 +63,7 @@ export interface CreateQueryOptions {
   ttlSeconds?: number;
   customerMeta?: CustomerMeta;
   payment_lock?: PaymentLockInfo;
-  /** Acceptable oracle IDs. Empty/undefined = any (defaults to built-in). */
+  /** Acceptable oracle IDs. Empty/undefined leaves registry selection to the host. */
   oracleIds?: string[];
   /** Escrow info — when present, creates an escrow-mode (HTLC or P2PK+FROST) query. */
   escrow?: EscrowInfo;

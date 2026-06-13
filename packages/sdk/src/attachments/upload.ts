@@ -1,14 +1,18 @@
 import { Buffer } from "node:buffer";
+import type { AttachmentRuntimeConfig } from "../internal/runtime/config.ts";
 import { isBlossomEnabled } from "./blossom.ts";
 import { providerUpload } from "./provider-upload.ts";
 import {
+  type GpsCoord,
   parseProofModeZip,
   type ProofModeIntegrity,
-  storeIntegrity,
-  validateC2pa,
   validateExif,
 } from "../proofs/mod.ts";
-import type { AttachmentRef, BlossomKeyMaterial, GpsCoord } from "../values.ts";
+import {
+  storeContentCredentialsIntegrity,
+  validateContentCredentials,
+} from "../proofs/content-credentials.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
 import {
   detectZip,
   extractProofModeIntegrity,
@@ -24,12 +28,16 @@ export interface UploadResult {
 
 export interface UploadOptions {
   expectedGps?: GpsCoord;
+  config?: AttachmentRuntimeConfig;
 }
 
 /**
  * Upload an attachment: validate integrity → encrypt → upload to Blossom.
  *
  * Accepts a photo file directly, or a ProofMode zip bundle.
+ * Callers must remove private metadata such as EXIF GPS/device fields before
+ * calling this API; the SDK preserves submitted bytes so evidence production
+ * owns the privacy policy.
  * Blossom is the only storage backend. BLOSSOM_SERVERS must be configured.
  * The encryption key is returned separately and never stored on the server (E2E).
  */
@@ -38,7 +46,7 @@ export async function uploadAttachment(
   file: File,
   options?: UploadOptions,
 ): Promise<UploadResult> {
-  if (!isBlossomEnabled()) {
+  if (!isBlossomEnabled({ config: options?.config })) {
     throw new Error(
       "Blossom is not configured. Set BLOSSOM_SERVERS to enable attachment uploads.",
     );
@@ -50,17 +58,18 @@ export async function uploadAttachment(
     file.name,
   );
 
-  const [exifResult, c2paResult] = await Promise.all([
+  const [exifResult, provenanceResult] = await Promise.all([
     Promise.resolve(
       validateExif(photoBuffer, { expectedGps: options?.expectedGps }),
     ),
-    validateC2pa(photoBuffer, photoFilename),
+    validateContentCredentials(photoBuffer, photoFilename),
   ]);
 
   const result = await providerUpload(
     new Uint8Array(photoBuffer),
     photoFilename,
     inferMimeTypeFromFilename(photoFilename),
+    { config: options?.config },
   );
   if (!result) {
     throw new Error(`Blossom upload failed for query ${queryId}`);
@@ -68,15 +77,15 @@ export async function uploadAttachment(
 
   const attachment = buildAttachmentRef(result);
 
-  storeIntegrity({
+  storeContentCredentialsIntegrity({
     attachmentId: attachment.id,
     requestId: queryId,
     capturedAt: Date.now(),
     exif: exifResult,
-    c2pa: c2paResult,
+    provenance: provenanceResult,
     proofmode,
   });
-  logIntegrity(queryId, exifResult, c2paResult, proofmode);
+  logIntegrity(queryId, exifResult, provenanceResult, proofmode);
 
   return {
     attachment,

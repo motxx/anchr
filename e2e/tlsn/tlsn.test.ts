@@ -13,6 +13,7 @@ import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
 import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
 import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import { isTlsnVerifiedData } from "@anchr/sdk/proofs";
 import type { QueryInput, QueryResult } from "@anchr/sdk/testing";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
@@ -238,7 +239,7 @@ describe("TLSNotary E2E", () => {
       description: "E2E: Verify BTC/JPY price",
       verification_requirements: ["tlsn"],
       visibility: "customer_only",
-      tlsn_requirements: {
+      schema_requirement: {
         target_url: TARGET_URL,
         conditions: [{
           type: "jsonpath",
@@ -253,12 +254,12 @@ describe("TLSNotary E2E", () => {
       payment_lock: { amount_sats: 21 },
     });
     expect(query.status).toBe("pending");
-    expect(query.tlsn_requirements?.target_url).toBe(TARGET_URL);
+    expect(query.schema_requirement).toEqual(input.schema_requirement);
 
     // Submit with real presentation
     const result: QueryResult = {
       attachments: [],
-      tlsn_attestation: { presentation: presentationB64 },
+      schema_evidence: { presentation: presentationB64 },
     };
 
     const outcome = await svc.submitQueryResult(
@@ -280,8 +281,10 @@ describe("TLSNotary E2E", () => {
     expect(checks.some((c) => c.includes("server name matches"))).toBe(true);
     expect(checks.some((c) => c.includes("Product code exists"))).toBe(true);
 
-    // Verify tlsn_verified data
-    const verified = outcome.query?.verification?.tlsn_verified;
+    // Verify schema_verdict data
+    const verified = outcome.query?.verification?.schema_verdict;
+    expect(isTlsnVerifiedData(verified)).toBe(true);
+    if (!isTlsnVerifiedData(verified)) return;
     expect(verified?.server_name).toBe(TARGET_SERVER);
     expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
   });
@@ -296,7 +299,7 @@ describe("TLSNotary E2E", () => {
     const query = svc.createQuery({
       description: "E2E: no attestation",
       verification_requirements: ["tlsn"],
-      tlsn_requirements: { target_url: "https://example.com" },
+      schema_requirement: { target_url: "https://example.com" },
       visibility: "customer_only",
     }, { ttlSeconds: 120 });
 
@@ -331,7 +334,7 @@ describe("TLSNotary E2E", () => {
           description: "E2E: extension result test",
           verification_requirements: ["tlsn"],
           visibility: "customer_only",
-          tlsn_requirements: {
+          schema_requirement: {
             target_url: TARGET_URL,
             conditions: [{
               type: "jsonpath",
@@ -349,15 +352,17 @@ describe("TLSNotary E2E", () => {
         query.id,
         {
           attachments: [],
-          tlsn_extension_result: { presentation: presentationB64 },
+          schema_evidence: { presentation: presentationB64 },
         },
         { executor_type: "human", channel: "adapter" },
       );
       expect(submitOutcome.ok).toBe(true);
       expect(submitOutcome.query?.verification?.passed).toBe(true);
 
-      // Verify that tlsn_verified data is populated
-      const verified = submitOutcome.query?.verification?.tlsn_verified;
+      // Verify that schema_verdict data is populated
+      const verified = submitOutcome.query?.verification?.schema_verdict;
+      expect(isTlsnVerifiedData(verified)).toBe(true);
+      if (!isTlsnVerifiedData(verified)) return;
       expect(verified?.server_name).toBe(TARGET_SERVER);
       expect(verified?.revealed_body).toContain(TARGET_BODY_MARKER);
     },
@@ -378,7 +383,7 @@ describe("TLSNotary E2E", () => {
         description: "E2E: HTTP API test",
         verification_requirements: ["tlsn"],
         visibility: "customer_only",
-        tlsn_requirements: {
+        schema_requirement: {
           target_url: TARGET_URL,
           conditions: [{
             type: "jsonpath",
@@ -396,7 +401,7 @@ describe("TLSNotary E2E", () => {
       query.id,
       {
         attachments: [],
-        tlsn_attestation: { presentation: presentationB64 },
+        schema_evidence: { presentation: presentationB64 },
       },
       { executor_type: "human", channel: "adapter" },
     );

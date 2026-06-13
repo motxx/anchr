@@ -2,6 +2,7 @@
 
 Created: 2026-06-12
 Model: Claude Fable 5
+Completed: 2026-06-14
 
 ## Priority
 
@@ -10,20 +11,7 @@ design
 ## Dependencies
 
 Depends on:
-- 0116
-- 0117
-- 0124
-- 0128
-- 0144
-- 0145
-- 0146
-- 0147
-- 0148
-- 0149
-- 0150
-- 0151
-- 0152
-- 0153
+- None
 
 Blocks:
 - None
@@ -58,7 +46,8 @@ Phased plan; each phase is owned by the listed issues:
 
 - **Phase A — decide and delete** (shrinks every later phase):
   0145 (remove AI content check), 0151 (strip platform media tooling),
-  0152 (canonical Oracle surface), 0117 (FROST complete-or-remove, existing).
+  0156 (delete HTTP Oracle exchange surface), and 0157 (migrate Oracle
+  discovery to schema URLs).
 - **Phase B — schema-extensibility core** (the centerpiece):
   0144 (decision: schema-owned verification) → 0146 (schema-scoped payloads)
   → 0147 (GPS out of shared core) → 0148 (runtime schema registration and
@@ -67,7 +56,7 @@ Phased plan; each phase is owned by the listed issues:
   0149 (runtime ports for config/persistence/sidecars) → 0150 (browser CI
   gate).
 - **Phase D — privacy/P2P hardening** (mostly already tracked):
-  0116, 0124, 0128 (existing), 0153 (FROST peer transport hook).
+  closed by 0153 (FROST peer transport hook).
 
 Correctness issues 0134-0141 remain independent and should generally land
 before or alongside Phase B since they touch the same verification code.
@@ -91,3 +80,56 @@ before or alongside Phase B since they touch the same verification code.
   otherwise have to migrate.
 - Re-read this plan after each phase; re-split or retire children whose
   scope was changed by earlier deletions.
+
+## Resolution
+
+Tracking parent for the 2026-06 premise-alignment restructuring. All dependency
+issues are closed; the full local bar (`deno task test:all`) passes.
+
+Premise outcomes:
+
+1. Anonymity/privacy first — the AI content check that forwarded proof evidence
+   to a third-party API was removed (0145); the FROST peer signing transport is
+   injectable for proxy routing (0153); the relay path is the canonical exchange
+   and the IP-exposing HTTP Oracle surface was deleted (0152, 0156).
+2. P2P exchange — relay-delivered Nostr/NIP-44 is the single canonical Oracle
+   transport; the parallel HTTP server/client exchange surface is gone (0156)
+   and discovery is relay-based by schema URL (0157).
+3. Nostr/Cashu native — already satisfied; preserved.
+4. Portable (browser and server) — env config, persistence, and sidecar
+   execution are behind injectable ports with server adapters, and the server
+   bootstrap is a dedicated entrypoint (0149 → 0162/0163/0164/0165); the
+   arch-lint E031 browser-surface gate drift-locks it (0150).
+5. Anyone can define a proof schema — the proof schema URI is the only
+   verification dispatch key (0144); requirement/evidence/verdict travel as
+   schema-scoped opaque payloads (0146); GPS moved into the C2PA schema (0147);
+   a public registerSchemaBundle API exists with TLSN/C2PA as reference adapters
+   (0148 → 0159), a manifest-driven page lint (0160), and a custom-schema e2e
+   proving the extension surface (0161).
+6. Simple — one dispatch model (the VerificationFactor union and static
+   factor-check registry are gone), and platform-specific media tooling was
+   stripped from the attachment surface (0151).
+
+Verified with:
+
+- `ls docs/issues/pending/` — none of the dependency issues remain.
+- `deno task test:all` — passed (lint:strict + cargo dep audit + test:unit +
+  test:integration + test:e2e:protocol + test:scripts + test:examples + Rust
+  crate gate + frost-signer build + test:e2e:frost).
+
+Harness update:
+
+- The premise invariants are locked by the gates the children added: arch-lint
+  E028 (env reads) and E031 (browser-portable surface), the manifest-driven
+  `lint:proof-schema-pages`, the `rg`-based decoupling guards in the child
+  resolutions, INV-05/INV-06/INV-08 threat-model locks, and the custom-schema
+  e2e. No further harness change is owned by this tracking issue.
+
+Review residuals:
+
+- None. Follow-up 0158 (EXIF GPS hint fixtures) was filed and closed during the
+  work; no premise exception was needed.
+
+Follow-up:
+
+- None

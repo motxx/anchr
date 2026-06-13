@@ -6,18 +6,19 @@ import type { P2PKOptions, Proof } from "@cashu/cashu-ts";
 import { getEncodedToken } from "@cashu/cashu-ts";
 import {
   type CashuConfig,
+  type CashuConfigOptions,
   getCashuConfig,
   getCashuWallet,
 } from "./cashu-wallet.ts";
 
-export async function getWalletAndConfig(): Promise<
+export async function getWalletAndConfig(options?: CashuConfigOptions): Promise<
   {
     wallet: NonNullable<ReturnType<typeof getCashuWallet>>;
     config: CashuConfig;
   } | null
 > {
-  const wallet = getCashuWallet();
-  const config = getCashuConfig();
+  const wallet = getCashuWallet({ config: options?.config });
+  const config = getCashuConfig({ config: options?.config });
   if (!wallet || !config) return null;
   await wallet.loadMint();
   return { wallet, config };

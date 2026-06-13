@@ -1,6 +1,7 @@
 # Add a local pre-commit secret scan
 
 Created: 2026-06-13
+Completed: 2026-06-13
 Model: Claude Fable 5
 
 ## Priority
@@ -67,3 +68,43 @@ the developer's machine.
 - Decide the absent-binary policy and document the install step next to
   `deno task setup:hooks`.
 - Keep the local ruleset aligned with the CI `gitleaks-action` defaults.
+
+## Resolution
+
+Implemented by updating:
+
+- `scripts/git-hooks/pre-commit`
+- `CONTRIBUTING.md`
+
+Verified with:
+
+- `gitleaks --help` and `gitleaks git --help` against gitleaks 8.30.1; the
+  installed staged-diff command is `gitleaks git --staged`.
+- `GIT_INDEX_FILE=$tmp_index GIT_OBJECT_DIRECTORY=$tmp_objects GIT_ALTERNATE_OBJECT_DIRECTORIES=$orig_objects bash scripts/git-hooks/pre-commit`
+  with `.tmp-gitleaks-staged-secret.txt` staged only in a temporary sandbox
+  index containing a fake `AKIA`-prefixed AWS access key id; rejected with
+  `RuleID: aws-access-token`, `File: .tmp-gitleaks-staged-secret.txt`,
+  `Line: 1`, and `leaks found: 1`.
+- Reviewer reproduced against the real index: the full hook rejected a staged
+  fake AWS access key id 8/8 runs and a staged GitHub PAT 5/5 runs, and passed
+  a clean change.
+- `bash scripts/git-hooks/pre-commit`; passed with `no leaks found` and the
+  full `deno task lint:strict` chain passing.
+- `PATH=/usr/bin:/bin bash scripts/git-hooks/pre-commit`; failed closed with
+  install guidance for `brew install gitleaks`, `nix profile install
+  nixpkgs#gitleaks`, and the gitleaks releases URL.
+- `deno task lint:strict`
+
+Harness update:
+
+- `scripts/git-hooks/pre-commit` now runs `gitleaks git --staged --redact
+  --no-banner --verbose`, so the pre-commit harness absorbs the secret-leak
+  finding class before push.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

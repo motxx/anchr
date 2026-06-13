@@ -1,5 +1,4 @@
 import type { BlossomKeyMap } from "../../values.ts";
-import { DEFAULT_VERIFICATION_FACTORS } from "../../values.ts";
 import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   CustomerMeta,
@@ -31,6 +30,8 @@ import {
 
 export { MIN_ESCROW_LOCKTIME_SECS };
 import { buildChallengeRule } from "./challenge.ts";
+
+const DEFAULT_QUERY_SCHEMA = "https://anchr-spec.org/spec/proof/photo/v1";
 
 export type TransitionResult =
   | { ok: true; query: Query }
@@ -66,8 +67,7 @@ export function createQueryAggregate(
     if (locktimeError) return { ok: false, error: locktimeError };
   }
 
-  const requirements = input.verification_requirements ??
-    DEFAULT_VERIFICATION_FACTORS;
+  const requirements = input.verification_requirements ?? [];
   const needsNonce = requirements.includes("nonce");
   const nonce = needsNonce
     ? services.nonceGenerator.newChallengeNonce()
@@ -76,6 +76,7 @@ export function createQueryAggregate(
 
   const query: Query = {
     id: services.idGenerator.newQueryId(),
+    schema: input.schema ?? DEFAULT_QUERY_SCHEMA,
     status: isEscrow ? "awaiting_offers" : "pending",
     description: input.description,
     location_hint: input.location_hint,
@@ -93,9 +94,7 @@ export function createQueryAggregate(
     escrow: options.escrow,
     offers: isEscrow ? [] : undefined,
     nostr_event_id: options.nostrEventId,
-    expected_gps: input.expected_gps,
-    max_gps_distance_km: input.max_gps_distance_km,
-    tlsn_requirements: input.tlsn_requirements,
+    schema_requirement: input.schema_requirement,
     quorum: options.quorum,
     visibility: input.visibility,
   };

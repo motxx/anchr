@@ -26,6 +26,7 @@ import {
   signRound1,
   signRound2,
 } from "./frost-cli.ts";
+import type { SidecarExecutor } from "../../internal/runtime/mod.ts";
 
 import { getLogger } from "../../internal/runtime/logger.ts";
 const log = getLogger(["anchr", "frost-signer"]);
@@ -40,6 +41,8 @@ export interface FrostSignerConfig {
    * "unavailable". Defaults to auto-detection when omitted.
    */
   frostSignerPath?: string | null;
+  /** Optional sidecar executor for the frost-signer process. */
+  executor?: SidecarExecutor;
 }
 
 export interface FrostSigner {
@@ -120,6 +123,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
           input.maxSigners ?? 3,
           input.minSigners ?? 2,
           config.frostSignerPath,
+          config.executor,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -134,6 +138,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
           input.secretPackage,
           input.round1Packages,
           config.frostSignerPath,
+          config.executor,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -152,6 +157,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
           input.round1Packages,
           input.round2Packages,
           config.frostSignerPath,
+          config.executor,
         );
         if (!result.ok || !result.data) return null;
         return {
@@ -184,7 +190,11 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
 
       // Step 2: If no commitments, this is round 1 — generate nonce commitments
       if (!commitmentsJson) {
-        const r1 = await signRound1(config.keyPackage, config.frostSignerPath);
+        const r1 = await signRound1(
+          config.keyPackage,
+          config.frostSignerPath,
+          config.executor,
+        );
         if (!r1.ok || !r1.data) return null;
         const newSessionId = crypto.randomUUID();
         pendingSessions.set(newSessionId, {
@@ -219,6 +229,7 @@ export function createFrostSigner(config: FrostSignerConfig): FrostSigner {
         commitmentsJson,
         message,
         config.frostSignerPath,
+        config.executor,
       );
       if (!r2.ok || !r2.data) return null;
 

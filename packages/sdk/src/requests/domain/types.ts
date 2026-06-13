@@ -1,15 +1,10 @@
 import type {
   AttachmentRef,
   BlossomKeyMap,
-  GpsCoord,
   VerificationFactor,
 } from "../../values.ts";
-import type {
-  TlsnAttestation,
-  TlsnRequirement,
-  TlsnVerifiedData,
-  VerificationDetail,
-} from "../../proofs/mod.ts";
+import type { VerificationDetail } from "../../proofs/mod.ts";
+import type { SchemaUri } from "../../schema.ts";
 
 export type QueryStatus =
   | "pending"
@@ -33,30 +28,23 @@ export type CustomerType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "adapter";
 
-/** Controls whether TLSNotary proof is published to Nostr relays or kept private. */
+/** Controls whether proof details are published to Nostr relays or kept private. */
 export type ProofVisibility = "public" | "customer_only";
 
 export interface QueryInput {
   description: string;
+  schema?: SchemaUri;
   location_hint?: string;
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km (default: 50). */
-  max_gps_distance_km?: number;
   verification_requirements?: readonly VerificationFactor[];
-  tlsn_requirements?: TlsnRequirement;
-  /** Proof visibility — required when tlsn_requirements is set. */
+  schema_requirement?: unknown;
+  /** Proof visibility controls whether schema verdict details are published. */
   visibility?: ProofVisibility;
 }
 
 export interface QueryResult {
   attachments: AttachmentRef[];
   notes?: string;
-  /** GPS coordinates reported by the provider's device at submission time. */
-  gps?: GpsCoord;
-  /** TLSNotary attestation submitted by the provider. */
-  tlsn_attestation?: TlsnAttestation;
-  /** TLSNotary browser extension result (results[] from MPC-TLS session). */
-  tlsn_extension_result?: unknown;
+  schema_evidence?: unknown;
 }
 
 export interface CustomerMeta {
@@ -163,11 +151,12 @@ export interface OracleAttestationRecord {
   checks: string[];
   failures: string[];
   attested_at: number;
-  tlsn_verified?: TlsnVerifiedData;
+  schema_verdict?: unknown;
 }
 
 export interface Query {
   id: string;
+  schema?: SchemaUri;
   status: QueryStatus;
   description: string;
   location_hint?: string;
@@ -179,7 +168,7 @@ export interface Query {
   expires_at: number;
   customer_meta?: CustomerMeta;
   payment_lock?: PaymentLockInfo;
-  /** Acceptable oracle IDs set by customer. Empty/undefined = any (defaults to built-in). */
+  /** Acceptable oracle IDs set by customer. Empty/undefined leaves registry selection to the host. */
   oracle_ids?: string[];
   /** Oracle selected by provider at submission time. */
   assigned_oracle_id?: string;
@@ -196,17 +185,12 @@ export interface Query {
   nostr_event_id?: string;
   /** Ephemeral Blossom encryption keys — stored for customer download via HTTP API. */
   blossom_keys?: BlossomKeyMap;
-  /** Expected GPS coordinates for proximity check. */
-  expected_gps?: GpsCoord;
-  /** Max allowed distance from expected_gps in km (default: 50). */
-  max_gps_distance_km?: number;
-  /** TLSNotary requirements for web content verification. */
-  tlsn_requirements?: TlsnRequirement;
+  schema_requirement?: unknown;
   /** Multi-oracle quorum config (if set, multiple oracles verify independently). */
   quorum?: QuorumConfig;
   /** Individual oracle attestations collected during quorum verification. */
   attestations?: OracleAttestationRecord[];
-  /** Proof visibility — controls whether TLSNotary proof is published to relays. */
+  /** Proof visibility controls whether schema verdict details are published. */
   visibility?: ProofVisibility;
   /** Nostr event IDs of published attestation events. */
   published_proofs?: string[];

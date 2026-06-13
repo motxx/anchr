@@ -19,6 +19,8 @@
  *          contract may be re-published.
  *   [E030] package code must not import from examples/, e2e/, or scripts/;
  *          packages are the dependency roots, never consumers of repo tooling.
+ *   [E031] browser-portable SDK/protocol roots must not reference Deno,
+ *          node:* modules, or server-only SDK adapters.
  *
  * Per-line opt-out:
  *   // allow-arch: <reason>
@@ -64,26 +66,75 @@ const APP_VOCAB =
 const SDK_KIND_CONST = /\bexport\s+const\s+(KIND_|ANCHR_)[A-Z_0-9]+\s*=\s*\d+/;
 // [E028] Direct env reads are confined to documented config-resolution
 // surfaces; library modules take config through options/deps instead.
-const ENV_READ = /\bDeno\.env\.get\b/;
+const ENV_READ = /\bDeno\.env\.(?:get|set|delete)\b/;
 const ENV_READ_ALLOWED: readonly string[] = [
   "packages/sdk/src/internal/runtime/",
   "packages/sdk/src/testing/helpers.ts",
+  "packages/sdk/src/adapters/oracle-service/server-entry.ts",
+];
+const RUNTIME_API_READ = /\bDeno\./;
+
+const PORTABLE_ENTRYPOINTS: readonly string[] = [
+  "packages/protocol/src/mod.ts",
+  "packages/protocol/src/events.ts",
+  "packages/protocol/src/nostr.ts",
+  "packages/protocol/src/schema.ts",
+  "packages/protocol/src/types.ts",
+  "packages/sdk/src/customer.ts",
+  "packages/sdk/src/customer-types.ts",
+  "packages/sdk/src/provider.ts",
+  "packages/sdk/src/provider-types.ts",
+  "packages/sdk/src/oracle.ts",
+  "packages/sdk/src/schema.ts",
+  "packages/sdk/src/values.ts",
+  "packages/sdk/src/adapters/oracle-client/index.ts",
+  "packages/sdk/src/adapters/types.ts",
+];
+
+const PORTABLE_PUBLIC_IMPORT_TARGETS: Record<string, string> = {
+  "@anchr/protocol": "packages/protocol/src/mod.ts",
+  "@anchr/protocol/events": "packages/protocol/src/events.ts",
+  "@anchr/protocol/nostr": "packages/protocol/src/nostr.ts",
+  "@anchr/protocol/schema": "packages/protocol/src/schema.ts",
+  "@anchr/protocol/types": "packages/protocol/src/types.ts",
+  "@anchr/sdk/customer": "packages/sdk/src/customer.ts",
+  "@anchr/sdk/provider": "packages/sdk/src/provider.ts",
+  "@anchr/sdk/oracle": "packages/sdk/src/oracle.ts",
+  "@anchr/sdk/schema": "packages/sdk/src/schema.ts",
+  "@anchr/sdk/adapters/oracle-client":
+    "packages/sdk/src/adapters/oracle-client/index.ts",
+};
+
+const PORTABLE_GRAPH_LEAF_TARGETS: readonly string[] = [
+  "packages/sdk/src/requests/domain/ports.ts",
+];
+
+const PORTABLE_SERVER_ONLY_TARGETS: readonly string[] = [
+  "packages/sdk/src/internal/runtime/config.ts",
+  "packages/sdk/src/internal/runtime/env.ts",
+  "packages/sdk/src/internal/runtime/fs.ts",
+  "packages/sdk/src/internal/runtime/logger.ts",
+  "packages/sdk/src/internal/runtime/mod.ts",
+  "packages/sdk/src/internal/runtime/process.ts",
+  "packages/sdk/src/internal/runtime/runtime.ts",
+  "packages/sdk/src/internal/runtime/sidecar-execution.ts",
+  "packages/sdk/src/internal/runtime/which.ts",
+  "packages/sdk/src/adapters/oracle-service/",
+  "packages/sdk/src/adapters/nostr/hash-responder.ts",
   "packages/sdk/src/adapters/nostr/oracle-service.ts",
-  "packages/sdk/src/adapters/oracle-client/config-loader.ts",
-  "packages/sdk/src/adapters/oracle-service/server.ts",
-  "packages/sdk/src/attachments/access.ts",
-  "packages/sdk/src/attachments/blossom.ts",
-  "packages/sdk/src/attachments/url-validation.ts",
-  "packages/sdk/src/payments/cashu/cashu-wallet.ts",
-  "packages/sdk/src/proofs/verification/checks/ai-content.ts",
+  "packages/sdk/src/payments/frost/",
+  "packages/sdk/src/proofs/c2pa-validation.ts",
+  "packages/sdk/src/proofs/tlsn-validation.ts",
 ];
 
 const IMPORT_RE =
   /(?:^|\n)\s*(?:import|export)\b[\s\S]*?\bfrom\s+["']([^"']+)["']/g;
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
-function extractImports(source: string): { specifier: string; line: number }[] {
-  const results: { specifier: string; line: number }[] = [];
+function extractImports(
+  source: string,
+): { specifier: string; line: number; typeOnly: boolean }[] {
+  const results: { specifier: string; line: number; typeOnly: boolean }[] = [];
   const stripped = source
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
     .replace(
@@ -101,7 +152,14 @@ function extractImports(source: string): { specifier: string; line: number }[] {
 
   for (const re of [IMPORT_RE, DYNAMIC_IMPORT_RE]) {
     for (const m of stripped.matchAll(re)) {
-      results.push({ specifier: m[1], line: lineOf(m.index ?? 0) });
+      const statement = m[0].trimStart();
+      const typeOnly = /^import\s+type\b/.test(statement) ||
+        /^export\s+type\b/.test(statement);
+      results.push({
+        specifier: m[1],
+        line: lineOf(m.index ?? 0),
+        typeOnly,
+      });
     }
   }
   return results;
@@ -167,6 +225,24 @@ function resolveRelativeImportTarget(
   return merged.join("/");
 }
 
+function toSourceFileRel(targetRel: string): string {
+  if (targetRel.endsWith(".ts") || targetRel.endsWith(".tsx")) {
+    return targetRel;
+  }
+  return `${targetRel}.ts`;
+}
+
+function resolvePortableImportTarget(
+  specifier: string,
+  fileRel: string,
+): string | null {
+  const publicTarget = PORTABLE_PUBLIC_IMPORT_TARGETS[specifier];
+  if (publicTarget !== undefined) return publicTarget;
+  const relativeTarget = resolveRelativeImportTarget(specifier, fileRel);
+  if (relativeTarget === null) return null;
+  return toSourceFileRel(relativeTarget);
+}
+
 function relativeTargetsPackageSrc(
   specifier: string,
   fileRel: string,
@@ -202,11 +278,26 @@ function scanContentLines(source: string, pattern: RegExp): ContentHit[] {
   return hits;
 }
 
+function lineAllowsArch(source: string, line: number): boolean {
+  const sourceLine = source.split("\n")[line - 1] ?? "";
+  return OPT_OUT.test(sourceLine);
+}
+
 function isPublicAnchrSpecifier(specifier: string): boolean {
   return specifier === "@anchr/sdk" ||
     specifier.startsWith("@anchr/sdk/") ||
     specifier === "@anchr/protocol" ||
     specifier.startsWith("@anchr/protocol/");
+}
+
+function isPortableServerOnlyTarget(fileRel: string): boolean {
+  return PORTABLE_SERVER_ONLY_TARGETS.some((target) =>
+    target.endsWith("/") ? fileRel.startsWith(target) : fileRel === target
+  );
+}
+
+function isPortableGraphLeafTarget(fileRel: string): boolean {
+  return PORTABLE_GRAPH_LEAF_TARGETS.includes(fileRel);
 }
 
 function isAllowedSdkRequestImport(
@@ -490,11 +581,81 @@ function checkPublicSurfaceFile(fileRel: string, source: string): Violation[] {
   return violations;
 }
 
+async function checkPortableBrowserSurface(): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  const visited = new Set<string>();
+  const pending = [...PORTABLE_ENTRYPOINTS];
+
+  while (pending.length > 0) {
+    const fileRel = pending.pop();
+    if (fileRel === undefined || visited.has(fileRel)) continue;
+    visited.add(fileRel);
+
+    const source = await Deno.readTextFile(`${ROOT}${fileRel}`);
+
+    for (const hit of scanContentLines(source, RUNTIME_API_READ)) {
+      violations.push({
+        file: fileRel,
+        line: hit.line,
+        code: "E031",
+        severity: "error",
+        message:
+          `portable browser surface must not reference runtime API "${hit.match}"`,
+      });
+    }
+
+    if (isPortableGraphLeafTarget(fileRel)) continue;
+
+    for (const { specifier, line, typeOnly } of extractImports(source)) {
+      if (typeOnly) continue;
+      if (lineAllowsArch(source, line)) continue;
+
+      if (specifier.startsWith("node:")) {
+        violations.push({
+          file: fileRel,
+          line,
+          code: "E031",
+          severity: "error",
+          message:
+            `portable browser surface must not import runtime module "${specifier}"`,
+        });
+        continue;
+      }
+
+      const target = resolvePortableImportTarget(specifier, fileRel);
+      if (target === null) continue;
+      if (
+        !target.startsWith("packages/sdk/src/") &&
+        !target.startsWith("packages/protocol/src/")
+      ) {
+        continue;
+      }
+
+      if (isPortableServerOnlyTarget(target)) {
+        violations.push({
+          file: fileRel,
+          line,
+          code: "E031",
+          severity: "error",
+          message:
+            `portable browser surface must not import server-only SDK adapter "${specifier}"`,
+        });
+        continue;
+      }
+
+      if (!visited.has(target)) pending.push(target);
+    }
+  }
+
+  return violations;
+}
+
 async function main() {
   const onlyErrors = Deno.args.includes("--errors-only");
   const jsonOutput = Deno.args.includes("--json");
   const fileArgs = Deno.args.filter((arg) => !arg.startsWith("--"));
   const violations: Violation[] = [];
+  violations.push(...await checkPortableBrowserSurface());
 
   async function checkPath(abs: string) {
     if (!abs.endsWith(".ts") && !abs.endsWith(".tsx")) return;

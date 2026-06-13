@@ -1,9 +1,7 @@
 /**
- * Oracle service — the host running *as* an oracle node.
+ * FROST Oracle peer service.
  *
- * Hono routes for HTLC + FROST DKG/sign coordination.
- *
- * The customer-side counterpart owns registry, HTTP client, and discovery.
+ * Hono routes for Oracle-to-Oracle DKG and signing coordination.
  */
 
 export { buildOracleApp } from "./server.ts";

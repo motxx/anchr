@@ -53,13 +53,18 @@ export {
 } from "./provider.ts";
 
 export {
+  getRegisteredSchemaBundles,
+  getSchemaBundle,
   InvalidSchemaUriError,
   isSchemaUri,
   ProofSchema,
+  registerSchemaBundle,
   resolveProofGenerator,
+  resolveSchemaEvidence,
   resolveVerifierAdapter,
   type SchemaUri,
   UnknownSchemaError,
+  unregisterSchemaBundle,
 } from "./schema.ts";
 
 export type {
@@ -71,9 +76,16 @@ export type {
 
 export type {
   ProofGenerator,
+  SchemaBundle,
+  SchemaConfigParser,
+  SchemaEvidencePayload,
+  SchemaEvidenceResolver,
+  SchemaOptions,
+  SchemaOptionsMap,
   SchemaProducer,
   SchemaProducerContext,
   SchemaVerifier,
+  SchemaVerifierContext,
   VerifierAdapter,
 } from "./schema.ts";
 
@@ -98,13 +110,9 @@ export type {
   AttachmentStorageKind,
   BlossomKeyMap,
   BlossomKeyMaterial,
-  GpsCoord,
   VerificationFactor,
 } from "./values.ts";
-export {
-  DEFAULT_VERIFICATION_FACTORS,
-  VERIFICATION_FACTORS,
-} from "./values.ts";
+export { VERIFICATION_FACTORS } from "./values.ts";
 
 export {
   createKeypairSigner,
@@ -145,13 +153,10 @@ export {
 } from "./adapters/storage.ts";
 
 export {
-  createHttpOracleClient,
   createNostrOracleClient,
-  type HttpOracleOptions,
   type NostrOracleOptions,
   type OracleClient,
   OracleConfigError,
-  OracleHttpError,
   OracleResponseError,
   OracleTimeoutError,
 } from "./oracle.ts";
