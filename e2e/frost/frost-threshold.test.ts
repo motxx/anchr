@@ -32,6 +32,7 @@ import {
   verifySignature,
 } from "@anchr/sdk/payments";
 import { buildOracleApp } from "@anchr/sdk/adapters/oracle-service";
+import { ProofSchema } from "@anchr/sdk";
 
 // ---------------------------------------------------------------------------
 // Oracle operators — all independent, no Customer/Provider
@@ -510,7 +511,8 @@ suite(
           message: "deadbeef",
           requirement: {
             id: "q1",
-            factors: ["gps"],
+            schema: ProofSchema.C2paImageV1,
+            factors: [],
             description: "test",
           },
           input: { attachments: [] },
