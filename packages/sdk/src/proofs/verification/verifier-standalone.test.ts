@@ -77,10 +77,11 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
-  test("rejects empty submission for the default generic-media schema", async () => {
+  test("rejects empty generic-media submission when schema_requirement requests photo proof", async () => {
     const requirement: VerificationRequirement = {
       id: "req_default_media",
       factors: [],
+      schema_requirement: { expected_gps: { lat: 35.0, lon: 139.0 } },
     };
     const input: VerificationInput = { attachments: [] };
 
@@ -92,7 +93,7 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     );
   });
 
-  test("rejects empty generic-media submission with empty schema evidence", async () => {
+  test("accepts empty generic-media submission for no-proof query as weak verification", async () => {
     const requirement: VerificationRequirement = {
       id: "req_default_media_empty_evidence",
       factors: [],
@@ -100,6 +101,24 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     const input: VerificationInput = {
       attachments: [],
       schema_evidence: {},
+    };
+
+    const verification = await verifyProof(requirement, input);
+
+    expect(verification.passed).toBe(true);
+    expect(verification.checks).toContain(
+      "no media evidence provided (weak verification)",
+    );
+  });
+
+  test("rejects empty generic-media submission with non-empty schema evidence", async () => {
+    const requirement: VerificationRequirement = {
+      id: "req_default_media_invalid_evidence",
+      factors: [],
+    };
+    const input: VerificationInput = {
+      attachments: [],
+      schema_evidence: { gps: { lat: 35.0, lon: 139.0 } },
     };
 
     const verification = await verifyProof(requirement, input);

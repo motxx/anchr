@@ -24,10 +24,19 @@ import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
 import { getEncodedToken, type Proof } from "@cashu/cashu-ts";
-import { createQueryService } from "@anchr/sdk/testing";
-import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
+import {
+  createQueryService,
+  type Query,
+  type QueryResult,
+} from "@anchr/sdk/testing";
+import {
+  createOracleRegistry,
+  type Oracle,
+  type OracleAttestation,
+} from "@anchr/sdk/adapters/oracle-client";
 import { createPreimageStore } from "@anchr/sdk/payments";
 import { normalizeResultAttachments } from "@anchr/sdk/attachments";
+import { verifyProof } from "@anchr/sdk/proofs";
 import {
   checkInfraReady,
   createWallet,
@@ -38,6 +47,7 @@ import process from "node:process";
 
 const MINT_URL = process.env.CASHU_MINT_URL ?? "http://localhost:3338";
 const BOUNTY_SATS = 21;
+const REGTEST_VERIFICATION_ORACLE_ID = "regtest-verification-oracle";
 
 const INFRA_READY = await checkInfraReady(MINT_URL);
 
@@ -54,12 +64,52 @@ async function mintCashuToken(
   return { token, proofs };
 }
 
+function createRegtestVerificationOracle(): Oracle {
+  return {
+    info: {
+      id: REGTEST_VERIFICATION_ORACLE_ID,
+      name: "Regtest verification oracle",
+      fee_ppm: 0,
+    },
+    async verify(
+      query: Query,
+      result: QueryResult,
+    ): Promise<OracleAttestation> {
+      const verification = await verifyProof(
+        {
+          id: query.id,
+          schema: query.schema,
+          factors: query.verification_requirements,
+          description: query.description,
+          challenge_nonce: query.challenge_nonce,
+          schema_requirement: query.schema_requirement,
+        },
+        {
+          attachments: result.attachments,
+          schema_evidence: result.schema_evidence,
+        },
+      );
+
+      return {
+        oracle_id: REGTEST_VERIFICATION_ORACLE_ID,
+        query_id: query.id,
+        passed: verification.passed,
+        checks: verification.checks,
+        failures: verification.failures,
+        attested_at: Date.now(),
+        schema_verdict: verification.schema_verdict,
+      };
+    },
+  };
+}
+
 const suite = INFRA_READY ? describe : describe.ignore;
 
 // Use a QueryService without relay hooks to avoid fire-and-forget WebSocket leaks.
 // Wire oracleRegistry + preimageStore so verification can actually succeed
 // Mirrors production composition through SDK request storage.
 const testOracleRegistry = createOracleRegistry();
+testOracleRegistry.register(createRegtestVerificationOracle());
 const testPreimageStore = createPreimageStore();
 const testService = createQueryService({
   oracleRegistry: testOracleRegistry,
@@ -125,6 +175,7 @@ suite("e2e: regtest Cashu payment_lock lifecycle", () => {
           amount_sats: BOUNTY_SATS,
           escrow_token: token,
         },
+        oracleIds: [REGTEST_VERIFICATION_ORACLE_ID],
       },
     );
     expect(created.id).toMatch(/^query_/);
@@ -169,6 +220,7 @@ suite("e2e: regtest Cashu payment_lock lifecycle", () => {
       {
         ttlSeconds: 300,
         payment_lock: { amount_sats: BOUNTY_SATS, escrow_token: token },
+        oracleIds: [REGTEST_VERIFICATION_ORACLE_ID],
       },
     );
     const submitOutcome = await testService.submitQueryResult(

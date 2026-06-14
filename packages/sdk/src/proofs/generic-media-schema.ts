@@ -1,5 +1,5 @@
 import type { SchemaBundle } from "../schema.ts";
-import { emptySubmissionCheck } from "./verification/checks/empty-submission.ts";
+import { createEmptySubmissionCheck } from "./verification/checks/empty-submission.ts";
 import type { FactorCheck } from "./verification/checks/types.ts";
 
 export const GenericMediaSchemaUri =
@@ -14,9 +14,21 @@ const genericMediaCheck: FactorCheck = {
   },
 };
 
+function hasNonEmptySchemaEvidence(value: unknown): boolean {
+  if (value === undefined) return false;
+  if (typeof value !== "object" || value === null) return true;
+  return Object.keys(value).length > 0;
+}
+
 export function createGenericMediaSchemaBundle(): SchemaBundle {
   return {
     uri: GenericMediaSchemaUri,
-    checks: [emptySubmissionCheck, genericMediaCheck],
+    checks: [
+      createEmptySubmissionCheck((ctx) =>
+        ctx.requirement.schema_requirement !== undefined ||
+        hasNonEmptySchemaEvidence(ctx.input.schema_evidence)
+      ),
+      genericMediaCheck,
+    ],
   };
 }

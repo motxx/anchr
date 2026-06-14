@@ -11,10 +11,18 @@
 import { beforeAll, describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spawn } from "../helpers/process.ts";
-import { createQueryService, createQueryStore } from "@anchr/sdk/testing";
-import { createOracleRegistry } from "@anchr/sdk/adapters/oracle-client";
-import { isTlsnVerifiedData } from "@anchr/sdk/proofs";
-import type { QueryInput, QueryResult } from "@anchr/sdk/testing";
+import {
+  createOracleRegistry,
+  createQueryService,
+  createQueryStore,
+  type Oracle,
+  type OracleAttestation,
+  type Query,
+  type QueryInput,
+  type QueryResult,
+} from "@anchr/sdk/testing";
+import { ProofSchema } from "@anchr/sdk";
+import { isTlsnVerifiedData, verifyProof } from "@anchr/sdk/proofs";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import process from "node:process";
@@ -38,8 +46,50 @@ const TARGET_BODY_MARKER = "BTC_JPY";
 const PRESENTATION_PATH = "/tmp/e2e-tlsn.presentation.tlsn";
 const MUTATED_PRESENTATION_PATH = "/tmp/e2e-tlsn-mutated.presentation.tlsn";
 const PROVER_ATTEMPTS = 3;
+const TLSN_E2E_ORACLE_ID = "tlsn-e2e-oracle";
 
 let filePresentationPromise: Promise<string> | undefined;
+
+function createTlsnE2eOracle(): Oracle {
+  return {
+    info: { id: TLSN_E2E_ORACLE_ID, name: "TLSN e2e oracle", fee_ppm: 0 },
+    async verify(
+      query: Query,
+      result: QueryResult,
+    ): Promise<OracleAttestation> {
+      const verification = await verifyProof(
+        {
+          id: query.id,
+          schema: query.schema,
+          factors: query.verification_requirements,
+          description: query.description,
+          challenge_nonce: query.challenge_nonce,
+          schema_requirement: query.schema_requirement,
+        },
+        {
+          attachments: result.attachments,
+          schema_evidence: result.schema_evidence,
+        },
+      );
+
+      return {
+        oracle_id: TLSN_E2E_ORACLE_ID,
+        query_id: query.id,
+        passed: verification.passed,
+        checks: verification.checks,
+        failures: verification.failures,
+        attested_at: Date.now(),
+        schema_verdict: verification.schema_verdict,
+      };
+    },
+  };
+}
+
+function createTlsnE2eOracleRegistry() {
+  const registry = createOracleRegistry();
+  registry.register(createTlsnE2eOracle());
+  return registry;
+}
 
 async function isVerifierReachable(): Promise<boolean> {
   try {
@@ -232,11 +282,12 @@ describe("TLSNotary E2E", () => {
     const store = createQueryStore();
     const svc = createQueryService({
       store,
-      oracleRegistry: createOracleRegistry(),
+      oracleRegistry: createTlsnE2eOracleRegistry(),
     });
 
     const input: QueryInput = {
       description: "E2E: Verify BTC/JPY price",
+      schema: ProofSchema.TlsnV1,
       verification_requirements: ["tlsn"],
       visibility: "customer_only",
       schema_requirement: {
@@ -252,6 +303,7 @@ describe("TLSNotary E2E", () => {
     const query = svc.createQuery(input, {
       ttlSeconds: 600,
       payment_lock: { amount_sats: 21 },
+      oracleIds: [TLSN_E2E_ORACLE_ID],
     });
     expect(query.status).toBe("pending");
     expect(query.schema_requirement).toEqual(input.schema_requirement);
@@ -293,15 +345,16 @@ describe("TLSNotary E2E", () => {
     const store = createQueryStore();
     const svc = createQueryService({
       store,
-      oracleRegistry: createOracleRegistry(),
+      oracleRegistry: createTlsnE2eOracleRegistry(),
     });
 
     const query = svc.createQuery({
       description: "E2E: no attestation",
+      schema: ProofSchema.TlsnV1,
       verification_requirements: ["tlsn"],
       schema_requirement: { target_url: "https://example.com" },
       visibility: "customer_only",
-    }, { ttlSeconds: 120 });
+    }, { ttlSeconds: 120, oracleIds: [TLSN_E2E_ORACLE_ID] });
 
     const outcome = await svc.submitQueryResult(
       query.id,
@@ -327,11 +380,12 @@ describe("TLSNotary E2E", () => {
 
       const testService = createQueryService({
         hooks: {},
-        oracleRegistry: createOracleRegistry(),
+        oracleRegistry: createTlsnE2eOracleRegistry(),
       });
       const query = testService.createQuery(
         {
           description: "E2E: extension result test",
+          schema: ProofSchema.TlsnV1,
           verification_requirements: ["tlsn"],
           visibility: "customer_only",
           schema_requirement: {
@@ -343,7 +397,7 @@ describe("TLSNotary E2E", () => {
             }],
           },
         },
-        { ttlSeconds: 600 },
+        { ttlSeconds: 600, oracleIds: [TLSN_E2E_ORACLE_ID] },
       );
 
       const presentationB64 = await generatePresentation(TARGET_URL);
@@ -376,11 +430,12 @@ describe("TLSNotary E2E", () => {
 
     const testService = createQueryService({
       hooks: {},
-      oracleRegistry: createOracleRegistry(),
+      oracleRegistry: createTlsnE2eOracleRegistry(),
     });
     const query = testService.createQuery(
       {
         description: "E2E: HTTP API test",
+        schema: ProofSchema.TlsnV1,
         verification_requirements: ["tlsn"],
         visibility: "customer_only",
         schema_requirement: {
@@ -392,7 +447,7 @@ describe("TLSNotary E2E", () => {
           }],
         },
       },
-      { ttlSeconds: 600 },
+      { ttlSeconds: 600, oracleIds: [TLSN_E2E_ORACLE_ID] },
     );
 
     const presentationB64 = await generatePresentation(TARGET_URL);

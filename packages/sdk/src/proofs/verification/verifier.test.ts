@@ -219,11 +219,30 @@ test("attachment without C2PA fails", async () => {
   );
 });
 
-test("payment_lock query without C2PA/nonce requirements rejects empty submission", async () => {
+test("payment_lock query without proof requirements accepts empty submission as weak verification", async () => {
   const query = makeQuery({
     schema: "https://anchr-spec.org/spec/proof/photo/v1",
     payment_lock: { amount_sats: 100 },
     verification_requirements: [],
+  });
+  const result: QueryResult = {
+    attachments: [],
+    notes: "Observed the target",
+  };
+
+  const verification = await verify(query, result);
+
+  expect(verification.passed).toBe(true);
+  expect(verification.checks).toContain(
+    "no media evidence provided (weak verification)",
+  );
+});
+
+test("generic media query with schema_requirement rejects empty submission", async () => {
+  const query = makeQuery({
+    schema: "https://anchr-spec.org/spec/proof/photo/v1",
+    verification_requirements: [],
+    schema_requirement: { expected_gps: { lat: 35.6762, lon: 139.6503 } },
   });
   const result: QueryResult = {
     attachments: [],
