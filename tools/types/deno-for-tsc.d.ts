@@ -23,9 +23,11 @@ declare namespace Deno {
     path: string,
     data: Uint8Array,
   ): Promise<void>;
+  export function readTextFile(path: string): Promise<string>;
   export function readTextFileSync(path: string): string;
   export function writeTextFile(path: string, data: string): Promise<void>;
   export function writeTextFileSync(path: string, data: string): void;
+  export function rename(oldpath: string, newpath: string): Promise<void>;
   export function renameSync(oldpath: string, newpath: string): void;
   export function stat(path: string): Promise<FileInfo>;
   export function statSync(path: string): FileInfo;
