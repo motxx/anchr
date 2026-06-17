@@ -334,11 +334,13 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       const swapAmount = p.amountSats;
 
       const phase1 = buildPhase1P2PKOptions(p.customerPubkey);
+      let keep: Proof[];
       let send: Proof[];
       try {
         const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(
           phase1,
         ).run();
+        keep = result.keep ?? [];
         send = result.send;
       } catch (err) {
         throw new CashuMintError("buildHtlcLock: mint swap failed", err);
@@ -350,6 +352,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         token,
         amountSats: sumAmounts(send),
         proofs: send as CashuProof[],
+        changeProofs: keep as CashuProof[],
       };
     },
 
@@ -394,6 +397,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       const phase2 = buildHtlcP2PKOptions(p);
       const customerPrivkeyHex = bytesToHexLocal(p.customerSecretKey);
 
+      let keep: Proof[];
       let send: Proof[];
       try {
         const result = await wallet.ops
@@ -401,6 +405,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
           .privkey(customerPrivkeyHex)
           .asP2PK(phase2)
           .run();
+        keep = result.keep ?? [];
         send = result.send;
       } catch (err) {
         throw new CashuMintError("bindProvider: mint swap failed", err);
@@ -412,6 +417,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         token,
         amountSats: sumAmounts(send),
         proofs: send as CashuProof[],
+        changeProofs: keep as CashuProof[],
       };
     },
 

@@ -609,6 +609,8 @@ test("Customer.request publishes expires_at floored to second granularity", asyn
 
 test("Customer.request happy path: returns the verified data + proof from a provider", async () => {
   const provider = generateKeypair();
+  const changeProofs = [{ amount: 500, id: "change-proof" }];
+  const observedChangeProofs: unknown[] = [];
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
   const queryIdRef: { value: string | null } = { value: null };
@@ -661,6 +663,16 @@ test("Customer.request happy path: returns the verified data + proof from a prov
       makeCustomerOracle(ORACLE_A, oracleClient),
       makeCustomerOracle(ORACLE_B),
     ],
+    cashuClient: makeCashuClient({
+      buildHtlcLock: async (
+        params: BuildHtlcLockParams,
+      ): Promise<CashuToken> => ({
+        token: "cashuBfake",
+        amountSats: params.amountSats,
+        proofs: [{ amount: params.amountSats }],
+        changeProofs,
+      }),
+    }),
     relayClient,
     stateStore,
     offerWindowMs: 30,
@@ -674,12 +686,17 @@ test("Customer.request happy path: returns the verified data + proof from a prov
     },
     payment: { maxAmount: 1000 },
     sourceProofs: [],
+    onPaymentChange: (proofs) => {
+      observedChangeProofs.push(...proofs);
+    },
   });
 
   expect(result.providerPubkey).toBe(provider.publicKey);
   expect(result.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(result.data).toEqual({ hello: "world" });
   expect(result.proof).toBe("base64proofbytes==");
+  expect(observedChangeProofs).toEqual(changeProofs);
+  expect(result.paymentChangeProofs).toEqual(changeProofs);
 
   if (queryIdRef.value === null) throw new Error("query id was not recorded");
   const stored = await stateStore.get(`customer:${queryIdRef.value}`);
@@ -900,6 +917,8 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   const requestEventRecorder: { id: string | null } = { id: null };
   const publishedEvents: Event[] = [];
   const bindRecorder: { params: BindProviderParams | null } = { params: null };
+  const changeProofs = [{ amount: 500, id: "change-proof" }];
+  const observedChangeProofs: unknown[] = [];
 
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
@@ -939,6 +958,14 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   });
 
   const cashuClient = makeCashuClient({
+    buildHtlcLock: async (
+      params: BuildHtlcLockParams,
+    ): Promise<CashuToken> => ({
+      token: "cashuBfake",
+      amountSats: params.amountSats,
+      proofs: [{ amount: params.amountSats }],
+      changeProofs,
+    }),
     bindProvider: async (p: BindProviderParams): Promise<CashuToken> => {
       bindRecorder.params = p;
       return { token: "cashuBbound", amountSats: 500, proofs: [] };
@@ -961,9 +988,13 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
       },
       payment: { maxAmount: 1000 },
       sourceProofs: [],
+      onPaymentChange: (proofs) => {
+        observedChangeProofs.push(...proofs);
+      },
     }),
   ).rejects.toThrow(ResultTimeoutError);
 
+  expect(observedChangeProofs).toEqual(changeProofs);
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
   expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);

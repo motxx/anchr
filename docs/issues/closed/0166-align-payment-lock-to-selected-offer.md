@@ -67,9 +67,13 @@ Payment Lock is part of the selected Provider's redeem path.
 Implemented by updating:
 
 - `packages/sdk/src/customer.ts`
+- `packages/sdk/src/customer-types.ts`
 - `packages/sdk/src/customer.test.ts`
+- `packages/sdk/src/adapters/types.ts`
 - `packages/sdk/src/adapters/cashu.ts`
 - `packages/sdk/src/adapters/cashu.test.ts`
+- `packages/sdk/src/payments/cashu/redeem-swap.ts`
+- `packages/sdk/src/index.ts`
 - `examples/sdk-public-api-dogfood.test.ts`
 
 Verified with:

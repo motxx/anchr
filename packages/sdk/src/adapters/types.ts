@@ -34,6 +34,7 @@ export interface CashuToken {
   token: string;
   amountSats: number;
   proofs: CashuProof[];
+  changeProofs?: CashuProof[];
 }
 
 export interface CashuClient {

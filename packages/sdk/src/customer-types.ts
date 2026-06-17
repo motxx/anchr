@@ -9,18 +9,24 @@ import type {
 import type {
   Offer,
   Payment,
-  RequestResult,
+  RequestResult as ProtocolRequestResult,
   Spec,
 } from "@anchr/protocol/types";
 import type { SchemaOptionsMap, VerifierAdapter } from "./schema.ts";
 
-export type { Offer, Payment, RequestResult, Spec, VerifierAdapter };
+export type { Offer, Payment, Spec, VerifierAdapter };
 export type {
   ActorStateStore,
   CashuClient,
   CashuProof,
   RelayClient,
 } from "./adapters/types.ts";
+
+/** Result returned by the SDK Customer after a successful purchase. */
+export interface RequestResult extends ProtocolRequestResult {
+  /** Cashu proofs kept by the wallet while sizing the Payment Lock. */
+  paymentChangeProofs?: readonly CashuProof[];
+}
 
 /** Strategy for picking an offer among the ones received within `offerWindowMs`. */
 export type OfferSelector = (offers: Offer[]) => Offer | null;
@@ -73,6 +79,8 @@ export interface RequestOptions {
   payment: Payment;
   /** Source proofs to lock at the Cashu mint. */
   sourceProofs: CashuProof[];
+  /** Receives Cashu proofs kept while sizing the Payment Lock. */
+  onPaymentChange?: (proofs: readonly CashuProof[]) => void | Promise<void>;
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;
   /**

@@ -64,6 +64,7 @@ function makeFakeWallet(opts: {
   outputs?: Proof[][];
   /** Single output (used for every call) — convenience for one-call tests. */
   outputProofs?: Proof[];
+  keepProofs?: Proof[];
   errorOnSend?: Error;
   /** Fee (sats) per swap call. Defaults to 0 (free regtest mints). */
   fee?: number;
@@ -90,7 +91,7 @@ function makeFakeWallet(opts: {
           run() {
             if (opts.errorOnSend) return Promise.reject(opts.errorOnSend);
             const out = outputs[outputIdx++] ?? opts.outputProofs ?? [];
-            return Promise.resolve({ send: out });
+            return Promise.resolve({ send: out, keep: opts.keepProofs ?? [] });
           },
         };
         return chain;
@@ -149,8 +150,17 @@ test("buildHtlcLock performs a Phase-1 mint swap for the requested output amount
       C: "02" + "dd".repeat(32),
     },
   ];
+  const changeProofs: Proof[] = [
+    {
+      id: "00ad268c4d1f5826",
+      amount: 500,
+      secret: "change-sec",
+      C: "02" + "cc".repeat(32),
+    },
+  ];
   const { wallet, calls } = makeFakeWallet({
     outputProofs: phase1Output,
+    keepProofs: changeProofs,
     fee: 2,
   });
   const client = createCashuClient({
@@ -168,6 +178,7 @@ test("buildHtlcLock performs a Phase-1 mint swap for the requested output amount
 
   expect(result.amountSats).toBe(1000);
   expect(result.proofs.length).toBe(1);
+  expect(result.changeProofs).toEqual(changeProofs);
   expect(result.token.startsWith("cashu")).toBe(true);
 
   expect(calls.length).toBe(1);

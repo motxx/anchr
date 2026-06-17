@@ -407,6 +407,10 @@ export function createCustomer(options: CustomerOptions): Customer {
         locktimeSeconds,
         sourceProofs: req.sourceProofs,
       });
+      const paymentChangeProofs = initialLock.changeProofs ?? [];
+      if (paymentChangeProofs.length > 0) {
+        await req.onPaymentChange?.(paymentChangeProofs);
+      }
 
       // Pass proofs directly rather than re-decoding the broadcast token:
       // the encoded V4 form truncates keyset IDs and would require wallet
@@ -503,6 +507,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         proof: response.proof,
         providerPubkey: selected.providerPubkey,
         schema: response.schema,
+        ...(paymentChangeProofs.length > 0 ? { paymentChangeProofs } : {}),
       };
       if (stateStore !== undefined) {
         await writeCustomerState(stateStore, {

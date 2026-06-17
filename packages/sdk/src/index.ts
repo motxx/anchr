@@ -67,12 +67,7 @@ export {
   unregisterSchemaBundle,
 } from "./schema.ts";
 
-export type {
-  Offer,
-  Payment,
-  RequestResult,
-  Spec,
-} from "@anchr/protocol/types";
+export type { Offer, Payment, Spec } from "@anchr/protocol/types";
 
 export type {
   ProofGenerator,
@@ -101,6 +96,7 @@ export type {
   OfferSelector,
   OracleSelector,
   RequestOptions,
+  RequestResult,
 } from "./customer-types.ts";
 
 export type { ProviderOptions } from "./provider-types.ts";

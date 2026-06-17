@@ -14,7 +14,7 @@ export interface CashuRedeemSendChain {
   asP2PK(options: P2PKOptions): CashuRedeemSendChain;
   privkey(k: string | string[]): CashuRedeemSendChain;
   asCustom?(data: OutputDataLike[]): CashuRedeemSendChain;
-  run(): Promise<{ send: Proof[] }>;
+  run(): Promise<{ send: Proof[]; keep?: Proof[] }>;
 }
 
 export interface CashuRedeemWallet {
