@@ -112,6 +112,7 @@ function baseSelectionExecution() {
     description: "private execution detail",
     mint_url: "https://mint.example.org",
     max_amount_sats: 1000,
+    amount_sats: 200,
     locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
   };
 }
@@ -438,6 +439,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   let onSelectionEvent: ((e: Event) => void) | null = null;
   let producerCalled = false;
   let producerPredicate: unknown = null;
+  let producerAmountSats: number | null = null;
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
@@ -469,6 +471,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     produce: async (selection) => {
       producerCalled = true;
       producerPredicate = selection.spec.predicate;
+      producerAmountSats = selection.amountSats;
       return { data: { hello: "world" }, proof: "pf-bytes" };
     },
   }));
@@ -521,6 +524,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   expect(producerPredicate).toEqual({
     target: "https://api.example.org/private",
   });
+  expect(producerAmountSats).toBe(200);
   // Two publishes from the provider: kind 7000 offer + kind 6300 result.
   expect(published).toHaveLength(2);
   expect(published[0].kind).toBe(7000);
@@ -652,6 +656,77 @@ test("Provider.serve ignores selection whose execution payload mismatches the Re
       provider_redemption_token: "cashuBbound",
       execution: selectionExecution({
         schema: CUSTOM_SCHEMA,
+      }),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(false);
+  expect(published).toHaveLength(1);
+  expect(published[0].kind).toBe(7000);
+});
+
+test("Provider.serve ignores selection whose payment amount differs from its offer", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      } else if (kinds.includes(7000)) {
+        onSelectionEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    relayClient,
+    selectionTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => {
+      producerCalled = true;
+      return { data: null, proof: "x" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  const fireRequest = requireOnEvent(onRequestEvent);
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: ORACLE_A,
+    max_amount_sats: 1000,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  const fireSelection = requireOnEvent(onSelectionEvent);
+  fireSelection(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      provider_redemption_token: "cashuBunderfunded",
+      execution: selectionExecution({
+        amount_sats: 1,
       }),
     },
   ));

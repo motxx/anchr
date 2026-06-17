@@ -53,6 +53,8 @@ export interface SelectionExecutionPayload {
   mint_url: string;
   /** Payment Budget: maximum amount the Customer will pay (sats). */
   max_amount_sats: number;
+  /** Requested Payment Amount: selected Provider Offer amount (sats). */
+  amount_sats: number;
   /** Locktime as Unix timestamp (seconds). */
   locktime_seconds: number;
 }
@@ -318,6 +320,7 @@ export function parseSelectionFeedbackEvent(
     typeof execution.schema !== "string" ||
     !("predicate" in execution) ||
     typeof execution.max_amount_sats !== "number" ||
+    typeof execution.amount_sats !== "number" ||
     typeof execution.mint_url !== "string" ||
     typeof execution.locktime_seconds !== "number"
   ) {
@@ -340,6 +343,7 @@ export function parseSelectionFeedbackEvent(
         : undefined,
       mint_url: execution.mint_url,
       max_amount_sats: execution.max_amount_sats,
+      amount_sats: execution.amount_sats,
       locktime_seconds: execution.locktime_seconds,
     },
   };

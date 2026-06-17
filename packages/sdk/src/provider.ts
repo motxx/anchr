@@ -331,6 +331,7 @@ async function handleJob(
   if (selection === null) return;
   if (selection.execution.schema !== payload.schema) return;
   if (selection.execution.max_amount_sats !== payload.max_amount_sats) return;
+  if (selection.execution.amount_sats !== offer.amountSats) return;
   if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
 
   let result: { data: unknown; proof: Uint8Array | string };
@@ -343,6 +344,7 @@ async function handleJob(
         context: selection.execution.context,
       },
       mint: selection.execution.mint_url,
+      amountSats: selection.execution.amount_sats,
       maxAmountSats: selection.execution.max_amount_sats,
       locktimeSeconds: selection.execution.locktime_seconds,
     });
@@ -492,6 +494,7 @@ function waitForSelection(
       context?: Record<string, unknown>;
       mint_url: string;
       max_amount_sats: number;
+      amount_sats: number;
       locktime_seconds: number;
     };
   } | null

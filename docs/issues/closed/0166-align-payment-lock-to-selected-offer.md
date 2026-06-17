@@ -70,6 +70,8 @@ Implemented by updating:
 - `packages/sdk/src/customer-types.ts`
 - `packages/sdk/src/customer.test.ts`
 - `packages/sdk/src/integration.test.ts`
+- `packages/sdk/src/provider.ts`
+- `packages/sdk/src/provider-types.ts`
 - `packages/sdk/src/provider.test.ts`
 - `packages/sdk/src/adapters/types.ts`
 - `packages/sdk/src/adapters/cashu.ts`
@@ -77,6 +79,8 @@ Implemented by updating:
 - `packages/sdk/src/payments/cashu/redeem-swap.ts`
 - `packages/sdk/src/index.ts`
 - `packages/sdk/src/testing/cashu.ts`
+- `packages/protocol/src/events.ts`
+- `packages/protocol/src/events.test.ts`
 - `examples/paid-request-simulation/mod.ts`
 - `examples/paid-request-simulation/mod.test.ts`
 - `examples/sdk-public-api-dogfood.test.ts`
@@ -88,6 +92,9 @@ The Customer flow now binds `fundingProofs` directly into a Provider-bound
 Payment Lock after selecting the Provider. The removed preselection swap avoids
 an extra mint round trip and lets the Cashu adapter create an exact Provider
 net amount while returning Customer change proofs from the same mint operation.
+Selection Feedback now carries the selected Provider Offer amount as
+`execution.amount_sats`, and the Provider rejects a selection whose amount does
+not match its own offer before producing work.
 
 Verified with:
 

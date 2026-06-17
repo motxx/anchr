@@ -265,6 +265,7 @@ test("feedback events expose causal tags and JSON payloads", () => {
       description: "private execution detail",
       mint_url: "https://mint.example.org",
       max_amount_sats: 42,
+      amount_sats: 42,
       locktime_seconds: 123456,
     },
   });
@@ -281,6 +282,7 @@ test("feedback events expose causal tags and JSON payloads", () => {
     customer.publicKey,
   );
   expect(parsedSelection?.provider_redemption_token).toBe("cashuBbound");
+  expect(parsedSelection?.execution.amount_sats).toBe(42);
   expect(parsedSelection?.execution.predicate).toEqual({
     target: "https://api.example.org",
   });
@@ -393,6 +395,7 @@ test("builders stamp the v0 wire-version tag", () => {
       predicate: {},
       mint_url: "https://mint.example.org",
       max_amount_sats: 1,
+      amount_sats: 1,
       locktime_seconds: 123456,
     },
   });

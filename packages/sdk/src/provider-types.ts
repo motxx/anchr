@@ -40,6 +40,7 @@ export interface ProviderRequestEvent {
 export interface ProviderSelectionContext {
   spec: Spec;
   mint: string;
+  amountSats: number;
   maxAmountSats: number;
   locktimeSeconds: number;
 }

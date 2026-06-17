@@ -438,6 +438,7 @@ export function createCustomer(options: CustomerOptions): Customer {
             context: req.spec.context,
             mint_url: mint,
             max_amount_sats: req.payment.maxAmount,
+            amount_sats: selected.amountSats,
             locktime_seconds: locktimeSeconds,
           },
         };

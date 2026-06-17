@@ -1139,6 +1139,7 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   expect(selection?.execution.predicate).toEqual({});
   expect(selection?.execution.mint_url).toBe("https://mint.example.org");
   expect(selection?.execution.max_amount_sats).toBe(1000);
+  expect(selection?.execution.amount_sats).toBe(500);
   expect(selection?.execution.locktime_seconds).toBeGreaterThan(
     Math.floor(Date.now() / 1000),
   );
