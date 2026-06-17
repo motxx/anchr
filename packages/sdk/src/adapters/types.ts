@@ -32,6 +32,7 @@ export interface CashuToken {
 
 export interface CashuClient {
   bindProvider(params: BindProviderParams): Promise<CashuToken>;
+  getTokenAmount(token: string): Promise<number>;
   redeemHtlc(params: RedeemHtlcParams): Promise<RedeemResult>;
   readonly mintUrl: string;
 }

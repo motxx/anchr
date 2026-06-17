@@ -146,6 +146,20 @@ test("createCashuClient stores the mint URL on the returned client", () => {
   expect(client.mintUrl).toBe("https://mint.example.org");
 });
 
+test("getTokenAmount decodes the Cashu token proof total", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const token = getEncodedToken({
+    mint: "https://mint.example.org",
+    proofs: VALID_SOURCE_PROOFS as Proof[],
+  });
+
+  await expect(client.getTokenAmount(token)).resolves.toBe(1000);
+});
+
 test("createCashuClient rejects an empty mint URL", () => {
   expect(() => createCashuClient({ mintUrl: "" })).toThrow(CashuClientError);
 });

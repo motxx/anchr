@@ -333,6 +333,15 @@ async function handleJob(
   if (selection.execution.max_amount_sats !== payload.max_amount_sats) return;
   if (selection.execution.amount_sats !== offer.amountSats) return;
   if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
+  let tokenAmount: number;
+  try {
+    tokenAmount = await ctx.cashuClient.getTokenAmount(
+      selection.provider_redemption_token,
+    );
+  } catch {
+    return;
+  }
+  if (tokenAmount !== offer.amountSats) return;
 
   let result: { data: unknown; proof: Uint8Array | string };
   try {

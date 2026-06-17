@@ -126,6 +126,7 @@ function makeCashuClient(): CashuClient {
       amountSats: p.amountSats,
       proofs: [],
     } satisfies CashuToken),
+    getTokenAmount: (_token) => Promise.resolve(100),
     redeemHtlc: async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
       proofs: [],
       amountSats: 0,

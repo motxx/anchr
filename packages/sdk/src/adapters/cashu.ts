@@ -356,6 +356,13 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       };
     },
 
+    async getTokenAmount(token: string): Promise<number> {
+      const wallet = await getWallet();
+      const knownKeysets = wallet.keyChain.getAllKeysetIds();
+      const decoded = getDecodedToken(token, [...knownKeysets]);
+      return sumAmounts(decoded.proofs);
+    },
+
     async redeemHtlc(p: RedeemHtlcParams): Promise<RedeemResult> {
       const wallet = await getWallet();
       // Pass known keyset IDs to map V4 cashuB tokens' truncated IDs back to full form.

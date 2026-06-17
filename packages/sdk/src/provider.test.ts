@@ -70,6 +70,8 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
         amountSats: 0,
         proofs: [],
       } satisfies CashuToken)),
+    getTokenAmount: overrides?.getTokenAmount ??
+      ((_token: string): Promise<number> => Promise.resolve(200)),
     redeemHtlc: overrides?.redeemHtlc ??
       (async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
         proofs: [],
@@ -669,7 +671,7 @@ test("Provider.serve ignores selection whose execution payload mismatches the Re
   expect(published[0].kind).toBe(7000);
 });
 
-test("Provider.serve ignores selection whose payment amount differs from its offer", async () => {
+test("Provider.serve ignores selection whose Payment Lock token amount differs from its offer", async () => {
   const published: Event[] = [];
   let onRequestEvent: ((e: Event) => void) | null = null;
   let onSelectionEvent: ((e: Event) => void) | null = null;
@@ -694,6 +696,9 @@ test("Provider.serve ignores selection whose payment amount differs from its off
   const provider = createProvider({
     ...validOptions(),
     relayClient,
+    cashuClient: makeCashuClient({
+      getTokenAmount: (_token) => Promise.resolve(1),
+    }),
     selectionTimeoutMs: 200,
   });
   const servePromise = provider.serve(async () => ({
@@ -725,9 +730,7 @@ test("Provider.serve ignores selection whose payment amount differs from its off
       status: "processing",
       selected_provider_pubkey: providerKey.publicKey,
       provider_redemption_token: "cashuBunderfunded",
-      execution: selectionExecution({
-        amount_sats: 1,
-      }),
+      execution: selectionExecution(),
     },
   ));
 

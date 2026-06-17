@@ -25,6 +25,7 @@ function stubCashuClient(): CashuClient {
         amountSats: params.amountSats,
         proofs: [],
       }),
+    getTokenAmount: (_token) => Promise.resolve(100),
     redeemHtlc: (): Promise<RedeemResult> =>
       Promise.resolve({ proofs: [], amountSats: 100 }),
   };

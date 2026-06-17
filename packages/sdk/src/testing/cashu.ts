@@ -43,6 +43,9 @@ export function createInMemoryCashuClient(
         proofs: [],
       });
     },
+    getTokenAmount(_token): Promise<number> {
+      return Promise.resolve(amountSats);
+    },
     redeemHtlc(params): Promise<RedeemResult> {
       redeems.push(params);
       return Promise.resolve({ proofs: [], amountSats });

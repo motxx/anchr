@@ -36,6 +36,7 @@ function makeStubCashuClient(): {
         amountSats: params.amountSats,
         proofs: [],
       }),
+    getTokenAmount: (_token) => Promise.resolve(100),
     redeemHtlc: (params): Promise<RedeemResult> => {
       redeems.push(params);
       return Promise.resolve({ proofs: [], amountSats: 100 });
