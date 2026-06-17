@@ -13,6 +13,7 @@ import type {
   RelayClient,
 } from "./adapters/types.ts";
 import type {
+  CashuProof,
   CustomerOptions,
   CustomerOracle,
   Offer,
@@ -133,6 +134,11 @@ export class SchemaVerificationError extends Error {
     super(`Local schema verifier rejected the proof for schema ${schema}.`);
     this.name = "SchemaVerificationError";
   }
+}
+
+/** Error shape used when a request fails after Payment Lock creation returned change. */
+export interface PaymentChangeProofsError extends Error {
+  readonly paymentChangeProofs?: readonly CashuProof[];
 }
 
 /**
@@ -409,110 +415,134 @@ export function createCustomer(options: CustomerOptions): Customer {
         customerPubkey: identity.publicKey,
         customerSecretKey: identity.secretKey,
       });
-      if (boundLock.amountSats !== selected.amountSats) {
-        throw new CustomerConfigError(
-          "bound Payment Lock amount does not match the selected offer amount",
-        );
-      }
       const paymentChangeProofs = boundLock.changeProofs ?? [];
-      if (paymentChangeProofs.length > 0) {
-        await req.onPaymentChange?.(paymentChangeProofs);
-      }
 
-      const selectionPayload: SelectionFeedbackPayload = {
-        status: "processing",
-        selected_provider_pubkey: selected.providerPubkey,
-        provider_redemption_token: boundLock.token,
-        execution: {
-          schema: req.spec.schema,
-          predicate: req.spec.predicate,
-          description: req.spec.description,
-          context: req.spec.context,
-          mint_url: mint,
-          max_amount_sats: req.payment.maxAmount,
-          locktime_seconds: locktimeSeconds,
-        },
-      };
-      const selectionEvent = buildSelectionFeedbackEvent(
-        identity,
-        requestEvent.id,
-        selectionPayload,
-      );
-      await relayClient.publish(selectionEvent);
-      if (stateStore !== undefined) {
-        await writeCustomerState(stateStore, {
-          queryId,
-          requestEventId: requestEvent.id,
-          schema: req.spec.schema,
-          status: "provider_selected",
-          providerPubkey: selected.providerPubkey,
-          offerEventId: selected.offerEventId,
-          updatedAt: clock.now(),
-        });
-      }
+      try {
+        if (boundLock.amountSats !== selected.amountSats) {
+          throw new CustomerConfigError(
+            "bound Payment Lock amount does not match the selected offer amount",
+          );
+        }
+        if (paymentChangeProofs.length > 0) {
+          await req.onPaymentChange?.(paymentChangeProofs);
+        }
 
-      const resultEvent: NostrEvent | null = await waitForFirstEvent(
-        relayClient,
-        {
-          kinds: [6300],
-          "#e": [requestEvent.id],
-          authors: [selected.providerPubkey],
-        },
-        (event) => event,
-        resultTimeoutMs,
-      ).result;
-      if (resultEvent === null) {
-        throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
-      }
+        const selectionPayload: SelectionFeedbackPayload = {
+          status: "processing",
+          selected_provider_pubkey: selected.providerPubkey,
+          provider_redemption_token: boundLock.token,
+          execution: {
+            schema: req.spec.schema,
+            predicate: req.spec.predicate,
+            description: req.spec.description,
+            context: req.spec.context,
+            mint_url: mint,
+            max_amount_sats: req.payment.maxAmount,
+            locktime_seconds: locktimeSeconds,
+          },
+        };
+        const selectionEvent = buildSelectionFeedbackEvent(
+          identity,
+          requestEvent.id,
+          selectionPayload,
+        );
+        await relayClient.publish(selectionEvent);
+        if (stateStore !== undefined) {
+          await writeCustomerState(stateStore, {
+            queryId,
+            requestEventId: requestEvent.id,
+            schema: req.spec.schema,
+            status: "provider_selected",
+            providerPubkey: selected.providerPubkey,
+            offerEventId: selected.offerEventId,
+            updatedAt: clock.now(),
+          });
+        }
 
-      const response = parseQueryResponseEvent(
-        resultEvent,
-        identity.secretKey,
-        selected.providerPubkey,
-      );
-      if (response === null) {
-        throw new ResultTimeoutError(
+        const resultEvent: NostrEvent | null = await waitForFirstEvent(
+          relayClient,
+          {
+            kinds: [6300],
+            "#e": [requestEvent.id],
+            authors: [selected.providerPubkey],
+          },
+          (event) => event,
           resultTimeoutMs,
+        ).result;
+        if (resultEvent === null) {
+          throw new ResultTimeoutError(
+            resultTimeoutMs,
+            selected.providerPubkey,
+          );
+        }
+
+        const response = parseQueryResponseEvent(
+          resultEvent,
+          identity.secretKey,
           selected.providerPubkey,
         );
-      }
-
-      const verifier = resolveVerifierAdapter(
-        verifierAdapters,
-        req.spec.schema,
-      );
-      if (verifier !== null) {
-        const ok = await Promise.resolve(
-          verifier.verify(response.proof, req.spec.predicate, response.data, {
-            options: schemaOptions?.[req.spec.schema],
-          }),
-        );
-        if (!ok) {
-          throw new SchemaVerificationError(req.spec.schema);
+        if (response === null) {
+          throw new ResultTimeoutError(
+            resultTimeoutMs,
+            selected.providerPubkey,
+          );
         }
-      }
 
-      const result = {
-        data: response.data,
-        proof: response.proof,
-        providerPubkey: selected.providerPubkey,
-        schema: response.schema,
-        ...(paymentChangeProofs.length > 0 ? { paymentChangeProofs } : {}),
-      };
-      if (stateStore !== undefined) {
-        await writeCustomerState(stateStore, {
-          queryId,
-          requestEventId: requestEvent.id,
-          schema: req.spec.schema,
-          status: "result_received",
+        const verifier = resolveVerifierAdapter(
+          verifierAdapters,
+          req.spec.schema,
+        );
+        if (verifier !== null) {
+          const ok = await Promise.resolve(
+            verifier.verify(response.proof, req.spec.predicate, response.data, {
+              options: schemaOptions?.[req.spec.schema],
+            }),
+          );
+          if (!ok) {
+            throw new SchemaVerificationError(req.spec.schema);
+          }
+        }
+
+        const result = {
+          data: response.data,
+          proof: response.proof,
           providerPubkey: selected.providerPubkey,
-          offerEventId: selected.offerEventId,
-          updatedAt: clock.now(),
-        });
+          schema: response.schema,
+          ...(paymentChangeProofs.length > 0 ? { paymentChangeProofs } : {}),
+        };
+        if (stateStore !== undefined) {
+          await writeCustomerState(stateStore, {
+            queryId,
+            requestEventId: requestEvent.id,
+            schema: req.spec.schema,
+            status: "result_received",
+            providerPubkey: selected.providerPubkey,
+            offerEventId: selected.offerEventId,
+            updatedAt: clock.now(),
+          });
+        }
+        return result;
+      } catch (err) {
+        throw attachPaymentChangeProofs(err, paymentChangeProofs);
       }
-      return result;
     },
   };
+}
+
+function attachPaymentChangeProofs(
+  err: unknown,
+  paymentChangeProofs: readonly CashuProof[],
+): Error {
+  if (paymentChangeProofs.length === 0) {
+    return err instanceof Error ? err : new Error(String(err));
+  }
+  const error = err instanceof Error ? err : new Error(String(err));
+  Object.defineProperty(error, "paymentChangeProofs", {
+    value: paymentChangeProofs,
+    enumerable: true,
+    configurable: true,
+  });
+  return error;
 }
 
 function findCustomerOracle(
