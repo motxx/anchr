@@ -23,6 +23,20 @@ export interface RedeemResult {
   amountSats: number;
 }
 
+export interface VerifyProviderPaymentLockParams {
+  token: string;
+  amountSats: number;
+  hashHex: string;
+  providerPubkey: string;
+  customerPubkey: string;
+  locktimeSeconds: number;
+}
+
+export interface VerifyProviderPaymentLockResult {
+  proofs: CashuProof[];
+  amountSats: number;
+}
+
 export interface CashuToken {
   token: string;
   amountSats: number;
@@ -32,7 +46,9 @@ export interface CashuToken {
 
 export interface CashuClient {
   bindProvider(params: BindProviderParams): Promise<CashuToken>;
-  getTokenAmount(token: string): Promise<number>;
+  verifyProviderPaymentLock(
+    params: VerifyProviderPaymentLockParams,
+  ): Promise<VerifyProviderPaymentLockResult>;
   redeemHtlc(params: RedeemHtlcParams): Promise<RedeemResult>;
   readonly mintUrl: string;
 }

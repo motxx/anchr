@@ -36,9 +36,13 @@ import type {
 import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
 import { waitForFirstEvent } from "./relay-wait.ts";
 import { type Clock, realClock } from "./requests/domain/ports.ts";
+import { createNostrOracleClient } from "./oracle.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
+
+/** Default timeout for waiting for the Oracle hash bootstrap response (10s). */
+export const DEFAULT_HASH_TIMEOUT_MS = 10_000;
 
 /** Default timeout for waiting for the oracle's preimage NIP-44 DM after publishing the result (5 min). */
 export const DEFAULT_PREIMAGE_TIMEOUT_MS = 5 * 60_000;
@@ -187,6 +191,7 @@ export function createProvider(options: ProviderOptions): Provider {
   const cashuClient = options.cashuClient;
   const selectionTimeoutMs = options.selectionTimeoutMs ??
     DEFAULT_SELECTION_TIMEOUT_MS;
+  const hashTimeoutMs = options.hashTimeoutMs ?? DEFAULT_HASH_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ??
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
@@ -226,6 +231,7 @@ export function createProvider(options: ProviderOptions): Provider {
               relayClient,
               stateStore,
               selectionTimeoutMs,
+              hashTimeoutMs,
               preimageTimeoutMs,
               proofGenerators,
               schemaOptions,
@@ -257,6 +263,7 @@ interface JobContext {
   relayClient: RelayClient;
   stateStore?: ActorStateStore;
   selectionTimeoutMs: number;
+  hashTimeoutMs: number;
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
   schemaOptions?: ProviderOptions["schemaOptions"];
@@ -333,15 +340,28 @@ async function handleJob(
   if (selection.execution.max_amount_sats !== payload.max_amount_sats) return;
   if (selection.execution.amount_sats !== offer.amountSats) return;
   if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
-  let tokenAmount: number;
+  let hash: string;
   try {
-    tokenAmount = await ctx.cashuClient.getTokenAmount(
-      selection.provider_redemption_token,
-    );
+    hash = (await createNostrOracleClient({
+      relayClient: ctx.relayClient,
+      oraclePubkey: payload.oracle_pubkey,
+      timeoutMs: ctx.hashTimeoutMs,
+    }).requestHash(payload.query_id)).hash;
   } catch {
     return;
   }
-  if (tokenAmount !== offer.amountSats) return;
+  try {
+    await ctx.cashuClient.verifyProviderPaymentLock({
+      token: selection.provider_redemption_token,
+      amountSats: offer.amountSats,
+      hashHex: hash,
+      providerPubkey: ctx.identity.publicKey,
+      customerPubkey: payload.customer_pubkey,
+      locktimeSeconds: selection.execution.locktime_seconds,
+    });
+  } catch {
+    return;
+  }
 
   let result: { data: unknown; proof: Uint8Array | string };
   try {

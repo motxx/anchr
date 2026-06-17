@@ -72,6 +72,7 @@ export interface ProviderOptions {
   /** Optional schema-specific configuration keyed by schema URI. */
   schemaOptions?: SchemaOptionsMap;
   selectionTimeoutMs?: number;
+  hashTimeoutMs?: number;
   preimageTimeoutMs?: number;
   proofGenerators?: readonly ProofGenerator[];
 }

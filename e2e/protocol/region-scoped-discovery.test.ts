@@ -14,6 +14,7 @@ import {
   generateKeypair,
   ProofSchema,
   type RedeemResult,
+  serveHashRequests,
 } from "@anchr/sdk";
 
 function stubCashuClient(): CashuClient {
@@ -25,7 +26,8 @@ function stubCashuClient(): CashuClient {
         amountSats: params.amountSats,
         proofs: [],
       }),
-    getTokenAmount: (_token) => Promise.resolve(100),
+    verifyProviderPaymentLock: () =>
+      Promise.resolve({ proofs: [], amountSats: 100 }),
     redeemHtlc: (): Promise<RedeemResult> =>
       Promise.resolve({ proofs: [], amountSats: 100 }),
   };
@@ -45,6 +47,11 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
   const oracleKey = generateKeypair();
   const providerKey = generateKeypair();
   const servedSchemas: string[] = [];
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
 
   const provider = createProvider({
     oracles: [oracleKey.publicKey],
@@ -104,6 +111,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
   } finally {
     await provider.stop();
     await servePromise;
+    hashResponder.close();
     relayClient.close();
   }
 });

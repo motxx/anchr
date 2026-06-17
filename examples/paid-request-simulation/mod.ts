@@ -11,6 +11,7 @@ import {
   type PublishResult,
   type RedeemHtlcParams,
   type RelayClient,
+  serveHashRequests,
   type Subscription,
 } from "@anchr/sdk";
 import {
@@ -71,6 +72,11 @@ export async function runPaidRequestSimulation(): Promise<
   }
 
   const queryIdsByRequest = new Map<string, string>();
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
   relayClient.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
     const payload = parseQueryRequestEvent(event);
     if (payload !== null) queryIdsByRequest.set(event.id, payload.query_id);
@@ -155,6 +161,7 @@ export async function runPaidRequestSimulation(): Promise<
   } finally {
     await provider.stop();
     await servePromise;
+    hashResponder.close();
     relayClient.close();
   }
 }

@@ -100,8 +100,8 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
         proofs: [],
       })
     ),
-    getTokenAmount: overrides?.getTokenAmount ??
-      ((_token: string): Promise<number> => Promise.resolve(0)),
+    verifyProviderPaymentLock: overrides?.verifyProviderPaymentLock ??
+      (async () => ({ proofs: [], amountSats: 0 })),
     redeemHtlc: overrides?.redeemHtlc ?? (
       async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
         proofs: [],

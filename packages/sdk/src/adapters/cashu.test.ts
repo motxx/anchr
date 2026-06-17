@@ -119,6 +119,11 @@ function makeHtlcToken(
   hashHex: string,
   providerPubkey: string,
   locktime: number,
+  options?: {
+    amount?: number;
+    customerPubkey?: string;
+    mint?: string;
+  },
 ): string {
   const secret = JSON.stringify([
     "HTLC",
@@ -128,17 +133,21 @@ function makeHtlcToken(
       tags: [
         ["pubkeys", `02${providerPubkey}`],
         ["locktime", String(locktime)],
+        ["refund", `02${options?.customerPubkey ?? CUSTOMER_PUBKEY}`],
         ["sigflag", "SIG_ALL"],
       ],
     },
   ]);
   const proof: Proof = {
     id: "00ad268c4d1f5826",
-    amount: 1000,
+    amount: options?.amount ?? 1000,
     secret,
     C: "02" + "ab".repeat(32),
   };
-  return getEncodedToken({ mint: "https://mint.example.org", proofs: [proof] });
+  return getEncodedToken({
+    mint: options?.mint ?? "https://mint.example.org",
+    proofs: [proof],
+  });
 }
 
 test("createCashuClient stores the mint URL on the returned client", () => {
@@ -146,18 +155,73 @@ test("createCashuClient stores the mint URL on the returned client", () => {
   expect(client.mintUrl).toBe("https://mint.example.org");
 });
 
-test("getTokenAmount decodes the Cashu token proof total", async () => {
+test("verifyProviderPaymentLock accepts a Provider-bound Cashu HTLC token", async () => {
   const { wallet } = makeFakeWallet({});
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
     wallet,
   });
-  const token = getEncodedToken({
+  const lockTime = FUTURE_LOCKTIME();
+  const token = makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime);
+
+  const result = await client.verifyProviderPaymentLock({
+    token,
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  });
+
+  expect(result.amountSats).toBe(1000);
+  expect(result.proofs.length).toBe(1);
+});
+
+test("verifyProviderPaymentLock rejects tokens that are not bound to the expected conditions", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+  const base = {
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  };
+  const validToken = makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime);
+  const plainToken = getEncodedToken({
     mint: "https://mint.example.org",
     proofs: VALID_SOURCE_PROOFS as Proof[],
   });
 
-  await expect(client.getTokenAmount(token)).resolves.toBe(1000);
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: plainToken,
+  })).rejects.toThrow(CashuClientError);
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: validToken,
+    hashHex: "ff".repeat(32),
+  })).rejects.toThrow(CashuClientError);
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: validToken,
+    providerPubkey: "11".repeat(32),
+  })).rejects.toThrow(CashuClientError);
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: validToken,
+    locktimeSeconds: lockTime + 1,
+  })).rejects.toThrow(CashuClientError);
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      mint: "https://other-mint.example.org",
+    }),
+  })).rejects.toThrow(CashuClientError);
 });
 
 test("createCashuClient rejects an empty mint URL", () => {

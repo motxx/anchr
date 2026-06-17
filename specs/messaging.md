@@ -299,8 +299,10 @@ as preimage delivery use NIP-44 direct messages between specific pubkeys.
 ## Hash Bootstrap (kind 4)
 
 Before locking payment, the Customer obtains the hash commitment `H` from the
-designated Oracle over the relay. Both messages are NIP-44 kind `4` DMs; no
-HTTP endpoint is required on either side.
+designated Oracle over the relay. The Provider may request the same
+query-bound hash before irreversible work to validate that the selected Payment
+Lock is locked to the Oracle's commitment. Both messages are NIP-44 kind `4`
+DMs; no HTTP endpoint is required on either side.
 
 Customer → Oracle request content:
 

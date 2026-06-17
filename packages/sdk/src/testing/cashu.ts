@@ -6,6 +6,7 @@
 import type {
   BindProviderParams,
   CashuClient,
+  CashuProof,
   RedeemHtlcParams,
   RedeemResult,
 } from "../adapters/types.ts";
@@ -43,8 +44,11 @@ export function createInMemoryCashuClient(
         proofs: [],
       });
     },
-    getTokenAmount(_token): Promise<number> {
-      return Promise.resolve(amountSats);
+    verifyProviderPaymentLock(_params): Promise<{
+      proofs: CashuProof[];
+      amountSats: number;
+    }> {
+      return Promise.resolve({ proofs: [], amountSats });
     },
     redeemHtlc(params): Promise<RedeemResult> {
       redeems.push(params);

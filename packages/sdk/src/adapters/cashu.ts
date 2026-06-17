@@ -39,6 +39,8 @@ import type {
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
+  VerifyProviderPaymentLockParams,
+  VerifyProviderPaymentLockResult,
 } from "./types.ts";
 
 export type {
@@ -48,6 +50,8 @@ export type {
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
+  VerifyProviderPaymentLockParams,
+  VerifyProviderPaymentLockResult,
 } from "./types.ts";
 
 /**
@@ -177,6 +181,114 @@ function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
     customerRefundPubkey: p.customerPubkey,
     locktimeSeconds: p.locktimeSeconds,
   });
+}
+
+function p2pkVariants(pubkey: string): string[] {
+  return pubkey.startsWith("02") || pubkey.startsWith("03")
+    ? [pubkey]
+    : [pubkey, `02${pubkey}`];
+}
+
+function findSecretTag(tags: unknown, name: string): string[] | null {
+  if (!Array.isArray(tags)) return null;
+  for (const tag of tags) {
+    if (
+      Array.isArray(tag) &&
+      tag.length > 0 &&
+      tag.every((value) => typeof value === "string") &&
+      tag[0] === name
+    ) {
+      return tag;
+    }
+  }
+  return null;
+}
+
+function requireTagValue(
+  tags: unknown,
+  name: string,
+  value: string,
+  message: string,
+): void {
+  const tag = findSecretTag(tags, name);
+  if (tag === null || !tag.slice(1).includes(value)) {
+    throw new CashuClientError(message);
+  }
+}
+
+function validateProviderPaymentLockProofs(
+  proofs: Proof[],
+  params: VerifyProviderPaymentLockParams,
+): number {
+  if (proofs.length === 0) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token has no proofs",
+    );
+  }
+  const expectedHash = validateHashHex(params.hashHex);
+  const amountSats = sumAmounts(proofs);
+  if (amountSats !== params.amountSats) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: token amount ${amountSats} does not match ${params.amountSats}`,
+    );
+  }
+
+  for (let i = 0; i < proofs.length; i++) {
+    const proof = proofs[i]!;
+    let secret: unknown;
+    try {
+      secret = JSON.parse(proof.secret);
+    } catch {
+      throw new CashuClientError(
+        `verifyProviderPaymentLock: proof ${i} has malformed secret`,
+      );
+    }
+    if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+      throw new CashuClientError(
+        `verifyProviderPaymentLock: proof ${i} is not an HTLC proof`,
+      );
+    }
+    const body = secret[1] as { data?: unknown; tags?: unknown } | undefined;
+    if (body?.data !== expectedHash) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: HTLC hash mismatch",
+      );
+    }
+    const tags = body.tags;
+    const pubkeyTag = findSecretTag(tags, "pubkeys");
+    const providerKeys = p2pkVariants(params.providerPubkey);
+    if (
+      pubkeyTag === null ||
+      !providerKeys.some((key) => pubkeyTag.slice(1).includes(key))
+    ) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: token is not locked to the selected provider",
+      );
+    }
+    const refundTag = findSecretTag(tags, "refund");
+    const refundKeys = p2pkVariants(params.customerPubkey);
+    if (
+      refundTag === null ||
+      !refundKeys.some((key) => refundTag.slice(1).includes(key))
+    ) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: token refund key does not match customer",
+      );
+    }
+    requireTagValue(
+      tags,
+      "locktime",
+      String(params.locktimeSeconds),
+      "verifyProviderPaymentLock: token locktime mismatch",
+    );
+    requireTagValue(
+      tags,
+      "sigflag",
+      "SIG_ALL",
+      "verifyProviderPaymentLock: token must require SIG_ALL",
+    );
+  }
+  return amountSats;
 }
 
 /**
@@ -356,11 +468,25 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       };
     },
 
-    async getTokenAmount(token: string): Promise<number> {
+    async verifyProviderPaymentLock(
+      params: VerifyProviderPaymentLockParams,
+    ): Promise<VerifyProviderPaymentLockResult> {
       const wallet = await getWallet();
       const knownKeysets = wallet.keyChain.getAllKeysetIds();
-      const decoded = getDecodedToken(token, [...knownKeysets]);
-      return sumAmounts(decoded.proofs);
+      const decoded = getDecodedToken(params.token, [...knownKeysets]);
+      if (decoded.mint !== mintUrl) {
+        throw new CashuClientError(
+          "verifyProviderPaymentLock: token mint does not match client mint",
+        );
+      }
+      const amountSats = validateProviderPaymentLockProofs(
+        decoded.proofs,
+        params,
+      );
+      return {
+        proofs: decoded.proofs as CashuProof[],
+        amountSats,
+      };
     },
 
     async redeemHtlc(p: RedeemHtlcParams): Promise<RedeemResult> {
