@@ -35,14 +35,17 @@ sequenceDiagram
     participant Oracle
     participant Mint as Cashu Mint
 
-    Customer->>Mint: Lock payment in a Cashu HTLC
-    Customer->>Relay: Publish work request
-    Relay-->>Provider: Deliver request
+    Customer->>Relay: Publish Request Notice with Payment Budget
+    Relay-->>Provider: Deliver Request Notice
     Provider->>Relay: Publish offer
     Relay-->>Customer: Deliver offer
-    Customer->>Relay: Select Provider and bind Payment Lock
+    Customer->>Oracle: Request payment hash commitment
+    Oracle-->>Customer: Return hash commitment
+    Customer->>Mint: Lock selected offer amount
+    Customer->>Relay: Select Provider and deliver Payment Lock
     Relay-->>Provider: Deliver selection
-    Provider->>Provider: Produce data and proof
+    Provider->>Provider: Verify Payment Lock before work
+    Provider->>Provider: Produce work and proof
     Provider->>Oracle: Submit proof for verification
 
     alt Proof accepted before timeout
@@ -147,7 +150,7 @@ const { data, proof, providerPubkey } = await customer.request({
     },
   },
   payment: { maxAmount: 1000 },
-  sourceProofs: cashuProofsFromYourWallet,
+  fundingProofs: cashuProofsFromYourWallet,
 });
 ```
 
