@@ -316,13 +316,6 @@ export function createCustomer(options: CustomerOptions): Customer {
 
       const locktimeSeconds = Math.floor(clock.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
-      const initialLock: CashuToken = await cashuClient.buildHtlcLock({
-        amountSats: req.payment.maxAmount,
-        hashHex: hash,
-        customerPubkey: identity.publicKey,
-        locktimeSeconds,
-        sourceProofs: req.sourceProofs,
-      });
 
       const relayClient: RelayClient = options.relayClient;
 
@@ -391,6 +384,19 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (selected === null) {
         throw new NoOffersReceivedError(offerWindowMs, totalReceived);
       }
+      if (selected.amountSats > req.payment.maxAmount) {
+        throw new CustomerConfigError(
+          "offerSelector returned an offer above payment.maxAmount",
+        );
+      }
+
+      const initialLock: CashuToken = await cashuClient.buildHtlcLock({
+        amountSats: selected.amountSats,
+        hashHex: hash,
+        customerPubkey: identity.publicKey,
+        locktimeSeconds,
+        sourceProofs: req.sourceProofs,
+      });
 
       // Pass proofs directly rather than re-decoding the broadcast token:
       // the encoded V4 form truncates keyset IDs and would require wallet

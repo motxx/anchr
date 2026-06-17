@@ -18,7 +18,7 @@ test("public SDK API dogfood: customer, provider, oracle, payment, proof, attach
     },
   });
   expect(result.customerLocks).toEqual([{
-    amountSats: 1000,
+    amountSats: 100,
     hashHex: "01234567".repeat(8),
     sourceProofCount: 1,
   }]);

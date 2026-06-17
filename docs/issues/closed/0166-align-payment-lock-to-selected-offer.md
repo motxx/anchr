@@ -1,6 +1,7 @@
 # Align Payment Lock to selected Provider Offer
 
 Created: 2026-06-18
+Completed: 2026-06-18
 Model: GPT-5 Codex
 
 ## Priority
@@ -60,3 +61,36 @@ Payment Lock is part of the selected Provider's redeem path.
   responsibility remains misleading.
 - Add or update focused tests that fail under the current maxAmount-locking
   behavior.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/customer.ts`
+- `packages/sdk/src/customer.test.ts`
+- `examples/sdk-public-api-dogfood.test.ts`
+
+Verified with:
+
+- `deno test packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
+- `deno task check`
+- `deno task lint:strict`
+- `deno test --allow-all examples/sdk-public-api-dogfood.test.ts examples/paid-request-simulation/mod.test.ts`
+- `deno task test:all`
+- `check-silent-bypass` review of `packages/sdk/src/customer.ts`: no silent-bypass patterns detected
+
+Harness update:
+
+- `packages/sdk/src/customer.test.ts` now proves the Payment Lock uses the
+  selected Provider Offer amount, not the Payment Budget, and rejects
+  over-budget selector results before locking.
+- `examples/sdk-public-api-dogfood.test.ts` now dogfoods the selected-offer
+  lock amount in the public SDK simulation.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
