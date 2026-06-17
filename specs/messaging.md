@@ -172,6 +172,7 @@ The `execution` object includes:
 | `context`          | Optional schema-agnostic context                           |
 | `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
 | `max_amount_sats`  | Customer Payment Budget in sats                            |
+| `amount_sats`      | Selected Provider Offer amount in sats; the Provider Redemption Token must carry this exact net amount |
 | `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and

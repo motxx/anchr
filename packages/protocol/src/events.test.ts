@@ -20,12 +20,14 @@ import {
   type QueryRequestPayload,
 } from "./events.ts";
 import {
+  encryptNip44,
   findAllTagValues,
   findTagValue,
   generateKeypair,
   KIND_QUERY_FEEDBACK,
   KIND_QUERY_REQUEST,
   KIND_QUERY_RESPONSE,
+  signEvent,
 } from "./nostr.ts";
 
 function samplePayload(
@@ -289,6 +291,50 @@ test("feedback events expose causal tags and JSON payloads", () => {
   expect(parseSelectionFeedbackEvent(
     selection,
     generateKeypair().secretKey,
+    customer.publicKey,
+  )).toBe(null);
+});
+
+test("parseSelectionFeedbackEvent rejects selection without selected amount", () => {
+  const customer = generateKeypair();
+  const provider = generateKeypair();
+  const payload = {
+    status: "processing",
+    selected_provider_pubkey: provider.publicKey,
+    provider_redemption_token: "cashuBbound",
+    execution: {
+      schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+      predicate: { target: "https://api.example.org" },
+      mint_url: "https://mint.example.org",
+      max_amount_sats: 42,
+      amount_sats: 42,
+      locktime_seconds: 123456,
+    },
+  };
+  const { amount_sats: _amountSats, ...execution } = payload.execution;
+
+  const selection = signEvent(
+    {
+      kind: KIND_QUERY_FEEDBACK,
+      created_at: 123456,
+      content: encryptNip44(
+        JSON.stringify({ ...payload, execution }),
+        customer.secretKey,
+        provider.publicKey,
+      ),
+      tags: [
+        ["e", "req123", "", "request"],
+        ["p", provider.publicKey],
+        ["status", "processing"],
+        ["v", "0"],
+      ],
+    },
+    customer.secretKey,
+  );
+
+  expect(parseSelectionFeedbackEvent(
+    selection,
+    provider.secretKey,
     customer.publicKey,
   )).toBe(null);
 });
