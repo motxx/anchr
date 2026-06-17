@@ -69,7 +69,7 @@ A v0 Payment Lock is a Cashu HTLC/P2PK lock. The selected Provider can redeem it
 only by presenting valid Release Material and satisfying the Provider P2PK
 binding. The Customer can recover funds only through the Cashu timeout path.
 
-The Request Notice carries only the payment budget needed for discovery and
+The Request Notice carries only the Payment Budget needed for discovery and
 offer evaluation. Provider-only payment data and payment-lock terms are
 delivered after Provider Selection as encrypted Provider-only content. The
 Provider Redemption Token must not appear in public relay-visible content.

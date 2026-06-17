@@ -33,7 +33,7 @@ export interface QueryRequestPayload {
   customer_pubkey: string;
   /** Hex pubkey of the oracle the customer designated for this query. */
   oracle_pubkey: string;
-  /** Maximum amount the customer will pay (sats). */
+  /** Payment Budget: maximum amount the Customer will pay (sats). */
   max_amount_sats: number;
   /** Unix timestamp (ms) after which the customer no longer accepts offers. */
   expires_at: number;
@@ -51,7 +51,7 @@ export interface SelectionExecutionPayload {
   context?: Record<string, unknown>;
   /** Cashu mint URL for the selected Provider Redemption Token. */
   mint_url: string;
-  /** Maximum amount the customer will pay (sats). */
+  /** Payment Budget: maximum amount the Customer will pay (sats). */
   max_amount_sats: number;
   /** Locktime as Unix timestamp (seconds). */
   locktime_seconds: number;
