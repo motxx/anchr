@@ -140,7 +140,7 @@ test("createCashuClient rejects an empty mint URL", () => {
   expect(() => createCashuClient({ mintUrl: "" })).toThrow(CashuClientError);
 });
 
-test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with no hashlock", async () => {
+test("buildHtlcLock performs a Phase-1 mint swap for the requested output amount", async () => {
   const phase1Output: Proof[] = [
     {
       id: "00ad268c4d1f5826",
@@ -149,7 +149,10 @@ test("buildHtlcLock performs a Phase-1 mint swap locked to P2PK(customer) with n
       C: "02" + "dd".repeat(32),
     },
   ];
-  const { wallet, calls } = makeFakeWallet({ outputProofs: phase1Output });
+  const { wallet, calls } = makeFakeWallet({
+    outputProofs: phase1Output,
+    fee: 2,
+  });
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
     wallet,
@@ -191,15 +194,25 @@ test("buildHtlcLock validates hashHex, amountSats, locktimeSeconds, and sourcePr
       sourceProofs: VALID_SOURCE_PROOFS,
     }),
   ).rejects.toThrow(CashuClientError);
-  await expect(
-    client.buildHtlcLock({
-      amountSats: 0,
-      hashHex: VALID_HASH,
-      customerPubkey: CUSTOMER_PUBKEY,
-      locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: VALID_SOURCE_PROOFS,
-    }),
-  ).rejects.toThrow(CashuClientError);
+  for (
+    const amountSats of [
+      0,
+      -1,
+      1.5,
+      Number.POSITIVE_INFINITY,
+      Number.NaN,
+    ]
+  ) {
+    await expect(
+      client.buildHtlcLock({
+        amountSats,
+        hashHex: VALID_HASH,
+        customerPubkey: CUSTOMER_PUBKEY,
+        locktimeSeconds: FUTURE_LOCKTIME(),
+        sourceProofs: VALID_SOURCE_PROOFS,
+      }),
+    ).rejects.toThrow(CashuClientError);
+  }
   await expect(
     client.buildHtlcLock({
       amountSats: 1000,

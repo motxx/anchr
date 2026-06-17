@@ -96,13 +96,13 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
       async (_p: BuildHtlcLockParams): Promise<CashuToken> => ({
         token: "cashuBfake",
         amountSats: _p.amountSats,
-        proofs: [],
+        proofs: [{ amount: _p.amountSats }],
       })
     ),
     bindProvider: overrides?.bindProvider ?? (
       async (_p: BindProviderParams): Promise<CashuToken> => ({
         token: "cashuBbound",
-        amountSats: 0,
+        amountSats: sumTestProofAmounts(_p.initialProofs),
         proofs: [],
       })
     ),
@@ -113,6 +113,20 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
       })
     ),
   };
+}
+
+function sumTestProofAmounts(proofs: unknown[]): number {
+  return proofs.reduce<number>((sum, proof) => {
+    if (
+      typeof proof === "object" &&
+      proof !== null &&
+      "amount" in proof &&
+      typeof proof.amount === "number"
+    ) {
+      return sum + proof.amount;
+    }
+    return sum;
+  }, 0);
 }
 
 function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
@@ -264,18 +278,20 @@ test("Customer.request rejects an invalid schema URL synchronously", async () =>
   ).rejects.toThrow(InvalidSchemaUriError);
 });
 
-test("Customer.request rejects non-positive maxAmount", async () => {
+test("Customer.request rejects invalid maxAmount", async () => {
   const customer = createCustomer(validOptions());
-  await expect(
-    customer.request({
-      spec: {
-        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
-        predicate: {},
-      },
-      payment: { maxAmount: 0 },
-      sourceProofs: [],
-    }),
-  ).rejects.toThrow(CustomerConfigError);
+  for (const maxAmount of [0, -1, 1.5, Number.POSITIVE_INFINITY, Number.NaN]) {
+    await expect(
+      customer.request({
+        spec: {
+          schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+          predicate: {},
+        },
+        payment: { maxAmount },
+        sourceProofs: [],
+      }),
+    ).rejects.toThrow(CustomerConfigError);
+  }
 });
 
 test("Customer.request calls the selected oracle client's requestHash", async () => {
@@ -381,6 +397,12 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
   const provider = generateKeypair();
   const recorder: { params: BuildHtlcLockParams | null } = { params: null };
   const requestEventId: { id: string | null } = { id: null };
+  const clockValues = [
+    1_700_000_000_000,
+    1_700_000_000_100,
+    1_700_000_030_000,
+  ];
+  let clockCalls = 0;
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
       if (event.kind === 5300) requestEventId.id = event.id;
@@ -408,7 +430,7 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
       return {
         token: "cashuBlocked",
         amountSats: params.amountSats,
-        proofs: [],
+        proofs: [{ amount: params.amountSats }],
       };
     },
   });
@@ -418,6 +440,9 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
     cashuClient,
     offerWindowMs: 30,
     resultTimeoutMs: 50,
+    clock: {
+      now: () => clockValues[Math.min(clockCalls++, clockValues.length - 1)],
+    },
   });
 
   await expect(
@@ -426,7 +451,7 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
         schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
         predicate: {},
       },
-      payment: { maxAmount: 1234 },
+      payment: { maxAmount: 1234, locktimeSeconds: 42 },
       sourceProofs: [{ id: "proof1" }],
     }),
   ).rejects.toThrow(ResultTimeoutError);
@@ -436,9 +461,7 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
   expect(recorder.params.amountSats).toBe(456);
   expect(recorder.params.hashHex).toBe(HASH_HEX);
   expect(recorder.params.customerPubkey).toMatch(/^[0-9a-f]{64}$/);
-  expect(recorder.params.locktimeSeconds).toBeGreaterThan(
-    Math.floor(Date.now() / 1000),
-  );
+  expect(recorder.params.locktimeSeconds).toBe(1_700_000_030 + 42);
   expect(recorder.params.sourceProofs).toHaveLength(1);
 });
 
@@ -944,7 +967,7 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
   expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);
-  expect(bindRecorder.params.initialProofs).toEqual([]);
+  expect(bindRecorder.params.initialProofs).toEqual([{ amount: 500 }]);
 
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
@@ -970,6 +993,61 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   expect(selection?.execution.locktime_seconds).toBeGreaterThan(
     Math.floor(Date.now() / 1000),
   );
+});
+
+test("Customer.request rejects an underfunded bound Payment Lock before publishing selection", async () => {
+  const provider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const publishedEvents: Event[] = [];
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      publishedEvents.push(event);
+      if (event.kind === 5300) requestEventId.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      queueMicrotask(() => {
+        onEvent(buildOfferFeedbackEvent(
+          provider,
+          requestEventId.id ?? "unknown",
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: provider.publicKey,
+            amount_sats: 500,
+          },
+        ));
+      });
+      return { close: () => {} };
+    },
+  });
+  const cashuClient = makeCashuClient({
+    bindProvider: async (_p: BindProviderParams): Promise<CashuToken> => ({
+      token: "cashuBunderfunded",
+      amountSats: 498,
+      proofs: [],
+    }),
+  });
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    cashuClient,
+    offerWindowMs: 30,
+  });
+
+  await expect(
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
+      payment: { maxAmount: 1000 },
+      sourceProofs: [],
+    }),
+  ).rejects.toThrow(CustomerConfigError);
+
+  expect(publishedEvents).toHaveLength(1);
+  expect(publishedEvents[0].kind).toBe(5300);
 });
 
 test("Customer.request rejects offers above the maxAmount budget", async () => {
@@ -1016,6 +1094,82 @@ test("Customer.request rejects offers above the maxAmount budget", async () => {
       sourceProofs: [],
     }),
   ).rejects.toThrow(NoOffersReceivedError);
+});
+
+test("Customer.request rejects invalid selector amounts before locking", async () => {
+  for (
+    const amountSats of [
+      0,
+      -1,
+      1.5,
+      Number.POSITIVE_INFINITY,
+      Number.NaN,
+    ]
+  ) {
+    const provider = generateKeypair();
+    const requestEventId: { id: string | null } = { id: null };
+    const recorder = { buildCalled: false };
+    const relayClient = makeRelayClient({
+      publish: async (event: Event): Promise<PublishResult> => {
+        if (event.kind === 5300) requestEventId.id = event.id;
+        return { successes: ["wss://relay.example.org"], failures: [] };
+      },
+      subscribe: (
+        _filter: Filter,
+        onEvent: (e: Event) => void,
+      ): Subscription => {
+        queueMicrotask(() => {
+          onEvent(buildOfferFeedbackEvent(
+            provider,
+            requestEventId.id ?? "unknown",
+            "00".repeat(32),
+            {
+              status: "payment-required",
+              provider_pubkey: provider.publicKey,
+              amount_sats: 500,
+            },
+          ));
+        });
+        return { close: () => {} };
+      },
+    });
+    const cashuClient = makeCashuClient({
+      buildHtlcLock: async (
+        params: BuildHtlcLockParams,
+      ): Promise<CashuToken> => {
+        recorder.buildCalled = true;
+        return {
+          token: "cashuBlocked",
+          amountSats: params.amountSats,
+          proofs: [],
+        };
+      },
+    });
+    const customer = createCustomer({
+      ...validOptions(),
+      relayClient,
+      cashuClient,
+      offerWindowMs: 20,
+      offerSelector: (_offers) => ({
+        providerPubkey: provider.publicKey,
+        amountSats,
+        offerEventId: "fabricated",
+        receivedAt: Date.now(),
+      }),
+    });
+
+    await expect(
+      customer.request({
+        spec: {
+          schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+          predicate: {},
+        },
+        payment: { maxAmount: 1000 },
+        sourceProofs: [],
+      }),
+    ).rejects.toThrow(CustomerConfigError);
+    expect(recorder.buildCalled).toBe(false);
+  }
 });
 
 test("Customer.request rejects selector results above the maxAmount budget before locking", async () => {

@@ -26,6 +26,7 @@ import {
 } from "@anchr/protocol/events";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
 import type {
+  BindProviderParams,
   CashuClient,
   CashuToken,
   Filter,
@@ -124,11 +125,11 @@ function makeCashuClient(): CashuClient {
     buildHtlcLock: async (p) => ({
       token: "cashuBinit",
       amountSats: p.amountSats,
-      proofs: [],
+      proofs: [{ amount: p.amountSats }],
     } satisfies CashuToken),
-    bindProvider: async (_p) => ({
+    bindProvider: async (p) => ({
       token: "cashuBbound",
-      amountSats: 0,
+      amountSats: sumTestProofAmounts(p.initialProofs),
       proofs: [],
     } satisfies CashuToken),
     redeemHtlc: async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
@@ -136,6 +137,22 @@ function makeCashuClient(): CashuClient {
       amountSats: 0,
     }),
   };
+}
+
+function sumTestProofAmounts(
+  proofs: BindProviderParams["initialProofs"],
+): number {
+  return proofs.reduce<number>((sum, proof) => {
+    if (
+      typeof proof === "object" &&
+      proof !== null &&
+      "amount" in proof &&
+      typeof proof.amount === "number"
+    ) {
+      return sum + proof.amount;
+    }
+    return sum;
+  }, 0);
 }
 
 // --- End-to-end test ---

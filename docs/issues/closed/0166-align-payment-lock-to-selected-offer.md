@@ -68,11 +68,14 @@ Implemented by updating:
 
 - `packages/sdk/src/customer.ts`
 - `packages/sdk/src/customer.test.ts`
+- `packages/sdk/src/adapters/cashu.ts`
+- `packages/sdk/src/adapters/cashu.test.ts`
 - `examples/sdk-public-api-dogfood.test.ts`
 
 Verified with:
 
 - `deno test packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
+- `deno test packages/sdk/src/adapters/cashu.test.ts packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
 - `deno task check`
 - `deno task lint:strict`
 - `deno test --allow-all examples/sdk-public-api-dogfood.test.ts examples/paid-request-simulation/mod.test.ts`

@@ -313,8 +313,12 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
     async buildHtlcLock(p: BuildHtlcLockParams): Promise<CashuToken> {
       validateHashHex(p.hashHex);
       validateLocktime(p.locktimeSeconds);
-      if (typeof p.amountSats !== "number" || p.amountSats <= 0) {
-        throw new CashuClientError("amountSats must be a positive number");
+      if (
+        !Number.isFinite(p.amountSats) ||
+        !Number.isInteger(p.amountSats) ||
+        p.amountSats <= 0
+      ) {
+        throw new CashuClientError("amountSats must be a positive integer");
       }
       if (!Array.isArray(p.sourceProofs) || p.sourceProofs.length === 0) {
         throw new CashuClientError("sourceProofs must be a non-empty array");
@@ -327,13 +331,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
 
       const wallet = await getWallet();
       const sourceProofs = p.sourceProofs as Proof[];
-      const fee = wallet.getFeesForProofs(sourceProofs);
-      const swapAmount = p.amountSats - fee;
-      if (swapAmount <= 0) {
-        throw new CashuMintError(
-          `buildHtlcLock: mint fee ${fee} exceeds requested ${p.amountSats} sats`,
-        );
-      }
+      const swapAmount = p.amountSats;
 
       const phase1 = buildPhase1P2PKOptions(p.customerPubkey);
       let send: Proof[];

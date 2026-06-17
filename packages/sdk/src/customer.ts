@@ -284,10 +284,12 @@ export function createCustomer(options: CustomerOptions): Customer {
         throw new InvalidSchemaUriError(req.spec.schema);
       }
       if (
-        typeof req.payment.maxAmount !== "number" || req.payment.maxAmount <= 0
+        !Number.isFinite(req.payment.maxAmount) ||
+        !Number.isInteger(req.payment.maxAmount) ||
+        req.payment.maxAmount <= 0
       ) {
         throw new CustomerConfigError(
-          "payment.maxAmount must be a positive number",
+          "payment.maxAmount must be a positive integer",
         );
       }
       if (!Array.isArray(req.sourceProofs)) {
@@ -313,9 +315,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           oraclePubkey: selectedOracle.pubkey,
         });
       const { hash } = await oracleClient.requestHash(queryId);
-
-      const locktimeSeconds = Math.floor(clock.now() / 1000) +
-        (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
 
       const relayClient: RelayClient = options.relayClient;
 
@@ -384,12 +383,23 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (selected === null) {
         throw new NoOffersReceivedError(offerWindowMs, totalReceived);
       }
+      if (
+        !Number.isFinite(selected.amountSats) ||
+        !Number.isInteger(selected.amountSats) ||
+        selected.amountSats <= 0
+      ) {
+        throw new CustomerConfigError(
+          "offerSelector returned an invalid offer amount",
+        );
+      }
       if (selected.amountSats > req.payment.maxAmount) {
         throw new CustomerConfigError(
           "offerSelector returned an offer above payment.maxAmount",
         );
       }
 
+      const locktimeSeconds = Math.floor(clock.now() / 1000) +
+        (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
       const initialLock: CashuToken = await cashuClient.buildHtlcLock({
         amountSats: selected.amountSats,
         hashHex: hash,
@@ -409,6 +419,11 @@ export function createCustomer(options: CustomerOptions): Customer {
         customerPubkey: identity.publicKey,
         customerSecretKey: identity.secretKey,
       });
+      if (boundLock.amountSats !== selected.amountSats) {
+        throw new CustomerConfigError(
+          "bound Payment Lock amount does not match the selected offer amount",
+        );
+      }
 
       const selectionPayload: SelectionFeedbackPayload = {
         status: "processing",
