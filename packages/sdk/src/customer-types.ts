@@ -77,9 +77,9 @@ export interface CustomerOptions {
 export interface RequestOptions {
   spec: Spec;
   payment: Payment;
-  /** Source proofs to lock at the Cashu mint. */
+  /** Funding proofs used to create the Provider-bound Payment Lock. */
   sourceProofs: CashuProof[];
-  /** Receives Cashu proofs kept while sizing the Payment Lock. */
+  /** Receives Cashu proofs kept as change from Payment Lock creation. */
   onPaymentChange?: (proofs: readonly CashuProof[]) => void | Promise<void>;
   /** Optional: target a specific provider pubkey instead of broadcasting. */
   provider?: string;

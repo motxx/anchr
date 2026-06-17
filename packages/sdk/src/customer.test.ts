@@ -23,7 +23,6 @@ import type { OracleClient } from "./oracle.ts";
 import type {
   ActorStateStore,
   BindProviderParams,
-  BuildHtlcLockParams,
   CashuClient,
   CashuToken,
   Filter,
@@ -92,17 +91,10 @@ function makeCustomerOracle(
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
     mintUrl: overrides?.mintUrl ?? "https://mint.example.org",
-    buildHtlcLock: overrides?.buildHtlcLock ?? (
-      async (_p: BuildHtlcLockParams): Promise<CashuToken> => ({
-        token: "cashuBfake",
-        amountSats: _p.amountSats,
-        proofs: [{ amount: _p.amountSats }],
-      })
-    ),
     bindProvider: overrides?.bindProvider ?? (
       async (_p: BindProviderParams): Promise<CashuToken> => ({
         token: "cashuBbound",
-        amountSats: sumTestProofAmounts(_p.initialProofs),
+        amountSats: _p.amountSats,
         proofs: [],
       })
     ),
@@ -113,20 +105,6 @@ function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
       })
     ),
   };
-}
-
-function sumTestProofAmounts(proofs: unknown[]): number {
-  return proofs.reduce<number>((sum, proof) => {
-    if (
-      typeof proof === "object" &&
-      proof !== null &&
-      "amount" in proof &&
-      typeof proof.amount === "number"
-    ) {
-      return sum + proof.amount;
-    }
-    return sum;
-  }, 0);
 }
 
 function makeRelayClient(overrides?: Partial<RelayClient>): RelayClient {
@@ -393,9 +371,9 @@ test("Customer.request rejects when oracleSelector returns outside the whitelist
   ).rejects.toThrow(CustomerConfigError);
 });
 
-test("Customer.request builds the Payment Lock for the selected offer amount", async () => {
+test("Customer.request binds the Payment Lock for the selected offer amount", async () => {
   const provider = generateKeypair();
-  const recorder: { params: BuildHtlcLockParams | null } = { params: null };
+  const recorder: { params: BindProviderParams | null } = { params: null };
   const requestEventId: { id: string | null } = { id: null };
   const clockValues = [
     1_700_000_000_000,
@@ -425,12 +403,12 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
     },
   });
   const cashuClient = makeCashuClient({
-    buildHtlcLock: async (params: BuildHtlcLockParams): Promise<CashuToken> => {
+    bindProvider: async (params: BindProviderParams): Promise<CashuToken> => {
       recorder.params = params;
       return {
         token: "cashuBlocked",
         amountSats: params.amountSats,
-        proofs: [{ amount: params.amountSats }],
+        proofs: [],
       };
     },
   });
@@ -465,7 +443,7 @@ test("Customer.request builds the Payment Lock for the selected offer amount", a
   expect(recorder.params.sourceProofs).toHaveLength(1);
 });
 
-test("Customer.request propagates payment adapter errors from buildHtlcLock", async () => {
+test("Customer.request propagates payment adapter errors from bindProvider", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const relayClient = makeRelayClient({
@@ -490,7 +468,7 @@ test("Customer.request propagates payment adapter errors from buildHtlcLock", as
     },
   });
   const cashuClient = makeCashuClient({
-    buildHtlcLock: () =>
+    bindProvider: () =>
       Promise.reject(new TestCashuMintError("simulated mint failure")),
   });
   const customer = createCustomer({
@@ -664,12 +642,12 @@ test("Customer.request happy path: returns the verified data + proof from a prov
       makeCustomerOracle(ORACLE_B),
     ],
     cashuClient: makeCashuClient({
-      buildHtlcLock: async (
-        params: BuildHtlcLockParams,
+      bindProvider: async (
+        params: BindProviderParams,
       ): Promise<CashuToken> => ({
-        token: "cashuBfake",
+        token: "cashuBbound",
         amountSats: params.amountSats,
-        proofs: [{ amount: params.amountSats }],
+        proofs: [],
         changeProofs,
       }),
     }),
@@ -958,17 +936,14 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   });
 
   const cashuClient = makeCashuClient({
-    buildHtlcLock: async (
-      params: BuildHtlcLockParams,
-    ): Promise<CashuToken> => ({
-      token: "cashuBfake",
-      amountSats: params.amountSats,
-      proofs: [{ amount: params.amountSats }],
-      changeProofs,
-    }),
     bindProvider: async (p: BindProviderParams): Promise<CashuToken> => {
       bindRecorder.params = p;
-      return { token: "cashuBbound", amountSats: 500, proofs: [] };
+      return {
+        token: "cashuBbound",
+        amountSats: 500,
+        proofs: [],
+        changeProofs,
+      };
     },
   });
 
@@ -998,7 +973,8 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   expect(bindRecorder.params).not.toBe(null);
   if (bindRecorder.params === null) throw new Error("unreachable");
   expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);
-  expect(bindRecorder.params.initialProofs).toEqual([{ amount: 500 }]);
+  expect(bindRecorder.params.amountSats).toBe(500);
+  expect(bindRecorder.params.sourceProofs).toEqual([]);
 
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
@@ -1139,7 +1115,7 @@ test("Customer.request rejects invalid selector amounts before locking", async (
   ) {
     const provider = generateKeypair();
     const requestEventId: { id: string | null } = { id: null };
-    const recorder = { buildCalled: false };
+    const recorder = { bindCalled: false };
     const relayClient = makeRelayClient({
       publish: async (event: Event): Promise<PublishResult> => {
         if (event.kind === 5300) requestEventId.id = event.id;
@@ -1165,10 +1141,10 @@ test("Customer.request rejects invalid selector amounts before locking", async (
       },
     });
     const cashuClient = makeCashuClient({
-      buildHtlcLock: async (
-        params: BuildHtlcLockParams,
+      bindProvider: async (
+        params: BindProviderParams,
       ): Promise<CashuToken> => {
-        recorder.buildCalled = true;
+        recorder.bindCalled = true;
         return {
           token: "cashuBlocked",
           amountSats: params.amountSats,
@@ -1199,14 +1175,14 @@ test("Customer.request rejects invalid selector amounts before locking", async (
         sourceProofs: [],
       }),
     ).rejects.toThrow(CustomerConfigError);
-    expect(recorder.buildCalled).toBe(false);
+    expect(recorder.bindCalled).toBe(false);
   }
 });
 
 test("Customer.request rejects selector results above the maxAmount budget before locking", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
-  const recorder = { buildCalled: false };
+  const recorder = { bindCalled: false };
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
       if (event.kind === 5300) requestEventId.id = event.id;
@@ -1229,8 +1205,8 @@ test("Customer.request rejects selector results above the maxAmount budget befor
     },
   });
   const cashuClient = makeCashuClient({
-    buildHtlcLock: async (params: BuildHtlcLockParams): Promise<CashuToken> => {
-      recorder.buildCalled = true;
+    bindProvider: async (params: BindProviderParams): Promise<CashuToken> => {
+      recorder.bindCalled = true;
       return {
         token: "cashuBlocked",
         amountSats: params.amountSats,
@@ -1261,7 +1237,7 @@ test("Customer.request rejects selector results above the maxAmount budget befor
       sourceProofs: [],
     }),
   ).rejects.toThrow(CustomerConfigError);
-  expect(recorder.buildCalled).toBe(false);
+  expect(recorder.bindCalled).toBe(false);
 });
 
 test("Customer.request honors `provider` pinning when set", async () => {

@@ -5,8 +5,8 @@
  *   - In-process simulated oracle
  *
  * The customer's source proofs are minted via regtest Lightning so the
- * Phase-1 lock, Phase-2 swap, and provider's HTLC redemption all hit
- * the real mint. This is the "no Mock" verification of the SDK wire
+ * Provider-bound Payment Lock swap and provider's HTLC redemption both
+ * hit the real mint. This is the "no Mock" verification of the SDK wire
  * flow. **Scope:** HTLC + Nostr transport. The simulated oracle here
  * does not verify proofs (it always releases the preimage on a kind
  * 6300 result event); proof verification (TLSN attestation, C2PA, GPS,
@@ -46,7 +46,8 @@ import {
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
 const RELAY_URL = (Deno.env.get("NOSTR_RELAYS") ?? "ws://localhost:7777")
   .split(",")[0]!.trim();
-const BOUNTY_SATS = 16;
+const PROVIDER_AMOUNT_SATS = 16;
+const CUSTOMER_FUNDING_SATS = PROVIDER_AMOUNT_SATS * 2;
 
 const INFRA_READY = await checkInfraReady(MINT_URL);
 const sharedWallet = INFRA_READY ? await createWallet(MINT_URL) : undefined;
@@ -66,7 +67,7 @@ suite(
       // Mint Cashu proofs into the customer's wallet via Lightning.
       const customerProofs = await throttledMintProofs(
         sharedWallet!,
-        BOUNTY_SATS,
+        CUSTOMER_FUNDING_SATS,
       );
 
       // Generate keys for oracle and provider.
@@ -131,7 +132,7 @@ suite(
 
       const servePromise = provider.serve((request) =>
         Promise.resolve({
-          amountSats: BOUNTY_SATS,
+          amountSats: PROVIDER_AMOUNT_SATS,
           produce: () =>
             Promise.resolve({
               data: { schema: request.spec.schema, ok: true },
@@ -162,7 +163,7 @@ suite(
             schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
             predicate: { target: "https://api.example.org" },
           },
-          payment: { maxAmount: BOUNTY_SATS },
+          payment: { maxAmount: PROVIDER_AMOUNT_SATS },
           sourceProofs: customerProofs,
         });
 
@@ -197,7 +198,7 @@ suite(
 
       const customerProofs = await throttledMintProofs(
         sharedWallet!,
-        BOUNTY_SATS,
+        CUSTOMER_FUNDING_SATS,
       );
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
       const oracleKey = generateKeypair();
@@ -229,7 +230,7 @@ suite(
           schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
           predicate: { target: "https://api.example.org" },
         },
-        payment: { maxAmount: BOUNTY_SATS },
+        payment: { maxAmount: PROVIDER_AMOUNT_SATS },
         sourceProofs: customerProofs,
       })).rejects.toThrow();
 

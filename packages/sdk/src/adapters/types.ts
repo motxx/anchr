@@ -2,16 +2,9 @@ import type { Event as NostrEvent } from "@anchr/protocol/nostr";
 
 export type CashuProof = unknown;
 
-export interface BuildHtlcLockParams {
-  amountSats: number;
-  hashHex: string;
-  customerPubkey: string;
-  locktimeSeconds: number;
-  sourceProofs: CashuProof[];
-}
-
 export interface BindProviderParams {
-  initialProofs: CashuProof[];
+  amountSats: number;
+  sourceProofs: CashuProof[];
   providerPubkey: string;
   hashHex: string;
   locktimeSeconds: number;
@@ -38,7 +31,6 @@ export interface CashuToken {
 }
 
 export interface CashuClient {
-  buildHtlcLock(params: BuildHtlcLockParams): Promise<CashuToken>;
   bindProvider(params: BindProviderParams): Promise<CashuToken>;
   redeemHtlc(params: RedeemHtlcParams): Promise<RedeemResult>;
   readonly mintUrl: string;

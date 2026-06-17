@@ -19,17 +19,11 @@ import {
 function stubCashuClient(): CashuClient {
   return {
     mintUrl: "https://mint.test.example",
-    buildHtlcLock: (params) =>
-      Promise.resolve({
-        token: "cashuB-initial",
-        amountSats: params.amountSats,
-        proofs: params.sourceProofs,
-      }),
     bindProvider: (params) =>
       Promise.resolve({
         token: "cashuB-bound",
-        amountSats: 100,
-        proofs: params.initialProofs,
+        amountSats: params.amountSats,
+        proofs: [],
       }),
     redeemHtlc: (): Promise<RedeemResult> =>
       Promise.resolve({ proofs: [], amountSats: 100 }),

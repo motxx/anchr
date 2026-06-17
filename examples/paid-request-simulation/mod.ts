@@ -24,23 +24,17 @@ import {
 
 type RelayEvent = Parameters<RelayClient["publish"]>[0];
 
-export interface BuildHtlcLockCall {
-  amountSats: number;
-  hashHex: string;
-  sourceProofCount: number;
-}
-
 export interface BindProviderCall {
+  amountSats: number;
   providerPubkey: string;
   hashHex: string;
-  initialProofCount: number;
+  sourceProofCount: number;
 }
 
 export interface PaidRequestSimulationResult {
   providerPubkey: string;
   proof: string;
   data: unknown;
-  customerLocks: readonly BuildHtlcLockCall[];
   customerBinds: readonly BindProviderCall[];
   providerRedeems: readonly RedeemHtlcParams[];
 }
@@ -150,15 +144,11 @@ export async function runPaidRequestSimulation(): Promise<
       providerPubkey: result.providerPubkey,
       proof: result.proof,
       data: result.data,
-      customerLocks: customerCashu.locks.map((params) => ({
-        amountSats: params.amountSats,
-        hashHex: params.hashHex,
-        sourceProofCount: params.sourceProofs.length,
-      })),
       customerBinds: customerCashu.binds.map((params) => ({
+        amountSats: params.amountSats,
         providerPubkey: params.providerPubkey,
         hashHex: params.hashHex,
-        initialProofCount: params.initialProofs.length,
+        sourceProofCount: params.sourceProofs.length,
       })),
       providerRedeems: providerCashu.redeems,
     };

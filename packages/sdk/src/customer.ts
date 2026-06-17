@@ -400,23 +400,9 @@ export function createCustomer(options: CustomerOptions): Customer {
 
       const locktimeSeconds = Math.floor(clock.now() / 1000) +
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
-      const initialLock: CashuToken = await cashuClient.buildHtlcLock({
-        amountSats: selected.amountSats,
-        hashHex: hash,
-        customerPubkey: identity.publicKey,
-        locktimeSeconds,
-        sourceProofs: req.sourceProofs,
-      });
-      const paymentChangeProofs = initialLock.changeProofs ?? [];
-      if (paymentChangeProofs.length > 0) {
-        await req.onPaymentChange?.(paymentChangeProofs);
-      }
-
-      // Pass proofs directly rather than re-decoding the broadcast token:
-      // the encoded V4 form truncates keyset IDs and would require wallet
-      // keychain access to map them back.
       const boundLock: CashuToken = await cashuClient.bindProvider({
-        initialProofs: initialLock.proofs,
+        amountSats: selected.amountSats,
+        sourceProofs: req.sourceProofs,
         providerPubkey: selected.providerPubkey,
         hashHex: hash,
         locktimeSeconds,
@@ -427,6 +413,10 @@ export function createCustomer(options: CustomerOptions): Customer {
         throw new CustomerConfigError(
           "bound Payment Lock amount does not match the selected offer amount",
         );
+      }
+      const paymentChangeProofs = boundLock.changeProofs ?? [];
+      if (paymentChangeProofs.length > 0) {
+        await req.onPaymentChange?.(paymentChangeProofs);
       }
 
       const selectionPayload: SelectionFeedbackPayload = {

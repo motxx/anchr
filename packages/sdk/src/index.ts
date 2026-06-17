@@ -164,7 +164,6 @@ export {
 
 export {
   type BindProviderParams,
-  type BuildHtlcLockParams,
   type CashuClient,
   CashuClientError,
   type CashuClientOptions,

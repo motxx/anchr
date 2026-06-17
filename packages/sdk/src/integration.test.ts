@@ -26,7 +26,6 @@ import {
 } from "@anchr/protocol/events";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
 import type {
-  BindProviderParams,
   CashuClient,
   CashuToken,
   Filter,
@@ -122,14 +121,9 @@ function makeOracleClient(): OracleClient {
 function makeCashuClient(): CashuClient {
   return {
     mintUrl: "https://mint.example.org",
-    buildHtlcLock: async (p) => ({
-      token: "cashuBinit",
-      amountSats: p.amountSats,
-      proofs: [{ amount: p.amountSats }],
-    } satisfies CashuToken),
     bindProvider: async (p) => ({
       token: "cashuBbound",
-      amountSats: sumTestProofAmounts(p.initialProofs),
+      amountSats: p.amountSats,
       proofs: [],
     } satisfies CashuToken),
     redeemHtlc: async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
@@ -137,22 +131,6 @@ function makeCashuClient(): CashuClient {
       amountSats: 0,
     }),
   };
-}
-
-function sumTestProofAmounts(
-  proofs: BindProviderParams["initialProofs"],
-): number {
-  return proofs.reduce<number>((sum, proof) => {
-    if (
-      typeof proof === "object" &&
-      proof !== null &&
-      "amount" in proof &&
-      typeof proof.amount === "number"
-    ) {
-      return sum + proof.amount;
-    }
-    return sum;
-  }, 0);
 }
 
 // --- End-to-end test ---

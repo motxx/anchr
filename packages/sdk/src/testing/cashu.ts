@@ -5,7 +5,6 @@
 
 import type {
   BindProviderParams,
-  BuildHtlcLockParams,
   CashuClient,
   RedeemHtlcParams,
   RedeemResult,
@@ -18,8 +17,6 @@ export interface InMemoryCashuClientOptions {
 }
 
 export interface InMemoryCashuClient extends CashuClient {
-  /** buildHtlcLock calls, in order. */
-  readonly locks: BuildHtlcLockParams[];
   /** bindProvider calls, in order. */
   readonly binds: BindProviderParams[];
   /** redeemHtlc calls, in order. */
@@ -31,29 +28,19 @@ export function createInMemoryCashuClient(
 ): InMemoryCashuClient {
   const mintUrl = options.mintUrl ?? "https://mint.test.example";
   const amountSats = options.amountSats ?? 100;
-  const locks: BuildHtlcLockParams[] = [];
   const binds: BindProviderParams[] = [];
   const redeems: RedeemHtlcParams[] = [];
 
   return {
     mintUrl,
-    locks,
     binds,
     redeems,
-    buildHtlcLock(params) {
-      locks.push(params);
-      return Promise.resolve({
-        token: "cashuB-in-memory-initial",
-        amountSats: params.amountSats,
-        proofs: params.sourceProofs,
-      });
-    },
     bindProvider(params) {
       binds.push(params);
       return Promise.resolve({
         token: "cashuB-in-memory-bound",
-        amountSats,
-        proofs: params.initialProofs,
+        amountSats: params.amountSats,
+        proofs: [],
       });
     },
     redeemHtlc(params): Promise<RedeemResult> {

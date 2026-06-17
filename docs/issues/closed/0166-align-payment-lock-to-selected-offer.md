@@ -69,22 +69,37 @@ Implemented by updating:
 - `packages/sdk/src/customer.ts`
 - `packages/sdk/src/customer-types.ts`
 - `packages/sdk/src/customer.test.ts`
+- `packages/sdk/src/integration.test.ts`
+- `packages/sdk/src/provider.test.ts`
 - `packages/sdk/src/adapters/types.ts`
 - `packages/sdk/src/adapters/cashu.ts`
 - `packages/sdk/src/adapters/cashu.test.ts`
 - `packages/sdk/src/payments/cashu/redeem-swap.ts`
 - `packages/sdk/src/index.ts`
+- `packages/sdk/src/testing/cashu.ts`
+- `examples/paid-request-simulation/mod.ts`
+- `examples/paid-request-simulation/mod.test.ts`
 - `examples/sdk-public-api-dogfood.test.ts`
+- `e2e/protocol/anonymous-relay-flow.test.ts`
+- `e2e/protocol/region-scoped-discovery.test.ts`
+- `e2e/regtest/sdk-integration.test.ts`
+
+The Customer flow now binds `sourceProofs` directly into a Provider-bound
+Payment Lock after selecting the Provider. The removed preselection swap avoids
+an extra mint round trip and lets the Cashu adapter create an exact Provider
+net amount while returning Customer change proofs from the same mint operation.
 
 Verified with:
 
 - `deno test packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
 - `deno test packages/sdk/src/adapters/cashu.test.ts packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
+- `deno test packages/sdk/src/adapters/cashu.test.ts packages/sdk/src/customer.test.ts packages/sdk/src/provider.test.ts packages/sdk/src/integration.test.ts examples/sdk-public-api-dogfood.test.ts examples/paid-request-simulation/mod.test.ts e2e/protocol/anonymous-relay-flow.test.ts e2e/protocol/region-scoped-discovery.test.ts --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys`
 - `deno task check`
 - `deno task lint:strict`
 - `deno test --allow-all examples/sdk-public-api-dogfood.test.ts examples/paid-request-simulation/mod.test.ts`
 - `deno task test:all`
-- `check-silent-bypass` review of `packages/sdk/src/customer.ts`: no silent-bypass patterns detected
+- `check-silent-bypass` review of changed package payment files: no silent-bypass patterns detected
+- `arch-lint-llm` review of changed package files: no semantic architecture violations detected
 
 Harness update:
 

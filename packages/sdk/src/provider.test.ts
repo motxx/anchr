@@ -64,14 +64,6 @@ function createMemoryStateStore(): ActorStateStore {
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
     mintUrl: overrides?.mintUrl ?? "https://mint.example.org",
-    buildHtlcLock: overrides?.buildHtlcLock ??
-      (async (
-        p,
-      ) => ({
-        token: "x",
-        amountSats: p.amountSats,
-        proofs: [],
-      } satisfies CashuToken)),
     bindProvider: overrides?.bindProvider ??
       (async () => ({
         token: "y",
