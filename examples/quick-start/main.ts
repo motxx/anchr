@@ -20,7 +20,7 @@ if (relays.length === 0) {
 const relayClient = createRelayClient(relays);
 try {
   const result = await runQuickStart(relayClient);
-  console.log(`advertisement published: ${result.eventId}`);
+  console.log(`Request Notice published: ${result.eventId}`);
   console.log(`accepted by:             ${result.acceptedBy.join(", ")}`);
   console.log(`echoed back query_id:    ${result.echoed.query_id}`);
   console.log(

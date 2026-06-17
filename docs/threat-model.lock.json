@@ -12,8 +12,8 @@
     "justification": "promote the existing pre-locktime refund attack coverage from cross-referenced to enforced; invariant claim unchanged"
   },
   "INV-04": {
-    "hash": "sha256:34081c9c18206848b299bed501a29c8d97dd91dfaff68a0b53755ca21fcd7444",
-    "justification": "correct the Provider-bound escrow invariant to the load-bearing Anchr redemption path after Docker regtest exposed that relying on mint-specific wrong-key witness behavior is insufficient"
+    "hash": "sha256:09a70a35de12188f154c982e636da88be2bd421283da51ad9b719676a0a31e78",
+    "justification": "rename Provider-bound escrow wording to Payment Lock without changing the redemption invariant"
   },
   "INV-05": {
     "hash": "sha256:c7e9632735b2fba41d4dba9ed7d05dc650c4028c516d4ff9c1b2fca177d0b4e7",
@@ -24,8 +24,8 @@
     "justification": "promote C2PA/GPS from deferred public surface to an enforced invariant backed by SDK GPS-binding tests"
   },
   "INV-07": {
-    "hash": "sha256:1b15eb0654f2a8c47904434f73bed1b1a30f76a117e93389c7ce48504f04696a",
-    "justification": "declare the ephemeral-identity unlinkability invariant (P1 in docs/lifecycle-unification-design.md) with its locking test"
+    "hash": "sha256:d7e20ca09ec4f530b410c10c215f797b1149127bae24af74fd2fce53d81c93a4",
+    "justification": "rename public request advertisement wording to Request Notice without changing the Customer unlinkability invariant"
   },
   "INV-08": {
     "hash": "sha256:fa8ed21198073476de456e8c0c1da3618e97b62b689ce9f7008ff8957c63134f",

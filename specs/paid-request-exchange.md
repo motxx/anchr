@@ -51,8 +51,8 @@ Each step must preserve these links:
 
 | Step                  | Required link                                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `request`             | Public request advertisement with Customer pubkey, query id, proof schema URL, Oracle pubkey, payment budget, and offer expiry.                                                            |
-| `provider_offer`      | Provider pubkey, request event reference, requested amount, and offer status.                                                                                                              |
+| `request`             | Request Notice with Customer pubkey, query id, proof schema URL, Oracle pubkey, Payment Budget, and offer expiry.                                                                          |
+| `provider_offer`      | Provider pubkey, request event reference, Requested Payment Amount, and offer status.                                                                                                      |
 | `provider_selection`  | Request event reference, selected Provider pubkey, encrypted Provider Redemption Token, and encrypted execution payload with predicate, Cashu mint URL, and Cashu locktime.                |
 | `proof_submission`    | Request event reference, selected Provider identity, proof schema URL, proof payload or attachment references, Customer-readable encrypted content, and Oracle-readable encrypted content. |
 | `oracle_verification` | Proof decision made against the request, proof schema, predicate, submitted proof material, and expected Oracle authority.                                                                 |
@@ -69,7 +69,7 @@ A v0 Payment Lock is a Cashu HTLC/P2PK lock. The selected Provider can redeem it
 only by presenting valid Release Material and satisfying the Provider P2PK
 binding. The Customer can recover funds only through the Cashu timeout path.
 
-The public request carries only the payment budget needed for discovery and
+The Request Notice carries only the Payment Budget needed for discovery and
 offer evaluation. Provider-only payment data and payment-lock terms are
 delivered after Provider Selection as encrypted Provider-only content. The
 Provider Redemption Token must not appear in public relay-visible content.
@@ -77,6 +77,8 @@ Provider Redemption Token must not appear in public relay-visible content.
 The v0 Cashu Payment Lock must preserve these properties:
 
 - the lock is associated with one request and one Customer-selected Provider;
+- the lock amount matches the selected Provider Offer's Requested Payment
+  Amount;
 - the lock has a refund locktime;
 - the selected Provider needs both valid Release Material and Provider
   authorization to redeem before locktime;
@@ -165,7 +167,7 @@ in this spec. This exchange depends on these invariants:
 | `INV-01`               | Oracle proof verification rejects forged TLSNotary presentations before release. |
 | `INV-02`               | Oracle wrappers do not expose preimages when verification fails.                 |
 | `INV-03`               | Customer refund before Cashu locktime is rejected by the mint.                   |
-| `INV-04`               | Stolen preimage alone cannot redeem Provider-bound Cashu escrow.                 |
+| `INV-04`               | Stolen preimage alone cannot redeem a Provider-bound Payment Lock.               |
 
 When a new security property is needed, add or update the threat-model invariant
 and its tests before relying on it from this spec.

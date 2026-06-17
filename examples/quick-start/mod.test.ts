@@ -3,7 +3,7 @@ import { expect } from "@std/expect";
 import { createInMemoryRelayClient } from "@anchr/sdk/testing";
 import { QuickStartError, runQuickStart } from "./mod.ts";
 
-test("quick start round-trips an advertisement through the relay", async () => {
+test("quick start round-trips a Request Notice through the relay", async () => {
   const relayClient = createInMemoryRelayClient();
   const result = await runQuickStart(relayClient, { timeoutMs: 1_000 });
   expect(result.echoed.query_id).toBe(result.queryId);

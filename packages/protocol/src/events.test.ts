@@ -77,7 +77,7 @@ test("parseQueryRequestEvent recovers a payload from the built event (round-trip
   expect(parsed?.max_amount_sats).toBe(payload.max_amount_sats);
 });
 
-test("buildQueryRequestEvent publishes only the public advertisement allowlist", () => {
+test("buildQueryRequestEvent publishes only the Request Notice allowlist", () => {
   const identity = generateKeypair();
   const payload = samplePayload();
   const event = buildQueryRequestEvent(identity, payload);

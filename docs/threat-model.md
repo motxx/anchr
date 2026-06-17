@@ -70,7 +70,7 @@ the Oracle's preimage store is not decremented.
 - `e2e/protocol/paid-request-attacks.test.ts` — `preimage not leaked on rejected
   verification`.
 
-### INV-03: Customer can't unlock escrow before timeout
+### INV-03: Customer can't unlock Payment Lock before timeout
 
 **Status:** `enforced`
 
@@ -97,7 +97,7 @@ Related (not INV-03 but same surface, kept for context):
 `LEGIT: Customer refund key after locktime → Mint ACCEPTS` demonstrates the
 refund path works once locktime elapses.
 
-### INV-04: Stolen preimage alone cannot redeem bound escrow
+### INV-04: Stolen preimage alone cannot redeem bound Payment Lock
 
 **Status:** `enforced`
 
@@ -107,8 +107,8 @@ the SDK verifies that the witness also satisfies the bound Provider P2PK lock
 with the selected Provider's signature.
 
 **Attack:** Learn or steal the Oracle preimage for an active Provider-bound
-escrow, then attempt to redeem through Anchr with a different private key or
-with no Provider signature.
+Payment Lock, then attempt to redeem through Anchr with a different private key
+or with no Provider signature.
 
 **Expected:** Anchr returns `null` before a successful redemption when the
 signature is missing or does not match the Provider-bound key. The no-signature
@@ -179,12 +179,12 @@ distance policy.
 
 **Status:** `enforced`
 
-**Claim:** Every `Customer.request` lifecycle signs and advertises under a
+**Claim:** Every `Customer.request` lifecycle publishes a Request Notice under a
 fresh ephemeral keypair. Two requests from the same Customer instance carry
-distinct event pubkeys and distinct `customer_pubkey` advertisement fields, so
-a relay observer cannot link them through key reuse.
+distinct event pubkeys and distinct `customer_pubkey` notice fields, so a relay
+observer cannot link them through key reuse.
 
-**Attack:** A passive relay observer collects kind 5300 advertisements and
+**Attack:** A passive relay observer collects kind 5300 Request Notices and
 correlates them to one Customer via a reused signing key or a reused
 `customer_pubkey` field.
 
@@ -246,7 +246,7 @@ accepted design limit, not an oversight:
   a persistent identity.
 - An Oracle must advertise one stable pubkey (kind 5300 `p`-tag, the kind
   30088 registry entry, and the hash-bootstrap DM recipient), because
-  Customers select Oracles by key and bind escrow conditions to them.
+  Customers select Oracles by key and bind Payment Lock conditions to them.
 
 A relay observer can therefore profile a Provider's or an Oracle's request
 volume, activity times, and counterparties across requests. Operators who

@@ -12,7 +12,7 @@ specifies their Nostr event encoding.
 
 Proof format dispatch uses HTTPS schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
-schema URL in an `s` tag and a public advertisement body for discovery.
+schema URL in an `s` tag and a Request Notice body for discovery.
 Encrypted Provider Selection payloads carry the same URL in their `schema` field
 plus execution details for the selected Provider.
 
@@ -69,7 +69,7 @@ rule below: the event is ignored, never an error.
 
 ## Query Posting (kind 5300)
 
-The Customer broadcasts a DVM Job Request as a public request advertisement:
+The Customer broadcasts a DVM Job Request as a Request Notice:
 
 ```json
 {
@@ -86,10 +86,10 @@ The Customer broadcasts a DVM Job Request as a public request advertisement:
 
 An optional `region` tag (uppercase region code, indexable as `#region`)
 scopes discovery: region-bound Providers subscribe with a `#region` filter and
-ignore untagged advertisements. The tag is cleartext and relay-indexable: any
+ignore untagged notices. The tag is cleartext and relay-indexable: any
 relay observer can partition requests by region, shrinking the requester's
 anonymity set from "all requesters" to "requesters in that region". Omit the
-tag when regional scoping is not required. Hiding advertisement content from
+tag when regional scoping is not required. Hiding notice content from
 out-of-region relay observers via a region-derived shared key remains an
 SDK-local optional layer (`@anchr/sdk/adapters/nostr` encryption helpers), not
 part of the interoperable v0 profile.
@@ -108,13 +108,13 @@ helper does not use a NIP-90 `bid` tag for payment material.
 | `schema`          | Proof schema URL                                 |
 | `customer_pubkey` | Customer Nostr pubkey                            |
 | `oracle_pubkey`   | Oracle Nostr pubkey                              |
-| `max_amount_sats` | Maximum Customer payment in sats                 |
+| `max_amount_sats` | Customer Payment Budget in sats                  |
 | `expires_at`      | Offer cutoff as Unix milliseconds at second granularity (a multiple of 1000) |
 
 The public content MUST NOT include `predicate`, `context`, `mint_url`,
 `payment_lock`, `payment_lock_token`, `bounty_token`,
 `provider_redemption_token`, or `locktime_seconds`. The canonical parser
-rejects an advertisement carrying any of these field names.
+rejects a Request Notice carrying any of these field names.
 
 ## Provider Offer (kind 7000, status=payment-required)
 
@@ -133,7 +133,8 @@ A Provider discovers the query and submits an offer:
 ```
 
 The offer content is signed JSON with `status`, `provider_pubkey`, and
-`amount_sats`. The `provider_pubkey` must match the event author.
+`amount_sats`. The `amount_sats` field is the Provider's Requested Payment
+Amount. The `provider_pubkey` must match the event author.
 
 ## Provider Selection (kind 7000, status=processing)
 
@@ -170,7 +171,7 @@ The `execution` object includes:
 | `description`      | Optional human-readable request detail                     |
 | `context`          | Optional schema-agnostic context                           |
 | `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
-| `max_amount_sats`  | Maximum Customer payment in sats                           |
+| `max_amount_sats`  | Customer Payment Budget in sats                            |
 | `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
@@ -316,7 +317,7 @@ Oracle → Customer response content:
 | `hash`     | Hex `H = sha256(S)`; the Oracle holds `S` until release |
 
 The request SHOULD be sent under a fresh ephemeral keypair so the bootstrap
-is unlinkable from the later kind `5300` advertisement. The Oracle answers
+is unlinkable from the later kind `5300` Request Notice. The Oracle answers
 the sender pubkey and MUST be idempotent per `query_id` (a retried request
 returns the same `hash`). An Oracle-operated HTTP `POST /hash` adapter may
 exist as deployment policy, but the interoperable default is this DM pair.
@@ -351,7 +352,7 @@ for compatible paid-request implementations.
 
 The release material is the most critical message in the Nostr profile. If the
 Provider completed valid work but never receives the preimage or FROST
-signature, they cannot redeem escrow. The Nostr delivery strategy is:
+signature, they cannot redeem the Payment Lock. The Nostr delivery strategy is:
 
 ### NIP-44 Delivery
 

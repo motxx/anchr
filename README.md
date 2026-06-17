@@ -4,10 +4,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Specs: CC0](https://img.shields.io/badge/Specs-CC0-green.svg)](specs/LICENSE)
 
-Anchr is an SDK for verifiable paid requests. A Customer locks payment, a
-Provider does the work, and the Provider can redeem only after a trusted Oracle
-accepts the proof. It removes the pay-first / deliver-first deadlock for
-verifiable off-chain work.
+Anchr is an SDK for verifiable paid requests. A Customer publishes a payment
+budget, selects one Provider, and locks payment for that Provider's Requested
+Payment Amount. The Provider returns work with proof, and the Provider can
+redeem only after a trusted Oracle accepts the proof. It removes the pay-first /
+deliver-first deadlock for verifiable off-chain work.
 
 The public deliverables are `@anchr/sdk` for application developers and
 `@anchr/protocol` for interoperable wire contracts. Anchr is not a hosted
@@ -16,7 +17,7 @@ service; each app chooses its own relay, mint, oracle, and notary.
 It combines:
 
 - **Nostr** for peer discovery and request/response transport
-- **Cashu HTLCs** for escrow and automatic refunds
+- **Cashu HTLCs** for Payment Locks and automatic refunds
 - **Oracle verification** for TLSNotary, C2PA/GPS images, or application-specific proofs
 
 > **Status:** experimental and testnet-focused. See the
@@ -39,7 +40,7 @@ sequenceDiagram
     Relay-->>Provider: Deliver request
     Provider->>Relay: Publish offer
     Relay-->>Customer: Deliver offer
-    Customer->>Relay: Accept offer and bind escrow
+    Customer->>Relay: Select Provider and bind Payment Lock
     Relay-->>Provider: Deliver selection
     Provider->>Provider: Produce data and proof
     Provider->>Oracle: Submit proof for verification
@@ -95,16 +96,16 @@ also need a notary.
 ## Quick Start
 
 From a clean checkout (with [Deno](https://deno.com/) installed), publish a
-Public Request Advertisement to a relay you choose and read it back:
+Request Notice to a relay you choose and read it back:
 
 ```sh
 git clone https://github.com/motxx/anchr && cd anchr
 NOSTR_RELAYS=wss://your-relay.example deno run --allow-net --allow-env examples/quick-start/main.ts
 ```
 
-The command builds a kind `5300` advertisement with the SDK under a fresh
-ephemeral keypair, publishes it to your relay, and prints the advertisement
-the relay echoes back. No payment is locked: the advertisement carries only
+The command builds a kind `5300` Request Notice with the SDK under a fresh
+ephemeral keypair, publishes it to your relay, and prints the notice the relay
+echoes back. No payment is locked: the notice carries only
 public discovery fields, and the full payment-locked exchange is the
 [`paid-request-simulation`](examples/paid-request-simulation/) lesson. A
 deterministic smoke test covers the same code path in CI without contacting
@@ -172,7 +173,7 @@ Status labels are defined in
 
 | Example | Status | Lesson |
 | --- | --- | --- |
-| [`quick-start`](examples/quick-start/) | Testnet | Publish a Public Request Advertisement to a real relay with SDK-built events and read it back. |
+| [`quick-start`](examples/quick-start/) | Testnet | Publish a Request Notice to a real relay with SDK-built events and read it back. |
 | [`paid-request-simulation`](examples/paid-request-simulation/) | Simulation | Compose Customer, Provider, Oracle, payment, proof, attachment, and adapter boundaries through public SDK imports. |
 
 New examples must be tiny lessons for verifiable paid requests and must use

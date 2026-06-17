@@ -16,6 +16,10 @@ events, payment locks, proof material, and release authorization. A deployment
 may bundle roles into one process for development, but that process is not a
 protocol actor and must not be required for interoperability.
 
+Application coordination such as provider catalogs, listings, ranking,
+reputation, pricing policy, dispute handling, and domain-specific workflows
+belongs to applications built on top of Anchr, not to the core SDK or protocol.
+
 ## Public Contract
 
 The stable public Anchr package surface is intentionally small:
