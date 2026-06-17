@@ -1,9 +1,8 @@
-# Split public request advertisement from Provider-only execution
+# Split Request Notice from Provider-only execution
 
-Kind `5300` request content is a public request advertisement, not the full
-execution payload. It carries only the fields needed for Provider discovery:
-query id, proof schema, Customer pubkey, Oracle pubkey, payment budget, and
-offer expiry.
+Kind `5300` request content is a Request Notice, not the full execution
+payload. It carries only the fields needed for Provider discovery: query id,
+proof schema, Customer pubkey, Oracle pubkey, payment budget, and offer expiry.
 
 Execution predicates, schema-agnostic context, Cashu mint URL, Cashu locktime,
 and the Provider Redemption Token travel after Provider Selection in encrypted

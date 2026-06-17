@@ -20,9 +20,9 @@ import {
 } from "./nostr.ts";
 
 /**
- * Public advertisement published in the content of a kind 5300 Job Request
- * event. Provider-specific execution and payment material is delivered after
- * Provider Selection.
+ * Request Notice published in the content of a kind 5300 Job Request event.
+ * Provider-specific execution and payment material is delivered after Provider
+ * Selection.
  */
 export interface QueryRequestPayload {
   /** Caller-chosen unique query id (SHOULD match the `d` tag). */
@@ -80,7 +80,7 @@ function hasIncompatibleWireVersion(event: Event): boolean {
  *   - s:        proof schema URL (custom tag, indexable as #s)
  *   - region:   optional uppercase region code (indexable as #region)
  *
- * The content carries only the public advertisement payload above.
+ * The content carries only the Request Notice payload above.
  */
 export function buildQueryRequestEvent(
   identity: Keypair,
@@ -608,7 +608,7 @@ export interface HashResponsePayload {
 /**
  * Build a signed kind 4 NIP-44 DM asking the Oracle for a hash commitment.
  * The sender SHOULD be a fresh ephemeral keypair so the bootstrap is not
- * linkable to the later advertisement.
+ * linkable to the later Request Notice.
  */
 export function buildHashRequestEvent(
   identity: Keypair,

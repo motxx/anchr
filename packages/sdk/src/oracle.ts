@@ -71,7 +71,7 @@ export interface NostrOracleOptions {
 /**
  * Default OracleClient: the hash bootstrap rides the relay as NIP-44 DMs.
  * Each request uses a fresh ephemeral sender keypair, so the bootstrap is
- * unlinkable from the later advertisement and neither side needs an HTTP
+ * unlinkable from the later Request Notice and neither side needs an HTTP
  * endpoint (INV-08).
  */
 export function createNostrOracleClient(

@@ -602,7 +602,7 @@ test("Provider.serve never runs the producer when no selection event arrives wit
   expect(published[0].kind).toBe(7000);
 });
 
-test("Provider.serve ignores selection whose execution payload mismatches the public advertisement", async () => {
+test("Provider.serve ignores selection whose execution payload mismatches the Request Notice", async () => {
   const published: Event[] = [];
   let onRequestEvent: ((e: Event) => void) | null = null;
   let onSelectionEvent: ((e: Event) => void) | null = null;
