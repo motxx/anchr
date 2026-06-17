@@ -10,6 +10,30 @@ Current package, app, and example boundaries are documented in `CLAUDE.md` and
 `docs/architecture.md`; keep agent-specific notes as pointers instead of
 duplicating the layout rules here.
 
+## PR review guidelines
+
+When reviewing a pull request, lead with defects that could change behavior,
+weaken trust boundaries, lose funds, leak private data, or make the protocol
+harder to interoperate with. Treat style, naming, and wording as findings only
+when they obscure a load-bearing contract or public vocabulary.
+
+Review against the PR's base branch and the current documented model, not
+against older repository history. For stacked PRs, distinguish issues
+introduced by the head branch from context inherited from the base PR.
+
+For changes under `packages/`, check the relevant actor boundary:
+
+- `packages/protocol/` owns interoperable Nostr/Cashu wire contracts.
+- `packages/sdk/` owns Customer, Provider, Oracle, payment, proof, attachment,
+  adapter, and request orchestration.
+- Examples and apps must not become a second owner for reusable package logic.
+
+For payment, verification, redemption, signing, auth, or quorum changes, look
+for silent-bypass shapes: branches that appear valid but skip the load-bearing
+check, catches that turn failure into success, or functions whose name promises
+work they do not perform. Prefer a focused test or harness update over a broad
+rewrite recommendation.
+
 ## Shared skills
 
 - Canonical skill definitions live in `skills/<skill-name>/SKILL.md`.
