@@ -5,7 +5,7 @@ import {
   createCustomer,
   CustomerConfigError,
   NoOffersReceivedError,
-  type PaymentChangeProofsError,
+  type PaymentRecoveryError,
   pickOracleForRequest,
   RelayPublishError,
   ResultTimeoutError,
@@ -897,6 +897,7 @@ test("Customer.request attaches payment change proofs to post-bind timeout error
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const changeProofs = [{ amount: 500, id: "change-proof" }];
+  const lockProofs = [{ amount: 100, id: "lock-proof" }];
 
   const relayClient = makeRelayClient({
     publish: async (event: Event): Promise<PublishResult> => {
@@ -929,7 +930,7 @@ test("Customer.request attaches payment change proofs to post-bind timeout error
     ): Promise<CashuToken> => ({
       token: "cashuBbound",
       amountSats: params.amountSats,
-      proofs: [],
+      proofs: lockProofs,
       changeProofs,
     }),
   });
@@ -956,8 +957,14 @@ test("Customer.request attaches payment change proofs to post-bind timeout error
   }
 
   expect(thrown).toBeInstanceOf(ResultTimeoutError);
-  expect((thrown as PaymentChangeProofsError).paymentChangeProofs).toEqual(
+  expect((thrown as PaymentRecoveryError).paymentChangeProofs).toEqual(
     changeProofs,
+  );
+  expect((thrown as PaymentRecoveryError).paymentLockProofs).toEqual(
+    lockProofs,
+  );
+  expect((thrown as PaymentRecoveryError).paymentLockToken).toBe(
+    "cashuBbound",
   );
 });
 
@@ -965,6 +972,7 @@ test("Customer.request attaches payment change proofs when onPaymentChange fails
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };
   const changeProofs = [{ amount: 500, id: "change-proof" }];
+  const lockProofs = [{ amount: 100, id: "lock-proof" }];
   const handlerError = new Error("wallet persistence failed");
 
   const relayClient = makeRelayClient({
@@ -998,7 +1006,7 @@ test("Customer.request attaches payment change proofs when onPaymentChange fails
     ): Promise<CashuToken> => ({
       token: "cashuBbound",
       amountSats: params.amountSats,
-      proofs: [],
+      proofs: lockProofs,
       changeProofs,
     }),
   });
@@ -1028,8 +1036,14 @@ test("Customer.request attaches payment change proofs when onPaymentChange fails
   }
 
   expect(thrown).toBe(handlerError);
-  expect((thrown as PaymentChangeProofsError).paymentChangeProofs).toEqual(
+  expect((thrown as PaymentRecoveryError).paymentChangeProofs).toEqual(
     changeProofs,
+  );
+  expect((thrown as PaymentRecoveryError).paymentLockProofs).toEqual(
+    lockProofs,
+  );
+  expect((thrown as PaymentRecoveryError).paymentLockToken).toBe(
+    "cashuBbound",
   );
 });
 

@@ -136,9 +136,11 @@ export class SchemaVerificationError extends Error {
   }
 }
 
-/** Error shape used when a request fails after Payment Lock creation returned change. */
-export interface PaymentChangeProofsError extends Error {
+/** Error shape used when a request fails after Payment Lock creation. */
+export interface PaymentRecoveryError extends Error {
   readonly paymentChangeProofs?: readonly CashuProof[];
+  readonly paymentLockProofs?: readonly CashuProof[];
+  readonly paymentLockToken?: string;
 }
 
 /**
@@ -524,22 +526,32 @@ export function createCustomer(options: CustomerOptions): Customer {
         }
         return result;
       } catch (err) {
-        throw attachPaymentChangeProofs(err, paymentChangeProofs);
+        throw attachPaymentRecoveryMaterial(err, boundLock);
       }
     },
   };
 }
 
-function attachPaymentChangeProofs(
+function attachPaymentRecoveryMaterial(
   err: unknown,
-  paymentChangeProofs: readonly CashuProof[],
+  boundLock: CashuToken,
 ): Error {
-  if (paymentChangeProofs.length === 0) {
-    return err instanceof Error ? err : new Error(String(err));
-  }
   const error = err instanceof Error ? err : new Error(String(err));
-  Object.defineProperty(error, "paymentChangeProofs", {
-    value: paymentChangeProofs,
+  const paymentChangeProofs = boundLock.changeProofs ?? [];
+  if (paymentChangeProofs.length > 0) {
+    Object.defineProperty(error, "paymentChangeProofs", {
+      value: paymentChangeProofs,
+      enumerable: true,
+      configurable: true,
+    });
+  }
+  Object.defineProperty(error, "paymentLockProofs", {
+    value: boundLock.proofs,
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(error, "paymentLockToken", {
+    value: boundLock.token,
     enumerable: true,
     configurable: true,
   });
