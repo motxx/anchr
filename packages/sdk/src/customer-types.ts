@@ -78,7 +78,7 @@ export interface RequestOptions {
   spec: Spec;
   payment: Payment;
   /** Funding proofs used to create the Provider-bound Payment Lock. */
-  sourceProofs: CashuProof[];
+  fundingProofs: CashuProof[];
   /** Receives Cashu proofs kept as change from Payment Lock creation. */
   onPaymentChange?: (proofs: readonly CashuProof[]) => void | Promise<void>;
   /** Optional: target a specific provider pubkey instead of broadcasting. */

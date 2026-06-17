@@ -4,7 +4,7 @@
  *   - Real Nostr relay (ws://localhost:7777)
  *   - In-process simulated oracle
  *
- * The customer's source proofs are minted via regtest Lightning so the
+ * The customer's funding proofs are minted via regtest Lightning so the
  * Provider-bound Payment Lock swap and provider's HTLC redemption both
  * hit the real mint. This is the "no Mock" verification of the SDK wire
  * flow. **Scope:** HTLC + Nostr transport. The simulated oracle here
@@ -164,7 +164,7 @@ suite(
             predicate: { target: "https://api.example.org" },
           },
           payment: { maxAmount: PROVIDER_AMOUNT_SATS },
-          sourceProofs: customerProofs,
+          fundingProofs: customerProofs,
         });
 
         expect(result.providerPubkey).toBe(providerKey.publicKey);
@@ -231,7 +231,7 @@ suite(
           predicate: { target: "https://api.example.org" },
         },
         payment: { maxAmount: PROVIDER_AMOUNT_SATS },
-        sourceProofs: customerProofs,
+        fundingProofs: customerProofs,
       })).rejects.toThrow();
 
       const requestEvent = published.find((event) => event.kind === 5300);

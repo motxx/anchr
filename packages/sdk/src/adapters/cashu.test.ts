@@ -180,7 +180,7 @@ test("bindProvider performs one direct mint swap for the selected Provider amoun
   const lockTime = FUTURE_LOCKTIME();
   const result = await client.bindProvider({
     amountSats: 1000,
-    sourceProofs: VALID_FUNDING_PROOFS,
+    fundingProofs: VALID_FUNDING_PROOFS,
     providerPubkey: PROVIDER_PUBKEY,
     hashHex: VALID_HASH,
     locktimeSeconds: lockTime,
@@ -204,7 +204,7 @@ test("bindProvider performs one direct mint swap for the selected Provider amoun
   expect(tagsJson).toContain(String(lockTime));
 });
 
-test("bindProvider validates hashHex, amountSats, locktimeSeconds, and sourceProofs", async () => {
+test("bindProvider validates hashHex, amountSats, locktimeSeconds, and fundingProofs", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
@@ -216,7 +216,7 @@ test("bindProvider validates hashHex, amountSats, locktimeSeconds, and sourcePro
       hashHex: "not-hex",
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: VALID_FUNDING_PROOFS,
+      fundingProofs: VALID_FUNDING_PROOFS,
       providerPubkey: PROVIDER_PUBKEY,
       customerSecretKey: CUSTOMER_SECRET,
     }),
@@ -236,7 +236,7 @@ test("bindProvider validates hashHex, amountSats, locktimeSeconds, and sourcePro
         hashHex: VALID_HASH,
         customerPubkey: CUSTOMER_PUBKEY,
         locktimeSeconds: FUTURE_LOCKTIME(),
-        sourceProofs: VALID_SOURCE_PROOFS,
+        fundingProofs: VALID_SOURCE_PROOFS,
         providerPubkey: PROVIDER_PUBKEY,
         customerSecretKey: CUSTOMER_SECRET,
       }),
@@ -248,7 +248,7 @@ test("bindProvider validates hashHex, amountSats, locktimeSeconds, and sourcePro
       hashHex: VALID_HASH,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: Math.floor(Date.now() / 1000) - 1,
-      sourceProofs: VALID_SOURCE_PROOFS,
+      fundingProofs: VALID_SOURCE_PROOFS,
       providerPubkey: PROVIDER_PUBKEY,
       customerSecretKey: CUSTOMER_SECRET,
     }),
@@ -259,14 +259,14 @@ test("bindProvider validates hashHex, amountSats, locktimeSeconds, and sourcePro
       hashHex: VALID_HASH,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: [],
+      fundingProofs: [],
       providerPubkey: PROVIDER_PUBKEY,
       customerSecretKey: CUSTOMER_SECRET,
     }),
   ).rejects.toThrow(CashuClientError);
 });
 
-test("bindProvider rejects malformed source proofs (caller misuse)", async () => {
+test("bindProvider rejects malformed funding proofs (caller misuse)", async () => {
   const { wallet } = makeFakeWallet({ outputProofs: [] });
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
@@ -278,7 +278,7 @@ test("bindProvider rejects malformed source proofs (caller misuse)", async () =>
       hashHex: VALID_HASH,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: [{ amount: 1000 }],
+      fundingProofs: [{ amount: 1000 }],
       providerPubkey: PROVIDER_PUBKEY,
       customerSecretKey: CUSTOMER_SECRET,
     }),
@@ -289,14 +289,14 @@ test("bindProvider rejects malformed source proofs (caller misuse)", async () =>
       hashHex: VALID_HASH,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: ["not-an-object"],
+      fundingProofs: ["not-an-object"],
       providerPubkey: PROVIDER_PUBKEY,
       customerSecretKey: CUSTOMER_SECRET,
     }),
   ).rejects.toThrow(CashuClientError);
 });
 
-test("bindProvider rejects source proofs that cannot cover amount plus mint fee", async () => {
+test("bindProvider rejects funding proofs that cannot cover amount plus mint fee", async () => {
   const { wallet } = makeFakeWallet({
     outputProofs: [],
     fee: 2,
@@ -312,7 +312,7 @@ test("bindProvider rejects source proofs that cannot cover amount plus mint fee"
       providerPubkey: PROVIDER_PUBKEY,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
-      sourceProofs: VALID_SOURCE_PROOFS,
+      fundingProofs: VALID_SOURCE_PROOFS,
       customerSecretKey: CUSTOMER_SECRET,
     }),
   ).rejects.toThrow(CashuMintError);
@@ -331,7 +331,7 @@ test("bindProvider wraps mint errors in CashuMintError", async () => {
     client.bindProvider({
       amountSats: 1000,
       hashHex: VALID_HASH,
-      sourceProofs: VALID_SOURCE_PROOFS,
+      fundingProofs: VALID_SOURCE_PROOFS,
       providerPubkey: PROVIDER_PUBKEY,
       customerPubkey: CUSTOMER_PUBKEY,
       locktimeSeconds: FUTURE_LOCKTIME(),
@@ -349,7 +349,7 @@ test("bindProvider rejects a missing or wrong-shape customerSecretKey", async ()
   await expect(
     client.bindProvider({
       amountSats: 1000,
-      sourceProofs: VALID_SOURCE_PROOFS,
+      fundingProofs: VALID_SOURCE_PROOFS,
       providerPubkey: PROVIDER_PUBKEY,
       hashHex: VALID_HASH,
       locktimeSeconds: FUTURE_LOCKTIME(),

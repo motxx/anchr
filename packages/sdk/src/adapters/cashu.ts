@@ -2,7 +2,7 @@
  * Cashu HTLC client — wraps `@cashu/cashu-ts` v3 for the SDK's
  * Customer / Provider wire flow.
  *
- * The Customer binds source proofs after selecting a Provider. `bindProvider`
+ * The Customer binds funding proofs after selecting a Provider. `bindProvider`
  * swaps the funding proofs into new proofs locked under
  *   hashlock(H) + P2PK(provider) + locktime + refund(customer)
  * so the selected provider can redeem with `preimage + provider sig`
@@ -181,7 +181,7 @@ function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
 
 /**
  * Minimal shape check for a Cashu proof. Catches caller misuse (passing
- * arbitrary objects as `sourceProofs`) before the values reach cashu-ts
+ * arbitrary objects as `fundingProofs`) before the values reach cashu-ts
  * and produce confusing mint errors.
  */
 function isValidProofShape(p: unknown): p is Proof {
@@ -252,7 +252,7 @@ function mapRedeemFailure(result: RedeemSwapResult): never {
 /**
  * Construct a CashuClient bound to a specific mint.
  *
- * Performs a real swap at `mintUrl` using the provided source proofs.
+ * Performs a real swap at `mintUrl` using the provided funding proofs.
  * Tests can pass `options.wallet` to inject a Wallet stub instead of
  * opening a live mint connection.
  */
@@ -300,26 +300,26 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
           "customerSecretKey must be a 32-byte Uint8Array",
         );
       }
-      if (!Array.isArray(p.sourceProofs) || p.sourceProofs.length === 0) {
-        throw new CashuClientError("sourceProofs must be a non-empty array");
+      if (!Array.isArray(p.fundingProofs) || p.fundingProofs.length === 0) {
+        throw new CashuClientError("fundingProofs must be a non-empty array");
       }
-      for (const proof of p.sourceProofs) {
+      for (const proof of p.fundingProofs) {
         if (!isValidProofShape(proof)) {
           throw new CashuClientError(
-            "sourceProofs contains a malformed proof",
+            "fundingProofs contains a malformed proof",
           );
         }
       }
       const wallet = await getWallet();
-      const sourceProofs = p.sourceProofs as Proof[];
-      const totalAmount = sumAmounts(sourceProofs);
+      const inputProofs = p.fundingProofs as Proof[];
+      const totalAmount = sumAmounts(inputProofs);
       if (totalAmount <= 0) {
         throw new CashuClientError(
-          "sourceProofs contains no spendable proofs",
+          "fundingProofs contains no spendable proofs",
         );
       }
 
-      const fee = wallet.getFeesForProofs(sourceProofs);
+      const fee = wallet.getFeesForProofs(inputProofs);
       const requiredAmount = p.amountSats + fee;
       if (totalAmount < requiredAmount) {
         throw new CashuMintError(
@@ -336,7 +336,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       let send: Proof[];
       try {
         const result = await wallet.ops
-          .send(p.amountSats, sourceProofs)
+          .send(p.amountSats, inputProofs)
           .privkey(customerPrivkeyHex)
           .asP2PK(phase2)
           .run();

@@ -144,7 +144,7 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
           predicate: { target: "https://api.example.org/account" },
         },
         payment: { maxAmount: 1000 },
-        sourceProofs: ["wallet-proof"],
+        fundingProofs: ["wallet-proof"],
       });
 
       expect(result.providerPubkey).toBe(providerKey.publicKey);

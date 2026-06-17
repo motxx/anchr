@@ -4,7 +4,7 @@ export type CashuProof = unknown;
 
 export interface BindProviderParams {
   amountSats: number;
-  sourceProofs: CashuProof[];
+  fundingProofs: CashuProof[];
   providerPubkey: string;
   hashHex: string;
   locktimeSeconds: number;

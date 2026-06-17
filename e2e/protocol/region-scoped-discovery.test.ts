@@ -86,7 +86,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
       makeCustomer().request({
         spec: { schema: CUSTOM_SCHEMA, predicate: {} },
         payment: { maxAmount: 1000 },
-        sourceProofs: [],
+        fundingProofs: [],
       }),
     ).rejects.toThrow();
     expect(servedSchemas).toEqual([]);
@@ -95,7 +95,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
     const result = await makeCustomer().request({
       spec: { schema: ProofSchema.TlsnV1, predicate: {} },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
       regionCode: "JP",
     });
     expect(result.proof).toBe("region-proof");

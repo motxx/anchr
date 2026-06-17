@@ -84,7 +84,7 @@ Implemented by updating:
 - `e2e/protocol/region-scoped-discovery.test.ts`
 - `e2e/regtest/sdk-integration.test.ts`
 
-The Customer flow now binds `sourceProofs` directly into a Provider-bound
+The Customer flow now binds `fundingProofs` directly into a Provider-bound
 Payment Lock after selecting the Provider. The removed preselection swap avoids
 an extra mint round trip and lets the Cashu adapter create an exact Provider
 net amount while returning Customer change proofs from the same mint operation.

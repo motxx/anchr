@@ -292,9 +292,9 @@ export function createCustomer(options: CustomerOptions): Customer {
           "payment.maxAmount must be a positive integer",
         );
       }
-      if (!Array.isArray(req.sourceProofs)) {
+      if (!Array.isArray(req.fundingProofs)) {
         throw new CustomerConfigError(
-          "sourceProofs must be an array of Cashu proofs",
+          "fundingProofs must be an array of Cashu proofs",
         );
       }
 
@@ -402,7 +402,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
       const boundLock: CashuToken = await cashuClient.bindProvider({
         amountSats: selected.amountSats,
-        sourceProofs: req.sourceProofs,
+        fundingProofs: req.fundingProofs,
         providerPubkey: selected.providerPubkey,
         hashHex: hash,
         locktimeSeconds,

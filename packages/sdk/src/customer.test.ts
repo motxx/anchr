@@ -251,7 +251,7 @@ test("Customer.request rejects an invalid schema URL synchronously", async () =>
     customer.request({
       spec: { schema: "not-a-valid-uri", predicate: {} },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(InvalidSchemaUriError);
 });
@@ -266,7 +266,7 @@ test("Customer.request rejects invalid maxAmount", async () => {
           predicate: {},
         },
         payment: { maxAmount },
-        sourceProofs: [],
+        fundingProofs: [],
       }),
     ).rejects.toThrow(CustomerConfigError);
   }
@@ -296,7 +296,7 @@ test("Customer.request calls the selected oracle client's requestHash", async ()
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow();
 
@@ -345,7 +345,7 @@ test("Customer.request can select a non-first trusted oracle", async () => {
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(NoOffersReceivedError);
 
@@ -366,7 +366,7 @@ test("Customer.request rejects when oracleSelector returns outside the whitelist
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(CustomerConfigError);
 });
@@ -430,7 +430,7 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
         predicate: {},
       },
       payment: { maxAmount: 1234, locktimeSeconds: 42 },
-      sourceProofs: [{ id: "proof1" }],
+      fundingProofs: [{ id: "proof1" }],
     }),
   ).rejects.toThrow(ResultTimeoutError);
 
@@ -440,7 +440,7 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
   expect(recorder.params.hashHex).toBe(HASH_HEX);
   expect(recorder.params.customerPubkey).toMatch(/^[0-9a-f]{64}$/);
   expect(recorder.params.locktimeSeconds).toBe(1_700_000_030 + 42);
-  expect(recorder.params.sourceProofs).toHaveLength(1);
+  expect(recorder.params.fundingProofs).toHaveLength(1);
 });
 
 test("Customer.request propagates payment adapter errors from bindProvider", async () => {
@@ -485,7 +485,7 @@ test("Customer.request propagates payment adapter errors from bindProvider", asy
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(TestCashuMintError);
 });
@@ -499,7 +499,7 @@ test("Customer.request throws NoOffersReceivedError when no offers arrive in the
         predicate: { foo: "bar" },
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(NoOffersReceivedError);
 });
@@ -525,7 +525,7 @@ test("Customer.request publishes a kind 5300 Job Request event via relayClient",
         predicate: { foo: "bar" },
       },
       payment: { maxAmount: 500 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow();
 
@@ -568,7 +568,7 @@ test("Customer.request publishes expires_at floored to second granularity", asyn
         predicate: { foo: "bar" },
       },
       payment: { maxAmount: 500 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow();
 
@@ -663,7 +663,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
       predicate: { foo: "bar" },
     },
     payment: { maxAmount: 1000 },
-    sourceProofs: [],
+    fundingProofs: [],
     onPaymentChange: (proofs) => {
       observedChangeProofs.push(...proofs);
     },
@@ -759,7 +759,7 @@ test("Customer.request runs verifierAdapters when provided", async () => {
       predicate: { x: 1 },
     },
     payment: { maxAmount: 1000 },
-    sourceProofs: [],
+    fundingProofs: [],
   });
 
   expect(verifierCalls).toHaveLength(1);
@@ -835,7 +835,7 @@ test("Customer.request throws SchemaVerificationError when verifier returns fals
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(SchemaVerificationError);
 });
@@ -884,7 +884,7 @@ test("Customer.request throws ResultTimeoutError when no result arrives", async 
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(ResultTimeoutError);
 });
@@ -962,7 +962,7 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
       onPaymentChange: (proofs) => {
         observedChangeProofs.push(...proofs);
       },
@@ -974,7 +974,7 @@ test("Customer.request collects offers, picks cheapest, binds HTLC, and publishe
   if (bindRecorder.params === null) throw new Error("unreachable");
   expect(bindRecorder.params.providerPubkey).toBe(providerB.publicKey);
   expect(bindRecorder.params.amountSats).toBe(500);
-  expect(bindRecorder.params.sourceProofs).toEqual([]);
+  expect(bindRecorder.params.fundingProofs).toEqual([]);
 
   expect(publishedEvents).toHaveLength(2);
   expect(publishedEvents[0].kind).toBe(5300);
@@ -1049,7 +1049,7 @@ test("Customer.request rejects an underfunded bound Payment Lock before publishi
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(CustomerConfigError);
 
@@ -1098,7 +1098,7 @@ test("Customer.request rejects offers above the maxAmount budget", async () => {
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(NoOffersReceivedError);
 });
@@ -1172,7 +1172,7 @@ test("Customer.request rejects invalid selector amounts before locking", async (
           predicate: {},
         },
         payment: { maxAmount: 1000 },
-        sourceProofs: [],
+        fundingProofs: [],
       }),
     ).rejects.toThrow(CustomerConfigError);
     expect(recorder.bindCalled).toBe(false);
@@ -1234,7 +1234,7 @@ test("Customer.request rejects selector results above the maxAmount budget befor
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(CustomerConfigError);
   expect(recorder.bindCalled).toBe(false);
@@ -1290,7 +1290,7 @@ test("Customer.request honors `provider` pinning when set", async () => {
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
       provider: wantedProvider.publicKey,
     }),
   ).rejects.toThrow(ResultTimeoutError);
@@ -1316,7 +1316,7 @@ test("Customer.request throws RelayPublishError when no relay accepts the event"
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     }),
   ).rejects.toThrow(RelayPublishError);
 });
@@ -1369,7 +1369,7 @@ test("INV-07: two sequential requests publish under distinct ephemeral pubkeys",
         predicate: {},
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
     });
 
   await expect(req()).rejects.toThrow(NoOffersReceivedError);

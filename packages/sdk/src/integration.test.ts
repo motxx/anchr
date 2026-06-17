@@ -216,7 +216,7 @@ test("in-process wiring: customer.request returns the provider's data via a shar
       predicate: { target: "https://api.example.org" },
     },
     payment: { maxAmount: 1000 },
-    sourceProofs: [],
+    fundingProofs: [],
   });
 
   expect(result.providerPubkey).toBe(providerKey.publicKey);

@@ -133,7 +133,7 @@ export async function runPaidRequestSimulation(): Promise<
         predicate: { target: "https://api.example.org/account" },
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: ["wallet-proof"],
+      fundingProofs: ["wallet-proof"],
     });
     if (typeof result.proof !== "string") {
       throw new Error("simulation expected string proof bytes");
@@ -148,7 +148,7 @@ export async function runPaidRequestSimulation(): Promise<
         amountSats: params.amountSats,
         providerPubkey: params.providerPubkey,
         hashHex: params.hashHex,
-        sourceProofCount: params.sourceProofs.length,
+        sourceProofCount: params.fundingProofs.length,
       })),
       providerRedeems: providerCashu.redeems,
     };
