@@ -1279,6 +1279,72 @@ test("Customer.request rejects an underfunded bound Payment Lock before publishi
   expect(publishedEvents[0].kind).toBe(5300);
 });
 
+test("Customer.request ignores malformed offer amounts before selection", async () => {
+  const malformedProvider = generateKeypair();
+  const validProvider = generateKeypair();
+  const requestEventId: { id: string | null } = { id: null };
+  const bindRecorder: { params: BindProviderParams | null } = { params: null };
+  const relayClient = makeRelayClient({
+    publish: async (event: Event): Promise<PublishResult> => {
+      if (event.kind === 5300) requestEventId.id = event.id;
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+    subscribe: (_filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      queueMicrotask(() => {
+        const id = requestEventId.id ?? "unknown";
+        onEvent(buildOfferFeedbackEvent(
+          malformedProvider,
+          id,
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: malformedProvider.publicKey,
+            amount_sats: 0,
+          },
+        ));
+        onEvent(buildOfferFeedbackEvent(
+          validProvider,
+          id,
+          "00".repeat(32),
+          {
+            status: "payment-required",
+            provider_pubkey: validProvider.publicKey,
+            amount_sats: 500,
+          },
+        ));
+      });
+      return { close: () => {} };
+    },
+  });
+  const cashuClient = makeCashuClient({
+    bindProvider: async (p: BindProviderParams): Promise<CashuToken> => {
+      bindRecorder.params = p;
+      return { token: "cashuBbound", amountSats: p.amountSats, proofs: [] };
+    },
+  });
+  const customer = createCustomer({
+    ...validOptions(),
+    relayClient,
+    cashuClient,
+    offerWindowMs: 20,
+    resultTimeoutMs: 20,
+  });
+
+  await expect(
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
+      payment: { maxAmount: 1000 },
+      fundingProofs: [],
+    }),
+  ).rejects.toThrow(ResultTimeoutError);
+
+  expect(bindRecorder.params?.providerPubkey).toBe(validProvider.publicKey);
+  expect(bindRecorder.params?.amountSats).toBe(500);
+});
+
 test("Customer.request rejects offers above the maxAmount budget", async () => {
   const provider = generateKeypair();
   const requestEventId: { id: string | null } = { id: null };

@@ -67,6 +67,12 @@ export function selectCheapestOffer(offers: Offer[]): Offer | null {
   return offers.reduce((min, q) => (q.amountSats < min.amountSats ? q : min));
 }
 
+function isValidOfferAmount(amountSats: number): boolean {
+  return Number.isFinite(amountSats) &&
+    Number.isInteger(amountSats) &&
+    amountSats > 0;
+}
+
 /** Customer client returned by `createCustomer`. */
 export interface Customer {
   /** Send a request to the network and wait for a verified result. */
@@ -384,6 +390,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           const parsed = parseOfferFeedbackEvent(event);
           if (parsed === null) return;
           totalReceived++;
+          if (!isValidOfferAmount(parsed.amount_sats)) return;
           if (parsed.amount_sats > req.payment.maxAmount) return;
           if (
             req.provider !== undefined &&
@@ -411,9 +418,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         throw new NoOffersReceivedError(offerWindowMs, totalReceived);
       }
       if (
-        !Number.isFinite(selected.amountSats) ||
-        !Number.isInteger(selected.amountSats) ||
-        selected.amountSats <= 0
+        !isValidOfferAmount(selected.amountSats)
       ) {
         throw new CustomerConfigError(
           "offerSelector returned an invalid offer amount",
