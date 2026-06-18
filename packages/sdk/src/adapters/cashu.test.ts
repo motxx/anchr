@@ -75,6 +75,7 @@ function makeFakeWallet(opts: {
   outputProofs?: Proof[];
   keepProofs?: Proof[];
   errorOnSend?: Error;
+  states?: Array<{ state: string }> | Error;
   /** Fee (sats) per swap call. Defaults to 0 (free regtest mints). */
   fee?: number;
   /** Keyset IDs the fake wallet knows. Defaults to ["00ad268c4d1f5826"]. */
@@ -110,6 +111,10 @@ function makeFakeWallet(opts: {
     keyChain: {
       getAllKeysetIds: () => opts.keysetIds ?? ["00ad268c4d1f5826"],
     },
+    checkProofsStates() {
+      if (opts.states instanceof Error) return Promise.reject(opts.states);
+      return Promise.resolve(opts.states ?? [{ state: "UNSPENT" }]);
+    },
   };
   return { wallet, calls };
 }
@@ -123,19 +128,21 @@ function makeHtlcToken(
     amount?: number;
     customerPubkey?: string;
     mint?: string;
+    tags?: string[][];
   },
 ): string {
+  const tags = options?.tags ?? [
+    ["pubkeys", `02${providerPubkey}`],
+    ["locktime", String(locktime)],
+    ["refund", `02${options?.customerPubkey ?? CUSTOMER_PUBKEY}`],
+    ["sigflag", "SIG_ALL"],
+  ];
   const secret = JSON.stringify([
     "HTLC",
     {
       nonce: "01".repeat(16),
       data: hashHex,
-      tags: [
-        ["pubkeys", `02${providerPubkey}`],
-        ["locktime", String(locktime)],
-        ["refund", `02${options?.customerPubkey ?? CUSTOMER_PUBKEY}`],
-        ["sigflag", "SIG_ALL"],
-      ],
+      tags,
     },
   ]);
   const proof: Proof = {
@@ -220,6 +227,108 @@ test("verifyProviderPaymentLock rejects tokens that are not bound to the expecte
     ...base,
     token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
       mint: "https://other-mint.example.org",
+    }),
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects locks that require unsupported signatures", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`],
+        ["locktime", String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`],
+        ["n_sigs", "2"],
+        ["sigflag", "SIG_ALL"],
+      ],
+    }),
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects expired locks", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const expiredLockTime = Math.floor(Date.now() / 1000) - 1;
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, expiredLockTime),
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: expiredLockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects spent proofs before work", async () => {
+  const { wallet } = makeFakeWallet({ states: [{ state: "SPENT" }] });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime),
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock compares single-value tags by position", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+  const base = {
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  };
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`],
+        ["locktime", String(lockTime - 1), String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`],
+        ["sigflag", "SIG_ALL"],
+      ],
+    }),
+  })).rejects.toThrow(CashuClientError);
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`],
+        ["locktime", String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`],
+        ["sigflag", "SIG_INPUTS", "SIG_ALL"],
+      ],
     }),
   })).rejects.toThrow(CashuClientError);
 });

@@ -28,6 +28,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createCustomer } from "@anchr/sdk/customer";
 import { createProvider } from "@anchr/sdk/provider";
+import { serveHashRequests } from "@anchr/sdk";
 import { createCashuClient } from "@anchr/sdk/adapters/cashu";
 import { createRelayClient } from "@anchr/sdk/adapters/nostr";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
@@ -90,6 +91,11 @@ suite(
       // would verify the proof first — here we trust the provider for
       // the purposes of testing the Cashu HTLC swap path.
       const queryIdsByRequest = new Map<string, string>();
+      const hashResponder = serveHashRequests({
+        relayClient: oracleRelay,
+        identity: oracleKey,
+        issueHash: () => hashHex,
+      });
       const reqSub = oracleRelay.subscribe(
         { kinds: [5300] },
         (event) => {
@@ -183,6 +189,7 @@ suite(
       } finally {
         await provider.stop();
         await servePromise;
+        hashResponder.close();
         reqSub.close();
         respSub.close();
         oracleRelay.close();

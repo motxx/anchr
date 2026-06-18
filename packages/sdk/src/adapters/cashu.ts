@@ -15,6 +15,7 @@
  */
 
 import {
+  CheckStateEnum,
   getDecodedToken,
   getEncodedToken,
   Mint,
@@ -211,8 +212,17 @@ function requireTagValue(
   message: string,
 ): void {
   const tag = findSecretTag(tags, name);
-  if (tag === null || !tag.slice(1).includes(value)) {
+  if (tag === null || tag[1] !== value) {
     throw new CashuClientError(message);
+  }
+}
+
+function rejectUnsupportedExtraSignatures(tags: unknown): void {
+  const tag = findSecretTag(tags, "n_sigs");
+  if (tag !== null && tag[1] !== "1") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token requires unsupported extra signatures",
+    );
   }
 }
 
@@ -226,6 +236,7 @@ function validateProviderPaymentLockProofs(
     );
   }
   const expectedHash = validateHashHex(params.hashHex);
+  validateLocktime(params.locktimeSeconds);
   const amountSats = sumAmounts(proofs);
   if (amountSats !== params.amountSats) {
     throw new CashuClientError(
@@ -287,8 +298,39 @@ function validateProviderPaymentLockProofs(
       "SIG_ALL",
       "verifyProviderPaymentLock: token must require SIG_ALL",
     );
+    rejectUnsupportedExtraSignatures(tags);
   }
   return amountSats;
+}
+
+async function requireProofsUnspent(
+  wallet: CashuWalletAdapter,
+  proofs: Proof[],
+): Promise<void> {
+  if (!wallet.checkProofsStates) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof state check unavailable",
+    );
+  }
+
+  let states: Array<{ state: string }>;
+  try {
+    states = await wallet.checkProofsStates(proofs);
+  } catch (err) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: proof state check failed",
+      err,
+    );
+  }
+
+  const invalid = states.find((state) =>
+    state.state !== CheckStateEnum.UNSPENT
+  );
+  if (invalid !== undefined) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: proof state is ${invalid.state}`,
+    );
+  }
 }
 
 /**
@@ -483,6 +525,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         decoded.proofs,
         params,
       );
+      await requireProofsUnspent(wallet, decoded.proofs);
       return {
         proofs: decoded.proofs as CashuProof[],
         amountSats,
