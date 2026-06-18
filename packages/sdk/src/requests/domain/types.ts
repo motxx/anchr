@@ -63,8 +63,9 @@ export interface PaymentLockInfo {
   escrow_token?: string;
 }
 
-/** Escrow mechanism type — discriminator for the EscrowInfo union. */
+/** Payment Lock variant advertised by Oracle registry capabilities. */
 export type PaymentLockType = "htlc" | "p2pk_frost";
+/** Existing EscrowInfo discriminator type for request lifecycle internals. */
 export type EscrowType = PaymentLockType;
 
 /** Fields shared by every escrow variant. */

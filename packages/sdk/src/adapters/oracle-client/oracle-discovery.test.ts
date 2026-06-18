@@ -240,7 +240,7 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
   expect(result!.supported_schemas).toEqual([ProofSchema.TlsnV1]);
 });
 
-test("parseOracleAnnouncementEvent ignores obsolete payment lock capability field", () => {
+test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field", () => {
   const event = {
     kind: 30088,
     created_at: 1700000000,
