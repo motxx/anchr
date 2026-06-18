@@ -25,17 +25,20 @@ import {
   doSubmitEscrowResult,
 } from "./escrow-flow-methods.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
+import type {
+  CancelQueryOutcome,
+  CreateQueryOptions,
+  HtlcOutcome,
+  QueryHooks,
+  SubmitQueryOutcome,
+} from "./query-service-types.ts";
 import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
 import type {
-  CustomerMeta,
-  EscrowInfo,
   EscrowSubmitOutcome,
   OfferInfo,
-  PaymentLockInfo,
   Query,
   QueryInput,
   QueryResult,
-  QuorumConfig,
   SubmissionMeta,
 } from "../domain/types.ts";
 
@@ -53,37 +56,13 @@ export type {
   QueryStatus,
 } from "../domain/types.ts";
 
-export interface CreateQueryOptions {
-  ttlMs?: number;
-  ttlSeconds?: number;
-  customerMeta?: CustomerMeta;
-  payment_lock?: PaymentLockInfo;
-  /** Acceptable oracle IDs. Empty/undefined leaves registry selection to the host. */
-  oracleIds?: string[];
-  /** Escrow info — when present, creates an escrow-mode (HTLC or P2PK+FROST) query. */
-  escrow?: EscrowInfo;
-  /** Nostr event ID of the kind 5300 Job Request. */
-  nostrEventId?: string;
-  /** Multi-oracle quorum config. When set with FROST, oracle_ids become FROST signers. */
-  quorum?: QuorumConfig;
-}
-
-export interface SubmitQueryOutcome {
-  ok: boolean;
-  query: Query | null;
-  message: string;
-}
-
-export interface CancelQueryOutcome {
-  ok: boolean;
-  message: string;
-}
+export type { CreateQueryOptions } from "./query-service-types.ts";
+export type { SubmitQueryOutcome } from "./query-service-types.ts";
+export type { CancelQueryOutcome } from "./query-service-types.ts";
 
 export { createQueryStore, type QueryStore } from "../domain/query-store.ts";
 
-export interface QueryHooks {
-  onCreated?: (query: Query) => void;
-}
+export type { QueryHooks } from "./query-service-types.ts";
 
 export interface QueryServiceDeps {
   store?: QueryStore;
@@ -98,10 +77,7 @@ export interface QueryServiceDeps {
   normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }
 
-export interface HtlcOutcome {
-  ok: boolean;
-  message: string;
-}
+export type { HtlcOutcome } from "./query-service-types.ts";
 
 export interface QueryService {
   createQuery(input: QueryInput, options?: CreateQueryOptions): Query;
