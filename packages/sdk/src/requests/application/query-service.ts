@@ -32,7 +32,7 @@ import type {
   QueryHooks,
   SubmitQueryOutcome,
 } from "./query-service-types.ts";
-import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
+import type { BlossomKeyMap } from "../../values.ts";
 import type {
   EscrowSubmitOutcome,
   OfferInfo,
