@@ -54,6 +54,10 @@ export const DEFAULT_LOCKTIME_SECONDS = 3600;
 /** Minimum Customer-requested Payment Lock duration accepted by SDK Providers. */
 export const MIN_PAYMENT_LOCK_DURATION_SECONDS = 10 * 60;
 
+/** Minimum SDK Customer-requested duration, leaving room for provider checks. */
+export const MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS =
+  MIN_PAYMENT_LOCK_DURATION_SECONDS + 60;
+
 /** Default result-event timeout (5 minutes). */
 export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 
@@ -314,10 +318,10 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (
         !Number.isFinite(locktimeDurationSeconds) ||
         !Number.isInteger(locktimeDurationSeconds) ||
-        locktimeDurationSeconds < MIN_PAYMENT_LOCK_DURATION_SECONDS
+        locktimeDurationSeconds < MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS
       ) {
         throw new CustomerConfigError(
-          `payment.locktimeSeconds must be an integer >= ${MIN_PAYMENT_LOCK_DURATION_SECONDS}`,
+          `payment.locktimeSeconds must be an integer >= ${MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS}`,
         );
       }
 

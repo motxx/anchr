@@ -13,6 +13,7 @@ import { sumProofAmounts } from "./cashu-escrow-helpers.ts";
 export interface CashuRedeemSendChain {
   asP2PK(options: P2PKOptions): CashuRedeemSendChain;
   privkey(k: string | string[]): CashuRedeemSendChain;
+  includeFees?(on?: boolean): CashuRedeemSendChain;
   asCustom?(data: OutputDataLike[]): CashuRedeemSendChain;
   run(): Promise<{ send: Proof[]; keep?: Proof[] }>;
 }

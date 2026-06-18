@@ -4,6 +4,7 @@ import { expect } from "@std/expect";
 import {
   createCustomer,
   CustomerConfigError,
+  MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS,
   NoOffersReceivedError,
   type PaymentRecoveryError,
   pickOracleForRequest,
@@ -309,7 +310,10 @@ test("Customer.request rejects too-short locktime durations before binding", asy
         schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
         predicate: {},
       },
-      payment: { maxAmount: 1000, locktimeSeconds: 599 },
+      payment: {
+        maxAmount: 1000,
+        locktimeSeconds: MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS - 1,
+      },
       fundingProofs: [],
     }),
   ).rejects.toThrow(CustomerConfigError);
@@ -474,7 +478,10 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
         schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
         predicate: {},
       },
-      payment: { maxAmount: 1234, locktimeSeconds: 600 },
+      payment: {
+        maxAmount: 1234,
+        locktimeSeconds: MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS,
+      },
       fundingProofs: [{ id: "proof1" }],
     }),
   ).rejects.toThrow(ResultTimeoutError);
@@ -484,7 +491,9 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
   expect(recorder.params.amountSats).toBe(456);
   expect(recorder.params.hashHex).toBe(HASH_HEX);
   expect(recorder.params.customerPubkey).toMatch(/^[0-9a-f]{64}$/);
-  expect(recorder.params.locktimeSeconds).toBe(1_700_000_030 + 600);
+  expect(recorder.params.locktimeSeconds).toBe(
+    1_700_000_030 + MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS,
+  );
   expect(recorder.params.fundingProofs).toHaveLength(1);
 });
 

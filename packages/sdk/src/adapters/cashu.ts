@@ -296,6 +296,7 @@ function rejectDuplicateProofs(proofs: Proof[]): void {
 function validateProviderPaymentLockProofs(
   proofs: Proof[],
   params: VerifyProviderPaymentLockParams,
+  providerRedeemFeeSats: number,
 ): number {
   if (proofs.length === 0) {
     throw new CashuClientError(
@@ -305,10 +306,11 @@ function validateProviderPaymentLockProofs(
   const expectedHash = validateHashHex(params.hashHex);
   validateMinimumProviderLocktime(params.locktimeSeconds);
   rejectDuplicateProofs(proofs);
-  const amountSats = sumAmounts(proofs);
-  if (amountSats !== params.amountSats) {
+  const faceAmountSats = sumAmounts(proofs);
+  const redeemableAmountSats = faceAmountSats - providerRedeemFeeSats;
+  if (redeemableAmountSats !== params.amountSats) {
     throw new CashuClientError(
-      `verifyProviderPaymentLock: token amount ${amountSats} does not match ${params.amountSats}`,
+      `verifyProviderPaymentLock: token redeemable amount ${redeemableAmountSats} does not match ${params.amountSats}`,
     );
   }
 
@@ -361,7 +363,7 @@ function validateProviderPaymentLockProofs(
     rejectUnsupportedExtraSignatures(tags);
     rejectUnsupportedRefundSignatures(tags);
   }
-  return amountSats;
+  return redeemableAmountSats;
 }
 
 async function requireProofsUnspent(
@@ -640,11 +642,18 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       let keep: Proof[];
       let send: Proof[];
       try {
-        const result = await wallet.ops
+        let chain = wallet.ops
           .send(p.amountSats, inputProofs)
           .privkey(customerPrivkeyHex)
-          .asP2PK(phase2)
-          .run();
+          .asP2PK(phase2);
+        if (chain.includeFees !== undefined) {
+          chain = chain.includeFees(true);
+        } else if (fee > 0) {
+          throw new CashuClientError(
+            "bindProvider: wallet send builder cannot include receiver fees",
+          );
+        }
+        const result = await chain.run();
         keep = result.keep ?? [];
         send = result.send;
       } catch (err) {
@@ -655,7 +664,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       });
       return {
         token,
-        amountSats: sumAmounts(send),
+        amountSats: sumAmounts(send) - wallet.getFeesForProofs(send),
         proofs: send as CashuProof[],
         changeProofs: keep as CashuProof[],
       };
@@ -676,6 +685,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       const amountSats = validateProviderPaymentLockProofs(
         decoded.proofs,
         params,
+        wallet.getFeesForProofs(decoded.proofs),
       );
       requireMintSignatureProofs(wallet, decoded.proofs);
       await requireProofsUnspent(wallet, decoded.proofs);

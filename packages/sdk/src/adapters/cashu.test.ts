@@ -81,6 +81,7 @@ interface SendCall {
   proofs: Proof[];
   p2pk?: P2PKOptions;
   privkey?: string | string[];
+  includeFees?: boolean;
 }
 
 /** Build a minimal CashuWalletAdapter that records the swap and returns mock output proofs. */
@@ -113,6 +114,10 @@ function makeFakeWallet(opts: {
           },
           privkey(k) {
             call.privkey = k;
+            return chain;
+          },
+          includeFees(on = true) {
+            call.includeFees = on;
             return chain;
           },
           run() {
@@ -248,6 +253,36 @@ test("verifyProviderPaymentLock accepts a Provider-bound Cashu HTLC token", asyn
   expect(result.amountSats).toBe(1000);
   expect(result.proofs.length).toBe(1);
   expect(loadMintCalls).toEqual([1]);
+});
+
+test("verifyProviderPaymentLock accounts for Provider redemption fees before work", async () => {
+  const { wallet } = makeFakeWallet({ fee: 2 });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+  const token = makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime);
+
+  await expect(client.verifyProviderPaymentLock({
+    token,
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  })).rejects.toThrow(CashuClientError);
+
+  const result = await client.verifyProviderPaymentLock({
+    token,
+    amountSats: 998,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  });
+
+  expect(result.amountSats).toBe(998);
 });
 
 test("verifyProviderPaymentLock rejects tokens that are not bound to the expected conditions", async () => {
@@ -545,11 +580,11 @@ test("createCashuClient rejects an empty mint URL", () => {
   expect(() => createCashuClient({ mintUrl: "" })).toThrow(CashuClientError);
 });
 
-test("bindProvider performs one direct mint swap for the selected Provider amount", async () => {
+test("bindProvider performs one fee-covered mint swap for the selected Provider amount", async () => {
   const providerOutput: Proof[] = [
     {
       id: "00ad268c4d1f5826",
-      amount: 1000,
+      amount: 1002,
       secret: '["HTLC",{"data":"' + VALID_HASH + '"}]',
       C: "02" + "dd".repeat(32),
     },
@@ -590,6 +625,7 @@ test("bindProvider performs one direct mint swap for the selected Provider amoun
 
   expect(calls.length).toBe(1);
   expect(calls[0].amount).toBe(1000);
+  expect(calls[0].includeFees).toBe(true);
   expect(typeof calls[0].privkey).toBe("string");
   expect(calls[0].p2pk).toBeDefined();
   const tagsJson = JSON.stringify(calls[0].p2pk);
