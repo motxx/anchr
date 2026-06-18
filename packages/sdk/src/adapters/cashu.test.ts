@@ -6,6 +6,7 @@ import {
   hashToCurve,
   type OutputDataLike,
   type P2PKOptions,
+  pointFromHex,
   type Proof,
 } from "@cashu/cashu-ts";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -40,12 +41,15 @@ const PROVIDER_SECRET = (() => {
 const MINT_PRIVATE_KEY_HEX = "01".padStart(64, "0");
 const MINT_PUBLIC_KEY_HEX =
   "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const DLEQ_BLINDING_FACTOR = 1n;
+const DLEQ_BLINDING_FACTOR_HEX = "01";
+const proofSecretEncoder = new TextEncoder();
 function hashProofSecretToCurve(
   secret: string,
 ): ReturnType<typeof hashToCurve> {
-  return Reflect.apply(hashToCurve, undefined, [secret]) as ReturnType<
-    typeof hashToCurve
-  >;
+  return Reflect.apply(hashToCurve, undefined, [
+    proofSecretEncoder.encode(secret),
+  ]) as ReturnType<typeof hashToCurve>;
 }
 
 const VALID_SOURCE_PROOFS: Record<string, unknown>[] = [
@@ -92,8 +96,9 @@ function makeFakeWallet(opts: {
   fee?: number;
   /** Keyset IDs the fake wallet knows. Defaults to ["00ad268c4d1f5826"]. */
   keysetIds?: readonly string[];
-}): { wallet: CashuWalletAdapter; calls: SendCall[] } {
+}): { wallet: CashuWalletAdapter; calls: SendCall[]; loadMintCalls: number[] } {
   const calls: SendCall[] = [];
+  const loadMintCalls: number[] = [];
   const outputs = opts.outputs ?? [];
   let outputIdx = 0;
   const wallet: CashuWalletAdapter = {
@@ -135,8 +140,12 @@ function makeFakeWallet(opts: {
         opts.states ?? proofs.map(() => ({ state: "UNSPENT" })),
       );
     },
+    loadMint(forceRefresh) {
+      loadMintCalls.push(forceRefresh === true ? 1 : 0);
+      return Promise.resolve();
+    },
   };
-  return { wallet, calls };
+  return { wallet, calls, loadMintCalls };
 }
 
 function makeMintSignedProof(
@@ -145,7 +154,14 @@ function makeMintSignedProof(
   options?: { C?: string; includeDleq?: boolean },
 ): Proof {
   const point = hashProofSecretToCurve(secret);
-  const proof = createDLEQProof(point, hexToBytes(MINT_PRIVATE_KEY_HEX));
+  const mintPublicKey = pointFromHex(MINT_PUBLIC_KEY_HEX);
+  const blindedPoint = point.add(
+    mintPublicKey.multiply(DLEQ_BLINDING_FACTOR),
+  );
+  const proof = createDLEQProof(
+    blindedPoint,
+    hexToBytes(MINT_PRIVATE_KEY_HEX),
+  );
   return {
     id: "00ad268c4d1f5826",
     amount,
@@ -155,7 +171,7 @@ function makeMintSignedProof(
       dleq: {
         s: bytesToHex(proof.s),
         e: bytesToHex(proof.e),
-        r: "00",
+        r: DLEQ_BLINDING_FACTOR_HEX,
       },
     }),
   };
@@ -207,7 +223,7 @@ test("createCashuClient stores the mint URL on the returned client", () => {
 });
 
 test("verifyProviderPaymentLock accepts a Provider-bound Cashu HTLC token", async () => {
-  const { wallet } = makeFakeWallet({});
+  const { wallet, loadMintCalls } = makeFakeWallet({});
   const client = createCashuClient({
     mintUrl: "https://mint.example.org",
     wallet,
@@ -226,6 +242,7 @@ test("verifyProviderPaymentLock accepts a Provider-bound Cashu HTLC token", asyn
 
   expect(result.amountSats).toBe(1000);
   expect(result.proofs.length).toBe(1);
+  expect(loadMintCalls).toEqual([1]);
 });
 
 test("verifyProviderPaymentLock rejects tokens that are not bound to the expected conditions", async () => {

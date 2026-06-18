@@ -18,14 +18,13 @@ import {
   CheckStateEnum,
   getDecodedToken,
   getEncodedToken,
-  hashToCurve,
   Mint,
   type P2PKOptions,
   pointFromHex,
   type Proof,
   type RequestFn,
   signP2PKProofs,
-  verifyDLEQProof,
+  verifyDLEQProof_reblind,
   verifyHTLCHash,
   Wallet,
 } from "@cashu/cashu-ts";
@@ -86,6 +85,8 @@ export interface CashuWalletAdapter extends CashuRedeemWallet {
   keyChain: {
     getAllKeysetIds(): readonly string[];
   };
+  /** Refresh mint metadata and keysets. Real cashu-ts Wallet supports this. */
+  loadMint?(forceRefresh?: boolean): Promise<void>;
 }
 
 /** Construction options for {@link createCashuClient}. */
@@ -189,14 +190,6 @@ function hexToBytesLocal(hex: string): Uint8Array {
     out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
   return out;
-}
-
-function hashProofSecretToCurve(
-  secret: string,
-): ReturnType<typeof hashToCurve> {
-  return Reflect.apply(hashToCurve, undefined, [secret]) as ReturnType<
-    typeof hashToCurve
-  >;
 }
 
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
@@ -389,14 +382,30 @@ async function requireProofsUnspent(
   }
 }
 
-function decodeProofDleq(proof: Proof): { s: Uint8Array; e: Uint8Array } {
+async function refreshMintKeysets(wallet: CashuWalletAdapter): Promise<void> {
+  if (wallet.loadMint === undefined) return;
+  try {
+    await wallet.loadMint(true);
+  } catch (err) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: mint keyset refresh failed",
+      err,
+    );
+  }
+}
+
+function decodeProofDleq(proof: Proof): {
+  s: Uint8Array;
+  e: Uint8Array;
+  r: bigint;
+} {
   const dleq = proof.dleq;
   if (typeof dleq !== "object" || dleq === null) {
     throw new CashuClientError(
       "verifyProviderPaymentLock: proof is missing DLEQ proof",
     );
   }
-  const serialized = dleq as { s?: unknown; e?: unknown };
+  const serialized = dleq as { s?: unknown; e?: unknown; r?: unknown };
   if (typeof serialized.s !== "string" || typeof serialized.e !== "string") {
     throw new CashuClientError(
       "verifyProviderPaymentLock: proof has malformed DLEQ proof",
@@ -405,22 +414,24 @@ function decodeProofDleq(proof: Proof): { s: Uint8Array; e: Uint8Array } {
   return {
     s: hexToBytesLocal(serialized.s),
     e: hexToBytesLocal(serialized.e),
+    r: BigInt(`0x${typeof serialized.r === "string" ? serialized.r : "00"}`),
   };
 }
+
+const proofSecretEncoder = new TextEncoder();
 
 function requireMintSignatureProofs(
   wallet: CashuWalletAdapter,
   proofs: Proof[],
 ): void {
-  const getKeyset = wallet.getKeyset;
-  if (getKeyset === undefined) {
+  if (wallet.getKeyset === undefined) {
     throw new CashuClientError(
       "verifyProviderPaymentLock: mint keyset lookup unavailable",
     );
   }
 
   for (const proof of proofs) {
-    const keyset = getKeyset(proof.id);
+    const keyset = wallet.getKeyset(proof.id);
     const amountPublicKey = keyset.keys[proof.amount];
     if (typeof amountPublicKey !== "string") {
       throw new CashuClientError(
@@ -429,9 +440,9 @@ function requireMintSignatureProofs(
     }
 
     try {
-      const isValid = verifyDLEQProof(
+      const isValid = verifyDLEQProof_reblind(
+        proofSecretEncoder.encode(proof.secret),
         decodeProofDleq(proof),
-        hashProofSecretToCurve(proof.secret),
         pointFromHex(proof.C),
         pointFromHex(amountPublicKey),
       );
@@ -630,6 +641,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       params: VerifyProviderPaymentLockParams,
     ): Promise<VerifyProviderPaymentLockResult> {
       const wallet = await getWallet();
+      await refreshMintKeysets(wallet);
       const knownKeysets = wallet.keyChain.getAllKeysetIds();
       const decoded = getDecodedToken(params.token, [...knownKeysets]);
       if (decoded.mint !== mintUrl) {

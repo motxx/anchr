@@ -16,6 +16,7 @@ const PROVIDER_PUB =
 const REFUND_PUB =
   "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const KEYSET_ID = "00ad268c4d1f5826";
+const LONG_KEYSET_ID = "01" + "88".repeat(31);
 
 const textEncoder = new TextEncoder();
 
@@ -29,6 +30,17 @@ function makeP2pkProof(secret: string, amount: number): Proof {
     id: KEYSET_ID,
     secret,
     C: "02" + String(amount).padStart(2, "0").repeat(32),
+  };
+}
+
+function makeP2pkProofWithKeyset(
+  secret: string,
+  amount: number,
+  keysetId: string,
+): Proof {
+  return {
+    ...makeP2pkProof(secret, amount),
+    id: keysetId,
   };
 }
 
@@ -70,6 +82,19 @@ describe("FROST P2PK signing messages", () => {
       sha256Utf8Hex(secret1),
       sha256Utf8Hex(secret2),
     ]);
+  });
+
+  test("maps v4 short keyset IDs when known keysets are supplied", () => {
+    const secret = makeP2pkSecret({ groupPubkey: GROUP_PUB, nSigs: "2" });
+    const token = encode([
+      makeP2pkProofWithKeyset(secret, 1, LONG_KEYSET_ID),
+    ]);
+
+    expect(deriveFrostP2pkMessages(token, [LONG_KEYSET_ID])).toEqual([
+      sha256Utf8Hex(secret),
+    ]);
+    expect(tokenMatchesFrostP2pkLock(token, GROUP_PUB, [LONG_KEYSET_ID]))
+      .toBe(true);
   });
 
   test("hashes the encoded escrow token for requirement binding", () => {

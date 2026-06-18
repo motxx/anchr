@@ -80,7 +80,8 @@ suite(
       const customerRelay = createRelayClient([RELAY_URL]);
       const providerRelay = createRelayClient([RELAY_URL]);
 
-      // The OracleClient that the customer uses for the pre-flight hash.
+      // The OracleClient that the customer and provider use for the hash
+      // committed into the Provider Payment Lock.
       const oracleClient: OracleClient = {
         requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
       };
@@ -123,7 +124,19 @@ suite(
 
       // Real CashuClient against the regtest mint for both actors.
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
-      const providerCashu = createCashuClient({ mintUrl: MINT_URL });
+      const baseProviderCashu = createCashuClient({ mintUrl: MINT_URL });
+      let providerPaymentLockError: unknown;
+      const providerCashu: typeof baseProviderCashu = {
+        ...baseProviderCashu,
+        verifyProviderPaymentLock: async (params) => {
+          try {
+            return await baseProviderCashu.verifyProviderPaymentLock(params);
+          } catch (err) {
+            providerPaymentLockError = err;
+            throw err;
+          }
+        },
+      };
 
       const provider = createProvider({
         oracles: [oracleKey.publicKey],
@@ -132,6 +145,7 @@ suite(
         privKey: bytesToHex(providerKey.secretKey),
         cashuClient: providerCashu,
         relayClient: providerRelay,
+        oracleClients: { [oracleKey.publicKey]: oracleClient },
         selectionTimeoutMs: 30_000,
         preimageTimeoutMs: 30_000,
       });
@@ -186,6 +200,17 @@ suite(
         // Give the provider a moment to finish redeemHtlc against the
         // real mint after the customer has returned.
         await new Promise((r) => setTimeout(r, 2_000));
+      } catch (err) {
+        if (providerPaymentLockError !== undefined) {
+          const message = providerPaymentLockError instanceof Error
+            ? providerPaymentLockError.message
+            : String(providerPaymentLockError);
+          throw new Error(
+            `Provider Payment Lock verification failed before result: ${message}`,
+            { cause: providerPaymentLockError },
+          );
+        }
+        throw err;
       } finally {
         await provider.stop();
         await servePromise;
