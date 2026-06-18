@@ -1,6 +1,7 @@
 # Rename Oracle registry payment lock type field
 
 Created: 2026-06-18
+Completed: 2026-06-19
 Model: GPT-5 Codex
 
 ## Priority
@@ -62,3 +63,42 @@ exact replacement name and migration shape.
   protocol surface.
 - Update the spec, SDK types/parsers/builders, and focused tests in one
   verifiable change.
+
+## Resolution
+
+Implemented by updating:
+
+- `specs/oracle-registry.md`
+- `packages/sdk/src/requests/domain/types.ts`
+- `packages/sdk/src/requests/domain/oracle-types.ts`
+- `packages/sdk/src/requests/domain/value-objects.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.ts`
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts`
+- `packages/sdk/src/adapters/nostr/events/event-builders.ts`
+- `packages/sdk/src/adapters/nostr/events/events.test.ts`
+- `packages/sdk/src/payments/cashu/cashu-escrow.ts`
+- `packages/sdk/src/payments/cashu/frost-escrow-provider.ts`
+- `e2e/relay/oracle-discovery.test.ts`
+
+Verified with:
+
+- `rg -n "supported_escrow_types|escrow types|P2PK escrow" specs packages/sdk e2e`
+- `deno test packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts e2e/relay/oracle-discovery.test.ts --allow-env --allow-net --allow-read --allow-write`
+- `deno task check`
+- `deno task lint:strict`
+- `deno task test:all`
+- `check-silent-bypass` review of changed package TypeScript
+
+Harness update:
+
+- `packages/sdk/src/adapters/oracle-client/oracle-discovery.test.ts` now locks
+  the `supported_payment_lock_types` field name and verifies that obsolete
+  `supported_escrow_types` content is not mapped into current capabilities.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None

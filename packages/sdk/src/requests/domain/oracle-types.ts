@@ -1,6 +1,6 @@
 import type { SchemaUri } from "../../schema.ts";
 import type { BlossomKeyMap } from "../../values.ts";
-import type { EscrowType, Query, QueryResult } from "./types.ts";
+import type { PaymentLockType, Query, QueryResult } from "./types.ts";
 import type { VerificationDetail } from "../../proofs/mod.ts";
 
 export interface OracleInfo {
@@ -11,7 +11,7 @@ export interface OracleInfo {
   /** Fee in parts-per-million of the Payment Lock amount (e.g. 50_000 = 5%). */
   fee_ppm: number;
   supported_schemas?: SchemaUri[];
-  supported_escrow_types?: EscrowType[];
+  supported_payment_lock_types?: PaymentLockType[];
   /** Minimum Payment Lock amount this oracle accepts (sats). */
   min_amount_sats?: number;
   /** Maximum Payment Lock amount this oracle accepts (sats). */

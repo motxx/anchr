@@ -49,7 +49,7 @@ export function buildOracleAnnouncementEvent(
     ...(oracleInfo.endpoint !== undefined && { endpoint: oracleInfo.endpoint }),
     fee_ppm: oracleInfo.fee_ppm,
     supported_schemas: oracleInfo.supported_schemas ?? [],
-    supported_escrow_types: oracleInfo.supported_escrow_types ?? [],
+    supported_payment_lock_types: oracleInfo.supported_payment_lock_types ?? [],
     ...(oracleInfo.min_amount_sats !== undefined &&
       { min_amount_sats: oracleInfo.min_amount_sats }),
     ...(oracleInfo.max_amount_sats !== undefined &&

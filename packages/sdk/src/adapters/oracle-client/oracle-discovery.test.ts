@@ -17,7 +17,7 @@ const FULL_ORACLE_INFO: OracleInfo = {
     ProofSchema.C2paImageV1,
     "https://example.com/spec/proof/nonce/v1",
   ],
-  supported_escrow_types: ["htlc", "p2pk_frost"],
+  supported_payment_lock_types: ["htlc", "p2pk_frost"],
   min_amount_sats: 100,
   max_amount_sats: 1000000,
   description: "A test oracle for unit tests",
@@ -64,7 +64,11 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   expect(content.name).toBe("Test Oracle");
   expect(content.fee_ppm).toBe(50000);
   expect(content.supported_schemas).toEqual(FULL_ORACLE_INFO.supported_schemas);
-  expect(content.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
+  expect(content.supported_payment_lock_types).toEqual([
+    "htlc",
+    "p2pk_frost",
+  ]);
+  expect(content).not.toHaveProperty("supported_escrow_types");
   expect(content.min_amount_sats).toBe(100);
   expect(content.max_amount_sats).toBe(1000000);
   expect(content.description).toBe("A test oracle for unit tests");
@@ -97,7 +101,8 @@ test("buildOracleAnnouncementEvent omits optional fields when not set", () => {
   expect(content.name).toBe("Minimal");
   expect(content.fee_ppm).toBe(10000);
   expect(content.supported_schemas).toEqual([]);
-  expect(content.supported_escrow_types).toEqual([]);
+  expect(content.supported_payment_lock_types).toEqual([]);
+  expect(content).not.toHaveProperty("supported_escrow_types");
   expect(content).not.toHaveProperty("endpoint");
   expect(content).not.toHaveProperty("min_amount_sats");
   expect(content).not.toHaveProperty("max_amount_sats");
@@ -127,7 +132,10 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
   expect(announcement!.supported_schemas).toEqual(
     FULL_ORACLE_INFO.supported_schemas,
   );
-  expect(announcement!.supported_escrow_types).toEqual(["htlc", "p2pk_frost"]);
+  expect(announcement!.supported_payment_lock_types).toEqual([
+    "htlc",
+    "p2pk_frost",
+  ]);
   expect(announcement!.min_amount_sats).toBe(100);
   expect(announcement!.max_amount_sats).toBe(1000000);
   expect(announcement!.description).toBe("A test oracle for unit tests");
@@ -201,7 +209,7 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
   expect(result!.name).toBe("Minimal");
   expect(result!.fee_ppm).toBe(5000);
   expect(result!.supported_schemas).toEqual([]);
-  expect(result!.supported_escrow_types).toEqual([]);
+  expect(result!.supported_payment_lock_types).toEqual([]);
   expect(result!.endpoint).toBeUndefined();
   expect(result!.min_amount_sats).toBeUndefined();
   expect(result!.max_amount_sats).toBeUndefined();
@@ -232,6 +240,27 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
   expect(result!.supported_schemas).toEqual([ProofSchema.TlsnV1]);
 });
 
+test("parseOracleAnnouncementEvent ignores obsolete payment lock capability field", () => {
+  const event = {
+    kind: 30088,
+    created_at: 1700000000,
+    tags: [["d", "old-field"]],
+    content: JSON.stringify({
+      name: "Old Field",
+      fee_ppm: 5000,
+      supported_schemas: [],
+      supported_escrow_types: ["htlc"],
+    }),
+    pubkey: "deadbeef",
+    id: "fake",
+    sig: "fake",
+  };
+
+  const result = parseOracleAnnouncementEvent(event);
+  expect(result).not.toBeNull();
+  expect(result!.supported_payment_lock_types).toEqual([]);
+});
+
 test("round-trip: build then parse preserves all fields", () => {
   const identity = generateEphemeralIdentity();
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
@@ -245,8 +274,8 @@ test("round-trip: build then parse preserves all fields", () => {
   expect(parsed!.supported_schemas).toEqual(
     FULL_ORACLE_INFO.supported_schemas,
   );
-  expect(parsed!.supported_escrow_types).toEqual(
-    FULL_ORACLE_INFO.supported_escrow_types,
+  expect(parsed!.supported_payment_lock_types).toEqual(
+    FULL_ORACLE_INFO.supported_payment_lock_types,
   );
   expect(parsed!.min_amount_sats).toBe(FULL_ORACLE_INFO.min_amount_sats);
   expect(parsed!.max_amount_sats).toBe(FULL_ORACLE_INFO.max_amount_sats);

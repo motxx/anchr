@@ -99,7 +99,7 @@ suite(
           ProofSchema.TlsnV1,
           "https://example.com/spec/proof/gps/v1",
         ],
-        supported_escrow_types: ["htlc"],
+        supported_payment_lock_types: ["htlc"],
         min_amount_sats: 1000,
         max_amount_sats: 1_000_000,
         description: "Oracle for E2E testing",
@@ -123,7 +123,7 @@ suite(
         ProofSchema.TlsnV1,
         "https://example.com/spec/proof/gps/v1",
       ]);
-      expect(found!.supported_escrow_types).toEqual(["htlc"]);
+      expect(found!.supported_payment_lock_types).toEqual(["htlc"]);
       expect(found!.min_amount_sats).toBe(1000);
       expect(found!.max_amount_sats).toBe(1_000_000);
       expect(found!.description).toBe("Oracle for E2E testing");
@@ -138,7 +138,7 @@ suite(
         name: "Parse Test Oracle",
         fee_ppm: 10_000,
         supported_schemas: ["https://example.com/spec/proof/nonce/v1"],
-        supported_escrow_types: ["p2pk_frost"],
+        supported_payment_lock_types: ["p2pk_frost"],
       };
 
       const event = buildOracleAnnouncementEvent(identity, oracleInfo, [
@@ -154,7 +154,7 @@ suite(
       expect(parsed!.supported_schemas).toEqual([
         "https://example.com/spec/proof/nonce/v1",
       ]);
-      expect(parsed!.supported_escrow_types).toEqual(["p2pk_frost"]);
+      expect(parsed!.supported_payment_lock_types).toEqual(["p2pk_frost"]);
       expect(parsed!.endpoint).toBeUndefined();
       expect(parsed!.pubkey).toBe(identity.publicKey);
     });
@@ -169,7 +169,7 @@ suite(
         name: "TLSNotary Oracle",
         fee_ppm: 30_000,
         supported_schemas: [ProofSchema.TlsnV1],
-        supported_escrow_types: ["htlc"],
+        supported_payment_lock_types: ["htlc"],
       };
 
       const gpsOracle: OracleInfo = {
@@ -177,7 +177,7 @@ suite(
         name: "GPS Oracle",
         fee_ppm: 20_000,
         supported_schemas: [gpsSchema],
-        supported_escrow_types: ["htlc"],
+        supported_payment_lock_types: ["htlc"],
       };
 
       const tlsnEvent = buildOracleAnnouncementEvent(identity, tlsnOracle, [
@@ -225,7 +225,7 @@ suite(
         name: "Oracle V1",
         fee_ppm: 10_000,
         supported_schemas: ["https://example.com/spec/proof/gps/v1"],
-        supported_escrow_types: ["htlc"],
+        supported_payment_lock_types: ["htlc"],
         description: "First version",
       };
 
@@ -246,7 +246,7 @@ suite(
           "https://example.com/spec/proof/gps/v1",
           ProofSchema.TlsnV1,
         ],
-        supported_escrow_types: ["htlc", "p2pk_frost"],
+        supported_payment_lock_types: ["htlc", "p2pk_frost"],
         description: "Updated version",
       };
 
@@ -273,7 +273,7 @@ suite(
         "https://example.com/spec/proof/gps/v1",
         ProofSchema.TlsnV1,
       ]);
-      expect(matching[0]!.supported_escrow_types).toEqual([
+      expect(matching[0]!.supported_payment_lock_types).toEqual([
         "htlc",
         "p2pk_frost",
       ]);

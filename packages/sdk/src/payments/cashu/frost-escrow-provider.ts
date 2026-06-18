@@ -45,7 +45,9 @@ export function buildFrostP2PKOptions(
   if (!customerRefundPubkey) {
     // Without a refund key, funds are stranded forever if the FROST group
     // never releases — refuse to build such a lock.
-    throw new Error("FROST P2PK escrow requires a customer refund pubkey");
+    throw new Error(
+      "FROST P2PK Payment Lock requires a customer refund pubkey",
+    );
   }
   return new P2PKBuilder()
     .addLockPubkey([providerPubkey, groupPubkey])

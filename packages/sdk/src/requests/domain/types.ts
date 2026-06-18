@@ -64,7 +64,8 @@ export interface PaymentLockInfo {
 }
 
 /** Escrow mechanism type — discriminator for the EscrowInfo union. */
-export type EscrowType = "htlc" | "p2pk_frost";
+export type PaymentLockType = "htlc" | "p2pk_frost";
+export type EscrowType = PaymentLockType;
 
 /** Fields shared by every escrow variant. */
 interface EscrowCommonFields {
