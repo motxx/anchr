@@ -78,3 +78,6 @@ test-results
 docs/chaos-*.md
 
 # deno
+
+# sprawlens (codesprawl) local analysis snapshots
+.codesprawl/
