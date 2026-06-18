@@ -29,10 +29,6 @@ export function isStringArray(x: unknown): x is string[] {
   return Array.isArray(x) && x.every(isString);
 }
 
-export function isRecordArray(x: unknown): x is Record<string, unknown>[] {
-  return Array.isArray(x) && x.every(isRecord);
-}
-
 /** Read a string field; throws if missing or wrong type. */
 export function requireString(
   obj: Record<string, unknown>,
@@ -51,16 +47,6 @@ export function optionalString(
   const v = obj[key];
   if (v === undefined || v === null) return undefined;
   if (!isString(v)) throw new TypeError(`expected ${key} to be a string`);
-  return v;
-}
-
-/** Read a boolean field; throws if missing or wrong type. */
-export function requireBoolean(
-  obj: Record<string, unknown>,
-  key: string,
-): boolean {
-  const v = obj[key];
-  if (!isBoolean(v)) throw new TypeError(`expected ${key} to be a boolean`);
   return v;
 }
 
@@ -85,31 +71,6 @@ export function optionalNumber(
   if (v === undefined || v === null) return undefined;
   if (!isNumber(v)) {
     throw new TypeError(`expected ${key} to be a finite number`);
-  }
-  return v;
-}
-
-/** Read a string-array field; throws if not array-of-strings. */
-export function requireStringArray(
-  obj: Record<string, unknown>,
-  key: string,
-): string[] {
-  const v = obj[key];
-  if (!isStringArray(v)) {
-    throw new TypeError(`expected ${key} to be an array of strings`);
-  }
-  return v;
-}
-
-/** Read a string-array field if present; defaults to []. Throws if present-but-wrong-type. */
-export function optionalStringArray(
-  obj: Record<string, unknown>,
-  key: string,
-): string[] {
-  const v = obj[key];
-  if (v === undefined || v === null) return [];
-  if (!isStringArray(v)) {
-    throw new TypeError(`expected ${key} to be an array of strings`);
   }
   return v;
 }
