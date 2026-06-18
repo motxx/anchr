@@ -1,9 +1,4 @@
-import { Buffer } from "node:buffer";
-import type {
-  AttachmentRef,
-  AttachmentStorageKind,
-  BlossomKeyMaterial,
-} from "../values.ts";
+import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
 import type { QueryResult as RequestSubmissionResult } from "../requests/domain/types.ts";
 import {
   type AttachmentRuntimeConfig,
@@ -20,26 +15,18 @@ import {
   readBlossomAttachment,
   readExternalAttachment,
 } from "./attachment-helpers.ts";
+import type {
+  StoredAttachment,
+  StoredAttachmentBuffer,
+  StoredAttachmentStats,
+} from "./types.ts";
+
+export type { StoredAttachment, StoredAttachmentBuffer, StoredAttachmentStats };
 
 type AttachmentLike = AttachmentRef | string;
 
 export interface AttachmentAccessOptions {
   config?: AttachmentRuntimeConfig;
-}
-
-export interface StoredAttachment {
-  filename: string;
-  mimeType: string;
-  absoluteUrl: string;
-  storageKind: AttachmentStorageKind;
-}
-
-export interface StoredAttachmentBuffer extends StoredAttachment {
-  data: Buffer;
-}
-
-export interface StoredAttachmentStats extends StoredAttachment {
-  size: number;
 }
 
 export function attachmentPublicBaseUrl(
