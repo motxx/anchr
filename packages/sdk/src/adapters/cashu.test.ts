@@ -151,7 +151,7 @@ function makeFakeWallet(opts: {
 function makeMintSignedProof(
   amount: number,
   secret: string,
-  options?: { C?: string; includeDleq?: boolean },
+  options?: { C?: string; includeDleq?: boolean; dleqR?: string },
 ): Proof {
   const point = hashProofSecretToCurve(secret);
   const mintPublicKey = pointFromHex(MINT_PUBLIC_KEY_HEX);
@@ -171,7 +171,7 @@ function makeMintSignedProof(
       dleq: {
         s: bytesToHex(proof.s),
         e: bytesToHex(proof.e),
-        r: DLEQ_BLINDING_FACTOR_HEX,
+        r: options?.dleqR ?? DLEQ_BLINDING_FACTOR_HEX,
       },
     }),
   };
@@ -189,6 +189,7 @@ function makeHtlcToken(
     tags?: string[][];
     C?: string;
     includeDleq?: boolean;
+    dleqR?: string;
     duplicateProof?: boolean;
   },
 ): string {
@@ -209,7 +210,11 @@ function makeHtlcToken(
   const proof = makeMintSignedProof(
     options?.amount ?? 1000,
     secret,
-    { C: options?.C, includeDleq: options?.includeDleq },
+    {
+      C: options?.C,
+      includeDleq: options?.includeDleq,
+      dleqR: options?.dleqR,
+    },
   );
   return getEncodedToken({
     mint: options?.mint ?? "https://mint.example.org",
@@ -464,6 +469,13 @@ test("verifyProviderPaymentLock rejects forged or unverifiable proof signatures"
     ...base,
     token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
       includeDleq: false,
+    }),
+  })).rejects.toThrow(CashuClientError);
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      dleqR: "",
     }),
   })).rejects.toThrow(CashuClientError);
 });

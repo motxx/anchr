@@ -432,7 +432,13 @@ function decodeProofDleq(proof: Proof): {
   return {
     s: hexToBytesLocal(serialized.s),
     e: hexToBytesLocal(serialized.e),
-    r: BigInt(`0x${typeof serialized.r === "string" ? serialized.r : "00"}`),
+    r: BigInt(
+      `0x${
+        typeof serialized.r === "string" && serialized.r.length > 0
+          ? serialized.r
+          : "00"
+      }`,
+    ),
   };
 }
 
