@@ -10,7 +10,10 @@ import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { isSchemaUri, type SchemaUri } from "../../schema.ts";
-import type { PaymentLockType } from "../../requests/domain/types.ts";
+import {
+  PAYMENT_LOCK_TYPE_VALUES,
+  type PaymentLockType,
+} from "../../requests/domain/types.ts";
 import {
   isRecord,
   optionalNumber,
@@ -19,7 +22,7 @@ import {
   requireString,
 } from "../../internal/runtime/types.ts";
 
-const PAYMENT_LOCK_TYPE_VALUES = new Set<string>(["htlc", "p2pk_frost"]);
+const PAYMENT_LOCK_TYPE_SET = new Set<string>(PAYMENT_LOCK_TYPE_VALUES);
 const RELAY_CLOSE_GRACE_MS = 250;
 
 function delay(ms: number): Promise<void> {
@@ -27,7 +30,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function isPaymentLockType(x: unknown): x is PaymentLockType {
-  return typeof x === "string" && PAYMENT_LOCK_TYPE_VALUES.has(x);
+  return typeof x === "string" && PAYMENT_LOCK_TYPE_SET.has(x);
 }
 
 function filterSchemaUris(value: unknown): SchemaUri[] {

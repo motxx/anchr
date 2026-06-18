@@ -64,7 +64,8 @@ export interface PaymentLockInfo {
 }
 
 /** Payment Lock variant advertised by Oracle registry capabilities. */
-export type PaymentLockType = "htlc" | "p2pk_frost";
+export const PAYMENT_LOCK_TYPE_VALUES = ["htlc", "p2pk_frost"] as const;
+export type PaymentLockType = typeof PAYMENT_LOCK_TYPE_VALUES[number];
 /** Existing EscrowInfo discriminator type for request lifecycle internals. */
 export type EscrowType = PaymentLockType;
 
