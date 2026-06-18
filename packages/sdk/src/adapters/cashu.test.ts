@@ -318,6 +318,72 @@ test("verifyProviderPaymentLock rejects locks that require unsupported signature
   })).rejects.toThrow(CashuClientError);
 });
 
+test("verifyProviderPaymentLock rejects extra pre-locktime spend keys", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`, "02" + "11".repeat(32)],
+        ["locktime", String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`],
+        ["sigflag", "SIG_ALL"],
+      ],
+    }),
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects unusable refund paths", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+  const base = {
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  };
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`],
+        ["locktime", String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`, "02" + "22".repeat(32)],
+        ["sigflag", "SIG_ALL"],
+      ],
+    }),
+  })).rejects.toThrow(CashuClientError);
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      tags: [
+        ["pubkeys", `02${PROVIDER_PUBKEY}`],
+        ["locktime", String(lockTime)],
+        ["refund", `02${CUSTOMER_PUBKEY}`],
+        ["n_sigs_refund", "2"],
+        ["sigflag", "SIG_ALL"],
+      ],
+    }),
+  })).rejects.toThrow(CashuClientError);
+});
+
 test("verifyProviderPaymentLock rejects expired locks", async () => {
   const { wallet } = makeFakeWallet({});
   const client = createCashuClient({

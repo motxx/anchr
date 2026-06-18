@@ -26,6 +26,12 @@ export type {
 export interface RequestResult extends ProtocolRequestResult {
   /** Cashu proofs kept by the wallet while sizing the Payment Lock. */
   paymentChangeProofs?: readonly CashuProof[];
+  /** Provider-bound Payment Lock proofs that can be refunded after locktime. */
+  paymentLockProofs?: readonly CashuProof[];
+  /** Provider-bound Payment Lock token that can be persisted for recovery. */
+  paymentLockToken?: string;
+  /** Secret key for the Payment Lock refund path after locktime. */
+  paymentLockRefundSecretKey?: Uint8Array;
 }
 
 /** Strategy for picking an offer among the ones received within `offerWindowMs`. */

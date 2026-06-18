@@ -51,6 +51,9 @@ export const DEFAULT_OFFER_WINDOW_MS = 30_000;
 /** Default locktime offset (1 hour) for HTLC-locked tokens. */
 export const DEFAULT_LOCKTIME_SECONDS = 3600;
 
+/** Minimum Customer-requested Payment Lock duration accepted by SDK Providers. */
+export const MIN_PAYMENT_LOCK_DURATION_SECONDS = 10 * 60;
+
 /** Default result-event timeout (5 minutes). */
 export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 
@@ -141,6 +144,7 @@ export interface PaymentRecoveryError extends Error {
   readonly paymentChangeProofs?: readonly CashuProof[];
   readonly paymentLockProofs?: readonly CashuProof[];
   readonly paymentLockToken?: string;
+  readonly paymentLockRefundSecretKey?: Uint8Array;
 }
 
 /**
@@ -305,6 +309,17 @@ export function createCustomer(options: CustomerOptions): Customer {
           "fundingProofs must be an array of Cashu proofs",
         );
       }
+      const locktimeDurationSeconds = req.payment.locktimeSeconds ??
+        DEFAULT_LOCKTIME_SECONDS;
+      if (
+        !Number.isFinite(locktimeDurationSeconds) ||
+        !Number.isInteger(locktimeDurationSeconds) ||
+        locktimeDurationSeconds < MIN_PAYMENT_LOCK_DURATION_SECONDS
+      ) {
+        throw new CustomerConfigError(
+          `payment.locktimeSeconds must be an integer >= ${MIN_PAYMENT_LOCK_DURATION_SECONDS}`,
+        );
+      }
 
       const expectedOracle = oracleSelector(oraclePubkeys);
       const selectedOracle = findCustomerOracle(oracleEntries, expectedOracle);
@@ -407,7 +422,7 @@ export function createCustomer(options: CustomerOptions): Customer {
       }
 
       const locktimeSeconds = Math.floor(clock.now() / 1000) +
-        (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
+        locktimeDurationSeconds;
       const boundLock: CashuToken = await cashuClient.bindProvider({
         amountSats: selected.amountSats,
         fundingProofs: req.fundingProofs,
@@ -512,6 +527,9 @@ export function createCustomer(options: CustomerOptions): Customer {
           providerPubkey: selected.providerPubkey,
           schema: response.schema,
           ...(paymentChangeProofs.length > 0 ? { paymentChangeProofs } : {}),
+          paymentLockProofs: boundLock.proofs,
+          paymentLockToken: boundLock.token,
+          paymentLockRefundSecretKey: identity.secretKey.slice(),
         };
         if (stateStore !== undefined) {
           await writeCustomerState(stateStore, {
@@ -526,7 +544,7 @@ export function createCustomer(options: CustomerOptions): Customer {
         }
         return result;
       } catch (err) {
-        throw attachPaymentRecoveryMaterial(err, boundLock);
+        throw attachPaymentRecoveryMaterial(err, boundLock, identity.secretKey);
       }
     },
   };
@@ -535,6 +553,7 @@ export function createCustomer(options: CustomerOptions): Customer {
 function attachPaymentRecoveryMaterial(
   err: unknown,
   boundLock: CashuToken,
+  refundSecretKey: Uint8Array,
 ): Error {
   const error = err instanceof Error ? err : new Error(String(err));
   const paymentChangeProofs = boundLock.changeProofs ?? [];
@@ -552,6 +571,11 @@ function attachPaymentRecoveryMaterial(
   });
   Object.defineProperty(error, "paymentLockToken", {
     value: boundLock.token,
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(error, "paymentLockRefundSecretKey", {
+    value: refundSecretKey.slice(),
     enumerable: true,
     configurable: true,
   });

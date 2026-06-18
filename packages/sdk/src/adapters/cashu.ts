@@ -243,6 +243,31 @@ function rejectUnsupportedExtraSignatures(tags: unknown): void {
   }
 }
 
+function rejectUnsupportedRefundSignatures(tags: unknown): void {
+  const tag = findSecretTag(tags, "n_sigs_refund");
+  if (tag !== null && tag[1] !== "1") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token refund path requires unsupported extra signatures",
+    );
+  }
+}
+
+function requireSingleKeyTag(
+  tags: unknown,
+  name: string,
+  acceptedKeys: readonly string[],
+  message: string,
+): void {
+  const tag = findSecretTag(tags, name);
+  if (
+    tag === null ||
+    tag.length !== 2 ||
+    !acceptedKeys.includes(tag[1]!)
+  ) {
+    throw new CashuClientError(message);
+  }
+}
+
 function validateMinimumProviderLocktime(
   locktimeSeconds: number,
   nowSeconds: number = Math.floor(Date.now() / 1000),
@@ -309,26 +334,18 @@ function validateProviderPaymentLockProofs(
       );
     }
     const tags = body.tags;
-    const pubkeyTag = findSecretTag(tags, "pubkeys");
-    const providerKeys = p2pkVariants(params.providerPubkey);
-    if (
-      pubkeyTag === null ||
-      !providerKeys.some((key) => pubkeyTag.slice(1).includes(key))
-    ) {
-      throw new CashuClientError(
-        "verifyProviderPaymentLock: token is not locked to the selected provider",
-      );
-    }
-    const refundTag = findSecretTag(tags, "refund");
-    const refundKeys = p2pkVariants(params.customerPubkey);
-    if (
-      refundTag === null ||
-      !refundKeys.some((key) => refundTag.slice(1).includes(key))
-    ) {
-      throw new CashuClientError(
-        "verifyProviderPaymentLock: token refund key does not match customer",
-      );
-    }
+    requireSingleKeyTag(
+      tags,
+      "pubkeys",
+      p2pkVariants(params.providerPubkey),
+      "verifyProviderPaymentLock: token is not locked only to the selected provider",
+    );
+    requireSingleKeyTag(
+      tags,
+      "refund",
+      p2pkVariants(params.customerPubkey),
+      "verifyProviderPaymentLock: token refund key does not match customer",
+    );
     requireTagValue(
       tags,
       "locktime",
@@ -342,6 +359,7 @@ function validateProviderPaymentLockProofs(
       "verifyProviderPaymentLock: token must require SIG_ALL",
     );
     rejectUnsupportedExtraSignatures(tags);
+    rejectUnsupportedRefundSignatures(tags);
   }
   return amountSats;
 }

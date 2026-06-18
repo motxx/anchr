@@ -276,6 +276,47 @@ test("Customer.request rejects invalid maxAmount", async () => {
   }
 });
 
+test("Customer.request rejects too-short locktime durations before binding", async () => {
+  let hashRequested = false;
+  let bindCalled = false;
+  const customer = createCustomer({
+    ...validOptions(),
+    oracles: [
+      makeCustomerOracle(ORACLE_A, {
+        requestHash: async () => {
+          hashRequested = true;
+          return { hash: HASH_HEX };
+        },
+      }),
+    ],
+    cashuClient: makeCashuClient({
+      bindProvider: async (
+        params: BindProviderParams,
+      ): Promise<CashuToken> => {
+        bindCalled = true;
+        return {
+          token: "cashuBbound",
+          amountSats: params.amountSats,
+          proofs: [],
+        };
+      },
+    }),
+  });
+
+  await expect(
+    customer.request({
+      spec: {
+        schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+        predicate: {},
+      },
+      payment: { maxAmount: 1000, locktimeSeconds: 599 },
+      fundingProofs: [],
+    }),
+  ).rejects.toThrow(CustomerConfigError);
+  expect(hashRequested).toBe(false);
+  expect(bindCalled).toBe(false);
+});
+
 test("Customer.request calls the selected oracle client's requestHash", async () => {
   let receivedQueryId = "";
   const oracleClient = makeOracleClient({
@@ -433,7 +474,7 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
         schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
         predicate: {},
       },
-      payment: { maxAmount: 1234, locktimeSeconds: 42 },
+      payment: { maxAmount: 1234, locktimeSeconds: 600 },
       fundingProofs: [{ id: "proof1" }],
     }),
   ).rejects.toThrow(ResultTimeoutError);
@@ -443,7 +484,7 @@ test("Customer.request binds the Payment Lock for the selected offer amount", as
   expect(recorder.params.amountSats).toBe(456);
   expect(recorder.params.hashHex).toBe(HASH_HEX);
   expect(recorder.params.customerPubkey).toMatch(/^[0-9a-f]{64}$/);
-  expect(recorder.params.locktimeSeconds).toBe(1_700_000_030 + 42);
+  expect(recorder.params.locktimeSeconds).toBe(1_700_000_030 + 600);
   expect(recorder.params.fundingProofs).toHaveLength(1);
 });
 
@@ -592,6 +633,7 @@ test("Customer.request publishes expires_at floored to second granularity", asyn
 test("Customer.request happy path: returns the verified data + proof from a provider", async () => {
   const provider = generateKeypair();
   const changeProofs = [{ amount: 500, id: "change-proof" }];
+  const lockProofs = [{ amount: 500, id: "lock-proof" }];
   const observedChangeProofs: unknown[] = [];
   const requestEventId: { id: string | null } = { id: null };
   const customerEphemeralPubkey: { value: string | null } = { value: null };
@@ -651,7 +693,7 @@ test("Customer.request happy path: returns the verified data + proof from a prov
       ): Promise<CashuToken> => ({
         token: "cashuBbound",
         amountSats: params.amountSats,
-        proofs: [],
+        proofs: lockProofs,
         changeProofs,
       }),
     }),
@@ -679,6 +721,10 @@ test("Customer.request happy path: returns the verified data + proof from a prov
   expect(result.proof).toBe("base64proofbytes==");
   expect(observedChangeProofs).toEqual(changeProofs);
   expect(result.paymentChangeProofs).toEqual(changeProofs);
+  expect(result.paymentLockProofs).toEqual(lockProofs);
+  expect(result.paymentLockToken).toBe("cashuBbound");
+  expect(result.paymentLockRefundSecretKey).toBeInstanceOf(Uint8Array);
+  expect(result.paymentLockRefundSecretKey).toHaveLength(32);
 
   if (queryIdRef.value === null) throw new Error("query id was not recorded");
   const stored = await stateStore.get(`customer:${queryIdRef.value}`);
@@ -966,6 +1012,10 @@ test("Customer.request attaches payment change proofs to post-bind timeout error
   expect((thrown as PaymentRecoveryError).paymentLockToken).toBe(
     "cashuBbound",
   );
+  expect((thrown as PaymentRecoveryError).paymentLockRefundSecretKey)
+    .toBeInstanceOf(Uint8Array);
+  expect((thrown as PaymentRecoveryError).paymentLockRefundSecretKey)
+    .toHaveLength(32);
 });
 
 test("Customer.request attaches payment change proofs when onPaymentChange fails", async () => {
@@ -1045,6 +1095,10 @@ test("Customer.request attaches payment change proofs when onPaymentChange fails
   expect((thrown as PaymentRecoveryError).paymentLockToken).toBe(
     "cashuBbound",
   );
+  expect((thrown as PaymentRecoveryError).paymentLockRefundSecretKey)
+    .toBeInstanceOf(Uint8Array);
+  expect((thrown as PaymentRecoveryError).paymentLockRefundSecretKey)
+    .toHaveLength(32);
 });
 
 test("Customer.request collects offers, picks cheapest, binds HTLC, and publishes selection", async () => {
