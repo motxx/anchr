@@ -10,7 +10,10 @@ import type { Filter } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/core";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { isSchemaUri, type SchemaUri } from "../../schema.ts";
-import type { EscrowType } from "../../requests/domain/types.ts";
+import {
+  PAYMENT_LOCK_TYPE_VALUES,
+  type PaymentLockType,
+} from "../../requests/domain/types.ts";
 import {
   isRecord,
   optionalNumber,
@@ -19,15 +22,15 @@ import {
   requireString,
 } from "../../internal/runtime/types.ts";
 
-const ESCROW_TYPE_VALUES = new Set<string>(["htlc", "p2pk_frost"]);
+const PAYMENT_LOCK_TYPE_SET = new Set<string>(PAYMENT_LOCK_TYPE_VALUES);
 const RELAY_CLOSE_GRACE_MS = 250;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isEscrowType(x: unknown): x is EscrowType {
-  return typeof x === "string" && ESCROW_TYPE_VALUES.has(x);
+function isPaymentLockType(x: unknown): x is PaymentLockType {
+  return typeof x === "string" && PAYMENT_LOCK_TYPE_SET.has(x);
 }
 
 function filterSchemaUris(value: unknown): SchemaUri[] {
@@ -35,9 +38,9 @@ function filterSchemaUris(value: unknown): SchemaUri[] {
   return value.filter(isSchemaUri);
 }
 
-function filterEscrowTypes(value: unknown): EscrowType[] {
+function filterPaymentLockTypes(value: unknown): PaymentLockType[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isEscrowType);
+  return value.filter(isPaymentLockType);
 }
 
 /** Parsed oracle announcement from a Nostr kind 30088 event. */
@@ -47,7 +50,7 @@ export interface OracleAnnouncement {
   endpoint?: string;
   fee_ppm: number;
   supported_schemas: SchemaUri[];
-  supported_escrow_types: EscrowType[];
+  supported_payment_lock_types: PaymentLockType[];
   min_amount_sats?: number;
   max_amount_sats?: number;
   description?: string;
@@ -78,7 +81,9 @@ export function parseOracleAnnouncementEvent(
       endpoint: optionalString(content, "endpoint"),
       fee_ppm: requireNumber(content, "fee_ppm"),
       supported_schemas: filterSchemaUris(content.supported_schemas),
-      supported_escrow_types: filterEscrowTypes(content.supported_escrow_types),
+      supported_payment_lock_types: filterPaymentLockTypes(
+        content.supported_payment_lock_types,
+      ),
       min_amount_sats: optionalNumber(content, "min_amount_sats"),
       max_amount_sats: optionalNumber(content, "max_amount_sats"),
       description: optionalString(content, "description"),

@@ -13,7 +13,7 @@ describe("oracle announcement events", () => {
       name: "Test Oracle",
       fee_ppm: 50_000,
       supported_schemas: [ProofSchema.TlsnV1],
-      supported_escrow_types: ["htlc"],
+      supported_payment_lock_types: ["htlc"],
     }, ["wss://relay.example"]);
 
     expect(event.kind).toBe(KIND_ORACLE_ANNOUNCEMENT);

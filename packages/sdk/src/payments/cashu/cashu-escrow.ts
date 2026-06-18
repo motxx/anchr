@@ -21,7 +21,7 @@
  *   Refund:
  *     Customer reclaims after locktime expires.
  *
- * Also exposes a 2-of-2(Oracle, Provider) P2PK escrow primitive for the
+ * Also exposes a 2-of-2(Oracle, Provider) P2PK Payment Lock primitive for the
  * pre-HTLC settlement path used by SDK payment adapters.
  */
 
@@ -53,7 +53,7 @@ import {
 
 const log = getLogger(["anchr", "cashu-escrow"]);
 
-// --- 2-of-2 P2PK escrow primitive ---
+// --- 2-of-2 P2PK Payment Lock primitive ---
 
 export interface EscrowParams {
   /** Oracle's public key (hex). */

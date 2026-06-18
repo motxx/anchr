@@ -17,13 +17,13 @@ closed to new Oracle operators.
 
 Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
 
-| Field     | Value                                |
-| --------- | ------------------------------------ |
-| `kind`    | `30088`                              |
-| `d` tag   | Oracle ID (unique identifier)        |
-| `t` tags  | `anchr-oracle`                       |
-| `s` tags  | Supported proof schema URLs          |
-| `content` | JSON-encoded `OracleAnnouncement`    |
+| Field     | Value                             |
+| --------- | --------------------------------- |
+| `kind`    | `30088`                           |
+| `d` tag   | Oracle ID (unique identifier)     |
+| `t` tags  | `anchr-oracle`                    |
+| `s` tags  | Supported proof schema URLs       |
+| `content` | JSON-encoded `OracleAnnouncement` |
 
 ### Tags
 
@@ -48,16 +48,16 @@ modules own any local predicate, evidence, or check vocabulary.
 
 The `content` field contains a JSON object:
 
-| Field                    | Required | Description                                                       |
-| ------------------------ | -------- | ----------------------------------------------------------------- |
-| `name`                   | yes      | Human-readable Oracle name                                        |
-| `endpoint`               | no       | Optional Oracle-operated HTTP adapter URL                         |
-| `fee_ppm`                | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
-| `supported_schemas`      | yes      | Array of proof schema URLs this Oracle supports                   |
-| `supported_escrow_types` | yes      | Array of escrow types: `htlc`, `p2pk_frost`                       |
-| `min_amount_sats`        | no       | Minimum payment amount this Oracle accepts                        |
-| `max_amount_sats`        | no       | Maximum payment amount this Oracle accepts                        |
-| `description`            | no       | Free-text description of the Oracle service                       |
+| Field                          | Required | Description                                                       |
+| ------------------------------ | -------- | ----------------------------------------------------------------- |
+| `name`                         | yes      | Human-readable Oracle name                                        |
+| `endpoint`                     | no       | Optional Oracle-operated HTTP adapter URL                         |
+| `fee_ppm`                      | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
+| `supported_schemas`            | yes      | Array of proof schema URLs this Oracle supports                   |
+| `supported_payment_lock_types` | yes      | Array of Payment Lock types: `htlc`, `p2pk_frost`                 |
+| `min_amount_sats`              | no       | Minimum payment amount this Oracle accepts                        |
+| `max_amount_sats`              | no       | Maximum payment amount this Oracle accepts                        |
+| `description`                  | no       | Free-text description of the Oracle service                       |
 
 ### Example
 
@@ -69,7 +69,7 @@ The `content` field contains a JSON object:
     "https://anchr-spec.org/spec/proof/tlsn/v1",
     "https://anchr-spec.org/spec/proof/c2pa-image/v1"
   ],
-  "supported_escrow_types": ["htlc", "p2pk_frost"],
+  "supported_payment_lock_types": ["htlc", "p2pk_frost"],
   "min_amount_sats": 1,
   "max_amount_sats": 1000000,
   "description": "Independent Oracle with TLSNotary and C2PA image verification"
@@ -117,5 +117,5 @@ Customers SHOULD:
 - Verify Oracle pubkeys against a trusted whitelist for high-value queries.
 - Choose explicit Oracle pubkeys and endpoints; there is no protocol default
   hosted Oracle.
-- Use a threshold Oracle group backed by the SDK FROST signing and P2PK escrow
-  helpers to distribute trust across multiple independent Oracles.
+- Use a threshold Oracle group backed by the SDK FROST signing helpers and P2PK
+  Payment Lock helpers to distribute trust across multiple independent Oracles.
