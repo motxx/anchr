@@ -13,6 +13,7 @@ import type {
   RelayClient,
 } from "./adapters/types.ts";
 import type {
+  CashuProof,
   CustomerOptions,
   CustomerOracle,
   Offer,
@@ -50,6 +51,13 @@ export const DEFAULT_OFFER_WINDOW_MS = 30_000;
 /** Default locktime offset (1 hour) for HTLC-locked tokens. */
 export const DEFAULT_LOCKTIME_SECONDS = 3600;
 
+/** Minimum Customer-requested Payment Lock duration accepted by SDK Providers. */
+export const MIN_PAYMENT_LOCK_DURATION_SECONDS = 10 * 60;
+
+/** Minimum SDK Customer-requested duration, leaving room for provider checks. */
+export const MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS =
+  MIN_PAYMENT_LOCK_DURATION_SECONDS + 60;
+
 /** Default result-event timeout (5 minutes). */
 export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 
@@ -57,6 +65,12 @@ export const DEFAULT_RESULT_TIMEOUT_MS = 5 * 60_000;
 export function selectCheapestOffer(offers: Offer[]): Offer | null {
   if (offers.length === 0) return null;
   return offers.reduce((min, q) => (q.amountSats < min.amountSats ? q : min));
+}
+
+function isValidOfferAmount(amountSats: number): boolean {
+  return Number.isFinite(amountSats) &&
+    Number.isInteger(amountSats) &&
+    amountSats > 0;
 }
 
 /** Customer client returned by `createCustomer`. */
@@ -133,6 +147,14 @@ export class SchemaVerificationError extends Error {
     super(`Local schema verifier rejected the proof for schema ${schema}.`);
     this.name = "SchemaVerificationError";
   }
+}
+
+/** Error shape used when a request fails after Payment Lock creation. */
+export interface PaymentRecoveryError extends Error {
+  readonly paymentChangeProofs?: readonly CashuProof[];
+  readonly paymentLockProofs?: readonly CashuProof[];
+  readonly paymentLockToken?: string;
+  readonly paymentLockRefundSecretKey?: Uint8Array;
 }
 
 /**
@@ -284,15 +306,28 @@ export function createCustomer(options: CustomerOptions): Customer {
         throw new InvalidSchemaUriError(req.spec.schema);
       }
       if (
-        typeof req.payment.maxAmount !== "number" || req.payment.maxAmount <= 0
+        !Number.isFinite(req.payment.maxAmount) ||
+        !Number.isInteger(req.payment.maxAmount) ||
+        req.payment.maxAmount <= 0
       ) {
         throw new CustomerConfigError(
-          "payment.maxAmount must be a positive number",
+          "payment.maxAmount must be a positive integer",
         );
       }
-      if (!Array.isArray(req.sourceProofs)) {
+      if (!Array.isArray(req.fundingProofs)) {
         throw new CustomerConfigError(
-          "sourceProofs must be an array of Cashu proofs",
+          "fundingProofs must be an array of Cashu proofs",
+        );
+      }
+      const locktimeDurationSeconds = req.payment.locktimeSeconds ??
+        DEFAULT_LOCKTIME_SECONDS;
+      if (
+        !Number.isFinite(locktimeDurationSeconds) ||
+        !Number.isInteger(locktimeDurationSeconds) ||
+        locktimeDurationSeconds < MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS
+      ) {
+        throw new CustomerConfigError(
+          `payment.locktimeSeconds must be an integer >= ${MIN_CUSTOMER_PAYMENT_LOCK_DURATION_SECONDS}`,
         );
       }
 
@@ -313,16 +348,6 @@ export function createCustomer(options: CustomerOptions): Customer {
           oraclePubkey: selectedOracle.pubkey,
         });
       const { hash } = await oracleClient.requestHash(queryId);
-
-      const locktimeSeconds = Math.floor(clock.now() / 1000) +
-        (req.payment.locktimeSeconds ?? DEFAULT_LOCKTIME_SECONDS);
-      const initialLock: CashuToken = await cashuClient.buildHtlcLock({
-        amountSats: req.payment.maxAmount,
-        hashHex: hash,
-        customerPubkey: identity.publicKey,
-        locktimeSeconds,
-        sourceProofs: req.sourceProofs,
-      });
 
       const relayClient: RelayClient = options.relayClient;
 
@@ -365,6 +390,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           const parsed = parseOfferFeedbackEvent(event);
           if (parsed === null) return;
           totalReceived++;
+          if (!isValidOfferAmount(parsed.amount_sats)) return;
           if (parsed.amount_sats > req.payment.maxAmount) return;
           if (
             req.provider !== undefined &&
@@ -391,112 +417,178 @@ export function createCustomer(options: CustomerOptions): Customer {
       if (selected === null) {
         throw new NoOffersReceivedError(offerWindowMs, totalReceived);
       }
+      if (
+        !isValidOfferAmount(selected.amountSats)
+      ) {
+        throw new CustomerConfigError(
+          "offerSelector returned an invalid offer amount",
+        );
+      }
+      if (selected.amountSats > req.payment.maxAmount) {
+        throw new CustomerConfigError(
+          "offerSelector returned an offer above payment.maxAmount",
+        );
+      }
 
-      // Pass proofs directly rather than re-decoding the broadcast token:
-      // the encoded V4 form truncates keyset IDs and would require wallet
-      // keychain access to map them back.
+      const locktimeSeconds = Math.floor(clock.now() / 1000) +
+        locktimeDurationSeconds;
       const boundLock: CashuToken = await cashuClient.bindProvider({
-        initialProofs: initialLock.proofs,
+        amountSats: selected.amountSats,
+        fundingProofs: req.fundingProofs,
         providerPubkey: selected.providerPubkey,
         hashHex: hash,
         locktimeSeconds,
         customerPubkey: identity.publicKey,
         customerSecretKey: identity.secretKey,
       });
+      const paymentChangeProofs = boundLock.changeProofs ?? [];
 
-      const selectionPayload: SelectionFeedbackPayload = {
-        status: "processing",
-        selected_provider_pubkey: selected.providerPubkey,
-        provider_redemption_token: boundLock.token,
-        execution: {
-          schema: req.spec.schema,
-          predicate: req.spec.predicate,
-          description: req.spec.description,
-          context: req.spec.context,
-          mint_url: mint,
-          max_amount_sats: req.payment.maxAmount,
-          locktime_seconds: locktimeSeconds,
-        },
-      };
-      const selectionEvent = buildSelectionFeedbackEvent(
-        identity,
-        requestEvent.id,
-        selectionPayload,
-      );
-      await relayClient.publish(selectionEvent);
-      if (stateStore !== undefined) {
-        await writeCustomerState(stateStore, {
-          queryId,
-          requestEventId: requestEvent.id,
-          schema: req.spec.schema,
-          status: "provider_selected",
-          providerPubkey: selected.providerPubkey,
-          offerEventId: selected.offerEventId,
-          updatedAt: clock.now(),
-        });
-      }
+      try {
+        if (boundLock.amountSats !== selected.amountSats) {
+          throw new CustomerConfigError(
+            "bound Payment Lock amount does not match the selected offer amount",
+          );
+        }
+        if (paymentChangeProofs.length > 0) {
+          await req.onPaymentChange?.(paymentChangeProofs);
+        }
 
-      const resultEvent: NostrEvent | null = await waitForFirstEvent(
-        relayClient,
-        {
-          kinds: [6300],
-          "#e": [requestEvent.id],
-          authors: [selected.providerPubkey],
-        },
-        (event) => event,
-        resultTimeoutMs,
-      ).result;
-      if (resultEvent === null) {
-        throw new ResultTimeoutError(resultTimeoutMs, selected.providerPubkey);
-      }
+        const selectionPayload: SelectionFeedbackPayload = {
+          status: "processing",
+          selected_provider_pubkey: selected.providerPubkey,
+          provider_redemption_token: boundLock.token,
+          execution: {
+            schema: req.spec.schema,
+            predicate: req.spec.predicate,
+            description: req.spec.description,
+            context: req.spec.context,
+            mint_url: mint,
+            max_amount_sats: req.payment.maxAmount,
+            amount_sats: selected.amountSats,
+            locktime_seconds: locktimeSeconds,
+          },
+        };
+        const selectionEvent = buildSelectionFeedbackEvent(
+          identity,
+          requestEvent.id,
+          selectionPayload,
+        );
+        await relayClient.publish(selectionEvent);
+        if (stateStore !== undefined) {
+          await writeCustomerState(stateStore, {
+            queryId,
+            requestEventId: requestEvent.id,
+            schema: req.spec.schema,
+            status: "provider_selected",
+            providerPubkey: selected.providerPubkey,
+            offerEventId: selected.offerEventId,
+            updatedAt: clock.now(),
+          });
+        }
 
-      const response = parseQueryResponseEvent(
-        resultEvent,
-        identity.secretKey,
-        selected.providerPubkey,
-      );
-      if (response === null) {
-        throw new ResultTimeoutError(
+        const resultEvent: NostrEvent | null = await waitForFirstEvent(
+          relayClient,
+          {
+            kinds: [6300],
+            "#e": [requestEvent.id],
+            authors: [selected.providerPubkey],
+          },
+          (event) => event,
           resultTimeoutMs,
+        ).result;
+        if (resultEvent === null) {
+          throw new ResultTimeoutError(
+            resultTimeoutMs,
+            selected.providerPubkey,
+          );
+        }
+
+        const response = parseQueryResponseEvent(
+          resultEvent,
+          identity.secretKey,
           selected.providerPubkey,
         );
-      }
-
-      const verifier = resolveVerifierAdapter(
-        verifierAdapters,
-        req.spec.schema,
-      );
-      if (verifier !== null) {
-        const ok = await Promise.resolve(
-          verifier.verify(response.proof, req.spec.predicate, response.data, {
-            options: schemaOptions?.[req.spec.schema],
-          }),
-        );
-        if (!ok) {
-          throw new SchemaVerificationError(req.spec.schema);
+        if (response === null) {
+          throw new ResultTimeoutError(
+            resultTimeoutMs,
+            selected.providerPubkey,
+          );
         }
-      }
 
-      const result = {
-        data: response.data,
-        proof: response.proof,
-        providerPubkey: selected.providerPubkey,
-        schema: response.schema,
-      };
-      if (stateStore !== undefined) {
-        await writeCustomerState(stateStore, {
-          queryId,
-          requestEventId: requestEvent.id,
-          schema: req.spec.schema,
-          status: "result_received",
+        const verifier = resolveVerifierAdapter(
+          verifierAdapters,
+          req.spec.schema,
+        );
+        if (verifier !== null) {
+          const ok = await Promise.resolve(
+            verifier.verify(response.proof, req.spec.predicate, response.data, {
+              options: schemaOptions?.[req.spec.schema],
+            }),
+          );
+          if (!ok) {
+            throw new SchemaVerificationError(req.spec.schema);
+          }
+        }
+
+        const result = {
+          data: response.data,
+          proof: response.proof,
           providerPubkey: selected.providerPubkey,
-          offerEventId: selected.offerEventId,
-          updatedAt: clock.now(),
-        });
+          schema: response.schema,
+          ...(paymentChangeProofs.length > 0 ? { paymentChangeProofs } : {}),
+          paymentLockProofs: boundLock.proofs,
+          paymentLockToken: boundLock.token,
+          paymentLockRefundSecretKey: identity.secretKey.slice(),
+        };
+        if (stateStore !== undefined) {
+          await writeCustomerState(stateStore, {
+            queryId,
+            requestEventId: requestEvent.id,
+            schema: req.spec.schema,
+            status: "result_received",
+            providerPubkey: selected.providerPubkey,
+            offerEventId: selected.offerEventId,
+            updatedAt: clock.now(),
+          });
+        }
+        return result;
+      } catch (err) {
+        throw attachPaymentRecoveryMaterial(err, boundLock, identity.secretKey);
       }
-      return result;
     },
   };
+}
+
+function attachPaymentRecoveryMaterial(
+  err: unknown,
+  boundLock: CashuToken,
+  refundSecretKey: Uint8Array,
+): Error {
+  const error = err instanceof Error ? err : new Error(String(err));
+  const paymentChangeProofs = boundLock.changeProofs ?? [];
+  if (paymentChangeProofs.length > 0) {
+    Object.defineProperty(error, "paymentChangeProofs", {
+      value: paymentChangeProofs,
+      enumerable: true,
+      configurable: true,
+    });
+  }
+  Object.defineProperty(error, "paymentLockProofs", {
+    value: boundLock.proofs,
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(error, "paymentLockToken", {
+    value: boundLock.token,
+    enumerable: true,
+    configurable: true,
+  });
+  Object.defineProperty(error, "paymentLockRefundSecretKey", {
+    value: refundSecretKey.slice(),
+    enumerable: true,
+    configurable: true,
+  });
+  return error;
 }
 
 function findCustomerOracle(

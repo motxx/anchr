@@ -17,15 +17,11 @@ test("public SDK API dogfood: customer, provider, oracle, payment, proof, attach
       storage_kind: "external",
     },
   });
-  expect(result.customerLocks).toEqual([{
-    amountSats: 1000,
-    hashHex: "01234567".repeat(8),
-    sourceProofCount: 1,
-  }]);
   expect(result.customerBinds).toEqual([{
+    amountSats: 100,
     providerPubkey: result.providerPubkey,
     hashHex: "01234567".repeat(8),
-    initialProofCount: 1,
+    sourceProofCount: 1,
   }]);
   expect(result.providerRedeems).toHaveLength(1);
   expect(result.providerRedeems[0]?.preimageHex).toBe("89abcdef".repeat(8));

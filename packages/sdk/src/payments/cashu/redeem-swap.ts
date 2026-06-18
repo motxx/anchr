@@ -13,8 +13,9 @@ import { sumProofAmounts } from "./cashu-escrow-helpers.ts";
 export interface CashuRedeemSendChain {
   asP2PK(options: P2PKOptions): CashuRedeemSendChain;
   privkey(k: string | string[]): CashuRedeemSendChain;
+  includeFees?(on?: boolean): CashuRedeemSendChain;
   asCustom?(data: OutputDataLike[]): CashuRedeemSendChain;
-  run(): Promise<{ send: Proof[] }>;
+  run(): Promise<{ send: Proof[]; keep?: Proof[] }>;
 }
 
 export interface CashuRedeemWallet {
@@ -25,7 +26,7 @@ export interface CashuRedeemWallet {
   checkProofsStates?(
     proofs: Array<Pick<Proof, "secret">>,
   ): Promise<Array<{ state: string }>>;
-  getKeyset?(): { id: string; keys: Record<number, string> };
+  getKeyset?(id?: string): { id: string; keys: Record<number, string> };
   mint?: {
     restore(payload: { outputs: SerializedBlindedMessage[] }): Promise<{
       outputs: SerializedBlindedMessage[];

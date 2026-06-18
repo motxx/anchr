@@ -70,7 +70,7 @@ const result = await customer.request({
     predicate: { target: "https://api.github.com/users/alice" },
   },
   payment: { maxAmount: 1000 },
-  sourceProofs: cashuProofsFromYourWallet,
+  fundingProofs: cashuProofsFromYourWallet,
 });
 
 console.log(result.data, result.proof, result.providerPubkey);
@@ -141,10 +141,10 @@ await provider.serve(async (request) => {
 });
 ```
 
-Provider implementations must preflight a selected escrow before irreversible
-work and keep redeem decisions narrower than clean-settlement or audit
-decisions. The normative rules live in `specs/paid-request-exchange.md` and
-`docs/threat-model.md`.
+Provider implementations must verify the selected Payment Lock before
+irreversible work and keep redeem decisions narrower than clean-settlement or
+audit decisions. The normative rules live in `specs/paid-request-exchange.md`
+and `docs/threat-model.md`.
 
 ## Proofs
 

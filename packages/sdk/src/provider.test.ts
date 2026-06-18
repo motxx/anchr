@@ -8,6 +8,7 @@ import {
   validateProviderOptions,
 } from "./provider.ts";
 import {
+  buildHashResponseEvent,
   buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
@@ -26,6 +27,7 @@ import type {
   RedeemResult,
   RelayClient,
   Subscription,
+  VerifyProviderPaymentLockParams,
 } from "./adapters/types.ts";
 import { bytesToHex } from "./test-helpers.ts";
 import { ProofSchema } from "./schema.ts";
@@ -64,20 +66,14 @@ function createMemoryStateStore(): ActorStateStore {
 function makeCashuClient(overrides?: Partial<CashuClient>): CashuClient {
   return {
     mintUrl: overrides?.mintUrl ?? "https://mint.example.org",
-    buildHtlcLock: overrides?.buildHtlcLock ??
-      (async (
-        p,
-      ) => ({
-        token: "x",
-        amountSats: p.amountSats,
-        proofs: [],
-      } satisfies CashuToken)),
     bindProvider: overrides?.bindProvider ??
       (async () => ({
         token: "y",
         amountSats: 0,
         proofs: [],
       } satisfies CashuToken)),
+    verifyProviderPaymentLock: overrides?.verifyProviderPaymentLock ??
+      (async () => ({ proofs: [], amountSats: 200 })),
     redeemHtlc: overrides?.redeemHtlc ??
       (async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
         proofs: [],
@@ -120,6 +116,7 @@ function baseSelectionExecution() {
     description: "private execution detail",
     mint_url: "https://mint.example.org",
     max_amount_sats: 1000,
+    amount_sats: 200,
     locktime_seconds: Math.floor(Date.now() / 1000) + 3600,
   };
 }
@@ -136,6 +133,19 @@ test("validateProviderOptions accepts schema options", () => {
       ...validOptions(),
       schemaOptions: {
         [ProofSchema.TlsnV1]: { notaryUrl: "wss://notary.example.org" },
+      },
+    })
+  ).not.toThrow();
+});
+
+test("validateProviderOptions accepts oracle hash clients", () => {
+  expect(() =>
+    validateProviderOptions({
+      ...validOptions(),
+      oracleClients: {
+        [ORACLE_A]: {
+          requestHash: async () => ({ hash: "aa".repeat(32) }),
+        },
       },
     })
   ).not.toThrow();
@@ -195,6 +205,15 @@ test("validateProviderOptions accepts proof generator adapters", () => {
 test("validateProviderOptions rejects malformed proof generator adapters", () => {
   expect(() =>
     validateProviderOptions({ ...validOptions(), proofGenerators: [{}] })
+  ).toThrow(ProviderConfigError);
+});
+
+test("validateProviderOptions rejects malformed oracle hash clients", () => {
+  expect(() =>
+    validateProviderOptions({
+      ...validOptions(),
+      oracleClients: { [ORACLE_A]: {} },
+    })
   ).toThrow(ProviderConfigError);
 });
 
@@ -444,8 +463,10 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   const published: Event[] = [];
   let onRequestEvent: ((e: Event) => void) | null = null;
   let onSelectionEvent: ((e: Event) => void) | null = null;
+  let onHashEvent: ((e: Event) => void) | null = null;
   let producerCalled = false;
   let producerPredicate: unknown = null;
+  let producerAmountSats: number | null = null;
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
@@ -457,19 +478,36 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
         onRequestEvent = onEvent;
       } else if (kinds.includes(7000)) {
         onSelectionEvent = onEvent;
+      } else if (kinds.includes(4)) {
+        onHashEvent = onEvent;
       }
       return { close: () => {} };
     },
     publish: async (event: Event): Promise<PublishResult> => {
       published.push(event);
+      if (event.kind === 4) {
+        queueMicrotask(() => {
+          onHashEvent?.(buildHashResponseEvent(
+            oracleKey,
+            event.pubkey,
+            {
+              type: "hash_response",
+              query_id: "q1",
+              hash: "aa".repeat(32),
+            },
+          ));
+        });
+      }
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
   });
 
   const provider = createProvider({
     ...validOptions(),
+    oracles: [oracleKey.publicKey],
     relayClient,
     selectionTimeoutMs: 200,
+    hashTimeoutMs: 200,
     preimageTimeoutMs: 30,
   });
   const servePromise = provider.serve(async () => ({
@@ -477,6 +515,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     produce: async (selection) => {
       producerCalled = true;
       producerPredicate = selection.spec.predicate;
+      producerAmountSats = selection.amountSats;
       return { data: { hello: "world" }, proof: "pf-bytes" };
     },
   }));
@@ -492,7 +531,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
     query_id: "q1",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
     customer_pubkey: customerKey.publicKey,
-    oracle_pubkey: ORACLE_A,
+    oracle_pubkey: oracleKey.publicKey,
     max_amount_sats: 1000,
     expires_at: Date.now() + 60_000,
   });
@@ -519,7 +558,7 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   );
   fireSelection(selectionEvent);
 
-  // Wait for produce + result publish + preimage timeout (30ms) to drain
+  // Wait for hash bootstrap + produce + result publish + preimage timeout (30ms) to drain
   // before stopping, so no setTimeout leaks.
   await new Promise((r) => setTimeout(r, 70));
   await provider.stop();
@@ -529,14 +568,17 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   expect(producerPredicate).toEqual({
     target: "https://api.example.org/private",
   });
-  // Two publishes from the provider: kind 7000 offer + kind 6300 result.
-  expect(published).toHaveLength(2);
+  expect(producerAmountSats).toBe(200);
+  // Three publishes from the provider side: kind 7000 offer, kind 4 hash request,
+  // then kind 6300 result.
+  expect(published).toHaveLength(3);
   expect(published[0].kind).toBe(7000);
-  expect(published[1].kind).toBe(6300);
+  expect(published[1].kind).toBe(4);
+  expect(published[2].kind).toBe(6300);
 
   // The kind 6300 content is NIP-44-encrypted to the customer.
   const decrypted = decryptNip44(
-    published[1].content,
+    published[2].content,
     customerKey.secretKey,
     providerKey.publicKey,
   );
@@ -544,6 +586,96 @@ test("Provider.serve waits for selection, runs producer, and publishes encrypted
   expect(payload.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
   expect(payload.data).toEqual({ hello: "world" });
   expect(payload.proof).toBe("pf-bytes");
+});
+
+test("Provider.serve can bootstrap hashes through a configured OracleClient", async () => {
+  const published: Event[] = [];
+  const hashRequests: string[] = [];
+  const paymentLockRecorder: {
+    params: VerifyProviderPaymentLockParams | null;
+  } = { params: null };
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      } else if (kinds.includes(7000)) {
+        onSelectionEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    oracles: [oracleKey.publicKey],
+    relayClient,
+    cashuClient: makeCashuClient({
+      verifyProviderPaymentLock: async (params) => {
+        paymentLockRecorder.params = params;
+        return { proofs: [], amountSats: params.amountSats };
+      },
+    }),
+    oracleClients: {
+      [oracleKey.publicKey]: {
+        requestHash: async (queryId) => {
+          hashRequests.push(queryId);
+          return { hash: "bb".repeat(32) };
+        },
+      },
+    },
+    selectionTimeoutMs: 200,
+    preimageTimeoutMs: 30,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => {
+      producerCalled = true;
+      return { data: { ok: true }, proof: "p1" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  const fireRequest = requireOnEvent(onRequestEvent);
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q-custom-oracle",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: oracleKey.publicKey,
+    max_amount_sats: 1000,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  const fireSelection = requireOnEvent(onSelectionEvent);
+  fireSelection(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      provider_redemption_token: "cashuBbound",
+      execution: selectionExecution(),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 70));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(true);
+  expect(hashRequests).toEqual(["q-custom-oracle"]);
+  expect(paymentLockRecorder.params?.hashHex).toBe("bb".repeat(32));
+  expect(published.map((event) => event.kind)).toEqual([7000, 6300]);
 });
 
 test("Provider.serve never runs the producer when no selection event arrives within timeout", async () => {
@@ -673,10 +805,102 @@ test("Provider.serve ignores selection whose execution payload mismatches the Re
   expect(published[0].kind).toBe(7000);
 });
 
+test("Provider.serve ignores selection whose Payment Lock token amount differs from its offer", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let onHashEvent: ((e: Event) => void) | null = null;
+  let producerCalled = false;
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) {
+        onRequestEvent = onEvent;
+      } else if (kinds.includes(7000)) {
+        onSelectionEvent = onEvent;
+      } else if (kinds.includes(4)) {
+        onHashEvent = onEvent;
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      if (event.kind === 4) {
+        queueMicrotask(() => {
+          onHashEvent?.(buildHashResponseEvent(
+            oracleKey,
+            event.pubkey,
+            {
+              type: "hash_response",
+              query_id: "q1",
+              hash: "aa".repeat(32),
+            },
+          ));
+        });
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    oracles: [oracleKey.publicKey],
+    relayClient,
+    cashuClient: makeCashuClient({
+      verifyProviderPaymentLock: () => Promise.reject(new Error("underfunded")),
+    }),
+    selectionTimeoutMs: 200,
+    hashTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => {
+      producerCalled = true;
+      return { data: null, proof: "x" };
+    },
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  const fireRequest = requireOnEvent(onRequestEvent);
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q1",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: oracleKey.publicKey,
+    max_amount_sats: 1000,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  const fireSelection = requireOnEvent(onSelectionEvent);
+  fireSelection(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      provider_redemption_token: "cashuBunderfunded",
+      execution: selectionExecution(),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(producerCalled).toBe(false);
+  expect(published).toHaveLength(2);
+  expect(published[0].kind).toBe(7000);
+  expect(published[1].kind).toBe(4);
+});
+
 test("Provider.serve receives oracle preimage DM and redeems the HTLC", async () => {
   const published: Event[] = [];
   let onRequestEvent: ((e: Event) => void) | null = null;
   let onSelectionEvent: ((e: Event) => void) | null = null;
+  let onHashEvent: ((e: Event) => void) | null = null;
   let onPreimageEvent: ((e: Event) => void) | null = null;
   const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
   const stateStore = createMemoryStateStore();
@@ -686,11 +910,31 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
       const kinds = filter.kinds ?? [];
       if (kinds.includes(5300)) onRequestEvent = onEvent;
       else if (kinds.includes(7000)) onSelectionEvent = onEvent;
-      else if (kinds.includes(4)) onPreimageEvent = onEvent;
+      else if (kinds.includes(4)) {
+        const recipients = filter["#p"] ?? [];
+        if (recipients.includes(providerKey.publicKey)) {
+          onPreimageEvent = onEvent;
+        } else {
+          onHashEvent = onEvent;
+        }
+      }
       return { close: () => {} };
     },
     publish: async (event: Event): Promise<PublishResult> => {
       published.push(event);
+      if (event.kind === 4) {
+        queueMicrotask(() => {
+          onHashEvent?.(buildHashResponseEvent(
+            oracleKey,
+            event.pubkey,
+            {
+              type: "hash_response",
+              query_id: "q-redeem",
+              hash: "aa".repeat(32),
+            },
+          ));
+        });
+      }
       return { successes: ["wss://relay.example.org"], failures: [] };
     },
   });
@@ -709,6 +953,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     cashuClient,
     stateStore,
     selectionTimeoutMs: 200,
+    hashTimeoutMs: 200,
     preimageTimeoutMs: 200,
   });
   const servePromise = provider.serve(async () => ({
@@ -780,7 +1025,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   const parsed = JSON.parse(stored) as Record<string, unknown>;
   expect(parsed.status).toBe("redeemed");
   expect(parsed.queryId).toBe("q-redeem");
-  expect(parsed.responseEventId).toBe(published[1].id);
+  expect(parsed.responseEventId).toBe(published[2].id);
 });
 
 test("Provider.serve does not publish an offer that exceeds the request's maxAmountSats", async () => {

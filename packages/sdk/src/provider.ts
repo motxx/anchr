@@ -36,9 +36,13 @@ import type {
 import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
 import { waitForFirstEvent } from "./relay-wait.ts";
 import { type Clock, realClock } from "./requests/domain/ports.ts";
+import { createNostrOracleClient, type OracleClient } from "./oracle.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
+
+/** Default timeout for waiting for the Oracle hash bootstrap response (10s). */
+export const DEFAULT_HASH_TIMEOUT_MS = 10_000;
 
 /** Default timeout for waiting for the oracle's preimage NIP-44 DM after publishing the result (5 min). */
 export const DEFAULT_PREIMAGE_TIMEOUT_MS = 5 * 60_000;
@@ -136,6 +140,28 @@ export function validateProviderOptions(
       );
     }
   }
+  if (o.oracleClients !== undefined) {
+    if (typeof o.oracleClients !== "object" || o.oracleClients === null) {
+      throw new ProviderConfigError(
+        "oracleClients, when provided, must be an object",
+      );
+    }
+    for (const client of Object.values(o.oracleClients)) {
+      if (typeof client !== "object" || client === null) {
+        throw new ProviderConfigError(
+          "oracleClients entries must be objects",
+        );
+      }
+      const requestHash = "requestHash" in client
+        ? client.requestHash
+        : undefined;
+      if (typeof requestHash !== "function") {
+        throw new ProviderConfigError(
+          "oracleClients entries must expose requestHash",
+        );
+      }
+    }
+  }
   if (o.proofGenerators !== undefined) {
     if (!Array.isArray(o.proofGenerators)) {
       throw new ProviderConfigError(
@@ -187,10 +213,12 @@ export function createProvider(options: ProviderOptions): Provider {
   const cashuClient = options.cashuClient;
   const selectionTimeoutMs = options.selectionTimeoutMs ??
     DEFAULT_SELECTION_TIMEOUT_MS;
+  const hashTimeoutMs = options.hashTimeoutMs ?? DEFAULT_HASH_TIMEOUT_MS;
   const preimageTimeoutMs = options.preimageTimeoutMs ??
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
   const schemaOptions = options.schemaOptions;
+  const oracleClients = options.oracleClients ?? {};
   const stateStore = options.stateStore;
   const clock = options.clock ?? realClock;
 
@@ -226,9 +254,11 @@ export function createProvider(options: ProviderOptions): Provider {
               relayClient,
               stateStore,
               selectionTimeoutMs,
+              hashTimeoutMs,
               preimageTimeoutMs,
               proofGenerators,
               schemaOptions,
+              oracleClients,
               clock,
             }, handler).catch(() => {
               // One bad event must not tear down the subscription.
@@ -257,9 +287,11 @@ interface JobContext {
   relayClient: RelayClient;
   stateStore?: ActorStateStore;
   selectionTimeoutMs: number;
+  hashTimeoutMs: number;
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
   schemaOptions?: ProviderOptions["schemaOptions"];
+  oracleClients: Readonly<Record<string, OracleClient>>;
   clock: Clock;
 }
 
@@ -331,7 +363,28 @@ async function handleJob(
   if (selection === null) return;
   if (selection.execution.schema !== payload.schema) return;
   if (selection.execution.max_amount_sats !== payload.max_amount_sats) return;
+  if (selection.execution.amount_sats !== offer.amountSats) return;
   if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
+  let hash: string;
+  try {
+    hash = (await getOracleClient(ctx, payload.oracle_pubkey).requestHash(
+      payload.query_id,
+    )).hash;
+  } catch {
+    return;
+  }
+  try {
+    await ctx.cashuClient.verifyProviderPaymentLock({
+      token: selection.provider_redemption_token,
+      amountSats: offer.amountSats,
+      hashHex: hash,
+      providerPubkey: ctx.identity.publicKey,
+      customerPubkey: payload.customer_pubkey,
+      locktimeSeconds: selection.execution.locktime_seconds,
+    });
+  } catch {
+    return;
+  }
 
   let result: { data: unknown; proof: Uint8Array | string };
   try {
@@ -343,6 +396,7 @@ async function handleJob(
         context: selection.execution.context,
       },
       mint: selection.execution.mint_url,
+      amountSats: selection.execution.amount_sats,
       maxAmountSats: selection.execution.max_amount_sats,
       locktimeSeconds: selection.execution.locktime_seconds,
     });
@@ -407,6 +461,15 @@ async function handleJob(
   } catch {
     return;
   }
+}
+
+function getOracleClient(ctx: JobContext, oraclePubkey: string): OracleClient {
+  return ctx.oracleClients[oraclePubkey] ??
+    createNostrOracleClient({
+      relayClient: ctx.relayClient,
+      oraclePubkey,
+      timeoutMs: ctx.hashTimeoutMs,
+    });
 }
 
 type ProviderStateStatus =
@@ -492,6 +555,7 @@ function waitForSelection(
       context?: Record<string, unknown>;
       mint_url: string;
       max_amount_sats: number;
+      amount_sats: number;
       locktime_seconds: number;
     };
   } | null

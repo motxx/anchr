@@ -11,6 +11,7 @@ import {
   type PublishResult,
   type RedeemHtlcParams,
   type RelayClient,
+  serveHashRequests,
   type Subscription,
 } from "@anchr/sdk";
 import {
@@ -24,23 +25,17 @@ import {
 
 type RelayEvent = Parameters<RelayClient["publish"]>[0];
 
-export interface BuildHtlcLockCall {
-  amountSats: number;
-  hashHex: string;
-  sourceProofCount: number;
-}
-
 export interface BindProviderCall {
+  amountSats: number;
   providerPubkey: string;
   hashHex: string;
-  initialProofCount: number;
+  sourceProofCount: number;
 }
 
 export interface PaidRequestSimulationResult {
   providerPubkey: string;
   proof: string;
   data: unknown;
-  customerLocks: readonly BuildHtlcLockCall[];
   customerBinds: readonly BindProviderCall[];
   providerRedeems: readonly RedeemHtlcParams[];
 }
@@ -77,6 +72,11 @@ export async function runPaidRequestSimulation(): Promise<
   }
 
   const queryIdsByRequest = new Map<string, string>();
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
   relayClient.subscribe({ kinds: [KIND_QUERY_REQUEST] }, (event) => {
     const payload = parseQueryRequestEvent(event);
     if (payload !== null) queryIdsByRequest.set(event.id, payload.query_id);
@@ -139,7 +139,7 @@ export async function runPaidRequestSimulation(): Promise<
         predicate: { target: "https://api.example.org/account" },
       },
       payment: { maxAmount: 1000 },
-      sourceProofs: ["wallet-proof"],
+      fundingProofs: ["wallet-proof"],
     });
     if (typeof result.proof !== "string") {
       throw new Error("simulation expected string proof bytes");
@@ -150,21 +150,18 @@ export async function runPaidRequestSimulation(): Promise<
       providerPubkey: result.providerPubkey,
       proof: result.proof,
       data: result.data,
-      customerLocks: customerCashu.locks.map((params) => ({
-        amountSats: params.amountSats,
-        hashHex: params.hashHex,
-        sourceProofCount: params.sourceProofs.length,
-      })),
       customerBinds: customerCashu.binds.map((params) => ({
+        amountSats: params.amountSats,
         providerPubkey: params.providerPubkey,
         hashHex: params.hashHex,
-        initialProofCount: params.initialProofs.length,
+        sourceProofCount: params.fundingProofs.length,
       })),
       providerRedeems: providerCashu.redeems,
     };
   } finally {
     await provider.stop();
     await servePromise;
+    hashResponder.close();
     relayClient.close();
   }
 }

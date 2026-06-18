@@ -2,19 +2,11 @@
  * Cashu HTLC client — wraps `@cashu/cashu-ts` v3 for the SDK's
  * Customer / Provider wire flow.
  *
- * Two-phase HTLC pattern using the SDK payment preselection-transfer model:
- *
- *   Phase 1 (initial lock — provider unknown):
- *     `buildHtlcLock` swaps the source proofs into P2PK(customer) proofs.
- *     The resulting token can appear in the kind 5300 event so providers
- *     see the payment_lock amount, but relay observers cannot spend it.
- *
- *   Phase 2 (swap to bind provider after selection):
- *     `bindProvider` swaps the held proofs at the mint into new proofs
- *     locked under
- *       hashlock(H) + P2PK(provider) + locktime + refund(customer)
- *     so the selected provider can redeem with `preimage + provider sig`
- *     and only after locktime can the customer reclaim.
+ * The Customer binds funding proofs after selecting a Provider. `bindProvider`
+ * swaps the funding proofs into new proofs locked under
+ *   hashlock(H) + P2PK(provider) + locktime + refund(customer)
+ * so the selected provider can redeem with `preimage + provider sig`
+ * and only after locktime can the customer reclaim.
  *
  *   Redemption (`redeemHtlc`):
  *     Provider attaches the preimage to the HTLC witness, signs with
@@ -23,20 +15,20 @@
  */
 
 import {
+  CheckStateEnum,
   getDecodedToken,
   getEncodedToken,
   Mint,
   type P2PKOptions,
+  pointFromHex,
   type Proof,
   type RequestFn,
   signP2PKProofs,
+  verifyDLEQProof_reblind,
   verifyHTLCHash,
   Wallet,
 } from "@cashu/cashu-ts";
-import {
-  buildHtlcFinalOptions,
-  buildHtlcPreselectionOptions,
-} from "../payments/cashu/cashu-htlc-options.ts";
+import { buildHtlcFinalOptions } from "../payments/cashu/cashu-htlc-options.ts";
 import {
   type CashuRedeemSendChain,
   type CashuRedeemWallet,
@@ -45,22 +37,24 @@ import {
 } from "../payments/cashu/redeem-swap.ts";
 import type {
   BindProviderParams,
-  BuildHtlcLockParams,
   CashuClient,
   CashuProof,
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
+  VerifyProviderPaymentLockParams,
+  VerifyProviderPaymentLockResult,
 } from "./types.ts";
 
 export type {
   BindProviderParams,
-  BuildHtlcLockParams,
   CashuClient,
   CashuProof,
   CashuToken,
   RedeemHtlcParams,
   RedeemResult,
+  VerifyProviderPaymentLockParams,
+  VerifyProviderPaymentLockResult,
 } from "./types.ts";
 
 /**
@@ -78,8 +72,8 @@ export interface CashuWalletAdapter extends CashuRedeemWallet {
   };
   /**
    * Mint swap fee for the given proofs. Subtracted from the input amount
-   * when swapping all proofs for new ones (e.g. Phase-2 HTLC bind +
-   * provider HTLC redemption).
+   * when swapping proofs for new ones (e.g. Provider-bound HTLC bind +
+   * Provider HTLC redemption).
    */
   getFeesForProofs(proofs: Proof[]): number;
   /**
@@ -91,6 +85,8 @@ export interface CashuWalletAdapter extends CashuRedeemWallet {
   keyChain: {
     getAllKeysetIds(): readonly string[];
   };
+  /** Refresh mint metadata and keysets. Real cashu-ts Wallet supports this. */
+  loadMint?(forceRefresh?: boolean): Promise<void>;
 }
 
 /** Construction options for {@link createCashuClient}. */
@@ -136,6 +132,8 @@ export class CashuClientError extends Error {
     this.name = "CashuClientError";
   }
 }
+
+const MIN_PROVIDER_PAYMENT_LOCK_REMAINING_SECONDS = 10 * 60;
 
 /**
  * Validates that a hex hash is the right shape for a Cashu HTLC.
@@ -183,19 +181,15 @@ function bytesToHexLocal(bytes: Uint8Array): string {
   return s;
 }
 
-/**
- * Phase-1 P2PK options: lock to the customer's pubkey only. The payment_lock
- * token is broadcast in the kind 5300 event, so the lock prevents any
- * Nostr-relay subscriber from spending the proofs as bearer tokens —
- * spending requires the customer's signature, which only Phase 2
- * (`bindProvider`) supplies.
- *
- * Hashlock is intentionally NOT applied in Phase 1: the customer needs
- * to swap these proofs in Phase 2, and a hashlock would require the
- * preimage (which only the oracle holds) to spend before locktime.
- */
-function buildPhase1P2PKOptions(customerPubkey: string): P2PKOptions {
-  return buildHtlcPreselectionOptions({ customerPubkey });
+function hexToBytesLocal(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
+    throw new CashuClientError(`Invalid hex string: ${hex}`);
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
 }
 
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
@@ -207,9 +201,294 @@ function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
   });
 }
 
+function p2pkVariants(pubkey: string): string[] {
+  return pubkey.startsWith("02") || pubkey.startsWith("03")
+    ? [pubkey]
+    : [pubkey, `02${pubkey}`];
+}
+
+function findSecretTag(tags: unknown, name: string): string[] | null {
+  if (!Array.isArray(tags)) return null;
+  for (const tag of tags) {
+    if (
+      Array.isArray(tag) &&
+      tag.length > 0 &&
+      tag.every((value) => typeof value === "string") &&
+      tag[0] === name
+    ) {
+      return tag;
+    }
+  }
+  return null;
+}
+
+function requireTagValue(
+  tags: unknown,
+  name: string,
+  value: string,
+  message: string,
+): void {
+  const tag = findSecretTag(tags, name);
+  if (tag === null || tag[1] !== value) {
+    throw new CashuClientError(message);
+  }
+}
+
+function rejectUnsupportedExtraSignatures(tags: unknown): void {
+  const tag = findSecretTag(tags, "n_sigs");
+  if (tag !== null && tag[1] !== "1") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token requires unsupported extra signatures",
+    );
+  }
+}
+
+function rejectUnsupportedRefundSignatures(tags: unknown): void {
+  const tag = findSecretTag(tags, "n_sigs_refund");
+  if (tag !== null && tag[1] !== "1") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token refund path requires unsupported extra signatures",
+    );
+  }
+}
+
+function requireSingleKeyTag(
+  tags: unknown,
+  name: string,
+  acceptedKeys: readonly string[],
+  message: string,
+): void {
+  const tag = findSecretTag(tags, name);
+  if (
+    tag === null ||
+    tag.length !== 2 ||
+    !acceptedKeys.includes(tag[1]!)
+  ) {
+    throw new CashuClientError(message);
+  }
+}
+
+function validateMinimumProviderLocktime(
+  locktimeSeconds: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): void {
+  validateLocktime(locktimeSeconds, nowSeconds);
+  const remainingSeconds = locktimeSeconds - nowSeconds;
+  if (remainingSeconds < MIN_PROVIDER_PAYMENT_LOCK_REMAINING_SECONDS) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: token locktime has only ${remainingSeconds}s remaining`,
+    );
+  }
+}
+
+function rejectDuplicateProofs(proofs: Proof[]): void {
+  const seenSecrets = new Set<string>();
+  for (const proof of proofs) {
+    if (seenSecrets.has(proof.secret)) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: token contains duplicate proofs",
+      );
+    }
+    seenSecrets.add(proof.secret);
+  }
+}
+
+function validateProviderPaymentLockProofs(
+  proofs: Proof[],
+  params: VerifyProviderPaymentLockParams,
+  providerRedeemFeeSats: number,
+): number {
+  if (proofs.length === 0) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: token has no proofs",
+    );
+  }
+  const expectedHash = validateHashHex(params.hashHex);
+  validateMinimumProviderLocktime(params.locktimeSeconds);
+  rejectDuplicateProofs(proofs);
+  const faceAmountSats = sumAmounts(proofs);
+  const redeemableAmountSats = faceAmountSats - providerRedeemFeeSats;
+  if (redeemableAmountSats !== params.amountSats) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: token redeemable amount ${redeemableAmountSats} does not match ${params.amountSats}`,
+    );
+  }
+
+  for (let i = 0; i < proofs.length; i++) {
+    const proof = proofs[i]!;
+    let secret: unknown;
+    try {
+      secret = JSON.parse(proof.secret);
+    } catch {
+      throw new CashuClientError(
+        `verifyProviderPaymentLock: proof ${i} has malformed secret`,
+      );
+    }
+    if (!Array.isArray(secret) || secret[0] !== "HTLC") {
+      throw new CashuClientError(
+        `verifyProviderPaymentLock: proof ${i} is not an HTLC proof`,
+      );
+    }
+    const body = secret[1] as { data?: unknown; tags?: unknown } | undefined;
+    if (body?.data !== expectedHash) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: HTLC hash mismatch",
+      );
+    }
+    const tags = body.tags;
+    requireSingleKeyTag(
+      tags,
+      "pubkeys",
+      p2pkVariants(params.providerPubkey),
+      "verifyProviderPaymentLock: token is not locked only to the selected provider",
+    );
+    requireSingleKeyTag(
+      tags,
+      "refund",
+      p2pkVariants(params.customerPubkey),
+      "verifyProviderPaymentLock: token refund key does not match customer",
+    );
+    requireTagValue(
+      tags,
+      "locktime",
+      String(params.locktimeSeconds),
+      "verifyProviderPaymentLock: token locktime mismatch",
+    );
+    requireTagValue(
+      tags,
+      "sigflag",
+      "SIG_ALL",
+      "verifyProviderPaymentLock: token must require SIG_ALL",
+    );
+    rejectUnsupportedExtraSignatures(tags);
+    rejectUnsupportedRefundSignatures(tags);
+  }
+  return redeemableAmountSats;
+}
+
+async function requireProofsUnspent(
+  wallet: CashuWalletAdapter,
+  proofs: Proof[],
+): Promise<void> {
+  if (!wallet.checkProofsStates) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof state check unavailable",
+    );
+  }
+
+  let states: Array<{ state: string }>;
+  try {
+    states = await wallet.checkProofsStates(proofs);
+  } catch (err) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: proof state check failed",
+      err,
+    );
+  }
+
+  if (states.length !== proofs.length) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: proof state check returned an unexpected count",
+    );
+  }
+
+  const invalid = states.find((state) =>
+    state.state !== CheckStateEnum.UNSPENT
+  );
+  if (invalid !== undefined) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: proof state is ${invalid.state}`,
+    );
+  }
+}
+
+async function refreshMintKeysets(wallet: CashuWalletAdapter): Promise<void> {
+  if (wallet.loadMint === undefined) return;
+  try {
+    await wallet.loadMint(true);
+  } catch (err) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: mint keyset refresh failed",
+      err,
+    );
+  }
+}
+
+function decodeProofDleq(proof: Proof): {
+  s: Uint8Array;
+  e: Uint8Array;
+  r: bigint;
+} {
+  const dleq = proof.dleq;
+  if (typeof dleq !== "object" || dleq === null) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof is missing DLEQ proof",
+    );
+  }
+  const serialized = dleq as { s?: unknown; e?: unknown; r?: unknown };
+  if (typeof serialized.s !== "string" || typeof serialized.e !== "string") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof has malformed DLEQ proof",
+    );
+  }
+  return {
+    s: hexToBytesLocal(serialized.s),
+    e: hexToBytesLocal(serialized.e),
+    r: BigInt(
+      `0x${
+        typeof serialized.r === "string" && serialized.r.length > 0
+          ? serialized.r
+          : "00"
+      }`,
+    ),
+  };
+}
+
+const proofSecretEncoder = new TextEncoder();
+
+function requireMintSignatureProofs(
+  wallet: CashuWalletAdapter,
+  proofs: Proof[],
+): void {
+  if (wallet.getKeyset === undefined) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: mint keyset lookup unavailable",
+    );
+  }
+
+  for (const proof of proofs) {
+    const keyset = wallet.getKeyset(proof.id);
+    const amountPublicKey = keyset.keys[proof.amount];
+    if (typeof amountPublicKey !== "string") {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: mint key for proof amount unavailable",
+      );
+    }
+
+    try {
+      const isValid = verifyDLEQProof_reblind(
+        proofSecretEncoder.encode(proof.secret),
+        decodeProofDleq(proof),
+        pointFromHex(proof.C),
+        pointFromHex(amountPublicKey),
+      );
+      if (!isValid) {
+        throw new CashuClientError(
+          "verifyProviderPaymentLock: proof signature is invalid",
+        );
+      }
+    } catch (err) {
+      if (err instanceof CashuClientError) throw err;
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: proof signature verification failed",
+      );
+    }
+  }
+}
+
 /**
  * Minimal shape check for a Cashu proof. Catches caller misuse (passing
- * arbitrary objects as `sourceProofs`) before the values reach cashu-ts
+ * arbitrary objects as `fundingProofs`) before the values reach cashu-ts
  * and produce confusing mint errors.
  */
 function isValidProofShape(p: unknown): p is Proof {
@@ -280,7 +559,7 @@ function mapRedeemFailure(result: RedeemSwapResult): never {
 /**
  * Construct a CashuClient bound to a specific mint.
  *
- * Performs a real swap at `mintUrl` using the provided source proofs.
+ * Performs a real swap at `mintUrl` using the provided funding proofs.
  * Tests can pass `options.wallet` to inject a Wallet stub instead of
  * opening a live mint connection.
  */
@@ -310,54 +589,16 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
   return {
     mintUrl,
 
-    async buildHtlcLock(p: BuildHtlcLockParams): Promise<CashuToken> {
-      validateHashHex(p.hashHex);
-      validateLocktime(p.locktimeSeconds);
-      if (typeof p.amountSats !== "number" || p.amountSats <= 0) {
-        throw new CashuClientError("amountSats must be a positive number");
-      }
-      if (!Array.isArray(p.sourceProofs) || p.sourceProofs.length === 0) {
-        throw new CashuClientError("sourceProofs must be a non-empty array");
-      }
-      for (const proof of p.sourceProofs) {
-        if (!isValidProofShape(proof)) {
-          throw new CashuClientError("sourceProofs contains a malformed proof");
-        }
-      }
-
-      const wallet = await getWallet();
-      const sourceProofs = p.sourceProofs as Proof[];
-      const fee = wallet.getFeesForProofs(sourceProofs);
-      const swapAmount = p.amountSats - fee;
-      if (swapAmount <= 0) {
-        throw new CashuMintError(
-          `buildHtlcLock: mint fee ${fee} exceeds requested ${p.amountSats} sats`,
-        );
-      }
-
-      const phase1 = buildPhase1P2PKOptions(p.customerPubkey);
-      let send: Proof[];
-      try {
-        const result = await wallet.ops.send(swapAmount, sourceProofs).asP2PK(
-          phase1,
-        ).run();
-        send = result.send;
-      } catch (err) {
-        throw new CashuMintError("buildHtlcLock: mint swap failed", err);
-      }
-      const token = getEncodedToken({ mint: mintUrl, proofs: send }, {
-        version: 4,
-      });
-      return {
-        token,
-        amountSats: sumAmounts(send),
-        proofs: send as CashuProof[],
-      };
-    },
-
     async bindProvider(p: BindProviderParams): Promise<CashuToken> {
       validateHashHex(p.hashHex);
       validateLocktime(p.locktimeSeconds);
+      if (
+        !Number.isFinite(p.amountSats) ||
+        !Number.isInteger(p.amountSats) ||
+        p.amountSats <= 0
+      ) {
+        throw new CashuClientError("amountSats must be a positive integer");
+      }
       if (
         !(p.customerSecretKey instanceof Uint8Array) ||
         p.customerSecretKey.length !== 32
@@ -366,43 +607,54 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
           "customerSecretKey must be a 32-byte Uint8Array",
         );
       }
-      if (!Array.isArray(p.initialProofs) || p.initialProofs.length === 0) {
-        throw new CashuClientError("initialProofs must be a non-empty array");
+      if (!Array.isArray(p.fundingProofs) || p.fundingProofs.length === 0) {
+        throw new CashuClientError("fundingProofs must be a non-empty array");
       }
-      for (const proof of p.initialProofs) {
+      for (const proof of p.fundingProofs) {
         if (!isValidProofShape(proof)) {
           throw new CashuClientError(
-            "initialProofs contains a malformed proof",
+            "fundingProofs contains a malformed proof",
           );
         }
       }
       const wallet = await getWallet();
-      const sourceProofs = p.initialProofs as Proof[];
-      const totalAmount = sumAmounts(sourceProofs);
+      const inputProofs = p.fundingProofs as Proof[];
+      const totalAmount = sumAmounts(inputProofs);
       if (totalAmount <= 0) {
         throw new CashuClientError(
-          "initialProofs contains no spendable proofs",
+          "fundingProofs contains no spendable proofs",
         );
       }
 
-      const fee = wallet.getFeesForProofs(sourceProofs);
-      const swapAmount = totalAmount - fee;
-      if (swapAmount <= 0) {
+      const fee = wallet.getFeesForProofs(inputProofs);
+      const requiredAmount = p.amountSats + fee;
+      if (totalAmount < requiredAmount) {
         throw new CashuMintError(
-          `bindProvider: mint fee ${fee} exceeds available ${totalAmount} sats`,
+          `bindProvider: mint fee ${fee} leaves ${
+            totalAmount - fee
+          } sats for ${p.amountSats} sat lock`,
         );
       }
 
       const phase2 = buildHtlcP2PKOptions(p);
       const customerPrivkeyHex = bytesToHexLocal(p.customerSecretKey);
 
+      let keep: Proof[];
       let send: Proof[];
       try {
-        const result = await wallet.ops
-          .send(swapAmount, sourceProofs)
+        let chain = wallet.ops
+          .send(p.amountSats, inputProofs)
           .privkey(customerPrivkeyHex)
-          .asP2PK(phase2)
-          .run();
+          .asP2PK(phase2);
+        if (chain.includeFees !== undefined) {
+          chain = chain.includeFees(true);
+        } else if (fee > 0) {
+          throw new CashuClientError(
+            "bindProvider: wallet send builder cannot include receiver fees",
+          );
+        }
+        const result = await chain.run();
+        keep = result.keep ?? [];
         send = result.send;
       } catch (err) {
         throw new CashuMintError("bindProvider: mint swap failed", err);
@@ -412,8 +664,34 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
       });
       return {
         token,
-        amountSats: sumAmounts(send),
+        amountSats: sumAmounts(send) - wallet.getFeesForProofs(send),
         proofs: send as CashuProof[],
+        changeProofs: keep as CashuProof[],
+      };
+    },
+
+    async verifyProviderPaymentLock(
+      params: VerifyProviderPaymentLockParams,
+    ): Promise<VerifyProviderPaymentLockResult> {
+      const wallet = await getWallet();
+      await refreshMintKeysets(wallet);
+      const knownKeysets = wallet.keyChain.getAllKeysetIds();
+      const decoded = getDecodedToken(params.token, [...knownKeysets]);
+      if (decoded.mint !== mintUrl) {
+        throw new CashuClientError(
+          "verifyProviderPaymentLock: token mint does not match client mint",
+        );
+      }
+      const amountSats = validateProviderPaymentLockProofs(
+        decoded.proofs,
+        params,
+        wallet.getFeesForProofs(decoded.proofs),
+      );
+      requireMintSignatureProofs(wallet, decoded.proofs);
+      await requireProofsUnspent(wallet, decoded.proofs);
+      return {
+        proofs: decoded.proofs as CashuProof[],
+        amountSats,
       };
     },
 

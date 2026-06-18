@@ -554,7 +554,12 @@ suite(
           },
         );
         const groupSignatures: string[] = [];
-        for (const message of deriveFrostP2pkMessages(token)) {
+        for (
+          const message of deriveFrostP2pkMessages(
+            token,
+            wallet.keyChain.getAllKeysetIds(),
+          )
+        ) {
           groupSignatures.push(await signWithFrostPair(frostGroup, message));
         }
 

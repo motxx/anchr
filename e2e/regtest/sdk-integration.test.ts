@@ -4,9 +4,9 @@
  *   - Real Nostr relay (ws://localhost:7777)
  *   - In-process simulated oracle
  *
- * The customer's source proofs are minted via regtest Lightning so the
- * Phase-1 lock, Phase-2 swap, and provider's HTLC redemption all hit
- * the real mint. This is the "no Mock" verification of the SDK wire
+ * The customer's funding proofs are minted via regtest Lightning so the
+ * Provider-bound Payment Lock swap and provider's HTLC redemption both
+ * hit the real mint. This is the "no Mock" verification of the SDK wire
  * flow. **Scope:** HTLC + Nostr transport. The simulated oracle here
  * does not verify proofs (it always releases the preimage on a kind
  * 6300 result event); proof verification (TLSN attestation, C2PA, GPS,
@@ -28,6 +28,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { createCustomer } from "@anchr/sdk/customer";
 import { createProvider } from "@anchr/sdk/provider";
+import { serveHashRequests } from "@anchr/sdk";
 import { createCashuClient } from "@anchr/sdk/adapters/cashu";
 import { createRelayClient } from "@anchr/sdk/adapters/nostr";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
@@ -46,7 +47,8 @@ import {
 const MINT_URL = Deno.env.get("CASHU_MINT_URL") ?? "http://localhost:3338";
 const RELAY_URL = (Deno.env.get("NOSTR_RELAYS") ?? "ws://localhost:7777")
   .split(",")[0]!.trim();
-const BOUNTY_SATS = 16;
+const PROVIDER_AMOUNT_SATS = 16;
+const CUSTOMER_FUNDING_SATS = PROVIDER_AMOUNT_SATS * 2;
 
 const INFRA_READY = await checkInfraReady(MINT_URL);
 const sharedWallet = INFRA_READY ? await createWallet(MINT_URL) : undefined;
@@ -66,7 +68,7 @@ suite(
       // Mint Cashu proofs into the customer's wallet via Lightning.
       const customerProofs = await throttledMintProofs(
         sharedWallet!,
-        BOUNTY_SATS,
+        CUSTOMER_FUNDING_SATS,
       );
 
       // Generate keys for oracle and provider.
@@ -78,7 +80,8 @@ suite(
       const customerRelay = createRelayClient([RELAY_URL]);
       const providerRelay = createRelayClient([RELAY_URL]);
 
-      // The OracleClient that the customer uses for the pre-flight hash.
+      // The OracleClient that the customer and provider use for the hash
+      // committed into the Provider Payment Lock.
       const oracleClient: OracleClient = {
         requestHash: (_queryId) => Promise.resolve({ hash: hashHex }),
       };
@@ -89,6 +92,11 @@ suite(
       // would verify the proof first — here we trust the provider for
       // the purposes of testing the Cashu HTLC swap path.
       const queryIdsByRequest = new Map<string, string>();
+      const hashResponder = serveHashRequests({
+        relayClient: oracleRelay,
+        identity: oracleKey,
+        issueHash: () => hashHex,
+      });
       const reqSub = oracleRelay.subscribe(
         { kinds: [5300] },
         (event) => {
@@ -116,7 +124,19 @@ suite(
 
       // Real CashuClient against the regtest mint for both actors.
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
-      const providerCashu = createCashuClient({ mintUrl: MINT_URL });
+      const baseProviderCashu = createCashuClient({ mintUrl: MINT_URL });
+      let providerPaymentLockError: unknown;
+      const providerCashu: typeof baseProviderCashu = {
+        ...baseProviderCashu,
+        verifyProviderPaymentLock: async (params) => {
+          try {
+            return await baseProviderCashu.verifyProviderPaymentLock(params);
+          } catch (err) {
+            providerPaymentLockError = err;
+            throw err;
+          }
+        },
+      };
 
       const provider = createProvider({
         oracles: [oracleKey.publicKey],
@@ -125,13 +145,14 @@ suite(
         privKey: bytesToHex(providerKey.secretKey),
         cashuClient: providerCashu,
         relayClient: providerRelay,
+        oracleClients: { [oracleKey.publicKey]: oracleClient },
         selectionTimeoutMs: 30_000,
         preimageTimeoutMs: 30_000,
       });
 
       const servePromise = provider.serve((request) =>
         Promise.resolve({
-          amountSats: BOUNTY_SATS,
+          amountSats: PROVIDER_AMOUNT_SATS,
           produce: () =>
             Promise.resolve({
               data: { schema: request.spec.schema, ok: true },
@@ -162,8 +183,8 @@ suite(
             schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
             predicate: { target: "https://api.example.org" },
           },
-          payment: { maxAmount: BOUNTY_SATS },
-          sourceProofs: customerProofs,
+          payment: { maxAmount: PROVIDER_AMOUNT_SATS },
+          fundingProofs: customerProofs,
         });
 
         expect(result.providerPubkey).toBe(providerKey.publicKey);
@@ -179,9 +200,21 @@ suite(
         // Give the provider a moment to finish redeemHtlc against the
         // real mint after the customer has returned.
         await new Promise((r) => setTimeout(r, 2_000));
+      } catch (err) {
+        if (providerPaymentLockError !== undefined) {
+          const message = providerPaymentLockError instanceof Error
+            ? providerPaymentLockError.message
+            : String(providerPaymentLockError);
+          throw new Error(
+            `Provider Payment Lock verification failed before result: ${message}`,
+            { cause: providerPaymentLockError },
+          );
+        }
+        throw err;
       } finally {
         await provider.stop();
         await servePromise;
+        hashResponder.close();
         reqSub.close();
         respSub.close();
         oracleRelay.close();
@@ -197,7 +230,7 @@ suite(
 
       const customerProofs = await throttledMintProofs(
         sharedWallet!,
-        BOUNTY_SATS,
+        CUSTOMER_FUNDING_SATS,
       );
       const customerCashu = createCashuClient({ mintUrl: MINT_URL });
       const oracleKey = generateKeypair();
@@ -229,8 +262,8 @@ suite(
           schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
           predicate: { target: "https://api.example.org" },
         },
-        payment: { maxAmount: BOUNTY_SATS },
-        sourceProofs: customerProofs,
+        payment: { maxAmount: PROVIDER_AMOUNT_SATS },
+        fundingProofs: customerProofs,
       })).rejects.toThrow();
 
       const requestEvent = published.find((event) => event.kind === 5300);

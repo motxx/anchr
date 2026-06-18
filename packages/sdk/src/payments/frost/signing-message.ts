@@ -12,17 +12,27 @@ export function deriveFrostEscrowTokenHash(encodedToken: string): string {
   return sha256Utf8Hex(encodedToken);
 }
 
-export function deriveFrostP2pkMessages(encodedToken: string): string[] {
-  const decoded = getDecodedToken(encodedToken);
+export function deriveFrostP2pkMessages(
+  encodedToken: string,
+  knownKeysets?: readonly string[],
+): string[] {
+  const decoded = getDecodedToken(
+    encodedToken,
+    knownKeysets === undefined ? undefined : [...knownKeysets],
+  );
   return decoded.proofs.map((proof) => sha256Utf8Hex(proof.secret));
 }
 
 export function tokenMatchesFrostP2pkLock(
   encodedToken: string,
   groupPubkey: string,
+  knownKeysets?: readonly string[],
 ): boolean {
   try {
-    const decoded = getDecodedToken(encodedToken);
+    const decoded = getDecodedToken(
+      encodedToken,
+      knownKeysets === undefined ? undefined : [...knownKeysets],
+    );
     return decoded.proofs.length > 0 &&
       decoded.proofs.every((proof) =>
         p2pkSecretRequiresGroup(proof.secret, groupPubkey)

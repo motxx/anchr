@@ -172,6 +172,7 @@ The `execution` object includes:
 | `context`          | Optional schema-agnostic context                           |
 | `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
 | `max_amount_sats`  | Customer Payment Budget in sats                            |
+| `amount_sats`      | Selected Provider Offer amount in sats; the Provider Redemption Token must carry this exact net amount |
 | `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
@@ -298,8 +299,10 @@ as preimage delivery use NIP-44 direct messages between specific pubkeys.
 ## Hash Bootstrap (kind 4)
 
 Before locking payment, the Customer obtains the hash commitment `H` from the
-designated Oracle over the relay. Both messages are NIP-44 kind `4` DMs; no
-HTTP endpoint is required on either side.
+designated Oracle over the relay. The Provider may request the same
+query-bound hash before irreversible work to validate that the selected Payment
+Lock is locked to the Oracle's commitment. Both messages are NIP-44 kind `4`
+DMs; no HTTP endpoint is required on either side.
 
 Customer → Oracle request content:
 

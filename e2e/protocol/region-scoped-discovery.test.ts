@@ -14,23 +14,20 @@ import {
   generateKeypair,
   ProofSchema,
   type RedeemResult,
+  serveHashRequests,
 } from "@anchr/sdk";
 
 function stubCashuClient(): CashuClient {
   return {
     mintUrl: "https://mint.test.example",
-    buildHtlcLock: (params) =>
-      Promise.resolve({
-        token: "cashuB-initial",
-        amountSats: params.amountSats,
-        proofs: params.sourceProofs,
-      }),
     bindProvider: (params) =>
       Promise.resolve({
         token: "cashuB-bound",
-        amountSats: 100,
-        proofs: params.initialProofs,
+        amountSats: params.amountSats,
+        proofs: [],
       }),
+    verifyProviderPaymentLock: () =>
+      Promise.resolve({ proofs: [], amountSats: 100 }),
     redeemHtlc: (): Promise<RedeemResult> =>
       Promise.resolve({ proofs: [], amountSats: 100 }),
   };
@@ -50,6 +47,11 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
   const oracleKey = generateKeypair();
   const providerKey = generateKeypair();
   const servedSchemas: string[] = [];
+  const hashResponder = serveHashRequests({
+    relayClient,
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
 
   const provider = createProvider({
     oracles: [oracleKey.publicKey],
@@ -92,7 +94,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
       makeCustomer().request({
         spec: { schema: CUSTOM_SCHEMA, predicate: {} },
         payment: { maxAmount: 1000 },
-        sourceProofs: [],
+        fundingProofs: [],
       }),
     ).rejects.toThrow();
     expect(servedSchemas).toEqual([]);
@@ -101,7 +103,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
     const result = await makeCustomer().request({
       spec: { schema: ProofSchema.TlsnV1, predicate: {} },
       payment: { maxAmount: 1000 },
-      sourceProofs: [],
+      fundingProofs: [],
       regionCode: "JP",
     });
     expect(result.proof).toBe("region-proof");
@@ -109,6 +111,7 @@ test("a region-scoped Provider only serves region-matching advertisements", asyn
   } finally {
     await provider.stop();
     await servePromise;
+    hashResponder.close();
     relayClient.close();
   }
 });

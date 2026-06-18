@@ -25,6 +25,7 @@ import {
   parseQueryRequestEvent,
 } from "@anchr/protocol/events";
 import { type Event, generateKeypair } from "@anchr/protocol/nostr";
+import { serveHashRequests } from "./adapters/nostr/hash-responder.ts";
 import type {
   CashuClient,
   CashuToken,
@@ -121,16 +122,13 @@ function makeOracleClient(): OracleClient {
 function makeCashuClient(): CashuClient {
   return {
     mintUrl: "https://mint.example.org",
-    buildHtlcLock: async (p) => ({
-      token: "cashuBinit",
+    bindProvider: async (p) => ({
+      token: "cashuBbound",
       amountSats: p.amountSats,
       proofs: [],
     } satisfies CashuToken),
-    bindProvider: async (_p) => ({
-      token: "cashuBbound",
-      amountSats: 0,
-      proofs: [],
-    } satisfies CashuToken),
+    verifyProviderPaymentLock: () =>
+      Promise.resolve({ proofs: [], amountSats: 100 }),
     redeemHtlc: async (_p: RedeemHtlcParams): Promise<RedeemResult> => ({
       proofs: [],
       amountSats: 0,
@@ -153,6 +151,11 @@ test("in-process wiring: customer.request returns the provider's data via a shar
   // The original request payload (carrying query_id) was on kind 5300;
   // we also subscribe to those to remember query_ids by event id.
   const queryIdsByRequest: Map<string, string> = new Map();
+  const hashResponder = serveHashRequests({
+    relayClient: relay.asClient(),
+    identity: oracleKey,
+    issueHash: () => HASH_HEX,
+  });
   relay.subscribe({ kinds: [5300] }, (event) => {
     const payload = parseQueryRequestEvent(event);
     if (payload !== null) queryIdsByRequest.set(event.id, payload.query_id);
@@ -221,7 +224,7 @@ test("in-process wiring: customer.request returns the provider's data via a shar
       predicate: { target: "https://api.example.org" },
     },
     payment: { maxAmount: 1000 },
-    sourceProofs: [],
+    fundingProofs: [],
   });
 
   expect(result.providerPubkey).toBe(providerKey.publicKey);
@@ -240,4 +243,5 @@ test("in-process wiring: customer.request returns the provider's data via a shar
   await new Promise((r) => setTimeout(r, 30));
   await provider.stop();
   await servePromise;
+  hashResponder.close();
 });

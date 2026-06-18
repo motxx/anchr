@@ -30,18 +30,14 @@ function makeStubCashuClient(): {
   const redeems: RedeemHtlcParams[] = [];
   const client: CashuClient = {
     mintUrl: "https://mint.test.example",
-    buildHtlcLock: (params) =>
-      Promise.resolve({
-        token: "cashuB-initial",
-        amountSats: params.amountSats,
-        proofs: params.sourceProofs,
-      }),
     bindProvider: (params) =>
       Promise.resolve({
         token: "cashuB-bound",
-        amountSats: 100,
-        proofs: params.initialProofs,
+        amountSats: params.amountSats,
+        proofs: [],
       }),
+    verifyProviderPaymentLock: () =>
+      Promise.resolve({ proofs: [], amountSats: 100 }),
     redeemHtlc: (params): Promise<RedeemResult> => {
       redeems.push(params);
       return Promise.resolve({ proofs: [], amountSats: 100 });
@@ -150,7 +146,7 @@ test("INV-08: full exchange completes relay-only with no HTTP endpoint", async (
           predicate: { target: "https://api.example.org/account" },
         },
         payment: { maxAmount: 1000 },
-        sourceProofs: ["wallet-proof"],
+        fundingProofs: ["wallet-proof"],
       });
 
       expect(result.providerPubkey).toBe(providerKey.publicKey);
