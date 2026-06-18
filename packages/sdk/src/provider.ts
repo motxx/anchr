@@ -36,7 +36,7 @@ import type {
 import { isSchemaUri, resolveProofGenerator } from "./schema.ts";
 import { waitForFirstEvent } from "./relay-wait.ts";
 import { type Clock, realClock } from "./requests/domain/ports.ts";
-import { createNostrOracleClient } from "./oracle.ts";
+import { createNostrOracleClient, type OracleClient } from "./oracle.ts";
 
 /** Default timeout for waiting for the customer's selection event after an offer (60s). */
 export const DEFAULT_SELECTION_TIMEOUT_MS = 60_000;
@@ -140,6 +140,28 @@ export function validateProviderOptions(
       );
     }
   }
+  if (o.oracleClients !== undefined) {
+    if (typeof o.oracleClients !== "object" || o.oracleClients === null) {
+      throw new ProviderConfigError(
+        "oracleClients, when provided, must be an object",
+      );
+    }
+    for (const client of Object.values(o.oracleClients)) {
+      if (typeof client !== "object" || client === null) {
+        throw new ProviderConfigError(
+          "oracleClients entries must be objects",
+        );
+      }
+      const requestHash = "requestHash" in client
+        ? client.requestHash
+        : undefined;
+      if (typeof requestHash !== "function") {
+        throw new ProviderConfigError(
+          "oracleClients entries must expose requestHash",
+        );
+      }
+    }
+  }
   if (o.proofGenerators !== undefined) {
     if (!Array.isArray(o.proofGenerators)) {
       throw new ProviderConfigError(
@@ -196,6 +218,7 @@ export function createProvider(options: ProviderOptions): Provider {
     DEFAULT_PREIMAGE_TIMEOUT_MS;
   const proofGenerators = options.proofGenerators ?? [];
   const schemaOptions = options.schemaOptions;
+  const oracleClients = options.oracleClients ?? {};
   const stateStore = options.stateStore;
   const clock = options.clock ?? realClock;
 
@@ -235,6 +258,7 @@ export function createProvider(options: ProviderOptions): Provider {
               preimageTimeoutMs,
               proofGenerators,
               schemaOptions,
+              oracleClients,
               clock,
             }, handler).catch(() => {
               // One bad event must not tear down the subscription.
@@ -267,6 +291,7 @@ interface JobContext {
   preimageTimeoutMs: number;
   proofGenerators: readonly ProofGenerator[];
   schemaOptions?: ProviderOptions["schemaOptions"];
+  oracleClients: Readonly<Record<string, OracleClient>>;
   clock: Clock;
 }
 
@@ -342,11 +367,9 @@ async function handleJob(
   if (selection.execution.mint_url !== ctx.cashuClient.mintUrl) return;
   let hash: string;
   try {
-    hash = (await createNostrOracleClient({
-      relayClient: ctx.relayClient,
-      oraclePubkey: payload.oracle_pubkey,
-      timeoutMs: ctx.hashTimeoutMs,
-    }).requestHash(payload.query_id)).hash;
+    hash = (await getOracleClient(ctx, payload.oracle_pubkey).requestHash(
+      payload.query_id,
+    )).hash;
   } catch {
     return;
   }
@@ -438,6 +461,15 @@ async function handleJob(
   } catch {
     return;
   }
+}
+
+function getOracleClient(ctx: JobContext, oraclePubkey: string): OracleClient {
+  return ctx.oracleClients[oraclePubkey] ??
+    createNostrOracleClient({
+      relayClient: ctx.relayClient,
+      oraclePubkey,
+      timeoutMs: ctx.hashTimeoutMs,
+    });
 }
 
 type ProviderStateStatus =

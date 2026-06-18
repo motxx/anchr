@@ -1,7 +1,9 @@
 import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
+  createDLEQProof,
   getEncodedToken,
+  hashToCurve,
   type OutputDataLike,
   type P2PKOptions,
   type Proof,
@@ -35,6 +37,16 @@ const PROVIDER_SECRET = (() => {
   for (let i = 0; i < 32; i++) k[i] = i + 0x40;
   return k;
 })();
+const MINT_PRIVATE_KEY_HEX = "01".padStart(64, "0");
+const MINT_PUBLIC_KEY_HEX =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+function hashProofSecretToCurve(
+  secret: string,
+): ReturnType<typeof hashToCurve> {
+  return Reflect.apply(hashToCurve, undefined, [secret]) as ReturnType<
+    typeof hashToCurve
+  >;
+}
 
 const VALID_SOURCE_PROOFS: Record<string, unknown>[] = [
   {
@@ -111,12 +123,42 @@ function makeFakeWallet(opts: {
     keyChain: {
       getAllKeysetIds: () => opts.keysetIds ?? ["00ad268c4d1f5826"],
     },
-    checkProofsStates() {
+    getKeyset: () => ({
+      id: "00ad268c4d1f5826",
+      keys: {
+        1000: MINT_PUBLIC_KEY_HEX,
+      },
+    }),
+    checkProofsStates(proofs) {
       if (opts.states instanceof Error) return Promise.reject(opts.states);
-      return Promise.resolve(opts.states ?? [{ state: "UNSPENT" }]);
+      return Promise.resolve(
+        opts.states ?? proofs.map(() => ({ state: "UNSPENT" })),
+      );
     },
   };
   return { wallet, calls };
+}
+
+function makeMintSignedProof(
+  amount: number,
+  secret: string,
+  options?: { C?: string; includeDleq?: boolean },
+): Proof {
+  const point = hashProofSecretToCurve(secret);
+  const proof = createDLEQProof(point, hexToBytes(MINT_PRIVATE_KEY_HEX));
+  return {
+    id: "00ad268c4d1f5826",
+    amount,
+    secret,
+    C: options?.C ?? point.multiply(1n).toHex(true),
+    ...(options?.includeDleq === false ? {} : {
+      dleq: {
+        s: bytesToHex(proof.s),
+        e: bytesToHex(proof.e),
+        r: "00",
+      },
+    }),
+  };
 }
 
 /** Build a real cashuB-encoded Provider-bound HTLC token for redeem tests. */
@@ -129,6 +171,9 @@ function makeHtlcToken(
     customerPubkey?: string;
     mint?: string;
     tags?: string[][];
+    C?: string;
+    includeDleq?: boolean;
+    duplicateProof?: boolean;
   },
 ): string {
   const tags = options?.tags ?? [
@@ -145,15 +190,14 @@ function makeHtlcToken(
       tags,
     },
   ]);
-  const proof: Proof = {
-    id: "00ad268c4d1f5826",
-    amount: options?.amount ?? 1000,
+  const proof = makeMintSignedProof(
+    options?.amount ?? 1000,
     secret,
-    C: "02" + "ab".repeat(32),
-  };
+    { C: options?.C, includeDleq: options?.includeDleq },
+  );
   return getEncodedToken({
     mint: options?.mint ?? "https://mint.example.org",
-    proofs: [proof],
+    proofs: options?.duplicateProof ? [proof, proof] : [proof],
   });
 }
 
@@ -275,6 +319,24 @@ test("verifyProviderPaymentLock rejects expired locks", async () => {
   })).rejects.toThrow(CashuClientError);
 });
 
+test("verifyProviderPaymentLock rejects locks without enough remaining time", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const nearExpiryLockTime = Math.floor(Date.now() / 1000) + 5;
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, nearExpiryLockTime),
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: nearExpiryLockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
 test("verifyProviderPaymentLock rejects spent proofs before work", async () => {
   const { wallet } = makeFakeWallet({ states: [{ state: "SPENT" }] });
   const client = createCashuClient({
@@ -286,6 +348,57 @@ test("verifyProviderPaymentLock rejects spent proofs before work", async () => {
   await expect(client.verifyProviderPaymentLock({
     token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime),
     amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects forged or unverifiable proof signatures", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+  const base = {
+    amountSats: 1000,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: lockTime,
+  };
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      C: "02" + "ab".repeat(32),
+    }),
+  })).rejects.toThrow(CashuClientError);
+
+  await expect(client.verifyProviderPaymentLock({
+    ...base,
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      includeDleq: false,
+    }),
+  })).rejects.toThrow(CashuClientError);
+});
+
+test("verifyProviderPaymentLock rejects duplicate proofs before summing amount", async () => {
+  const { wallet } = makeFakeWallet({});
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  const lockTime = FUTURE_LOCKTIME();
+
+  await expect(client.verifyProviderPaymentLock({
+    token: makeHtlcToken(VALID_HASH, PROVIDER_PUBKEY, lockTime, {
+      amount: 1000,
+      duplicateProof: true,
+    }),
+    amountSats: 2000,
     hashHex: VALID_HASH,
     providerPubkey: PROVIDER_PUBKEY,
     customerPubkey: CUSTOMER_PUBKEY,

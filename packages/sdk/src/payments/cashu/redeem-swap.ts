@@ -25,7 +25,7 @@ export interface CashuRedeemWallet {
   checkProofsStates?(
     proofs: Array<Pick<Proof, "secret">>,
   ): Promise<Array<{ state: string }>>;
-  getKeyset?(): { id: string; keys: Record<number, string> };
+  getKeyset?(id?: string): { id: string; keys: Record<number, string> };
   mint?: {
     restore(payload: { outputs: SerializedBlindedMessage[] }): Promise<{
       outputs: SerializedBlindedMessage[];

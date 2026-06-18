@@ -18,11 +18,14 @@ import {
   CheckStateEnum,
   getDecodedToken,
   getEncodedToken,
+  hashToCurve,
   Mint,
   type P2PKOptions,
+  pointFromHex,
   type Proof,
   type RequestFn,
   signP2PKProofs,
+  verifyDLEQProof,
   verifyHTLCHash,
   Wallet,
 } from "@cashu/cashu-ts";
@@ -129,6 +132,8 @@ export class CashuClientError extends Error {
   }
 }
 
+const MIN_PROVIDER_PAYMENT_LOCK_REMAINING_SECONDS = 10 * 60;
+
 /**
  * Validates that a hex hash is the right shape for a Cashu HTLC.
  * Returns the lowercased hash on success; throws on failure.
@@ -173,6 +178,25 @@ function bytesToHexLocal(bytes: Uint8Array): string {
     s += bytes[i].toString(16).padStart(2, "0");
   }
   return s;
+}
+
+function hexToBytesLocal(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
+    throw new CashuClientError(`Invalid hex string: ${hex}`);
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+function hashProofSecretToCurve(
+  secret: string,
+): ReturnType<typeof hashToCurve> {
+  return Reflect.apply(hashToCurve, undefined, [secret]) as ReturnType<
+    typeof hashToCurve
+  >;
 }
 
 function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
@@ -226,6 +250,31 @@ function rejectUnsupportedExtraSignatures(tags: unknown): void {
   }
 }
 
+function validateMinimumProviderLocktime(
+  locktimeSeconds: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): void {
+  validateLocktime(locktimeSeconds, nowSeconds);
+  const remainingSeconds = locktimeSeconds - nowSeconds;
+  if (remainingSeconds < MIN_PROVIDER_PAYMENT_LOCK_REMAINING_SECONDS) {
+    throw new CashuClientError(
+      `verifyProviderPaymentLock: token locktime has only ${remainingSeconds}s remaining`,
+    );
+  }
+}
+
+function rejectDuplicateProofs(proofs: Proof[]): void {
+  const seenSecrets = new Set<string>();
+  for (const proof of proofs) {
+    if (seenSecrets.has(proof.secret)) {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: token contains duplicate proofs",
+      );
+    }
+    seenSecrets.add(proof.secret);
+  }
+}
+
 function validateProviderPaymentLockProofs(
   proofs: Proof[],
   params: VerifyProviderPaymentLockParams,
@@ -236,7 +285,8 @@ function validateProviderPaymentLockProofs(
     );
   }
   const expectedHash = validateHashHex(params.hashHex);
-  validateLocktime(params.locktimeSeconds);
+  validateMinimumProviderLocktime(params.locktimeSeconds);
+  rejectDuplicateProofs(proofs);
   const amountSats = sumAmounts(proofs);
   if (amountSats !== params.amountSats) {
     throw new CashuClientError(
@@ -323,6 +373,12 @@ async function requireProofsUnspent(
     );
   }
 
+  if (states.length !== proofs.length) {
+    throw new CashuMintError(
+      "verifyProviderPaymentLock: proof state check returned an unexpected count",
+    );
+  }
+
   const invalid = states.find((state) =>
     state.state !== CheckStateEnum.UNSPENT
   );
@@ -330,6 +386,66 @@ async function requireProofsUnspent(
     throw new CashuClientError(
       `verifyProviderPaymentLock: proof state is ${invalid.state}`,
     );
+  }
+}
+
+function decodeProofDleq(proof: Proof): { s: Uint8Array; e: Uint8Array } {
+  const dleq = proof.dleq;
+  if (typeof dleq !== "object" || dleq === null) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof is missing DLEQ proof",
+    );
+  }
+  const serialized = dleq as { s?: unknown; e?: unknown };
+  if (typeof serialized.s !== "string" || typeof serialized.e !== "string") {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: proof has malformed DLEQ proof",
+    );
+  }
+  return {
+    s: hexToBytesLocal(serialized.s),
+    e: hexToBytesLocal(serialized.e),
+  };
+}
+
+function requireMintSignatureProofs(
+  wallet: CashuWalletAdapter,
+  proofs: Proof[],
+): void {
+  const getKeyset = wallet.getKeyset;
+  if (getKeyset === undefined) {
+    throw new CashuClientError(
+      "verifyProviderPaymentLock: mint keyset lookup unavailable",
+    );
+  }
+
+  for (const proof of proofs) {
+    const keyset = getKeyset(proof.id);
+    const amountPublicKey = keyset.keys[proof.amount];
+    if (typeof amountPublicKey !== "string") {
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: mint key for proof amount unavailable",
+      );
+    }
+
+    try {
+      const isValid = verifyDLEQProof(
+        decodeProofDleq(proof),
+        hashProofSecretToCurve(proof.secret),
+        pointFromHex(proof.C),
+        pointFromHex(amountPublicKey),
+      );
+      if (!isValid) {
+        throw new CashuClientError(
+          "verifyProviderPaymentLock: proof signature is invalid",
+        );
+      }
+    } catch (err) {
+      if (err instanceof CashuClientError) throw err;
+      throw new CashuClientError(
+        "verifyProviderPaymentLock: proof signature verification failed",
+      );
+    }
   }
 }
 
@@ -525,6 +641,7 @@ export function createCashuClient(options: CashuClientOptions): CashuClient {
         decoded.proofs,
         params,
       );
+      requireMintSignatureProofs(wallet, decoded.proofs);
       await requireProofsUnspent(wallet, decoded.proofs);
       return {
         proofs: decoded.proofs as CashuProof[],

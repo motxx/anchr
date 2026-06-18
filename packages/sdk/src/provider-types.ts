@@ -4,6 +4,7 @@ import type {
   CashuClient,
   RelayClient,
 } from "./adapters/types.ts";
+import type { OracleClient } from "./oracle.ts";
 import type { Spec } from "@anchr/protocol/types";
 import type {
   ProofGenerator,
@@ -67,6 +68,8 @@ export interface ProviderOptions {
   cashuClient: CashuClient;
   /** Transport adapter. The bundled Nostr relay adapter is one implementation. */
   relayClient: RelayClient;
+  /** Optional hash-bootstrap clients keyed by Oracle pubkey. Defaults to relay-DM bootstrap. */
+  oracleClients?: Record<string, OracleClient>;
   /** Optional local state adapter for browser, Node, Deno, or test persistence. */
   stateStore?: ActorStateStore;
   /** Optional schema-specific configuration keyed by schema URI. */
