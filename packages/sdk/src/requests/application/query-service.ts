@@ -26,12 +26,10 @@ import {
 } from "./escrow-flow-methods.ts";
 import type { ServiceDeps } from "./query-service-deps.ts";
 import type { BlossomKeyMap, VerificationFactor } from "../../values.ts";
-import type { VerificationDetail } from "../../proofs/mod.ts";
 import type {
   CustomerMeta,
   EscrowInfo,
   EscrowSubmitOutcome,
-  ExecutorType,
   OfferInfo,
   PaymentLockInfo,
   Query,
@@ -54,9 +52,6 @@ export type {
   QueryResult,
   QueryStatus,
 } from "../domain/types.ts";
-export type QueryVerification = VerificationDetail;
-export type QueryExecutorType = ExecutorType;
-export type QuerySubmissionMeta = SubmissionMeta;
 
 export interface CreateQueryOptions {
   ttlMs?: number;

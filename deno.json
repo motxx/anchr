@@ -13,12 +13,9 @@
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4",
-    "hono/cors": "jsr:@hono/hono@^4/cors",
-    "hono/deno": "jsr:@hono/hono@^4/deno",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
-    "@std/testing/mock": "jsr:@std/testing@^1/mock",
     "@std/expect": "jsr:@std/expect@^1",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
     "nostr-tools": "npm:nostr-tools@^2",
@@ -51,9 +48,7 @@
     "@anchr/sdk/oracle": "./packages/sdk/src/oracle.ts",
     "@anchr/sdk/testing": "./packages/sdk/src/testing/mod.ts",
     "@logtape/logtape": "jsr:@logtape/logtape@^2",
-    "puppeteer": "npm:puppeteer@^24",
-    "playwright": "npm:playwright@^1.58",
-    "anchr-sdk": "./packages/sdk/src/index.ts"
+    "puppeteer": "npm:puppeteer@^24"
   },
   "unstable": ["sloppy-imports", "detect-cjs"],
   "tasks": {
@@ -93,6 +88,7 @@
     "setup:hooks": "git config core.hooksPath scripts/git-hooks && echo '✓ git hooks installed (core.hooksPath → scripts/git-hooks)'"
   },
   "exclude": [
+    ".worktrees/",
     "node_modules",
     "dist/",
     "packages/sdk/dist/"
