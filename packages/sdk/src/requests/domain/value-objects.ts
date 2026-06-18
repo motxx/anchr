@@ -1,7 +1,7 @@
 import type { OfferInfo, PaymentLockInfo, QueryInput } from "./types.ts";
 import { isSchemaUri } from "../../schema.ts";
 
-/** Minimum locktime in seconds (10 minutes). Applies to all Payment Lock variants. */
+/** Minimum escrow locktime in seconds (10 minutes). */
 export const MIN_ESCROW_LOCKTIME_SECS = 600;
 
 /** Validate payment_lock info. Returns error string or null if valid. */
