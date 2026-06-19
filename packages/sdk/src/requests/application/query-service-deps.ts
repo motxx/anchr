@@ -10,7 +10,7 @@ import type {
   OracleResolver,
 } from "./query-verification.ts";
 import type { QueryResult } from "../domain/types.ts";
-import type { CreateQueryOptions } from "./query-service.ts";
+import type { CreateQueryOptions } from "./query-service-types.ts";
 
 export interface ServiceDeps {
   store: QueryStore;
