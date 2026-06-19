@@ -3,7 +3,10 @@
  * evaluate its requirement and evidence payloads.
  */
 
-import type { SchemaOptions, SchemaOptionsMap } from "../../../schema.ts";
+import type {
+  SchemaOptions,
+  SchemaOptionsMap,
+} from "../../../schema-options.ts";
 import type { BlossomKeyMap } from "../../../values.ts";
 import type {
   VerificationInput,

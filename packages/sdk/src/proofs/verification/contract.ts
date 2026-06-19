@@ -9,7 +9,7 @@
  */
 
 import type { AttachmentRef, VerificationFactor } from "../../values.ts";
-import type { SchemaUri } from "../../schema.ts";
+import type { SchemaUri } from "@anchr/protocol/schema";
 
 /**
  * Query-independent verification policy. NIP-90 adapters derive this from a
