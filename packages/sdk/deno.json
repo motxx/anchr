@@ -53,6 +53,7 @@
       "src/relay-wait.ts",
       "src/identity.ts",
       "src/schema.ts",
+      "src/schema-options.ts",
       "src/values.ts",
       "src/customer.ts",
       "src/customer-types.ts",

@@ -1,4 +1,5 @@
 import type { SchemaUri } from "@anchr/protocol/schema";
+import type { SchemaOptions } from "./schema-options.ts";
 import type {
   FactorCheck,
   VerifyProofOptions,
@@ -11,14 +12,12 @@ export {
   type SchemaUri,
   UnknownSchemaError,
 } from "@anchr/protocol/schema";
+export type { SchemaOptions, SchemaOptionsMap } from "./schema-options.ts";
 
 export type SchemaProducer = (
   predicate: unknown,
   context: SchemaProducerContext,
 ) => Promise<{ data: unknown; proof: Uint8Array | string }>;
-
-export type SchemaOptions = unknown;
-export type SchemaOptionsMap = Readonly<Record<SchemaUri, SchemaOptions>>;
 
 export interface SchemaProducerContext {
   customerPubkey: string;
