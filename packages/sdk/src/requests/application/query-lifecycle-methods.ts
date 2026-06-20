@@ -13,7 +13,7 @@ import type {
   CreateQueryOptions,
   QueryHooks,
   SubmitQueryOutcome,
-} from "./query-service.ts";
+} from "./query-service-types.ts";
 import {
   identityNormalize,
   resolveTtlMs,

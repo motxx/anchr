@@ -25,7 +25,7 @@ import type {
   OfferInfo,
   QueryResult,
 } from "../domain/types.ts";
-import type { HtlcOutcome } from "./query-service.ts";
+import type { HtlcOutcome } from "./query-service-types.ts";
 import { identityNormalize, ServiceDeps } from "./query-service-deps.ts";
 import {
   tryRevealPreimage,
