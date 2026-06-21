@@ -179,3 +179,7 @@ export {
   validateHashHex,
   validateLocktime,
 } from "./adapters/cashu.ts";
+export {
+  type BrowserCashuClientOptions,
+  createBrowserCashuClient,
+} from "./adapters/cashu-browser.ts";

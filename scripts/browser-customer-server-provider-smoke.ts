@@ -35,6 +35,10 @@ interface SmokeData {
 const ROOT = new URL("../", import.meta.url);
 const EXAMPLE = new URL("examples/browser-customer-server-provider/", ROOT);
 const BUNDLE = new URL("dist/app.js", EXAMPLE);
+const CUSTOMER_RESULT_TIMEOUT_MS = 120_000;
+const SERVER_SETTLEMENT_TIMEOUT_MS = 120_000;
+const SMOKE_STATUS_TIMEOUT_MS = CUSTOMER_RESULT_TIMEOUT_MS +
+  SERVER_SETTLEMENT_TIMEOUT_MS + 30_000;
 
 async function main(): Promise<void> {
   await assertBrowserSourceIsPortable();
@@ -66,7 +70,7 @@ async function main(): Promise<void> {
         const status = document.documentElement.dataset.anchrStatus;
         return status === "pass" || status === "fail";
       },
-      { timeout: 180_000 },
+      { timeout: SMOKE_STATUS_TIMEOUT_MS },
     );
     const resultText = await page.$eval(
       "[data-result]",

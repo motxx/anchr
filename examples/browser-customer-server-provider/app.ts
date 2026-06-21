@@ -1,18 +1,11 @@
 import type {
-  CashuClient,
   CashuProof,
   PublishResult,
   RelayClient,
 } from "@anchr/sdk/adapters";
+import { createBrowserCashuClient } from "@anchr/sdk/adapters/cashu-browser";
 import { createCustomer } from "@anchr/sdk/customer";
 import { ProofSchema } from "@anchr/sdk/schema";
-import {
-  getEncodedToken,
-  P2PKBuilder,
-  type P2PKOptions,
-  type Proof,
-  Wallet,
-} from "@cashu/cashu-ts";
 
 interface ExampleConfig {
   relay_url: string;
@@ -74,7 +67,7 @@ async function runExample(): Promise<BrowserServerProviderResult> {
   const baseUrl = new URL("/", location.href);
   const config = await getJson<ExampleConfig>(new URL("config", baseUrl));
   const relayClient = createHttpRelayClient(baseUrl);
-  const cashuClient = createBrowserCashuClient(config.mint_url);
+  const cashuClient = createBrowserCashuClient({ mintUrl: config.mint_url });
   const funding = await getJson<FundingResponse>(
     new URL(`funding-proofs?amount=${config.funding_amount_sats}`, baseUrl),
   );
@@ -172,130 +165,6 @@ function decodedBase64ByteLength(value: string): number {
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
   return atob(padded).length;
-}
-
-function createBrowserCashuClient(mintUrl: string): CashuClient {
-  let walletPromise: Promise<Wallet> | null = null;
-  async function wallet(): Promise<Wallet> {
-    walletPromise ??= (async () => {
-      const value = new Wallet(mintUrl, { unit: "sat" });
-      await value.loadMint();
-      return value;
-    })();
-    return await walletPromise;
-  }
-
-  return {
-    mintUrl,
-    async bindProvider(params) {
-      validateHashHex(params.hashHex);
-      validateLocktime(params.locktimeSeconds);
-      const inputProofs = assertProofs(params.fundingProofs);
-      const value = await wallet();
-      const fee = value.getFeesForProofs(inputProofs);
-      const total = sumAmounts(inputProofs);
-      if (total < params.amountSats + fee) {
-        throw new Error(
-          `funding proofs hold ${total} sats, below ${params.amountSats}+${fee}`,
-        );
-      }
-
-      const options = buildHtlcFinalOptions({
-        hash: params.hashHex,
-        providerPubkey: params.providerPubkey,
-        customerRefundPubkey: params.customerPubkey,
-        locktimeSeconds: params.locktimeSeconds,
-      });
-      let chain = value.ops
-        .send(params.amountSats, inputProofs)
-        .privkey(bytesToHex(params.customerSecretKey))
-        .asP2PK(options);
-      if (chain.includeFees !== undefined) {
-        chain = chain.includeFees(true);
-      } else if (fee > 0) {
-        throw new Error("Cashu wallet cannot include receiver fees");
-      }
-
-      const result = await chain.run();
-      const send = result.send;
-      const keep = result.keep ?? [];
-      return {
-        token: getEncodedToken({ mint: mintUrl, proofs: send }, {
-          version: 4,
-        }),
-        amountSats: sumAmounts(send) - value.getFeesForProofs(send),
-        proofs: send,
-        changeProofs: keep,
-      };
-    },
-    verifyProviderPaymentLock() {
-      throw new Error("browser Customer does not verify provider locks");
-    },
-    redeemHtlc() {
-      throw new Error("browser Customer does not redeem provider HTLCs");
-    },
-  };
-}
-
-function buildHtlcFinalOptions(params: {
-  hash: string;
-  providerPubkey: string;
-  customerRefundPubkey: string;
-  locktimeSeconds: number;
-}): P2PKOptions {
-  return new P2PKBuilder()
-    .addHashlock(params.hash)
-    .addLockPubkey(params.providerPubkey)
-    .requireLockSignatures(1)
-    .lockUntil(params.locktimeSeconds)
-    .addRefundPubkey(params.customerRefundPubkey)
-    .requireRefundSignatures(1)
-    .sigAll()
-    .toOptions();
-}
-
-function assertProofs(proofs: CashuProof[]): Proof[] {
-  if (!Array.isArray(proofs) || proofs.length === 0) {
-    throw new Error("funding proofs are empty");
-  }
-  for (const proof of proofs) {
-    if (!isProof(proof)) throw new Error("funding proof is malformed");
-  }
-  return proofs as Proof[];
-}
-
-function isProof(value: unknown): value is Proof {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.id === "string" &&
-    typeof record.amount === "number" &&
-    typeof record.secret === "string" &&
-    typeof record.C === "string";
-}
-
-function validateHashHex(hash: string): void {
-  if (!/^[0-9a-fA-F]{64}$/.test(hash)) {
-    throw new Error(`invalid HTLC hash: ${hash}`);
-  }
-}
-
-function validateLocktime(locktimeSeconds: number): void {
-  if (!Number.isInteger(locktimeSeconds)) {
-    throw new Error("locktime must be an integer");
-  }
-  if (locktimeSeconds <= Math.floor(Date.now() / 1000)) {
-    throw new Error("locktime must be in the future");
-  }
-}
-
-function sumAmounts(proofs: Proof[]): number {
-  return proofs.reduce((sum, proof) => sum + proof.amount, 0);
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
-    "",
-  );
 }
 
 async function waitForServerSettlement(

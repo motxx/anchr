@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./adapters": "./src/adapters/mod.ts",
+    "./adapters/cashu-browser": "./src/adapters/cashu-browser.ts",
     "./adapters/cashu": "./src/adapters/cashu.ts",
     "./adapters/nostr": "./src/adapters/nostr/mod.ts",
     "./adapters/oracle-client": "./src/adapters/oracle-client/index.ts",
