@@ -128,6 +128,58 @@ describe("verifyAndDeliver", () => {
     expect(await store.has(hash)).toBe(false);
   });
 
+  test("four-argument signature derives request event id from watched requests", async () => {
+    const store = createPreimageStore();
+    const relay = makeCapturingRelay();
+    const published = relay.published;
+    const config = makeConfig({
+      preimageStore: store,
+      relayClient: relay.client,
+      verify: verifyPass,
+    });
+    const service = createOracleNostrService(config);
+    const { hash } = await service.generateRequestHash("q-four-arg");
+    const query = makeQuery({
+      id: "q-four-arg",
+      status: "processing",
+      payment_status: "escrow_swapped",
+    });
+    service.watchRequest(query, "request-event-four-arg", "customer-pubkey");
+
+    const passed = await service.verifyAndDeliver(
+      "q-four-arg",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    );
+
+    expect(passed).toBe(true);
+    expect(published.length).toBe(1);
+    const dm = parseOracleDM(
+      published[0]!.content,
+      providerIdentity.secretKey,
+      config.identity.publicKey,
+    );
+    expect(dm?.type).toBe("preimage");
+    if (dm?.type !== "preimage") throw new Error("unreachable");
+    expect(dm.request_event_id).toBe("request-event-four-arg");
+    expect(await store.has(hash)).toBe(false);
+  });
+
+  test("four-argument signature rejects unwatched requests", async () => {
+    const service = createOracleNostrService(
+      makeConfig({ verify: verifyPass }),
+    );
+    const query = makeQuery({ id: "q-unwatched" });
+
+    await expect(service.verifyAndDeliver(
+      "q-unwatched",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    )).rejects.toThrow("requires watchRequest");
+  });
+
   test("returns false and retains preimage when delivery fails", async () => {
     const store = createPreimageStore();
     const failingRelay = makeCapturingRelay(() => ({

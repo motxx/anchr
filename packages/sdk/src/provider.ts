@@ -527,12 +527,14 @@ function waitForPreimage(
         ctx.identity.secretKey,
         oraclePubkey,
       );
-      if (
-        parsed !== null &&
-        parsed.query_id === queryId &&
-        parsed.request_event_id === requestEventId
-      ) {
-        return parsed.preimage;
+      if (parsed !== null) {
+        if (
+          parsed.query_id === queryId &&
+          parsed.request_event_id === requestEventId
+        ) {
+          return parsed.preimage;
+        }
+        return null;
       }
 
       const oracleDm = parseOracleDM(

@@ -109,7 +109,18 @@ export interface OracleNostrService {
   ): void;
   /** Record the selected Provider pubkey for a request. */
   recordSelectedProvider(requestId: string, providerPubkey: string): void;
-  /** Verify a result and deliver preimage or rejection. */
+  /**
+   * Verify a result and deliver preimage or rejection. The five-argument form
+   * binds delivery to the request event id explicitly. The four-argument form
+   * is kept for callers that already registered the request with
+   * `watchRequest()`, deriving the request event id from that watched entry.
+   */
+  verifyAndDeliver(
+    queryId: string,
+    request: VerifiableRequest,
+    result: RequestSubmissionResult,
+    providerPubkey: string,
+  ): Promise<boolean>;
   verifyAndDeliver(
     queryId: string,
     requestEventId: string,
@@ -136,6 +147,22 @@ export interface OracleNostrService {
 interface DeliveryOutcome {
   passed: boolean;
   terminal: boolean;
+}
+
+function isVerifiableRequest(value: unknown): value is VerifiableRequest {
+  return typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string";
+}
+
+function isRequestSubmissionResult(
+  value: unknown,
+): value is RequestSubmissionResult {
+  return typeof value === "object" &&
+    value !== null &&
+    "attachments" in value &&
+    Array.isArray(value.attachments);
 }
 
 export function createOracleNostrService(
@@ -401,6 +428,94 @@ export function createOracleNostrService(
     );
   }
 
+  interface VerifyAndDeliverArgs {
+    requestEventId: string;
+    query: VerifiableRequest;
+    result: RequestSubmissionResult;
+    providerPubkey: string;
+  }
+
+  function normalizeVerifyAndDeliverArgs(
+    queryId: string,
+    requestEventIdOrQuery: string | VerifiableRequest,
+    queryOrResult: VerifiableRequest | RequestSubmissionResult,
+    resultOrProviderPubkey: RequestSubmissionResult | string,
+    providerPubkey?: string,
+  ): VerifyAndDeliverArgs {
+    if (typeof requestEventIdOrQuery === "string") {
+      if (
+        !isVerifiableRequest(queryOrResult) ||
+        !isRequestSubmissionResult(resultOrProviderPubkey) ||
+        typeof providerPubkey !== "string"
+      ) {
+        throw new TypeError("invalid verifyAndDeliver arguments");
+      }
+      return {
+        requestEventId: requestEventIdOrQuery,
+        query: queryOrResult,
+        result: resultOrProviderPubkey,
+        providerPubkey,
+      };
+    }
+
+    if (
+      !isRequestSubmissionResult(queryOrResult) ||
+      typeof resultOrProviderPubkey !== "string"
+    ) {
+      throw new TypeError("invalid verifyAndDeliver arguments");
+    }
+    const entry = watched.get(queryId);
+    if (entry === undefined) {
+      throw new Error(
+        `verifyAndDeliver four-argument signature requires watchRequest() for ${queryId}`,
+      );
+    }
+    return {
+      requestEventId: entry.queryEventId,
+      query: requestEventIdOrQuery,
+      result: queryOrResult,
+      providerPubkey: resultOrProviderPubkey,
+    };
+  }
+
+  async function verifyAndDeliver(
+    queryId: string,
+    request: VerifiableRequest,
+    result: RequestSubmissionResult,
+    providerPubkey: string,
+  ): Promise<boolean>;
+  async function verifyAndDeliver(
+    queryId: string,
+    requestEventId: string,
+    query: VerifiableRequest,
+    result: RequestSubmissionResult,
+    providerPubkey: string,
+  ): Promise<boolean>;
+  async function verifyAndDeliver(
+    queryId: string,
+    requestEventIdOrQuery: string | VerifiableRequest,
+    queryOrResult: VerifiableRequest | RequestSubmissionResult,
+    resultOrProviderPubkey: RequestSubmissionResult | string,
+    providerPubkey?: string,
+  ): Promise<boolean> {
+    const args = normalizeVerifyAndDeliverArgs(
+      queryId,
+      requestEventIdOrQuery,
+      queryOrResult,
+      resultOrProviderPubkey,
+      providerPubkey,
+    );
+    const outcome = await dispatchVerifyAndDeliver(
+      queryId,
+      args.query,
+      args.requestEventId,
+      args.result,
+      args.providerPubkey,
+    );
+    if (outcome.terminal) unwatchRequest(queryId);
+    return outcome.passed;
+  }
+
   function unwatchRequest(queryId: string): void {
     const entry = watched.get(queryId);
     if (!entry) return;
@@ -456,23 +571,7 @@ export function createOracleNostrService(
       }
     },
 
-    async verifyAndDeliver(
-      queryId: string,
-      requestEventId: string,
-      query: VerifiableRequest,
-      result: RequestSubmissionResult,
-      providerPubkey: string,
-    ): Promise<boolean> {
-      const outcome = await dispatchVerifyAndDeliver(
-        queryId,
-        query,
-        requestEventId,
-        result,
-        providerPubkey,
-      );
-      if (outcome.terminal) unwatchRequest(queryId);
-      return outcome.passed;
-    },
+    verifyAndDeliver,
 
     async verifyAndDeliverWithFrost(
       queryId: string,
