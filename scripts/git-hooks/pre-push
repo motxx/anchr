@@ -3,15 +3,12 @@
 # Enable with: deno task setup:hooks
 # (which runs `git config core.hooksPath scripts/git-hooks`)
 #
-# Runs the full test gauntlet — lint:strict + unit + protocol + frost +
-# integration + example + pentest, plus the Docker-backed e2e (relay +
-# Blossom + Postgres + regtest Cashu/Lightning). Mirrors the entire CI
-# pipeline; a green run here implies a green CI.
+# Runs the local, non-Docker test gauntlet — lint:strict + lint:deps
+# (cargo audit) + unit + integration + protocol + frost + scripts +
+# examples + Rust crate gate. Docker-backed e2e remains in CI by default; run
+# `deno task test:all:docker` explicitly when you need it locally.
 #
-# Requires Docker to be running. The script starts and tears down its
-# own service containers; it will not contaminate other compose stacks.
-#
-# Iteration-window bypass: if test:all:full passed within the last 2
+# Iteration-window bypass: if test:all passed within the last 2
 # hours (marker at $HOME/.claude/.anchr-test-all-last-pass), the push
 # proceeds without re-running. Override with `RUN_TESTS=1 git push`.
 # Non-code bypass: if the pushed refs contain no implementation, test,
@@ -78,7 +75,7 @@ has_impl_or_test_changes() {
 }
 
 if [ "${RUN_TESTS:-}" = "1" ]; then
-  echo "RUN_TESTS=1 → forcing full test gauntlet."
+  echo "RUN_TESTS=1 → forcing local test gauntlet."
 elif ! has_impl_or_test_changes; then
   echo "✓ no implementation or test changes in this push — bypassing test gauntlet."
   exit 0
@@ -88,13 +85,13 @@ elif [ -f "$MARKER" ]; then
   AGE=$((NOW - LAST))
   if [ "$AGE" -lt "$WINDOW" ]; then
     REMAINING=$(((WINDOW - AGE) / 60 + 1))
-    echo "✓ test:all:full passed $((AGE / 60))m ago — bypass valid ~${REMAINING}m more."
+    echo "✓ test:all passed $((AGE / 60))m ago — bypass valid ~${REMAINING}m more."
     echo "  (Override with RUN_TESTS=1 git push, or wait for the marker to expire.)"
     exit 0
   fi
 fi
 
-deno task test:all:full
+deno task test:all
 mkdir -p "$(dirname "$MARKER")"
 date +%s > "$MARKER"
 echo "✓ test-all marker written — pushes within 2h will bypass the gauntlet."

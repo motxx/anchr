@@ -54,15 +54,19 @@ become second owners for existing behavior. Offer a smaller composition of
 single-purpose parts instead.
 
 ## Verification bar
-"Done" = full local pass:
-- `deno task test:all` — lint:strict + cargo dep audit + test:unit +
+"Done" = local pass plus CI Docker coverage:
+- `deno task test:all` — lint:strict + lint:deps (cargo audit) + test:unit +
   test:integration + test:e2e:protocol + test:scripts + test:examples +
   Rust crate gate (clippy + cargo test, all four crates) +
   frost-signer build + test:e2e:frost. Needs the Rust toolchain.
 - `deno task test:all:docker` — Docker-backed e2e
-  (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn)
-- `deno task test:all:full` — both; the pre-push hook runs this with a
-  2-hour pass marker (`RUN_TESTS=1 git push` forces a re-run)
+  (test:e2e:relay + test:e2e:regtest + test:e2e:tlsn). CI runs this on
+  pull requests and main pushes; run it locally when changing Docker-backed
+  e2e, compose infrastructure, or release-critical payment/proof paths.
+- `deno task test:all:full` — both local and Docker-backed suites in one run.
+- The pre-push hook runs `deno task test:all` with a 2-hour pass marker
+  (`RUN_TESTS=1 git push` forces a local re-run). Docker-backed e2e is CI-only
+  by default; run `deno task test:all:docker` explicitly when needed locally.
 
 Use `docs/review-harness.md` to route recurring review findings to automated
 checks, semantic skills, universal docs, or follow-up issues.
